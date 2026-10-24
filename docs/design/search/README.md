@@ -25,7 +25,7 @@ How we got here: a map of today's search (below), web research on what people li
 - A new place, `search`. Each Search tab is its own session, with its own query, selection and scroll, so two searches can sit side by side.
 - **Opening it.** ⌘⇧F opens Search in the current tab, or focuses the field when a Search tab is active. The sidebar's magnifier opens it too. In a topic, ⌘F opens Search scoped to that topic: a thread searches that thread, a Main searches its channel or DM. The scope is a chip ("in: Acme MSA renewal terms") that Backspace removes to widen the search. From ⌘K's Messages tab, a footer row "All results for "…" ⌘⇧F" carries the text and filters over.
 - ⌘K stays for fast navigation, and always searches everything. Its tabs are **All**, **Conversations** and **Messages**, and it opens on All. The tabs sit in their own row under the field, not beside it, so the field keeps the full width.
-  - **All** mixes the best of each kind in fixed groups: Conversations (up to 4), then Topics and messages (up to 5), then Pages, settings and commands (up to 3). Each group's heading has "⌘2" or "⌘3" to jump to its tab. Rows stay where they are as you type; a group only fills in below what is shown.
+  - **All** mixes the best of each kind in fixed groups: Conversations (up to 4), then Topics and messages (up to 5), then Pages, settings and commands (up to 3). The Conversations and Topics and messages headings show "⌘2" and "⌘3" for their tabs; the commands group has no tab and no hint. All may be taller than the other tabs, so its list cap is raised to fit the three groups. Rows stay where they are as you type; a group only fills in below what is shown.
   - **Conversations** is today's Conversations tab. **Messages** is the quick message list.
   - Messages come from this Mac only, with no Slack call, so ⌘K never waits. The same hiding rules apply.
   - The last row on All and Messages is "All results for "…"" with ⌘⇧F. It opens the Search tab with the text and filters.
@@ -38,10 +38,11 @@ How we got here: a map of today's search (below), web research on what people li
 - **Results column** 384 px wide, resizable from 312 to 480, like the sidebar. The **reader** takes the rest.
 - Up and Down move through the results, and the reader follows at once (it reads from the local store, within the 50 ms cached topic budget). Moving the selection never opens a tab or adds a history entry.
 - **Enter** opens the topic at the message in the current tab, with Back returning to the search exactly as it was. **⌘Enter** or ⌘-click opens it in a new tab in the background, and focus stays in the list, so you can open several in a row.
-- **The reader is the topic itself**, with its composer, reactions and message menus, scrolled to the match with the matched words marked. You can reply without leaving the search. Its header has the title, the place, **Open in new tab** and the topic's ⋯ menu. When a thread has several matches, "2 of 5" with up and down arrows (⌘↑ ⌘↓) step between them.
+- **The reader is the topic itself**, with its composer, reactions and message menus, scrolled to the match with the matched words marked. You can reply without leaving the search. Its header has the title, the place, **Open in new tab** and the topic's ⋯ menu. When a thread has several matches, "2 of 5" with up and down arrows (⌘↑ ⌘↓) step between them, counted in the thread's reading order (oldest first), whatever the list's sort.
 - **Reading marks read only when you act.** Arrowing past a result marks nothing read, as a peek. Clicking or typing in the reader, reacting, sending, or opening the topic marks it read, as opening it does today.
 - Tab moves focus from the list into the reader's composer; Esc in an empty composer goes back to the list.
 - Narrower than 312 + 480 px: one column. Enter shows the reader with "Back to results"; Esc does the same.
+- At the smallest widths the filter row wraps its two toggles to a second line, and under 480 px the reader's header keeps Back, the place icon, the title, the match arrows and ⋯; Open in new tab, Resolve and Juno move into ⋯.
 - The sidebar's magnifier shows the current state while a Search tab is active, as Home and All topics do.
 
 ### 3. Rows grouped by thread
@@ -57,7 +58,7 @@ How we got here: a map of today's search (below), web research on what people li
 - One `SearchQuery` object, shared by the Search tab, ⌘K and the Juno agent's search tool. One parser, and two compilers: to SQL for the local index, and to Slack's modifier syntax.
 - Operators: `from:`, `in:`, `with:`, `before:`, `after:`, `on:`, `during:`, `has:` (link, file, reaction, pin), `is:thread`, quoted phrases, `-` to exclude, `word*`. Juno adds `is:resolved`, `is:unresolved`, `is:pinned` and `in:` a sidebar view (v2), which Slack has no idea of.
 - Typing `from:` or `in:` opens a picker, searched as ⌘K's Conversations tab is. The pick becomes a chip in the field. Clicking a chip edits it; Backspace at its edge removes it. Dates offer Today, Yesterday, This week, Last week, This month and a date.
-- Under the field, a quiet row of filter buttons for the mouse: **From**, **In**, **Date**, **Has**, then **Apps** (see 6) and the sort.
+- Under the field, a quiet row of filter buttons for the mouse: **From**, **In**, **Date**, **Has**, then the sort, and at the end the **Apps hidden** and **Automated hidden** toggles (see 6).
 - An operator that can't be answered locally (`with:`, `is:saved`) searches Slack only and says so, rather than show wrong local rows.
 
 ### 5. Instant first, then complete, without rows jumping
@@ -73,14 +74,14 @@ How we got here: a map of today's search (below), web research on what people li
 - Two toggles at the end of the filter row, each remembered: **Apps hidden** (messages from apps and bots) and **Automated hidden** (the conversations in the Automated view, SPEC 5). One click shows them; the label then reads **Apps shown** or **Automated shown**. Nothing is hidden without a visible toggle saying so.
 - Apps maps to `search_exclude_bots` on Slack and the bot flag locally, once a live check shows both agree.
 - Automated is Juno's own list, so Slack can't filter it: Slack's rows from those conversations are dropped after they arrive, and paging asks for more when a page thins out. Locally it is a `NOT IN` on the channel.
-- When a search finds nothing but hidden rows would match, the empty state says so: "Nothing in your other conversations. 4 matches from apps and automated channels." with **Show them**.
+- When a search finds nothing but hidden rows would match, the empty state says so: "4 matches, all from apps and automated channels." with **Show 4 matches**.
 - An `in:` chip naming an automated channel searches it whatever the toggle says.
 
 ### 7. AI, quietly
 
 Each of these never delays a result, never applies itself, and is gone when AI assist is off.
 
-- **Words to filters.** "maya's messages about the vendor contract last week" searches the plain words at once. After a pause, one line appears under the field: "from: Maya Chen · Last week · vendor contract", with Tab to apply. It uses the existing command parse task (decision tier, cached by text), and only runs when the text names a person, a channel or a time.
+- **Words to filters.** "maya's messages about the vendor contract last week" searches the plain words at once. After a pause, the suggestion appears inside the field at its right end: "from: Maya Chen · Last week · vendor contract", with Tab to apply. It sits in the field so its arrival moves nothing below; when the text is too long to leave room, it is left out. It uses the existing command parse task (decision tier, cached by text), and only runs when the text names a person, a channel or a time.
 - **Answer from results.** When the query reads like a question ("when did we move the cutover?"), the empty reader shows one button, **Answer from results**. The answer appears in the reader, at most a few sentences, each claim followed by a small number; the cited rows carry the same number, and a number selects its row. It reads the matched threads, not just snippets, and says "No answer in these results" rather than guess. It never appears on its own.
 - **Summarize** in the reader header for long threads (over about 20 messages), on request, with citations.
 - **Matching AI titles** (section 3) is the quietest AI of all: it is already there.

@@ -9,12 +9,13 @@
 
 /* Tokens: packages/tokens/src/tokens.stylex.ts and themes.stylex.ts, Coral accent. */
 .theme-light {
+  --mark-current: color-mix(in oklch, var(--hl) 24%, var(--background));
   --background: hsla(48, 50%, 98%, 1); --background-subtle: hsla(48, 35%, 97%, 1);
   --surface-default: hsla(48, 30%, 98%, 1); --surface-hover: hsla(48, 30%, 94%, 1); --surface-raised: hsla(48, 30%, 98%, 1);
   --secondary-default: hsla(48, 30%, 92%, 1); --secondary-hover: hsla(48, 30%, 90%, 1); --secondary-active: hsla(48, 30%, 88%, 1);
   --border-subtle: hsla(48, 30%, 92%, 1); --border-default: hsla(48, 30%, 91%, 1); --border-strong: hsla(48, 30%, 88%, 1); --input-border: hsla(48, 14%, 82%, 1);
   --foreground-default: hsla(48, 15%, 12%, 1); --foreground-subtle: hsla(48, 8%, 35%, 1); --foreground-muted: hsla(48, 5%, 42%, 1);
-  --foreground-secondary: hsla(48, 8%, 28%, 1); --foreground-preview-read: #747269;
+  --foreground-secondary: hsla(48, 8%, 28%, 1); --foreground-preview-read: #747269; --foreground-muted-on-fill: hsla(48, 8%, 35%, 1);
   --hl: #CC4628; --hl-fg: #FFFFFF; --hl-text: #B4351F; --hl-soft: color-mix(in oklch, #CC4628 10%, var(--background));
   --hl-nav: color-mix(in oklch, #CC4628 9%, var(--background-subtle));
   --warning: #E0A500; --info: #008AB3;
@@ -25,12 +26,13 @@
   --sheet: #EFEDE6; --lights: #E1DFD6;
 }
 .theme-dark {
+  --mark-current: color-mix(in oklch, var(--hl) 30%, var(--background));
   --background: #1B1916; --background-subtle: #151411;
   --surface-default: #252421; --surface-hover: #2D2B28; --surface-raised: #373532;
   --secondary-default: #302F2C; --secondary-hover: #383633; --secondary-active: #403E3A;
   --border-subtle: #2B2A27; --border-default: #32302D; --border-strong: #3C3A37; --input-border: #464541;
   --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
-  --foreground-secondary: #C0BEB8; --foreground-preview-read: #95938F;
+  --foreground-secondary: #C0BEB8; --foreground-preview-read: #95938F; --foreground-muted-on-fill: #A09E9A;
   --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-soft: color-mix(in oklch, #FF8A73 14%, var(--background));
   --hl-nav: color-mix(in oklch, #FF8A73 16%, var(--background-subtle));
   --warning: #E0A500; --info: #008AB3;
@@ -136,35 +138,40 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
 .tb { font-size: 12.5px; font-weight: 500; color: var(--foreground-default); padding: 0 6px; height: 24px; border-radius: 6px; display: inline-flex; align-items: center; }
 .kbd { font: 400 10.5px/1 var(--font-mono); padding: 2px 5px 1px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; color: var(--foreground-subtle); white-space: nowrap; flex: none; }
 
-/* Search page: results column and reader. */
-.spage { flex: 1; min-height: 0; display: flex; }
-.rcol { width: 384px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--border-default); background: var(--background); position: relative; }
-.rcol.only { border-right: 0; }
-.fwrap { padding: 12px 12px 0; flex: none; }
+/* Search page: the field band across the top, then the split. */
+.spage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.stop { flex: none; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--border-default); position: relative; z-index: 4; }
+.split { flex: 1; min-height: 0; display: flex; }
+.rcol { width: 384px; flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--border-default); background: var(--background); }
+.rcol.only { width: auto; flex: 1; border-right: 0; }
 .sfield { min-height: 36px; border-radius: 9px; border: 1px solid var(--input-border); background: var(--surface-default); display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; font-size: 13.5px; }
-.sfield > svg.mg { width: 15px; height: 15px; color: var(--foreground-muted); align-self: flex-start; margin-top: 5px; }
+.sfield > svg.mg { width: 15px; height: 15px; color: var(--foreground-muted); }
 .sfield .txt { flex: 1; min-width: 0; line-height: 22px; min-height: 24px; display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; }
 .sfield .ph { color: var(--foreground-muted); }
-.sfield .clr { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--foreground-muted); align-self: flex-start; }
+.sfield .clr { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--foreground-muted); }
 .sfield .clr svg { width: 13px; height: 13px; }
 .caret { display: inline-block; width: 1.5px; height: 16px; vertical-align: -3px; background: var(--foreground-default); margin-left: 1px; }
 .qchip { height: 24px; padding: 0 8px 0 4px; border-radius: 6px; background: var(--secondary-default); display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
-.qchip .k { color: var(--foreground-muted); font-weight: 400; }
-.qchip svg { width: 13px; height: 13px; color: var(--foreground-subtle); margin-left: 2px; }
+.qchip .k { color: var(--foreground-muted-on-fill, var(--foreground-subtle)); font-weight: 400; }
 .qchip.noav { padding-left: 8px; }
+.qchip .tart { width: 16px; height: 16px; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; flex: none; }
 .av16 { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; line-height: 1; font-size: 7px; font-weight: 600; flex: none; }
-.sugg { height: 30px; margin: 6px 2px 0; padding: 0 8px; border-radius: 7px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--foreground-subtle); }
-.sugg > svg { width: 14px; height: 14px; color: var(--hl-text); }
-.sugg .q { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sugg { height: 26px; padding: 0 0 0 11px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--foreground-subtle); }
+.sugg > svg { width: 15px; height: 15px; color: var(--hl-text); }
+.sugg .q { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sugg .q .k { color: var(--foreground-muted); }
 .sugg .q b { font-weight: 500; color: var(--foreground-default); }
-.frow { display: flex; align-items: center; gap: 0; padding: 8px 8px 6px; flex: none; }
-.fb { height: 26px; padding: 0 5px 0 7px; border-radius: 7px; display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); white-space: nowrap; }
+.frow { display: flex; align-items: center; gap: 2px; }
+.fb { height: 26px; padding: 0 5px 0 8px; border-radius: 7px; display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); white-space: nowrap; }
 .fb svg { width: 10px; height: 10px; color: var(--foreground-muted); }
 .fb.set { background: var(--secondary-default); color: var(--foreground-default); }
-.fb.nocar { padding-right: 7px; }
-.fb .ico { width: 13px; height: 13px; color: var(--foreground-muted); margin-right: 2px; }
-.rlist { flex: 1; min-height: 0; overflow: hidden; padding: 4px 8px 12px; }
+.fb.tog { padding: 0 8px 0 7px; gap: 5px; }
+.fb .ico { width: 13px; height: 13px; color: var(--foreground-muted); }
+.fb.sort { margin-left: 10px; }
+.togs { display: flex; gap: 2px; margin-left: auto; padding-left: 12px; }
+.frow.wrap { flex-wrap: wrap; row-gap: 4px; }
+.frow.wrap .togs { margin-left: 0; padding-left: 0; }
+.rlist { flex: 1; min-height: 0; overflow: hidden; padding: 8px 12px 12px; }
 .grp { margin-bottom: 8px; }
 .tl { height: 34px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 8px; }
 .tl .art { width: 20px; height: 20px; flex: none; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; }
@@ -180,9 +187,9 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
 .ml .who { font-size: 12.5px; color: var(--foreground-subtle); white-space: nowrap; flex: none; }
 .ml .sn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--foreground-muted); }
 .ml .sn b { font-weight: 600; color: var(--foreground-default); }
-.sel { background: var(--secondary-default); }
-.sel .sn { color: var(--foreground-subtle); }
-.hov { background: var(--surface-hover); }
+/* The selected result while the list has focus: the nav selection tint, as the sidebar selects a page. */
+.sel { background: var(--hl-nav); }
+.sel .sn, .sel .tm { color: var(--foreground-muted-on-fill, var(--foreground-subtle)); }
 .more { height: 26px; display: flex; align-items: center; padding: 0 10px 0 40px; font-size: 12.5px; color: var(--foreground-muted); }
 .older { height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 10px; margin: 6px 0 2px; font-size: 12px; font-weight: 500; color: var(--foreground-muted); white-space: nowrap; }
 .older::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
@@ -198,40 +205,55 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
 .rs .qchip { height: 20px; font-size: 12px; padding: 0 6px; border-radius: 5px; }
 .rs .x { width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; color: var(--foreground-muted); visibility: hidden; }
 .rs .x svg { width: 12px; height: 12px; }
+.rs.hov { background: var(--surface-hover); }
 .rs.hov .x { visibility: visible; }
 .hint { padding: 12px 10px; font-size: 12.5px; color: var(--foreground-muted); }
 
-.reader { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--background); }
-.rhead { height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--border-subtle); }
-.rhead .art { width: 20px; height: 20px; flex: none; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; margin-right: 2px; }
-.rhead .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
-.step { display: flex; align-items: center; gap: 0; margin-right: 6px; }
-.step .n { font-size: 12.5px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; margin-right: 4px; white-space: nowrap; }
-.step .ib { width: 28px; height: 28px; border-radius: 7px; }
-.step .ib svg { width: 15px; height: 15px; }
-.rbody { flex: 1; min-height: 0; overflow: hidden; }
-.rcolm { max-width: 720px; margin: 0 auto; padding: 12px 20px; }
-.cm { display: flex; gap: 10px; padding: 6px 10px; border-radius: 10px; }
-.cm + .cm { margin-top: 2px; }
-.cm.flash { background: var(--flash); }
-.cav { width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 600; margin-top: 1px; }
+/* The reader is the topic view: islands over a band, the list, the composer. */
+.reader { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--background); position: relative; }
+.band { position: absolute; top: 0; left: 0; right: 0; height: 68px; background: linear-gradient(var(--background) 0, var(--background) 44px, transparent 68px); z-index: 2; }
+.islands { position: absolute; top: 8px; left: 0; right: 0; max-width: 800px; margin: 0 auto; padding: 0 24px; display: flex; gap: 8px; z-index: 3; }
+.islands .gap { flex: 1; }
+.island { height: 36px; border-radius: 999px; background: var(--surface-default); border: 1px solid transparent; box-shadow: var(--card-ring); padding: 3px; display: flex; align-items: center; gap: 2px; flex: none; }
+.island.l { padding-left: 5px; flex: 0 1 auto; min-width: 0; }
+.island .ti { height: 28px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; min-width: 0; }
+.island .ti span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.island .ti svg { width: 12px; height: 12px; color: var(--foreground-muted); }
+.island .rb { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--foreground-subtle); flex: none; }
+.island .rb svg { width: 16px; height: 16px; }
+.island .n { font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); font-variant-numeric: tabular-nums; padding: 0 4px 0 9px; white-space: nowrap; }
+.island .bk { height: 28px; padding: 0 10px 0 6px; border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 500; color: var(--foreground-default); white-space: nowrap; }
+.island .bk svg { width: 16px; height: 16px; color: var(--foreground-subtle); }
+.island .pill { max-width: 160px; }
+.tlist { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.tlist.top { justify-content: flex-start; }
+.col { width: 100%; max-width: 800px; margin: 0 auto; padding: 68px 24px 16px; }
+.m { display: flex; gap: 12px; padding: 4px 8px; border-radius: 14px; }
+.m + .m { margin-top: 12px; }
+.m.flash { background: var(--flash); }
+.av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12px; font-weight: 600; margin-top: 2px; }
 .a { background: color-mix(in oklch, #E89EB8 24%, var(--surface-default)); color: color-mix(in oklch, #E89EB8 62%, var(--foreground-default)); }
 .b { background: color-mix(in oklch, #008AB3 24%, var(--surface-default)); color: color-mix(in oklch, #008AB3 62%, var(--foreground-default)); }
 .c { background: color-mix(in oklch, #9BC27A 24%, var(--surface-default)); color: color-mix(in oklch, #9BC27A 62%, var(--foreground-default)); }
 .d { background: color-mix(in oklch, #E0A35F 24%, var(--surface-default)); color: color-mix(in oklch, #E0A35F 62%, var(--foreground-default)); }
 .me2 { background: color-mix(in oklch, #92C2F9 24%, var(--surface-default)); color: color-mix(in oklch, #92C2F9 62%, var(--foreground-default)); }
-.cmb { flex: 1; min-width: 0; }
-.cmh { display: flex; gap: 8px; align-items: baseline; }
-.cmh b { font-size: 13.5px; font-weight: 600; }
-.cmh span { font-size: 12px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
-.cmt { font-size: 14px; line-height: 1.55; }
+.mb { flex: 1; min-width: 0; }
+.mh { display: flex; gap: 8px; align-items: baseline; }
+.mh b { font-size: 14.5px; font-weight: 600; }
+.mh span { font-size: 12.5px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
+.mt { font-size: 14.5px; line-height: 1.6; }
 mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 0 2px; margin: 0 -1px; }
-.daysep { display: flex; align-items: center; gap: 10px; margin: 10px 10px 8px; font-size: 11.5px; font-weight: 600; color: var(--foreground-muted); }
-.daysep::before, .daysep::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+/* The current match keeps a stronger mark after the landing flash fades. */
+mark.cur { background: var(--mark-current); }
+.comp { flex: none; padding: 8px 24px 20px; }
+.compin { max-width: 752px; margin: 0 auto; }
+.box { background: var(--surface-default); border: 1px solid var(--input-border); border-radius: 20px; display: flex; align-items: flex-end; gap: 4px; }
+.box .att { width: 28px; height: 28px; border-radius: 50%; margin: 6px 0 6px 6px; display: grid; place-items: center; color: var(--foreground-subtle); }
+.box .att svg { width: 18px; height: 18px; }
+.box .ta { flex: 1; padding: 9px 4px; font-size: 14px; line-height: 22px; min-height: 40px; color: var(--foreground-muted); }
+.box .snd { width: 28px; height: 28px; border-radius: 50%; margin: 6px 6px 6px 0; background: var(--hl); color: var(--hl-fg); display: grid; place-items: center; opacity: .4; }
+.box .snd svg { width: 16px; height: 16px; }
 .rempty { flex: 1; display: grid; place-items: center; font-size: 13px; color: var(--foreground-muted); }
-.back { display: flex; align-items: center; gap: 8px; height: 44px; flex: none; padding: 0 12px; }
-.back .btn svg { width: 14px; height: 14px; }
-.rhead.two { border-bottom: 1px solid var(--border-subtle); height: 44px; padding-top: 0; }
 
 /* Answer. */
 .ans { max-width: 600px; margin: 0 auto; padding: 32px 28px; }
@@ -239,11 +261,10 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
 .ans .h svg { width: 15px; height: 15px; color: var(--hl-text); }
 .ans p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.65; }
 .ans .cite { vertical-align: 1px; margin-left: 3px; }
-.ans .cite.on { background: var(--hl-soft); color: var(--hl-text); }
 .ans .foot { margin-top: 16px; font-size: 12.5px; color: var(--foreground-muted); display: flex; align-items: center; gap: 12px; }
 
-/* Picker under the field. */
-.pick { position: absolute; left: 12px; right: 12px; top: 52px; border-radius: 12px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); padding: 6px; z-index: 5; }
+/* Picker under the typed operator. */
+.pick { position: absolute; top: 50px; width: 320px; border-radius: 12px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); padding: 6px; z-index: 5; }
 .pick .h { font-size: 11px; font-weight: 500; color: var(--foreground-muted); padding: 6px 10px 4px; }
 .pick .o { height: 36px; border-radius: 8px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
 .pick .o > svg { width: 16px; height: 16px; margin: 0 2px; color: var(--foreground-muted); }
@@ -251,51 +272,33 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
 .pick .o .nm b { font-weight: 600; }
 .pick .o .s { margin-left: auto; font-size: 12px; color: var(--foreground-muted); white-space: nowrap; }
 .pick .o.act { background: var(--surface-hover); }
-.pick .o .av20 { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 600; flex: none; }
+.av20 { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 600; flex: none; }
 
-/* Topic view behind the palette. */
-.islands { position: absolute; top: 52px; left: 0; right: 0; max-width: 800px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; gap: 8px; }
-.island { height: 36px; border-radius: 999px; background: var(--surface-default); box-shadow: var(--card-ring); padding: 3px; display: flex; align-items: center; gap: 2px; }
-.island.l { padding-left: 5px; }
-.island .ti { height: 28px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
-.island .ti svg { width: 12px; height: 12px; color: var(--foreground-muted); }
-.island .rb { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--foreground-subtle); }
-.island .rb svg { width: 16px; height: 16px; }
-.tlist { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; }
-.col { width: 100%; max-width: 800px; margin: 0 auto; padding: 16px 24px 8px; }
-.m { display: flex; gap: 12px; padding: 4px 8px; }
-.m + .m { margin-top: 12px; }
-.av { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12px; font-weight: 600; margin-top: 2px; }
-.mb { flex: 1; min-width: 0; }
-.mh { display: flex; gap: 8px; align-items: baseline; }
-.mh b { font-size: 14.5px; font-weight: 600; }
-.mh span { font-size: 12.5px; color: var(--foreground-muted); }
-.mt { font-size: 14.5px; line-height: 1.6; }
-.comp { flex: none; padding: 8px 24px 20px; }
-.compin { max-width: 752px; margin: 0 auto; }
-.box { background: var(--surface-default); border: 1px solid var(--input-border); border-radius: 12px; display: flex; align-items: flex-end; gap: 4px; }
-.box .att { width: 28px; height: 28px; border-radius: 50%; margin: 6px 0 6px 6px; display: grid; place-items: center; color: var(--foreground-subtle); }
-.box .att svg { width: 18px; height: 18px; }
-.box .ta { flex: 1; padding: 9px 0 9px 4px; font-size: 14px; line-height: 22px; min-height: 40px; color: var(--foreground-muted); }
-.box .snd { width: 28px; height: 28px; border-radius: 50%; margin: 6px 6px 6px 0; background: var(--hl); color: var(--hl-fg); display: grid; place-items: center; opacity: .4; }
-.box .snd svg { width: 16px; height: 16px; }
+/* A topic open behind the palette. */
+.work > .islands { top: 52px; }
+.work > .band { top: 44px; }
 
 /* ⌘K palette. */
 .dimmer { position: absolute; inset: 0; background: var(--dim); z-index: 20; }
 .pal { position: absolute; top: 96px; left: 50%; width: 560px; margin-left: -280px; border-radius: 14px; background: var(--surface-default); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); overflow: hidden; z-index: 30; }
-.pal .hd { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border-default); }
+.pal .hd { display: flex; align-items: center; gap: 10px; padding: 14px 16px 8px; }
 .pal .hd > svg { width: 18px; height: 18px; color: var(--foreground-muted); }
 .pal .in { flex: 1; min-width: 0; font-size: 15px; white-space: nowrap; }
-.seg { display: flex; padding: 2px; border-radius: 8px; background: var(--secondary-default); flex: none; }
-.seg span { height: 24px; padding: 0 10px; border-radius: 6px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); }
-.seg span.on { background: var(--surface-default); color: var(--foreground-default); box-shadow: var(--shadow-sm), 0 0 0 0.5px var(--border-strong); }
+.ptabs { display: flex; gap: 2px; padding: 0 16px 8px 34px; border-bottom: 1px solid var(--border-default); }
+.ptabs span { height: 26px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); }
+.ptabs span.on { background: var(--secondary-default); color: var(--foreground-default); font-weight: 600; }
 .pal .lst { padding: 6px; }
-.pal .h { font-size: 11px; font-weight: 500; color: var(--foreground-muted); padding: 8px 10px 4px; }
+.pal .h { display: flex; align-items: center; font-size: 11px; font-weight: 500; color: var(--foreground-muted); padding: 8px 10px 4px; }
+.pal .h .go { margin-left: auto; font: 400 11px/1 var(--font-sans); color: var(--foreground-muted); letter-spacing: .02em; }
 .pal .r { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; min-height: 55px; }
-.pal .r > svg { width: 16px; height: 16px; color: var(--foreground-muted); }
+.pal .r.one { min-height: 36px; padding: 0 10px; }
+.pal .r > svg { width: 16px; height: 16px; color: var(--foreground-muted); margin: 0 2px; }
 .pal .r .tx { flex: 1; min-width: 0; }
 .pal .r .lb { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal .r.one .lb { font-size: 13.5px; }
+.pal .r .lb b, .pal .r .sb b { font-weight: 600; }
 .pal .r .sb { font-size: 12px; color: var(--foreground-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal .r .sb b { color: var(--foreground-subtle); }
 .pal .r.act { background: var(--surface-hover); }
 .pal .r .hk { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--foreground-muted); flex: none; }
 .pal .ft { border-top: 1px solid var(--border-default); padding: 6px; }
@@ -332,9 +335,9 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
     <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
     <symbol id="i-newtab" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></symbol>
     <symbol id="i-funnel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4Z"/></symbol>
+    <symbol id="i-eyeoff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A9.9 9.9 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-2.6 3.4M6.2 6.2A17 17 0 0 0 2.5 12s3.5 7 9.5 7a9.7 9.7 0 0 0 5.8-1.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></symbol>
   </defs>
 </svg>
-
 <!-- Sidebar, as built: no topic is open, so no row is selected. Search is the current page, so the magnifier takes the current look. -->
 <template id="t-side">
   <div class="side">
@@ -367,24 +370,52 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
   </div>
 </template>
 
-<!-- The results column for "from: Maya Chen vendor contract". -->
-<template id="t-col-main">
+<!-- Filter rows. The two toggles sit at the end with the sort, after a hairline. -->
+<template id="t-frow">
+  <div class="frow">
+    <span class="fb">From<svg><use href="#i-down"/></svg></span>
+    <span class="fb">In<svg><use href="#i-down"/></svg></span>
+    <span class="fb">Date<svg><use href="#i-down"/></svg></span>
+    <span class="fb">Has<svg><use href="#i-down"/></svg></span>
+    <span class="fb sort">Newest<svg><use href="#i-down"/></svg></span>
+    <span class="togs"><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Apps hidden</span><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Automated hidden</span></span>
+  </div>
+</template>
+<template id="t-frow-from">
+  <div class="frow">
+    <span class="fb set">From<svg><use href="#i-down"/></svg></span>
+    <span class="fb">In<svg><use href="#i-down"/></svg></span>
+    <span class="fb">Date<svg><use href="#i-down"/></svg></span>
+    <span class="fb">Has<svg><use href="#i-down"/></svg></span>
+    <span class="fb sort">Newest<svg><use href="#i-down"/></svg></span>
+    <span class="togs"><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Apps hidden</span><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Automated hidden</span></span>
+  </div>
+</template>
+<template id="t-frow-in">
+  <div class="frow">
+    <span class="fb">From<svg><use href="#i-down"/></svg></span>
+    <span class="fb set">In<svg><use href="#i-down"/></svg></span>
+    <span class="fb">Date<svg><use href="#i-down"/></svg></span>
+    <span class="fb">Has<svg><use href="#i-down"/></svg></span>
+    <span class="fb sort">Newest<svg><use href="#i-down"/></svg></span>
+    <span class="togs"><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Apps hidden</span><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Automated hidden</span></span>
+  </div>
+</template>
+
+<!-- The band across the top for "from: Maya Chen vendor contract". -->
+<template id="t-top-vendor">
+  <div class="stop">
+    <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
+      <div class="txt"><span class="qchip"><span class="av16 a">MC</span><span class="k">from:</span>Maya Chen</span><span>vendor contract<span class="caret"></span></span></div>
+      <span class="clr"><svg><use href="#i-x"/></svg></span>
+    </div>
+    <div data-t="t-frow-from"></div>
+  </div>
+</template>
+
+<!-- Results for "from: Maya Chen vendor contract". -->
+<template id="t-col-vendor">
   <div class="rcol">
-    <div class="fwrap">
-      <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
-        <div class="txt"><span class="qchip"><span class="av16 a">MC</span><span class="k">from:</span>Maya Chen</span><span>vendor contract<span class="caret"></span></span></div>
-        <span class="clr"><svg><use href="#i-x"/></svg></span>
-      </div>
-    </div>
-    <div class="frow">
-      <span class="fb set">From<svg><use href="#i-down"/></svg></span>
-      <span class="fb">In<svg><use href="#i-down"/></svg></span>
-      <span class="fb">Date<svg><use href="#i-down"/></svg></span>
-      <span class="fb">Has<svg><use href="#i-down"/></svg></span>
-      <span class="spacer"></span>
-      <span class="fb nocar">Apps hidden</span>
-      <span class="fb">Newest<svg><use href="#i-down"/></svg></span>
-    </div>
     <div class="rlist">
       <div class="grp">
         <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
@@ -417,30 +448,62 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
   </div>
 </template>
 
-<!-- The reader for the selected match (2 of 5 in its thread). -->
-<template id="t-reader-main">
+<!-- The topic header's islands, for Acme MSA renewal terms. -->
+<template id="t-isle-acme">
+  <div class="island l"><span class="pill private"><svg><use href="#i-lock"/></svg>legal</span><span class="ti"><span>Acme MSA renewal terms</span><svg><use href="#i-down"/></svg></span></div>
+</template>
+<template id="t-isle-acts">
+  <div class="island"><span class="rb"><svg><use href="#i-newtab"/></svg></span><span class="rb"><svg><use href="#i-circ"/></svg></span><span class="rb"><svg><use href="#i-spark"/></svg></span><span class="rb"><svg><use href="#i-dots"/></svg></span></div>
+</template>
+<template id="t-composer">
+  <div class="comp"><div class="compin"><div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta">Reply</div><span class="snd"><svg><use href="#i-up"/></svg></span></div></div></div>
+</template>
+
+<!-- The thread, landed on "vendor contract" match 2 of 5. -->
+<template id="t-msgs-vendor">
+  <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>Oct 21, 16:40</span></div><div class="mt">Acme sent their renewal terms. Legal needs to look before Friday.</div></div></div>
+  <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Oct 21, 17:02</span></div><div class="mt">On it. I'll compare them against last year's <mark>vendor contract</mark> tonight.</div></div></div>
+  <div class="m"><div class="av c">PR</div><div class="mb"><div class="mh"><b>Priya Rao</b><span>Yesterday 10:04</span></div><div class="mt">What changed from last year?</div></div></div>
+  <div class="m flash"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Yesterday 10:21</span></div><div class="mt">The <mark class="cur">vendor contract</mark> caps the price rise at 4% a year, and the notice period goes from 60 to 90 days. Auto-renewal is still in, which I'd like to take out.</div></div></div>
+  <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>Yesterday 10:30</span></div><div class="mt">90 days is fine if they drop the auto-renewal.</div></div></div>
+  <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Yesterday 11:15</span></div><div class="mt">Agreed. I'll redline it and send the <mark>vendor contract</mark> back once Priya signs off.</div></div></div>
+  <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>9:48</span></div><div class="mt">I sent the redlined <mark>vendor contract</mark> back to Acme this morning. Auto-renewal is out.</div></div></div>
+  <div class="m"><div class="av c">PR</div><div class="mb"><div class="mh"><b>Priya Rao</b><span>9:55</span></div><div class="mt">Thanks. I'll tell finance the 4% cap holds.</div></div></div>
+</template>
+
+<!-- The same thread, landed on "notice period" match 2 of 4. -->
+<template id="t-msgs-notice">
+  <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>Oct 21, 16:40</span></div><div class="mt">Acme sent their renewal terms. Legal needs to look before Friday.</div></div></div>
+  <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Oct 21, 17:02</span></div><div class="mt">On it. Their draft keeps the 60-day <mark>notice period</mark>, so I'll compare it with last year's.</div></div></div>
+  <div class="m"><div class="av c">PR</div><div class="mb"><div class="mh"><b>Priya Rao</b><span>Yesterday 10:04</span></div><div class="mt">What changed from last year?</div></div></div>
+  <div class="m flash"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Yesterday 10:21</span></div><div class="mt">The vendor contract caps the price rise at 4% a year, and the <mark class="cur">notice period</mark> goes from 60 to 90 days. Auto-renewal is still in, which I'd like to take out.</div></div></div>
+  <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>Yesterday 10:30</span></div><div class="mt">90 days is fine if they drop the auto-renewal.</div></div></div>
+  <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Yesterday 11:15</span></div><div class="mt">Agreed. I'll redline it and send it back once Priya signs off.</div></div></div>
+  <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>9:48</span></div><div class="mt">Sent the redline back to Acme. Auto-renewal is out, and the 90-day <mark>notice period</mark> stays.</div></div></div>
+  <div class="m"><div class="av c">PR</div><div class="mb"><div class="mh"><b>Priya Rao</b><span>9:55</span></div><div class="mt">Thanks. I'll tell finance the 4% cap holds and the <mark>notice period</mark> is 90 days.</div></div></div>
+</template>
+
+<template id="t-reader-vendor">
   <div class="reader">
-    <div class="rhead">
-      <span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span>
-      <span class="t">Acme MSA renewal terms</span>
-      <span class="pill private"><svg><use href="#i-lock"/></svg>legal</span>
-      <span class="spacer"></span>
-      <span class="step"><span class="n">2 of 5</span><span class="ib"><svg><use href="#i-cup"/></svg></span><span class="ib"><svg><use href="#i-cdown"/></svg></span></span>
-      <span class="btn">Open</span>
-      <span class="btn ghost">Open in new tab</span>
+    <div class="band"></div>
+    <div class="islands"><div data-t="t-isle-acme"></div><span class="gap"></span>
+      <div class="island"><span class="n">2 of 5</span><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span></div>
+      <div data-t="t-isle-acts"></div>
     </div>
-    <div class="rbody"><div class="rcolm">
-      <div class="cm"><span class="cav b">D</span><div class="cmb"><div class="cmh"><b>Dev Patel</b><span>Wed 16:40</span></div><div class="cmt">Acme sent their renewal terms. Legal needs to look before Friday.</div></div></div>
-      <div class="cm"><span class="cav a">MC</span><div class="cmb"><div class="cmh"><b>Maya Chen</b><span>Wed 17:02</span></div><div class="cmt">On it. I'll compare against last year's <mark>vendor contract</mark> tonight.</div></div></div>
-      <div class="daysep">Yesterday</div>
-      <div class="cm"><span class="cav c">PR</span><div class="cmb"><div class="cmh"><b>Priya Rao</b><span>10:04</span></div><div class="cmt">What changed from last year?</div></div></div>
-      <div class="cm flash"><span class="cav a">MC</span><div class="cmb"><div class="cmh"><b>Maya Chen</b><span>10:21</span></div><div class="cmt">The <mark>vendor contract</mark> caps the price rise at 4% a year, and the notice period goes from 60 to 90 days. Auto-renewal is still in, which I'd like to take out.</div></div></div>
-      <div class="cm"><span class="cav b">D</span><div class="cmb"><div class="cmh"><b>Dev Patel</b><span>10:30</span></div><div class="cmt">90 days is fine if they drop the auto-renewal.</div></div></div>
-      <div class="cm"><span class="cav a">MC</span><div class="cmb"><div class="cmh"><b>Maya Chen</b><span>11:15</span></div><div class="cmt">Agreed. I'll redline it and send the <mark>vendor contract</mark> back once Priya signs off.</div></div></div>
-      <div class="daysep">Today</div>
-      <div class="cm"><span class="cav a">MC</span><div class="cmb"><div class="cmh"><b>Maya Chen</b><span>9:48</span></div><div class="cmt">I sent the redlined <mark>vendor contract</mark> back to Acme this morning. Auto-renewal is out.</div></div></div>
-      <div class="cm"><span class="cav c">PR</span><div class="cmb"><div class="cmh"><b>Priya Rao</b><span>9:55</span></div><div class="cmt">Thanks. I'll tell finance the 4% cap holds.</div></div></div>
-    </div></div>
+    <div class="tlist"><div class="col"><div data-t="t-msgs-vendor"></div></div></div>
+    <div data-t="t-composer"></div>
+  </div>
+</template>
+
+<template id="t-reader-notice">
+  <div class="reader">
+    <div class="band"></div>
+    <div class="islands"><div data-t="t-isle-acme"></div><span class="gap"></span>
+      <div class="island"><span class="n">2 of 4</span><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span></div>
+      <div data-t="t-isle-acts"></div>
+    </div>
+    <div class="tlist"><div class="col"><div data-t="t-msgs-notice"></div></div></div>
+    <div data-t="t-composer"></div>
   </div>
 </template>
 
@@ -459,138 +522,149 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
     <div data-t="t-side"></div>
     <div class="work">
       <div data-t="t-strip-vendor"></div>
-      <div class="spage"><div data-t="t-col-main"></div><div data-t="t-reader-main"></div></div>
+      <div class="spage"><div data-t="t-top-vendor"></div><div class="split"><div data-t="t-col-vendor"></div><div data-t="t-reader-vendor"></div></div></div>
     </div>
   </div>
 </template>
 
-<!-- 3. The in: picker. -->
+<!-- ⌘F in the topic: scoped to that thread. -->
+<template id="t-scoped">
+  <div class="win" style="width:1440px; height:900px">
+    <div data-t="t-side"></div>
+    <div class="work">
+      <div class="strip">
+        <div class="tab pin"><svg class="k"><use href="#i-house"/></svg></div>
+        <div class="tab"><span class="tart" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="lab">Postgres 16 cutover window</span></div>
+        <div class="tab on"><svg class="k"><use href="#i-search"/></svg><span class="lab">notice period</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+        <div class="tab"><span class="tart" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="lab">design-review</span><span class="udot"></span></div>
+        <div class="plus"><svg><use href="#i-plus"/></svg></div>
+      </div>
+      <div class="spage">
+        <div class="stop">
+          <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
+            <div class="txt"><span class="qchip"><span class="tart" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="k">in:</span>Acme MSA renewal terms</span><span>notice period<span class="caret"></span></span></div>
+            <span class="clr"><svg><use href="#i-x"/></svg></span>
+          </div>
+          <div data-t="t-frow-in"></div>
+        </div>
+        <div class="split">
+          <div class="rcol"><div class="rlist">
+            <div class="grp">
+              <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
+              <div class="ml"><span class="who">Priya Rao</span><span class="sn">…and the <b>notice period</b> is 90 days</span><span class="tm">2h</span></div>
+              <div class="ml"><span class="who">Maya Chen</span><span class="sn">…and the 90-day <b>notice period</b> stays</span><span class="tm">2h</span></div>
+              <div class="ml sel"><span class="who">Maya Chen</span><span class="sn">…and the <b>notice period</b> goes from 60 to 90 days</span><span class="tm">Yesterday</span></div>
+              <div class="ml"><span class="who">Maya Chen</span><span class="sn">…keeps the 60-day <b>notice period</b>, so I'll compare it</span><span class="tm">2d</span></div>
+            </div>
+          </div></div>
+          <div data-t="t-reader-notice"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<!-- Typing an operator: the picker drops from the typed word. -->
 <template id="t-picker">
-  <div class="win" style="width:384px; height:480px">
-    <div class="rcol only">
-      <div class="fwrap">
+  <div class="win" style="width:1056px; height:400px">
+    <div class="work"><div class="spage">
+      <div class="stop">
         <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
-          <div class="txt"><span>vendor contract in:pro<span class="caret"></span></span></div>
+          <div class="txt"><span>vendor contract <span class="optok">in:pro</span><span class="caret"></span></span></div>
           <span class="clr"><svg><use href="#i-x"/></svg></span>
         </div>
-      </div>
-      <div class="pick">
-        <div class="h">Conversations</div>
-        <div class="o act"><svg><use href="#i-hash"/></svg><span class="nm"><b>pro</b>curement</span><span class="s">Public channel</span></div>
-        <div class="o"><svg><use href="#i-lock"/></svg><span class="nm"><b>pro</b>curement-leads</span><span class="s">Private channel</span></div>
-        <div class="o"><svg><use href="#i-hash"/></svg><span class="nm"><b>pro</b>j-mobile-app</span><span class="s">Public channel</span></div>
-        <div class="o"><span class="av20 d">LP</span><span class="nm">Leo <b>Pro</b>kopenko</span><span class="s">Direct message</span></div>
-        <div class="o"><svg><use href="#i-hash"/></svg><span class="nm"><b>pro</b>duct</span><span class="s">Public channel</span></div>
-      </div>
-      <div class="frow">
-        <span class="fb">From<svg><use href="#i-down"/></svg></span>
-        <span class="fb">In<svg><use href="#i-down"/></svg></span>
-        <span class="fb">Date<svg><use href="#i-down"/></svg></span>
-        <span class="fb">Has<svg><use href="#i-down"/></svg></span>
-        <span class="spacer"></span>
-        <span class="fb nocar">Apps hidden</span>
-        <span class="fb">Newest<svg><use href="#i-down"/></svg></span>
-      </div>
-      <div class="rlist">
-        <div class="grp">
-          <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
-          <div class="ml"><span class="who">Maya Chen</span><span class="sn">I sent the redlined <b>vendor contract</b> back to Acme</span><span class="tm">2h</span></div>
-        </div>
-        <div class="grp">
-          <div class="tl"><span class="slot"><svg><use href="#i-hash"/></svg></span><span class="mainh">procurement · Main</span></div>
-          <div class="ml"><span class="who">Maya Chen</span><span class="sn">Reminder: every new <b>vendor contract</b> goes through legal first</span><span class="tm">3d</span></div>
-          <div class="ml"><span class="who">Dev Patel</span><span class="sn">Who holds the <b>vendor contract</b> for the badge readers?</span><span class="tm">5d</span></div>
-        </div>
-        <div class="grp">
-          <div class="tl"><span class="art" style="background:color-mix(in oklch,#B9A3D6 45%,var(--background))"></span><span class="t">Northwind onboarding</span><span class="where"><svg><use href="#i-hash"/></svg>ops</span><span class="tm">4d</span></div>
-          <div class="ml"><span class="who">Maya Chen</span><span class="sn">Can someone check the <b>vendor contract</b> for the SLA terms?</span><span class="tm">4d</span></div>
+        <div data-t="t-frow"></div>
+        <div class="pick" style="left:146px">
+          <div class="h">Conversations</div>
+          <div class="o act"><svg><use href="#i-hash"/></svg><span class="nm"><b>pro</b>curement</span><span class="s">Public channel</span></div>
+          <div class="o"><svg><use href="#i-lock"/></svg><span class="nm"><b>pro</b>curement-leads</span><span class="s">Private channel</span></div>
+          <div class="o"><svg><use href="#i-hash"/></svg><span class="nm"><b>pro</b>j-mobile-app</span><span class="s">Public channel</span></div>
+          <div class="o"><span class="av20 d">LP</span><span class="nm">Leo <b>Pro</b>kopenko</span><span class="s">Direct message</span></div>
+          <div class="o"><svg><use href="#i-hash"/></svg><span class="nm"><b>pro</b>duct</span><span class="s">Public channel</span></div>
         </div>
       </div>
-    </div>
+      <div class="split">
+        <div class="rcol"><div class="rlist">
+          <div class="grp">
+            <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
+            <div class="ml"><span class="who">Maya Chen</span><span class="sn">I sent the redlined <b>vendor contract</b> back to Acme</span><span class="tm">2h</span></div>
+          </div>
+          <div class="grp">
+            <div class="tl"><span class="slot"><svg><use href="#i-hash"/></svg></span><span class="mainh">procurement · Main</span></div>
+            <div class="ml"><span class="who">Maya Chen</span><span class="sn">Reminder: every new <b>vendor contract</b> goes through legal first</span><span class="tm">3d</span></div>
+            <div class="ml"><span class="who">Dev Patel</span><span class="sn">Who holds the <b>vendor contract</b> for the badge readers?</span><span class="tm">5d</span></div>
+          </div>
+        </div></div>
+        <div class="reader"></div>
+      </div>
+    </div></div>
   </div>
 </template>
 
-<!-- 4. Words to filters. -->
+<!-- Words to filters. -->
 <template id="t-words">
-  <div class="win" style="width:384px; height:480px">
-    <div class="rcol only">
-      <div class="fwrap">
+  <div class="win" style="width:1056px; height:400px">
+    <div class="work"><div class="spage">
+      <div class="stop">
         <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
           <div class="txt"><span>maya's messages about the vendor contract last week<span class="caret"></span></span></div>
           <span class="clr"><svg><use href="#i-x"/></svg></span>
         </div>
         <div class="sugg"><svg><use href="#i-spark"/></svg><span class="q"><span class="k">from:</span> <b>Maya Chen</b> · <b>Last week</b> · <b>vendor contract</b></span><span class="kbd">Tab</span></div>
+        <div data-t="t-frow"></div>
       </div>
-      <div class="frow">
-        <span class="fb">From<svg><use href="#i-down"/></svg></span>
-        <span class="fb">In<svg><use href="#i-down"/></svg></span>
-        <span class="fb">Date<svg><use href="#i-down"/></svg></span>
-        <span class="fb">Has<svg><use href="#i-down"/></svg></span>
-        <span class="spacer"></span>
-        <span class="fb nocar">Apps hidden</span>
-        <span class="fb">Newest<svg><use href="#i-down"/></svg></span>
+      <div class="split">
+        <div class="rcol"><div class="rlist">
+          <div class="grp">
+            <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
+            <div class="ml"><span class="who">Maya Chen</span><span class="sn">…approved the <b>vendor contract</b> changes on Friday</span><span class="tm">2h</span></div>
+          </div>
+          <div class="grp">
+            <div class="tl"><span class="slot"><svg><use href="#i-user"/></svg></span><span class="mainh">Maya Chen · Main</span></div>
+            <div class="ml"><span class="who">Maya Chen</span><span class="sn">Read the <b>vendor contract</b> notes from <b>last week</b> first</span><span class="tm">3d</span></div>
+          </div>
+          <div class="grp">
+            <div class="tl"><span class="art" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="t"><b>Vendor contract</b> template for 2027</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">6d</span></div>
+          </div>
+        </div></div>
+        <div class="reader"></div>
       </div>
-      <div class="rlist">
-        <div class="grp">
-          <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
-          <div class="ml"><span class="who">Maya Chen</span><span class="sn">…approved the <b>vendor contract</b> changes on Friday</span><span class="tm">2h</span></div>
-        </div>
-        <div class="grp">
-          <div class="tl"><span class="slot"><svg><use href="#i-user"/></svg></span><span class="mainh">Maya Chen · Main</span></div>
-          <div class="ml"><span class="who">Maya Chen</span><span class="sn">Read the <b>vendor contract</b> notes from <b>last week</b> first</span><span class="tm">3d</span></div>
-        </div>
-        <div class="grp">
-          <div class="tl"><span class="art" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="t"><b>Vendor contract</b> template for 2027</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">6d</span></div>
-        </div>
-        <div class="grp">
-          <div class="tl"><span class="slot"><svg><use href="#i-hash"/></svg></span><span class="mainh">procurement · Main</span></div>
-          <div class="ml"><span class="who">Dev Patel</span><span class="sn">Is the <b>vendor contract</b> for the badge readers in yet?</span><span class="tm">Sep 30</span></div>
-        </div>
-      </div>
-    </div>
+    </div></div>
   </div>
 </template>
 
-<!-- 5. Answer from results. -->
-<template id="t-col-cutover">
-  <div class="rcol">
-    <div class="fwrap">
-      <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
-        <div class="txt"><span>when did we move the cutover?</span></div>
-        <span class="clr"><svg><use href="#i-x"/></svg></span>
-      </div>
+<!-- Answer from results. -->
+<template id="t-top-cutover">
+  <div class="stop">
+    <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
+      <div class="txt"><span>when did we move the cutover?</span></div>
+      <span class="clr"><svg><use href="#i-x"/></svg></span>
     </div>
-    <div class="frow">
-      <span class="fb">From<svg><use href="#i-down"/></svg></span>
-      <span class="fb">In<svg><use href="#i-down"/></svg></span>
-      <span class="fb">Date<svg><use href="#i-down"/></svg></span>
-      <span class="fb">Has<svg><use href="#i-down"/></svg></span>
-      <span class="spacer"></span>
-      <span class="fb nocar">Apps hidden</span>
-      <span class="fb">Newest<svg><use href="#i-down"/></svg></span>
-    </div>
-    <div class="rlist">
-      <div class="grp">
-        <div class="tl"><span class="art" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="t">Postgres 16 <b>cutover</b> window</span><span class="where"><svg><use href="#i-hash"/></svg>eng</span><span class="tm">3d</span></div>
-        <div class="ml"><span class="who">Tushar</span><span class="sn">Can we <b>move</b> the <b>cutover</b> to Thursday night?</span><span class="cite">1</span><span class="tm">3d</span></div>
-        <div class="ml"><span class="who">Maya Chen</span><span class="sn">Thursday works. <b>Cutover</b> starts at 22:00.</span><span class="cite">2</span><span class="tm">3d</span></div>
-        <div class="more">4 more in this thread</div>
-      </div>
-      <div class="grp">
-        <div class="tl"><span class="slot"><svg><use href="#i-hash"/></svg></span><span class="mainh">eng · Main</span></div>
-        <div class="ml"><span class="who">Dev Patel</span><span class="sn"><b>Cutover</b> <b>moved</b> to Thursday 22:00. Runbook updated.</span><span class="cite">3</span><span class="tm">3d</span></div>
-      </div>
-      <div class="grp">
-        <div class="tl"><span class="art" style="background:color-mix(in oklch,#E3B96B 45%,var(--background))"></span><span class="t">Billing <b>cutover</b> checklist</span><span class="where"><svg><use href="#i-hash"/></svg>billing-ops</span><span class="tm">Oct 14</span></div>
-        <div class="ml"><span class="who">Leo Park</span><span class="sn">If we <b>move</b> the <b>cutover</b>, billing needs a day's notice</span><span class="tm">Oct 14</span></div>
-      </div>
-      <div class="grp">
-        <div class="tl"><span class="art" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="t">Postgres 16 migration plan</span><span class="where"><svg><use href="#i-hash"/></svg>eng</span><span class="tm">Oct 2</span></div>
-        <div class="ml"><span class="who">Dev Patel</span><span class="sn">Proposed <b>cutover</b>: Wednesday, October 21, 21:00</span><span class="tm">Oct 2</span></div>
-        <div class="ml"><span class="who">Maya Chen</span><span class="sn">…staff a Wednesday <b>cutover</b></span><span class="tm">Oct 2</span></div>
-      </div>
-    </div>
+    <div data-t="t-frow"></div>
   </div>
+</template>
+<template id="t-col-cutover">
+  <div class="rcol"><div class="rlist">
+    <div class="grp">
+      <div class="tl"><span class="art" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="t">Postgres 16 <b>cutover</b> window</span><span class="where"><svg><use href="#i-hash"/></svg>eng</span><span class="tm">3d</span></div>
+      <div class="ml"><span class="who">Tushar</span><span class="sn">Can we <b>move</b> the <b>cutover</b> to Thursday night?</span><span class="cite">1</span><span class="tm">3d</span></div>
+      <div class="ml"><span class="who">Maya Chen</span><span class="sn">Thursday works. <b>Cutover</b> starts at 22:00.</span><span class="cite">2</span><span class="tm">3d</span></div>
+      <div class="more">4 more in this thread</div>
+    </div>
+    <div class="grp">
+      <div class="tl"><span class="slot"><svg><use href="#i-hash"/></svg></span><span class="mainh">eng · Main</span></div>
+      <div class="ml"><span class="who">Dev Patel</span><span class="sn"><b>Cutover</b> <b>moved</b> to Thursday 22:00. Runbook updated.</span><span class="cite">3</span><span class="tm">3d</span></div>
+    </div>
+    <div class="grp">
+      <div class="tl"><span class="art" style="background:color-mix(in oklch,#E3B96B 45%,var(--background))"></span><span class="t">Billing <b>cutover</b> checklist</span><span class="where"><svg><use href="#i-hash"/></svg>billing-ops</span><span class="tm">Oct 14</span></div>
+      <div class="ml"><span class="who">Leo Park</span><span class="sn">If we <b>move</b> the <b>cutover</b>, billing needs a day's notice</span><span class="tm">Oct 14</span></div>
+    </div>
+    <div class="grp">
+      <div class="tl"><span class="art" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="t">Postgres 16 migration plan</span><span class="where"><svg><use href="#i-hash"/></svg>eng</span><span class="tm">Oct 2</span></div>
+      <div class="ml"><span class="who">Dev Patel</span><span class="sn">Proposed <b>cutover</b>: Wednesday, October 21, 21:00</span><span class="tm">Oct 2</span></div>
+      <div class="ml"><span class="who">Maya Chen</span><span class="sn">…staff a Wednesday <b>cutover</b></span><span class="tm">Oct 2</span></div>
+    </div>
+  </div></div>
 </template>
 
 <template id="t-strip-cutover">
@@ -607,12 +681,14 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
     <div data-t="t-side"></div>
     <div class="work">
       <div data-t="t-strip-cutover"></div>
-      <div class="spage"><div data-t="t-col-cutover"></div>
-        <div class="reader">
-          <div class="ans">
-            <div class="h"><svg><use href="#i-spark"/></svg>Answer from results</div>
-            <p>The cutover moved from Wednesday night to Thursday night, October 22, to give Dev one more day on the replica check.<span class="cite">1</span> It starts at 22:00.<span class="cite">2</span> Dev updated the runbook in #eng the same day.<span class="cite">3</span></p>
-            <div class="foot">From 3 messages in these results.</div>
+      <div class="spage"><div data-t="t-top-cutover"></div>
+        <div class="split"><div data-t="t-col-cutover"></div>
+          <div class="reader">
+            <div class="ans">
+              <div class="h"><svg><use href="#i-spark"/></svg>Answer from results</div>
+              <p>The cutover moved from Wednesday night to Thursday night, October 22, to give Dev one more day on the replica check.<span class="cite">1</span> It starts at 22:00.<span class="cite">2</span> Dev updated the runbook in #eng the same day.<span class="cite">3</span></p>
+              <div class="foot">From 3 messages in these results.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -621,16 +697,16 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
 </template>
 
 <template id="t-answer-before">
-  <div class="win nocite" style="width:1056px; height:540px">
-    <div class="work">
-      <div class="spage"><div data-t="t-col-cutover"></div>
+  <div class="win nocite" style="width:1056px; height:560px">
+    <div class="work"><div class="spage"><div data-t="t-top-cutover"></div>
+      <div class="split"><div data-t="t-col-cutover"></div>
         <div class="reader"><div class="rempty"><span class="btn"><svg><use href="#i-spark"/></svg>Answer from results</span></div></div>
       </div>
-    </div>
+    </div></div>
   </div>
 </template>
 
-<!-- 6. Empty field. -->
+<!-- Empty field. -->
 <template id="t-empty">
   <div class="win" style="width:1056px; height:560px">
     <div class="work">
@@ -641,22 +717,14 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
         <div class="plus"><svg><use href="#i-plus"/></svg></div>
       </div>
       <div class="spage">
-        <div class="rcol">
-          <div class="fwrap">
-            <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
-              <div class="txt"><span class="ph"><span class="caret" style="margin:0 1px 0 0"></span>Search messages and topics</span></div>
-            </div>
+        <div class="stop">
+          <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
+            <div class="txt"><span class="ph"><span class="caret" style="margin:0 1px 0 0"></span>Search messages and topics</span></div>
           </div>
-          <div class="frow">
-            <span class="fb">From<svg><use href="#i-down"/></svg></span>
-            <span class="fb">In<svg><use href="#i-down"/></svg></span>
-            <span class="fb">Date<svg><use href="#i-down"/></svg></span>
-            <span class="fb">Has<svg><use href="#i-down"/></svg></span>
-            <span class="spacer"></span>
-            <span class="fb nocar">Apps hidden</span>
-            <span class="fb">Newest<svg><use href="#i-down"/></svg></span>
-          </div>
-          <div class="rlist">
+          <div data-t="t-frow"></div>
+        </div>
+        <div class="split">
+          <div class="rcol"><div class="rlist">
             <div class="slabel">Recent searches</div>
             <div class="rs"><svg><use href="#i-clock"/></svg><span class="q"><span class="qchip"><span class="k">from:</span>Maya Chen</span>vendor contract</span><span class="x"><svg><use href="#i-x"/></svg></span></div>
             <div class="rs hov"><svg><use href="#i-clock"/></svg><span class="q">replica lag</span><span class="x"><svg><use href="#i-x"/></svg></span></div>
@@ -664,35 +732,22 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
             <div class="rs"><svg><use href="#i-clock"/></svg><span class="q">"badge readers"</span><span class="x"><svg><use href="#i-x"/></svg></span></div>
             <div class="rs"><svg><use href="#i-clock"/></svg><span class="q"><span class="qchip"><span class="k">in:</span>ops</span><span class="qchip">Last week</span>on-call</span><span class="x"><svg><use href="#i-x"/></svg></span></div>
             <div class="hint">Narrow with from:, in:, has: or a date.</div>
-          </div>
+          </div></div>
+          <div class="reader"></div>
         </div>
-        <div class="reader"></div>
       </div>
     </div>
   </div>
 </template>
 
-<!-- 7. States. -->
-<template id="t-state-frow">
-  <div class="frow">
-    <span class="fb">From<svg><use href="#i-down"/></svg></span>
-    <span class="fb">In<svg><use href="#i-down"/></svg></span>
-    <span class="fb">Date<svg><use href="#i-down"/></svg></span>
-    <span class="fb">Has<svg><use href="#i-down"/></svg></span>
-    <span class="spacer"></span>
-    <span class="fb nocar">Apps hidden</span>
-    <span class="fb">Newest<svg><use href="#i-down"/></svg></span>
-  </div>
-</template>
-
+<!-- States, at one-column width. -->
 <template id="t-states">
-  <div class="hrow">
+  <div style="display:grid; grid-template-columns:repeat(2, max-content); gap:28px">
     <div>
       <div class="colhead"><b>Slack unavailable</b>local rows stay</div>
-      <div class="win" style="width:384px; height:440px"><div class="rcol only">
-        <div class="fwrap"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span>vendor contract</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div></div>
-        <div data-t="t-state-frow"></div>
-        <div class="rlist">
+      <div class="win" style="width:560px; height:380px"><div class="spage">
+        <div class="stop"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span>vendor contract</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div><div data-t="t-frow"></div></div>
+        <div class="split"><div class="rcol only"><div class="rlist">
           <div class="note">Showing matches on this Mac. Slack search didn't answer.<div class="acts"><span class="btn sm">Try again</span></div></div>
           <div class="grp">
             <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
@@ -702,33 +757,23 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
             <div class="tl"><span class="slot"><svg><use href="#i-hash"/></svg></span><span class="mainh">procurement · Main</span></div>
             <div class="ml"><span class="who">Maya Chen</span><span class="sn">…every new <b>vendor contract</b> goes through legal</span><span class="tm">3d</span></div>
           </div>
-        </div>
+        </div></div></div>
       </div></div>
     </div>
     <div>
       <div class="colhead"><b>No matches</b>says what to try</div>
-      <div class="win" style="width:384px; height:440px"><div class="rcol only">
-        <div class="fwrap"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span class="qchip noav"><span class="k">in:</span>legal</span><span>foo</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div></div>
-        <div class="frow">
-          <span class="fb">From<svg><use href="#i-down"/></svg></span>
-          <span class="fb set">In<svg><use href="#i-down"/></svg></span>
-          <span class="fb">Date<svg><use href="#i-down"/></svg></span>
-          <span class="fb">Has<svg><use href="#i-down"/></svg></span>
-          <span class="spacer"></span>
-          <span class="fb nocar">Apps hidden</span>
-          <span class="fb">Newest<svg><use href="#i-down"/></svg></span>
-        </div>
-        <div class="rlist">
+      <div class="win" style="width:560px; height:380px"><div class="spage">
+        <div class="stop"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span class="qchip noav"><span class="k">in:</span>legal</span><span>foo</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div><div data-t="t-frow-in"></div></div>
+        <div class="split"><div class="rcol only"><div class="rlist">
           <div class="note">Nothing matches “foo”. Try fewer words, or remove a filter.<div class="acts"><span class="btn sm">Clear filters</span></div></div>
-        </div>
+        </div></div></div>
       </div></div>
     </div>
     <div>
       <div class="colhead"><b>Searching</b>local rows first, no spinner</div>
-      <div class="win" style="width:384px; height:440px"><div class="rcol only">
-        <div class="fwrap"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span>replica lag</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div></div>
-        <div data-t="t-state-frow"></div>
-        <div class="rlist">
+      <div class="win" style="width:560px; height:380px"><div class="spage">
+        <div class="stop"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span>replica lag</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div><div data-t="t-frow"></div></div>
+        <div class="split"><div class="rcol only"><div class="rlist">
           <div class="grp">
             <div class="tl"><span class="art" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="t">Postgres 16 cutover window</span><span class="where"><svg><use href="#i-hash"/></svg>eng</span><span class="tm">3d</span></div>
             <div class="ml"><span class="who">Dev Patel</span><span class="sn"><b>Replica lag</b> is under a second now</span><span class="tm">3d</span></div>
@@ -739,53 +784,93 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
             <div class="ml"><span class="who">Leo Park</span><span class="sn">Paging on <b>replica lag</b> over 5s from Monday</span><span class="tm">5d</span></div>
           </div>
           <div class="tail">Searching Slack…</div>
-        </div>
+        </div></div></div>
+      </div></div>
+    </div>
+    <div>
+      <div class="colhead"><b>Only hidden rows match</b>says how many, one button</div>
+      <div class="win" style="width:560px; height:380px"><div class="spage">
+        <div class="stop"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span>deploy failed</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div><div data-t="t-frow"></div></div>
+        <div class="split"><div class="rcol only"><div class="rlist">
+          <div class="note">Nothing in your other conversations. 4 matches from apps and automated channels.<div class="acts"><span class="btn sm">Show them</span></div></div>
+        </div></div></div>
       </div></div>
     </div>
   </div>
 </template>
 
-<!-- 8. ⌘K palette, Messages tab, with the way into Search. -->
+<!-- ⌘K over a topic. -->
+<template id="t-behind">
+  <div data-t="t-side"></div>
+  <div class="work">
+    <div class="strip">
+      <div class="tab pin"><svg class="k"><use href="#i-house"/></svg></div>
+      <div class="tab on"><span class="tart" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="lab">Postgres 16 cutover window</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
+      <div class="tab"><span class="tart" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="lab">design-review</span><span class="udot"></span></div>
+      <div class="plus"><svg><use href="#i-plus"/></svg></div>
+    </div>
+    <div class="band"></div>
+    <div class="islands">
+      <div class="island l"><span class="pill public"><svg><use href="#i-hash"/></svg>eng</span><span class="ti"><span>Postgres 16 cutover window</span><svg><use href="#i-down"/></svg></span></div><span class="gap"></span>
+      <div class="island"><span class="rb"><svg><use href="#i-circ"/></svg></span><span class="rb"><svg><use href="#i-spark"/></svg></span><span class="rb"><svg><use href="#i-dots"/></svg></span></div>
+    </div>
+    <div class="tlist end"><div class="col">
+      <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>9:40</span></div><div class="mt">Replica lag is under a second now. I'd still like one full day of checks before we flip.</div></div></div>
+      <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>10:02</span></div><div class="mt">Wednesday night is the only window support signed off on. Can you decide?</div></div></div>
+      <div class="m"><div class="av me2">T</div><div class="mb"><div class="mh"><b>Tushar</b><span>10:14</span></div><div class="mt">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.</div></div></div>
+    </div></div>
+    <div data-t="t-composer"></div>
+  </div>
+  <div class="dimmer"></div>
+</template>
+
 <template id="t-palette">
   <div class="win" style="width:1440px; height:900px">
-    <div data-t="t-side"></div>
-    <div class="work">
-      <div class="strip">
-        <div class="tab pin"><svg class="k"><use href="#i-house"/></svg></div>
-        <div class="tab on"><span class="tart" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="lab">Postgres 16 cutover window</span><span class="cl"><svg><use href="#i-x"/></svg></span></div>
-        <div class="tab"><span class="tart" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="lab">design-review</span><span class="udot"></span></div>
-        <div class="plus"><svg><use href="#i-plus"/></svg></div>
-      </div>
-      <div class="islands">
-        <div class="island l"><span class="pill public"><svg><use href="#i-hash"/></svg>eng</span><span class="ti">Postgres 16 cutover window<svg><use href="#i-down"/></svg></span></div>
-        <div class="island"><span class="rb"><svg><use href="#i-circ"/></svg></span><span class="rb"><svg><use href="#i-spark"/></svg></span><span class="rb"><svg><use href="#i-dots"/></svg></span></div>
-      </div>
-      <div class="tlist"><div class="col">
-        <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>9:40</span></div><div class="mt">Replica lag is under a second now. I'd still like one full day of checks before we flip.</div></div></div>
-        <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>10:02</span></div><div class="mt">Wednesday night is the only window support signed off on. Can you decide?</div></div></div>
-        <div class="m"><div class="av me2">T</div><div class="mb"><div class="mh"><b>Tushar</b><span>10:14</span></div><div class="mt">Can we move the cutover to Thursday night? Dev needs one more day on the replica check.</div></div></div>
-      </div></div>
-      <div class="comp"><div class="compin"><div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta">Reply</div><span class="snd"><svg><use href="#i-up"/></svg></span></div></div></div>
-    </div>
-    <div class="dimmer"></div>
+    <div data-t="t-behind"></div>
     <div class="pal">
-      <div class="hd"><svg><use href="#i-search"/></svg><span class="in">vendor contract<span class="caret"></span></span><span class="seg"><span>Conversations</span><span class="on">Messages</span></span><span class="kbd">esc</span></div>
+      <div class="hd"><svg><use href="#i-search"/></svg><span class="in">acme<span class="caret"></span></span><span class="kbd">esc</span></div>
+      <div class="ptabs"><span class="on">All</span><span>Conversations</span><span>Messages</span></div>
+      <div class="lst">
+        <div class="h">Conversations<span class="go">⌘2</span></div>
+        <div class="r one act"><svg><use href="#i-hash"/></svg><div class="tx"><div class="lb"><b>acme</b>-partners</div></div><span class="hk"><span class="kbd">⌘↵</span>New tab</span></div>
+        <div class="r one"><svg><use href="#i-lock"/></svg><div class="tx"><div class="lb"><b>acme</b>-legal</div></div></div>
+        <div class="r one"><span class="av20 d">JE</span><div class="tx"><div class="lb">Jordan Ellis (<b>Acme</b>)</div></div></div>
+        <div class="h">Topics and messages<span class="go">⌘3</span></div>
+        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb"><b>Acme</b> MSA renewal terms</div><div class="sb">#legal · 2h</div></div></div>
+        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb"><b>Acme</b> pilot kickoff</div><div class="sb">#acme-partners · Jordan: Kickoff moves to Tuesday at 10:00</div></div></div>
+        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Northwind onboarding</div><div class="sb">#ops · Dev Patel: Same SLA terms we gave <b>Acme</b> last year</div></div></div>
+        <div class="r"><svg><use href="#i-hash"/></svg><div class="tx"><div class="lb">#procurement · Main</div><div class="sb">Maya Chen: <b>Acme</b>'s invoice is in the shared drive</div></div></div>
+        <div class="h">Pages, settings and commands<span class="go">⌘2</span></div>
+        <div class="r one"><svg><use href="#i-funnel"/></svg><div class="tx"><div class="lb">Show topics in #<b>acme</b>-partners</div></div></div>
+        <div class="r one"><svg><use href="#i-clock"/></svg><div class="tx"><div class="lb">Scheduled: <b>Acme</b> renewal reminder</div></div></div>
+      </div>
+      <div class="ft"><div class="r"><svg><use href="#i-search"/></svg><div class="tx"><div class="lb">All results for “acme”</div></div><span class="kbd">⌘⇧F</span></div></div>
+    </div>
+  </div>
+</template>
+
+<template id="t-palette-messages">
+  <div class="win" style="width:1440px; height:900px">
+    <div data-t="t-behind"></div>
+    <div class="pal">
+      <div class="hd"><svg><use href="#i-search"/></svg><span class="in">vendor contract<span class="caret"></span></span><span class="kbd">esc</span></div>
+      <div class="ptabs"><span>All</span><span>Conversations</span><span class="on">Messages</span></div>
       <div class="lst">
         <div class="h">Results</div>
-        <div class="r act"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Acme MSA renewal terms</div><div class="sb">#legal · Maya Chen: I sent the redlined vendor contract back to Acme</div></div><span class="hk"><span class="kbd">⌘↵</span>New tab</span></div>
-        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Vendor contract template for 2027</div><div class="sb">#legal · 6d</div></div></div>
-        <div class="r"><svg><use href="#i-hash"/></svg><div class="tx"><div class="lb">#procurement · Main</div><div class="sb">Maya Chen: Reminder: every new vendor contract goes through legal first</div></div></div>
-        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Northwind onboarding</div><div class="sb">#ops · Maya Chen: Can someone check the vendor contract for the SLA terms?</div></div></div>
-        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Office cleaning renewal</div><div class="sb">#ops · Maya Chen: The old vendor contract ends in November</div></div></div>
+        <div class="r act"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Acme MSA renewal terms</div><div class="sb">#legal · Maya Chen: I sent the redlined <b>vendor contract</b> back to Acme</div></div><span class="hk"><span class="kbd">⌘↵</span>New tab</span></div>
+        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb"><b>Vendor contract</b> template for 2027</div><div class="sb">#legal · 6d</div></div></div>
+        <div class="r"><svg><use href="#i-hash"/></svg><div class="tx"><div class="lb">#procurement · Main</div><div class="sb">Maya Chen: Reminder: every new <b>vendor contract</b> goes through legal first</div></div></div>
+        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Northwind onboarding</div><div class="sb">#ops · Maya Chen: Can someone check the <b>vendor contract</b> for the SLA terms?</div></div></div>
+        <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Office cleaning renewal</div><div class="sb">#ops · Maya Chen: The old <b>vendor contract</b> ends in November</div></div></div>
       </div>
       <div class="ft"><div class="r"><svg><use href="#i-search"/></svg><div class="tx"><div class="lb">All results for “vendor contract”</div></div><span class="kbd">⌘⇧F</span></div></div>
     </div>
   </div>
 </template>
 
-<!-- 9. Narrow window: one column, the reader in front. -->
+<!-- Narrow window: one column, the reader in front. -->
 <template id="t-narrow">
-  <div class="win" style="width:1100px; height:712px">
+  <div class="win" style="width:1100px; height:760px">
     <div data-t="t-side"></div>
     <div class="work">
       <div class="strip">
@@ -794,36 +879,66 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
         <div class="tab"><span class="tart" style="background:color-mix(in oklch,#9AA7E0 45%,var(--background))"></span><span class="lab">design-review</span><span class="udot"></span></div>
         <div class="plus"><svg><use href="#i-plus"/></svg></div>
       </div>
-      <div class="reader">
-        <div class="back"><span class="btn plain"><svg><use href="#i-left"/></svg>Back to results</span><span class="spacer"></span>
-          <span class="step"><span class="n">2 of 5</span><span class="ib"><svg><use href="#i-cup"/></svg></span><span class="ib"><svg><use href="#i-cdown"/></svg></span></span>
-          <span class="btn">Open</span><span class="btn ghost">Open in new tab</span></div>
-        <div class="rhead two">
-          <span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span>
-          <span class="t">Acme MSA renewal terms</span>
-          <span class="pill private"><svg><use href="#i-lock"/></svg>legal</span>
+      <div class="spage"><div data-t="t-top-vendor"></div>
+        <div class="split">
+          <div class="reader">
+            <div class="band"></div>
+            <div class="islands">
+              <div class="island"><span class="bk"><svg><use href="#i-left"/></svg>Back to results</span></div>
+              <div data-t="t-isle-acme"></div><span class="gap"></span>
+              <div class="island"><span class="n">2 of 5</span><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span></div>
+              <div data-t="t-isle-acts"></div>
+            </div>
+            <div class="tlist"><div class="col"><div data-t="t-msgs-vendor"></div></div></div>
+            <div data-t="t-composer"></div>
+          </div>
         </div>
-        <div class="rbody"><div class="rcolm">
-          <div class="cm"><span class="cav b">D</span><div class="cmb"><div class="cmh"><b>Dev Patel</b><span>Wed 16:40</span></div><div class="cmt">Acme sent their renewal terms. Legal needs to look before Friday.</div></div></div>
-          <div class="daysep">Yesterday</div>
-          <div class="cm"><span class="cav c">PR</span><div class="cmb"><div class="cmh"><b>Priya Rao</b><span>10:04</span></div><div class="cmt">What changed from last year?</div></div></div>
-          <div class="cm"><span class="cav a">MC</span><div class="cmb"><div class="cmh"><b>Maya Chen</b><span>10:21</span></div><div class="cmt">The <mark>vendor contract</mark> caps the price rise at 4% a year, and the notice period goes from 60 to 90 days. Auto-renewal is still in, which I'd like to take out.</div></div></div>
-          <div class="cm"><span class="cav b">D</span><div class="cmb"><div class="cmh"><b>Dev Patel</b><span>10:30</span></div><div class="cmt">90 days is fine if they drop the auto-renewal.</div></div></div>
-          <div class="cm"><span class="cav a">MC</span><div class="cmb"><div class="cmh"><b>Maya Chen</b><span>11:15</span></div><div class="cmt">Agreed. I'll redline it and send the <mark>vendor contract</mark> back once Priya signs off.</div></div></div>
-          <div class="daysep">Today</div>
-          <div class="cm"><span class="cav a">MC</span><div class="cmb"><div class="cmh"><b>Maya Chen</b><span>9:48</span></div><div class="cmt">I sent the redlined <mark>vendor contract</mark> back to Acme this morning. Auto-renewal is out.</div></div></div>
-          <div class="cm"><span class="cav c">PR</span><div class="cmb"><div class="cmh"><b>Priya Rao</b><span>9:55</span></div><div class="cmt">Thanks. I'll tell finance the 4% cap holds.</div></div></div>
-        </div></div>
       </div>
     </div>
   </div>
 </template>
 
+<!-- The minimum window: 336px for the page. The filter row wraps; the header keeps the back button, the place, the title and the step. -->
+<template id="t-narrow-min">
+  <div class="win" style="width:336px; height:470px">
+    <div class="work"><div class="spage">
+      <div class="stop">
+        <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
+          <div class="txt"><span class="qchip"><span class="av16 a">MC</span><span class="k">from:</span>Maya Chen</span><span>vendor contract</span></div>
+          <span class="clr"><svg><use href="#i-x"/></svg></span>
+        </div>
+        <div class="frow wrap">
+          <span class="fb set">From<svg><use href="#i-down"/></svg></span>
+          <span class="fb">In<svg><use href="#i-down"/></svg></span>
+          <span class="fb">Date<svg><use href="#i-down"/></svg></span>
+          <span class="fb">Has<svg><use href="#i-down"/></svg></span>
+          <span class="fb sort">Newest<svg><use href="#i-down"/></svg></span>
+          <span class="togs"><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Apps hidden</span><span class="fb tog"><svg class="ico"><use href="#i-eyeoff"/></svg>Automated hidden</span></span>
+        </div>
+      </div>
+      <div class="split">
+        <div class="reader">
+          <div class="band"></div>
+          <div class="islands">
+            <div class="island l" style="padding-left:3px"><span class="rb"><svg><use href="#i-left"/></svg></span><span class="pill private" style="padding:0 6px"><svg><use href="#i-lock"/></svg></span><span class="ti"><span>Acme MSA renewal terms</span><svg><use href="#i-down"/></svg></span></div>
+            <div class="island" style="margin-left:auto"><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span><span class="rb"><svg><use href="#i-dots"/></svg></span></div>
+          </div>
+          <div class="tlist top"><div class="col">
+            <div class="m flash"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Yesterday 10:21</span></div><div class="mt">The <mark class="cur">vendor contract</mark> caps the price rise at 4% a year, and the notice period goes from 60 to 90 days.</div></div></div>
+            <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>Yesterday 10:30</span></div><div class="mt">90 days is fine if they drop the auto-renewal.</div></div></div>
+          </div></div>
+          <div data-t="t-composer"></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</template>
+
 <section class="sheet theme-light" data-key="tab-light">
   <h1>Search tab</h1>
-  <p class="lede">Results on the left, the conversation on the right. Up and Down move through the results and the reader follows; Enter opens the topic, ⌘Enter opens it in a new tab and keeps you here.</p>
+  <p class="lede">The field and filters across the top; results on the left, the topic itself on the right. Up and Down move through the results and the topic follows; Enter opens it full page, ⌘Enter in a new tab, and you can reply right here.</p>
   <div data-t="t-tab"></div>
-  <p class="cap"><b>Look at:</b> the field holds a <b>from:</b> chip and plain words as one query, and the From button shows the same filter. Thread matches sit under one topic line (art, Juno title, place, newest time), with up to two match lines and "3 more in this thread". Main matches share one header, "procurement · Main". A topic whose Juno title matches shows with no message line. Rows below "Older matches on this Mac" are local only and move up as Slack's pages reach them. The selected match is the second line of the first thread; the reader shows that thread scrolled to it, every match marked, and the landing message in the brief flash that fades to nothing. "2 of 5" steps with ⌘↑ ⌘↓.</p>
+  <p class="cap"><b>Look at:</b> the field and the filter row span the tab, and the split starts under the line below them. The field holds a <b>from:</b> chip and plain words as one query; the From button shows the same filter. The sort follows the filter menus; Apps hidden and Automated hidden end the row, each with an eye-slash icon so they read as buttons. Thread matches sit under one topic line with up to two match lines and "3 more in this thread"; Main matches share "procurement · Main"; a topic whose Juno title matches has no message line; rows under "Older matches on this Mac" are local only. The selected match has the nav selection tint while the list has focus. The reader is the topic: its header islands (place, title, Resolve, Juno, ⋯), "2 of 5" with ⌘↑ ⌘↓ in an island of its own, Open in new tab beside Resolve, the messages at full size with every match marked, the current match marked more strongly so it stays findable after the landing flash fades, and the Reply composer.</p>
 </section>
 
 <section class="sheet theme-dark" data-key="tab-dark">
@@ -832,25 +947,32 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
   <div data-t="t-tab"></div>
 </section>
 
+<section class="sheet theme-light" data-key="scoped-light">
+  <h1>⌘F in a topic</h1>
+  <p class="lede">In "Acme MSA renewal terms", ⌘F opens Search scoped to that thread. Backspace on the chip widens it to everything.</p>
+  <div data-t="t-scoped"></div>
+  <p class="cap"><b>Look at:</b> the chip carries the topic's art and title, and the In button shows it is set. One topic line, then every match in the thread, newest first; the topic line is not repeated. The reader stays on the same thread and steps between the four matches, landed on the second.</p>
+</section>
+
 <section class="sheet theme-light" data-key="picker-light">
   <h1>Typing an operator</h1>
-  <p class="lede">"in:" opens a picker under the field.</p>
+  <p class="lede">"in:" opens a picker under the word being typed.</p>
   <div data-t="t-picker"></div>
-  <p class="cap" style="max-width:384px"><b>Look at:</b> the rows are ⌘K's Conversations rows: 36px, the kind's icon or the person's photo, the matched part in semibold, the kind at the end. The first row is active; Enter or Tab turns it into an "in:" chip. The results behind keep their place.</p>
+  <p class="cap"><b>Look at:</b> the picker's left edge sits under "in:", not at the field's edge. Rows are ⌘K's Conversations rows: 36px, the kind's icon or the person's photo, the matched part in semibold, the kind at the end. Enter or Tab turns the active row into an "in:" chip. The results behind keep their place.</p>
 </section>
 
 <section class="sheet theme-light" data-key="words-light">
   <h1>Words to filters</h1>
   <p class="lede">Plain words search at once. The filters come after.</p>
   <div data-t="t-words"></div>
-  <p class="cap" style="max-width:384px"><b>Look at:</b> results for the plain words are already there. After a pause one quiet line offers the filters Juno read from the text; Tab applies them as chips. Nothing changes until you press it, and the line is gone when AI assist is off.</p>
+  <p class="cap"><b>Look at:</b> results for the plain words are already there. After a pause one quiet line under the field offers the filters Juno read from the text; Tab applies them as chips. Nothing changes until you press it, and the line is gone when AI assist is off.</p>
 </section>
 
 <section class="sheet theme-light" data-key="answer-light">
   <h1>Answer from results</h1>
   <p class="lede">A question gets a button, not an answer card. The answer reads the matched threads and cites them.</p>
   <div data-t="t-answer"></div>
-  <p class="cap"><b>Look at:</b> a few sentences in the reader, each claim followed by a number. The cited rows carry the same number in the list; a number selects its row and shows it in the reader. Nothing above the results moves.</p>
+  <p class="cap"><b>Look at:</b> a few sentences in the reader, each claim followed by a number. The cited rows carry the same number in the list; a number selects its row and shows its topic in the reader. Nothing above the results moves.</p>
   <div class="colhead" style="margin-top:28px"><b>Before</b>the empty reader offers the answer</div>
   <div data-t="t-answer-before"></div>
   <p class="cap"><b>Look at:</b> when the query reads like a question and nothing is selected, the reader holds one secondary button. It never runs on its own.</p>
@@ -860,28 +982,38 @@ mark { background: var(--hl-soft); color: inherit; border-radius: 3px; padding: 
   <h1>Empty field</h1>
   <p class="lede">A new Search tab: recent searches and one line on operators.</p>
   <div data-t="t-empty"></div>
-  <p class="cap"><b>Look at:</b> recent searches keep their chips. The hovered row shows × to remove it. One muted line names the operators. The reader stays empty.</p>
+  <p class="cap"><b>Look at:</b> recent searches keep their chips. The hovered row shows × to remove it. One muted line names the operators. The reader stays empty until a result is chosen.</p>
 </section>
 
 <section class="sheet theme-light" data-key="states-light">
   <h1>States</h1>
-  <p class="lede">Each state says what happened. No spinners.</p>
+  <p class="lede">Each state says what happened. No spinners. Shown at one-column width.</p>
   <div data-t="t-states"></div>
-  <p class="cap"><b>Look at:</b> when Slack doesn't answer, the local rows stay and one line says so, with Try again. No matches names the words and offers Clear filters because a filter is set. While Slack is asked, local rows show and one muted line sits at the end, where Slack's rows will appear.</p>
+  <p class="cap"><b>Look at:</b> when Slack doesn't answer, the local rows stay and one line says so, with Try again. No matches names the words and offers Clear filters because a filter is set. While Slack is asked, local rows show and one muted line sits at the end, where Slack's rows will appear. When only hidden rows match, the note says how many and Show them turns both toggles on.</p>
 </section>
 
 <section class="sheet theme-light" data-key="palette-light">
-  <h1>⌘K Messages</h1>
-  <p class="lede">The palette keeps its short list and gains a way into the Search tab.</p>
+  <h1>⌘K, All</h1>
+  <p class="lede">⌘K opens on All: the best of each kind in fixed groups, then the way into the Search tab.</p>
   <div data-t="t-palette"></div>
-  <p class="cap"><b>Look at:</b> the last row, under a line, carries the text and filters to a Search tab. It is reachable with the arrows like any row, or ⌘⇧F from the field.</p>
+  <p class="cap"><b>Look at:</b> the field takes the full width; All, Conversations and Messages sit in their own row under it, the first tab's text on the field's text. Conversations (up to 4), Topics and messages (up to 5), then Pages, settings and commands (up to 3). Each heading names the key for its tab. Messages here come from this Mac only. The last row carries the text and filters to a Search tab.</p>
+</section>
+
+<section class="sheet theme-light" data-key="palette-messages-light">
+  <h1>⌘K, Messages</h1>
+  <p class="lede">The quick message list, from this Mac only, so it never waits on Slack.</p>
+  <div data-t="t-palette-messages"></div>
+  <p class="cap"><b>Look at:</b> no Slack rows and no "Searching Slack" line. The last row, under a line, opens the Search tab with the same text, where Slack's results join.</p>
 </section>
 
 <section class="sheet theme-light" data-key="narrow-light">
   <h1>Narrow window</h1>
-  <p class="lede">Under 792px for the page, results and reader take turns.</p>
+  <p class="lede">Under 792px for the page, results and reader take turns. The field stays across the top.</p>
   <div data-t="t-narrow"></div>
-  <p class="cap"><b>Look at:</b> Enter on a result shows the reader in the column's place, with "Back to results" first. The header splits in two: the controls, then the title and place. Back to results (or Esc) returns to the list with the selection and scroll kept.</p>
+  <p class="cap"><b>Look at:</b> Enter on a result shows the topic in the list's place. "Back to results" leads the header islands; Esc does the same and returns to the list with the selection and scroll kept. The title takes the ellipsis first; the place pill always shows.</p>
+  <div class="colhead" style="margin-top:28px"><b>Minimum window</b>336px for the page</div>
+  <div data-t="t-narrow-min"></div>
+  <p class="cap" style="max-width:640px"><b>Look at:</b> the two toggles wrap to their own line under the filters. Under 480px the header keeps what you need to read and move: Back to results as an icon at the start of the left island (its name and tooltip say "Back to results", Esc), the place pill as its icon in its tint, the title, and the step arrows with the count in their tooltips. Open in new tab, Resolve and Juno are in ⋯, which already lists them.</p>
 </section>
 
 <script>
@@ -890,8 +1022,10 @@ while ((slot = document.querySelector('[data-t]'))) {
   slot.replaceWith(document.getElementById(slot.dataset.t).content.cloneNode(true))
 }
 for (const sec of document.querySelectorAll('section.sheet')) sec.style.height = Math.ceil(sec.getBoundingClientRect().height) + 'px'
+// The state crops are narrower than the filter row, so its toggles wrap to a second line.
+for (const el of document.querySelectorAll('[data-key="states-light"] .frow')) el.classList.add('wrap')
 // Behind the palette a topic is open, so Search is not the current page.
-for (const el of document.querySelectorAll('[data-key="palette-light"] .ib.cur')) el.classList.remove('cur')
+for (const el of document.querySelectorAll('[data-key^="palette"] .ib.cur')) el.classList.remove('cur')
 </script>
 </body>
 </html>
