@@ -167,7 +167,21 @@ test('a workspace alias adds its real emoji to quick reactions', async ({ juno, 
 test('choosing a quick reaction in Settings does not record recent use', async ({ juno }) => {
   await juno.openSettings('Appearance')
   await add(juno, 'juno_wave')
+  // Quick reactions fill the end of Frequently used; a recorded use would put juno_wave first.
+  await expect.poll(() => frequentInSettings(juno)).toEqual(['+1', 'white_check_mark', 'eyes', 'juno_wave'])
   await juno.settings.root.getByRole('button', { name: 'Remove juno_wave' }).click()
-  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
-  await expect(picker(juno).getByRole('group', { name: 'Frequently used' }).locator('[data-emoji="juno_wave"]')).toHaveCount(0)
+  await expect.poll(() => frequentInSettings(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
 })
+
+/**
+ * Frequently used in Settings' picker, then Esc. Each open keeps the list it
+ * opened with, and the engine's new list arrives a moment after a change.
+ */
+async function frequentInSettings(juno: Juno): Promise<Array<string | null>> {
+  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
+  await expect(picker(juno).getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
+  const names = await picker(juno).getByRole('group', { name: 'Frequently used' }).locator('[data-emoji]').evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-emoji')))
+  await juno.win.keyboard.press('Escape')
+  await expect(picker(juno)).toHaveCount(0)
+  return names
+}
