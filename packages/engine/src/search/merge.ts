@@ -73,7 +73,8 @@ export function mergeSearch(input: {
       if (group !== undefined) groups[index] = { ...group, messages: [...group.messages, entry.row], matchCount: group.matchCount + 1 }
     } else {
       if (kind === 'thread') threads.set(key, groups.length)
-      groups.push({ id: kind === 'main' || (input.group !== true && entry.kind === 'message') ? `${key}:${entry.row.id}` : key, kind, topicId, title: title?.title ?? entry.row.title, titleRanges: title?.ranges ?? [], place: entry.row.place, at: entry.at, messages: entry.kind === 'message' ? [entry.row] : [], older: isOlder, matchCount: entry.kind === 'message' ? 1 : 0 })
+      const art = title?.art ?? entry.row.art
+      groups.push({ id: kind === 'main' || (input.group !== true && entry.kind === 'message') ? `${key}:${entry.row.id}` : key, kind, topicId, title: title?.title ?? entry.row.title, titleRanges: title?.ranges ?? [], place: entry.row.place, ...(art === undefined ? {} : { art }), at: entry.at, messages: entry.kind === 'message' ? [entry.row] : [], older: isOlder, matchCount: entry.kind === 'message' ? 1 : 0 })
     }
   }
   const index = groups.findIndex((g) => g.older)

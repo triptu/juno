@@ -7,7 +7,7 @@ import { literalRanges, searchSnippet } from './merge'
 import { messageResults, readPlaces, readUsers, topicOfMessage, type MessageHit } from './query'
 import { personFrom } from '../topicRows'
 
-export const localHits = (rows: ReadonlyArray<MessageHit>, query: SearchQuery) => messageResults(rows.map((row) => ({ ...row, topicId: topicOfMessage(row.channel, row.ts, row.thread_ts, row.reply_count), stored: true }))).pipe(Effect.map((rows) => rows.map((row) => ({ ...row, ...searchSnippet(row.text, literalRanges(row.text, query)) }))))
+export const localHits = (rows: ReadonlyArray<MessageHit>, query: SearchQuery) => messageResults(rows.map((row) => ({ ...row, topicId: topicOfMessage(row.channel, row.ts, row.thread_ts, row.reply_count), stored: true }))).pipe(Effect.map((rows) => rows.map((row) => ({ ...row, ...searchSnippet(row.text, literalRanges(row.text, query)) }))), Effect.flatMap((hits) => withArt(hits, (hit) => hit.topicId)))
 export const threadOf = (match: SearchPageMatch) => match.thread_ts ?? /[?&]thread_ts=(\d+\.\d+)/.exec(match.permalink ?? '')?.[1]
 
 export const remoteHits = (matches: ReadonlyArray<SearchPageMatch>, query: SearchQuery) => Effect.gen(function* () {
@@ -19,10 +19,21 @@ export const remoteHits = (matches: ReadonlyArray<SearchPageMatch>, query: Searc
     const ts = threadOf(match)
     return { channel, ts: match.ts, thread_ts: ts ?? null, reply_count: match.reply_count ?? 0, user_id: match.user ?? null, username: match.username, bot_name: match.bot_profile?.name, text: match.extracts?.find((e) => e.text !== '')?.text ?? match.text ?? '', attachments_json: JSON.stringify(match.attachments), topicId: topicOfMessage(channel, match.ts, ts ?? null, match.reply_count ?? 0), stored: stored.has(`${channel}:${match.ts}`) }
   }))
-  return rows.map((row): SearchHit => {
+  return yield* withArt(rows.map((row): SearchHit => {
     const decoded = decodeSearchHighlights(row.text)
     return { ...row, ...searchSnippet(decoded.text, decoded.ranges.length > 0 ? decoded.ranges : literalRanges(decoded.text, query)) }
-  })
+  }), (hit) => hit.topicId)
+})
+
+/** Each result with its topic's art recipe, as the sidebar draws it: only a confident drawing, and none while AI assist is off. */
+export const withArt = <R extends object>(rows: ReadonlyArray<R>, topicOf: (row: R) => string) => Effect.gen(function* () {
+  const plain: ReadonlyArray<R & { readonly art?: string }> = rows
+  if (rows.length === 0) return plain
+  const sql = yield* StoreReader
+  const [assist] = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'aiAssist'`
+  if (assist !== undefined && JSON.parse(assist.value_json) === false) return plain
+  const recipes = new Map((yield* sql<{ topic_id: string; recipe: string }>`SELECT topic_id, recipe FROM topic_art WHERE status = 'ok' AND recipe != '' AND topic_id IN ${sql.in([...new Set(rows.map(topicOf))])}`).map((r) => [r.topic_id, r.recipe]))
+  return rows.map((row): R & { readonly art?: string } => { const recipe = recipes.get(topicOf(row)); return recipe === undefined ? row : { ...row, art: recipe } })
 })
 
 /** Slack's facets with the person or place the store knows for each id, so the From and In menus can name them. */

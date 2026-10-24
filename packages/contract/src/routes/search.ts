@@ -119,9 +119,11 @@ export const searchCommand = Rpc.make('search.command', {
   error: NotSignedIn,
 })
 
-export const SearchHit = Schema.Struct({ ...SearchMessage.fields, ranges: Schema.Array(SearchRange) })
+/** A topic's art recipe (`@juno/topic-art`) when it is drawn and AI assist is on; absent draws the placeholder. */
+const art = Schema.optionalKey(Schema.String)
+export const SearchHit = Schema.Struct({ ...SearchMessage.fields, ranges: Schema.Array(SearchRange), art })
 export type SearchHit = typeof SearchHit.Type
-export const SearchTitleHit = Schema.Struct({ ...SearchTopic.fields, ranges: Schema.Array(SearchRange) })
+export const SearchTitleHit = Schema.Struct({ ...SearchTopic.fields, ranges: Schema.Array(SearchRange), art })
 export type SearchTitleHit = typeof SearchTitleHit.Type
 export const SearchGroup = Schema.Struct({
   id: Schema.String,
@@ -130,6 +132,7 @@ export const SearchGroup = Schema.Struct({
   title: Schema.String,
   titleRanges: Schema.Array(SearchRange),
   place: SearchPlace,
+  art,
   at: Schema.String,
   messages: Schema.Array(SearchHit),
   older: Schema.Boolean,

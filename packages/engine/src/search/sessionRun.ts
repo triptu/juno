@@ -9,7 +9,7 @@ import type { SessionClient } from '../sessionClient'
 import type { SyncLink } from '../syncLink'
 import { literalRanges, mergeSearch, windowSearchGroups, type Coverage, type SearchPage } from './merge'
 import { messageHits, titleResults } from './query'
-import { localHits, namedFacets, remoteHits, threadOf } from './sessionRows'
+import { localHits, namedFacets, remoteHits, threadOf, withArt } from './sessionRows'
 
 export interface SearchRun {
   input: { sessionId: string; generation: number; query: SearchQuery; immediate?: boolean }
@@ -59,7 +59,7 @@ export const loadLocal = (run: SearchRun) => Effect.gen(function* () {
   const rows = yield* messageHits(run.resolved, run.localLimit + 1)
   run.local = yield* localHits(rows.slice(0, run.localLimit), run.resolved.query)
   const titles = yield* titleResults(run.resolved, run.localLimit + 1)
-  run.titles = titles.slice(0, run.localLimit).map((title) => ({ ...title, ranges: literalRanges(title.title, run.resolved.query) }))
+  run.titles = yield* withArt(titles.slice(0, run.localLimit).map((title) => ({ ...title, ranges: literalRanges(title.title, run.resolved.query) })), (title) => title.id)
   const bounds = [...(rows.length > run.localLimit ? [run.local.at(-1)?.ts] : []), ...(titles.length > run.localLimit ? [((run.titles.at(-1)?.at ?? 0) / 1000).toFixed(6)] : [])].filter((ts): ts is string => ts !== undefined)
   run.localCoverage = { through: bounds.toSorted((a, b) => (run.resolved.query.scope.sort === 'newest' ? -1 : 1) * compareTs(a, b))[0] ?? null, complete: bounds.length === 0 }
 })
