@@ -75,28 +75,6 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
   expect((await topic.chooseInMessageMenu(MINE, null)).labels).not.toContain('Also send to #eng')
 })
 
-test("the topic title in Main opens the topic at the reply, which flashes", async ({ juno, fake }) => {
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
-  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Dry run passed on staging.', threadTs: root.ts, broadcast: true })
-  const { topic } = juno
-
-  const source = topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')
-  await expect(source).toContainText(`in ${ROOT}`)
-  await expect(source).toContainText(ROOT)
-  await watchFlashes(juno.win)
-  await press(juno, source)
-
-  await expect(topic.message(ROOT)).toBeVisible({ timeout: 15_000 })
-  await expect(topic.message('Dry run passed on staging.')).toBeInViewport()
-  // In its thread it is marked, with no link back.
-  await expect(topic.message('Dry run passed on staging.')).toContainText('also sent to the channel')
-  await expect(topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')).toHaveCount(0)
-  await expect.poll(() => juno.win.evaluate(() => (globalThis as unknown as { flashedRows: string[] }).flashedRows.some((row) => row.includes('Dry run passed on staging.'))), { timeout: 10_000 }).toBe(true)
-})
-
-
 function broadcastRows(userData: string, team: string): number {
   const db = new DatabaseSync(join(userData, 'workspaces', team, 'user.db'), { readOnly: true })
   try {
@@ -164,16 +142,35 @@ test('an edit and broadcast of one reply keep their order and separate calls', a
   await expect(juno.topic.message(changed)).toBeVisible()
 })
 
-test('Main follows a renamed topic title', async ({ juno, fake }) => {
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
+test('the topic title in Main opens the topic at the reply, which flashes, and follows a rename', async ({ juno, fake }) => {
+  const { topic } = juno
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'The rollout is ready.', threadTs: root.ts, broadcast: true })
-  const source = juno.topic.message('The rollout is ready.').locator('[data-broadcast-source]')
-  await expect(source).toHaveText(`in ${ROOT}`)
-  await juno.sidebar.row(ROOT, { exact: true }).chooseInMenu('rename')
-  await juno.rename('Friday rollout')
-  await expect(source).toHaveText('in Friday rollout')
-  await press(juno, source)
-  await juno.topic.expectTitle('Friday rollout')
+  await test.step('the title opens the topic at the reply, which flashes', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await topic.expectTitle('Main')
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Dry run passed on staging.', threadTs: root.ts, broadcast: true })
+    const source = topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')
+    await expect(source).toContainText(`in ${ROOT}`)
+    const flashed = await watchFlashes(juno.win)
+    await press(juno, source)
+
+    await expect(topic.message(ROOT)).toBeVisible({ timeout: 15_000 })
+    await expect(topic.message('Dry run passed on staging.')).toBeInViewport()
+    // In its thread it is marked, with no link back.
+    await expect(topic.message('Dry run passed on staging.')).toContainText('also sent to the channel')
+    await expect(topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')).toHaveCount(0)
+    await expect.poll(async () => (await flashed()).some((row) => row.includes('Dry run passed on staging.')), { timeout: 10_000 }).toBe(true)
+  })
+  await test.step('Main follows a renamed topic title', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await topic.expectTitle('Main')
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'The rollout is ready.', threadTs: root.ts, broadcast: true })
+    const source = topic.message('The rollout is ready.').locator('[data-broadcast-source]')
+    await expect(source).toHaveText(`in ${ROOT}`)
+    await juno.sidebar.row(ROOT, { exact: true }).chooseInMenu('rename')
+    await juno.rename('Friday rollout')
+    await expect(source).toHaveText('in Friday rollout')
+    await press(juno, source)
+    await juno.topic.expectTitle('Friday rollout')
+  })
 })

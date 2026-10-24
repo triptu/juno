@@ -75,7 +75,7 @@ async function sendToThread({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pr
 
 async function changeDestination({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await juno.tabs.menu('new-message')
-const { write } = juno
+  const { write } = juno
 
   await write.pickConversation('eng', 'eng')
   await write.pickTopic('draft', POSTGRES)

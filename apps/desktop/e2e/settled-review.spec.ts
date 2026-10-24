@@ -1,8 +1,8 @@
 // Tidy up's review (SPEC 12, docs/design/settled-suggestions/): Home's card
 // opens a sheet with every topic that looks settled and why; one Resolve
-// with Undo on the row; Keep open with R and K from the keyboard; Resolve
-// all; What Resolve does, which leads to Settings › Tidy up; and a topic
-// kept open is not suggested again.
+// with Undo on the row; Keep open with R and K from the keyboard; Enter
+// opens a proposal; Resolve all; What Resolve does, which leads to
+// Settings › Tidy up; and a topic kept open is not suggested again.
 import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
@@ -23,7 +23,7 @@ async function freshHome(juno: Juno): Promise<string[]> {
   return juno.home.kinds()
 }
 
-test('the review shows why each topic looks settled; Resolve, Undo, Keep open and Resolve all work per row', async ({ juno, fake, win }) => {
+test('the review opens a proposal and Settings, shows why each topic looks settled, and Resolve, Undo, Keep open and Resolve all work per row', async ({ juno, fake, win }) => {
   // Dev's thread: the user answered, and Dev thanked them two hours ago.
   const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
   fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
@@ -42,13 +42,31 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
   await expect(juno.home.title('tidyUp')).toHaveText('2 topics look settled')
   await expect(juno.home.meta('tidyUp')).toHaveText('incidents')
 
+  // These steps only open and close the sheet: they act on no row, so both topics are still proposed below.
+  await test.step('Enter opens a proposal in the tab and closes the review', async () => {
+    const sheet = await juno.home.review()
+    await sheet.row(KEYS).getByRole('link').focus()
+    await win.keyboard.press('Enter')
+    await expect(sheet.root).toHaveCount(0)
+    await juno.topic.expectTitle(KEYS)
+  })
+  await test.step('Tidy up settings in What Resolve does opens Settings', async () => {
+    await juno.home.open()
+    const sheet = await juno.home.review()
+    await sheet.about.click()
+    await sheet.explainer.getByRole('button', { name: 'Tidy up settings' }).click()
+    await expect(sheet.root).toHaveCount(0)
+    await expect(juno.settings.section('Tidy up')).toHaveAttribute('aria-current', 'page')
+  })
+
+  await juno.home.open()
   const sheet = await juno.home.review()
   await expect(sheet.title).toHaveText('2 topics look settled')
   // Each reason comes from the last messages, not from the model.
   await expect(sheet.reason(INCIDENT)).toHaveText('Ended with your thank-you')
   await expect(sheet.reason(KEYS)).toHaveText('Ended with a thank-you from Dev')
 
-  // What Resolve does says what happens in Slack, and leads to Settings.
+  // What Resolve does says what happens in Slack.
   await sheet.about.click()
   await expect(sheet.explainer).toContainText('Nothing is posted to Slack.')
   // The info covers the top of the list; the button closes it again.
@@ -85,28 +103,4 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
 
   // The kept topic is not suggested again until someone writes in it, and the resolved one is gone.
   expect(await freshHome(juno)).not.toContain('tidyUp')
-})
-
-test('Enter opens a proposal in the tab and closes the review; Tidy up settings opens Settings', async ({ juno, fake, win }) => {
-  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
-  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
-  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.openSettings('Tidy up')
-  await win.getByRole('radio', { name: '1 hour' }).click()
-  await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toContain('tidyUp')
-
-  let sheet = await juno.home.review()
-  await sheet.row(KEYS).getByRole('link').focus()
-  await win.keyboard.press('Enter')
-  await expect(sheet.root).toHaveCount(0)
-  await juno.topic.expectTitle(KEYS)
-
-  await juno.home.open()
-  sheet = await juno.home.review()
-  await sheet.about.click()
-  await sheet.explainer.getByRole('button', { name: 'Tidy up settings' }).click()
-  await expect(sheet.root).toHaveCount(0)
-  await expect(juno.settings.section('Tidy up')).toHaveAttribute('aria-current', 'page')
 })

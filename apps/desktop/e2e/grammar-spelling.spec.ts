@@ -5,8 +5,10 @@ import { expect, test } from './fixtures'
 test.use({ fakeAiDelayMillis: 2_000, synced: true })
 test.describe.configure({ timeout: 120_000 })
 
-for (const destination of ['self-DM', 'channel'] as const) {
-  test(`late spelling fixes in a ${destination} can be reviewed, saved and dismissed`, async ({ juno, fake, userData }) => {
+test('late spelling fixes in a self-DM and in a channel can be reviewed, saved and dismissed', async ({ juno, fake, userData }) => {
+  const updates = () => fake.calls.filter((call) => call.method === 'chat.update').length
+  for (const destination of ['self-DM', 'channel'] as const) await test.step(`late spelling fixes in a ${destination} can be reviewed, saved and dismissed`, async () => {
+    const updatesBefore = updates()
     const channel = destination === 'self-DM' ? fake.workspace.open([fake.selfId]).conversation.id : 'C0ENG'
     if (destination === 'self-DM') fake.injectMessage({ channel, user: fake.selfId, text: 'Notes for today' })
     await juno.sidebar.row(destination === 'self-DM' ? 'Tushar' : '#eng').open()
@@ -24,10 +26,10 @@ for (const destination of ['self-DM', 'channel'] as const) {
     await suggestion.getByRole('button', { name: 'Review', exact: true }).click()
     const editor = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
     await expect(editor).toHaveValue(fixed)
-    expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(0)
+    expect(updates()).toBe(updatesBefore)
     await juno.topic.list.getByRole('button', { name: /^Save/ }).click()
     await expect.poll(() => fake.messages(channel).some((message) => message.text === fixed)).toBe(true)
-    expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(1)
+    expect(updates()).toBe(updatesBefore + 1)
     await expect(suggestion).toHaveCount(0)
 
     await juno.topic.send('please chek the the report')
@@ -40,7 +42,7 @@ for (const destination of ['self-DM', 'channel'] as const) {
     await juno.sidebar.row(destination === 'self-DM' ? 'Tushar' : '#eng').open()
     await expect(suggestion).toHaveCount(0)
     expect(fake.messages(channel).some((message) => message.text === 'please chek the the report')).toBe(true)
-    expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(1)
+    expect(updates()).toBe(updatesBefore + 1)
 
     await juno.topic.send('the report is ready')
     await juno.topic.expectSent('the report is ready')
@@ -51,4 +53,4 @@ for (const destination of ['self-DM', 'channel'] as const) {
     }, { timeout: 10_000 }).toBe('No fixes')
     await expect(suggestion).toHaveCount(0)
   })
-}
+})

@@ -3,16 +3,31 @@ import { join } from 'node:path'
 import { expect, test } from './fixtures'
 import { holdWorkspaceEmoji } from './emojiDelay'
 
-test('cold picker paints Frequently used complete and keeps its first cell still', async ({ juno, fake, relaunch, userData }) => {
+test('pickers open while workspace emoji load: standard emoji at once, and a cold Frequently used paints complete with its first cell still', async ({ juno, fake, relaunch, userData }) => {
   test.setTimeout(120_000)
   for (let i = 0; i < 20_000; i++) fake.addEmoji({ name: `cold_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
   await juno.signIn()
   await juno.waitForSync()
-  const second = await relaunch({ whileClosed: () => {
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-  db.prepare('INSERT INTO prefs (key, value_json) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json').run('quickReactions', JSON.stringify([{ name: 'hello_juno', unicode: ':hello_juno:', url: `${fake.url}/emoji/juno_wave.svg` }, { name: '+1', unicode: '👍' }]))
-  db.close()
-  } })
+
+  await test.step('standard emoji open while the workspace subscription is delayed', async () => {
+    await holdWorkspaceEmoji(juno.win)
+    await juno.openSettings('Appearance')
+    await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
+    await expect.poll(() => juno.win.evaluate(() => window.emojiGate.count())).toBeGreaterThan(0)
+    const picker = juno.win.getByRole('dialog', { name: 'Emoji' })
+    await expect(picker.getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
+    await expect(picker.getByRole('group', { name: 'Smileys & emotion' }).locator('[data-emoji]').first()).toBeVisible()
+    await expect(picker.getByRole('group', { name: 'Workspace', exact: true })).toHaveCount(0)
+    await juno.win.evaluate(() => window.emojiGate.release())
+    await expect(picker.getByRole('group', { name: 'Workspace', exact: true })).toHaveCount(1)
+  })
+
+  await test.step('after a relaunch, Frequently used paints complete and keeps its first cell still', async () => {
+    const second = await relaunch({ whileClosed: () => {
+      const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+      db.prepare('INSERT INTO prefs (key, value_json) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json').run('quickReactions', JSON.stringify([{ name: 'hello_juno', unicode: ':hello_juno:', url: `${fake.url}/emoji/juno_wave.svg` }, { name: '+1', unicode: '👍' }]))
+      db.close()
+    } })
     await second.waitForSync()
     await holdWorkspaceEmoji(second.win)
     await second.sidebar.row('#eng').open()
@@ -54,20 +69,5 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     expect(seen[0]!.names.some((name) => name === 'hello_juno' || name === 'juno_wave')).toBe(true)
     expect(new Set(seen.map((frame) => frame.names.length)).size).toBe(1)
     expect(new Set(seen.map((frame) => frame.top)).size).toBe(1)
-})
-
-
-test('standard emoji open while the workspace subscription is delayed', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await holdWorkspaceEmoji(juno.win)
-  await juno.openSettings('Appearance')
-  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
-  await expect.poll(() => juno.win.evaluate(() => window.emojiGate.count())).toBeGreaterThan(0)
-  const picker = juno.win.getByRole('dialog', { name: 'Emoji' })
-  await expect(picker.getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
-  await expect(picker.getByRole('group', { name: 'Smileys & emotion' }).locator('[data-emoji]').first()).toBeVisible()
-  await expect(picker.getByRole('group', { name: 'Workspace', exact: true })).toHaveCount(0)
-  await juno.win.evaluate(() => window.emojiGate.release())
-  await expect(picker.getByRole('group', { name: 'Workspace', exact: true })).toHaveCount(1)
+  })
 })

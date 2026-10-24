@@ -234,7 +234,7 @@ test('with AI assist off, local checks still work and models stay off', async ({
 })
 
 // The thread suggestion goes first, for the same reason: the audience step's drafts start wrong-place checks.
-test('Home checks a channel draft, posts in the suggested thread, and warns about the audience of the chosen channel', async ({ juno, fake, userData }) => {
+test('Home checks a channel draft, posts in the suggested thread, warns about the audience, and sends local mistakes unchanged', async ({ juno, fake, userData }) => {
   await test.step('Home checks a channel draft and can post in the suggested thread', async () => {
     await juno.tabs.newTabButton.click()
     await juno.write.pickConversation('eng', 'eng')
@@ -257,6 +257,19 @@ test('Home checks a channel draft, posts in the suggested thread, and warns abou
     await juno.write.pickConversation('hiring', 'hiring')
     await expect(juno.write.root.getByText('This reads like hiring or people detail.', { exact: false })).toHaveCount(0)
   })
+  await test.step('Home sends local mistakes unchanged; the fix line waits on the message in its topic', async () => {
+    await juno.tabs.newTabButton.click()
+    await juno.write.pickConversation('eng', 'eng')
+    await juno.write.write(TYPOS)
+    await juno.write.send()
+    await expect.poll(() => posts(fake).length).toBe(2)
+    expect(posts(fake)[1]!.args['text']).toBe(TYPOS)
+    await juno.win.clock.fastForward(1_200)
+    await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.expectSent(TYPOS)
+    await expect(juno.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
+  })
 })
 
 test('a message with a mention gets its fix line, and Review opens it as the field showed it', async ({ juno, fake }) => {
@@ -273,37 +286,6 @@ test('a message with a mention gets its fix line, and Review opens it as the fie
   await expect(suggestion).toContainText('the the → the')
   await suggestion.getByRole('button', { name: 'Review', exact: true }).click()
   await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toHaveValue('Thanks @Maya the build is green')
-})
-
-test('Home sends local mistakes unchanged; the fix line waits on the message in its topic', async ({ juno, fake }) => {
-  await juno.tabs.newTabButton.click()
-  await juno.write.pickConversation('eng', 'eng')
-  await juno.write.write(TYPOS)
-  await juno.write.send()
-  await expect.poll(() => posts(fake).length).toBe(1)
-  expect(posts(fake)[0]!.args['text']).toBe(TYPOS)
-  await juno.win.clock.fastForward(1_200)
-  await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectSent(TYPOS)
-  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
-})
-
-// Lowercase i left alone by default is a clarity rule (packages/domain/test/checks.test.ts).
-test('Capital i, turned on in General, flags lowercase i', async ({ juno, fake }) => {
-  await juno.openSettings('General')
-  const capital = juno.win.getByRole('checkbox', { name: 'Capital i', exact: true })
-  await expect(capital).not.toBeChecked()
-  await expect(juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true })).toBeChecked()
-  await juno.win.screenshot({ path: test.info().outputPath('send-checks-settings.png') })
-  await capital.check()
-  await juno.tabs.close('Settings')
-  await juno.openSettings('General')
-  await expect(capital).toBeChecked()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.send('i think so too')
-  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('i → I')
-  expect(posts(fake).map((call) => call.args['text'])).toEqual(['i think so too'])
 })
 
 test('grammar offers its broken as an inline edit after sending, and asks nothing while typing', async ({ juno, fake, userData }) => {
@@ -358,20 +340,38 @@ test.describe('with a grammar model that takes 5 seconds', () => {
   })
 })
 
-test('Wrong place and grammar can be turned off without disabling local checks', async ({ juno, fake, userData }) => {
-  await juno.openSettings('General')
-  await juno.win.getByRole('checkbox', { name: 'Wrong place', exact: true }).uncheck()
-  await juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true }).uncheck()
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.composer.fill(BILL_REPLY)
-  await juno.win.clock.fastForward(900)
-  await juno.topic.composer.press('Enter')
-  await juno.topic.expectSent(BILL_REPLY)
-  await juno.topic.send('its broken')
-  await juno.topic.expectSent('its broken')
-  await juno.topic.send('teh plan')
-  await expect(juno.win.locator('[data-send-suggestion]')).toContainText('teh → the')
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
-  try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task IN ('routeCheck', 'grammarCheck')").get()).toEqual({ n: 0 }) }
-  finally { db.close() }
+// Lowercase i left alone by default is a clarity rule (packages/domain/test/checks.test.ts).
+test('the send check switches in General: Capital i flags lowercase i, and Wrong place and grammar turn off without the local checks', async ({ juno, fake, userData }) => {
+  await test.step('the switches start as they ship and keep what is set', async () => {
+    await juno.openSettings('General')
+    const capital = juno.win.getByRole('checkbox', { name: 'Capital i', exact: true })
+    await expect(capital).not.toBeChecked()
+    await expect(juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true })).toBeChecked()
+    await capital.check()
+    await juno.win.getByRole('checkbox', { name: 'Wrong place', exact: true }).uncheck()
+    await juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true }).uncheck()
+    await juno.tabs.close('Settings')
+    await juno.openSettings('General')
+    await expect(capital).toBeChecked()
+  })
+  await test.step('Capital i flags lowercase i', async () => {
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.send('i think so too')
+    await expect(juno.win.locator('[data-send-suggestion]')).toContainText('i → I')
+  })
+  await test.step('with Wrong place and grammar off, a reply-like draft sends at once and local fixes still show', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.composer.fill(BILL_REPLY)
+    await juno.win.clock.fastForward(900)
+    await juno.topic.composer.press('Enter')
+    await juno.topic.expectSent(BILL_REPLY)
+    await juno.topic.send('its broken')
+    await juno.topic.expectSent('its broken')
+    await juno.topic.send('teh plan')
+    await expect(juno.win.locator('[data-send-suggestion]')).toContainText('teh → the')
+    expect(posts(fake).map((call) => call.args['text'])).toEqual(['i think so too', BILL_REPLY, 'its broken', 'teh plan'])
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+    try { expect(db.prepare("SELECT count(*) AS n FROM ai_cache WHERE task IN ('routeCheck', 'grammarCheck')").get()).toEqual({ n: 0 }) }
+    finally { db.close() }
+  })
 })

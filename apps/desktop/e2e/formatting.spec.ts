@@ -3,6 +3,7 @@
 // shows them, the edit field shows them back as markup, and ⌘B wraps a
 // selection in one edit that ⌘Z takes back.
 import { expect, test, type Fixtures } from './fixtures'
+import { readUserDb } from './driver/userDb'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -24,10 +25,13 @@ function lastPost(calls: ReadonlyArray<{ method: string; args: Json }>): { reado
   return { elements: (blocks as ReadonlyArray<{ elements: unknown }> | undefined)?.[0]?.elements, text: String(posted?.args['text']).replace(/\r\n/g, '\n') }
 }
 
-test('sends Slack markup as rich text styles and formats a selection with ⌘B', async ({ juno, fake }) => {
+test('sends Slack markup as rich text styles, formats a selection with ⌘B, keeps mentions and links, and aligns mixed-direction lines', async ({ juno, fake }) => {
   const context = { juno, fake }
   await test.step('markup typed in the composer goes as Slack styles and a code block, shows styled, and edits as markup', () => sendMarkup(context))
   await test.step('⌘B wraps the selection in one edit, and ⌘Z takes it back', () => boldSelection(context))
+  await test.step('formatting keeps picked mentions and linked words', () => formatMentionsAndLinks(context))
+  await test.step('inline edit formatting expands partial mentions and links', () => formatInEdit(context))
+  await test.step('Hebrew and mixed lines align the mirror with the native caret', () => alignMixedLines(context))
 })
 
 async function sendMarkup({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
@@ -109,100 +113,13 @@ async function boldSelection({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect(topic.composer).toHaveValue('ship it today')
 }
 
-for (const action of ['selection', 'focus', 'composition', 'send', 'failed-send', 'twice', 'twice-other', 'mac-control', 'fallback'] as const) {
-  test(`a cold formatting chunk respects ${action}`, async ({ juno, fake }) => {
-    let release!: () => void
-    const held = new Promise<void>((resolve) => { release = resolve })
-    const sending = action === 'send' || action === 'failed-send'
-    await juno.win.route(action === 'fallback' ? /\/(?:markupRules|TextareaLines)-[^/]+\.js/ : /\/markupRules-[^/]+\.js/, async (route) => { if (action === 'failed-send') return route.abort(); await held; await route.continue() })
-    try {
-      await juno.win.reload({ waitUntil: 'domcontentloaded' })
-      await juno.waitForSync()
-      await juno.sidebar.row(POSTGRES).open()
-      const field = juno.topic.composer
-      await field.fill(sending ? '*bold*' : '*loaded* first second')
-      await field.evaluate((el: HTMLTextAreaElement) => { el.focus(); el.setSelectionRange(9, 14) })
-      if (sending) {
-        await field.press('Enter')
-        await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(1)
-        await field.fill('next draft')
-      } else if (action === 'mac-control') {
-        const taken = await field.evaluate((el) => {
-          if (!navigator.platform.startsWith('Mac')) return false
-          return !el.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', ctrlKey: true, bubbles: true, cancelable: true }))
-        })
-        expect(taken).toBe(false)
-      } else if (action === 'fallback') {
-        await field.fill('hello\nשלום')
-        const layer = juno.win.locator('[data-textarea-layer]')
-        await expect(layer).toHaveCSS('unicode-bidi', 'plaintext')
-        expect(await layer.evaluate((el) => {
-          const range = document.createRange()
-          range.setStart(el.firstChild!, 6)
-          range.setEnd(el.firstChild!, 7)
-          const box = range.getBoundingClientRect()
-          const caret = document.caretPositionFromPoint(box.x + box.width * 0.75, box.y + box.height / 2)?.offset
-          return caret === 6 || caret === 7
-        })).toBe(true)
-      } else {
-        await field.press('ControlOrMeta+b')
-        if (action === 'twice-other') await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(15, 21))
-        if (action === 'twice' || action === 'twice-other') await field.press('ControlOrMeta+i')
-        if (action === 'selection') await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(15, 21))
-        if (action === 'focus') await field.evaluate((el: HTMLTextAreaElement) => el.blur())
-        if (action === 'composition') await field.dispatchEvent('compositionstart', { data: 'あ' })
-      }
-      release()
-      if (sending) {
-        await juno.topic.expectSent('bold')
-        await expect(field).toHaveValue('next draft')
-        expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'text', text: 'bold', style: { bold: true } }] }])
-      } else if (action === 'twice-other') await expect(field).toHaveValue('*loaded* *first* _second_')
-      else if (action === 'twice') await expect(field).toHaveValue('*loaded* *_first_* second')
-      else if (action === 'mac-control' || action === 'fallback') return
-      else if (action === 'selection') await expect(field).toHaveValue('*loaded* *first* second')
-      else {
-        // The original bold run proves the grammar and drawing have both loaded.
-        await field.focus()
-        if (action === 'composition') await field.dispatchEvent('compositionend')
-        await expect(juno.win.getByTestId('textarea-bold')).toHaveText('loaded')
-        await expect(field).toHaveValue('*loaded* first second')
-      }
-    } finally {
-      release()
-      await juno.win.unrouteAll({ behavior: 'wait' })
-    }
-  })
-}
+const posts = (fake: Fixtures['fake']) => fake.calls.filter((call) => call.method === 'chat.postMessage').length
+const updates = (fake: Fixtures['fake']) => fake.calls.filter((call) => call.method === 'chat.update')
 
-test('Hebrew and mixed lines align the mirror with the native caret in Electron', async ({ juno }) => {
-  await juno.sidebar.row(POSTGRES).open()
-  for (const text of ['שלום', 'שלום hello עולם', 'hello שלום world', 'hello\nשלום', 'שלום\nhello']) {
-    await juno.topic.composer.fill(text)
-    const layer = juno.win.locator('[data-textarea-layer]')
-    await expect(layer).toHaveText(text.replace(/\n/g, ''))
-    const aligned = await layer.evaluate((element) => {
-      let start = 0
-      return Array.from(element.children).every((line) => {
-        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT)
-        const node = walker.nextNode()!
-        const range = document.createRange()
-        range.setStart(node, 0)
-        range.setEnd(node, 1)
-        const box = range.getBoundingClientRect()
-        const caret = document.caretPositionFromPoint(box.x + box.width * 0.75, box.y + box.height / 2)?.offset
-        const matches = caret === start || caret === start + 1
-        start += (line.textContent?.length ?? 0) + 1
-        return matches
-      })
-    })
-    expect(aligned).toBe(true)
-  }
-})
-
-test('formatting keeps picked mentions and linked words', async ({ juno, fake }) => {
+async function formatMentionsAndLinks({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
-  await juno.sidebar.row(POSTGRES).open()
+  await topic.composer.fill('')
+  const before = posts(fake)
   await topic.composer.pressSequentially('@ma')
   await expect(topic.suggestion('Maya')).toBeVisible()
   await topic.composer.press('Enter')
@@ -225,14 +142,13 @@ test('formatting keeps picked mentions and linked words', async ({ juno, fake })
   await topic.composer.press('ControlOrMeta+b')
   await expect(topic.composerLinks).toHaveText('plan')
   await topic.composer.press('Enter')
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(2)
+  await expect.poll(() => posts(fake)).toBe(before + 2)
   expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } }] }])
-})
+}
 
-
-test('inline edit formatting expands partial mentions and links', async ({ juno, fake }) => {
-  await juno.sidebar.row(POSTGRES).open()
+async function formatInEdit({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const composer = juno.topic.composer
+  const before = { posts: posts(fake), updates: updates(fake).length }
   await composer.pressSequentially('@ma')
   await expect(juno.topic.suggestion('Maya')).toBeVisible()
   await composer.press('Enter')
@@ -244,10 +160,10 @@ test('inline edit formatting expands partial mentions and links', async ({ juno,
     el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
   })
   await composer.press('Enter')
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(1)
-  await juno.topic.expectSent('Maya')
+  await expect.poll(() => posts(fake)).toBe(before.posts + 1)
+  await juno.topic.expectSent('Maya plan')
   await composer.press('ArrowUp')
-  await juno.topic.message('Maya').press('e')
+  await juno.topic.message('Maya plan').press('e')
   const field = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
   await expect(field).toHaveValue('@Maya plan')
   await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(2, 4))
@@ -257,10 +173,112 @@ test('inline edit formatting expands partial mentions and links', async ({ juno,
   await field.press('ControlOrMeta+b')
   await expect(field).toHaveValue('_@Maya_ *plan*')
   await field.press('Enter')
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBe(1)
-  const update = fake.calls.find((call) => call.method === 'chat.update')!
+  await expect.poll(() => updates(fake).length).toBe(before.updates + 1)
+  const update = updates(fake).at(-1)!
   expect(lastPost([{ method: 'chat.postMessage', args: update.args }]).elements).toEqual([{ type: 'rich_text_section', elements: [
     { type: 'user', user_id: 'U0MAYA', style: { italic: true } }, { type: 'text', text: ' ' },
     { type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } },
   ] }])
+}
+
+async function alignMixedLines({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
+  for (const text of ['שלום', 'שלום hello עולם', 'hello שלום world', 'hello\nשלום', 'שלום\nhello']) {
+    await juno.topic.composer.fill(text)
+    const layer = juno.win.locator('[data-textarea-layer]')
+    await expect(layer).toHaveText(text.replace(/\n/g, ''))
+    const aligned = await layer.evaluate((element) => {
+      let start = 0
+      return Array.from(element.children).every((line) => {
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT)
+        const node = walker.nextNode()!
+        const range = document.createRange()
+        range.setStart(node, 0)
+        range.setEnd(node, 1)
+        const box = range.getBoundingClientRect()
+        const caret = document.caretPositionFromPoint(box.x + box.width * 0.75, box.y + box.height / 2)?.offset
+        const matches = caret === start || caret === start + 1
+        start += (line.textContent?.length ?? 0) + 1
+        return matches
+      })
+    })
+    expect(aligned).toBe(true)
+  }
+}
+
+const COLD_ACTIONS = ['selection', 'focus', 'composition', 'send', 'failed-send', 'twice', 'twice-other', 'mac-control', 'fallback'] as const
+
+// Each step reloads the page with the formatting chunk held, so the step's keys land before the grammar loads.
+test('a cold formatting chunk respects what the user did while it loaded', async ({ juno, fake, userData }) => {
+  const drafts = () => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT COUNT(*) AS n FROM drafts').get()?.['n'])
+  const draftsAtStart = drafts()
+  for (const action of COLD_ACTIONS) {
+    await test.step(`a cold formatting chunk respects ${action}`, async () => {
+      let release!: () => void
+      const held = new Promise<void>((resolve) => { release = resolve })
+      const sending = action === 'send' || action === 'failed-send'
+      // Each sending step posts its own word, so its message is the only one with it.
+      const word = action === 'send' ? 'bold' : 'emphatic'
+      await juno.win.route(action === 'fallback' ? /\/(?:markupRules|TextareaLines)-[^/]+\.js/ : /\/markupRules-[^/]+\.js/, async (route) => { if (action === 'failed-send') return route.abort(); await held; await route.continue() })
+      try {
+        await juno.win.reload({ waitUntil: 'domcontentloaded' })
+        await juno.waitForSync()
+        await juno.sidebar.row(POSTGRES).open()
+        const field = juno.topic.composer
+        const before = posts(fake)
+        await field.fill(sending ? `*${word}*` : '*loaded* first second')
+        await field.evaluate((el: HTMLTextAreaElement) => { el.focus(); el.setSelectionRange(9, 14) })
+        if (sending) {
+          await field.press('Enter')
+          await expect.poll(() => posts(fake)).toBe(before + 1)
+          await field.fill('next draft')
+        } else if (action === 'mac-control') {
+          const taken = await field.evaluate((el) => {
+            if (!navigator.platform.startsWith('Mac')) return false
+            return !el.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', ctrlKey: true, bubbles: true, cancelable: true }))
+          })
+          expect(taken).toBe(false)
+        } else if (action === 'fallback') {
+          await field.fill('hello\nשלום')
+          const layer = juno.win.locator('[data-textarea-layer]')
+          await expect(layer).toHaveCSS('unicode-bidi', 'plaintext')
+          expect(await layer.evaluate((el) => {
+            const range = document.createRange()
+            range.setStart(el.firstChild!, 6)
+            range.setEnd(el.firstChild!, 7)
+            const box = range.getBoundingClientRect()
+            const caret = document.caretPositionFromPoint(box.x + box.width * 0.75, box.y + box.height / 2)?.offset
+            return caret === 6 || caret === 7
+          })).toBe(true)
+        } else {
+          await field.press('ControlOrMeta+b')
+          if (action === 'twice-other') await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(15, 21))
+          if (action === 'twice' || action === 'twice-other') await field.press('ControlOrMeta+i')
+          if (action === 'selection') await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(15, 21))
+          if (action === 'focus') await field.evaluate((el: HTMLTextAreaElement) => el.blur())
+          if (action === 'composition') await field.dispatchEvent('compositionstart', { data: 'あ' })
+        }
+        release()
+        if (sending) {
+          await juno.topic.expectSent(word)
+          await expect(field).toHaveValue('next draft')
+          expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'text', text: word, style: { bold: true } }] }])
+        } else if (action === 'twice-other') await expect(field).toHaveValue('*loaded* *first* _second_')
+        else if (action === 'twice') await expect(field).toHaveValue('*loaded* *_first_* second')
+        else if (action === 'selection') await expect(field).toHaveValue('*loaded* *first* second')
+        else if (action !== 'mac-control' && action !== 'fallback') {
+          // The original bold run proves the grammar and drawing have both loaded.
+          await field.focus()
+          if (action === 'composition') await field.dispatchEvent('compositionend')
+          await expect(juno.win.getByTestId('textarea-bold')).toHaveText('loaded')
+          await expect(field).toHaveValue('*loaded* first second')
+        }
+        // The next step reloads into this topic: clear the draft and wait until it is stored, so it cannot come back.
+        await field.fill('')
+        await expect.poll(drafts).toBe(draftsAtStart)
+      } finally {
+        release()
+        await juno.win.unrouteAll({ behavior: 'wait' })
+      }
+    })
+  }
 })

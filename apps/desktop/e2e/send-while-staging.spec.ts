@@ -34,48 +34,47 @@ function holdFileRead(win: Page, { fail = false }: { readonly fail?: boolean } =
 
 const releaseFileRead = (win: Page) => win.evaluate(() => window.dispatchEvent(new Event('release-file-read')))
 
-test('Enter while a file is still being read sends at once, and the message goes when the file is ready', async ({ juno, win, fake }) => {
+test('Enter while a file is still being read sends at once: the message goes when the file is ready, or shows as not sent when it cannot be read', async ({ juno, win, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
 
-  await holdFileRead(win)
-  await paste(topic.composer, [chart()])
-  await expect(chip(topic, 'chart.png')).toBeVisible()
-  await topic.send('Chart while it loads')
-  // The composer empties and the message shows as sending, with its file, before the file is read.
-  await expect(topic.composer).toHaveValue('')
-  await expect(chips(topic)).toHaveCount(0)
-  await expect(topic.message('Chart while it loads')).toHaveAttribute('data-pending', 'sending')
-  await expect(topic.message('Chart while it loads')).toContainText('chart.png')
-  expect(fake.calls.filter((call) => call.method === 'files.getUploadURL' || call.method === 'files.share')).toEqual([])
+  await test.step('the message goes when the file is ready', async () => {
+    await holdFileRead(win)
+    await paste(topic.composer, [chart()])
+    await expect(chip(topic, 'chart.png')).toBeVisible()
+    await topic.send('Chart while it loads')
+    // The composer empties and the message shows as sending, with its file, before the file is read.
+    await expect(topic.composer).toHaveValue('')
+    await expect(chips(topic)).toHaveCount(0)
+    await expect(topic.message('Chart while it loads')).toHaveAttribute('data-pending', 'sending')
+    await expect(topic.message('Chart while it loads')).toContainText('chart.png')
+    expect(fake.calls.filter((call) => call.method === 'files.getUploadURL' || call.method === 'files.share')).toEqual([])
 
-  await releaseFileRead(win)
-  await topic.expectSent('Chart while it loads')
-  const shares = fake.calls.filter((call) => call.method === 'files.share')
-  expect(shares).toHaveLength(1)
-  expect(fake.calls.filter((call) => call.method === 'files.getUploadURL').map((call) => call.args['filename'])).toEqual(['chart.png'])
-  await expect(topic.message('Chart while it loads').getByRole('button', { name: 'Open chart.png' })).toBeVisible()
-})
+    await releaseFileRead(win)
+    await topic.expectSent('Chart while it loads')
+    const shares = fake.calls.filter((call) => call.method === 'files.share')
+    expect(shares).toHaveLength(1)
+    expect(fake.calls.filter((call) => call.method === 'files.getUploadURL').map((call) => call.args['filename'])).toEqual(['chart.png'])
+    await expect(topic.message('Chart while it loads').getByRole('button', { name: 'Open chart.png' })).toBeVisible()
+  })
 
-test('a file that cannot be read after Enter shows its message as not sent', async ({ juno, win, fake }) => {
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
+  await test.step('a file that cannot be read after Enter shows its message as not sent', async () => {
+    fake.resetCalls()
+    await holdFileRead(win, { fail: true })
+    await paste(topic.composer, [brief()])
+    await expect(chip(topic, 'launch-brief.pdf')).toBeVisible()
+    await topic.send('Brief that will not load')
+    await expect(topic.message('Brief that will not load')).toHaveAttribute('data-pending', 'sending')
 
-  await holdFileRead(win, { fail: true })
-  await paste(topic.composer, [brief()])
-  await expect(chip(topic, 'launch-brief.pdf')).toBeVisible()
-  await topic.send('Brief that will not load')
-  await expect(topic.message('Brief that will not load')).toHaveAttribute('data-pending', 'sending')
-
-  await releaseFileRead(win)
-  const failed = topic.failed('Brief that will not load')
-  await expect(failed.row).toContainText('Not sent.', { timeout: 15_000 })
-  expect(fake.calls.filter((call) => call.method === 'files.getUploadURL' || call.method === 'files.share' || call.method === 'chat.postMessage')).toEqual([])
-  // Nothing new can come of a retry: Delete draft takes the row away.
-  await failed.discard()
-  await expect(topic.message('Brief that will not load')).toHaveCount(0)
+    await releaseFileRead(win)
+    const failed = topic.failed('Brief that will not load')
+    await expect(failed.row).toContainText('Not sent.', { timeout: 15_000 })
+    expect(fake.calls.filter((call) => call.method === 'files.getUploadURL' || call.method === 'files.share' || call.method === 'chat.postMessage')).toEqual([])
+    // Nothing new can come of a retry: Delete draft takes the row away.
+    await failed.discard()
+    await expect(topic.message('Brief that will not load')).toHaveCount(0)
+  })
 })
 
 test('a choice on the send check bar sends while a newly attached file is still being read', async ({ juno, win, fake, userData }) => {

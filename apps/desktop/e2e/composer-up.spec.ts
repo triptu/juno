@@ -14,22 +14,27 @@ test.use({ synced: true })
 test.describe.configure({ timeout: 120_000 })
 
 const NEWEST = 'Looking at the replica lag now'
+const HOVERED = 'Hover target for Esc'
 
+/** Opens #eng's Main and sends two messages, so the newest is known and another can be hovered. */
 async function openMain(juno: Juno, fake: FakeSlack): Promise<void> {
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
-  await juno.topic.send(NEWEST)
-  await juno.topic.expectSent(NEWEST)
+  for (const text of [HOVERED, NEWEST]) {
+    await juno.topic.send(text)
+    await juno.topic.expectSent(text)
+  }
   await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === NEWEST)).toBe(true)
 }
 
 const caretOf = (field: Locator) => field.evaluate((el: HTMLTextAreaElement) => [el.selectionStart, el.selectionEnd])
 const putCaret = (field: Locator, at: number) => field.evaluate((el: HTMLTextAreaElement, to) => el.setSelectionRange(to, to), at)
 
-test('↑ on the composer’s first line selects the newest message, keeping the draft and caret for ↓', async ({ juno, fake }) => {
+test('↑ and Esc from the composer: ↑ on the first line selects the newest message, Esc the hovered one, and keys act on a hovered message', async ({ juno, fake }) => {
   await openMain(juno, fake)
   const { topic, win } = juno
   const newest = topic.message(NEWEST)
+  const editField = topic.list.getByRole('textbox', { name: 'Edit message' })
 
   await test.step('two lines, caret on the second: ↑ moves the caret, ↑ again selects, ↓ comes back', async () => {
     const draft = 'first line\nsecond line'
@@ -80,21 +85,11 @@ test('↑ on the composer’s first line selects the newest message, keeping the
     await expect(topic.suggestions).toBeVisible()
     await expect(topic.composer).not.toHaveAttribute('aria-activedescendant', before)
   })
-})
-
-test('Esc in the composer selects the message under the pointer, else the newest; keys act on a hovered message', async ({ juno, fake }) => {
-  const HOVERED = 'Hover target for Esc'
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.expectTitle('Main')
-  for (const text of [HOVERED, NEWEST]) {
-    await juno.topic.send(text)
-    await juno.topic.expectSent(text)
-  }
-  await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === NEWEST)).toBe(true)
-  const { topic, win } = juno
-  const editField = topic.list.getByRole('textbox', { name: 'Edit message' })
 
   await test.step('hovered: Esc selects it, and E edits it', async () => {
+    // Empty, so Esc is not taken by the @ suggestions the step above opened.
+    await topic.composer.fill('')
+    await expect(topic.suggestions).toBeHidden()
     await topic.composer.focus()
     await topic.message(HOVERED).hover()
     await topic.composer.press('Escape')

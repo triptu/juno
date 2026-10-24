@@ -1,4 +1,4 @@
-import { expect, syncedTest, test } from './fixtures'
+import { expect, syncedTest } from './fixtures'
 import { test as agentTest } from './juno-agent/chat'
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -32,31 +32,32 @@ syncedTest('colon suggestions insert Unicode in a reply and send it to Slack; in
   await expect.poll(() => postedText(fake).at(-1)).toBe('😄')
 })
 
-test('workspace emoji and aliases show images and send shortcodes', async ({ juno, fake }) => {
+// Workspace emoji are set before sign-in, so this test signs in itself.
+agentTest('workspace emoji and aliases show images and send shortcodes, and the Juno panel composer suggests emoji too', async ({ juno, fake }) => {
   fake.workspace.emoji.set('juno_wave', { name: 'juno_wave', value: `${fake.url}/avatars/U0MAYA.svg` })
   fake.workspace.emoji.set('juno_hello', { name: 'juno_hello', value: 'alias:juno_wave', alias: 'juno_wave', is_alias: true })
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   const { topic } = juno
-  await topic.composer.pressSequentially(':juno_hello')
-  const option = topic.suggestions.getByRole('option', { name: ':juno_hello:', exact: true })
-  await expect(option.locator('img')).toBeVisible()
-  await topic.composer.press('Tab')
-  await expect(topic.composer).toHaveValue(':juno_wave: ')
-  await topic.composer.press('Enter')
-  await expect.poll(() => postedText(fake).at(-1)).toBe(':juno_wave:')
-})
 
-agentTest('the Juno panel composer suggests emoji too', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.tabs.menu('juno')
-  const field = juno.win.locator('[data-juno-composer="panel"] textarea')
-  await expect(field).toBeFocused()
-  await field.pressSequentially(':smi')
-  await expect(juno.win.getByRole('listbox', { name: 'Emoji' })).toBeVisible()
-  await field.press('Tab')
-  await expect(field).toHaveValue('😄 ')
+  await agentTest.step('a workspace alias shows its image and sends the shortcode it points to', async () => {
+    await topic.composer.pressSequentially(':juno_hello')
+    const option = topic.suggestions.getByRole('option', { name: ':juno_hello:', exact: true })
+    await expect(option.locator('img')).toBeVisible()
+    await topic.composer.press('Tab')
+    await expect(topic.composer).toHaveValue(':juno_wave: ')
+    await topic.composer.press('Enter')
+    await expect.poll(() => postedText(fake).at(-1)).toBe(':juno_wave:')
+  })
+
+  await agentTest.step('the Juno panel composer suggests emoji', async () => {
+    await juno.tabs.menu('juno')
+    const field = juno.win.locator('[data-juno-composer="panel"] textarea')
+    await expect(field).toBeFocused()
+    await field.pressSequentially(':smi')
+    await expect(juno.win.getByRole('listbox', { name: 'Emoji' })).toBeVisible()
+    await field.press('Tab')
+    await expect(field).toHaveValue('😄 ')
+  })
 })

@@ -43,69 +43,72 @@ async function forward(juno: Juno, text: string, destination: string, note: stri
   await expect(dialog).toHaveCount(0)
 }
 
-test('Forward… shares a message into a channel with a note', async ({ juno, fake }) => {
+test('Forward… shares a message into a channel with a note, a refused forward can be retried, and F opens the sheet', async ({ juno, fake }) => {
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
 
-  const { labels } = await juno.topic.chooseInMessageMenu(HANDOFF, null)
-  expect(labels.indexOf('Forward…')).toBeGreaterThan(-1)
-  expect(labels.indexOf('Forward…')).toBe(labels.indexOf('Open in Slack') - 1)
-  expect(labels).not.toContain('Copy Slack link')
+  await test.step('F forwards a focused message, and chooses Forward… in its open menu', async () => {
+    const dialog = sheet(juno.win)
+    const row = juno.topic.message(HANDOFF)
 
-  await forward(juno, HANDOFF, 'product', 'For the roadmap review\nThe second point matters most')
-  await juno.expectToast('Forwarded to #product')
-  await juno.win.getByRole('status').getByRole('button', { name: 'Open' }).click()
-  await juno.topic.expectTitle('Main')
-  await juno.topic.expectSent('For the roadmap review')
-  const forwarded = juno.topic.message('For the roadmap review')
-  await expect(forwarded.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
-  // The card names the place it was forwarded from, as any shared message's card does.
-  await expect(forwarded.locator('[data-shared-source]')).toHaveText('eng')
+    await row.locator('[data-msg-text]').first().click()
+    await expect(row).toBeFocused()
+    await row.press('f')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator('[data-forward-preview]')).toContainText(HANDOFF)
+    await juno.win.keyboard.press('Escape')
+    await juno.win.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
 
-  const shares = fake.calls.filter((call) => call.method === 'chat.shareMessage')
-  expect(shares).toHaveLength(1)
-  expect(shares[0]!.args).toMatchObject({ channel: 'C0ENG', share_channel: 'C0PRODUCT', text: '' })
-  const stored = fake.messages('C0PRODUCT').at(-1)!
-  expect(stored.text).toBe('For the roadmap review\nThe second point matters most')
-  expect(stored.attachments?.[0]).toMatchObject({ is_msg_unfurl: true, text: expect.stringContaining(HANDOFF) })
-})
+    const menu = await juno.messageMenu.openOnRow(row)
+    expect((await menu.shortcuts())['forward']).toBe('F')
+    await juno.win.keyboard.press('f')
+    await expect(menu.root).toHaveCount(0)
+    await expect(dialog).toBeVisible()
+    await juno.win.keyboard.press('Escape')
+    await juno.win.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+  })
 
-test('a forward Slack refuses shows Not sent. in the destination, and Retry sends it', async ({ juno, fake }) => {
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
+  await test.step('Forward… shares a message into a channel with a note', async () => {
+    const { labels } = await juno.topic.chooseInMessageMenu(HANDOFF, null)
+    expect(labels.indexOf('Forward…')).toBeGreaterThan(-1)
+    expect(labels.indexOf('Forward…')).toBe(labels.indexOf('Open in Slack') - 1)
+    expect(labels).not.toContain('Copy Slack link')
 
-  fake.forceError({ method: 'chat.shareMessage', error: 'restricted_action', times: 1 })
-  await forward(juno, HANDOFF, 'product', 'This one is refused first')
-  await juno.win.getByRole('status').getByRole('button', { name: 'Open' }).click()
-  const failed = juno.topic.failed('This one is refused first')
-  await expect(failed.row).toContainText('Not sent.')
-  await expect(failed.row.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
-  // The pending card already has the footer Slack's copy will have.
-  await expect(failed.row.locator('[data-shared-source]')).toHaveText('eng')
+    await forward(juno, HANDOFF, 'product', 'For the roadmap review\nThe second point matters most')
+    await juno.expectToast('Forwarded to #product')
+    await juno.win.getByRole('status').getByRole('button', { name: 'Open' }).click()
+    await juno.topic.expectTitle('Main')
+    await juno.topic.expectSent('For the roadmap review')
+    const forwarded = juno.topic.message('For the roadmap review')
+    await expect(forwarded.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
+    // The card names the place it was forwarded from, as any shared message's card does.
+    await expect(forwarded.locator('[data-shared-source]')).toHaveText('eng')
 
-  await failed.retry()
-  await juno.topic.expectSent('This one is refused first')
-  expect(fake.messages('C0PRODUCT').filter((message) => message.text === 'This one is refused first')).toHaveLength(1)
-})
+    const shares = fake.calls.filter((call) => call.method === 'chat.shareMessage')
+    expect(shares).toHaveLength(1)
+    expect(shares[0]!.args).toMatchObject({ channel: 'C0ENG', share_channel: 'C0PRODUCT', text: '' })
+    const stored = fake.messages('C0PRODUCT').at(-1)!
+    expect(stored.text).toBe('For the roadmap review\nThe second point matters most')
+    expect(stored.attachments?.[0]).toMatchObject({ is_msg_unfurl: true, text: expect.stringContaining(HANDOFF) })
+  })
 
-test('F forwards a focused message, and chooses Forward… in its open menu', async ({ juno }) => {
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
-  const dialog = sheet(juno.win)
-  const row = juno.topic.message(HANDOFF)
+  await test.step('a forward Slack refuses shows Not sent. in the destination, and Retry sends it', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.expectTitle('Main')
 
-  await row.locator('[data-msg-text]').first().click()
-  await expect(row).toBeFocused()
-  await row.press('f')
-  await expect(dialog).toBeVisible()
-  await expect(dialog.locator('[data-forward-preview]')).toContainText(HANDOFF)
-  await juno.win.keyboard.press('Escape')
-  await juno.win.keyboard.press('Escape')
-  await expect(dialog).toHaveCount(0)
+    fake.forceError({ method: 'chat.shareMessage', error: 'restricted_action', times: 1 })
+    await forward(juno, HANDOFF, 'product', 'This one is refused first')
+    await juno.win.getByRole('status').getByRole('button', { name: 'Open' }).click()
+    const failed = juno.topic.failed('This one is refused first')
+    await expect(failed.row).toContainText('Not sent.')
+    await expect(failed.row.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
+    // The pending card already has the footer Slack's copy will have.
+    await expect(failed.row.locator('[data-shared-source]')).toHaveText('eng')
 
-  const menu = await juno.messageMenu.openOnRow(row)
-  expect((await menu.shortcuts())['forward']).toBe('F')
-  await juno.win.keyboard.press('f')
-  await expect(menu.root).toHaveCount(0)
-  await expect(dialog).toBeVisible()
+    await failed.retry()
+    await juno.topic.expectSent('This one is refused first')
+    expect(fake.messages('C0PRODUCT').filter((message) => message.text === 'This one is refused first')).toHaveLength(1)
+  })
 })

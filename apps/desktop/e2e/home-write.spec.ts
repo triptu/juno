@@ -17,6 +17,7 @@ syncedTest('writes from Home to people and channels, keeps text and read state, 
   await test.step('Home has no Recent section; a first @ suggests a person, Tab makes them the destination, and the send stays on Home with the field in place', () => sendToPerson(context))
   await test.step('a first # or @ stays text for Juno on Space or Esc, and Backspace in an empty field goes back to Juno', () => keepPrefixText(context))
   await test.step('choosing a destination never marks anything read', () => keepDestinationUnread(context))
+  await test.step('a send Slack refuses says why in a toast, and the draft and destination stay', () => refusedSend(context))
   await test.step('a person never messaged: chosen from the list, then conversations.open on send', () => openFirstDm(context))
   await test.step('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', () => startChannelThread(context))
 })
@@ -104,6 +105,21 @@ async function keepDestinationUnread({ juno, slack }: Pick<Fixtures, 'juno' | 's
   await engMain.expectUnread(unread)
 }
 
+async function refusedSend({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
+  const { write } = juno
+
+  await write.pickConversation('jon', 'Jonas')
+  fake.forceError({ method: 'conversations.open', error: 'user_disabled' })
+  await write.write('Welcome aboard')
+  await write.send()
+  await juno.expectToast('Not sent · Their account is deactivated')
+  await expect(write.composer).toHaveValue('Welcome aboard')
+  await write.expectDestination('Jonas')
+  expect(fake.calls.some((call) => call.method === 'chat.postMessage')).toBe(false)
+}
+
 async function openFirstDm({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   fake.resetCalls()
 
@@ -155,16 +171,54 @@ async function startChannelThread({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'
   expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
 }
 
-syncedTest('Home keeps its draft and destination when a topic opens over it, and Back brings them back', async ({ juno }) => {
-  const { write, topic, sidebar, nav } = juno
+syncedTest('Home opens from the sidebar in the current tab, a plain open focuses its tab and ⌘-click opens another, and Home keeps its draft when a topic opens over it', async ({ juno }) => {
+  const { write, tabs, sidebar, topic, nav } = juno
+  const home = juno.home.navItem
 
-  await write.pickConversation('ma', 'Maya')
-  await write.write('A long thought I do not want to lose')
-  await sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await nav.back()
-  await expect(write.composer).toHaveValue('A long thought I do not want to lose')
-  await write.expectDestination('Maya')
+  await test.step('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async () => {
+    // A fresh launch shows one Home tab, selected.
+    await juno.expectNothingOpen()
+    await expect(home).toHaveAttribute('aria-current', 'page')
+
+    await sidebar.row(POSTGRES).open()
+    await topic.expectTitle(POSTGRES)
+    await expect(home).not.toHaveAttribute('aria-current', 'page')
+
+    await home.click()
+    await tabs.expectActive('Home')
+    await tabs.expectCount(1)
+    await expect(home).toHaveAttribute('aria-current', 'page')
+    await juno.home.expectShown()
+    await nav.back()
+    await topic.expectTitle(POSTGRES)
+
+    // A plain open focuses the tab that shows Home.
+    await sidebar.row(OFFSITE).openInNewTab()
+    await tabs.select(POSTGRES)
+    await home.click()
+    await tabs.expectActive('Home')
+    await tabs.select(OFFSITE)
+    await home.click()
+    await tabs.expectCount(2)
+    await tabs.expectActive('Home')
+
+    // ⌘-click opens a second Home.
+    await home.click({ modifiers: ['Meta'] })
+    await tabs.expectCount(3)
+    await expect(tabs.tab('Home')).toHaveCount(2)
+    await tabs.expectActiveAt('Home', 1)
+    await juno.home.expectShown()
+  })
+
+  await test.step('Home keeps its draft and destination when a topic opens over it, and Back brings them back', async () => {
+    await write.pickConversation('ma', 'Maya')
+    await write.write('A long thought I do not want to lose')
+    await sidebar.row(POSTGRES).open()
+    await topic.expectTitle(POSTGRES)
+    await nav.back()
+    await expect(write.composer).toHaveValue('A long thought I do not want to lose')
+    await write.expectDestination('Maya')
+  })
 })
 
 syncedTest('New Message (⌘N) opens Home’s destination list, and a new Home when this one has a draft; "+" opens Home ready to write', async ({ juno }) => {
@@ -196,92 +250,42 @@ syncedTest('New Message (⌘N) opens Home’s destination list, and a new Home w
   await write.expectDestination('Juno')
 })
 
-syncedTest('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno }) => {
-  const { tabs, sidebar, topic, nav } = juno
-  const home = juno.home.navItem
+syncedTest('closing Home with a draft shows "Draft closed" and Undo brings it back; a new thread whose root fails stays with Not sent and Retry, and a queued reply follows it', async ({ juno, fake }) => {
+  const { write, tabs, topic, sidebar } = juno
 
-  // A fresh launch shows one Home tab, selected.
-  await juno.expectNothingOpen()
-  await expect(home).toHaveAttribute('aria-current', 'page')
+  await test.step('closing Home with a draft shows "Draft closed", and Undo brings the tab back with its draft', async () => {
+    await write.pickConversation('ma', 'Maya')
+    await write.write(DRAFT)
+    await tabs.closeAt('Home', 0)
+    await juno.expectToast('Draft closed')
+    // The last tab closed, so a fresh Home took its place.
+    await expect(write.composer).toHaveValue('')
+    await write.expectDestination('Juno')
 
-  await sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await expect(home).not.toHaveAttribute('aria-current', 'page')
+    await juno.undoFromToast()
+    await expect(tabs.tab('Home')).toHaveCount(2)
+    await expect(write.composer).toHaveValue(DRAFT)
+    await write.expectDestination('Maya')
+    await expect(write.composer).toBeFocused()
+  })
 
-  await home.click()
-  await tabs.expectActive('Home')
-  await tabs.expectCount(1)
-  await expect(home).toHaveAttribute('aria-current', 'page')
-  await juno.home.expectShown()
-  await nav.back()
-  await topic.expectTitle(POSTGRES)
-
-  // A plain open focuses the tab that shows Home.
-  await sidebar.row(OFFSITE).openInNewTab()
-  await tabs.select(POSTGRES)
-  await home.click()
-  await tabs.expectActive('Home')
-  await tabs.select(OFFSITE)
-  await home.click()
-  await tabs.expectCount(2)
-  await tabs.expectActive('Home')
-
-  // ⌘-click opens a second Home.
-  await home.click({ modifiers: ['Meta'] })
-  await tabs.expectCount(3)
-  await expect(tabs.tab('Home')).toHaveCount(2)
-  await tabs.expectActiveAt('Home', 1)
-  await juno.home.expectShown()
-})
-
-syncedTest('a new thread whose root fails stays in the sidebar with Not sent and Retry, and a queued reply follows it', async ({ juno, fake }) => {
-  const { write, topic, sidebar } = juno
-  await write.pickConversation('eng', 'eng')
-  fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 1 })
-  await write.write('first')
-  await write.send()
-  await expect(sidebar.row('first').root).toBeVisible()
-  await sidebar.row('first').open()
-  await topic.expectTitle('first')
-  await expect(topic.failed('first').row).toContainText('Not sent.')
-  await topic.send('second')
-  await expect(topic.message('second')).toHaveAttribute('data-pending', 'sending')
-  expect(fake.messages('C0ENG').some((message) => message.text === 'second')).toBe(false)
-  await topic.failed('first').retry()
-  await topic.expectSent('first')
-  await topic.expectSent('second')
-  await topic.expectTitle('first')
-  const root = fake.messages('C0ENG').find((message) => message.text === 'first')!
-  expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
-})
-
-syncedTest('closing Home with a draft shows "Draft closed", and Undo brings the tab back with its draft', async ({ juno }) => {
-  const { write, tabs } = juno
-
-  await write.pickConversation('ma', 'Maya')
-  await write.write(DRAFT)
-  await tabs.closeAt('Home', 0)
-  await juno.expectToast('Draft closed')
-  // The last tab closed, so a fresh Home took its place.
-  await expect(write.composer).toHaveValue('')
-  await write.expectDestination('Juno')
-
-  await juno.undoFromToast()
-  await expect(tabs.tab('Home')).toHaveCount(2)
-  await expect(write.composer).toHaveValue(DRAFT)
-  await write.expectDestination('Maya')
-  await expect(write.composer).toBeFocused()
-})
-
-syncedTest('a send Slack refuses says why in a toast, and the draft and destination stay', async ({ juno, fake }) => {
-  const { write } = juno
-
-  await write.pickConversation('jon', 'Jonas')
-  fake.forceError({ method: 'conversations.open', error: 'user_disabled' })
-  await write.write('Welcome aboard')
-  await write.send()
-  await juno.expectToast('Not sent · Their account is deactivated')
-  await expect(write.composer).toHaveValue('Welcome aboard')
-  await write.expectDestination('Jonas')
-  expect(fake.calls.some((call) => call.method === 'chat.postMessage')).toBe(false)
+  await test.step('a new thread whose root fails stays in the sidebar with Not sent and Retry, and a queued reply follows it', async () => {
+    await write.pickConversation('eng', 'eng')
+    fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 1 })
+    await write.write('first')
+    await write.send()
+    await expect(sidebar.row('first').root).toBeVisible()
+    await sidebar.row('first').open()
+    await topic.expectTitle('first')
+    await expect(topic.failed('first').row).toContainText('Not sent.')
+    await topic.send('second')
+    await expect(topic.message('second')).toHaveAttribute('data-pending', 'sending')
+    expect(fake.messages('C0ENG').some((message) => message.text === 'second')).toBe(false)
+    await topic.failed('first').retry()
+    await topic.expectSent('first')
+    await topic.expectSent('second')
+    await topic.expectTitle('first')
+    const root = fake.messages('C0ENG').find((message) => message.text === 'first')!
+    expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
+  })
 })
