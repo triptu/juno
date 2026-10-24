@@ -45,3 +45,4 @@ export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem } from '.
 export { customEmoji } from './custom-emoji'
 export { matchEmoji, mergeEmoji, warmEmojiSearch, isEmojiSearchWarm } from './emoji-ranking'
 export { dockBadgeActive, type BadgeTopic, type BadgeContext } from './dockBadge'
+export * from './search-query'
