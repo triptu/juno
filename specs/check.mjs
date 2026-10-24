@@ -377,7 +377,7 @@ const regressions = [
   ['metadata', 'missedRename', 'quietAgreement', 'metadata-missed-rename'],
   ['threadranges', 'liveCount', 'countSound', 'thread-live-count'],
   ['threadranges', 'jumpGap', 'shownContinuous', 'thread-jump-gap'],
-  ['threadranges', 'unfollowedDrop', 'countSound', 'thread-unfollowed-drop'],
+  ['threadranges', 'restartGap', 'countSound', 'thread-restart-gap'],
 ]
 // Specs whose corrected runs must reach their drained agreement.
 const drained = new Set(['outbox', 'catchup', 'metadata', 'mutation-repair'])
