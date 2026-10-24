@@ -91,7 +91,7 @@ async function otherTabs(context: Pick<Fixtures, 'juno'>): Promise<void> {
   await palette.expectTab('Messages')
   await expect(palette.input).toHaveValue('theme')
   await palette.expectResults()
-  await expect(palette.section('Results').getByRole('option').filter({ hasText: MESSAGE })).toBeVisible()
+  await expect(palette.section('Topics and messages').getByRole('option').filter({ hasText: MESSAGE })).toBeVisible()
   await expect(palette.section('Conversations')).toHaveCount(0)
 
   await palette.press('Meta+4')

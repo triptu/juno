@@ -267,7 +267,7 @@ export function OpenPalette() {
       const max = shownText === '' ? PALETTE_RECENT : juno.length > 0 ? RESULTS_UNDER_COMMAND : PALETTE_RESULTS
       sections = [
         { heading: 'Juno', items: juno },
-        { heading: shownText === '' ? 'Recent' : 'Results', items: matches.slice(0, max) },
+        { heading: shownText === '' ? 'Recent' : 'Topics and messages', items: matches.slice(0, max) },
       ]
       break
     }
