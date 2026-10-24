@@ -69,12 +69,12 @@ The header has no status line: the nav starts right under the 44px bar. Sync pro
 
 | Button | Icon | Size | Accessible name | Action |
 | --- | --- | --- | --- | --- |
-| Search | `search` 16 | 30×30, radius 8 | "Search ⌘K" | Opens ⌘K palette |
+| Search | `search` 16 | 30×30, radius 8 | "Search ⇧⌘F" | Opens the Search tab on mouse down (§9a) in the current tab, ⌘ for a new tab; right-click has the page menu. With a Search tab current it focuses its field, and it takes the current look as All topics does |
 | All topics | `list-bullets` 16 | 30×30 | "All topics" | Opens All topics on mouse down (§10), ⌘ for a new tab; right-click has the page menu. While All topics is the current tab it takes an active nav item's look: `--hl-nav` fill, `--hl-text` and the filled icon, `aria-current="page"` (`IconButton current`) |
 | Home | `house` 16 | 30×30 | "Home" | Opens Home on mouse down (§12), ⌘ for a new tab; right-click has the page menu; pointer enter or focus warms `home.view` (`prefetchHome`, performance.md 4.2). Takes the same current look as All topics while Home is the current tab. No count or dot: Home shows at most three things, and the rows are the count (SPEC 12) |
 | Me | avatar 24 with a presence dot | 30×30 round, margin-left 4 | "Account and settings", described "Active" or "Away", then "Notifications paused until 9am" while paused | Toggles the avatar menu. The dot is the menu's (10px, `--presence-active` or a hollow `--foreground-muted` ring) with its 2px ring in `--background-subtle`, so presence shows without opening the menu. It and the description show what Slack shows colleagues (SPEC 14, "Your own dot"): away until Slack answers and while the socket is down; none while your presence setting is unknown. While notifications are paused a 14px snooze badge takes the dot's place, as in Slack: a 10px "z" breaking out of an open circle (drawn in `PresenceDot`; Phosphor has no such glyph) in `--foreground-default`, inside the same 2px ring. Pause and presence are separate: the badge never takes the presence colour, and presence is then given in words (the description and the menu's line) |
 
-Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, static press geometry. Each has a tooltip (primitives 14a): "Search ⌘K" with the keys as keycaps, "All topics", "Home", "Account and settings". The icons sit 2px apart and the avatar 6px after Home. The nav below holds only Juno.
+Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, static press geometry. Each has a tooltip (primitives 14a): "Search ⇧⌘F" with the keys as keycaps, "All topics", "Home", "Account and settings". The icons sit 2px apart and the avatar 6px after Home. The nav below holds only Juno.
 
 **Avatar menu** (popover, 248px wide, centred under the avatar 4px below it, moved in from the window's edge when it would run past (decided 10-17; it hung off the avatar's right edge and opened to its left), z 20, padding 6, radius 13, `--pop-shadow`):
 
@@ -531,6 +531,25 @@ The composer is the topic composer (§7) at the bottom of Home, with the chips' 
 - In a short window the list gives up height: the palette ends 24px above the window's bottom edge (the dim's padding), down to the minimum window.
 - Commands show only while AI assist is on. Esc gives focus back to where it was; a press on the dim closes.
 
+## 9a. Search tab
+
+SPEC 10a; design and mocks in `docs/design/search/` (`tab-light`, `scoped-light`, `picker-light`, `empty-light`, `states-light`, `narrow-light`) and the accepted fixes in its `review.md`. Views in `packages/views/src/search/`, gallery `SearchPage`.
+
+- **Band** (`SearchPage`): the field over the filter row, across the tab; padding 10 12, gap 6, a 1px `--border-default` rule under it. A size container (`search-band`), over the reader's header islands (`--z-picker`).
+- **Field** (`SearchField`): min 36px, radius 8, 1px `--input-border`, `--surface-default`, padding 5 6 5 10; magnifier 15 `--foreground-muted`, gap 6; text 13.5 (`--text-ui-size`); placeholder "Search messages and topics"; × "Clear search" 24px, icon 13, once anything is typed. Chips (`FieldChip`): 24px, radius 6, `--secondary-default` (hover `--secondary-hover`), 12.5/500, padding 0 8 (4 at the start before a 16px photo or art), the operator ("from:", "in:", "has:", "is:") in `--foreground-muted-on-fill` 400; a date chip names itself ("Last week"). Chips wrap with the words; the field grows.
+- **Picker** (`SearchPicker`): under the operator being typed, its left edge at the operator, 6px below the field; 320px (`--send-to-width`), popover surface, radius 12, padding 6; heading "People" or "Conversations" 11/500 muted; rows 36px (`OptionRow`): a 20px photo or the kind's 16px icon, the name with the matched part semibold, the kind at the end ("Public channel", "Direct message").
+- **Filter row** (`SearchFilters`): buttons 26px, radius 7, 12.5/500 `--foreground-subtle`, transparent (hover `--surface-hover`); a set filter takes `--secondary-default` and `--foreground-default`. From, In, Date, Has with a 12px caret (muted), 2px apart; 10px, then the sort (Newest/Oldest) and Group by thread (`chats-circle` 13, pressed fill while on); then at the end, at least 12px after, Apps hidden / Apps shown and Automated hidden / Automated shown with `eye-slash` / `eye` 13. Under 760px of band the toggles take a line of their own from its start.
+- **Results column** (`SearchResults`): 384px (312–480, `ResizeEdge`, the sidebar's 6px edge), 1px `--border-default` on its right; list padding 8 12 12, rows in flow with `content-visibility: auto`.
+  - Flat row: 52px, radius 8, padding 0 10; line one 22px: topic art 16, gap 8, title 14/500, the place (kind icon 12 + name, 12.5 muted), the time (12, tabular, muted, at the end); line two 20px, 24px in: sender 12.5 `--foreground-subtle`, snippet 13 muted with the matched words 600 in `--foreground-default`.
+  - Title-only row: 34px, art 16, the title with the matched words semibold, place, time.
+  - Grouped: the topic line 34px (art 20, gap 10, 4px above it), match lines 32px 40px in (sender, snippet, time), "N more in this thread" 26px 40px in, 12.5 muted; a Main run's header 34px with the kind's icon in a 20px slot and "#procurement · Main" 12.5/500 subtle.
+  - Selected: `--secondary-default`; while the field or the list has focus, `--hl-nav`. On either fill the muted text takes `--foreground-muted-on-fill`. No focus ring on the rows: the tint is the indicator.
+  - "Older matches on this Mac": 32px, 12/500 muted, then a 1px `--border-subtle` rule to the end; 6 above, 2 below.
+  - States: a note 12.5 `--foreground-subtle` (padding 10 10 12) with a small secondary button 8px under it (Try again with `arrow-counter-clockwise`, Clear filters, Show 4 matches); "Searching Slack…" a 36px muted line at the end; an unsupported operator one 12.5 muted line over the rows.
+  - Empty field: "Recent searches" 11/500 muted (padding 10 10 4); rows 32px, radius 8, `clock-counter-clockwise` 14, 13.5, chips 20px radius 5 12/500; hover `--surface-hover` and a 22px × "Remove from recent searches"; then "Narrow with from:, in:, has: or a date." and "To jump to a conversation, topic or command, press ⌘K." (12.5 muted, 12px above; the ⌘K key cap is a button that opens ⌘K).
+- **Reader**: the topic view (§5–§7) with the reader's header controls (`header/ReaderControls.tsx`): Back to results (28px pill, `caret-left` 16 + "Back to results" 12.5/500; its icon alone under 480px) leading the left island in the one-column page; a step island before the right one: "2 of 5" (12.5/500 subtle, tabular) and Previous match / Next match (`caret-up` / `caret-down` 16, tooltips with ⌘↑ ⌘↓); Open in new tab (`arrow-square-out` 16, ⌘↵) first in the right island. Under 480px the count, Open in new tab, Resolve and Juno hide. Matched words in the reader are CSS highlights: `--hl-soft`, the current match `--mark-current`.
+- **Tab** in the strip: the magnifier icon and the query's words, "Search" when empty.
+
 ## 10. All topics page
 
 **Shows:** S09, shot 40b (Resolved filter), shot 40c (empty), shot 64 (dark).
@@ -898,6 +917,10 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 | Keys | Where | Action |
 | --- | --- | --- |
 | ⌘K | anywhere | Toggle palette |
+| ⌘⇧F | anywhere | The Search tab: its field when one is current, else Search in this tab (§9a) |
+| ⌘F | topic tab | Search scoped to the topic; elsewhere as ⌘⇧F |
+| ↑ ↓, Enter, ⌘Enter, Tab, Esc | Search list | Move (the reader follows), open here, open behind, to the reader's composer; Esc in its empty composer back to the list |
+| ⌘↑ / ⌘↓ | Search tab | Previous / next match in the reader |
 | ⌘J | topic tab | Toggle the Juno panel and focus its composer; with text selected in a message, Ask Juno on it |
 | ⌘J | elsewhere | Open Juno tab and focus its input |
 | ⌘N | anywhere | New message: Home's composer with the destination list open |
