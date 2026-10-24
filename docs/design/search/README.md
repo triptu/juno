@@ -101,6 +101,7 @@ Rejected: an answer card above the results, AI reranking, an AI "top hit", mergi
 ### 8. Empty field
 
 - Recent searches (the last 10, with their filters; × removes one), then a short line on operators.
+- Under it, a line pointing to ⌘K for quick navigation, since the sidebar's magnifier now opens this page: "To jump to a conversation, topic or command, press ⌘K." with the key shown as a key cap, and clicking it opens ⌘K. It shows on the empty field only, never over results.
 - A pinned Search tab is a kept search. No new "saved search" object in v1.
 
 ## Plan
