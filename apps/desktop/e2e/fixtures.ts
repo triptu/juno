@@ -232,7 +232,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   },
   otherApp: async ({ lane, fake, slackApp, hostPool, webBrowser, agentLaunch }, use) => {
     const cleanups: Array<() => Promise<void>> = []
-    try { await use(async (options) => {
+    await use(async (options) => {
       const userData = await tempUserData()
       let context: BrowserContext | undefined
       let running: RunningApp | undefined
@@ -246,11 +246,10 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         ? await launchApp(userData, { ...agentLaunch, ...options, fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
         : await startWebApp(hostPool, await context.newPage(), fake, userData, undefined, { sidebarTrace: false, sendTrace: false, engine: { ...agentLaunch, ...options } })
       return new Juno(running.host === undefined ? electronSurface(running.app) : webSurface(running.win, running.host), running.win)
-    }) } finally {
-      const results = await Promise.allSettled(cleanups.reverse().map((close) => close()))
-      const failed = results.find((result) => result.status === 'rejected')
-      if (failed?.status === 'rejected') throw failed.reason
-    }
+    })
+    const results = await Promise.allSettled(cleanups.reverse().map((close) => close()))
+    const failed = results.find((result) => result.status === 'rejected')
+    if (failed?.status === 'rejected') throw failed.reason
   },
   agentOptions: [{}, { option: true }],
   agentLaunch: async ({ agentOptions }, use) => {
