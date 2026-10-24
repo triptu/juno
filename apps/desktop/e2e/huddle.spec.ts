@@ -319,6 +319,8 @@ test('Switch leaves the huddle the user is in, joins the other, and says so', as
 
   // Maya's huddle in #product: its header offers Switch, with no confirmation.
   fake.control('startHuddle', { channel: 'C0PRODUCT', user: 'U0MAYA' })
+  // The huddle's message moves Main; wait for that update before aiming the click.
+  await juno.sidebar.expectTop('#product')
   await juno.sidebar.row('#product').open()
   await juno.topic.expectTitle('Main')
   await juno.sidebar.leave()

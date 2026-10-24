@@ -1,0 +1,1 @@
+- 10-24 14:15 · huddle-switch-test-order · The huddle switch test waits for the injected huddle message to move #product Main before clicking its sidebar row. A click aimed before that update could open the hiring thread at the old coordinates; the product's huddle switch behaviour is unchanged (owner).
