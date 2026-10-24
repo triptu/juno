@@ -25,7 +25,7 @@ export const MAIN_CONDITION = `(thread_ts IS NULL OR thread_ts = ts OR subtype =
 
 /** The columns a message row needs. */
 export const MESSAGE_COLUMNS = `channel, ts, thread_ts, user_id, bot_name, bot_icon, subtype, text, blocks_json, files_json, attachments_json,
-  edited_ts, deleted, client_msg_id, reply_count, latest_reply, reply_users_json, version, last_event_ts`
+  edited_ts, deleted, client_msg_id, reply_count, latest_reply, reply_users_json, version, last_event_ts, partial`
 
 export type WindowMessage = Pick<
   MessageRow,
@@ -48,6 +48,7 @@ export type WindowMessage = Pick<
   | 'reply_users_json'
   | 'version'
   | 'last_event_ts'
+  | 'partial'
 >
 
 export type WindowTarget = { readonly kind: 'main'; readonly channel: string } | { readonly kind: 'thread'; readonly channel: string; readonly threadTs: string }

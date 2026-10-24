@@ -805,6 +805,7 @@ const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMess
   // An edit before the post went out rewrites the row's text, so its body is parsed again.
   version: contentVersion(row.text, `${row.blocks_json ?? ''}${row.share_json ?? ''}`),
   last_event_ts: null,
+  partial: 0,
 })
 
 // Files
