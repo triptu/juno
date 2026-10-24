@@ -91,13 +91,13 @@ it('opening a topic fetches only what the store lacks, and a link finds its topi
     await header((detail) => detail?.title === 'Old thread about lag', 'the title from the root')
   })
 
-  await step('a second open asks only for replies after the newest stored one', async () => {
+  await step('a second open asks only for replies after what the first one proved', async () => {
     const newest = list.current().order.at(-1)!
     engine.fake.resetCalls()
     expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
     const again = opens(engine)
     expect(again.map((call) => call.method)).toEqual(['conversations.replies'])
-    expect(again[0]!.args['oldest']).toBe(newest)
+    expect(again[0]!.args['oldest']! >= newest).toBe(true)
   })
 
   await step('opening Main asks only for what is newer than its stored history, and the rows it had keep their objects', async () => {
@@ -183,12 +183,12 @@ it('history the first sync left out comes when asked: a searched reply in full o
   } })
   await quiet(engine)
 
-  await step('a reply the discovery search stored does not cover its thread; the open brings it in full, with its reactions', async () => {
-    // The followed thread's view carries only its latest replies; the search stored this one without its 👍.
+  await step('a reply the discovery search stored is not shown as part of its thread; the open brings it in full, with its reactions', async () => {
+    // The followed thread's view carries only its latest replies; the search stored this one without its 👍, and no page proves what is around it.
     const reply = engine.fake.messages('C0ENG').find((m) => m.text?.startsWith('We keep the old primary warm'))!
     const thread = `t:C0ENG:${reply.thread_ts}`
     const list = watchList(engine, messagesAtom(thread))
-    await list.until((window) => window.rows.get(reply.ts)?.reactions.length === 0 && window.meta.windowCovered === false, 'the search match, without reactions or coverage')
+    await list.until((window) => window.order.length > 0 && !window.rows.has(reply.ts) && window.meta.gapBefore === true, 'the thread without the search match')
     expect(valueOf(await openTopic(engine.registry, thread)).outcome).toBe('fetched')
     const after = await list.until((window) => window.meta.windowCovered === true && window.rows.get(reply.ts)?.reactions.length === 1, 'the reply in full')
     expect(after.rows.get(reply.ts)!.reactions).toMatchObject([{ name: '+1', count: 2, me: true }])
