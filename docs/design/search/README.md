@@ -45,20 +45,23 @@ How we got here: a map of today's search (below), web research on what people li
 - At the smallest widths the filter row wraps its two toggles to a second line, and under 480 px the reader's header keeps Back, the place icon, the title, the match arrows and ⋯; Open in new tab, Resolve and Juno move into ⋯.
 - The sidebar's magnifier shows the current state while a Search tab is active, as Home and All topics do.
 
-### 3. Rows grouped by thread
+### 3. Rows: a flat list by time, or grouped by thread
 
-Slack returns single messages, newest first, a page at a time, each with its thread (`thread_ts`). Grouping happens in Juno over the rows loaded so far, so it never needs anything Slack doesn't give:
+**By default the list is flat**: one row per matching message, in time order (newest first, or oldest with the sort). This is the order Slack returns, so pages only ever add rows at the end.
 
-- A thread's group sits where its newest loaded match falls in time order. Newest first, a later page can only hold older matches, so it adds lines to a group already shown, never moves a group up. Under Oldest first the same holds with the order reversed.
-- "N more in this thread" counts the matches loaded so far, and grows as pages arrive. It never claims a total Slack hasn't sent.
-- The reader's "2 of N" counts matches in the whole thread as Juno holds it (the thread is fetched when opened), so it is exact even when the list has loaded only some of them.
-- Best match (v2) would group by a thread's best-ranked match in the same way.
-
-- A thread's matches sit under one topic line: its art, its Juno title, its place, the time of the newest match. Under it are up to 2 match lines (sender, snippet with the matched words in semibold, time), then "3 more in this thread".
-- A channel's Main is not one conversation, so Main matches are single rows with the channel and date. Consecutive Main rows from the same channel share one header line.
+- A row is two lines. Line 1: the topic's art (16), its Juno title (a Main reads "#procurement · Main"), the place, and the time. Line 2: the sender and the snippet, with the matched words in semibold.
 - A snippet starts a few words before the first match, with a leading "…" when cut, so the matched words are always visible.
+- **Topic titles match too.** Juno's titles are AI-made, so "staging bill" can find the topic titled "Staging bill doubled since August" even when nobody wrote those words. A topic whose title matches shows as a one-line row with the words marked, at the time of its latest message. Slack can't do this. Title matches obey `in:` and dates; with `from:`, only topics that person wrote in.
+
+**Group by thread** is a toggle in the filter row, next to the sort, and is remembered. Slack returns single messages, each with its thread (`thread_ts`), so grouping happens in Juno over the rows loaded so far:
+
+- A thread's matches sit under one topic line (art, title, place, time of its newest loaded match), with up to 2 match lines, then "3 more in this thread".
+- A thread's group sits where its newest loaded match falls in time order. Newest first, a later page can only hold older matches, so it adds lines to a group already shown and never moves a group up. Under Oldest first the same holds in reverse.
+- "N more in this thread" counts the matches loaded so far and grows as pages arrive. It never claims a total Slack hasn't sent.
+- A channel's Main is not one conversation, so Main matches stay single rows; consecutive Main rows from the same channel share one header line.
 - Grouping uses thread identity only, never a model's sense of similarity. Similar bot messages are not merged: two alerts can be two incidents.
-- **Topic titles match too.** Juno's titles are AI-made, so "staging bill" can find the topic titled "Staging bill doubled since August" even when nobody wrote those words. A topic whose title matches shows as a topic line with the words marked, even without a message match. Slack can't do this. Title matches obey `in:` and dates; with `from:`, only topics that person wrote in.
+
+In both modes the reader's "2 of N" counts matches in the whole thread as Juno holds it (the thread is fetched when opened), so it is exact even when the list has loaded only some of them.
 
 ### 4. The query: typed operators and chips are one thing
 
