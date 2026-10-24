@@ -15,7 +15,7 @@ export interface ThreadCoverage {
 export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const ranges = yield* sql<ThreadRange>`SELECT from_ts, to_ts, tail FROM thread_ranges WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} ORDER BY from_ts`
+    const ranges = yield* sql<ThreadRange>`SELECT kind, from_ts, to_ts, tail FROM thread_ranges WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} ORDER BY from_ts`
     const roots = yield* sql<NonNullable<ThreadCoverage['root']>>`
       SELECT reply_count, latest_reply, user_id, text, blocks_json FROM messages WHERE channel = ${target.channel} AND ts = ${target.threadTs}`
     return { ranges, root: roots[0] } satisfies ThreadCoverage
@@ -23,9 +23,9 @@ export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>
 
 /**
  * A thread's window cut to the stretch the store proves continuous
- * (`@juno/sync` `threadRanges.ts`): the rows around the anchor (the newest
- * row without one) up to the first boundary on either side that no range
- * covers. The view then asks across that boundary when it scrolls near it,
+ * (`@juno/sync` `threadRanges.ts`): the rows around the anchor (without
+ * one, the newest row a page range holds, else the newest row) up to the
+ * first boundary on either side that no range covers. The view then asks across that boundary when it scrolls near it,
  * and the replies come in at the window's edge, so nothing inside it moves.
  *
  * `previous`: the message just before the rows, `next` the one just after
@@ -47,8 +47,12 @@ export function clipThread(
   const { ranges, root } = options.coverage
   if (rows.length === 0) return { rows, previous: options.previous, gapBefore: false, gapAfter: false }
   const joined = (older: string, newer: string) => continuous(ranges, older, newer)
+  // With no anchor, the newest row a page proved: later rows that only an event or a search brought wait beyond
+  // the window's end, so a reply stored across a gap never takes the window away from the rows shown.
   const anchor = options.anchor
-  const found = anchor === undefined ? -1 : rows.findIndex((row) => compareTs(row.ts, anchor) >= 0)
+  const found = anchor === undefined
+    ? rows.findLastIndex((row) => rangeHolding(ranges, row.ts) !== undefined)
+    : rows.findIndex((row) => compareTs(row.ts, anchor) >= 0)
   const start = found === -1 ? rows.length - 1 : found
   let low = start
   while (low > 0 && joined(rows[low - 1]!.ts, rows[low]!.ts)) low -= 1

@@ -208,7 +208,8 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     if (target.kind === 'thread' && !target.threadTs.startsWith('pending:')) {
       coverage = yield* threadCoverage(target)
       const clipped = clipThread(stored, { threadTs: target.threadTs, anchor: range.anchor, previous: beforeWindow, next: afterWindow, atNewest, coverage })
-      if (clipped.rows.at(-1) !== stored.at(-1)) atNewest = false
+      // Juno's own sends still show at the bottom: they come after everything, known or not.
+      if (range.anchor !== undefined && clipped.rows.at(-1) !== stored.at(-1)) atNewest = false
       stored = clipped.rows
       beforeWindow = clipped.previous
       gapBefore = clipped.gapBefore
