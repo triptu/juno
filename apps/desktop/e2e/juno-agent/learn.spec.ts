@@ -2,6 +2,7 @@
 // OpenRouter: the proactive ask on Home, Start, the background pass over the owner's own Slack
 // messages, the memory page with each note's source, the outline in the next chat's request, and
 // Undo on a later update.
+import { chatCopy } from '@juno/agent-contract'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { openChat, openPage, readySynced as ready } from './agent'
 import { answer, expect, test as base } from './chat'
@@ -53,15 +54,15 @@ test('Home offers to learn, the pass fills the memory page with sources, the nex
     await juno.home.open()
     return ask.count()
   }, { timeout: 30_000 }).toBe(1)
-  await expect(juno.home.title('ask')).toHaveText('Let Juno learn how you work')
-  await expect(juno.home.meta('ask')).toHaveText('Reads your Slack messages')
+  await expect(juno.home.title('ask')).toHaveText(chatCopy.ask.learn.title.setup)
+  await expect(juno.home.meta('ask')).toHaveText(chatCopy.ask.learn.meta([]))
   await ask.getByRole('button', { name: 'Start', exact: true }).click()
 
   // The pass runs in the background and never shows the typing bubble; the chat's ask says what it kept.
   const chat = await openChat(juno)
   const card = chat.root.locator('[data-chat-ask="learn"]')
   await expect(card).toHaveAttribute('data-ask-status', 'done', { timeout: 30_000 })
-  await expect(card.locator('[data-ask-after]')).toContainText('Done · Kept 2 notes')
+  await expect(card.locator('[data-ask-after]')).toContainText(chatCopy.ask.learn.done(2))
   await expect(chat.root.locator('[data-chat-status]')).toHaveCount(0)
   const passNote = chat.root.locator('[data-chat-note="memoryUpdated"]')
   await expect(passNote).toContainText('Updated memory · People, Writing style')
@@ -74,7 +75,7 @@ test('Home offers to learn, the pass fills the memory page with sources, the nex
   await expect(style).toContainText(STYLE)
   await expect(style).toHaveAttribute('data-memory-source', 'slack')
   await expect(style).toContainText('Slack · ')
-  await expect(style.locator('[data-memory-outside]')).toHaveAttribute('data-tooltip', 'Juno wrote this after reading outside content')
+  await expect(style.locator('[data-memory-outside]')).toHaveAttribute('data-tooltip', chatCopy.docs.outside)
   await expect(style).not.toContainText('outside content')
   await expect(page.locator('[data-memory-doc="people"] [data-memory-entry]')).toContainText(PEOPLE)
   await expect(page.locator('[data-memory-change="add"]')).toHaveCount(2)

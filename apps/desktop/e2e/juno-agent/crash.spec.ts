@@ -14,7 +14,7 @@ const NOTE = 'save a note about the address'
 
 /**
  * "read eng <n>" reads #eng through the engine and says whether it found messages; the note request
- * proposes a Littlebird write; "forget my first message" proposes a removal; the rest is echoed.
+ * proposes a Littlebird write; the rest is echoed.
  */
 function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   const read = /read eng (\d+)/.exec(request.input)?.[1]
@@ -24,14 +24,12 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   }
   if (request.toolResult !== undefined) {
     if (request.toolResult.includes('Proposed Change card')) return '<say>The note is ready for you to review.</say>'
-    if (request.toolResult.includes('Nothing is removed until')) return '<say>Ready to remove it.</say>'
     return `<say>Tool said: ${request.toolResult}</say>`
   }
   const server = /\bon (server-[0-9a-f-]+)/.exec(request.input)?.[1]
   if (server !== undefined && request.input.includes(NOTE)) {
     return { toolCall: { name: 'call_tool', arguments: { server, tool: 'add_material', args: { title: 'Launch', text: 'The launch moved to Tuesday.' } } } }
   }
-  if (request.input.includes('forget my first message')) return { toolCall: { name: 'remove_messages', arguments: { messages: ['n1'] } } }
   return echo(request)
 }
 

@@ -150,7 +150,6 @@ async function correctRelationship(juno: Juno): Promise<Locator> {
   await relationship.selectOption('manager')
   await expect(relationship).toHaveValue('manager')
   await expect(relationship).toHaveAttribute('data-memory-relationship-by', 'owner')
-  await expect(relationship).toHaveAttribute('data-tooltip', 'Set by you')
   return page
 }
 

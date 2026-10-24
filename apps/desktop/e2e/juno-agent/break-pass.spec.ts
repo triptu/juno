@@ -23,7 +23,7 @@ test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
-test('Resolve waits for approval, double clicking resolves once, and Undo survives a restart', async ({ juno, relaunch }) => {
+test('Resolve waits for approval, double clicking resolves once, Undo survives a restart, and AI off with an open card resolves nothing', async ({ juno, relaunch, userData, fake }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send('resolve m:C0ENG')
@@ -35,28 +35,28 @@ test('Resolve waits for approval, double clicking resolves once, and Undo surviv
   await expect(juno.sidebar.row('#eng').root).toHaveCount(0)
   const restarted = await relaunch()
   await restarted.waitForSync()
-  const restored = card(await openChat(restarted), 'resolve')
+  const again = await openChat(restarted)
+  const restored = card(again, 'resolve')
   await restored.getByRole('button', { name: 'Undo', exact: true }).click()
   await expect(restored).toContainText('Undone')
   await restarted.sidebar.row('#eng').expectVisible()
-})
 
-test('AI off with an open Resolve card does not resolve its topic', async ({ juno, relaunch, userData, fake }) => {
-  await ready(juno)
-  const chat = await openChat(juno)
-  await chat.send('resolve m:C0ENG')
-  await expect(card(chat, 'resolve')).toHaveAttribute('data-card-status', 'open')
-  await chat.expectJuno('Ready for your click.')
-  const restarted = await relaunch({ whileClosed: async () => {
+  // A second Resolve card, left open, then AI assist turned off while the app is closed.
+  const answered = await again.junoBubble('Ready for your click.').count()
+  await again.send('resolve m:C0ENG')
+  await expect(card(again, 'resolve')).toHaveCount(2)
+  await expect(card(again, 'resolve').last()).toHaveAttribute('data-card-status', 'open')
+  await expect(again.junoBubble('Ready for your click.')).toHaveCount(answered + 1, { timeout: 15_000 })
+  const off = await relaunch({ whileClosed: async () => {
     const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
     try {
       db.prepare("INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json").run()
     } finally { db.close() }
   } })
-  await restarted.waitForSync()
-    const off = await openChat(restarted)
-    await expect(off.root.getByText(chatCopy.banner.aiOff.line)).toBeVisible()
-    await expect(off.composer).toBeDisabled()
-    await expect(off.root.getByRole('button', { name: 'Resolve', exact: true })).toHaveCount(0)
-    await restarted.sidebar.row('#eng').expectVisible()
+  await off.waitForSync()
+  const offChat = await openChat(off)
+  await expect(offChat.root.getByText(chatCopy.banner.aiOff.line)).toBeVisible()
+  await expect(offChat.composer).toBeDisabled()
+  await expect(offChat.root.getByRole('button', { name: 'Resolve', exact: true })).toHaveCount(0)
+  await off.sidebar.row('#eng').expectVisible()
 })

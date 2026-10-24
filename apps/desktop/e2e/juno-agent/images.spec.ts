@@ -27,7 +27,7 @@ test.describe.configure({ timeout: 120_000 })
 
 const chatRequests = (model: ScriptedModel) => model.requests.filter((request) => !request.compaction)
 
-test('an image attached on Home goes to Juno as an image part, shows on the bubble, and a PDF stays on Home', async ({ juno, model }) => {
+test('an image attached on Home goes to Juno as an image part and a PDF stays on Home; the Juno tab takes a dropped image on its own, and with a model that reads text only the image stays and the line says why', async ({ juno, model }) => {
   await ready(juno)
   const { write, tabs } = juno
   await write.expectDestination('Juno')
@@ -55,19 +55,17 @@ test('an image attached on Home goes to Juno as an image part, shows on the bubb
   await tabs.expectActive('Home')
   await expect(write.root.getByRole('button', { name: 'Remove launch-brief.pdf' })).toBeVisible()
   await expect(write.root.getByRole('button', { name: 'Remove chart.png' })).toHaveCount(0)
-})
 
-test('the Juno tab takes a dropped image on its own; with a model that reads text only, the image stays and the line says why', async ({ juno, model }) => {
-  await ready(juno)
-  const chat = await openChat(juno)
+  // The Juno tab takes a dropped image on its own: an image alone is a message, no text needed.
+  await openChat(juno)
   await expect(chat.root.locator('[data-juno-composer]').getByRole('button', { name: 'Attach files' })).toBeVisible()
-
-  // An image alone is a message: no text needed.
+  const withImage = () => chatRequests(model).filter((request) => request.images.length > 0).length
+  const sentBefore = withImage()
   await drop(chat.root.locator('[data-juno-composer]'), [chart()])
   await expect(chat.root.locator('[data-juno-composer] [data-attachment="ready"] img')).toBeVisible()
   await chat.composer.press('Enter')
-  await expect(chat.root.locator('[data-chat-owner] [data-owner-image="0"] img')).toBeVisible()
-  await expect.poll(() => chatRequests(model).filter((request) => request.images.length === 1).length, { timeout: 15_000 }).toBe(1)
+  await expect(chat.root.locator('[data-chat-owner] [data-owner-image="0"] img')).toHaveCount(2)
+  await expect.poll(withImage, { timeout: 15_000 }).toBe(sentBefore + 1)
   await expect(chat.root.locator('[data-juno-composer] [data-attachment]')).toHaveCount(0)
 
   // Grok reads text only here.

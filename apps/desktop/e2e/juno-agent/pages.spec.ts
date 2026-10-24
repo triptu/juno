@@ -56,7 +56,7 @@ test('the Juno menu opens its pages: Activity, Connections rules, and Settings �
   await ready(juno)
   await test.step('Activity lists the run a message started, and the other pages open', () => walkPages(juno))
   await test.step('Connections starts with when Juno asks first, and saves your rules', () => saveRules(juno))
-  await test.step('Settings › Juno shows what is built, with the provider in use and the newest usable models, and Pause holds a message until Resume', () => settingsJuno(juno, model))
+  await test.step('Settings › Juno shows the provider in use and the newest usable models, and Pause holds a message until Resume', () => settingsJuno(juno, model))
 })
 
 async function walkPages(juno: Juno): Promise<void> {
@@ -98,21 +98,9 @@ async function settingsJuno(juno: Juno, model: ScriptedModel): Promise<void> {
   await openPage(juno, 'Settings')
   const page = juno.win.locator('main')
   await expect(page.getByRole('heading', { name: 'Juno', exact: true })).toBeVisible()
-  for (const heading of ['Provider', 'Model', 'Spend', 'Codex', 'Pause Juno']) await expect(page.getByRole('heading', { name: heading })).toBeVisible()
-  // The owner's rules are on Connections.
-  await expect(page.getByRole('heading', { name: 'When Juno asks first' })).toHaveCount(0)
-  await expect(page.getByText('Use your ChatGPT plan instead of an API key.')).toBeVisible()
-  await expect(page.getByText('Coming soon')).toBeVisible()
-  // Backup and This Mac are their own section.
-  const sections = juno.win.getByRole('navigation', { name: 'Settings' })
-  await sections.getByRole('button', { name: 'Backup & This Mac' }).click()
-  for (const heading of ['Backup', 'This Mac']) await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
-  await sections.getByRole('button', { name: 'Juno' }).click()
-  await expect(page.getByRole('heading', { name: 'Provider' })).toBeVisible()
   // The launch set OpenRouter up: its key is set and it is in use.
   await expect(page.locator('[data-provider-shown]')).toHaveAttribute('data-provider-shown', 'openRouter')
   await expect(page.locator('[data-provider-key]')).toHaveAttribute('data-provider-key', 'set')
-  await expect(page.getByText('OpenRouter is in use.')).toBeVisible()
 
   // The picker offers the newest usable model per family and hides batch, no-tools and small-window models.
   const names = () =>

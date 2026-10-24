@@ -1,6 +1,7 @@
 // Cards the owner clicks (plan v3 §16, flows 3, 5 and 11): Dismiss on a Send card, a multi-send
 // card where one post fails, a hostile Slack message that turns a task into a card with a
-// Because line, and the Budget card at the daily cap.
+// Because line, the Budget card at the daily cap (one test per button: the agent makes one Budget
+// card per day and raise), and a card that expires.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
@@ -50,8 +51,8 @@ test.use({ synced: true })
 test.describe.configure({ timeout: 150_000 })
 
 test(
-  'Dismiss on a Send card sends nothing; a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has all three',
-  async ({ juno, fake, slack }) => {
+  'Dismiss on a Send card sends nothing; a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has all three; after a hostile Slack message a task becomes a card with a Because line',
+  async ({ juno, fake, slack, model }) => {
     await ready(juno)
     const eng = slack.channel('eng')
     const product = slack.channel('product')
@@ -95,32 +96,29 @@ test(
     await expect(page.locator('[data-activity-action="done"]')).toContainText('Approved')
     await expect(page.locator('[data-activity-action="failed"]')).toContainText('Approved')
     await expect(actions.filter({ hasText: 'Declined' })).toHaveCount(1)
+
+    // After reading a hostile Slack message, a task becomes a card with a Because line and nothing starts.
+    fake.injectMessage({ channel: eng, user: slack.as('Leo').id, text: HOSTILE })
+    await openChat(juno)
+    const answered = await chat.junoBubble('It is ready for you.').count()
+    await chat.send(`read ${eng} and start a task on what it says`)
+    const task = card(chat, 'proposedTask')
+    await expect(task).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
+    await expect(task.getByText(UNTRUSTED, { exact: true })).toBeVisible()
+    await expect(task.getByRole('button', { name: 'Start', exact: true })).toBeVisible()
+    await expect(chat.junoBubble('It is ready for you.')).toHaveCount(answered + 1, { timeout: 15_000 })
+    await expect(card(chat, 'task')).toHaveCount(0)
+    // The helper model would get the task text as its input: it never ran.
+    expect(model.inputs().filter((input) => input.includes(TASK))).toEqual([])
+
+    await openPage(juno, 'Activity')
+    // The run says, in plain words, what it read and that it asked before acting.
+    const run = page.locator('[data-activity-run="replied"]').filter({ has: juno.win.locator('[data-activity-summary]', { hasText: /^Read .*#eng/ }) })
+    await expect(run).toHaveCount(1)
+    await openRuns(page)
+    await expect(run.locator('[data-activity-tainted]')).toBeVisible()
   },
 )
-
-test('after reading a hostile Slack message, a task becomes a card with a Because line and nothing starts', async ({ juno, fake, slack, model }) => {
-  await ready(juno)
-  const eng = slack.channel('eng')
-  fake.injectMessage({ channel: eng, user: slack.as('Leo').id, text: HOSTILE })
-  const chat = await openChat(juno)
-  await chat.send(`read ${eng} and start a task on what it says`)
-
-  const task = card(chat, 'proposedTask')
-  await expect(task).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
-  await expect(task.getByText(UNTRUSTED, { exact: true })).toBeVisible()
-  await expect(task.getByRole('button', { name: 'Start', exact: true })).toBeVisible()
-  await chat.expectJuno('It is ready for you.')
-  await expect(card(chat, 'task')).toHaveCount(0)
-  // The helper model would get the task text as its input: it never ran.
-  expect(model.inputs().filter((input) => input.includes(TASK))).toEqual([])
-
-  const page = await openPage(juno, 'Activity')
-  // The run says, in plain words, what it read and that it asked before acting.
-  const run = page.locator('[data-activity-run="replied"]').filter({ has: juno.win.locator('[data-activity-summary]', { hasText: /^Read .*#eng/ }) })
-  await expect(run).toHaveCount(1)
-  await openRuns(page)
-  await expect(run.locator('[data-activity-tainted]')).toBeVisible()
-})
 
 test('at the daily cap the Budget card appears, and Allow $1 more lets the answer through', async ({ juno }) => {
   await ready(juno)
@@ -163,7 +161,6 @@ test('at the daily cap, Wait until tomorrow closes the Budget card and Juno stay
   expect(model.inputs().filter((input) => input.includes('what is on today?'))).toEqual([])
 })
 
-
 test('an old unapproved card expires, and Ask again creates a fresh card without sending', async ({ juno, relaunch, userData, fake, slack }) => {
   await ready(juno)
   const chat = await openChat(juno)
@@ -177,12 +174,12 @@ test('an old unapproved card expires, and Ask again creates a fresh card without
   } })
   await again.waitForSync()
   await agentReady(again.surface)
-    const pane = await openChat(again)
-    const expired = card(pane, 'sendMessage').first()
-    await expect(expired).toHaveAttribute('data-card-status', 'expired')
-    await expired.getByRole('button', { name: 'Ask again' }).click()
-    await expect(pane.ownerBubble('Ask again')).toHaveCount(1)
-    await expect(card(pane, 'sendMessage')).toHaveCount(2)
-    await expect(card(pane, 'sendMessage').last()).toHaveAttribute('data-card-status', 'open')
-    expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
+  const pane = await openChat(again)
+  const expired = card(pane, 'sendMessage').first()
+  await expect(expired).toHaveAttribute('data-card-status', 'expired')
+  await expired.getByRole('button', { name: 'Ask again' }).click()
+  await expect(pane.ownerBubble('Ask again')).toHaveCount(1)
+  await expect(card(pane, 'sendMessage')).toHaveCount(2)
+  await expect(card(pane, 'sendMessage').last()).toHaveAttribute('data-card-status', 'open')
+  expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
 })
