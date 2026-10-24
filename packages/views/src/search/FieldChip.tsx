@@ -47,8 +47,10 @@ function chipLead(chip: SearchChipView) {
 }
 
 const styles = stylex.create({
+  // Whole until it is wider than the field; the field wraps it to a line of its own first.
   chip: {
     display: 'inline-flex',
+    flexShrink: 0,
     alignItems: 'center',
     gap: spacing['--space-1'],
     height: sizes['--control-24'],
