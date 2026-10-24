@@ -23,17 +23,20 @@ How we got here: a map of today's search (below), web research on what people li
 ### 1. Search is a tab
 
 - A new place, `search`. Each Search tab is its own session, with its own query, selection and scroll, so two searches can sit side by side.
-- **Opening it.** ⌘⇧F opens Search in the current tab, or focuses the field when a Search tab is active. The sidebar's magnifier opens it too. In a topic, ⌘F opens Search already filtered to that conversation (`in:` chip). From ⌘K's Messages tab, a footer row "All results for "…" ⌘⇧F" carries the text and filters over.
+- **Opening it.** ⌘⇧F opens Search in the current tab, or focuses the field when a Search tab is active. The sidebar's magnifier opens it too. In a topic, ⌘F opens Search scoped to that topic: a thread searches that thread, a Main searches its channel or DM. The scope is a chip ("in: Acme MSA renewal terms") that Backspace removes to widen the search. From ⌘K's Messages tab, a footer row "All results for "…" ⌘⇧F" carries the text and filters over.
 - ⌘K stays the quick way to jump somewhere. Its Messages tab keeps its short list.
 - The tab title is the query, or "Search" when empty. Privacy mode shows "Search".
 - Search state lives outside the mounted page, so Back and Forward, a closed and reopened tab (⌘⇧T) and a restart all bring back the query, the selection and the scroll. The results are fetched again.
 
-### 2. Results on the left, the conversation on the right
+### 2. The field across the top, results on the left, the conversation on the right
 
+- **The field and the filter row span the whole tab**, above the split, so long queries and several chips have room. The split starts under them.
 - **Results column** 384 px wide, resizable from 312 to 480, like the sidebar. The **reader** takes the rest.
 - Up and Down move through the results, and the reader follows at once (it reads from the local store, within the 50 ms cached topic budget). Moving the selection never opens a tab or adds a history entry.
 - **Enter** opens the topic at the message in the current tab, with Back returning to the search exactly as it was. **⌘Enter** or ⌘-click opens it in a new tab in the background, and focus stays in the list, so you can open several in a row.
-- **The reader** is the topic's messages in compact rows, as a peek shows them, scrolled to the match with the matched words marked. It is read-only and marks nothing read, like a peek. Its header has the title, the place, **Open** and **Open in new tab**. When a thread has several matches, "2 of 5" with up and down arrows (⌘↑ ⌘↓) step between them.
+- **The reader is the topic itself**, with its composer, reactions and message menus, scrolled to the match with the matched words marked. You can reply without leaving the search. Its header has the title, the place, **Open in new tab** and the topic's ⋯ menu. When a thread has several matches, "2 of 5" with up and down arrows (⌘↑ ⌘↓) step between them.
+- **Reading marks read only when you act.** Arrowing past a result marks nothing read, as a peek. Clicking or typing in the reader, reacting, sending, or opening the topic marks it read, as opening it does today.
+- Tab moves focus from the list into the reader's composer; Esc in an empty composer goes back to the list.
 - Narrower than 312 + 480 px: one column. Enter shows the reader with "Back to results"; Esc does the same.
 - The sidebar's magnifier shows the current state while a Search tab is active, as Home and All topics do.
 
@@ -101,7 +104,7 @@ Tests: end-to-end flows against the fake Slack (which needs the extra operators,
 
 ## Open questions
 
-1. **Can you reply from the reader, or is it read-only?** Recommended: read-only, like a peek, so moving through results never marks anything read; Enter opens the topic to reply.
-2. **Does ⌘F in a topic open Search scoped to that conversation,** rather than a find-in-page bar? Recommended: yes. It is how most people use ⌘F in Slack.
-3. **Hide apps and bots by default?** Recommended: yes, with the Apps toggle visible and showing "Apps hidden", so nothing is hidden silently. Against: you sometimes search for an alert or a deploy.
-4. **Does ⌘K's Messages tab stay?** Recommended: yes, as the quick list, with the footer row into the Search tab.
+Decided (10-24): the reader is not read-only; ⌘F in a topic searches that topic; the field spans the tab above the split.
+
+1. **Hide apps and bots by default?** Recommended: yes, with the Apps toggle visible and showing "Apps hidden", so nothing is hidden silently. Against: you sometimes search for an alert or a deploy.
+2. **Does ⌘K's Messages tab stay?** Recommended: yes, as the quick list, with the footer row into the Search tab.
