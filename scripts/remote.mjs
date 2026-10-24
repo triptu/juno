@@ -46,6 +46,7 @@ function parse(argv) {
   if (options.cores !== undefined && (!Number.isSafeInteger(options.cores) || options.cores < 1)) throw new Error('--cores must be a positive integer')
   if (!Number.isSafeInteger(options.wait) || options.wait < 0) throw new Error('--wait must be a non-negative number of seconds')
   for (const pair of options.env) if (!/^[A-Za-z_][A-Za-z0-9_]*=[^\n\r]*$/.test(pair ?? '')) throw new Error('--env takes NAME=value on one line')
+  if (process.env.JUNO_PLAN_SERIAL === '1' && !options.env.some((pair) => pair.startsWith('JUNO_PLAN_SERIAL='))) options.env.push('JUNO_PLAN_SERIAL=1')
   const [script, ...args] = argv.slice(index)
   if (!script) throw new Error('usage: bun run remote [--local] [--cores n] [--wait seconds] <script> [args...]')
   // A split plan can queue an app job behind the unit/spec jobs in the same allocation.

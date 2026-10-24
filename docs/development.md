@@ -1082,7 +1082,7 @@ Namespace, if needed again, is available only through `/tstack:runner`.
 `test:plan` splits unit, desktop and gallery, and specs steps into independent SSH jobs. Browser and Electron desktop steps run in order and share builds; conformance stays with specs. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
-runs every step in order. `KEY=VALUE` before a step overrides its environment.
+runs every step in order, whether set locally or passed with `--env`. An explicit `--env` value wins. `KEY=VALUE` before a step overrides its environment.
 
 ```sh
 bun run runner:check

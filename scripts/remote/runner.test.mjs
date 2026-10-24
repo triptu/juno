@@ -99,6 +99,19 @@ test('split plans allow queued jobs to wait and keep an explicit wait override',
   assert.ok(f.calls().filter((call) => call.sub === 'run').at(-1).args.includes('wait=60'))
 })
 
+test('a serial plan from the environment reaches the laptop and an explicit override wins', (t) => {
+  const f = fixture(t)
+  const args = ['test:plan', 'test:gallery', '+', 'test:desktop']
+  const serial = f.run(args, { JUNO_PLAN_SERIAL: '1' })
+  assert.equal(serial.status, 0, serial.output)
+  const jobs = f.calls().filter((call) => call.sub === 'run')
+  assert.equal(jobs.length, 1)
+  assert.ok(jobs[0].args.includes('env=JUNO_PLAN_SERIAL=1'))
+  const parallel = f.run(['--env', 'JUNO_PLAN_SERIAL=0', ...args], { JUNO_PLAN_SERIAL: '1' })
+  assert.equal(parallel.status, 0, parallel.output)
+  assert.equal(f.calls().filter((call) => call.sub === 'run').length, 3)
+})
+
 test('--local runs root commands sequentially without requiring tstack or SSH', (t) => {
   const f = fixture(t)
   const result = f.run(['--local', 'test:plan', 'test', 'test/messages.test.ts', '+', 'test:desktop', 'e2e/app.spec.ts'], { TSTACK_HOME: '/nonexistent', TEST_MODE: 'unreachable' })

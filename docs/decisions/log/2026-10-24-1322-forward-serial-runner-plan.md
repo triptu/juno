@@ -1,0 +1,1 @@
+- 10-24 13:22 · Forward serial plans to the laptop · A local JUNO_PLAN_SERIAL=1 now reaches the remote plan as well as disabling split SSH jobs; an explicit --env value wins. This lets one-agent, one-job verification run suites in sequence without starving timed repository-tool checks beside the browser workers.
