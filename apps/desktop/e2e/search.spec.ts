@@ -84,7 +84,9 @@ async function moreShots({ juno }: Context): Promise<void> {
   // Settings opens in the current tab and closes after; a new tab keeps the search.
   await juno.surface.appMenu('new-tab')
   await juno.setTheme('Dark')
-  await juno.tabs.select('flamingo')
+  // The search is the first tab: ⌘1 brings it back.
+  await juno.surface.appMenu('tab-1')
+  await juno.tabs.expectActive('flamingo')
   await shot(juno, 'tab-dark')
 }
 
