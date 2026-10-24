@@ -21,10 +21,12 @@ export const planWords = (steps) => steps.flatMap((step, index) => [
   ...(index ? ['+'] : []), ...Object.entries(step.env).map(([key, value]) => `${key}=${value}`), step.script, ...step.args,
 ])
 
+export const defaultPlanCores = { desktop: 3, gallery: 3 }
+
 export function planCores(kind, options, env = process.env) {
   const key = `JUNO_RUNNER_${kind.toUpperCase()}_CORES`
   const value = options.env.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
-  const cores = value === undefined ? options.cores : Number(value)
+  const cores = value === undefined ? options.cores ?? defaultPlanCores[kind] : Number(value)
   if (cores !== undefined && (!Number.isInteger(cores) || cores < 1)) throw new Error(`${key} must be a positive whole number`)
   return cores
 }

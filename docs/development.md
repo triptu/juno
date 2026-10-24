@@ -1215,7 +1215,8 @@ Juno requests physical cores from the laptop's shared `4-11` allocation:
 | Job | Cores | Memory cap |
 | --- | ---: | ---: |
 | Narrow unit, agent tests, cached spec check | 1 | 3 GiB |
-| Wide unit, uncached spec check, gallery, app | 2 | 6 GiB |
+| Wide unit, uncached spec check, standalone gallery or app | 2 | 6 GiB |
+| Gallery or desktop inside a split plan | 3 | 9 GiB |
 | Conformance, trace generation, other scripts | 4 | 12 GiB |
 
 Wide units have no named files or more than 20. `--cores` overrides the request;
@@ -1226,9 +1227,9 @@ CPU, with no burst to two.
 
 The shared host maps sibling CPUs and sets the actual thread quota. Workers
 use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
-threads from the request. At four threads units run four `bun test` processes,
-desktop runs three workers (two in sequential plans),
-and gallery runs three. Quint uses one simulation group per two threads and one
+threads from the request. At four threads units run four `bun test` processes.
+At six threads a split desktop job runs three workers and a split gallery job
+runs four. Quint uses one simulation group per two threads and one
 Apalache checker per two threads, limited by the job’s cgroup memory ("Faster test runs").
 A two-core, 6 GiB job gets two simulation groups and two 1,536 MiB JVM heaps.
 Explicit worker settings win within the Apalache memory cap.
@@ -1673,4 +1674,14 @@ After fixing and committing the cause, run `bun run verify:main --ref origin/mai
 
 ### Compare desktop and gallery allocation
 
-After the browser lane lands on main, run `bun scripts/verify-benchmark.mjs --dry-run` to inspect the plan, then `bun scripts/verify-benchmark.mjs --ref origin/main`. It pins one commit and runs five laptop full runs sequentially at desktop/gallery core splits 2/2, 3/3, 4/4, 5/3 and 4/4. It stops on a failure for triage. It refuses local fallback and waits for both browser and Electron scripts before starting. Records live in shared `.juno-status/verify-benchmarks/` and include wall time, suite records and allocations; the retained logs contain allocator waits, peak container memory and CPU pressure. Compare the whole run, failure rate and shared-host pressure, not desktop time alone. Keep defaults until repeated measurements justify a change.
+After the browser lane lands on main, run `bun scripts/verify-benchmark.mjs --dry-run` to inspect the plan, then `bun scripts/verify-benchmark.mjs --ref origin/main`. It pins one commit and runs five laptop full runs sequentially at desktop/gallery core splits 2/2, 3/3, 4/4, 5/3 and 4/4. It stops on a failure for triage. It refuses local fallback and waits for both browser and Electron scripts before starting. Records live in shared `.juno-status/verify-benchmarks/` and include wall time, suite records and allocations; the retained logs contain allocator waits, peak container memory and CPU pressure. Compare the whole run, failure rate and shared-host pressure, not desktop time alone. A failed configuration is not eligible even when its raw wall time is lower.
+
+The 2026-10-24 warm-cache run at `baea08148` produced these single-run results:
+
+| Desktop/gallery cores | Result | Wall | Unit | Gallery | Browser | Electron | Allocator wait | Desktop peak | Desktop median CPU |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2/2 | Passed | 567.1 s | 95 s | 75 s | 435 s | 121 s | 86 s | 4.10 GiB | 97% |
+| 3/3 | Passed | 387.4 s | 95 s | 61 s | 297 s | 81 s | 0 s | 5.39 GiB | 98% |
+| 4/4 | Failed | 353.6 s | 90 s | 45 s | 224 s | 73 s | 46 s | 6.81 GiB | 99% |
+
+The 4/4 run failed a browser media-tab flow, so the harness stopped before 5/3 and the repeated 4/4 run. These are observations, not replicated medians. The browser lane was the long pole in both successful runs. The split-plan default is 3/3 because it was the fastest successful sample and the only sample without an allocator wait; 4/4 is ineligible despite its lower raw wall time.
