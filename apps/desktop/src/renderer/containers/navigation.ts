@@ -46,6 +46,7 @@ import {
   goToEntry,
   allTopicsPlace,
   galleryPlace,
+  searchPlace,
   replaceInTab,
   allTopicsTab,
   homePlace,
@@ -540,6 +541,11 @@ export function openGallery(pictureId?: string, options: OpenOptions = {}): void
   show((tabs) => openPlace(tabs, galleryPlace(pictureId), options), undefined)
 }
 
+/** A Search tab's session (SPEC 10a), in the current tab as a new history entry, or with `newTab` in a new one. `search/open.ts` starts the session. */
+export function showSearch(sessionId: string, options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, searchPlace(sessionId), options), undefined)
+}
+
 /** Another picture in the tab that shows one, without a new history entry (the picture page's ‹ and ›). */
 export function stepPicture(tabId: string, pictureId: string): void {
   show((tabs) => replaceInTab(tabs, tabId, galleryPlace(pictureId)), undefined)
@@ -813,6 +819,10 @@ export function runMenuCommand(command: MenuCommand): void {
       return
     case 'palette.toggle':
       // `Palette.tsx` handles it.
+      return
+    case 'search.open':
+    case 'search.topic':
+      // `search/open.ts` handles them.
       return
     case 'settings.open':
       return openSettings()

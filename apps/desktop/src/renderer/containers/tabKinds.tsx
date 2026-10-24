@@ -6,7 +6,7 @@
 import { Suspense, type ReactElement } from 'react'
 import { junoPageTitles } from '@juno/agent-contract'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
-import { pictureTitle, registry, topicAtom, type Place } from '@juno/state'
+import { pictureTitle, registry, searchTitleAtom, topicAtom, type Place } from '@juno/state'
 import type { WorkspaceTab, WorkspaceTabIcon } from '@juno/views'
 import { chunk } from './chunks'
 import { gallery } from './galleryChunk'
@@ -28,6 +28,11 @@ const DevLogTab = devLog.component((module) => module.DevLogTab)
 // The gallery and the picture page load when a gallery tab first shows, or earlier (`galleryChunk.ts`).
 const GalleryTab = gallery.component((module) => module.GalleryTab)
 
+// The Search page loads when a Search tab first shows, or on idle after the sidebar (`Workspace.tsx`).
+const searchPage = chunk(() => import('./search/SearchTab'))
+const SearchTab = searchPage.component((module) => module.SearchTab)
+export const loadSearchTab = searchPage.load
+
 // The huddle page loads when a huddle tab first shows.
 const huddle = chunk(() => import('./huddle/Tab'))
 const HuddleTab = huddle.component((module) => module.HuddleTab)
@@ -36,8 +41,8 @@ const HuddleTab = huddle.component((module) => module.HuddleTab)
 export type TabLook = Omit<WorkspaceTab, 'id' | 'pinned'>
 
 export interface TabKind<P extends Place> {
-  /** The tab in the strip. `detail` is the topic's header for a topic, and unused otherwise. */
-  readonly strip: (place: P, detail: TopicDetail | null | undefined) => TabLook
+  /** The tab in the strip. `detail` is the topic's header for a topic; `title` a Search tab's, from its query. */
+  readonly strip: (place: P, detail: TopicDetail | null | undefined, title: string | undefined) => TabLook
   /** What the history menu calls the place. */
   readonly label: (place: P) => string
   /** The page. Its key is the place, so a new place in the tab mounts afresh. */
@@ -133,6 +138,15 @@ export const tabKinds: { readonly [K in Place['kind']]: TabKind<Extract<Place, {
       <GalleryTab pictureId={place.pictureId} tabId={tabId} />
     </Suspense>
   )),
+  search: {
+    strip: (_, __, title) => ({ title: title ?? 'Search', icon: 'search' }),
+    label: (place) => registry.get(searchTitleAtom(place.sessionId)),
+    page: (place, tabId) => (
+      <Suspense key={`search:${place.sessionId}`} fallback={null}>
+        <SearchTab tabId={tabId} sessionId={place.sessionId} />
+      </Suspense>
+    ),
+  },
   huddle: {
     strip: (_, detail) => ({ title: huddleTabTitle(detail), icon: 'headphones' }),
     label: (place) => huddleTabTitle(topicDetailOf(mainTopicOf(place.channelId))),

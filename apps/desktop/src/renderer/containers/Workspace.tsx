@@ -34,10 +34,11 @@ import { useNotificationBridge } from './notificationBridge'
 import { closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { runUndoCommand } from './topicActions'
 import { focusPage, forcePageFocus, pageComposer, takeForcedPageFocus, takeTypedAhead } from './pageFocus'
-import { loadSettingsTab, tabKindOf } from './tabKinds'
+import { loadSearchTab, loadSettingsTab, tabKindOf } from './tabKinds'
 import { preloadAfterSidebar } from './preloadAfterSidebar'
 import { loadChannelMenu } from './placeMenus'
 import { TitlebarNav } from './TitlebarNav'
+import { runSearchCommand } from './search/open'
 
 // The web panel warms on idle, outside the startup bundle.
 const webPanelChunk = chunk(() => import('./WebPanel'))
@@ -50,7 +51,7 @@ function stripTab(summary: TabSummary): WorkspaceTab {
   const held = tabs.get(summary)
   if (held !== undefined) return held
   const { detail, place } = summary
-  const tab: WorkspaceTab = { id: summary.id, pinned: summary.pinned, ...tabKindOf(place).strip(place, detail) }
+  const tab: WorkspaceTab = { id: summary.id, pinned: summary.pinned, ...tabKindOf(place).strip(place, detail, summary.title) }
   tabs.set(summary, tab)
   return tab
 }
@@ -145,6 +146,7 @@ function useWorkspaceEffects(active: string | undefined): void {
     return () => window.removeEventListener('keydown', holdKeysAfterNewShortcut, true)
   }, [])
   useEffect(() => onMenuCommand(runUndoCommand), [])
+  useEffect(() => onMenuCommand(runSearchCommand), [])
   useEffect(() => followWebPanel(registry), [])
   useEffect(() => onMenuCommand((command) => command === 'juno.toggle' && runJunoShortcut()), [])
   // "Pick up where you left off" on Home: the topic that stayed on screen for a minute.
@@ -156,6 +158,7 @@ function useWorkspaceEffects(active: string | undefined): void {
       () => {
         void loadSettingsTab()
         void loadAllTopicsPage()
+        void loadSearchTab()
         if (registry.get(junoAvailableAtom)) {
           void loadJuno()
         }
