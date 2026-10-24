@@ -81,10 +81,13 @@ export function useTopicFetch(id: string, view: string, enabled = true) {
 /**
  * A partial cache is not an opening window. The header and composer paint immediately;
  * messages wait for coverage, or show the available cache when fetching cannot finish.
+ * A thread window that stops at replies the store cannot prove above its first row
+ * (`meta.gapBefore`) waits for the open's fetch, which may bring them in above it.
  */
 export function windowShown(positioned: boolean, list: MessageWindow, readAtOpen: string | undefined, fetchState: FetchState): boolean {
   const contextLoaded = readAtOpen === undefined || (list.order[0] !== undefined && list.order[0] <= readAtOpen)
-  return positioned || (list.meta.windowCovered === true && (contextLoaded || fetchState === 'done')) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
+  const settled = fetchState === 'done' || (contextLoaded && list.meta.gapBefore !== true)
+  return positioned || (list.meta.windowCovered === true && settled) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
 }
 
 /** An empty list says nothing until Slack has answered or 300 ms have passed. */
