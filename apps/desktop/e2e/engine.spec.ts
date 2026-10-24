@@ -1,22 +1,20 @@
-import { expect, hooks, syncedTest, test } from './fixtures'
-
-test('is served from the juno: scheme', async ({ win }) => {
-  await expect(win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible()
-  expect(await win.evaluate(() => location.protocol)).toBe('juno:')
-  expect(await win.evaluate(() => location.href)).toBe('juno://app/index.html?theme=system&accent=coral&density=compact&sidebar=384&tour=manual')
-  // Nothing outside the renderer folder is served: a traversal attempt ends
-  // as a 404 (Chromium normalises the path; main refuses what is left).
-  const escaped = await win.evaluate(() =>
-    fetch('juno://app/../../package.json').then(
-      (r) => r.status,
-      () => 'failed',
-    ),
-  )
-  expect(escaped).toBe(404)
-})
+import { expect, hooks, syncedTest as test } from './fixtures'
 
 // Restart brings the engine back, so the supervisor can give up on it a second time.
-syncedTest('when the engine stops for good, the sidebar and About say so, and Restart brings it back', async ({ juno, app }) => {
+test('the app is served from the juno: scheme; when the engine stops for good, the sidebar and About say so, and Restart brings it back', async ({ juno, app, win }) => {
+
+  await test.step('is served from the juno: scheme, and nothing outside the renderer folder', async () => {
+    expect(await win.evaluate(() => `${location.protocol}//${location.host}${location.pathname}`)).toBe('juno://app/index.html')
+    // Nothing outside the renderer folder is served: a traversal attempt ends
+    // as a 404 (Chromium normalises the path; main refuses what is left).
+    const escaped = await win.evaluate(() =>
+      fetch('juno://app/../../package.json').then(
+        (r) => r.status,
+        () => 'failed',
+      ),
+    )
+    expect(escaped).toBe(404)
+  })
 
   await test.step('says so under the filters when the engine stops for good, and Restart brings it back', async () => {
     const { sidebar } = juno

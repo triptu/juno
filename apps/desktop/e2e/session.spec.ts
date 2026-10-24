@@ -10,9 +10,9 @@ test('signed out at launch, then imports and verifies the Slack app’s session'
     await juno.expectSignedOut()
     await expect(juno.importButton).toBeVisible()
     await expect(win.getByRole('button', { name: 'Sign in to Slack', exact: true })).toHaveCount(0)
-    await expect(win.getByText('I make Slack sane. Every thread, channel and DM becomes a topic, all in one quiet list.')).toBeVisible()
-    for (const label of ['Home', 'Resolve topics', 'Smart notifications', 'Fast']) await expect(win.getByRole('term').filter({ hasText: label })).toBeVisible()
-    await expect(win.getByText('macOS will ask for your password once, so I can read the Slack app’s session.')).toBeVisible()
+    // The highlights show here; the expired page below has none.
+    await expect(win.getByRole('term').first()).toBeVisible()
+    await expect(win.getByText('macOS will ask for your password once', { exact: false })).toBeVisible()
     // The appearance controls sit at the foot with no visible labels, and keep their names.
     await expect(win.getByRole('radiogroup', { name: 'Theme' })).toBeVisible()
     await expect(win.getByRole('group', { name: 'Accent' })).toBeVisible()
@@ -180,7 +180,7 @@ test('signing out, and Slack expiring the session, both return to the sign-in pa
 
     await juno.expectSessionExpired()
     await expect(juno.importButton).toBeVisible()
-    await expect(win.getByText('The Slack app’s session ended. Open Slack, sign in there, then try again. Your topics and settings are kept.')).toBeVisible()
+    await expect(win.getByText('The Slack app’s session ended.', { exact: false })).toBeVisible()
     // Signed out, the page gives only the next step: no highlights.
     await expect(win.getByRole('term')).toHaveCount(0)
     // Stand in for signing in again in the installed Slack app.

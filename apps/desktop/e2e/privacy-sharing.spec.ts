@@ -93,7 +93,7 @@ async function manualPrivacy({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect(toggle).not.toBeChecked()
 }
 
-test('a capture running at launch hides nothing, and true then false then true hides the text', async ({ juno, running, userData, fake, slackApp }) => {
+test('a capture running at launch hides nothing; one that never stops says detection is not available, until it stops and the next share hides the text', async ({ juno, running, userData, fake, slackApp }) => {
   // Sharing turned the mode on when Juno quit; the next launch has it as the user left it, off.
   await juno.privacy.startSharing()
   await expect(juno.privacy.footer).toBeVisible()
@@ -111,36 +111,26 @@ test('a capture running at launch hides nothing, and true then false then true h
     await second.privacy.expectBlurred(rina.preview, false)
     expect(await second.privacy.menuLabel()).toBe('Hide Message Text')
 
+    await second.openSettings('General')
+    await expect(second.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
+    // True since launch for more than two minutes.
+    await second.privacy.elapse(2 * 60_000 + 1_000)
+    await second.settings.show('Appearance')
+    await second.settings.show('General')
+    await expect(second.settings.root.getByText(ALWAYS_ON)).toBeVisible()
+    await expect(second.settings.root.getByRole('switch', { name: SWITCH })).toBeChecked()
+    await expect(second.privacy.footer).toHaveCount(0)
+
+    // The capture stops: detection is available again, and the next share hides the text.
     await second.privacy.stopSharing()
+    await second.settings.show('Appearance')
+    await second.settings.show('General')
+    await expect(second.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
     await second.privacy.startSharing()
+    await expect(second.privacy.footer).toBeVisible()
     await second.privacy.expectBlurred(rina.preview)
     expect(await second.privacy.footerText()).toBe('Message text hidden while sharing')
   } finally {
     await again.close()
   }
-})
-
-test.describe('with a capture running at launch', () => {
-  test.use({ screenShared: true })
-
-  test('a capture that never stops says detection is not available, until it stops', async ({ juno }) => {
-    await juno.openSettings('General')
-    await expect(juno.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
-
-    // True since launch for more than two minutes.
-    await juno.privacy.elapse(2 * 60_000 + 1_000)
-    await juno.settings.show('Appearance')
-    await juno.settings.show('General')
-    await expect(juno.settings.root.getByText(ALWAYS_ON)).toBeVisible()
-    await expect(juno.settings.root.getByRole('switch', { name: SWITCH })).toBeChecked()
-    await expect(juno.privacy.footer).toHaveCount(0)
-
-    // The capture stops: detection is available again, and the next share hides the text.
-    await juno.privacy.stopSharing()
-    await juno.settings.show('Appearance')
-    await juno.settings.show('General')
-    await expect(juno.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
-    await juno.privacy.startSharing()
-    await expect(juno.privacy.footer).toBeVisible()
-  })
 })

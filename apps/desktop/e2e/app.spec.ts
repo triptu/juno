@@ -60,49 +60,28 @@ async function shellFontsAndColours(win: Page): Promise<void> {
   await expect(button).toHaveCSS('cursor', 'default')
 }
 
+/** Names that would hand the page Electron's raw IPC rather than one route of the bridge. */
+const RAW_IPC = ['ipcRenderer', 'send', 'sendSync', 'invoke', 'on', 'once', 'postMessage', 'removeAllListeners']
+
+// The method names are JunoBridge's, which the compiler checks; this checks what
+// only a running preload shows: no Node globals, and only functions cross.
 async function onlyTheBridge(win: Page): Promise<void> {
   await expect(win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible()
   const exposed = await win.evaluate(() => {
     const globals = window as unknown as Record<string, unknown>
-    return {
-      require: typeof globals['require'],
-      process: typeof globals['process'],
-      juno: Object.keys(window.juno),
-      updates: Object.keys(window.juno.updates),
-      app: Object.keys(window.juno.app),
-      engine: Object.keys(window.juno.engine),
-      agent: Object.keys(window.juno.agent),
-      launch: Object.keys(window.juno.launch),
-      window: Object.keys(window.juno.window),
-      sharing: Object.keys(window.juno.sharing),
-      contextMenu: Object.keys(window.juno.contextMenu),
-      shell: Object.keys(window.juno.shell),
-      files: Object.keys(window.juno.files),
-      clipboard: Object.keys(window.juno.clipboard),
-      menu: Object.keys(window.juno.menu),
-      notifications: Object.keys(window.juno.notifications),
-      webPanel: Object.keys(window.juno.webPanel),
-    }
+    const members = Object.entries(window.juno as unknown as Record<string, unknown>).flatMap(([group, value]) =>
+      typeof value === 'object' && value !== null
+        ? Object.entries(value).map(([name, member]) => ({ group, name, type: typeof member }))
+        : [{ group, name: '', type: typeof value }])
+    return { require: typeof globals['require'], process: typeof globals['process'], ipcRenderer: typeof globals['ipcRenderer'], members }
   })
-  expect(exposed).toEqual({
-    require: 'undefined',
-    process: 'undefined',
-    juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'huddle', 'contextMenu', 'shell', 'files', 'clipboard', 'menu', 'notifications', 'webPanel'],
-    updates: ['get', 'set', 'restart', 'check', 'download', 'notes', 'onChange'],
-    app: ['getInfo', 'diagnostics', 'copyDiagnostics', 'copySyncLog', 'showLogs', 'reportStagingFailure', 'reportState'],
-    engine: ['requestPort', 'restart'],
-    agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
-    launch: ['setTheme', 'setAccent', 'setTopicTitleLines', 'setDensity', 'setPrivacy', 'setSidebar', 'onPrivacy'],
-    window: ['onFullScreen'],
-    sharing: ['get', 'set'],
-    contextMenu: ['popup'],
-    shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile', 'openFile'],
-    files: ['quickLook'],
-    clipboard: ['writeText', 'writeImage'],
-    menu: ['onCommand'],
-    notifications: ['contentShown', 'setViewing', 'onOpen', 'test', 'permission', 'requestPermission', 'openSettings'],
-    webPanel: ['show', 'setBounds', 'hide', 'close', 'onState'],
-  })
+  expect(exposed.require).toBe('undefined')
+  expect(exposed.process).toBe('undefined')
+  expect(exposed.ipcRenderer).toBe('undefined')
+  expect(exposed.members.length).toBeGreaterThan(0)
+  // Each group holds functions only: no nested object, such as ipcRenderer itself, and no value.
+  expect(exposed.members.filter((member) => member.type !== 'function')).toEqual([])
+  expect(exposed.members.filter((member) => RAW_IPC.includes(member.name))).toEqual([])
 }
 
 async function darkThemeInPlace(win: Page): Promise<void> {

@@ -46,41 +46,6 @@ async function openCard({ juno }: Pick<Fixtures, 'juno'>, row: ReturnType<Fixtur
   return viewer
 }
 
-test('a PDF opens in Chromium’s PDF viewer from the content main serves as a PDF', { tag: '@electron' }, async ({ juno, fake }) => {
-  const row = await postFiles({ juno, fake }, 'The capacity review', ['pdf'])
-  // The card keeps Download.
-  await expect(row.getByRole('button', { name: 'Download capacity-review.pdf' })).toBeVisible()
-  const viewer = await openCard({ juno }, row, 'capacity-review.pdf')
-  const frame = viewer.locator('[data-viewer-kind="pdf"] iframe')
-  const src = await frame.getAttribute('src')
-  expect(src).toMatch(/^juno:\/\/files\/[^/]+\/content\/capacity-review\.pdf\?url=/)
-  const answer = await juno.win.evaluate(async (url) => {
-    const response = await fetch(url)
-    return { type: response.headers.get('content-type'), start: new TextDecoder().decode((await response.arrayBuffer()).slice(0, 5)) }
-  }, src!)
-  expect(answer).toEqual({ type: 'application/pdf', start: '%PDF-' })
-  // Esc closes it from inside Chromium's PDF viewer too.
-  await frame.focus()
-  await expect.poll(() => juno.win.evaluate(() => document.activeElement?.tagName)).toBe('IFRAME')
-  await pressEscape({ juno })
-  await expect(viewer).toHaveCount(0)
-})
-
-test('an HTML file shows in a sandboxed frame where its script does not run', { tag: '@electron' }, async ({ juno, fake }) => {
-  const row = await postFiles({ juno, fake }, 'This week’s digest', ['html'])
-  const viewer = await openCard({ juno }, row, 'weekly-digest.html')
-  const frame = viewer.locator('[data-viewer-kind="html"] iframe')
-  await expect(frame).toHaveAttribute('sandbox', '')
-  const page = viewer.frameLocator('[data-viewer-kind="html"] iframe')
-  await expect(page.getByRole('heading', { name: 'Weekly digest' })).toBeVisible()
-  await expect(page.locator('html')).not.toHaveAttribute('data-script-ran', /.*/)
-  await expect(viewer.getByRole('button', { name: 'Open in browser' })).not.toHaveAttribute('aria-disabled', 'true')
-  // Esc closes it from inside the page too, which keeps its keys from the app.
-  await page.locator('body').click()
-  await pressEscape({ juno })
-  await expect(viewer).toHaveCount(0)
-})
-
 test('file cards open Markdown, CSV, audio and voice clips, with viewer navigation and external links', async ({ juno, fake }) => {
   await test.step('read snippets and move between files', async () => {
     const row = await postFiles({ juno, fake }, 'Notes and metrics', ['markdown', 'csv'])
@@ -130,18 +95,56 @@ test('file cards open Markdown, CSV, audio and voice clips, with viewer navigati
   })
 })
 
-test('Quick Look on a zip asks main to show it in the preview window, and nothing goes into Downloads', { tag: '@electron' }, async ({ juno, fake }) => {
-  const row = await postFiles({ juno, fake }, 'Logs from the nightly build', ['zip'])
-  await expect(row.getByRole('button', { name: /^Open / })).toHaveCount(0)
-  await row.getByRole('button', { name: 'Quick Look build-logs.zip' }).click()
-  const looked = () => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { quickLooked: Array<{ path: string; name: string }> } }).junoTest.quickLooked.slice())
-  await expect.poll(looked, { timeout: 15_000 }).toHaveLength(1)
-  const [shown] = await looked()
-  expect(shown!.name).toBe('build-logs.zip')
-  expect(shown!.path).toMatch(/Temp\/[0-9a-f]{16}\/build-logs\.zip$/)
-  // Again, into the same folder: the copy is replaced, not added to.
-  await row.getByRole('button', { name: 'Quick Look build-logs.zip' }).click()
-  await expect.poll(looked, { timeout: 15_000 }).toHaveLength(2)
-  expect((await looked())[1]!.path).toBe(shown!.path)
-  expect(await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads.length)).toBe(0)
+// Main serves the PDF, sees Esc pressed inside a frame and shows Quick Look: Electron only.
+test('a PDF opens in Chromium’s PDF viewer, an HTML file in a sandboxed frame, Esc closes both from inside, and Quick Look on a zip leaves Downloads alone', { tag: '@electron' }, async ({ juno, fake }) => {
+  await test.step('a PDF opens in Chromium’s PDF viewer from the content main serves as a PDF', async () => {
+    const row = await postFiles({ juno, fake }, 'The capacity review', ['pdf'])
+    // The card keeps Download.
+    await expect(row.getByRole('button', { name: 'Download capacity-review.pdf' })).toBeVisible()
+    const viewer = await openCard({ juno }, row, 'capacity-review.pdf')
+    const frame = viewer.locator('[data-viewer-kind="pdf"] iframe')
+    const src = await frame.getAttribute('src')
+    expect(src).toMatch(/^juno:\/\/files\/[^/]+\/content\/capacity-review\.pdf\?url=/)
+    const answer = await juno.win.evaluate(async (url) => {
+      const response = await fetch(url)
+      return { type: response.headers.get('content-type'), start: new TextDecoder().decode((await response.arrayBuffer()).slice(0, 5)) }
+    }, src!)
+    expect(answer).toEqual({ type: 'application/pdf', start: '%PDF-' })
+    // Esc closes it from inside Chromium's PDF viewer too.
+    await frame.focus()
+    await expect.poll(() => juno.win.evaluate(() => document.activeElement?.tagName)).toBe('IFRAME')
+    await pressEscape({ juno })
+    await expect(viewer).toHaveCount(0)
+  })
+
+  await test.step('an HTML file shows in a sandboxed frame where its script does not run', async () => {
+    const row = await postFiles({ juno, fake }, 'This week’s digest', ['html'])
+    const viewer = await openCard({ juno }, row, 'weekly-digest.html')
+    const frame = viewer.locator('[data-viewer-kind="html"] iframe')
+    await expect(frame).toHaveAttribute('sandbox', '')
+    const page = viewer.frameLocator('[data-viewer-kind="html"] iframe')
+    await expect(page.getByRole('heading', { name: 'Weekly digest' })).toBeVisible()
+    await expect(page.locator('html')).not.toHaveAttribute('data-script-ran', /.*/)
+    await expect(viewer.getByRole('button', { name: 'Open in browser' })).not.toHaveAttribute('aria-disabled', 'true')
+    // Esc closes it from inside the page too, which keeps its keys from the app.
+    await page.locator('body').click()
+    await pressEscape({ juno })
+    await expect(viewer).toHaveCount(0)
+  })
+
+  await test.step('Quick Look on a zip asks main to show it in the preview window, and nothing goes into Downloads', async () => {
+    const row = await postFiles({ juno, fake }, 'Logs from the nightly build', ['zip'])
+    await expect(row.getByRole('button', { name: /^Open / })).toHaveCount(0)
+    await row.getByRole('button', { name: 'Quick Look build-logs.zip' }).click()
+    const looked = () => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { quickLooked: Array<{ path: string; name: string }> } }).junoTest.quickLooked.slice())
+    await expect.poll(looked, { timeout: 15_000 }).toHaveLength(1)
+    const [shown] = await looked()
+    expect(shown!.name).toBe('build-logs.zip')
+    expect(shown!.path).toMatch(/Temp\/[0-9a-f]{16}\/build-logs\.zip$/)
+    // Again, into the same folder: the copy is replaced, not added to.
+    await row.getByRole('button', { name: 'Quick Look build-logs.zip' }).click()
+    await expect.poll(looked, { timeout: 15_000 }).toHaveLength(2)
+    expect((await looked())[1]!.path).toBe(shown!.path)
+    expect(await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads.length)).toBe(0)
+  })
 })

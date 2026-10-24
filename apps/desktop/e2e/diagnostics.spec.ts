@@ -7,7 +7,7 @@ import { expect, hooks, launchApp, test } from './fixtures'
 const LOG_LIMIT = 5 * 1024 * 1024
 const processes = ['Main', 'Window', 'Engine', 'Juno agent', 'Graphics', 'Network']
 
-test('About shows every process, copies content-free diagnostics and rotates each process log', async ({ fake, slackApp, userData }) => {
+test('About shows every process, copies content-free diagnostics and rotates each process log; an unhandled rejection in main is logged and the app keeps running', async ({ fake, slackApp, userData }) => {
   test.setTimeout(120_000)
   const folder = join(userData, 'logs')
   await mkdir(folder, { recursive: true })
@@ -65,24 +65,15 @@ test('About shows every process, copies content-free diagnostics and rotates eac
     await win.getByRole('button', { name: 'Show logs in Finder' }).click()
     await expect.poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { logsOpened: () => number } }).junoTest.logsOpened())).toBe(1)
 
-  } finally { await running.close() }
-})
-
-test('an unhandled rejection in main is logged with its stack and the app keeps running', async ({ fake, slackApp, userData }) => {
-  const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const { app, win } = running
-    const juno = new Juno(app, win)
-    await juno.signIn()
-    await juno.waitForSync()
-    await app.evaluate(() => (globalThis as unknown as { junoTest: { rejectInMain: () => void } }).junoTest.rejectInMain())
-    const line = /ERROR main unhandled rejection cause=Error stack=\d+:\d+/
-    await expect.poll(() => readFile(join(userData, 'logs', 'main.log'), 'utf8').catch(() => '')).toMatch(line)
-    // Still running: the window answers and About copies the line.
-    await juno.openSettings('About')
-    await win.getByRole('button', { name: 'Copy diagnostics', exact: true }).click()
-    await expect(win.getByText('Copied', { exact: true })).toBeVisible()
-    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toMatch(line)
-    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBeGreaterThan(0)
+    await test.step('an unhandled rejection in main is logged with its stack, and the app keeps running', async () => {
+      await app.evaluate(() => (globalThis as unknown as { junoTest: { rejectInMain: () => void } }).junoTest.rejectInMain())
+      const line = /ERROR main unhandled rejection cause=Error stack=\d+:\d+/
+      await expect.poll(() => readFile(join(folder, 'main.log'), 'utf8').catch(() => '')).toMatch(line)
+      // Still running: the window answers and About copies the line. The clipboard still holds the report above.
+      await app.evaluate(({ clipboard }) => clipboard.clear())
+      await win.getByRole('button', { name: 'Copy diagnostics', exact: true }).click()
+      await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toMatch(line)
+      expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBeGreaterThan(0)
+    })
   } finally { await running.close() }
 })
