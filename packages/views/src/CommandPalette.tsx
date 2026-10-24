@@ -74,13 +74,15 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
   const items = footer === undefined ? listed : [...listed, footer]
   const hasBody = resultsReady || listed.length > 0
   const ids = items.map((item) => item.id)
+  // The automatic selection is the first listed row, never the last row under the line, so a late command still takes it.
+  const first = listed[0]?.id
   const shown = `${tab}\n${resultsQuery}`
-  const [selection, setSelection] = useState({ query: shown, id: ids[0] })
+  const [selection, setSelection] = useState({ query: shown, id: first })
   // Pin even the automatic first selection. A late command or re-ranked
   // local result must not change what Enter will open.
-  const chosen = selection.query === shown ? selection.id : ids[0]
-  if (selection.query !== shown || (chosen === undefined && ids.length > 0)) {
-    setSelection({ query: shown, id: chosen ?? ids[0] })
+  const chosen = selection.query === shown ? selection.id : first
+  if (selection.query !== shown || (chosen === undefined && first !== undefined)) {
+    setSelection({ query: shown, id: chosen ?? first })
   }
   // If a selected result disappears, Enter does nothing until the user
   // chooses another row; it must not silently open the new first result.

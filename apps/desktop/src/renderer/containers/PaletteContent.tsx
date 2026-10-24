@@ -245,8 +245,10 @@ export function OpenPalette() {
   const shownText = tab === 'commands' ? request.text.trim() : deferred.text.trim()
   const shownCommand = settled && tab !== 'commands' ? (command ?? null) : null
 
-  const conversationRows = (conversations._tag === 'Success' ? conversations.value : []).map(conversationRow)
-  const matches = matchRows(messages._tag === 'Success' ? messages.value : [])
+  const conversationsValue = conversations._tag === 'Success' ? conversations.value : undefined
+  const messagesValue = messages._tag === 'Success' ? messages.value : undefined
+  const conversationRows = (conversationsValue ?? []).map(conversationRow)
+  const matches = matchRows(messagesValue ?? [])
   const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
   const topic = commands.topic
   const footer = shownText !== '' && (tab === 'all' || tab === 'messages') ? searchRow(shownText) : undefined
@@ -291,7 +293,7 @@ export function OpenPalette() {
   // query does.
   const [answers, setAnswers] = useState<Partial<Record<PaletteTab, PaletteAnswer>>>({})
   const previous = answers[tab]
-  const inputs = [request, needsConversations ? conversations : undefined, needsMatches ? messages : undefined, command]
+  const inputs = [request, needsConversations ? conversationsValue : undefined, needsMatches ? messagesValue : undefined, command]
   const fresh: PaletteAnswer = { inputs, text: shownText, sections, footer, rows }
   if (settled && (previous === undefined || previous.inputs.some((input, at) => input !== inputs[at]))) {
     setAnswers({ ...answers, [tab]: fresh })
