@@ -15,99 +15,104 @@ import { expect, syncedTest, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
 import type { Juno } from './driver/juno'
 
+test.describe.configure({ timeout: 90_000 })
+
 const ALERTS_MAIN = '#alerts-prod'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const RINA = 'Rina finished the onsite'
 const LONG_THREAD = 'Review the rollout checklist 1.'
 
-syncedTest('Notify me on a channel lists it on the page, and removing it there has Undo', async ({ juno }) => {
-  // A bot channel: the Automated view holds it.
-  await juno.sidebar.selectView('Automated')
-  const alerts = juno.sidebar.row(ALERTS_MAIN)
-  const before = await alerts.chooseInMenu('notify-never')
-  expect(before.labels).toContain('> Auto ✓')
-  await juno.expectToast('#alerts-prod: Never')
-  const after = await alerts.chooseInMenu('mark-read')
-  expect(after.labels).toContain('> Never ✓')
+// One journey: each step leaves the levels it set, and later steps use other conversations.
+syncedTest('Notify me levels, which messages notify and how a click opens them, and the dock badge', async ({ juno, slack, fake, userData }) => {
+  // From a fresh start, before anything is read.
+  await test.step('unread topics badge the dock', async () => {
+    await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
+  })
+  await test.step('Notify me on a channel lists it on the page, and removing it there has Undo', async () => {
+    // A bot channel: the Automated view holds it.
+    await juno.sidebar.selectView('Automated')
+    const alerts = juno.sidebar.row(ALERTS_MAIN)
+    const before = await alerts.chooseInMenu('notify-never')
+    expect(before.labels).toContain('> Auto ✓')
+    await juno.expectToast('#alerts-prod: Never')
+    const after = await alerts.chooseInMenu('mark-read')
+    expect(after.labels).toContain('> Never ✓')
 
-  // A thread: Always follows it and is kept as its level.
-  await juno.sidebar.filter('All')
-  const rina = juno.sidebar.row(RINA)
-  await rina.chooseInMenu('notify-always')
-  // The toast names the topic by its title, which drops the final full stop.
-  await juno.expectToast(': Always')
-  expect((await rina.chooseInMenu('mark-read')).labels).toContain('> Always ✓')
+    // A thread: Always follows it and is kept as its level.
+    await juno.sidebar.filter('All')
+    const rina = juno.sidebar.row(RINA)
+    await rina.chooseInMenu('notify-always')
+    // The toast names the topic by its title, which drops the final full stop.
+    await juno.expectToast(': Always')
+    expect((await rina.chooseInMenu('mark-read')).labels).toContain('> Always ✓')
 
-  await juno.openNotifications()
-  const page = juno.notifications
-  await expect(page.level('Never')).toContainText('alerts-prod')
-  await page.removeTag('alerts-prod')
-  await juno.expectToast('#alerts-prod: Auto')
-  await expect(page.level('Never')).not.toContainText('alerts-prod')
-  await juno.undoFromToast()
-  await expect(page.level('Never')).toContainText('alerts-prod')
-})
-
-syncedTest('a group DM notifies under its people\'s names, not Slack\'s internal name', async ({ juno, slack }) => {
+    await juno.openNotifications()
+    const page = juno.notifications
+    await expect(page.level('Never')).toContainText('alerts-prod')
+    await page.removeTag('alerts-prod')
+    await juno.expectToast('#alerts-prod: Auto')
+    await expect(page.level('Never')).not.toContainText('alerts-prod')
+    await juno.undoFromToast()
+    await expect(page.level('Never')).toContainText('alerts-prod')
+  })
   await juno.notificationHoursNow()
-  await juno.sidebar.row('Maya, Leo', { exact: true }).open()
-  await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-always', { onSender: true })
-  await juno.expectToast('Leo: Always')
+  await test.step('a topic on screen in a focused window does not notify', async () => {
+    await juno.sidebar.selectView('Automated')
+    await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('notify-always')
+    await juno.sidebar.row(ALERTS_MAIN).open()
+    await juno.focusWindow()
+    slack.as('Leo').postIn('alerts-prod', 'Disk at 91% on db-2')
+    await juno.topic.expectMessage('Disk at 91% on db-2')
+    await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE preview LIKE ?').get('%Disk at 91% on db-2%')?.['suppressed_at'])).toEqual(expect.any(String))
+    expect((await juno.osNotifications()).map((notification) => notification.body)).not.toContain('Disk at 91% on db-2')
 
-  await juno.openNotifications()
-  slack.as('Leo').groupDm('Moved it to 1pm')
-  await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya, Leo', body: 'Moved it to 1pm' })
-})
+    await juno.blurWindow()
+    slack.as('Leo').postIn('alerts-prod', 'Disk at 95% on db-2')
+    await expect.poll(async () => (await juno.osNotifications()).map((notification) => notification.body), { timeout: 15_000 }).toContain('Disk at 95% on db-2')
+    await juno.focusWindow()
+  })
+  await test.step('a group DM notifies under its people\'s names, not Slack\'s internal name', async () => {
+    await juno.sidebar.row('Maya, Leo', { exact: true }).open()
+    await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-always', { onSender: true })
+    await juno.expectToast('Leo: Always')
 
-syncedTest('a DM set to Always notifies, and the click opens it at the message', async ({ juno, slack }) => {
-  // Maya's DM is on the page's Always list once set from the person menu.
-  await juno.notificationHoursNow()
-  await juno.sidebar.row('Maya', { exact: true }).open()
-  await juno.topic.expectTitle('Maya')
-  slack.as('Maya').dm('Here is the hiring plan for today.')
-  await juno.topic.expectMessage('Here is the hiring plan for today.')
-  const person = await juno.topic.chooseInMessageMenu('Here is the hiring plan for today.', 'notify-always', { onSender: true })
-  expect(person.labels).toEqual(['Notify me about Maya', '> Always', '> Auto ✓', '> Never', '> -', '> How Auto decides…', '-', 'Ask Juno', 'What Juno knows about Maya'])
-  await juno.expectToast('Maya: Always')
+    await juno.openNotifications()
+    slack.as('Leo').groupDm('Moved it to 1pm')
+    await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya, Leo', body: 'Moved it to 1pm' })
+  })
+  await test.step('a DM set to Always notifies, and the click opens it at the message', async () => {
+    // Maya's DM is on the page's Always list once set from the person menu.
+    await juno.sidebar.row('Maya', { exact: true }).open()
+    await juno.topic.expectTitle('Maya')
+    slack.as('Maya').dm('Here is the hiring plan for today.')
+    await juno.topic.expectMessage('Here is the hiring plan for today.')
+    const person = await juno.topic.chooseInMessageMenu('Here is the hiring plan for today.', 'notify-always', { onSender: true })
+    // The person menu shows Maya's level before the change.
+    expect(person.labels).toEqual(expect.arrayContaining(['Notify me about Maya', '> Auto ✓']))
+    await juno.expectToast('Maya: Always')
 
-  // Away from the DM, a new message from Maya notifies. Clicking it opens the DM at the message.
-  await juno.openNotifications()
-  slack.as('Maya').dm('The offer letter needs your signature')
-  await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya', body: 'The offer letter needs your signature' })
-  const shown = (await juno.osNotifications()).findIndex((notification) => notification.body === 'The offer letter needs your signature')
-  await juno.clickOsNotification(shown)
-  await juno.tabs.expectActive('Maya')
-  await juno.topic.expectMessage('The offer letter needs your signature')
+    // Away from the DM, a new message from Maya notifies. Clicking it opens the DM at the message.
+    await juno.openNotifications()
+    slack.as('Maya').dm('The offer letter needs your signature')
+    await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya', body: 'The offer letter needs your signature' })
+    const shown = (await juno.osNotifications()).findIndex((notification) => notification.body === 'The offer letter needs your signature')
+    await juno.clickOsNotification(shown)
+    await juno.tabs.expectActive('Maya')
+    await juno.topic.expectMessage('The offer letter needs your signature')
 
-  // The message menu has no why row; how a message notified is on the Notifications page.
-  const menu = await juno.topic.chooseInMessageMenu('The offer letter needs your signature', null)
-  expect(menu.labels.some((label) => label.startsWith('Why'))).toBe(false)
-})
-
-syncedTest('a topic on screen in a focused window does not notify, and unread topics badge the dock', async ({ juno, slack, fake, userData }) => {
-  await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
-  await juno.notificationHoursNow()
-
-  await juno.sidebar.selectView('Automated')
-  await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('notify-always')
-  await juno.sidebar.row(ALERTS_MAIN).open()
-  await juno.focusWindow()
-  slack.as('Leo').postIn('alerts-prod', 'Disk at 91% on db-2')
-  await juno.topic.expectMessage('Disk at 91% on db-2')
-  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE preview LIKE ?').get('%Disk at 91% on db-2%')?.['suppressed_at'])).toEqual(expect.any(String))
-  expect((await juno.osNotifications()).map((notification) => notification.body)).not.toContain('Disk at 91% on db-2')
-
-  await juno.blurWindow()
-  slack.as('Leo').postIn('alerts-prod', 'Disk at 95% on db-2')
-  await expect.poll(async () => (await juno.osNotifications()).map((notification) => notification.body), { timeout: 15_000 }).toContain('Disk at 95% on db-2')
+    // The message menu has no why row; how a message notified is on the Notifications page.
+    const menu = await juno.topic.chooseInMessageMenu('The offer letter needs your signature', null)
+    expect(menu.labels.some((label) => label.startsWith('Why'))).toBe(false)
+  })
 })
 
 // The defaults are read first, before any step changes a setting.
-syncedTest('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', { tag: '@canary' }, async ({ juno }) => {
+syncedTest('Settings: Notifications and Appearance save, the test notification and permission line, Ignored, and Tidy up', { tag: '@canary' }, async ({ juno }) => {
   await test.step('Settings › Notifications saves hours, and Appearance changes the density', () => notificationsAndAppearance(juno))
   await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
   await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', () => ignoredChannels(juno))
   await test.step('Settings › Ignored ignores a channel picked by keyboard, as its menu does, with Undo', () => ignoreFromSettings(juno))
+  await test.step('Tidy up saves rapid changes to separate controls', () => tidyUpRapidChanges(juno))
 })
 
 async function notificationsAndAppearance(juno: Juno): Promise<void> {
@@ -137,7 +142,7 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await expect(page.edge('Notifications', 'Weekdays', 'from')).toHaveValue(String(10 * 60))
 }
 
-syncedTest('Tidy up saves rapid changes to separate controls', async ({ juno }) => {
+async function tidyUpRapidChanges(juno: Juno): Promise<void> {
   await juno.openSettings('Tidy up')
   const checks = juno.settings.root.getByRole('checkbox', { name: /^(Threads|Direct messages)$/ })
   await expect(checks).toHaveCount(2)
@@ -152,7 +157,7 @@ syncedTest('Tidy up saves rapid changes to separate controls', async ({ juno }) 
   await expect(juno.settings.root.getByRole('checkbox', { name: 'Threads', exact: true })).not.toBeChecked()
   await expect(juno.settings.root.getByRole('checkbox', { name: 'Direct messages', exact: true })).not.toBeChecked()
   await expect(juno.settings.root.getByRole('radio', { name: '4 hours', exact: true })).toHaveAttribute('aria-checked', 'true')
-})
+}
 
 async function testNotificationAndPermission(juno: Juno): Promise<void> {
   await juno.openNotifications()

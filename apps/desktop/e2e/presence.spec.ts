@@ -6,7 +6,7 @@
  * (`slack.expectSeenAs`): active while a socket is open, manual presence is
  * active and a tickle came in the last 10 minutes of its clock.
  *
- * Active hours set presence at launch by the time of day, so each test
+ * Active hours set presence at launch by the time of day, so the test
  * first makes sure you are set active, as the owner would from the menu.
  *
  * `setSystemIdle` reads the idle time at once, so a test can make main say
@@ -28,47 +28,46 @@ async function setActive(juno: Juno): Promise<void> {
   await juno.accountMenu.close()
 }
 
-test('Set yourself away from the avatar menu sets Slack presence and stays away while you use the Mac', async ({ juno, slack }) => {
-  test.setTimeout(90_000)
-  await setActive(juno)
-  await slack.expectSeenAs('active')
-
-  await juno.accountMenu.open()
-  // A presence.set from the launch's schedule must not count for the click.
-  slack.resetCalls()
-  await juno.accountMenu.item('Set yourself away').click()
-  await slack.expectPresenceSet('away')
-  // The menu now offers the other choice and says you are away.
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.item('Set yourself active')).toBeVisible()
-  await juno.accountMenu.expectPresence(/^Away/)
-  await juno.accountMenu.close()
-  // With the menu closed, the avatar button's description gives the state; outside notification hours it also says notifications are paused.
-  await expect(juno.sidebar.accountButton).toHaveAccessibleDescription(/^Away(\. Notifications paused until .+)?$/)
-  slack.resetCalls()
-  // You keep using the Mac; Juno sends nothing that would show you active.
-  await juno.setSystemIdle(0)
-  expect(slack.tickles()).toBe(0)
-  await slack.expectSeenAs('away')
-
-  await juno.accountMenu.open()
-  await juno.accountMenu.item('Set yourself active').click()
-  await slack.expectPresenceSet('active')
-  await slack.expectSeenAs('active')
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.item('Set yourself away')).toBeVisible()
-  await juno.accountMenu.expectPresence(/^Active/)
-  await juno.accountMenu.close()
-  await expect(juno.sidebar.accountButton).toHaveAccessibleDescription(/^Active(\. Notifications paused until .+)?$/)
-  await juno.setSystemIdle(0)
-  await expect.poll(() => slack.tickles(), { timeout: 15_000 }).toBeGreaterThan(0)
-})
-
-test('the avatar shows what Slack shows colleagues, while the setting stays active', async ({ juno, slack }) => {
-  test.setTimeout(90_000)
+test('Set yourself away and active from the avatar menu, and the avatar shows what Slack shows colleagues', async ({ juno, slack }) => {
+  test.setTimeout(150_000)
   await setActive(juno)
   await slack.expectSeenAs('active')
   await juno.sidebar.expectOwnPresence('active')
+
+  await test.step('Set yourself away sets Slack presence and stays away while you use the Mac', async () => {
+    await juno.accountMenu.open()
+    // A presence.set from the launch's schedule must not count for the click.
+    slack.resetCalls()
+    await juno.accountMenu.item('Set yourself away').click()
+    await slack.expectPresenceSet('away')
+    // The menu now offers the other choice and says you are away.
+    await juno.accountMenu.open()
+    await expect(juno.accountMenu.item('Set yourself active')).toBeVisible()
+    await juno.accountMenu.expectPresence(/^Away/)
+    await juno.accountMenu.close()
+    // With the menu closed, the avatar button's description gives the state; outside notification hours it also says notifications are paused.
+    await expect(juno.sidebar.accountButton).toHaveAccessibleDescription(/^Away(\. Notifications paused until .+)?$/)
+    slack.resetCalls()
+    // You keep using the Mac; Juno sends nothing that would show you active.
+    await juno.setSystemIdle(0)
+    expect(slack.tickles()).toBe(0)
+    await slack.expectSeenAs('away')
+  })
+
+  await test.step('Set yourself active sets Slack presence and tickles again', async () => {
+    await juno.accountMenu.open()
+    await juno.accountMenu.item('Set yourself active').click()
+    await slack.expectPresenceSet('active')
+    await slack.expectSeenAs('active')
+    await juno.accountMenu.open()
+    await expect(juno.accountMenu.item('Set yourself away')).toBeVisible()
+    await juno.accountMenu.expectPresence(/^Active/)
+    await juno.accountMenu.close()
+    await expect(juno.sidebar.accountButton).toHaveAccessibleDescription(/^Active(\. Notifications paused until .+)?$/)
+    await juno.setSystemIdle(0)
+    await expect.poll(() => slack.tickles(), { timeout: 15_000 }).toBeGreaterThan(0)
+    await juno.sidebar.expectOwnPresence('active')
+  })
 
   await test.step("Slack's timeout shows you away; the setting stays active", async () => {
     await juno.setSystemIdle(IDLE_OVER_LIMIT_SECONDS)

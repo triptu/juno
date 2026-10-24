@@ -17,6 +17,8 @@ import { agentReady } from './juno-agent/agent'
 
 const standingByTest = agentTest.extend({ synced: true })
 
+test.describe.configure({ timeout: 90_000 })
+
 /** Today's weekday (0 is Sunday) and now, down to the half hour, as the app sees them. */
 function now(juno: Juno): Promise<{ readonly today: number; readonly half: number }> {
   return juno.win.evaluate(() => {
@@ -46,7 +48,7 @@ standingByTest('outside notification hours a DM is held with its reason and show
   expect(model.inputs()).toHaveLength(0)
 })
 
-syncedTest('hours saved by an older version still load; Saturday reaches Slack as a custom day, Weekdays sets all five, and today\'s row decides', async ({ fake, slack, userData, relaunch }) => {
+syncedTest('hours saved by an older version still load; Saturday reaches Slack as a custom day, Weekdays sets all five, today\'s row decides, and the Active in Slack rows set presence', async ({ fake, slack, userData, relaunch }) => {
   // As an older version saved them: Monday to Thursday, one from and to.
   const juno = await relaunch({ whileClosed: () => {
     const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
@@ -104,23 +106,21 @@ syncedTest('hours saved by an older version still load; Saturday reaches Slack a
     await expect.poll(async () => (await juno.osNotifications()).map((each) => each.body), { timeout: 15_000 }).toContain(shown)
     expect((await juno.osNotifications()).map((each) => each.body)).not.toContain(held)
   })
-})
 
-syncedTest('the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async ({ juno, slack }) => {
-  await juno.openNotifications()
-  const page = juno.notifications
-  const { today, half } = await now(juno)
-  await page.setRow('Active in Slack', rowOf(today), { from: half, to: (half + 120) % 1440 })
-  await juno.accountMenu.open()
-  await juno.accountMenu.expectPresence(/^Active/)
-  await juno.accountMenu.close()
+  await test.step('the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async () => {
+    const { today, half } = await now(juno)
+    await page.setRow('Active in Slack', rowOf(today), { from: half, to: (half + 120) % 1440 })
+    await juno.accountMenu.open()
+    await juno.accountMenu.expectPresence(/^Active/)
+    await juno.accountMenu.close()
 
-  // Every row off but the weekend day that is not today, 11am to 2pm.
-  const weekend: HoursRowName = today === 6 ? 'Sunday' : 'Saturday'
-  slack.resetCalls()
-  for (const row of hoursRows) await page.setRow('Active in Slack', row, row === weekend ? { from: 660, to: 840 } : 'off')
-  await slack.expectPresenceSet('away')
-  await juno.accountMenu.open()
-  await juno.accountMenu.expectPresence(new RegExp(`^Away until (tomorrow|${weekend.slice(0, 3)}) 11am`))
-  await juno.accountMenu.close()
+    // Every row off but the weekend day that is not today, 11am to 2pm.
+    const weekend: HoursRowName = today === 6 ? 'Sunday' : 'Saturday'
+    slack.resetCalls()
+    for (const row of hoursRows) await page.setRow('Active in Slack', row, row === weekend ? { from: 660, to: 840 } : 'off')
+    await slack.expectPresenceSet('away')
+    await juno.accountMenu.open()
+    await juno.accountMenu.expectPresence(new RegExp(`^Away until (tomorrow|${weekend.slice(0, 3)}) 11am`))
+    await juno.accountMenu.close()
+  })
 })
