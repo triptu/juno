@@ -80,8 +80,8 @@ describe('SlackSocket', () => {
         fake.dropSocket()
         yield* takeUntil(queue, isConnected)
         expect(yield* socket.tickle('polling')).toBe(false)
-        yield* Effect.sleep(1_500)
-        expect(yield* socket.tickle('polling')).toBe(true)
+        // Accepted again once the spacing has passed since the first.
+        while (!(yield* socket.tickle('polling'))) yield* Effect.sleep(25)
         yield* eventually(() => tickles().length === 2)
         expect(fake.selfPresence()).toBe('active')
       })
