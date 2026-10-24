@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 14:30 · Tushar · Status counts in All topics reserve three tabular digits and show counts above 99 as 99+ (was four digits); the 640 px status-picker breakpoint that only made room for four digits is reverted. The thread-link fallback icon stays at the avatar size (16 px), since it stops a measured shift when the first reply's avatars arrive.
 - 10-24 13:46 · Use the reserved install budget · Worktree installs inside an allocated remote container do not wait on host-wide load. The release fixture timed out at “load 12.0 is above 8” after desktop verification, despite owning reserved cores; local installs keep the load guard. Interrupted release fixtures now print their captured subprocess output.
 - 10-24 13:35 · Keep focus in open popups · A late composer mount or deferred page-focus callback leaves focus in a visible dialog, menu or expanded popup trigger, just as it already leaves another text field alone. A broadcast flow exposed the callback closing the Account menu after a thread opened.
 - 10-24 13:26 · Reserve late topic content · Thread-link fallback icons match the first avatar’s size. All topics keeps the preview line when empty, and status counts reserve four tabular digits; the narrow status picker appears earlier to fit. These fix measured shifts during live reply arrival and cold sync.
