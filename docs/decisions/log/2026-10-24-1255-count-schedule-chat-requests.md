@@ -1,0 +1,1 @@
+- 10-24 12:55 · Count chat requests when checking reply watches · A menu-created reply watch must not start a chat run. Count the fake model’s chat inputs, excluding background memory compaction; compaction may finish while the menu is used and previously made this check race.

@@ -211,7 +211,7 @@ test('reply watches from the chat and the message menu: Undo deletes one, and a 
   await ready(juno)
   // Undo first: it leaves nothing scheduled, so the second watch is the only one.
   await test.step('Undo on a menu reply watch deletes it without a model run', async () => {
-    const requests = model.requests.length
+    const requests = model.inputs().length
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.composer.fill('Please confirm the test window.')
     await juno.topic.composer.press('Enter')
@@ -222,7 +222,7 @@ test('reply watches from the chat and the message menu: Undo deletes one, and a 
     await juno.undoFromToast()
     const page = await openPage(juno, 'Scheduled')
     await expect(page.getByText('Nothing scheduled')).toBeVisible()
-    expect(model.requests).toHaveLength(requests)
+    expect(model.inputs()).toHaveLength(requests)
   })
 
   await test.step('a watch made in the chat and "Tell me if nobody replies" on a message both end when Leo replies, with no wake', async () => {
@@ -231,7 +231,7 @@ test('reply watches from the chat and the message menu: Undo deletes one, and a 
     await chatPane.expectJuno('Scheduled.')
     await expect(card(chatPane, 'schedule').filter({ hasText: 'Leo on the cutover' })).toBeVisible()
 
-    const requests = model.requests.length
+    const requests = model.inputs().length
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.composer.fill('Can someone confirm the cutover?')
     await juno.topic.composer.press('Enter')
@@ -240,7 +240,7 @@ test('reply watches from the chat and the message menu: Undo deletes one, and a 
     const menu = await juno.topic.chooseInMessageMenu('Can someone confirm the cutover?', 'watch-reply')
     expect(menu.labels).toContain('Tell me if nobody replies')
     await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
-    expect(model.requests).toHaveLength(requests)
+    expect(model.inputs()).toHaveLength(requests)
     const page = await openPage(juno, 'Scheduled')
     await expect(page.locator('[data-schedule]')).toHaveCount(2)
     await expect(scheduleRow(page, 'Leo on the cutover')).toHaveAttribute('data-schedule', 'active')

@@ -1,0 +1,1 @@
+- 10-24 13:01 · Distinguish upward drags from a held thumb · A pointer held at the bottom is not upward scrolling. Track its last vertical motion so a full message window dropping an old row does not release the bottom hold through scroll anchoring. The existing Main and thread flows also drag upward and check that arrivals do not pull them back down.

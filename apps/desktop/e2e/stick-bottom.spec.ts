@@ -1,10 +1,6 @@
-// At the bottom the list keeps its bottom (SPEC 7, "Stable geometry"): a message that arrives while the user sits
-// at the end of a list longer than the view is fully in view on the first frame that draws it, and the list stays
-// at its end. Sitting there includes turning the wheel down at the end and clicking a message, which scroll
-// nothing. The last message growing at the bottom (a reaction, its edit box) stays whole above the composer, and an
-// edit box started just above the bottom shows whole too. Back at the end by hand, with the wheel or with the
-// scrollbar thumb still held there, a list with more messages than its window follows new messages, though each
-// drops its first row. Scrolled up, an arriving message or a reaction moves nothing.
+// Bottom following (SPEC 7, "Stable geometry"): arrivals and growing rows stay above the composer from their
+// first frame, including while the scrollbar thumb is held at the end. A full message window drops its first
+// row without moving the viewport; an upward gesture lets go, and arrivals leave that scrolled position alone.
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { TOPIC300_MAIN_CHANNEL } from '@juno/fake-slack'
 import { expect, test, type Fixtures } from './fixtures'
@@ -294,6 +290,18 @@ for (const place of ['Main', 'thread'] as const) {
       }
       await frames(win, 5)
       await expectLastWhole(juno, 'After the thumb 3')
+    })
+
+    await test.step('dragging the thumb upward leaves the bottom while messages arrive', async () => {
+      await holdThumbAtEnd(win, topic.scroller)
+      const box = (await topic.scroller.boundingBox())!
+      await win.mouse.move(box.x + box.width - 5, box.y + box.height / 2, { steps: 8 })
+      await expect.poll(() => distance(topic.scroller)).toBeGreaterThan(1_000)
+      post('While the thumb is above the bottom')
+      await expect.poll(() => topic.message('While the thumb is above the bottom').count()).toBe(1)
+      expect(await distance(topic.scroller)).toBeGreaterThan(1_000)
+      await expect(topic.message('While the thumb is above the bottom')).not.toBeInViewport()
+      await win.mouse.up()
     })
   })
 }
