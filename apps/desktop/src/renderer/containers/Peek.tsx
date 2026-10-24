@@ -203,12 +203,16 @@ export const Peek = memo(function Peek() {
   )
 })
 
+/** The open reads a thread back to its root when it has at most this many replies (`OPEN_FETCH_MAX` in `@juno/sync`). */
+const OPEN_READS_WHOLE = 500
+
 /**
- * The topic's header and first window are local and covered (or it failed, or is unknown): a peek at it
- * can paint. A thread no page proves up to its newest reply paints what stands in for it (`meta.standIn`), and a thread window that
- * stops at replies the store cannot prove above its first row paints at its full height, so the replies its fetch
- * brings come in above the rows (`PeekTopic`). A window of search matches alone is not covered (performance.md 3.3)
- * and would grow when the replies page lands, so the peek waits for the fetch it makes anyway.
+ * The topic's header and first window are local and covered (or it failed, or is unknown): a peek at it can paint,
+ * and so can a thread no page proves yet, with what stands in for it (`meta.standIn`). A peek is as tall as its
+ * rows, so one that would grow under the pointer when its fetch lands waits for that fetch, which it makes anyway:
+ * a window of search matches alone (performance.md 3.3), and a thread window that stops at replies the store
+ * cannot prove above its first row (`meta.gapBefore`) when the open reads the thread back to its root. A longer
+ * thread's open reads from the read pointer on, which brings nothing above, so its peek paints at once.
  */
 function canPaint(id: string): boolean {
   const header = registry.get(topicAtom(id))
@@ -216,7 +220,8 @@ function canPaint(id: string): boolean {
   if (header._tag !== 'Success') return false
   if (header.value === null) return true
   const list = registry.get(messageListAtom(id))
-  return list.ready && (list.meta.windowCovered !== false || list.meta.standIn === true)
+  if (!list.ready || (list.meta.windowCovered === false && list.meta.standIn !== true)) return false
+  return list.meta.gapBefore !== true || header.value.messageCount - 1 > OPEN_READS_WHOLE
 }
 
 /**

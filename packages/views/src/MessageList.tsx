@@ -56,10 +56,7 @@ export interface MessageListProps {
   readonly notDrawnAbove?: number
   /** The `ts` of the first unread message: the "N new" divider goes before it. */
   readonly dividerBefore?: string
-  /**
-   * A message that shows its sender's name and avatar even when it continues their group: the Search reader's
-   * landing match, or the first row a thread window opened with while replies may still land above it.
-   */
+  /** A message that shows its sender's name and avatar even when it continues their group: the Search reader's landing match. */
   readonly startsGroupAt?: string | undefined
   /**
    * The rows sit at the bottom of the list while it is shorter than the view: replies that come in above them
@@ -485,7 +482,7 @@ const styles = stylex.create({
     paddingInline: sizes['--focus-ring-room'],
     paddingBottom: spacing['--space-2'],
   },
-  // Rows at the bottom: the space a short list leaves goes above them. In a peek, the popover is as tall as it may be.
+  // Rows at the bottom: the space a short list leaves goes above them.
   fromBottom: {
     justifyContent: 'flex-end',
     minHeight: '100%',

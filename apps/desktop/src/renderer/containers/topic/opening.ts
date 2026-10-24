@@ -65,11 +65,20 @@ export function useTopicFetch(id: string, view: string, enabled = true, shown = 
     shownRef.current = shown
   }, [shown])
   const stopWaiting = useRef<(() => void) | undefined>(undefined)
-  useEffect(() => () => stopWaiting.current?.(), [])
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      stopWaiting.current?.()
+    }
+  }, [])
   useEffect(() => {
     if (fetched.current || !enabled) return
     fetched.current = true
     void fetchTopic(registry, id).then((exit) => {
+      // A view gone meanwhile asks for nothing more.
+      if (!mounted.current) return
       const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
       if (!done) return setFetchState('offline')
       if (shownRef.current) return setFetchState('done')
@@ -98,32 +107,29 @@ export function useTopicFetch(id: string, view: string, enabled = true, shown = 
 
 /**
  * Whether the window may show (performance.md 3.3). A topic shows what the store holds at once: history it
- * fetched, or for a thread no page proves up to its newest reply what stands in for it (`meta.standIn`). A partial cache (socket or
- * search messages alone) is not an opening window: the header and composer paint, and the messages wait for the
- * fetch, or show what is stored when it cannot finish. A Main window that does not reach back to the read pointer
- * waits for the fetch too, since the divider belongs there. A thread window that stops at replies the store cannot
- * prove (`meta.gapBefore`), or stands in, shows at once even then: it opens at its bottom, and the replies its fetch
- * brings, the divider among them, come in above its rows (`useFromBottom`).
+ * fetched, a thread window that stops at replies the store cannot prove (`meta.gapBefore`, whose replies come in
+ * above its rows, `useFromBottom`), or for a thread no page proves yet what stands in for it (`meta.standIn`). A
+ * partial cache (socket or search messages alone) is not an opening window: the header and composer paint, and the
+ * messages wait for the fetch, or show what is stored when it cannot finish. A window that does not reach back to
+ * the read pointer waits for the fetch too, since the topic opens at its "N new" divider (SPEC 7).
  */
 export function windowShown(positioned: boolean, list: MessageWindow, readAtOpen: string | undefined, fetchState: FetchState): boolean {
-  const { meta } = list
-  const contextLoaded = readAtOpen === undefined || meta.gapBefore === true || meta.standIn === true || (list.order[0] !== undefined && list.order[0] <= readAtOpen)
-  const held = meta.windowCovered === true || meta.standIn === true
+  const contextLoaded = readAtOpen === undefined || (list.order[0] !== undefined && list.order[0] <= readAtOpen)
+  const held = list.meta.windowCovered === true || list.meta.standIn === true
   return positioned || (held && (contextLoaded || fetchState === 'done')) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
 }
 
 /**
- * The window first showed with replies above it that the store cannot prove (`meta.gapBefore`): its rows sit at
- * the bottom of the list for as long as the view lasts, so the replies its fetch, or a step up, brings in above
- * never move them, even while the list is shorter than the view, and its first row keeps its sender's name and
- * avatar when a reply from the same sender lands above it. Decided once, when the window first shows; the first
- * row then, or undefined.
+ * The window at a thread's end first showed with replies above it that the store cannot prove
+ * (`meta.gapBefore`): its rows sit at the bottom of the list for as long as the view lasts, so the replies its
+ * fetch, or a step up, brings in above never move them, even while the list is shorter than the view. A window
+ * around a message (a link, the Search reader) lands that message under the header instead. Decided once, when
+ * the window first shows.
  */
-export function useFromBottom(list: MessageWindow, showWindow: boolean, positioned: boolean): string | undefined {
-  const [first, setFirst] = useState<string | undefined>(undefined)
-  const at = list.order[0]
-  if (first === undefined && showWindow && !positioned && list.meta.gapBefore === true && at !== undefined) setFirst(at)
-  return first
+export function useFromBottom(list: MessageWindow, showWindow: boolean, positioned: boolean): boolean {
+  const [fromBottom, setFromBottom] = useState(false)
+  if (!fromBottom && showWindow && !positioned && list.meta.gapBefore === true && list.spec.anchor === undefined) setFromBottom(true)
+  return fromBottom
 }
 
 /** The window stands in for proof (`meta.standIn`) while the open's fetch, which is proving it, is out: page steps wait. */
