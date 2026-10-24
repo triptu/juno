@@ -80,17 +80,6 @@ export const apiCalls = (engine: RunningEngine, method?: string) =>
 /** A page of the recheck after a drop or a restart (`@juno/sync` `recheck.ts`). */
 export const notRecheck = (call: { readonly args: Readonly<Record<string, string>> }) => !['recheck', 'mutation-repair'].includes(call.args['_x_reason'] ?? '')
 
-/** Calls by `kind:method`, for exact budgets. The recheck's pages count apart, as `recheck:method`. */
-export const callMap = (engine: RunningEngine): Record<string, number> => {
-  const map: Record<string, number> = {}
-  for (const call of engine.fake.calls) {
-    const reason = call.args['_x_reason']
-    const key = notRecheck(call) ? `${call.kind}:${call.method}` : `${reason}:${call.method}`
-    map[key] = (map[key] ?? 0) + 1
-  }
-  return map
-}
-
 /** Waits for the work already triggered, without inferring idleness from elapsed time. */
 export async function quiet(engine: RunningEngine): Promise<void> {
   await timed('sync idle', () => engine.syncIdle())
