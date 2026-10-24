@@ -8,6 +8,7 @@ import { junoText, type CardId, type ChatItem, type ChatPage, type OpId } from '
 import type { HostReads } from '../src/index'
 import { ONLINE, run, served as chat, closeServed } from './serve-harness'
 import { deferred, say } from './turns-harness'
+import { searchPage } from './fixtures/search'
 
 afterEach(closeServed)
 
@@ -45,7 +46,7 @@ it('a sent message shows as the owner bubble, then Juno answers it, and reading 
 it('words Juno took from a Slack message it read show as a source, and an unknown handle as plain words', async () => {
   const review = { channelId: 'C0ENG', ts: '1760500000.000100', senderId: 'U0MAYA', senderName: 'Maya Chen', channelName: '#eng', text: 'Review moved to Thursday.' }
   const page = { messages: [review] as never }
-  const host: HostReads = { search: async () => page, history: async () => page, replies: async () => page, topics: async () => ({ topics: [] }), person: async (id) => ({ id, name: 'maya', displayName: 'Maya' }) }
+  const host: HostReads = { search: async () => searchPage([review]), history: async () => page, replies: async () => page, topics: async () => ({ topics: [] }), person: async (id) => ({ id, name: 'maya', displayName: 'Maya' }) }
   const { h, client, pageWhere } = await chat({ host })
   h.fake.script([
     reply({ type: 'toolCall', id: 'call-1', name: 'slack_search', arguments: { query: 'review' } }),

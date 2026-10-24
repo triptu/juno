@@ -25,7 +25,20 @@ export const HostMessage = Schema.Struct({
   senderName: Schema.optionalKey(Schema.String), channelName: Schema.optionalKey(Schema.String),
 })
 export const HostMessagePage = Schema.Struct({ messages: Schema.Array(HostMessage), next: Schema.optionalKey(HostCursor) })
-export const hostSearch = Rpc.make('host.slack.search', { payload: { accountId: AccountId, query: Schema.String, cursor: Schema.optionalKey(HostCursor), limit }, success: HostMessagePage, error: AgentHostError })
+export const HostSearchOptions = Schema.Struct({
+  includeApps: Schema.optionalKey(Schema.Boolean), includeAutomated: Schema.optionalKey(Schema.Boolean),
+  sort: Schema.optionalKey(Schema.Literals(['newest', 'oldest'])),
+})
+/**
+ * One match, in the page's order. A message match carries the message (its text is the snippet around the match);
+ * a topic-title match has none, and `rootTs` when the topic is a thread. `time` is the owner's local date and time.
+ */
+export const HostSearchMatch = Schema.Struct({
+  topic: TopicLink, channelId: HostChannelId, time: Schema.String,
+  message: Schema.optionalKey(HostMessage), rootTs: Schema.optionalKey(HostMessageTs),
+})
+export const HostSearchPage = Schema.Struct({ matches: Schema.Array(HostSearchMatch), notes: Schema.Array(Schema.String), next: Schema.optionalKey(HostCursor) })
+export const hostSearch = Rpc.make('host.slack.search', { payload: { accountId: AccountId, query: Schema.String, cursor: Schema.optionalKey(HostCursor), limit, ...HostSearchOptions.fields }, success: HostSearchPage, error: AgentHostError })
 export const hostHistory = Rpc.make('host.slack.history', { payload: { accountId: AccountId, channelId: HostChannelId, cursor: Schema.optionalKey(HostCursor), limit }, success: HostMessagePage, error: AgentHostError })
 export const hostReplies = Rpc.make('host.slack.replies', { payload: { accountId: AccountId, channelId: HostChannelId, threadTs: HostMessageTs, cursor: Schema.optionalKey(HostCursor), limit }, success: HostMessagePage, error: AgentHostError })
 export const hostTopics = Rpc.make('host.topics.list', { payload: { cursor: Schema.optionalKey(HostCursor), limit },

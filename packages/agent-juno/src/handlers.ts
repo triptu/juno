@@ -54,7 +54,7 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.views.update': ({ accountId, id, view }) => asAccount(accountId, host.views?.save(view, id) ?? unsupported('Views are unavailable.')),
         'host.views.delete': ({ accountId, id }) => asAccount(accountId, host.views?.delete(id) ?? unsupported('Views are unavailable.')),
         'host.views.undo': ({ accountId, undo }) => asAccount(accountId, host.views?.undo(undo) ?? unsupported('Views are unavailable.')),
-        'host.slack.search': ({ accountId, query, cursor, limit }) => asAccount(accountId, host.search(query, cursor, limit)),
+        'host.slack.search': ({ accountId, query, cursor, limit, ...options }) => asAccount(accountId, host.search(query, cursor, limit, options)),
         'host.slack.history': ({ accountId, channelId, cursor, limit }) => asAccount(accountId, host.history(channelId, cursor, limit)),
         'host.slack.replies': ({ accountId, channelId, threadTs, cursor, limit }) => asAccount(accountId, host.replies(channelId, threadTs, cursor, limit)),
         'host.slack.person': ({ accountId, userId }) => asAccount(accountId, host.person(userId)),

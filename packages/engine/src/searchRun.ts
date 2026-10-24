@@ -116,7 +116,7 @@ function visibleMatches(run: SearchRun, matches: ReadonlyArray<SearchPageMatch>)
   })
 }
 
-export const fetchSearch = (run: SearchRun) => Effect.gen(function* () {
+export const fetchSearch = (run: SearchRun, singlePage = false) => Effect.gen(function* () {
   if (!run.online) { run.state = 'offline'; return }
   const firstArgs = compileSearchSlack(run.resolved, run.pagination.page + 1)
   if (firstArgs === undefined || (firstArgs.query === '' && run.resolved.query.raw.trim() !== '')) { run.state = 'done'; return }
@@ -142,9 +142,10 @@ export const fetchSearch = (run: SearchRun) => Effect.gen(function* () {
     shown += rows.length
     run.pages.push({ rows, coverage: { through: raw.at(-1)?.ts ?? run.pages.at(-1)?.coverage.through ?? null, complete: !run.pagination.hasMore } })
     run.publish()
+    if (singlePage) break
   } while (run.pagination.hasMore && shown < 50 && run.current())
   if (!run.current()) return
-  if (run.local.length === 0 && run.pages.every((p) => p.rows.length === 0) && run.resolved.query.scope.hideApps) {
+  if (!singlePage && run.local.length === 0 && run.pages.every((p) => p.rows.length === 0) && run.resolved.query.scope.hideApps) {
     const unhidden = compileSearchSlack({ ...run.resolved, query: { ...run.resolved.query, scope: { ...run.resolved.query.scope, hideApps: false } } })
     if (unhidden !== undefined) run.hiddenApps = yield* searchMessagePage(api, unhidden).pipe(Effect.map((answer) => Math.max(0, (answer.total ?? 0) - (run.slackTotal ?? 0))), Effect.catch(() => Effect.succeed(0)))
   }

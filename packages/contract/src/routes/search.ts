@@ -41,6 +41,7 @@ export const SearchMessage = Schema.Struct({
   place: SearchPlace,
   /** The sender's display name. */
   sender: Schema.String,
+  senderId: Schema.optionalKey(Schema.String),
   /** The message text, on one line. */
   text: Schema.String,
   /** The store holds the message, so the topic opens at it without asking Slack. */

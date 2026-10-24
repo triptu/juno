@@ -1,14 +1,11 @@
-import { resolveSearch } from '../searchResolve'
-import { compileSearchSql } from '../searchCompiler'
 /**
  * The agent's Slack and topic reads, from the local store (architecture 10,
- * plan v3 §9 Tier 0). Reads never call Slack: the sync keeps the store
- * current, and a read must not spend the request budget. Text is returned
- * whole and as stored; the agent treats it as untrusted.
+ * plan v3 §9 Tier 0). Search lives in search.ts and also reads Slack.
+ * These reads return cached text whole and as stored; the agent treats it as untrusted.
  *
  * Pages: history is newest first by page, each page in time order, with
  * `next` the oldest `ts` to read before. Replies run from the root forward,
- * `next` the last `ts`. Search and the topic list page by offset.
+ * `next` the last `ts`. The topic list pages by offset.
  */
 import {
   channelKindLabel,
@@ -120,20 +117,6 @@ export const replies = (channelId: string, threadTs: string, after: string | und
     const page = rows.slice(0, limit)
     const last = page.at(-1)
     return { messages: yield* named(sql, page), ...(rows.length > limit && last ? { next: cursor(last.ts) } : {}) } satisfies MessagePage
-  })
-
-/** The agent shares the palette's local query rules and never spends Slack's request budget. */
-export const search = (query: string, offsetCursor: string | undefined, limit: number) =>
-  Effect.gen(function* () {
-    const sql = yield* StoreReader
-    if (query.trim() === '') return { messages: [] } satisfies MessagePage
-    const compiled = compileSearchSql(yield* resolveSearch(query))
-    const offset = Math.max(0, Number(offsetCursor ?? 0) || 0)
-    const rows = yield* sql.unsafe<MessageRow>(
-      `SELECT ${MESSAGE_COLUMNS} FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${compiled.order} LIMIT ? OFFSET ?`,
-      [...compiled.params, limit + 1, offset],
-    )
-    return { messages: yield* named(sql, rows.slice(0, limit)), ...(rows.length > limit ? { next: cursor(String(offset + limit)) } : {}) } satisfies MessagePage
   })
 
 export const person = (userId: string) =>

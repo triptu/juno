@@ -8,6 +8,7 @@
 // Commands: send:<op>:<text>  idle  killInAnswer
 import { fakeProvider, reply } from '@juno/agent-testing'
 import { createProviderGuard, openTurns, type HostReads, type TurnEvent } from '../../src/index'
+import { searchPage } from './search'
 
 const [dir, ...commands] = process.argv.slice(2)
 if (dir === undefined) throw new Error('usage: turns.ts <dir> [command...]')
@@ -28,7 +29,7 @@ fake.script(Array.from({ length: 16 }, () => reply((context) => {
 let searches = 0
 const page = { messages: [] as never[] }
 const host: HostReads = {
-  search: async () => (searches++, page),
+  search: async () => (searches++, searchPage([])),
   history: async () => page,
   replies: async () => page,
   topics: async () => ({ topics: [] }),

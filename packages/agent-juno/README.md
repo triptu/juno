@@ -10,7 +10,8 @@ Juno as the agent's host. It runs inside the engine and serves the whole AgentHo
 | RPC | Behaviour |
 | --- | --- |
 | `host.hello` | Answers `{ host: 'juno', protocol: 2 }`. The agent refuses a host on another protocol |
-| `host.slack.search`, `history`, `replies`, `person` | Read Juno's local store. Search takes free text plus Slack's `from:` and `in:` (names or ids; `from:me` is the signed-in user). Text is as Slack holds it, never cleaned. A request for another account than the signed-in one fails with `stale`; none signed in, `signedOut` |
+| `host.slack.search` | Searches local messages and topic titles plus one Slack page, with the Search tab's operators, name resolution, time zone and hiding defaults. Includes snippets, topic links, notes on unsupported operators or Slack failure, and a cursor. Options include apps, automated conversations and newest/oldest order. Account checks reject stale or signed-out reads |
+| `host.slack.history`, `replies`, `person` | Read Juno's local store. Message text is as Slack holds it. Account checks reject stale or signed-out reads |
 | `host.topics.list`, `host.topics.get` | Open topics, newest activity first, as `TopicLink`s; one topic with its place, resolved flag and first page of messages |
 | `host.presence` | A stream: `online` (the engine is live, catching up or rate-limited; also before Slack sign-in, which is not a network outage), `aiEnabled` (the AI assist pref), `quietHours` and `ownerActive` (outside notification hours, inside active hours, from the notifications settings in prefs that the notifications engine reads; the SPEC defaults when none are stored), `accountId`, and `thisTopic`, the topic last viewed in the app |
 | `host.outbox.send` | A Slack send through the composer's outbox, only on the owner's click (below). Fails with `unsupported` while writes are disabled, the default for embedders such as the live scripts. The desktop app enables them |

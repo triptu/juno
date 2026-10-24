@@ -7,6 +7,7 @@ import { fakeCatalogue, lostStream, rateLimited, rejectedKey, reply, serverError
 import type { BubbleId } from '@juno/agent-contract'
 import { dollars, type HostReads } from '../src/index'
 import { answer, deferred, fakeHost, HAIKU, say, textOf, toolCall, turnsHarness } from './turns-harness'
+import { searchPage } from './fixtures/search'
 
 let h: Awaited<ReturnType<typeof turnsHarness>> | undefined
 afterEach(async () => {
@@ -83,7 +84,7 @@ it('messages sent during a tool call join right after it, together, before Juno 
     search: async () => {
       searched.resolve()
       await release.promise
-      return page
+      return searchPage([])
     },
     history: async () => page,
     replies: async () => page,
@@ -113,7 +114,7 @@ it('gives each Slack message a run reads one handle, and resolves only those han
   const room = { channelId: 'C0ENG', ts: '1.000002', senderId: 'U0SAM', text: 'Room 4 is booked.' }
   let searches = 0
   const host: HostReads = {
-    search: async () => ({ messages: (++searches === 1 ? [review] : [room, review]) as never }),
+    search: async () => searchPage(++searches === 1 ? [review] : [room, review]),
     history: async () => ({ messages: [] }),
     replies: async () => ({ messages: [] }),
     topics: async () => ({ topics: [] }),
@@ -129,10 +130,9 @@ it('gives each Slack message a run reads one handle, and resolves only those han
   expect((await h.ended(op)).ending).toEqual({ _tag: 'complete' })
 
   const results = h.chatRequests()[2]!.context.messages.filter((m) => m.role === 'toolResult').map(textOf)
-  expect(results).toEqual([
-    'm1 #eng (C0ENG) ts 1.000001, Maya Chen: Review moved to Thursday.',
-    'm2 C0ENG ts 1.000002, U0SAM: Room 4 is booked.\nm1 #eng (C0ENG) ts 1.000001, Maya Chen: Review moved to Thursday.',
-  ])
+  // Each line starts with its message's handle; the second read keeps m1 for the message it read again.
+  expect(results.map((r) => r.split('\n').map((l) => l.split(' ')[0]))).toEqual([['m1'], ['m2', 'm1']])
+  expect(results[1]).toContain('Room 4 is booked.')
   const bubble = h.events.find((e) => e._tag === 'bubble')
   expect(bubble).toMatchObject({
     text: 'It moved to Thursday, in room 4, says Maya.',

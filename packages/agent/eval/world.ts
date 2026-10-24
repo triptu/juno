@@ -116,7 +116,10 @@ export function recordingHost(): { readonly host: HostReads; readonly read: () =
     return { messages }
   }
   const host: HostReads = {
-    search: async (query) => page(search(query)),
+    search: async (query) => ({ notes: [], matches: page(search(query)).messages.map((m) => ({
+      topic: { topicId: m.threadTs === undefined ? `m:${m.channelId}` : `t:${m.channelId}:${m.threadTs}`, title: m.text, where: `#${channelName(m.channelId)}`, tint: 'public' as const },
+      channelId: m.channelId, time: new Date(Number(m.ts) * 1000).toISOString().slice(0, 16), message: m,
+    })) }),
     // Like the real host, these take channel ids only: a name is not found.
     history: async (channelId) => page(known(channelId).filter((m) => m.threadTs === undefined)),
     replies: async (channelId, threadTs) => page(known(channelId).filter((m) => m.ts === threadTs || m.threadTs === threadTs)),

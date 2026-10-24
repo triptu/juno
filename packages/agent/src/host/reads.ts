@@ -80,7 +80,7 @@ export const bindHost = Effect.gen(function* () {
       } while (cursor !== undefined)
       return channels
     },
-    search: (query) => withAccount((accountId) => client['host.slack.search']({ accountId, query, limit })),
+    search: (query, { cursor, limit: count = limit, ...options } = {}) => withAccount((accountId) => client['host.slack.search']({ accountId, query, limit: count, ...options, ...(cursor === undefined ? {} : { cursor: HostCursor.make(cursor) }) })),
     history: (channelId) => withAccount((accountId) => client['host.slack.history']({ accountId, channelId: HostChannelId.make(channelId), limit })),
     replies: (channelId, threadTs) =>
       withAccount((accountId) =>

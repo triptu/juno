@@ -6,7 +6,7 @@
  * the open workspace's store and the outbox.
  */
 import { Context, type Effect, type Stream } from 'effect'
-import type { HostAiCall, HostInteraction, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostSendState, HostUserId, Place, TopicLink } from '@juno/agent-contract'
+import type { HostAiCall, HostInteraction, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostSearchOptions, HostSearchPage, HostPresence, HostSendState, HostUserId, Place, TopicLink } from '@juno/agent-contract'
 
 export type Message = typeof HostMessage.Type
 export type MessagePage = typeof HostMessagePage.Type
@@ -70,7 +70,7 @@ export class JunoHost extends Context.Service<
       readonly delete: (id: string) => Effect.Effect<typeof HostViewChange.Type, AgentHostError>
       readonly undo: (undo: typeof HostViewUndo.Type) => Effect.Effect<void, AgentHostError>
     }
-    readonly search: (query: string, cursor: string | undefined, limit: number) => Effect.Effect<MessagePage, AgentHostError>
+    readonly search: (query: string, cursor: string | undefined, limit: number, options?: typeof HostSearchOptions.Type) => Effect.Effect<typeof HostSearchPage.Type, AgentHostError>
     readonly history: (channelId: string, cursor: string | undefined, limit: number) => Effect.Effect<MessagePage, AgentHostError>
     readonly replies: (channelId: string, threadTs: string, cursor: string | undefined, limit: number) => Effect.Effect<MessagePage, AgentHostError>
     readonly topics: (

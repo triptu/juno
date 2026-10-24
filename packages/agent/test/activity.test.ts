@@ -7,6 +7,7 @@ import { HostMessagePage } from '@juno/agent-contract'
 import { activityPage } from '../src/serve/pages'
 import { fakeHost, say, turnsHarness } from './turns-harness'
 import { seedRuns } from './activity-seed'
+import { searchPage } from './fixtures/search'
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -22,7 +23,7 @@ const page = Schema.decodeUnknownSync(HostMessagePage)({
 
 async function open() {
   const reads = fakeHost()
-  const h = await turnsHarness({ host: { ...reads.host, history: async () => page, search: async () => ({ messages: [] }) } })
+  const h = await turnsHarness({ host: { ...reads.host, history: async () => page, search: async () => searchPage([]) } })
   cleanups.push(h.close)
   return h
 }
@@ -46,7 +47,7 @@ it('a run names its message, the channel it read, each step with its result, and
   expect(read).toMatchObject({ outcome: 'replied', sources: ['#eng'], tainted: true })
   expect(read!.steps).toEqual([
     { label: 'Read #eng', result: '2 messages', outcome: 'done' },
-    { label: 'Searched Slack', input: 'launch date', result: '0 messages', outcome: 'done' },
+    { label: 'Searched Slack', input: 'launch date', result: '0 matches', outcome: 'done' },
   ])
   // Its requests are counted against its model, at the guard's prices.
   expect(read!.model).toBeTruthy()
@@ -89,7 +90,7 @@ it('removing a message clears its run\'s words and step arguments, and later run
   const [later, removed] = activityPage(h.turns.store, { limit: 50 }).runs
   expect(removed!.trigger).toEqual({ _tag: 'message', words: '', files: 0 })
   expect(removed!.steps).toEqual([{ label: 'Searched Slack', outcome: 'done' }])
-  expect(later!.steps).toEqual([{ label: 'Searched Slack', input: 'hiring', result: '0 messages', outcome: 'done' }])
+  expect(later!.steps).toEqual([{ label: 'Searched Slack', input: 'hiring', result: '0 matches', outcome: 'done' }])
 })
 
 it('500 runs: a window stays a small payload', async () => {

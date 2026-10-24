@@ -8,6 +8,7 @@ import type { HostReads } from '../src/index'
 import { activityPage } from '../src/serve/pages'
 import { credentials } from './connections-harness'
 import { deferred, say, turnsHarness } from './turns-harness'
+import { searchPage } from './fixtures/search'
 
 // Each test opens the engine; a run takes under a second, but a loaded machine can stretch it past bun's 5 s.
 setDefaultTimeout(30_000)
@@ -25,7 +26,7 @@ function slack(hold?: Promise<void>) {
     search: async (query) => {
       first.resolve()
       if (hold) await hold
-      return { messages: (query === 'deploy' ? [message('1760500000.000001', 'The deploy is at 3pm.'), message('1760500000.000002', 'Lunch is pizza.')] : [message('1760500000.000003', 'The review moved to Friday.')]) as never }
+      return searchPage(query === 'deploy' ? [message('1760500000.000001', 'The deploy is at 3pm.'), message('1760500000.000002', 'Lunch is pizza.')] : [message('1760500000.000003', 'The review moved to Friday.')])
     },
     history: async () => ({ messages: [] }),
     replies: async () => ({ messages: [] }),

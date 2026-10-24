@@ -10,12 +10,12 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
-import { actionDigest, AgentHostRpcs, HostDispatch, HostPresence, HostTopicId, type HostSendState } from '@juno/agent-contract'
+import { actionDigest, AgentHostRpcs, HostDispatch, HostPresence, HostTopicId, type HostSearchPage, type HostSendState } from '@juno/agent-contract'
 import { hostProtocol, startAgent, type HostConnection, type HostPort } from '@juno/agent'
 import { forgedSendReceipt, hostileMessages, HOSTILE_USER } from '@juno/agent-testing'
 import { SELF_ID } from '@juno/fake-slack'
-import { agentWritesApprove, messagesRetry, prefsSet } from '@juno/contract'
-import { runCommand, topicAtom } from '@juno/state'
+import { agentWritesApprove, messagesRetry, prefsSet, parseSearchQuery, type SearchSnapshot } from '@juno/contract'
+import { runCommand, topicAtom, searchSnapshots } from '@juno/state'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { bootedEngine, slackWrites } from './scenario'
@@ -63,6 +63,7 @@ async function connectAgent(transport: ReturnType<typeof memoryTransport>) {
   return agent
 }
 
+const messagesOf = (page: typeof HostSearchPage.Type) => page.matches.flatMap((m) => (m.message === undefined ? [] : [m.message]))
 const run = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(Effect.result(effect))
 const ok = async <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
   const result = await run(effect)
@@ -189,6 +190,53 @@ describe('the AgentHost port', () => {
     expect(slackWrites(engine, slackCalls)).toEqual([])
   })
 
+  it('shares Search tab filters and pages both sources without duplicates or extra Slack requests', async () => {
+    const { engine, agent, account } = await hostWithAgent('disabled')
+    const { fake } = engine
+    const at = fake.now() - 40 * 86400_000
+    // The owner's calendar day: the fake signs in as a user in Europe/Paris.
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(at)
+    const maya = fake.workspace.post({ channel: CHANNEL, user: 'U0MAYA', text: 'agentparity contract', at, silent: true })
+    fake.workspace.post({ channel: CHANNEL, user: 'U0LEO', text: 'agentparity contract', at: at + 1000, silent: true })
+    fake.workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: 'agentparity contract', at: at + 2000, silent: true })
+    const query = `agentparity from:@maya in:#eng on:${day}`
+    const tab = searchSnapshots({ sessionId: 'agent-parity', generation: 1, query: parseSearchQuery(query), immediate: true })
+    const release = engine.registry.mount(tab)
+    let snapshot: SearchSnapshot
+    try {
+      snapshot = await waitFor(() => { const value = engine.registry.get(tab); return value._tag === 'Success' && value.value.state === 'done' ? value.value : undefined })
+    } finally { release() }
+    const page = await ok(agent.client['host.slack.search']({ accountId: account, query, limit: 50 }))
+    expect(messagesOf(page).map((m) => `${m.channelId}:${m.ts}`)).toEqual(snapshot.groups.flatMap((g) => g.messages.map((m) => m.id)))
+    expect(messagesOf(page).map((m) => String(m.ts))).toEqual([String(maya.ts)])
+
+    // Cached newest and oldest rows overlap Slack's pages. Every result must appear once.
+    fake.workspace.post({ channel: CHANNEL, user: 'U0MAYA', text: 'agentpaging newest', at: fake.now() })
+    fake.workspace.post({ channel: CHANNEL, user: 'U0MAYA', text: 'agentpaging cached old', at: at - 1000 })
+    await engine.socketIdle()
+    for (let i = 0; i < 65; i++) fake.workspace.post({ channel: CHANNEL, user: 'U0MAYA', text: `agentpaging ${i}`, at: at + i * 1000, silent: true })
+    for (const sort of ['newest', 'oldest'] as const) {
+      const times: string[] = []
+      let cursor: typeof page.next
+      for (let n = 0; n < 10; n++) {
+        const calls = fake.callCount('search.modules.messages')
+        const next = await ok(agent.client['host.slack.search']({ accountId: account, query: 'agentpaging', sort, limit: 17, ...(cursor === undefined ? {} : { cursor }) }))
+        expect(fake.callCount('search.modules.messages') - calls).toBeLessThanOrEqual(1)
+        expect(next.matches.length).toBeLessThanOrEqual(17)
+        times.push(...messagesOf(next).map((m) => m.ts))
+        cursor = next.next
+        if (cursor === undefined) break
+      }
+      expect(cursor).toBeUndefined()
+      expect(times).toHaveLength(67)
+      expect(new Set(times).size).toBe(67)
+      expect(times).toEqual(times.toSorted((a, b) => (sort === 'newest' ? -1 : 1) * a.localeCompare(b)))
+    }
+    const unsupported = await ok(agent.client['host.slack.search']({ accountId: account, query: 'agentpaging is:saved', limit: 50 }))
+    expect(unsupported.matches).toEqual([])
+    expect(unsupported.notes.join(' ')).toContain('is:saved')
+  })
+
   it('serves Slack and topic reads from the store, hostile text as it is', async () => {
     const { engine, agent, account } = await hostWithAgent('disabled')
     for (const { message } of hostileMessages.filter((f) => f.message.threadTs === undefined && f.name !== 'loneSurrogate')) {
@@ -217,15 +265,16 @@ describe('the AgentHost port', () => {
     expect<unknown>(older.next).toBe(older.messages[0]!.ts)
 
     const found = await ok(client['host.slack.search']({ accountId: account, query: 'maintenance mode', limit: 10 } as never))
-    expect(found.messages.map((m) => m.text)).toEqual([injection])
+    expect(messagesOf(found)).toHaveLength(1)
+    expect(messagesOf(found)[0]?.text).toContain('maintenance mode')
     const fromMaya = await ok(client['host.slack.search']({ accountId: account, query: 'from:@maya in:#eng maintenance', limit: 10 } as never))
-    expect(fromMaya.messages.map((m) => m.text)).toEqual([injection])
+    expect(messagesOf(fromMaya).map((m) => m.ts)).toEqual(messagesOf(found).map((m) => m.ts))
     const fromLeo = await ok(client['host.slack.search']({ accountId: account, query: 'from:@leo maintenance', limit: 10 } as never))
-    expect(fromLeo.messages).toEqual([])
+    expect(fromLeo.matches).toEqual([])
     // `from:me` is the signed-in user: what the learning pass reads.
     const fromMe = await ok(client['host.slack.search']({ accountId: account, query: 'from:me', limit: 50 } as never))
-    expect(fromMe.messages.length).toBeGreaterThan(0)
-    expect(fromMe.messages.every((m) => m.senderId === SELF_ID)).toBe(true)
+    expect(messagesOf(fromMe).length).toBeGreaterThan(0)
+    expect(messagesOf(fromMe).every((m) => m.senderId === SELF_ID)).toBe(true)
 
     expect<unknown>(await ok(client['host.slack.person']({ accountId: account, userId: 'U0MAYA' } as never))).toMatchObject({ id: 'U0MAYA', name: 'Maya Chen' })
     expect((await failure(client['host.slack.person']({ accountId: account, userId: 'U0NOBODY' } as never)))).toMatchObject({ reason: 'notFound' })
@@ -269,7 +318,7 @@ describe('the AgentHost port', () => {
       return page.messages.some((m) => m.text === 'Deploy is green') ? page : undefined
     }, 30_000, 'the message in history')
     expect(history.messages.find((m) => m.text === 'Deploy is green')).toMatchObject({ channelId: CHANNEL, senderId: 'U0MAYA' })
-    expect((await agent.reads.search('green')).messages.map((m) => m.text)).toEqual(['Deploy is green'])
+    expect(messagesOf(await agent.reads.search('green')).map((m) => m.text)).toEqual(['Deploy is green'])
     expect(await agent.reads.person('U0MAYA')).toMatchObject({ id: 'U0MAYA', name: 'Maya Chen' })
     expect(await agent.reads.person('U0NOBODY').catch((error: unknown) => error)).toMatchObject({ reason: 'notFound' })
   })

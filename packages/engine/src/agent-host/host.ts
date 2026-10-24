@@ -30,6 +30,8 @@ import { MarkWorker } from '../markWorker'
 import { resolve, undoResolve } from './resolve'
 import { Outbox, type MirrorError } from '../outbox'
 import { PostQueue } from '../postQueue'
+import { makeAgentSearch } from './search'
+import { SessionClient } from '../sessionClient'
 import { SyncLink } from '../syncLink'
 import { Workspace, type StoreServices } from '../workspace'
 import { savedViews } from '../viewCommands'
@@ -79,7 +81,7 @@ const hoursAt = (millis: number, hours: Hours) => {
   }
 }
 
-export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend | AiAudit | AiFallback | PostQueue> = Layer.effect(
+export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | SessionClient | SyncLink | PhaseSource | EngineConfig | MarkWorker | AiSpend | AiAudit | AiFallback | PostQueue> = Layer.effect(
   JunoHost,
   Effect.gen(function* () {
     const config = yield* EngineConfig
@@ -87,6 +89,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const link = yield* SyncLink
+    const search = makeAgentSearch(yield* SessionClient, link)
     const phases = yield* PhaseSource
     const spend = yield* AiSpend
     const audit = yield* AiAudit
@@ -267,7 +270,7 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
         delete: (id) => views.remove(id).pipe(Effect.provideService(Workspace, workspace)),
         undo: (undo) => views.undo(undo).pipe(Effect.provideService(Workspace, workspace)),
       },
-      search: (query, cursor, limit) => inStore(reads.search(query, cursor, limit)),
+      search: (query, cursor, limit, options) => Effect.flatMap(account, (owner) => inStore(search(owner.id, query, cursor, limit, options))),
       history: (channelId, cursor, limit) => inStore(reads.history(channelId, cursor, limit)),
       replies: (channelId, threadTs, cursor, limit) => inStore(reads.replies(channelId, threadTs, cursor, limit)),
       topics: (cursor, limit) => inStore(reads.topics(cursor, limit)),

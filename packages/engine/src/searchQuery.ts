@@ -189,6 +189,7 @@ export const messageResults = (
         title,
         ts: hit.ts,
         place,
+        ...(hit.user_id === null ? {} : { senderId: hit.user_id }),
         sender: hit.bot_name ?? (hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id))),
         text: oneLine(readableText(messageBody({ text: hit.text, attachments: hit.attachments_json ? JSON.parse(hit.attachments_json) as MessageContent['attachments'] : undefined, blocks: hit.blocks_json ? JSON.parse(hit.blocks_json) as MessageContent['blocks'] : undefined }, lookups))),
         stored: hit.stored,

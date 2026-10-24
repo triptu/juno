@@ -11,7 +11,7 @@
  *
  *   m3 #eng (C0ENG) ts 1760500000.000004 in thread 1760500000.000001, Maya Chen: It times out…
  */
-import type { AgentHostError, HostMessagePage, HostChannel, TopicLink } from '@juno/agent-contract'
+import type { AgentHostError, HostMessagePage, HostSearchOptions, HostSearchPage, HostChannel, TopicLink } from '@juno/agent-contract'
 import { abortable, Cancelled, defineTool, type JunoTool, type ToolOutput } from '../request/tool'
 import type { SourceRef } from './sources'
 
@@ -19,7 +19,7 @@ type Page = typeof HostMessagePage.Type
 
 export interface HostReads {
   readonly channels?: (pattern: string) => Promise<ReadonlyArray<typeof HostChannel.Type>>
-  readonly search: (query: string) => Promise<Page>
+  readonly search: (query: string, options?: typeof HostSearchOptions.Type & { readonly cursor?: string; readonly limit?: number }) => Promise<typeof HostSearchPage.Type>
   readonly history: (channelId: string) => Promise<Page>
   readonly replies: (channelId: string, threadTs: string) => Promise<Page>
   readonly topics: () => Promise<{ readonly topics: ReadonlyArray<TopicLink> }>
@@ -80,17 +80,57 @@ const string = (description: string) => ({ type: 'string', description })
 
 export type HostTool = JunoTool & { readonly taints: boolean }
 
+type SearchArgs = { readonly query: string; readonly cursor?: string; readonly limit?: number } & typeof HostSearchOptions.Type
+type SearchMatch = (typeof HostSearchPage.Type)['matches'][number]
+
+/** A match as a line: the message line with its time and topic, or a topic whose title matched. */
+const matchLine = (m: SearchMatch, handle: string | undefined) => {
+  const topic = `topic ${m.topic.topicId} "${m.topic.title}"`
+  if (m.message !== undefined) return `${line(m.message, handle)} | ${m.time} | ${topic}`
+  return `${handle === undefined ? '' : `${handle} `}Title match: ${topic} in ${m.topic.where} (${m.channelId}), last active ${m.time}`
+}
+
+const searchTool = (host: HostReads, handles: Handles) =>
+  defineTool<SearchArgs>({
+    name: 'slack_search',
+    description: [
+      'Search the owner\'s Slack: messages on this Mac and Slack\'s full history, plus Juno topic titles, newest first.',
+      'Filters: from: and in: take names or ids (several in: match any of them); before:, after:, on: and during: take days or months in the owner\'s time zone (on:2026-10-12, during:2026-09);',
+      'has:link, has:file, has:reaction, has:pin; is:thread; "exact phrase"; -word or -from:name to exclude.',
+      'Apps and automated conversations are hidden unless you include them, as for alerts, deploys or bots.',
+      'Text is the part around the match; read the thread for more. For more matches, call again with the cursor and the same query and options.',
+    ].join(' '),
+    parameters: { type: 'object', properties: {
+      query: string('The search, words and filters'),
+      includeApps: { type: 'boolean', description: 'Include messages from apps and bots' },
+      includeAutomated: { type: 'boolean', description: 'Include automated conversations. An in: filter already includes its conversation' },
+      sort: { type: 'string', enum: ['newest', 'oldest'] },
+      cursor: string('The cursor from the previous page'),
+      limit: { type: 'integer', minimum: 1, maximum: 50, description: 'Matches per call, at most 50' },
+    }, required: ['query'], additionalProperties: false },
+    replay: 'safe',
+    status: (n) => (n === 1 ? 'Searching Slack' : `Searching Slack, ${plural(n, 'search', 'searches')}`),
+    run: ({ query, ...options }, call) => read(async () => {
+      const page = await host.search(query, options)
+      // A title match without a thread root names no message, so it gets no handle.
+      const cited = page.matches.flatMap((m) => {
+        const ts = m.message?.ts ?? m.rootTs
+        return ts === undefined ? [] : [{ match: m, ref: { channelId: m.channelId, ts, place: m.topic.where } }]
+      })
+      const assigned = await handles(cited.map((c) => c.ref))
+      const handleOf = new Map(cited.map((c, i) => [c.match, assigned[i]]))
+      const rows = page.matches.map((m) => matchLine(m, handleOf.get(m)))
+      if (rows.length === 0) rows.push(page.next === undefined ? 'No matches.' : 'No matches on this page.')
+      rows.push(...page.notes.map((note) => `Note: ${note}`))
+      if (page.next !== undefined) rows.push(`Next cursor: ${page.next}`)
+      return { text: rows.join('\n'), summary: plural(page.matches.length, 'match', 'matches') }
+    }, call.signal),
+  })
+
 /** `handles` numbers the messages read in the live run. */
 export function hostTools(host: HostReads, handles: Handles): ReadonlyArray<HostTool> {
   const tools = [
-    defineTool<{ readonly query: string }>({
-      name: 'slack_search',
-      description: 'Search the owner\'s Slack messages. Slack search syntax works, for example "from:@maya in:#eng".',
-      parameters: { type: 'object', properties: { query: string('The search') }, required: ['query'], additionalProperties: false },
-      replay: 'safe',
-      status: (n) => (n === 1 ? 'Searching Slack' : `Searching Slack, ${plural(n, 'search', 'searches')}`),
-      run: ({ query }, call) => read(async () => lines(await host.search(query), handles), call.signal),
-    }),
+    searchTool(host, handles),
     defineTool<{ readonly channel: string }>({
       name: 'slack_history',
       description: 'Read the newest messages of a channel or direct message.',

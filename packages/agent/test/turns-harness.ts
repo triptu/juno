@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fakeProvider, type FakeProviderOptions } from '@juno/agent-testing'
 import type { BubbleId, ChatMention, ReplyTarget, SendContext } from '@juno/agent-contract'
 import { createProviderGuard, openTurns, type ActionsOptions, type TurnsOptions, type HostReads, type MigrationSet, type ModelRef, type TurnEvent, type Turns } from '../src/index'
+import { searchPage } from './fixtures/search'
 
 export const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
 export const HAIKU: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' }
@@ -160,7 +161,7 @@ export function fakeHost() {
   let calls = 0
   const page = { messages: [] as never[] }
   const host: HostReads = {
-    search: async () => (calls++, page),
+    search: async () => (calls++, searchPage([])),
     history: async () => (calls++, page),
     replies: async () => (calls++, page),
     topics: async () => (calls++, { topics: [] }),

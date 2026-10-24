@@ -12,6 +12,7 @@ import { entries, undoRun, writeEntry } from '../src/memory-docs/store'
 import { docNotes, docsPage } from '../src/memory-docs/views'
 import { DOLLAR } from '../src/spend'
 import { say, textOf, toolCall, turnsHarness } from './turns-harness'
+import { searchPage } from './fixtures/search'
 
 let h: Awaited<ReturnType<typeof turnsHarness>> | undefined
 afterEach(async () => {
@@ -31,7 +32,7 @@ function slack(counts: () => ReadonlyArray<HostInteraction> = () => []): HostRea
   const reads: string[] = []
   return {
     reads,
-    search: async (query) => (reads.push(`search ${query}`), { messages: ownMessages as never }),
+    search: async (query) => (reads.push(`search ${query}`), searchPage(ownMessages)),
     history: async (channel) => (reads.push(`history ${channel}`), { messages: [{ channelId: channel, ts: '1.000003', senderId: 'U0MAYA', senderName: 'Maya Chen', text: 'can you send the one-liner?' }] as never }),
     replies: async () => ({ messages: [] }),
     topics: async () => ({ topics: [] }),
