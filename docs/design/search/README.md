@@ -4,7 +4,9 @@ Tushar's request: search is too basic. You can't filter by channel or person, ch
 
 How we got here: a map of today's search (below), web research on what people like and dislike about Slack search (`rounds/research.md`, summarised under "Evidence"), and two design rounds between Fable (interaction design) and Astra (systems), in `rounds/`. Where they disagreed, the choice and the reason are given.
 
-`mock.html` holds the mocks. `node ../../../scripts/heavy.mjs node render.mjs` writes the PNGs.
+`mock.html` holds the first mocks, `mock-v2.html` the revision of 10-24 (cards, the topic beside them, the mark). `node ../../../scripts/heavy.mjs node render.mjs [--file mock-v2.html]` writes the PNGs.
+
+The revision followed Tushar's look at the built tab: "this feels very busy, and i think the results part needs more space, and also larger rows showing more details so i don't have to open to see surrounding text", and, after seeing Slack's results, "search page isn't something you see all the time, but when you do go to it, you really want to find your thing fast and close the tab. it should be optimized for functionality." What each result can show, from Slack's answer and from the store, is in `v2-fields-light.png`.
 
 ## Today
 
@@ -30,40 +32,36 @@ How we got here: a map of today's search (below), web research on what people li
   - Messages come from this Mac only, with no Slack call, so ⌘K never waits. The same hiding rules apply.
   - The last row on All and Messages is "All results for "…"" with ⌘⇧F. It opens the Search tab with the text and filters.
 - The tab title is the query, or "Search" when empty. Privacy mode shows "Search".
-- Search state lives outside the mounted page, so Back and Forward, a closed and reopened tab (⌘⇧T) and a restart all bring back the query, the selection and the scroll. The results are fetched again.
+- Search state lives outside the mounted page, so Back and Forward, a closed and reopened tab (⌘⇧T) and a restart all bring back the query, the selection, whether the topic showed beside the results, and the scroll (the card at the top and where it sat). The results are fetched again.
 
-### 2. The field across the top, results on the left, the conversation on the right
+### 2. Results first, the topic beside them when you ask
 
-- **The field and the filter row span the whole tab**, above the split, so long queries and several chips have room. The split starts under them.
-- **Results column** 384 px wide, resizable from 312 to 480 by its edge, like the sidebar, with the mouse or, with the edge focused, ← → Home End and Enter. The **reader** takes the rest.
-- Until you choose a row, a new search's first result shows in the reader as a peek once Slack has answered (its answer can put a newer match first), so the reader is not left blank; it marks nothing read and focus stays in the field. A row that takes focus (Tab into the list, a click) is selected, so the tint always shows where you are.
-- Up and Down move through the results, and the reader follows at once (it reads from the local store, within the 50 ms cached topic budget; the results next to the selection and under the pointer are kept warm). It never keeps the last topic on screen: a result whose topic is not local yet shows its header and its own message from the row, where the match lands, and the topic fills in around it. A held arrow asks Slack only for the result it stops on. Moving the selection never opens a tab or adds a history entry.
-- **Enter** opens the topic at the message in the current tab, with Back returning to the search exactly as it was. **⌘Enter** or ⌘-click opens it in a new tab in the background, and focus stays in the list, so you can open several in a row.
-- **The reader is the topic itself**, with its composer, reactions and message menus, scrolled to the match with the matched words marked. You can reply without leaving the search. Its header has the title, the place, **Open in new tab** and the topic's ⋯ menu. When a thread has several matches, "2 of 5" with up and down arrows (⌘↑ ⌘↓) step between them, counted in the thread's reading order (oldest first), whatever the list's sort.
-- **Reading marks read only when you act.** Arrowing past a result marks nothing read, as a peek. Clicking or typing in the reader, reacting, sending, or opening the topic marks it read, as opening it does today.
-- Tab moves focus from the list into the reader's composer; Esc in an empty composer goes back to the list.
-- Narrower than 312 + 480 px: one column. Enter shows the reader with "Back to results"; Esc does the same.
-- At the smallest widths the filter row wraps its two toggles to a second line, and under 480 px the reader's header keeps Back, the place icon, the title, the match arrows and ⋯; Open in new tab, Resolve and Juno move into ⋯.
+- **The results take the tab.** The field, the filter row and the cards sit in the middle of the page, at most 780 px wide (`--search-measure`), so a line of a message stays readable. Nothing opens until you ask.
+- **The topic shows beside the results** as a panel on the right: Space, a click or → on a card. 560 px by default, resizable from 480 to 800 by its left edge, with the mouse or, with the edge focused, ← → Home End and Enter; the results keep at least 320 px (`--search-list-min`). **Esc** hides it (from the list, or from the panel outside its composer), and so does Space again on the same card, or Close at the end of its header. While it shows, ↑ and ↓ move through the cards and the panel follows at once. Moving the selection never opens a tab or adds a history entry.
+- The panel shows a new selection in the frame the selection moves, never the last topic's messages: a topic not on this Mac yet shows its header and the card's message at the match, and the rest fills in around it without moving it. Slack is asked only for the result the arrows stop on, after 120 ms of a still selection. The previous, next and hovered cards' topics are kept warm.
+- No first-result preview: a new search selects nothing and shows no topic until you choose.
+- **Enter** opens the topic at the message in the current tab, with Back returning to the search exactly as it was, panel included. **⌘Enter** or ⌘-click opens it in a new tab in the background, and focus stays in the list, so you can open several in a row.
+- **The panel is the topic itself**, with its composer, reactions and message menus, at the match with the matched words marked. You can reply without leaving the search. Its header has the place, the title, **Open in new tab**, the topic's ⋯ menu and Close. When a thread has several matches, "2 of 5" with up and down arrows (⌘↑ ⌘↓) step between them, counted in the thread's reading order (oldest first), whatever the list's sort.
+- **Reading marks read only when you act.** Arrowing past a result marks nothing read. Clicking or typing in the panel, reacting, sending, or opening the topic marks it read, as opening it does today.
+- Tab moves focus from a card into the panel's composer; Esc in an empty composer goes back to the list.
+- A new query whose results do not hold the selected card drops the selection and the panel.
+- **Narrow:** under 800 px for the page (the results' minimum and a topic's), the panel covers the results, its header led by Back to results; Esc does the same. At the smallest widths the filter row wraps its two toggles to a second line, and under 480 px the panel's header keeps Back, the place icon, the title, the match arrows and ⋯; Open in new tab, Resolve and Juno move into ⋯.
 - The sidebar's magnifier shows the current state while a Search tab is active, as Home and All topics do.
 
-### 3. Rows: a flat list by time, or grouped by thread
+### 3. Cards: each result is its whole message
 
-**By default the list is flat**: one row per matching message, in time order (newest first, or oldest with the sort). This is the order Slack returns, so pages only ever add rows at the end.
+**The list is flat**: one card per matching message, in time order (newest first, or oldest with the sort). This is the order Slack returns, so pages only ever add cards at the end. There is no Group by thread.
 
-- A row is two lines. Line 1: the topic's art (16), its Juno title (a Main reads "#procurement · Main"), the place, and the time. Line 2: the sender and the snippet, with the matched words in semibold.
-- A match from the same topic as the row just before it is a one-line match line instead (sender, snippet, time, as grouped mode draws them), under that row's snippet. A run from one topic, as alert and incident channels often are, shows its topic line once and the snippets that differ under it; topics that alternate keep a full row each. This only looks at the row before, so the time order and the pages that add rows at the end do not change.
-- A snippet starts a few words before the first match, with a leading "…" when cut, so the matched words are always visible.
-- **Topic titles match too.** Juno's titles are AI-made, so "staging bill" can find the topic titled "Staging bill doubled since August" even when nobody wrote those words. A topic whose title matches shows as a one-line row with the words marked, at the time of its latest message. Once above the completeness line, it stays for this query even when a later page finds an older matching message in that topic. Slack can't do this. Title matches obey `in:` and dates; with `from:`, only topics that person wrote in.
+- **A place line** over the card: the place's pill in its tint (public, private, DM) and, for a thread, Juno's title for it. A card from the same topic as the card just before it leaves the line out, so a run from one topic, as alert and incident channels often are, shows it once. This only looks at the card before, so the time order and the pages that add cards at the end do not change.
+- **The card** is the message as the topic draws it: the sender's photo and name, "App" for an app or a bot, the date and time ("Oct 22, 20:41", "Yesterday 19:42", "10:41" today), then the whole message: rich text, code, quotes, mentions and links, its files as quiet chips (icon, name, kind and size; pictures show in the panel), and its reactions, read-only. A thread's first message ends with who replied (up to three faces, when Juno knows them) and "6 replies · last reply 2h". A press on a link or a mention inside a card is theirs.
+- **A long message folds** at about ten lines (`--search-fold`). Folded, it shows the part with its first match, two lines under the fold's top, with a fade where more is above or below, and "Show more" unfolds it in place ("Show less" folds it again).
+- The cards are calm: a hairline and space, no fill. The selected card takes a quiet tint (`--hl-select`: 10% of the accent in light, 9% in dark) and, while the list or the field has focus, an accent edge (`--hl-rule`). A card that takes focus is selected.
+- **The search mark** is Find yellow, as every Mac app and Slack mark what you searched for, in the cards, in the panel and in Find in topic: `--find`, and `--find-current` for the match the panel's arrows are on (in dark, dark text on bright yellow, as macOS draws it). With an accent that is yellow itself (Marigold) the mark is blue, so it never looks like the @you chip or a link. Text on every mark is at least 8:1 (`v2-marks.png`; `docs/design/tokens.md`).
+- **Topic titles match too.** Juno's titles are AI-made, so "staging bill" can find the topic titled "Staging bill doubled since August" even when nobody wrote those words. A topic whose title matches shows as a one-line card (its pill, the title with the words marked, its latest activity). Once above the completeness line, it stays for this query even when a later page finds an older matching message in that topic. Slack can't do this. Title matches obey `in:` and dates; with `from:`, only topics that person wrote in.
+- **Where each part comes from.** Slack's answer (with `extra_message_data`) carries the text, blocks, attachments, files, reactions, the sender's id, an app's name and icon, `thread_ts`, and on a thread's first message `reply_count` and `latest_reply`. Names and photos, Juno's titles and who replied come from the store (`reply_users` was never seen in a search match). The engine builds each card as the topic builds a message (`packages/engine/src/searchCards.ts`).
+- The engine sends 50 cards at a time (`SEARCH_WINDOW`), so a window of whole messages stays inside the live-query budget.
 
-**Group by thread** is a toggle in the filter row, next to the sort, and is remembered. Slack returns single messages, each with its thread (`thread_ts`), so grouping happens in Juno over the rows loaded so far:
-
-- A thread's matches sit under one topic line (art, title, place, time of its newest loaded match), with up to 2 match lines, then "3 more in this thread".
-- A thread's group sits where its newest loaded match falls in time order. Newest first, a later page can only hold older matches, so it adds lines to a group already shown and never moves a group up. Under Oldest first the same holds in reverse.
-- "N more in this thread" counts the matches loaded so far and grows as pages arrive. It never claims a total Slack hasn't sent.
-- A channel's Main is not one conversation, so Main matches stay single rows; consecutive Main rows from the same channel share one header line.
-- Grouping uses thread identity only, never a model's sense of similarity. Similar bot messages are not merged: two alerts can be two incidents.
-
-In both modes the reader's "2 of N" counts matches in the whole thread as Juno holds it (the thread is fetched when opened), so it is exact even when the list has loaded only some of them.
+In the panel the "2 of N" counts matches in the whole thread as Juno holds it (the thread is fetched when opened), so it is exact even when the list has loaded only some of them.
 
 ### 4. The query: typed operators and chips are one thing
 
@@ -85,11 +83,12 @@ In both modes the reader's "2 of N" counts matches in the whole thread as Juno h
 
 ### 6. Apps, bots and automated channels are hidden by default
 
-- Two toggles at the end of the filter row, each remembered: **Apps hidden** (messages from apps and bots) and **Automated hidden** (the conversations in the Automated view, SPEC 5). One click shows them; the label then reads **Apps shown** or **Automated shown**. Nothing is hidden without a visible toggle saying so.
+- Two toggles at the end of the filter row, each remembered: **Apps hidden** (messages from apps and bots) and **Automated hidden** (the conversations in the Automated view, SPEC 5). One click shows them; the label then reads **Apps shown** or **Automated shown**. Nothing is hidden without a visible toggle saying so. They stay as two buttons in the row, with From, In, Date, Has and the sort, so every option can be found without opening a menu (decided 10-24 in the card revision, over folding them into one "Hidden" menu).
 - Apps maps to `search_exclude_bots` on Slack (checked live: it removes every bot message) and the bot flag locally.
 - Automated is Juno's own list, so Slack can't filter it: Slack's rows from those conversations are dropped after they arrive, and paging asks for more when a page thins out. Locally it is a `NOT IN` on the channel.
 - When a search finds nothing but hidden rows would match, the empty state says so: "4 matches, all from apps and automated channels." with **Show 4 matches**.
 - An `in:` chip naming an automated channel searches it whatever the toggle says.
+- A card from an app says "App" next to its name, so an alert never reads as a person, when apps are shown.
 
 ### 7. Ask Juno
 
@@ -113,9 +112,10 @@ v1, in order:
 2. Done (10-24): `SearchQuery`, the parser and both compilers. ⌘K and the agent tool move onto it.
 3. Done (10-24): the `search` place with sessions, the two-pane page, the reader, keys, ⌘⇧F, ⌘F in a topic, the ⌘K handoff. SPEC 10a describes what was built.
 4. Done (10-24): merge with the completeness line, paging, highlighting, the four states, the Apps and Automated toggles.
-5. Done (10-24): flat rows and Group by thread, Main rows, title matches, stepping between matches.
+5. Done (10-24): flat rows, title matches, stepping between matches.
 6. Done (10-24): recent searches; privacy mode.
 7. Done (10-24): Juno answers search questions with this tab's search and cites the messages (section 7).
+8. Done (10-24): the card revision (sections 2 and 3): results first, the topic as a panel, cards with whole messages, the search mark; Group by thread removed.
 
 v2: Best match, Juno-only filters, Files, and a semantic index only if we see many searches that find nothing.
 
@@ -123,4 +123,4 @@ Tests: end-to-end flows against the fake Slack (which needs the extra operators,
 
 ## Decisions
 
-None. Decided with Tushar (10-24): the reader is not read-only; ⌘F in a topic searches that topic; the field spans the tab above the split; apps and automated channels are hidden by default behind visible toggles; ⌘K stays for fast navigation: All, Conversations and Messages tabs, opening on All, local-only results and a row into the Search tab.
+None. Decided with Tushar (10-24, card revision): results take the tab and the topic shows as a panel beside them only when asked; results are cards with the whole message; the mark is Find yellow (blue for a yellow accent), never the accent; Group by thread is gone; the filter row keeps every control visible. Decided earlier (10-24): the reader is not read-only; ⌘F in a topic searches that topic; apps and automated channels are hidden by default behind visible toggles; ⌘K stays for fast navigation: All, Conversations and Messages tabs, opening on All, local-only results and a row into the Search tab.
