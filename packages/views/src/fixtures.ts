@@ -29,6 +29,7 @@ import Message from './Message.fixtures'
 import MessageMenu from './MessageMenu.fixtures'
 import MessageList from './MessageList.fixtures'
 import CommandPalette from './CommandPalette.fixtures'
+import SearchPage from './search/SearchPage.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
 import HuddleRingSection from './HuddleRingSection.fixtures'
@@ -135,6 +136,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MessageMenu,
   MessageList,
   CommandPalette,
+  SearchPage,
   MoveSheet: moveSheet,
   NewDivider,
   NewMessagesPill,
