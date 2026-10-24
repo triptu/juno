@@ -44,13 +44,14 @@ export function SearchPage({ field, filters, results, reader, readerRef, readerS
   const reportNarrow = useEffectEvent((value: boolean) => onNarrow?.(value))
   useEffect(() => reportNarrow(narrow), [narrow])
 
-  // The field and the list count as one place for focus, as ⌘K's field and rows do.
+  // The field and the list count as one place for focus, as ⌘K's field and rows do. The column's resize edge does not.
+  const isEdge = (target: EventTarget | null) => target instanceof Element && target.matches('[data-resize-edge]')
   const listFocus = {
-    onFocus: () => onListFocus?.(true),
+    onFocus: (event: FocusEvent<HTMLElement>) => onListFocus?.(!isEdge(event.target)),
     onBlur: (event: FocusEvent<HTMLElement>) => {
       const next = event.relatedTarget
       const inside = (selector: string) => next instanceof Node && root.current?.querySelector(selector)?.contains(next) === true
-      if (!inside('[data-search-band]') && !inside('[data-search-column]')) onListFocus?.(false)
+      if (isEdge(next) || (!inside('[data-search-band]') && !inside('[data-search-column]'))) onListFocus?.(false)
     },
   }
 
@@ -117,9 +118,12 @@ const styles = stylex.create({
     borderInlineEndStyle: 'solid',
     borderInlineEndColor: colors['--border-default'],
   },
+  // One column: the list takes the page's width and its rows end in an ellipsis, down to the smallest window.
   whole: {
     width: 'auto',
     flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     borderInlineEndWidth: 0,
   },
   gone: {

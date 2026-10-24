@@ -4,11 +4,18 @@
  * straight onto the pane (its parent), with no React state, and reports the
  * width when it ends; a double-click asks for the default. With
  * `collapseBelow`, a drag that ends narrower than that hides the pane
- * instead. The sidebar and the Search tab's results column use it.
+ * instead. It is a window splitter for the keyboard too: Tab reaches it,
+ * ← and → move it 8px, Home and End go to the minimum and the maximum, and
+ * Enter asks for the default. The sidebar and the Search tab's results
+ * column use it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { useRef, type PointerEvent } from 'react'
+import { useRef, type KeyboardEvent, type PointerEvent } from 'react'
 import { layout } from '@juno/tokens/tokens.stylex'
+import { focusRing } from '@juno/ui'
+
+/** How far ← and → move the edge. */
+const KEY_STEP = 8
 
 export interface ResizeEdgeProps {
   readonly width: number
@@ -66,9 +73,27 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
     if (next !== width) onResize?.(next)
   }
 
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      return onReset?.()
+    }
+    const to = event.key === 'ArrowLeft' ? width - KEY_STEP : event.key === 'ArrowRight' ? width + KEY_STEP : event.key === 'Home' ? min : event.key === 'End' ? max : undefined
+    if (to === undefined) return
+    event.preventDefault()
+    const box = event.currentTarget.parentElement
+    const next = clamp(to)
+    if (box === null || next === width) return
+    write(box, next)
+    onResize?.(next)
+  }
+
   return (
     <div
       role="separator"
+      tabIndex={0}
+      data-resize-edge=""
       aria-orientation="vertical"
       aria-label={label}
       aria-valuemin={min}
@@ -79,7 +104,8 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
       onPointerUp={end}
       onPointerCancel={end}
       onDoubleClick={onReset}
-      {...stylex.props(styles.edge)}
+      onKeyDown={onKeyDown}
+      {...stylex.props(styles.edge, focusRing.inset)}
     />
   )
 }
