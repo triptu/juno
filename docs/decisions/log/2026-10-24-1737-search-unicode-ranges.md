@@ -1,0 +1,1 @@
+- 10-24 17:37 · search-unicode-ranges · Search snippets and reader highlights share accent-insensitive matching with original UTF-16 boundary mapping, so expanding case folds, combining marks and emoji cannot shift DOM ranges.
