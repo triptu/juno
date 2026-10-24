@@ -1,4 +1,4 @@
-// Which replies of a thread the store holds (architecture 5.5 and 5.6, specs/thread-coverage.qnt), against the
+// Which replies of a thread the store holds (architecture 5.5 and 5.6, specs/threadranges.qnt), against the
 // fake Slack: only pages prove replies continuous, a thread window stops at the first boundary none proves and
 // fills it as the view scrolls there, socket replies never stand in for a page, and a thread's unread count is
 // exact only when a proven range reaches back to its read pointer.
@@ -132,23 +132,23 @@ it('replies arriving live during a jump never make the thread look complete', as
     expect(valueOf(await jump).outcome).toBe('fetched')
   })
 
-  await step('the bottom shows only the live replies, not the stretch below the hole, and the count is not exact', async () => {
-    const bottom = await windowOf(engine, thread.id, { limit: 150 }, (value) => texts(value).at(-1) === 'live 3', 'the live replies')
-    expect(texts(bottom).every((text) => text.startsWith('live'))).toBe(true)
+  await step('the bottom stops at the jump\'s last proven reply, does not run across to the live ones, and the count is not exact', async () => {
+    const bottom = await windowOf(engine, thread.id, { limit: 150 }, (value) => value.order.length > 0, 'the bottom')
+    expect(steps(bottom)[0]).toBe(1100)
+    expect(steps(bottom).at(-1)).toBe(1198)
     expect(bottom.meta.gapBefore).toBe(true)
-    expect(bottom.meta.windowCovered).toBe(false)
+    expect(bottom.meta.gapAfter).toBe(true)
     expect(indexRow(engine, thread.id)?.unread_exact).toBe(0)
   })
 
-  await step('scrolling up from the live replies asks Slack instead of trusting the count, and one call joins them to the jump', async () => {
-    const first = (await windowOf(engine, thread.id, { limit: 150 }, (value) => value.order.length > 0, 'the bottom')).order[0]!
+  await step('scrolling down asks Slack instead of trusting the count, and one call joins the live replies to the jump', async () => {
     engine.fake.resetCalls()
-    expect(valueOf(await loadOlderMessages(engine.registry, thread.id, first)).outcome).toBe('fetched')
+    expect(valueOf(await loadNewerMessages(engine.registry, thread.id, thread.replies[1197]!.ts)).outcome).toBe('fetched')
     expect(opens(engine)).toHaveLength(1)
-    const window = await windowOf(engine, thread.id, { limit: 150 }, (value) => texts(value).includes('rollout step 1100'), 'the replies down to the jump')
+    const window = await windowOf(engine, thread.id, { limit: 150 }, (value) => texts(value).at(-1) === 'live 3', 'the replies down to the live ones')
     expect(texts(window).slice(-5)).toEqual(['rollout step 1199', 'rollout step 1200', 'live 1', 'live 2', 'live 3'])
     expect(steps(window).filter((n) => n > 0)).toEqual(Array.from({ length: 101 }, (_, i) => i + 1100))
-    expect(window.meta.gapBefore).toBe(true)
+    expect(window.meta.gapAfter).toBeUndefined()
   })
 })
 
@@ -185,6 +185,33 @@ it('after a drop a followed thread keeps an exact unread count and an unfollowed
     expect(valueOf(await openTopic(engine.registry, unfollowed)).outcome).toBe('fetched')
     await waitFor(() => (indexRow(engine, unfollowed)?.unread_exact === 1 ? true : undefined), WAIT_MS, 'the exact count')
     expect(indexRow(engine, unfollowed)?.unread_count).toBe(2)
+  })
+})
+
+it('an open thread keeps the replies the socket brought across a drop, and shows none it did not', async () => {
+  const engine = await syncedEngine(engines)
+  const thread = longThread(engine.fake, 3)
+  expect(valueOf(await openTopic(engine.registry, thread.id)).outcome).toBe('fetched')
+  for (const text of ['live 1', 'live 2']) engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text, threadTs: thread.root.ts })
+  await engine.socketIdle()
+  const whole = (value: ListWindow<MessageView>) => texts(value).length === 6 && value.meta.gapBefore === undefined
+
+  await step('the drop ends the live tail at the last reply heard, so the window stays whole', async () => {
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    // A reply the socket never brought.
+    engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'missed 1', threadTs: thread.root.ts as never, silent: true })
+    const window = await windowOf(engine, thread.id, { limit: 150 }, whole, 'the whole thread while offline')
+    expect(texts(window)).toEqual(['Long rollout log', 'rollout step 1', 'rollout step 2', 'rollout step 3', 'live 1', 'live 2'])
+  })
+
+  await step('after the reconnect the missed reply comes in below the last one, never in place of the rows shown', async () => {
+    engine.fake.goOnline()
+    await engine.phase('live', 30_000)
+    await quiet(engine)
+    expect(valueOf(await openTopic(engine.registry, thread.id)).outcome).toBe('fetched')
+    const window = await windowOf(engine, thread.id, { limit: 150 }, (value) => texts(value).at(-1) === 'missed 1' && value.meta.gapAfter === undefined, 'the missed reply')
+    expect(texts(window)).toEqual(['Long rollout log', 'rollout step 1', 'rollout step 2', 'rollout step 3', 'live 1', 'live 2', 'missed 1'])
   })
 })
 
