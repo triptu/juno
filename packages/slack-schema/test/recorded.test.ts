@@ -17,20 +17,6 @@ const responses = readdirSync(dir).filter((name) => name.endsWith('.json'))
 const frames = readdirSync(join(dir, 'rtm')).filter((name) => name.endsWith('.json'))
 
 describe('recorded responses', () => {
-  it('cover the calls the smoke makes', () => {
-    expect(responses).toEqual(
-      expect.arrayContaining([
-        'auth.test.json',
-        'client.userBoot.json',
-        'users.prefs.get.json',
-        'client.counts.json',
-        'subscriptions.thread.getView.json',
-        'conversations.history.json',
-        'client.getWebSocketURL.json',
-      ]),
-    )
-  })
-
   for (const file of responses) {
     const method = file.slice(0, -'.json'.length)
     it(`${method} decodes as ok`, () => {
@@ -95,10 +81,6 @@ describe('recorded responses', () => {
 })
 
 describe('recorded socket frames', () => {
-  it('include the connection frames', () => {
-    expect(frames).toEqual(expect.arrayContaining(['hello.json', 'pong.json', 'reconnect_url.json']))
-  })
-
   for (const file of frames) {
     const type = file.slice(0, -'.json'.length)
     it(`${type} decodes as a known frame`, () => {

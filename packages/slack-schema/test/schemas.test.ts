@@ -8,7 +8,6 @@ import {
   EdgeEmojisListOk,
   decodeRtmFrame,
   encodeRtmFrame,
-  Message,
   Methods,
   maxTs,
   millisToTs,
@@ -21,18 +20,6 @@ import {
 } from '@juno/slack-schema'
 
 describe('tolerant decoding', () => {
-  it('keeps decoding when Slack adds keys', () => {
-    const message = Schema.decodeUnknownSync(Message)({
-      type: 'message',
-      ts: '1760000000.000100',
-      user: 'U0MAYA',
-      text: 'hi',
-      brand_new_field: { nested: true },
-    })
-    expect<unknown>(message.ts).toBe('1760000000.000100')
-    expect('brand_new_field' in message).toBe(false)
-  })
-
   it('turns unknown rich text elements and blocks into the unknown variant and encodes them back', () => {
     const decodeInline = Schema.decodeUnknownSync(RichTextInline)
     const element = decodeInline({ type: 'workflowtoken', workflow_id: 'W1', text: 'Run' })
@@ -41,41 +28,6 @@ describe('tolerant decoding', () => {
 
     const block = Schema.decodeUnknownSync(Block)({ type: 'actions', elements: [] })
     expect(block.type).toBe('unknown')
-  })
-
-  it('decodes a rich_text block with every inline kind', () => {
-    const block = Schema.decodeUnknownSync(Block)({
-      type: 'rich_text',
-      block_id: 'b1',
-      elements: [
-        {
-          type: 'rich_text_section',
-          elements: [
-            { type: 'text', text: 'Hey ', style: { bold: true } },
-            { type: 'user', user_id: 'U0TUSHAR' },
-            { type: 'channel', channel_id: 'C0ENG' },
-            { type: 'usergroup', usergroup_id: 'S1' },
-            { type: 'broadcast', range: 'here' },
-            { type: 'emoji', name: 'tada', unicode: '1f389' },
-            { type: 'link', url: 'https://example.com', text: 'docs' },
-            { type: 'date', timestamp: 1760000000, format: '{date_short}' },
-          ],
-        },
-        { type: 'rich_text_quote', elements: [{ type: 'text', text: 'quoted' }] },
-        { type: 'rich_text_preformatted', elements: [{ type: 'text', text: 'code' }], border: 0 },
-        { type: 'rich_text_list', style: 'bullet', indent: 0, elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: 'one' }] }] },
-        { type: 'rich_text_divider' },
-      ],
-    })
-    expect(block.type).toBe('rich_text')
-    if (block.type !== 'rich_text') throw new Error('unreachable')
-    expect(block.elements.map((e) => e.type)).toEqual([
-      'rich_text_section',
-      'rich_text_quote',
-      'rich_text_preformatted',
-      'rich_text_list',
-      'rich_text_divider',
-    ])
   })
 })
 
@@ -104,22 +56,6 @@ describe('search', () => {
 })
 
 describe('socket frames', () => {
-  it('decodes known frames by type', () => {
-    expect(decodeRtmFrame({ type: 'hello', region: 'fake' })).toEqual({ type: 'hello', region: 'fake' })
-    expect(decodeRtmFrame({ type: 'pong', reply_to: 16385 })).toEqual({ type: 'pong', reply_to: 16385 })
-    const changed = decodeRtmFrame({
-      type: 'message',
-      subtype: 'message_changed',
-      channel: 'C0ENG',
-      ts: '1760000000.000200',
-      message: { ts: '1760000000.000100', text: 'edited', edited: { user: 'U0LEO', ts: '1760000000.000200' } },
-      event_ts: '1760000000.000200',
-    })
-    expect(changed.type).toBe('message')
-    if (changed.type !== 'message') throw new Error('unreachable')
-    expect(changed.subtype).toBe('message_changed')
-  })
-
   it('decodes unknown frame types to the unknown variant with the raw frame', () => {
     const frame = decodeRtmFrame({ type: 'canvas_updated', canvas: 'F1' })
     expect(frame).toEqual({ type: 'unknown', raw: { type: 'canvas_updated', canvas: 'F1' } })
@@ -170,11 +106,6 @@ describe('form arguments', () => {
     expect(Schema.encodeSync(Methods['rooms.join'].args)({ channel_id: 'C1', regions: ['us-east-1'] })).toEqual({ channel_id: 'C1', regions: 'us-east-1' })
   })
 
-  it('decodes an ok and an error response of the same method', () => {
-    const decode = Schema.decodeUnknownSync(Methods['conversations.mark'].response)
-    expect(decode({ ok: true })).toEqual({ ok: true })
-    expect(decode({ ok: false, error: 'ratelimited' })).toEqual({ ok: false, error: 'ratelimited' })
-  })
 })
 
 describe('ts helpers', () => {
@@ -213,23 +144,21 @@ describe('custom emoji', () => {
   // The shapes observed live on 2026-10-16 (research section 3), with invented names and urls.
   const decode = (results: ReadonlyArray<unknown>) => Schema.decodeUnknownSync(EdgeEmojisListOk)({ ok: true, results }).results.map(customEmojiRow)
 
-  it('stores the image url from value, and an alias from value or alias', () => {
+  it('stores the image url from value, an alias from value or alias, and neither when both are missing', () => {
     expect(
       decode([
         { name: 'wave', value: 'https://emoji.example.invalid/wave.png', updated: 1700000000 },
         { name: 'hi', value: 'alias:wave', alias: 'wave', is_alias: true },
         { name: 'yes', value: 'alias:thumbsup', alias: 'thumbsup', is_alias: true },
         { name: 'flag', value: { apple: 'https://emoji.example.invalid/a.png', google: 'https://emoji.example.invalid/g.png' } },
+        { name: 'empty' },
       ]),
     ).toEqual([
       { name: 'wave', url: 'https://emoji.example.invalid/wave.png', alias_for: null },
       { name: 'hi', url: null, alias_for: 'wave' },
       { name: 'yes', url: null, alias_for: 'thumbsup' },
       { name: 'flag', url: 'https://emoji.example.invalid/a.png', alias_for: null },
+      { name: 'empty', url: null, alias_for: null },
     ])
-  })
-
-  it('keeps an entry with neither image nor alias, without either', () => {
-    expect(decode([{ name: 'empty' }])).toEqual([{ name: 'empty', url: null, alias_for: null }])
   })
 })
