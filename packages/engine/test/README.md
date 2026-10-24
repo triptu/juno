@@ -3,8 +3,8 @@
 The tests run the real engine and state client over a MessageChannel against the fake Slack server, on `bun test` (the preload in `packages/testing/src/preload.ts` gives Bun's `node:sqlite` Electron's behaviour). A test has 30 s and a harness wait 15 s (`WAIT_MS`), so a slow step fails with its own label. Run a few files in the package, or every package's tests from the root through the machine lock:
 
 ```sh
-cd packages/engine && bun test test/send.test.ts
-bun run test --files packages/engine/test/send.test.ts
+cd packages/engine && bun test test/flows/outbox.flow.test.ts
+bun run test --files packages/engine/test/flows/outbox.flow.test.ts
 bun run test
 ```
 

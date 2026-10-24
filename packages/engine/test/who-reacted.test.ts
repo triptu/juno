@@ -8,9 +8,9 @@ import { REACTORS_LISTED, type ManyReactionsSeed } from '@juno/fake-slack'
 import { openTopic, reactToMessage, whoReactedAtom } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { apiCalls, quiet, readDb, valueOf } from './scenario'
-import { actionRows, booted, chip, MAIN, stopEnginesAfterEach, watch } from './actionScenario'
+import { actionRows, chip, MAIN, outboxScenario } from './outboxScenario'
 
-stopEnginesAfterEach()
+const { booted, watch } = outboxScenario()
 
 /** Seeds the message with many reactions in #eng and opens Main, so a page stores them cut short. */
 async function seeded(engine: RunningEngine): Promise<ManyReactionsSeed> {

@@ -6,9 +6,9 @@ import { editMessage } from '@juno/state'
 import { productionTiming } from '../../src/config'
 import { waitFor } from '../harness'
 import { readDb, valueOf } from '../scenario'
-import { actionRows, booted, MAIN, refOf, sent, stopEnginesAfterEach, watch } from '../actionScenario'
+import { actionRows, MAIN, outboxScenario, refOf, sent } from '../outboxScenario'
 
-stopEnginesAfterEach()
+const { booted, watch } = outboxScenario()
 
 it('stays idle while the channel’s first edit waits to retry and a second waits behind it [production timing]', async () => {
   const engine = await booted({ timing: { retryBaseMillis: productionTiming.retryBaseMillis, retryCapMillis: productionTiming.retryCapMillis, actionDeadlineMillis: productionTiming.actionDeadlineMillis } })
