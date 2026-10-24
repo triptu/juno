@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 11:06 · flow-test-size · A flow test (`*.flow.test.ts`) is one user journey on one engine boot with named steps, so the health size check leaves its test callback out of the 80-line function limit; its files still stay under 400 lines, and a file splits by journey.
 - 10-24 10:01 · burst-ten-seconds · Within 10 seconds of a banner the same conversation does not notify again; later messages are decided on their own, since the 1-minute rule hid real questions (owner).
 - 10-24 10:00 · auto-from-labels · From Tushar's labels: sure, yep and nice are closers; a message in a group DM, thread or channel that names someone else and not the owner or their group stays (addressedElsewhere); in the reading, an ask counts only in a DM or group DM or when the owner started the thread, wrote the previous message or is named, and a decision only in a thread the owner started (owner).
 - 10-24 05:29 · Browser agent flows · Run the real agent beside the engine with main’s provider configuration, memory secrets and an agent WebSocket. Bundle its QuickJS worker and wasm, keep a codemode Electron canary, and merge duplicate Resolve, AI-off and Budget checks into user flows.

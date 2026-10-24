@@ -45,7 +45,9 @@ export function collectSizeReport(directory = root) {
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true)
     const occurrences = new Map()
     const visit = (node) => {
-      if (ts.isFunctionLike(node) && node.body) {
+      // A flow test (`*.flow.test.ts`) is one user journey on one engine boot; its steps are named with `step`, so the test's own callback may run long.
+      const journey = file.endsWith('.flow.test.ts') && node.parent !== undefined && ts.isCallExpression(node.parent) && ['it', 'test'].includes(callName(node.parent.expression))
+      if (ts.isFunctionLike(node) && node.body && !journey) {
         const context = functionContext(node, source)
         const occurrence = (occurrences.get(context) ?? 0) + 1
         occurrences.set(context, occurrence)
