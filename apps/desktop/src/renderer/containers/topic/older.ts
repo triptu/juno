@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MESSAGE_WINDOW_MAX } from '@juno/contract'
 import { loadOlderMessages, messageWindowSpecAtom, registry, topicStartKnownAtom, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { OlderStatus } from '@juno/views'
 import type { Position } from './position'
 import { rowInView, rowSelector } from './scroll'
+import { useStepStall } from './stall'
 
 /** Rows each older page adds to the window. */
 const OLDER_PAGE = 100
@@ -17,7 +18,7 @@ const OLDER_MARGIN = '1000px 0px 0px 0px'
  * and neither has a topic whose start an earlier page reached this run (`topicStartKnownAtom`), so opening it
  * again asks for nothing, unless its window stops at replies the store cannot prove (`meta.gapBefore`). A thread
  * window grows only once the replies reach its first row, so a wide gap can take a few steps while the top stays
- * in view. A step Slack could not answer is not asked again until the first row changes.
+ * in view. A step Slack could not answer waits a few seconds before it is asked again (`useStepStall`).
  * Out of the React Compiler, as the effect-only hooks in `position.ts` are.
  */
 export function useOlderPages(position: Position, id: string, view: string, list: MessageWindow): OlderStatus {
@@ -26,13 +27,13 @@ export function useOlderPages(position: Position, id: string, view: string, list
   const first = list.order[0]
   const complete = useAtomValue(topicStartKnownAtom(id))
   const [loadingOlder, setLoadingOlder] = useState(false)
-  const stalled = useRef<string | undefined>(undefined)
+  const { stalled, settle } = useStepStall()
   const rootShown = first !== undefined && list.rows.get(first)?.root === true
   const windowFull = list.order.length >= list.spec.limit
   const older: OlderStatus = loadingOlder ? 'loading' : rootShown || (complete && !windowFull && list.meta.gapBefore !== true) ? 'none' : 'more'
   useEffect(() => {
     const scroller = scrollRef.current
-    if (scroller === null || !drawnAll || older !== 'more' || first === undefined || stalled.current === first) return
+    if (scroller === null || !drawnAll || older !== 'more' || first === undefined || stalled === first) return
     const row = scroller.querySelector(rowSelector(first))
     if (row === null) return
     const observer = new IntersectionObserver(
@@ -42,7 +43,8 @@ export function useOlderPages(position: Position, id: string, view: string, list
         setLoadingOlder(true)
         void loadOlderMessages(registry, id, first).then((exit) => {
           if (exit._tag === 'Success' && exit.value.complete) registry.set(topicStartKnownAtom(id), true)
-          if (exit._tag !== 'Success' || (exit.value.outcome !== 'fetched' && exit.value.outcome !== 'cached')) stalled.current = first
+          const outcome = exit._tag === 'Success' ? exit.value.outcome : undefined
+          settle(first, outcome === 'fetched' || outcome === 'cached', outcome === 'fetched')
           const spec = registry.get(messageWindowSpecAtom(view))
           // Up to the cap the window grows at the top; past it, it holds the 500 rows from the new page down.
           const next =
@@ -65,7 +67,7 @@ export function useOlderPages(position: Position, id: string, view: string, list
     )
     observer.observe(row)
     return () => observer.disconnect()
-  }, [id, view, drawnAll, older, first, scrollRef, pinRef, pinnedTopRef, setHeldAt])
+  }, [id, view, drawnAll, older, first, stalled, settle, scrollRef, pinRef, pinnedTopRef, setHeldAt])
   return older
 }
 
