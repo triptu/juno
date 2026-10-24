@@ -11,7 +11,7 @@ import type { MessageListStatus } from '@juno/views'
 /** No "Loading messages" line before this (performance 4.4). */
 const LOADING_DELAY_MS = 300
 
-type FetchState = 'pending' | 'done' | 'offline'
+export type FetchState = 'pending' | 'done' | 'offline'
 
 export const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
 
@@ -125,6 +125,9 @@ export function useFromBottom(list: MessageWindow, showWindow: boolean, position
   if (first === undefined && showWindow && !positioned && list.meta.gapBefore === true && at !== undefined) setFirst(at)
   return first
 }
+
+/** The window stands in for proof (`meta.standIn`) while the open's fetch, which is proving it, is out: page steps wait. */
+export const standingIn = (list: MessageWindow, fetchState: FetchState): boolean => list.meta.standIn === true && fetchState === 'pending'
 
 /** An empty list says nothing until Slack has answered or 300 ms have passed. */
 export function listStatus(showWindow: boolean, list: MessageWindow, { fetchState, slow }: { readonly fetchState: FetchState; readonly slow: boolean }): MessageListStatus {

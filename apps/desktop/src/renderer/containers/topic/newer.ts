@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MESSAGE_WINDOW_MAX } from '@juno/contract'
 import { loadNewerMessages, messageListAtom, messageWindowSpecAtom, registry, type MessageWindow, type MessageWindowSpec } from '@juno/state'
+import { standingIn, type FetchState } from './opening'
 import type { Position } from './position'
 import { rowInView, rowSelector } from './scroll'
 import { useStepStall } from './stall'
@@ -17,15 +18,15 @@ const NEWER_MARGIN = '0px 0px 1000px 0px'
  * lets go of rows at the top, and the row in view is held as `useOlderPages` holds it. A window at the
  * bottom (no anchor) shows the new replies by itself. While a step is out the list shows nothing extra;
  * a step Slack could not answer waits a few seconds before it is asked again (`useStepStall`). No step is asked
- * while a thread shows what stands in for proof (`meta.standIn`), as in `useOlderPages`.
+ * while the window stands in and the open's fetch is out, as in `useOlderPages`.
  * Out of the React Compiler, as the effect-only hooks in `position.ts` are.
  */
-export function useNewerPages(position: Position, id: string, view: string, list: MessageWindow): void {
+export function useNewerPages(position: Position, id: string, view: string, list: MessageWindow, fetchState: FetchState = 'done'): void {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, drawnAll, setHeldAt } = position
   // The last row the store proved, which the user's own replies and sends may follow.
   const last = list.meta.gapAfter
-  const gap = last !== undefined && list.meta.standIn !== true
+  const gap = last !== undefined && !standingIn(list, fetchState)
   const [loading, setLoading] = useState(false)
   const { stalled, settle } = useStepStall()
   useEffect(() => {

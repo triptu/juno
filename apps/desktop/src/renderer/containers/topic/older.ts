@@ -3,6 +3,7 @@ import { MESSAGE_WINDOW_MAX } from '@juno/contract'
 import { loadOlderMessages, messageWindowSpecAtom, registry, topicStartKnownAtom, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { OlderStatus } from '@juno/views'
+import { standingIn, type FetchState } from './opening'
 import type { Position } from './position'
 import { rowInView, rowSelector } from './scroll'
 import { useStepStall } from './stall'
@@ -19,23 +20,23 @@ const OLDER_MARGIN = '1000px 0px 0px 0px'
  * again asks for nothing, unless its window stops at replies the store cannot prove (`meta.gapBefore`). A thread
  * window grows only once the replies reach its first row, so a wide gap can take a few steps while the top stays
  * in view. A step Slack could not answer waits a few seconds before it is asked again (`useStepStall`). While a
- * thread shows what stands in for proof (`meta.standIn`), no step is asked: the open's fetch is proving that
- * stretch already. Out of the React Compiler, as the effect-only hooks in `position.ts` are.
+ * thread shows what stands in for proof (`meta.standIn`) and the open's fetch is out (`fetchState`), no step is asked:
+ * that fetch is proving the stretch already. Out of the React Compiler, as the effect-only hooks in `position.ts` are.
  */
-export function useOlderPages(position: Position, id: string, view: string, list: MessageWindow): OlderStatus {
+export function useOlderPages(position: Position, id: string, view: string, list: MessageWindow, fetchState: FetchState = 'done'): OlderStatus {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, drawnAll, setHeldAt } = position
   const first = list.order[0]
+  const paused = standingIn(list, fetchState)
   const complete = useAtomValue(topicStartKnownAtom(id))
   const [loadingOlder, setLoadingOlder] = useState(false)
   const { stalled, settle } = useStepStall()
-  const standIn = list.meta.standIn === true
   const rootShown = first !== undefined && list.rows.get(first)?.root === true
   const windowFull = list.order.length >= list.spec.limit
   const older: OlderStatus = loadingOlder ? 'loading' : rootShown || (complete && !windowFull && list.meta.gapBefore !== true) ? 'none' : 'more'
   useEffect(() => {
     const scroller = scrollRef.current
-    if (scroller === null || !drawnAll || older !== 'more' || first === undefined || stalled === first || standIn) return
+    if (scroller === null || !drawnAll || older !== 'more' || first === undefined || stalled === first || paused) return
     const row = scroller.querySelector(rowSelector(first))
     if (row === null) return
     const observer = new IntersectionObserver(
@@ -69,7 +70,7 @@ export function useOlderPages(position: Position, id: string, view: string, list
     )
     observer.observe(row)
     return () => observer.disconnect()
-  }, [id, view, drawnAll, older, first, stalled, standIn, settle, scrollRef, pinRef, pinnedTopRef, setHeldAt])
+  }, [id, view, drawnAll, older, first, stalled, paused, settle, scrollRef, pinRef, pinnedTopRef, setHeldAt])
   return older
 }
 
