@@ -14,15 +14,28 @@ export interface LocalTime {
   readonly minutes: number
 }
 
-/**
- * Hours on some days of the week. `to` may be before `from` to cross
- * midnight; the span then belongs to the day it starts on. Equal `from` and
- * `to` means no hours.
- */
-export interface Hours {
-  readonly days: ReadonlyArray<Weekday>
+/** A from and to time in minutes since local midnight. */
+export interface Span {
   readonly from: number
   readonly to: number
+}
+
+/** One day's own hours, on a day whose hours differ from the shared ones. */
+export interface DayHours extends Span {
+  readonly day: Weekday
+}
+
+/**
+ * Hours on some days of the week, as Slack's Custom schedule: each day is
+ * off or has its own from and to. `days` are the days with hours, `from`
+ * and `to` their shared hours, and `dayHours` the days whose hours differ.
+ * Hours saved before 2026-10-24 have no `dayHours`. `to` may be before
+ * `from` to cross midnight; the span then belongs to the day it starts on.
+ * Equal `from` and `to` means no hours that day.
+ */
+export interface Hours extends Span {
+  readonly days: ReadonlyArray<Weekday>
+  readonly dayHours?: ReadonlyArray<DayHours>
 }
 
 /** A stored Notify me level. Auto is the default and is not stored. */
@@ -90,6 +103,7 @@ export interface NotificationSettings {
 }
 
 const weekdays: ReadonlyArray<Weekday> = [1, 2, 3, 4, 5]
+const allWeekdays: ReadonlyArray<Weekday> = [0, 1, 2, 3, 4, 5, 6]
 
 export const defaultNotificationSettings: NotificationSettings = {
   notificationHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
@@ -104,13 +118,46 @@ function weekdayAfter(weekday: Weekday, days: number): Weekday {
   return ((((weekday + days) % 7) + 7) % 7) as Weekday
 }
 
-/** Whether `at` falls inside `hours`. */
+/** The hours on `day`: its own when it has them, else the shared ones. Undefined on a day without hours. */
+export function hoursOn(hours: Hours, day: Weekday): Span | undefined {
+  if (!hours.days.includes(day)) return undefined
+  const { from, to } = hours.dayHours?.find((own) => own.day === day) ?? hours
+  return from === to ? undefined : { from, to }
+}
+
+/** Whether two sets of hours give every day the same hours. */
+export function sameHours(a: Hours, b: Hours): boolean {
+  return allWeekdays.every((day) => {
+    const left = hoursOn(a, day)
+    const right = hoursOn(b, day)
+    return left?.from === right?.from && left?.to === right?.to
+  })
+}
+
+/**
+ * Hours as they are saved: a day keeps its own hours only while it has
+ * hours that differ from the shared ones, and once every day with hours
+ * has the same hours they become the shared ones.
+ */
+export function normalHours(hours: Hours): Hours {
+  const own = (hours.dayHours ?? []).filter(
+    (each, index, all) => hours.days.includes(each.day) && all.findLastIndex((other) => other.day === each.day) === index,
+  )
+  const spans = hours.days.map((day) => own.find((each) => each.day === day) ?? hours)
+  const first = spans[0] ?? hours
+  const shared = spans.every((span) => span.from === first.from && span.to === first.to) ? first : hours
+  const differ = own.filter((each) => each.from !== shared.from || each.to !== shared.to)
+  const base = { days: hours.days, from: shared.from, to: shared.to }
+  return differ.length === 0 ? base : { ...base, dayHours: differ.toSorted((a, b) => a.day - b.day).map(({ day, from, to }) => ({ day, from, to })) }
+}
+
+/** Whether `at` falls inside `hours`. A span that crosses midnight belongs to the day it starts on. */
 export function inHours(at: LocalTime, hours: Hours): boolean {
-  const { from, to, days } = hours
-  if (from === to) return false
   const m = ((at.minutes % DAY) + DAY) % DAY
-  if (from < to) return days.includes(at.weekday) && m >= from && m < to
-  return (days.includes(at.weekday) && m >= from) || (days.includes(weekdayAfter(at.weekday, -1)) && m < to)
+  const today = hoursOn(hours, at.weekday)
+  if (today !== undefined && m >= today.from && (today.from > today.to || m < today.to)) return true
+  const yesterday = hoursOn(hours, weekdayAfter(at.weekday, -1))
+  return yesterday !== undefined && yesterday.from > yesterday.to && m < yesterday.to
 }
 
 function shift(at: LocalTime, minutes: number): LocalTime {
@@ -129,9 +176,10 @@ export interface Switch {
 /** The next time `hours` start or end after `at`, within a week. Undefined when they never change. */
 export function nextSwitch(at: LocalTime, hours: Hours): Switch | undefined {
   const inside = inHours(at, hours)
+  const boundaries = new Set([hours.from, hours.to, ...(hours.dayHours ?? []).flatMap((own) => [own.from, own.to])])
   const offsets: number[] = []
   for (let day = 0; day <= 7; day++) {
-    for (const boundary of [hours.from, hours.to]) {
+    for (const boundary of boundaries) {
       const offset = day * DAY + boundary - at.minutes
       if (offset > 0) offsets.push(offset)
     }
@@ -204,20 +252,20 @@ export function scheduledPresence(at: LocalTime, presenceHours: Hours): Presence
   return inHours(at, presenceHours) ? 'active' : 'away'
 }
 
-const calendarWeekdays: ReadonlyArray<Weekday> = [0, 1, 2, 3, 4, 5, 6]
 export function localTime(at: number): LocalTime {
   const date = new Date(at)
-  return { weekday: calendarWeekdays[date.getDay()] ?? 0, minutes: date.getHours() * 60 + date.getMinutes() }
+  return { weekday: allWeekdays[date.getDay()] ?? 0, minutes: date.getHours() * 60 + date.getMinutes() }
 }
 
-/** Calendar arithmetic preserves local hour boundaries across daylight saving changes. */
+/** The next time `hours` start after `at`, each day at its own start. Calendar arithmetic preserves local hour boundaries across daylight saving changes. */
 export function nextHoursStart(at: number, hours: Hours): number | undefined {
-  if (hours.from === hours.to) return undefined
   for (let offset = 0; offset <= 7; offset++) {
     const date = new Date(at)
     date.setDate(date.getDate() + offset)
-    date.setHours(Math.floor(hours.from / 60), hours.from % 60, 0, 0)
-    if (date.getTime() > at && hours.days.includes(localTime(date.getTime()).weekday)) return date.getTime()
+    const span = hoursOn(hours, allWeekdays[date.getDay()] ?? 0)
+    if (span === undefined) continue
+    date.setHours(Math.floor(span.from / 60), span.from % 60, 0, 0)
+    if (date.getTime() > at) return date.getTime()
   }
   return undefined
 }

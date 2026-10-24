@@ -10,7 +10,7 @@
  * the stop, and `dnd_enabled_<day>` is `partial` (those hours), `all_day`
  * (no notifications) or `disabled` (no pause).
  */
-import type { Hours, Weekday } from './notifications'
+import { hoursOn, type Hours, type Weekday } from './notifications'
 
 /** The schedule prefs Juno reads and writes, as Slack holds them. */
 export type SlackSchedulePrefs = Readonly<Record<string, string | boolean>>
@@ -32,32 +32,37 @@ const clock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(
 /** Slack sends both `9:00` and `09:00`; its own client pads before comparing. */
 const normalTime = (value: string) => (/^\d:\d\d$/.test(value) ? `0${value}` : value)
 
-const sameDays = (days: ReadonlyArray<Weekday>, wanted: ReadonlyArray<Weekday>) =>
+const sameDays = (days: ReadonlyArray<number>, wanted: ReadonlyArray<number>) =>
   days.length === wanted.length && wanted.every((day) => days.includes(day))
 
 /**
- * The prefs that make Slack pause outside `hours`. Every day and Monday to
- * Friday use Slack's `every_day` and `weekdays`; any other set of days, and
- * no hours at all, use `custom`. Slack's per-day hours cannot cross
+ * The prefs that make Slack pause outside `hours`. When every day with
+ * hours has the same hours, every day and Monday to Friday use Slack's
+ * `every_day` and `weekdays`; any other days, days with their own hours,
+ * and no hours at all use `custom`. Slack's per-day hours cannot cross
  * midnight, so on custom days a span that does stops at 23:59.
  */
 export function slackScheduleFor(hours: Hours): SlackSchedulePrefs {
-  const { days, from, to } = hours
-  if (from !== to && sameDays(days, [0, 1, 2, 3, 4, 5, 6])) {
-    return { dnd_enabled: true, dnd_days: 'every_day', dnd_start_hour: clock(to), dnd_end_hour: clock(from) }
+  const spans = dayNames.map((_, day) => hoursOn(hours, day as Weekday))
+  const on = spans.flatMap((span, day) => (span === undefined ? [] : [day]))
+  const first = spans.find((span) => span !== undefined)
+  const shared = first !== undefined && spans.every((span) => span === undefined || (span.from === first.from && span.to === first.to))
+  if (shared && sameDays(on, [0, 1, 2, 3, 4, 5, 6])) {
+    return { dnd_enabled: true, dnd_days: 'every_day', dnd_start_hour: clock(first.to), dnd_end_hour: clock(first.from) }
   }
-  if (from !== to && sameDays(days, [1, 2, 3, 4, 5])) {
-    return { dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: clock(to), dnd_end_hour: clock(from) }
+  if (shared && sameDays(on, [1, 2, 3, 4, 5])) {
+    return { dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: clock(first.to), dnd_end_hour: clock(first.from) }
   }
   const prefs: Record<string, string | boolean> = { dnd_enabled: true, dnd_days: 'custom' }
   for (const [index, day] of dayNames.entries()) {
-    if (from === to || !days.includes(index as Weekday)) {
+    const span = spans[index]
+    if (span === undefined) {
       prefs[`dnd_enabled_${day}`] = 'all_day'
       continue
     }
     prefs[`dnd_enabled_${day}`] = 'partial'
-    prefs[`dnd_before_${day}`] = clock(from)
-    prefs[`dnd_after_${day}`] = from < to ? clock(to) : '23:59'
+    prefs[`dnd_before_${day}`] = clock(span.from)
+    prefs[`dnd_after_${day}`] = span.from < span.to ? clock(span.to) : '23:59'
   }
   return prefs
 }

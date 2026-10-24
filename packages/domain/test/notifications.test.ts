@@ -7,7 +7,10 @@ import {
   notificationIsMuted,
   nextSwitch,
   nextHoursStart,
+  normalHours,
   localTime,
+  pausedLabel,
+  slackScheduleFor,
   scheduledPresence,
   untilLabel,
   presenceLabel,
@@ -166,6 +169,40 @@ describe('hours', () => {
     expect(untilLabel(at(5, 20), work)).toBe('until Mon 9am')
     expect(untilLabel(at(MON, 7, 30), work)).toBe('until 9am')
     expect(untilLabel(at(MON, 12), { days: [], from: 0, to: 60 })).toBeUndefined()
+  })
+
+  it('each day keeps its own hours: the check, the next start and Slack\'s schedule', () => {
+    const FRI = 5
+    const SUN = 0
+    // Monday to Thursday 9 to 7, Friday 10pm to 2am, Saturday 11 to 2, Sunday off.
+    const week: Hours = { days: [1, 2, 3, 4, 5, 6], from: 9 * 60, to: 19 * 60, dayHours: [{ day: 5, from: 22 * 60, to: 2 * 60 }, { day: 6, from: 11 * 60, to: 14 * 60 }] }
+    expect(inHours(at(MON, 12), week)).toBe(true)
+    expect(inHours(at(FRI, 12), week)).toBe(false)
+    expect(inHours(at(FRI, 23), week)).toBe(true)
+    expect(inHours(at(SAT, 1), week)).toBe(true)
+    expect(inHours(at(SAT, 3), week)).toBe(false)
+    expect(inHours(at(SAT, 12), week)).toBe(true)
+    expect(inHours(at(SAT, 23), week)).toBe(false)
+    expect(inHours(at(SUN, 1), week)).toBe(false)
+
+    expect(pausedLabel(at(FRI, 12), week)).toBe('Paused until 10pm')
+    expect(pausedLabel(at(SAT, 3), week)).toBe('Paused until 11am')
+    expect(pausedLabel(at(SAT, 15), week)).toBe('Paused until Mon 9am')
+    expect(pausedLabel(at(4, 20), { ...week, days: [1, 2, 3, 4, 6] })).toBe('Paused until Sat 11am')
+
+    // The same hours on every day with hours are the shared hours again, and Slack's own modes.
+    const sameEveryWeekday = normalHours({ days: [1, 2, 3, 4, 5], from: 8 * 60, to: 17 * 60, dayHours: [1, 2, 3, 4, 5].map((day) => ({ day: day as 1, from: 600, to: 1080 })) })
+    expect(sameEveryWeekday).toEqual({ days: [1, 2, 3, 4, 5], from: 600, to: 1080 })
+    expect(slackScheduleFor(sameEveryWeekday)).toEqual({ dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '18:00', dnd_end_hour: '10:00' })
+    expect(slackScheduleFor({ days: [0, 1, 2, 3, 4, 5, 6], from: 540, to: 1140, dayHours: [{ day: 6, from: 540, to: 1140 }] })).toMatchObject({ dnd_days: 'every_day' })
+    expect(slackScheduleFor(week)).toEqual({
+      dnd_enabled: true,
+      dnd_days: 'custom',
+      ...Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday'].flatMap((day) => [[`dnd_enabled_${day}`, 'partial'], [`dnd_before_${day}`, '09:00'], [`dnd_after_${day}`, '19:00']])),
+      dnd_enabled_friday: 'partial', dnd_before_friday: '22:00', dnd_after_friday: '23:59',
+      dnd_enabled_saturday: 'partial', dnd_before_saturday: '11:00', dnd_after_saturday: '14:00',
+      dnd_enabled_sunday: 'all_day',
+    })
   })
 })
 
