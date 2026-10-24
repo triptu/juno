@@ -19,8 +19,11 @@ syncedTest('Back and Forward move through the topics one tab showed', { tag: '@c
 
   await nav.expectCanGo(false, false)
   await sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
   await sidebar.row(RINA).open()
+  await topic.expectTitle(RINA)
   await sidebar.row(ROADMAP).open()
+  await topic.expectTitle(ROADMAP)
   await tabs.expectCount(1)
   await nav.expectCanGo(true, false)
 
