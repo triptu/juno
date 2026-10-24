@@ -24,9 +24,9 @@ How we got here: a map of today's search (below), web research on what people li
 
 - A new place, `search`. Each Search tab is its own session, with its own query, selection and scroll, so two searches can sit side by side.
 - **Opening it.** ⌘⇧F opens Search in the current tab, or focuses the field when a Search tab is active. The sidebar's magnifier opens it too. In a topic, ⌘F opens Search scoped to that topic: a thread searches that thread, a Main searches its channel or DM. The scope is a chip ("in: Acme MSA renewal terms") that Backspace removes to widen the search. From ⌘K's Messages tab, a footer row "All results for "…" ⌘⇧F" carries the text and filters over.
-- ⌘K stays for fast navigation, and always searches everything. Its tabs are **All**, **Conversations** and **Messages**, and it opens on All. The tabs sit in their own row under the field, not beside it, so the field keeps the full width.
-  - **All** mixes the best of each kind in fixed groups: Conversations (up to 4), then Topics and messages (up to 5), then Pages, settings and commands (up to 3). The Conversations and Topics and messages headings show "⌘2" and "⌘3" for their tabs; the commands group has no tab and no hint. All may be taller than the other tabs, so its list cap is raised to fit the three groups. Rows stay where they are as you type; a group only fills in below what is shown.
-  - **Conversations** is today's Conversations tab. **Messages** is the quick message list.
+- ⌘K stays for fast navigation, and always searches everything. Its tabs are **All**, **Conversations**, **Messages** and **Commands** (⌘1 to ⌘4), and it opens on All. The tabs sit in their own row under the field, not beside it, so the field keeps the full width.
+  - **All** mixes the best of each kind in fixed groups: Conversations (up to 4), then Topics and messages (up to 5), then Pages, settings and commands (up to 3). Each heading shows its tab's key: "⌘2", "⌘3" and "⌘4". All may be taller than the other tabs, so its list cap is raised to fit the three groups. Rows stay where they are as you type; a group only fills in below what is shown.
+  - **Conversations** is today's Conversations tab. **Messages** is the quick message list. **Commands** holds the app's actions: pages, settings, themes, accents and commands. Typing ">" first still shows only commands; it now switches to this tab.
   - Messages come from this Mac only, with no Slack call, so ⌘K never waits. The same hiding rules apply.
   - The last row on All and Messages is "All results for "…"" with ⌘⇧F. It opens the Search tab with the text and filters.
 - The tab title is the query, or "Search" when empty. Privacy mode shows "Search".
@@ -46,6 +46,13 @@ How we got here: a map of today's search (below), web research on what people li
 - The sidebar's magnifier shows the current state while a Search tab is active, as Home and All topics do.
 
 ### 3. Rows grouped by thread
+
+Slack returns single messages, newest first, a page at a time, each with its thread (`thread_ts`). Grouping happens in Juno over the rows loaded so far, so it never needs anything Slack doesn't give:
+
+- A thread's group sits where its newest loaded match falls in time order. Newest first, a later page can only hold older matches, so it adds lines to a group already shown, never moves a group up. Under Oldest first the same holds with the order reversed.
+- "N more in this thread" counts the matches loaded so far, and grows as pages arrive. It never claims a total Slack hasn't sent.
+- The reader's "2 of N" counts matches in the whole thread as Juno holds it (the thread is fetched when opened), so it is exact even when the list has loaded only some of them.
+- Best match (v2) would group by a thread's best-ranked match in the same way.
 
 - A thread's matches sit under one topic line: its art, its Juno title, its place, the time of the newest match. Under it are up to 2 match lines (sender, snippet with the matched words in semibold, time), then "3 more in this thread".
 - A channel's Main is not one conversation, so Main matches are single rows with the channel and date. Consecutive Main rows from the same channel share one header line.
