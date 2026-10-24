@@ -41,6 +41,7 @@ if (suite === 'test:desktop' && process.env.JUNO_COVERAGE === '1') {
   fs.writeFileSync('apps/desktop/coverage/map/partial-local.json', JSON.stringify({specs:{'apps/desktop/e2e/app.spec.ts':['apps/desktop/src/main.ts']},bundled:['apps/desktop/src/main.ts']}));
 }
 console.log('fixture '+suite);
+if (process.env.JUNO_VERIFY_POLICY === '1') console.log('juno-test: ' + JSON.stringify({failure: suite === process.env.TEST_FAIL_SUITE}));
 process.exit(suite === process.env.TEST_FAIL_SUITE ? 7 : 0);
 `)
   writeFileSync(join(root, 'bin/ssh'), `#!/usr/bin/env node
@@ -174,7 +175,7 @@ console.log('__juno_runner_connected\\nos=Linux fixture\\narch=x86_64\\ndocker=r
 import { appendFileSync } from 'node:fs'
 import { parsePlan } from './plan.mjs'
 const identity = { runtime: 'bun', version: '1.4.4', bun: '1.4.4', node: '26.11.1', platform: process.env.TEST_PLATFORM ?? 'linux', arch: 'x64', electron: '44.7.0' }
-for (const [index, step] of parsePlan(process.argv.slice(3)).entries()) {
+for (const [index, step] of parsePlan(process.argv.slice(process.argv.indexOf('test:plan') + 1)).entries()) {
   appendFileSync(process.env.TEST_CALLS, step.script + '\\n')
   const actual = step.script === process.env.TEST_MISMATCH ? { ...identity, arch: 'arm64' } : identity
   if (step.script !== process.env.TEST_MISSING) console.log('[' + step.script + '] juno-runtime: ' + JSON.stringify(actual))
@@ -234,4 +235,25 @@ setInterval(() => {}, 1000)
   assert.equal(readFileSync(env.TEST_CALLS, 'utf8'), 'stopped before suites finished')
   assert.equal(record().passed, false)
   assert.ok(record().suites.filter((suite) => !suite.reusedFrom).every((suite) => suite.cause?.category === 'infrastructure'))
+})
+
+test('remote setup failures stop every job and remain in the suite record', { timeout: 30_000 }, (t) => {
+  const { root, env, invoke, git: fixtureGit } = verificationFixture(t)
+  writeFileSync(join(root, 'bin/ssh'), `#!/usr/bin/env node
+console.log('__juno_runner_connected\\nos=Linux fixture\\narch=x86_64\\ndocker=ready\\ncapacity=8 pinned');
+`)
+  writeFileSync(join(root, 'scripts/remote.mjs'), `
+import { writeFileSync } from 'node:fs'
+console.log('juno-stop: ' + JSON.stringify({ scope: 'run', rule: 'setup', signature: 'Workspace install failed' }))
+process.on('SIGTERM', () => { writeFileSync(process.env.TEST_CALLS, 'stopped on setup'); process.exit(143) })
+setInterval(() => {}, 1000)
+`)
+  fixtureGit('add', 'bin/ssh', 'scripts/remote.mjs')
+  fixtureGit('commit', '-qm', 'Broken install')
+  const setup = invoke([])
+  assert.equal(setup.status, 1, setup.stderr + setup.stdout)
+  assert.match(setup.stderr, /setup: Workspace install failed; stopped every job/)
+  assert.equal(readFileSync(env.TEST_CALLS, 'utf8'), 'stopped on setup')
+  const record = JSON.parse(readFileSync(join(root, '.juno-status/verify-main.json'), 'utf8'))
+  assert.ok(record.suites.some((suite) => suite.stop?.rule === 'setup'))
 })

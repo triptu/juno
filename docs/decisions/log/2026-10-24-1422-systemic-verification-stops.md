@@ -1,0 +1,1 @@
+- 10-24 14:22 · Tushar · Keep running after isolated test failures. Stop every full-run job on setup or identity failure; stop only a failing suite after more than half of 20 completed tests fail or eight errors share a signature. Stream and retain the fired rule and counts so a systemic stop is distinct from an ordinary test failure.

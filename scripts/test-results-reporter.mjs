@@ -1,9 +1,27 @@
+import { errorSignature } from './verify-failures.mjs'
+
 // A complete result in the suite log lets release gates distinguish test failures
 // from timeouts or worker crashes. Playwright's list reporter still shows retries.
 export default class TestResultsReporter {
   errors = 0
+  completed = 0
   onBegin(_config, suite) { this.suite = suite }
-  onError() { this.errors += 1 }
+  onError(error) {
+    this.errors += 1
+    if (this.completed === 0) this.progress({ setup: true, signature: errorSignature(error) })
+  }
+  progress(event) {
+    if (process.env.JUNO_VERIFY_POLICY === '1') console.log(`juno-test: ${JSON.stringify(event)}`)
+  }
+  onStepEnd(_test, _result, step) {
+    if (this.completed === 0 && step.title === 'Before Hooks' && step.error) this.progress({ setup: true, signature: errorSignature(step.error) })
+  }
+  onTestEnd(test, result) {
+    if (result.status === 'skipped' || result.status === 'interrupted') return
+    this.completed++
+    const failure = result.status !== test.expectedStatus
+    this.progress({ failure, ...(failure ? { signature: errorSignature(result.error ?? result.errors?.[0]), setup: (test.parent?.project()?.name ?? '').startsWith('build-') } : {}) })
+  }
   onEnd(result) {
     const tests = this.suite.allTests()
     const describe = (test) => ({

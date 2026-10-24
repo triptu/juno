@@ -87,7 +87,8 @@ if (options.shards !== undefined) {
 const runId = `juno-${Date.now()}-${process.pid}-${randomUUID().slice(0, 8)}`
 const reportDir = join(root, '.remote', runId)
 let runLog, work, code = 255, reserved, threads
-const log = (line) => { console.log(line); if (runLog) appendFileSync(runLog, `${line}\n`); const match = /^remote: allocated threads=(\d+)$/.exec(line); if (match) threads = Number(match[1]) }
+let jobStarted = false
+const log = (line) => { if (line.startsWith('juno-runtime:')) jobStarted = true; console.log(line); if (runLog) appendFileSync(runLog, `${line}\n`); const match = /^remote: allocated threads=(\d+)$/.exec(line); if (match) threads = Number(match[1]) }
 const stagedCache = `.remote/cache-${runId}/specs`
 const specCache = join(tmpdir(), 'juno-cache', 'specs')
 const carriesCache = (options.script.startsWith('specs:') || (options.script === 'test:plan' && options.args.some((arg) => arg.startsWith('specs:')))) && process.env.SPECS_CACHE !== 'off' && !options.env.includes('SPECS_CACHE=off')
@@ -132,6 +133,8 @@ try {
     log(`remote: SSH job ${runId}, ${reserved} ${health.pinned ? 'physical cores' : 'CPUs'}`)
     const result = await streamJob(runner, args, tarball, log)
     code = result.code
+    if (code !== 0 && !cancelled && !jobStarted && options.env.includes('JUNO_VERIFY_POLICY=1'))
+      log(`juno-stop: ${JSON.stringify({ scope: 'run', rule: 'setup', signature: `Remote job exited with ${code} before its plan started` })}`)
     if (result.artifacts) {
       const fetched = spawnSync('ssh', [...runner.args, hostCommand('fetch', [runId])], { maxBuffer: 1024 * 1024 * 1024, timeout: 60_000 })
       if (fetched.status !== 0) throw new Error('could not fetch remote reports')
@@ -149,6 +152,7 @@ try {
   }
 } catch (error) {
   log(`remote: ${error.message}`)
+  if (!cancelled && options.env.includes('JUNO_VERIFY_POLICY=1')) log(`juno-stop: ${JSON.stringify({ scope: 'run', rule: 'setup', signature: error.message })}`)
   code = cancelled ? 130 : 255
 } finally {
   if (work) rmSync(work, { recursive: true, force: true })

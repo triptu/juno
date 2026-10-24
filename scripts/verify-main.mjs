@@ -43,6 +43,7 @@ import { committedInputKey, protocolInputs, runtimeIdentity, sameIdentity } from
 import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { keepReports } from './verify-reports.mjs'
+import { stopFromLog } from './verify-failures.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -125,6 +126,7 @@ const children = new Set()
 let cancelled
 let liveIdentity
 let runtimeFailure
+let setupFailure
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = signal; for (const child of children) child.kill(signal) })
 
 /** Runs one suite, writing its log; resolves with the outcome. */
@@ -140,6 +142,13 @@ function run(suite, command, args, cwd, env = {}) {
     child.stdout.pipe(out)
     child.stderr.pipe(out)
     if (suite === 'plan') for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => {
+      const event = line.replace(/^\[runner:[^\]]+\] /, '').replace(/^\[[^\]]+\] /, '')
+      const stop = stopFromLog(event)
+      if (stop?.scope === 'run' && !setupFailure) {
+        setupFailure = stop
+        console.error(`verify:main: ${stop.rule}: ${stop.signature}; stopped every job`)
+        child.kill('SIGTERM')
+      }
       const report = /^(?:\[runner:[^\]]+\] )?(?:\[[^\]]+\] )?juno-runtime: (.+)$/.exec(line)
       if (!report || runtimeFailure) return
       const checked = reportedRuntime(`juno-runtime: ${report[1]}`, undefined, [...reused.map((suite) => suite.identity), ...(liveIdentity ? [liveIdentity] : [])], baseline?.identity)
@@ -199,7 +208,7 @@ if (baseline) {
 const runs = [cancelled || !installed ? Promise.resolve(suites.map(({ name }) => ({ suite: name, code: cancelled ? 130 : 1, seconds: 0, log: join(logDir, 'install.log') })))
   : suites.length === 0 ? Promise.resolve([]) : run('plan', process.execPath, local
     ? [heavy, '--exclusive', process.execPath, join(checkout, 'scripts/plan.mjs'), ...words]
-    : [join(checkout, 'scripts/remote.mjs'), 'test:plan', ...words], checkout, local ? { ...localVerifyEnv, JUNO_SKIP_TAGS: '@mac' } : {}).then((planned) => splitPlan(planned))]
+    : [join(checkout, 'scripts/remote.mjs'), '--env', 'JUNO_VERIFY_POLICY=1', 'test:plan', ...words], checkout, local ? { ...localVerifyEnv, JUNO_SKIP_TAGS: '@mac', JUNO_VERIFY_POLICY: '1' } : {}).then((planned) => splitPlan(planned))]
 if (withMac) {
   // The @mac tests need the installed workspace and a build here; they take a heavy-job slot.
   runs.push(
@@ -267,24 +276,25 @@ const measured = results.map((result) => {
   const checked = inPlan ? reportedRuntime(log, local ? identity : undefined, [runtime.identity]) : reportedRuntime(log, runtimeIdentity(root))
   const actual = checked.identity
   const mismatch = checked.mismatch || (inPlan && (runtime.mismatch || Boolean(runtimeFailure)))
-  let code = cancelled && result.code !== 0 ? 130 : mismatch ? 1 : result.code
+  const stop = stopFromLog(log) ?? (result.code !== 0 || result.unfinished ? setupFailure : undefined)
+  let code = cancelled && result.code !== 0 ? 130 : mismatch || stop ? 1 : result.code
   let tests = testResults(log)
   if (baseline && tests) tests = mergeRepairTests(baseline.suites.find((suite) => suite.suite === result.suite)?.tests, tests)
   if (!suitePassed({ ...result, code, tests })) code ||= 1
   const inputs = protocols[result.suite]
   const override = argv.filter((word, index) => argv[index - 1] === '--cause').map((word) => word.split('=')).find(([suite]) => suite === result.suite)?.[1]
-  return { ...result, code, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs ? committedInputKey(root, commit, inputs, actual) : undefined,
+  return { ...result, code, stop, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs && actual ? committedInputKey(root, commit, inputs, actual) : undefined,
     host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? execution.host : hostname(),
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
-    failures: code === 0 ? [] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused'] : failures(result.log), tests,
-    cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch ? 'infrastructure' : undefined), note: mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
+    failures: code === 0 ? [] : stop ? [`${stop.rule}: ${stop.signature ?? `${stop.failed}/${stop.completed} tests failed`}`] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused'] : failures(result.log), tests,
+    cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch || stop ? 'infrastructure' : undefined), note: stop ? JSON.stringify(stop) : mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
   }
 })
 const outcomes = [...measured, ...reused]
 const summary = {
   version: 2, commit, subject, ref, identity: runtime.identity, plannedIdentity, execution, smoke,
   finishedAt: new Date().toISOString(),
-  passed: !cancelled && !runtimeFailure && !runtime.mismatch && outcomes.every(suitePassed),
+  passed: !cancelled && !setupFailure && !runtimeFailure && !runtime.mismatch && outcomes.every(suitePassed),
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,

@@ -21,8 +21,8 @@ import { spawn } from 'node:child_process'
 import { availableParallelism, loadavg } from 'node:os'
 import { createInterface } from 'node:readline'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { forwardSignals } from './remote/children.mjs'
 import { runtimeIdentity } from './verify-inputs.mjs'
+import { failureMonitor } from './verify-failures.mjs'
 
 export function parsePlan(argv) {
   const steps = []
@@ -79,9 +79,22 @@ if (import.meta.main) {
     process.exit(2)
   }
   const children = new Set()
+  let stopRun = false
   const identity = runtimeIdentity(process.cwd())
   console.log(`juno-runtime: ${JSON.stringify(identity)}`)
-  forwardSignals(children)
+  const guarded = process.env.JUNO_VERIFY_POLICY === '1'
+  const stopChild = (child, signal) => {
+    if (child.exitCode !== null || child.signalCode !== null) return
+    try {
+      if (guarded && process.platform !== 'win32') process.kill(-child.pid, signal)
+      else child.kill(signal)
+    } catch (error) { if (error.code !== 'ESRCH') throw error }
+  }
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => {
+    stopRun = true
+    process.exitCode = 130
+    for (const child of children) stopChild(child, signal)
+  })
   const serial = process.env.JUNO_PLAN_SERIAL === '1'
   const planned = lanes(steps, serial)
   const cores = Number(process.env.JUNO_RUNNER_JOB_CORES) || availableParallelism()
@@ -89,17 +102,31 @@ if (import.meta.main) {
   const run = (step, low) =>
     new Promise((resolvePromise) => {
       const started = Date.now()
+      const monitor = failureMonitor()
+      let stopped
       const command = low ? ['nice', ['-n', '10', 'bun', 'run', step.script, ...step.args]] : ['bun', ['run', step.script, ...step.args]]
       const laneEnv = appSuites.includes(step.script) ? shared?.app : step.script === 'specs:check' ? shared?.specs : shared?.rest
-      const child = spawn(command[0], command[1], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(steps.indexOf(step)) } })
+      const child = spawn(command[0], command[1], { detached: guarded && process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(steps.indexOf(step)) } })
       children.add(child)
       const prefix = `[${step.script}] `
       console.log(`${prefix}juno-runtime: ${JSON.stringify(identity)}`)
-      for (const [stream, out] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) createInterface({ input: stream }).on('line', (line) => out.write(prefix + line + '\n'))
+      const stop = (reason) => {
+        if (stopped) return
+        stopped = reason
+        stopRun ||= reason.scope === 'run'
+        console.log(`${prefix}juno-stop: ${JSON.stringify(reason)}`)
+        stopChild(child, 'SIGTERM')
+      }
+      for (const [stream, out] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) createInterface({ input: stream }).on('line', (line) => {
+        out.write(prefix + line + '\n')
+        const reason = guarded ? monitor.line(line) : undefined
+        if (reason) stop(reason)
+      })
       child.on('error', () => {})
       child.on('close', (code) => {
         children.delete(child)
-        const result = code ?? 1
+        if (guarded && code !== 0 && !stopped && monitor.completed === 0 && /^test(?::|$)/.test(step.script)) stop({ scope: 'run', rule: 'setup', signature: `${step.script} exited before any tests completed`, completed: 0, failed: 0 })
+        const result = stopped ? 1 : code ?? 1
         console.log(`plan: step ${steps.indexOf(step)} ${step.script} exited with ${result} after ${Math.round((Date.now() - started) / 1000)} s`)
         resolvePromise(result)
       })
@@ -109,6 +136,7 @@ if (import.meta.main) {
     const results = []
     // The unit and spec lanes give priority to the app lane.
     for (const step of lane) {
+      if (stopRun) break
       // The local full run owns the lock, but unrelated processes may still be busy.
       while (serial && loadavg()[0] > Number(process.env.JUNO_PLAN_MAX_LOAD ?? Infinity)) {
         console.log(`plan: load ${loadavg()[0].toFixed(1)} is above ${process.env.JUNO_PLAN_MAX_LOAD}; waiting before ${step.script}`)
