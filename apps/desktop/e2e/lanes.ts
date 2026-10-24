@@ -106,6 +106,7 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'palette-pages.spec.ts',
   'palette-stable-results.spec.ts',
   'palette.spec.ts',
+  'search.spec.ts',
   'peek.spec.ts',
   'pending-menu.spec.ts',
   'person-links.spec.ts',

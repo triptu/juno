@@ -16,7 +16,7 @@ test('opens and dismisses the palette, switches search modes and opens conversat
 })
 
 async function openPalette({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
-  const { palette, sidebar, tabs } = juno
+  const { palette, tabs } = juno
 
   await palette.open()
   await palette.expectTab('All')
@@ -50,7 +50,7 @@ async function openPalette({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await palette.expectClosed()
 
   // Each open starts on All.
-  await sidebar.searchButton.click()
+  await palette.shortcut()
   await palette.expectOpen()
   await palette.expectTab('All')
   await palette.shortcut()

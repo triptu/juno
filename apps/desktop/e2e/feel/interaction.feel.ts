@@ -58,8 +58,9 @@ test('hover and press feedback', async ({ juno, win, feel }) => {
     await juno.topic.expectTitle(RINA)
   })
 
-  const search = await tag(juno.sidebar.searchButton, 'press-button')
-  await pointAt(win, juno.sidebar.searchButton)
+  // A button that acts on click, so leaving before the release does nothing.
+  const search = await tag(juno.tabs.newTabButton, 'press-button')
+  await pointAt(win, juno.tabs.newTabButton)
   await win.waitForTimeout(300)
   await feel.run({ name: 'press-button', title: 'Hold an icon button: it stays still through press and release', probes: [{ kind: 'rect', name: 'buttonRect', selector: search }], checks: [landsAndStays('buttonRect', 'the icon button', { from: 'go' }), noLayoutShift({ includeInput: true })] }, async (rec) => {
     await rec.mark('go')

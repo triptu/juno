@@ -499,7 +499,7 @@ export class Sidebar {
   }
 
   get searchButton() {
-    return this.root.getByRole('button', { name: 'Search ⌘K' })
+    return this.root.getByRole('button', { name: 'Search ⇧⌘F' })
   }
 
   get accountButton() {
