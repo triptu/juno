@@ -32,7 +32,12 @@ Read the parts relevant to your task, and the package's README, before changing 
 - Repo scripts run on Bun (`bun scripts/<name>.mjs`, `bun <file>.ts`). Only the tools `docs/development.md`, "Runtimes", lists stay on Node; a new one needs a real reason there and a one-line comment where it starts.
 
 - Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, performance, and others as they are added).
-- Tests: prefer end-to-end tests that follow a user flow against the fake Slack server. Write unit tests only for pure domain rules, and test behaviour, not implementation details.
+- Tests (`docs/development.md`, "Rules for tests"). Tushar: "few meaningful tests >>>>> tons of one line slop tests. we do need good overall tests for realistic practice behaviours though." So:
+  - Write realistic behaviour tests: user and system flows through the real code, against fakes at the boundaries (the fake Slack server, the fake model, a test clock), in the browser lane unless the flow needs Electron.
+  - Unit tests only for something actually tricky (a protocol or merge rule, a parser edge case, a state machine), never 2–3 line checks of a mapping, a label or a constant.
+  - No mocks: use fakes for boundaries.
+  - "If any change in code requires change in test, the test isn't useful." Delete tests that never failed, change with every code change, and give no plausible signal.
+  - Every test is isolated (no shared state, fixed ports, shared folders or order) so suites run in parallel, on the fastest runner.
 - No scheduled task runs the full suites; full runs (`bun run verify:main`, with `--nightly` for coverage, the full gallery walks, a varied Quint seed and the Mac suites) start only when Tushar asks or a release needs one, and the agent that runs one with `--nightly` commits the refreshed coverage map. Before you report, run `bun run affected`: the local Bun typecheck and lint, then a selective remote plan (separate SSH jobs through tstack) (the specs you changed or name with `--spec`, coverage picks within a 300-second estimated test budget, gallery components within the same estimate budget, heavy tests only for their own area). `bun run affected --plan` shows what it would run and why.
   - Unit tests run on `bun test`: `bun run test` runs every package's test files in one parallel `bun test` from the root. To run a few files by hand: `bun run test --files <repo paths>` here, or `bun run remote test --files <repo paths>` (`packages/engine/test/send.test.ts`); in a package, `bun test <files>`. One e2e spec: `bun run remote test:desktop <files>`.
   `bun run typecheck:tsc` is manual only.

@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 12:00 · Tushar · Testing rules restated in Tushar's words in CLAUDE.md and docs/development.md ("Rules for tests"): few meaningful behaviour flows against fakes at the boundaries, unit tests only for tricky rules, no mocks, delete tests that only change with the code, every test isolated and parallel.
 - 10-24 11:55 · Tushar · Keep `verify:main --nightly` as it is (varied Quint seed, coverage, full gallery walks, Mac suites), but schedule nothing: no cron or scheduled task runs full runs; they start when Tushar asks or a release needs one.
 - 10-24 11:20 · Tushar · No heavy work on this Mac: it hung and restarted twice on 10-24 under agent load. Suites, e2e, gallery, builds, packaging and full runs go to the laptop; `verify:main` fails when the laptop is unreachable instead of running here, and `--local` is only for when Tushar asks. Replaces the 10-22 decision that full runs fall back to the Mac.
 - 10-24 11:06 · flow-test-size · A flow test (`*.flow.test.ts`) is one user journey on one engine boot with named steps, so the health size check leaves its test callback out of the 80-line function limit; its files still stay under 400 lines, and a file splits by journey.

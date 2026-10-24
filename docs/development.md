@@ -585,7 +585,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
    `src/fixtures.ts` and exported from `index.ts`. Check it in `bun run gallery`, one state at a time. Props in, callbacks out;
    no state, Effect or `window.juno`.
 6. **Test.** `apps/desktop/e2e/<feature>.spec.ts` follows the user flow against the built app (and the
-   fake Slack server once sign-in exists). Add engine or domain unit tests only for pure rules.
+   fake Slack server once sign-in exists). Add engine or domain unit tests only for a rule that is actually tricky.
 
 ## Tests
 
@@ -936,7 +936,15 @@ The full commands are `bun run remote --env JUNO_E2E_TIMINGS=1 test:desktop` and
 
 ### Rules for tests
 
-These apply to every new or changed test. The audit has the measurements behind them.
+These apply to every new or changed test. They start from Tushar's words (10-24):
+
+> Avoid useless slop unit tests coupled with implementation; tons of 2–3 line unit tests are bad. Don't do mocks, instead use fakes for boundaries. Most unit tests are useless, unless actually testing something tricky. Mocks should be rarely used. If any change in code requires change in test, the test isn't useful. Tests which have never failed in history, and have a lot of changes with changes in code and are unlikely to provide any meaningful signal, should be removed. Few meaningful tests >>>>> tons of one line slop tests. We do need good overall tests for realistic practice behaviours though. Make things isolated, and run them on the fastest thing possible.
+
+- **Few meaningful flows.** Prefer one realistic flow that walks a user or system journey through the real code (engine flows in `packages/engine/test/flows/`, agent flows in `packages/agent/test/`, UI flows in the browser lane) over many small tests. Extend a flow's journey before adding a file.
+- **Unit tests only for tricky rules.** A unit test earns its place by guarding something easy to get wrong: a merge or protocol rule, a parser edge case, a state machine (as a seeded model where it fits), an invariant. A table row beats a new test. Never test a mapping, a label, copy or a constant against itself.
+- **Fakes at boundaries, no mocks.** The boundaries are Slack (`@juno/fake-slack`), the model and other services (`@juno/agent-testing`, the fake OpenRouter), time (a test clock or an injected sleep) and the OS (the browser host's fakes for notifications, idle and the dock). Do not replace our own modules; if a test needs a seam, add one to the code (an injected clock, a callback) and use it.
+- **A test that changes with the code is a cost, not a check.** If an ordinary change to the code needs a change to the test, rewrite the test against behaviour or delete it. Delete tests that never failed, change with every code change and give no plausible signal.
+- **Isolated and parallel.** No shared state between files, no fixed ports (port 0), no shared folders (a temp folder per test, removed even on failure), no order between tests, no `process.env` edits. Every file passes alone and in parallel with all others.
 
 - **Test what a user or a caller sees.** Assert on the screen, on what reached the fake Slack, on rows a live query returns, or on a command's result. Do not assert on private state (a queue's internal map, a table only the module reads), on calls between our own modules, or on the exact shape of an internal object; such a test fails on a refactor and passes on a bug. Unit tests are for pure rules; boot the engine against the fake Slack for anything else.
 - **A test must be able to fail.** Before you finish, break the code it guards (return early, flip a condition) and see it fail. A check of a constant against the same literal, of what the test itself set up, or of a copy of the code (SQL pasted into the test) guards nothing. A title must match the input: "flattens list items" needs a list.
