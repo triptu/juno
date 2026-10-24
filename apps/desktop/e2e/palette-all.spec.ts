@@ -33,7 +33,7 @@ test('All shows each kind in its group, Enter opens each, and ⌘3 and ⌘4 keep
   slack.as('Maya').postIn('product', MESSAGE)
 
   const context = { juno }
-  await test.step('⌘K opens on All, and "theme" fills each group, with the way into Search last', () => groups(context))
+  await test.step('⌘K opens on All, and "theme" fills each group', () => groups(context))
   await test.step('Enter on the thread opens it, and on the message lands on it', () => matches(context))
   await test.step('⌘3 shows Messages and ⌘4 Commands with the same text; Theme: Dark there applies it', () => otherTabs(context))
   await test.step('Enter on a command in All runs it', () => command(context))
@@ -62,7 +62,6 @@ async function groups(context: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect(found.filter({ hasText: THREAD }).locator('[data-match]').first()).toHaveText('Theme')
   await expect(found.filter({ hasText: MESSAGE }).locator('[data-match]')).toHaveText(['theme'])
   await expect(palette.section('Pages, settings and commands').getByRole('option', { name: /Theme: Dark/ })).toBeVisible()
-  await expect(palette.searchRow).toHaveText(/All results for “theme”/)
   await palette.expectActive(/theme-studio/)
   await palette.press('Enter')
   await palette.expectClosed()
@@ -94,7 +93,6 @@ async function otherTabs(context: Pick<Fixtures, 'juno'>): Promise<void> {
   await palette.expectResults()
   await expect(palette.section('Results').getByRole('option').filter({ hasText: MESSAGE })).toBeVisible()
   await expect(palette.section('Conversations')).toHaveCount(0)
-  await expect(palette.searchRow).toHaveText(/All results for “theme”/)
 
   await palette.press('Meta+4')
   await palette.expectTab('Commands')

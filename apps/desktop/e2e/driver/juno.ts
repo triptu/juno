@@ -2516,11 +2516,6 @@ export class PaletteDriver {
     throw new Error(`No row matching ${String(text)} among ${count}`)
   }
 
-  /** The last row on All and Messages, under a line: "All results for …". */
-  get searchRow(): Locator {
-    return this.root.getByRole('listbox', { name: 'Search' }).getByRole('option')
-  }
-
   /** Picks a row with the pointer; ⌘-click with `newTab`. */
   async choose(text: string | RegExp, options: { readonly newTab?: boolean } = {}): Promise<void> {
     const row = this.row(text).first()

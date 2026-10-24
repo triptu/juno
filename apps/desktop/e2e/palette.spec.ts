@@ -24,7 +24,6 @@ async function openPalette({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   // With no text, All shows the most used conversations and the latest topics, four and five.
   await expect(palette.section('Frequent').getByRole('option')).toHaveCount(4)
   await expect(palette.section('Recent').getByRole('option')).toHaveCount(5)
-  await expect(palette.searchRow).toHaveCount(0)
   // Tab and Shift Tab go round the tabs; focus stays in the field, never reaching the window under the dim.
   await palette.press('Tab')
   await palette.expectTab('Conversations')
@@ -245,7 +244,7 @@ test('a command shows above the results with its confidence, and Enter runs it',
   await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => [call.args['channel'], call.args['text']])).toEqual([['D0MAYA', 'the wednesday slot works']])
 })
 
-test('channels from the keyboard and from their menu, with "All results" last', async ({ juno, fake }) => {
+test('channels from the keyboard and from their menu', async ({ juno, fake }) => {
   const { palette, sidebar, tabs } = juno
 
   await test.step('keyboard only: ⌘K, type, arrows, Enter and Esc', async () => {
@@ -253,9 +252,10 @@ test('channels from the keyboard and from their menu, with "All results" last', 
     await palette.type('platfo')
     await palette.expectResults()
     await palette.expectActive(/platform$/)
-    // Up from the first row wraps to the last, "All results for …", and down from there back to the first.
+    // Up from the first row wraps to the last, and down from there back to the first.
     await palette.press('ArrowUp')
-    await palette.expectActive('All results for “platfo”')
+    const last = (await palette.rows().last().innerText()).replace(/\s+/g, ' ').trim()
+    await palette.expectActive(last)
     await palette.press('ArrowDown')
     await palette.expectActive(/platform$/)
     await palette.press('Enter')
@@ -266,7 +266,6 @@ test('channels from the keyboard and from their menu, with "All results" last', 
     await palette.type('nothing like this anywhere')
     await palette.expectResults()
     await palette.expectNoMatches()
-    await expect(palette.searchRow).toBeVisible()
     await palette.press('Escape')
     await palette.expectClosed()
   })
@@ -296,7 +295,6 @@ test('Messages finds what this Mac stores, with apps hidden, and never asks Slac
   await expect(palette.row(POSTGRES)).toHaveCount(1)
   // Grafana's alerts on db-replica-2 are from an app.
   await expect(palette.row('db-replica-2')).toHaveCount(0)
-  await expect(palette.searchRow).toHaveText(/All results for “replica”/)
   // Slack's search used to be asked 400 ms after the last key: wait past that.
   await juno.win.waitForTimeout(1_000)
   // Sync's own discovery searches Slack too, never with typed text.
