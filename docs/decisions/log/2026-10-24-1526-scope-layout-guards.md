@@ -1,0 +1,1 @@
+- 10-24 15:26 · Tushar · Layout guards establish the settled state they describe and observe only that surface: the tall-last-row geometry check scrolls the drawn gallery list to its end, and the delayed-image check excludes expected sidebar recency reordering while still sampling the image anchor every frame.

@@ -133,7 +133,7 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
     fake.releaseThumbnails({ event: 'file_created' })
     await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
     await expect.poll(() => image.locator(`img${schemeSrc('files')}`).evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
-  })
+  }, { within: '[data-topic-view]' })
   expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
   expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length).toBeGreaterThan(0)
 })
