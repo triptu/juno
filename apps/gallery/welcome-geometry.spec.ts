@@ -1,14 +1,16 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openState, type Route, type Theme } from './support'
+import { openState, type Route } from './support'
 
 /**
  * The welcome card on Home (SPEC 4, "The welcome"; inventory, Home
  * "Welcome card"): it is whole above the field on every window, the
- * minimum one included, and a tick, "You're all set" or Hide moves nothing.
+ * minimum one included, and a tick or "You're all set" moves nothing.
+ * That Hide moves nothing is checked in the app (apps/desktop/e2e/welcome.spec.ts).
+ * Light only: a theme changes colours, never a size.
  */
 
-const open = (page: Page, component: string, id: string, theme: Theme = 'light') =>
-  openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} } satisfies Route, theme)
+const open = (page: Page, component: string, id: string) =>
+  openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} } satisfies Route)
 
 const box = async (page: Page, selector: string) => {
   const found = await page.locator(selector).first().boundingBox()
@@ -18,19 +20,17 @@ const box = async (page: Page, selector: string) => {
 
 for (const state of ['welcome/fresh', 'welcome/minimum-window', 'welcome/minimum-window-all-set', 'welcome/short-window', 'welcome/narrow'] as const) {
   test(`Home's welcome card is whole above the field, unscrolled (${state})`, async ({ page }) => {
-    for (const theme of ['light'] as const) {
-      await open(page, 'Home', state, theme)
-      const frame = await box(page, `[data-fixture-frame="Home/${state}"]`)
-      const card = await box(page, '[data-home-welcome] section')
-      const chip = await box(page, 'button[aria-label^="Send to"]')
-      expect(card.y).toBeGreaterThanOrEqual(frame.y)
-      expect(card.x).toBeGreaterThanOrEqual(frame.x)
-      expect(card.x + card.width).toBeLessThanOrEqual(frame.x + frame.width)
-      // Clear of the destination chip, the top of the composer.
-      expect(card.y + card.height).toBeLessThanOrEqual(chip.y)
-      // Seen without scrolling: the column has not scrolled and nothing of the card is cut.
-      expect(await page.locator('[data-home] > div').first().evaluate((node) => node.scrollTop)).toBe(0)
-    }
+    await open(page, 'Home', state)
+    const frame = await box(page, `[data-fixture-frame="Home/${state}"]`)
+    const card = await box(page, '[data-home-welcome] section')
+    const chip = await box(page, 'button[aria-label^="Send to"]')
+    expect(card.y).toBeGreaterThanOrEqual(frame.y)
+    expect(card.x).toBeGreaterThanOrEqual(frame.x)
+    expect(card.x + card.width).toBeLessThanOrEqual(frame.x + frame.width)
+    // Clear of the destination chip, the top of the composer.
+    expect(card.y + card.height).toBeLessThanOrEqual(chip.y)
+    // Seen without scrolling: the column has not scrolled and nothing of the card is cut.
+    expect(await page.locator('[data-home] > div').first().evaluate((node) => node.scrollTop)).toBe(0)
   })
 }
 
@@ -43,13 +43,4 @@ test('a tick and "You\'re all set" change no size in the card', async ({ page })
     sizes.push({ width: card.width, height: card.height, hints })
   }
   for (const size of sizes.slice(1)) expect(size).toEqual(sizes[0])
-})
-
-test('the room kept after Hide holds the rows where they were', async ({ page }) => {
-  const rows = []
-  for (const state of ['welcome/fresh', 'welcome/room-kept']) {
-    await open(page, 'Home', state)
-    rows.push(await page.locator('[data-home-item]').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top)))
-  }
-  expect(rows[1]).toEqual(rows[0])
 })

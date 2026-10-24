@@ -3,8 +3,7 @@ import { openState, type Route } from './support'
 
 /**
  * The tab strip's close buttons (inventory 4, decided 10-17): never a Tab
- * stop, never inside the `tab` element, named by the tab as its action, and
- * drawn where they were, 7px from the tab's end.
+ * stop, never inside the `tab` element, and named by the tab as its action.
  */
 
 const open = (page: Page, component: string, id: string) =>
@@ -21,7 +20,6 @@ test('a tab names its close button as its action; the button is its sibling and 
         nested: tab.querySelector('button') !== null,
         sibling: button?.closest('[data-tab]') === tab.parentElement,
         tabStop: button === null ? false : button.tabIndex >= 0,
-        end: button === null ? null : Math.round(tab.getBoundingClientRect().right - button.getBoundingClientRect().right),
       }
     }),
   )

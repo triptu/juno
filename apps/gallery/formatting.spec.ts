@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
 
+// Both themes: code and quote fills must differ in each. Right-to-left lines are checked against the
+// native caret in apps/desktop/e2e/formatting.spec.ts.
 for (const theme of ['light', 'dark'] as const) {
   test(`composer formatting keeps glyph geometry in ${theme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme })
     await page.goto(`/#/Composer?__state=markup/mixed&theme=${theme}`)
-    const field = page.locator('[data-composer] textarea')
     const code = page.getByTestId('textarea-code-block')
     const quote = page.getByTestId('textarea-quote')
     await expect(code.first()).toBeVisible()
@@ -39,11 +40,5 @@ for (const theme of ['light', 'dark'] as const) {
       return Math.max(...styled.flatMap((box, i) => box.map((value, axis) => Math.abs(value - plain[i]![axis]!))))
     })
     expect(geometry).toBeLessThan(0.5)
-    for (const text of ['שלום', 'שלום hello עולם', 'hello שלום world']) {
-      await field.fill(text)
-      const layer = page.locator('[data-textarea-layer]')
-      await expect(layer).toHaveText(text)
-      expect(await layer.evaluate((el) => getComputedStyle(el).direction)).toBe(await field.evaluate((el) => getComputedStyle(el).direction))
-    }
   })
 }

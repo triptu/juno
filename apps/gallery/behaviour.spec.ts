@@ -17,11 +17,6 @@ test('message links use the hand cursor only when they open outside Juno', async
 })
 
 /**
- * A one-line text that is cut off shows its full text as the tooltip when
- * hovered; one that fits shows none. The browser draws the tooltip itself, so
- * the check reads the `title` attribute the hover sets.
- */
-/**
  * Home's title lines may be rewritten by the assistant after Home paints
  * (SPEC section 12). The two states hold the same rows with the plain and
  * the rewritten titles: every row, title, meta line, button and the ask
@@ -60,6 +55,11 @@ test('a thread link keeps its height when the first reply becomes known', async 
   expect((await link.boundingBox())!.height).toBe(height)
 })
 
+/**
+ * A one-line text that is cut off shows its full text as the tooltip when
+ * hovered; one that fits shows none. The browser draws the tooltip itself, so
+ * the check reads the `title` attribute the hover sets.
+ */
 test.describe('truncation tooltip', () => {
   const hoverText = async (page: Page, text: string | RegExp) => {
     const node = page.locator('[data-fixture-frame]').getByText(text, { exact: true }).first()
@@ -73,18 +73,16 @@ test.describe('truncation tooltip', () => {
     return name
   }
 
-  test('a cut-off sender name shows the full name', async ({ page }) => {
+  test('a cut-off sender name shows the full name; one that fits does not', async ({ page }) => {
     await page.goto('/#/Message?__state=row/long-name')
-    const name = await hoverName(page)
-    await expect(name).toHaveText('Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
-    await expect(name).toHaveAttribute('title', 'Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
-  })
-
-  test('a name that fits has no tooltip', async ({ page }) => {
+    const long = await hoverName(page)
+    await expect(long).toHaveText('Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
+    await expect(long).toHaveAttribute('title', 'Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
     await page.goto('/#/Message?__state=row/group-start')
-    const name = await hoverName(page)
-    await expect(name).toHaveText('Leo Park')
-    await expect(name).not.toHaveAttribute('title')
+    // The new state first, so the hover lands on its name.
+    await expect(page.locator('[data-message-row] span[dir="auto"]').first()).toHaveText('Leo Park')
+    const short = await hoverName(page)
+    await expect(short).not.toHaveAttribute('title')
   })
 
   test('a cut-off thread link preview shows the full preview; one that fits does not', async ({ page }) => {
@@ -331,6 +329,7 @@ test.describe('state switcher', () => {
     await page.goto('/#/Avatar?__state=photo/pending')
     const avatar = page.getByRole('img', { name: 'Maya Chen' })
     await expect(avatar).toHaveText('MC')
+    // Nothing marks a photo that never comes: wait a while, then check that nothing changed.
     await page.waitForTimeout(1500)
     // Still the initials, and the photo has no bytes to draw.
     await expect(avatar).toHaveText('MC')

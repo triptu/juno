@@ -23,11 +23,11 @@ Measured full and cached timings, including the interrupted Mac comparison, are 
 
 ## Spec audit, 2026-10-24
 
-Reviewed every spec and its non-merge history. Commit counts alone do not prove usefulness; the decisions below also consider the assertion and recorded regression evidence. The history cannot establish that a test never failed in an unrecorded local run.
+Reviewed every spec and its non-merge history. Commit counts alone do not prove usefulness; the decisions below also consider the assertion and recorded regression evidence. The history cannot establish that a test never failed in an unrecorded local run. A second review the same day checked these claims against the code and recorded a verdict per file in `docs/reviews/2026-10-24-e2e-alignment.tsv`.
 
 | Specs | Decision and evidence |
 | --- | --- |
-| `shift`, `focus-ring` | Keep and cache broad walks. Shift history includes real regressions, the disabled-control hang and fallback-font failures; retain injected-shift self-tests and delayed loads. |
+| `shift`, `focus-ring` | Keep and cache broad walks. Shift history includes real regressions, the disabled-control hang and fallback-font failures; retain injected-shift self-tests and delayed loads. Size checks run in light only, and the header band and Resolve button are checked against each other, not against pinned pixels. |
 | `activation` | Merge eight small cases into three pointer, nested-control and keyboard flows. |
 | `behaviour` | Keep cursor, scroll chaining, whole-pixel row, truncation, late palette and gallery routing checks. These have specific regression history. |
 | `tooltip` | Merge six checks into a timing/dismissal flow and an edge-containment check. Drive time explicitly instead of racing wall-clock sleeps. |
@@ -41,14 +41,14 @@ Reviewed every spec and its non-merge history. Commit counts alone do not prove 
 | `emoji-align`, `selection-bar-align` | Remove screenshot ink-centering probes and their unused helpers. They were introduced alongside alignment changes; interaction and keyboard checks remain. |
 | `processes` | Remove fixture row-count/screenshot inventory. It tested fixed fixture contents rather than diagnostics behavior. |
 | `attachment-images`, `thread-link` | Keep held-image arrival/failure checks; remove attachment pixel dimensions. |
-| `emoji-picker` | Keep search, aliases, failed-image stability, focus retention and Escape regressions; remove duplicate theme screenshots. |
+| `emoji-picker` | Keep search, aliases, failed-image stability, focus retention and Escape regressions as one search-and-pick flow; remove duplicate theme screenshots. |
 | `peek-contrast` | Keep browser-computed readability in both themes with two accents. Remove comparisons to the former design, screenshot capture and JSON dumps. |
 | `contrast` | Keep all accents: each defines different colors and could independently break readable contrast. |
-| `message-geometry` | Keep density, wrapping and absent-content rules tied to recorded regressions. Remove the pinned top gap. |
+| `message-geometry` | Keep density, wrapping and absent-content rules tied to recorded regressions, and that the first row holds while older messages load. Remove the pinned top gap. |
 | `message-menu` | Keep edge placement and picker expansion anchors. Remove font, row, emoji and icon pixel probes. |
 | `message-more` | Keep hover/focus visibility, stable rows and menu anchoring; remove unasserted screenshots and fixed button size. |
 | `message-hover`, `button-press`, `trigger-open` | Keep actual hover, selection, held-press and trigger feedback checks. |
 | `narrow-geometry`, `confirm-geometry`, `popover-anchor-geometry` | Keep clipping/overlap and edge-placement regressions. Narrow layouts have a series of real fixes in history. |
-| `tabs-geometry`, `topic-titles`, `welcome-geometry` | Keep keyboard semantics, stable/contained geometry and wrapping. Remove fixed tab inset/title heights and duplicate light/dark geometry screenshots. |
-| `sidebar-rows`, `roving`, `card-working`, `table`, `formatting`, `topic-art` | Keep behavior and regression checks: accessible state, keyboard navigation, disabled mutation, copying/wrapping, preview alignment and deferred art. |
+| `tabs-geometry`, `topic-titles`, `welcome-geometry` | Keep keyboard semantics, stable/contained geometry and wrapping. Remove fixed tab inset/title heights and duplicate light/dark geometry screenshots. The room kept after Welcome's Hide is checked in desktop `welcome.spec.ts` on the real Hide. |
+| `sidebar-rows`, `roving`, `card-working`, `table`, `formatting`, `topic-art` | Keep behavior and regression checks: accessible state, keyboard navigation, disabled mutation, copying/wrapping, preview alignment and deferred art. Right-to-left caret placement is checked in desktop `formatting.spec.ts`. |
 | `shots` | Keep the review screenshot command separate from behavior tests. |

@@ -10,7 +10,7 @@ import { openState, type Route } from './support'
 const open = (page: Page, id: string) =>
   openState(page, { component: 'Message', id, route: `Message/${id}`, group: '', groupId: '', state: '', frame: {} } satisfies Route)
 
-test('a wrapped column wraps so the table fits a narrow message; an unwrapped one keeps its width', async ({ page }) => {
+test('a wrapped column wraps so the table fits a narrow message; an unwrapped one keeps its width, so a wide table scrolls', async ({ page }) => {
   await open(page, 'table/wrapped')
   const box = page.locator('[data-msg-table]')
   const fit = await box.evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth, body: element.closest('[data-msg-text]')!.clientWidth }))
@@ -24,13 +24,11 @@ test('a wrapped column wraps so the table fits a narrow message; an unwrapped on
   })
   expect(await lines('OPS-410')).toBe(1)
   expect(await lines(/^Certificates expire/)).toBeGreaterThan(1)
-})
 
-test('the wide table still scrolls, since its unwrapped columns alone are wider than the message', async ({ page }) => {
+  // The wide table's unwrapped columns alone are wider than the message.
   await open(page, 'table/wide')
-  const box = page.locator('[data-msg-table]')
-  const fit = await box.evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth }))
-  expect(fit.scroll).toBeGreaterThan(fit.client)
+  const wide = await box.evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth }))
+  expect(wide.scroll).toBeGreaterThan(wide.client)
 })
 
 test('copying a selection inside a table gives its rows as tab-separated lines, a tab and a break in a cell as spaces', async ({ page }) => {

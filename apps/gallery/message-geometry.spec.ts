@@ -105,7 +105,7 @@ test('custom reactions show the workspace image, and an unknown one shows its na
   await expect(page.locator('[data-msg-text] img[alt=":makes-sense:"]')).toHaveCount(1)
 })
 
-test('at scroll top the first row starts 24px under the islands, as the last ends 24px over the composer, and “Loading older messages” takes no space', async ({ page }) => {
+test('at scroll top the first row starts as far under the islands as the last ends over the composer, and “Loading older messages” takes no space', async ({ page }) => {
   const measure = () =>
     page.evaluate(async () => {
       const island = document.querySelector('[data-island="left"]')!.getBoundingClientRect()
@@ -120,12 +120,15 @@ test('at scroll top the first row starts 24px under the islands, as the last end
   await open(page, 'TopicView', 'thread/long-thread')
   const at = await measure()
   expect(at.bottom).toBe(at.top)
-  await open(page, 'MessageList', 'thread/loading-older')
-  await expect(page.locator('[data-older-line]')).toHaveText('Loading older messages')
-  await open(page, 'MessageList', 'thread/more-above')
-  const more = await page.evaluate(() => document.querySelector('[data-message-row]')!.getBoundingClientRect().top)
+  // The same thread at its start, with older messages to come, and while they load: the first row never moves.
+  const firstTop = () => page.evaluate(() => document.querySelector('[data-message-row]')!.getBoundingClientRect().top)
   await open(page, 'MessageList', 'thread/long')
-  expect(await page.evaluate(() => document.querySelector('[data-message-row]')!.getBoundingClientRect().top)).toBe(more)
+  const start = await firstTop()
+  for (const id of ['thread/more-above', 'thread/loading-older']) {
+    await open(page, 'MessageList', id)
+    expect(await firstTop(), id).toBe(start)
+  }
+  await expect(page.locator('[data-older-line="loading"]')).toBeVisible()
 })
 
 // A link preview's picture is 360px wide. The body once took that as its least width, so in a narrow

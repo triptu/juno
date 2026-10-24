@@ -7,11 +7,8 @@ for (const theme of ['light', 'dark'] as const) {
       const routes = (await readRoutes(page)).filter((route) => route.component === 'PeekView' && route.groupId === 'over-topic')
       expect(routes).toHaveLength(2)
       for (const route of routes) {
-        await openState(page, route, theme)
-        await page.goto(`${page.url()}&accent=${accent}`)
+        await openState(page, route, theme, accent)
         await expect(page.locator('[data-peek]')).toBeVisible()
-        await page.evaluate(() => document.fonts.ready)
-        await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
         const panel = page.locator('[data-peek] > div')
         const measure = () => panel.evaluate((node) => {
           const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!
@@ -46,13 +43,12 @@ for (const theme of ['light', 'dark'] as const) {
             text: element.textContent?.slice(0, 50) ?? element.tagName,
             contrast: ratio(rgb(getComputedStyle(element).color), backdrop(element)),
           }))
-          return { surface, background, contrast: ratio(surface, background), border: style.borderColor, shadow: style.boxShadow, text,
-            boxes: [node, ...node.querySelectorAll('*')].map((element) => { const box = element.getBoundingClientRect(); return [box.x, box.y, box.width, box.height] }) }
+          return { contrast: ratio(surface, background), text }
         })
         const after = await measure()
         for (const item of after.text) expect(item.contrast, JSON.stringify(item)).toBeGreaterThanOrEqual(4.5)
+        // The panel's surface reads apart from the page behind it.
         if (theme === 'light') expect(after.contrast).toBeGreaterThan(1.03)
-
       }
     })
   }

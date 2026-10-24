@@ -49,40 +49,42 @@ async function geometry(row: Locator) {
 
 const boxes = (page: Page) => rows(page).evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().toJSON() as DOMRect))
 
-for (const theme of ['light', 'dark'] as const) {
-  test(`the menu button shows on hover, level with the first line and moving nothing, in ${theme}`, async ({ page }) => {
-    for (const [state, index, name] of [
-      ['menu-button/hover', 3, 'hovered'],
-      ['menu-button/hover', 4, 'hovered-grouped'],
-      ['menu-button/hover', 0, 'hovered-first'],
-      ['menu-button/long-hover', 0, 'long-hovered'],
-      ['menu-button/long-hover', 1, 'long-hovered-grouped'],
-      ['menu-button/long-hover', 2, 'long-hovered-code'],
-      ['menu-button/long-hover', 3, 'long-hovered-image'],
-      ['menu-button/long-hover', 4, 'long-hovered-reactions'],
-    ] as const) {
-      await open(page, state, theme)
-      await page.mouse.move(0, 0)
-      const row = rows(page).nth(index)
-      // At rest no row shows it.
-      await expect(rows(page).locator('[data-message-more] button:visible')).toHaveCount(0)
-      const before = await boxes(page)
-      await row.locator('[data-msg-text], [data-message-header]').first().hover({ position: { x: 4, y: 4 } })
-      await expect(more(row)).toBeVisible()
-      await expect(rows(page).locator('[data-message-more] button:visible')).toHaveCount(1)
-      expect(await boxes(page)).toEqual(before)
-      const { button, row: box, gutter, line } = await geometry(row)
-      // Its right inset mirrors the avatar's left inset; on a code block first, it sits inside the block's frame.
-      if (name.endsWith('code')) {
-        const frame = (await row.locator('pre').first().boundingBox())!
-        expect(button.right).toBeLessThan(frame.x + frame.width - 1)
-        expect(button.top).toBeGreaterThan(frame.y + 1)
-      } else expect(Math.abs(box.right - button.right - (gutter.left - box.left))).toBeLessThanOrEqual(0.5)
-      // Centred on the first line: the name and time, or the first line of words.
-      if (line !== undefined) expect(Math.abs(button.top + button.height / 2 - (line.top + line.height / 2)), name).toBeLessThanOrEqual(1)
-    }
-  })
+// Geometry in light only: a theme changes colours, never a size.
+test('the menu button shows on hover, level with the first line and moving nothing', async ({ page }) => {
+  for (const [state, index, name] of [
+    ['menu-button/hover', 3, 'hovered'],
+    ['menu-button/hover', 4, 'hovered-grouped'],
+    ['menu-button/hover', 0, 'hovered-first'],
+    ['menu-button/long-hover', 0, 'long-hovered'],
+    ['menu-button/long-hover', 1, 'long-hovered-grouped'],
+    ['menu-button/long-hover', 2, 'long-hovered-code'],
+    ['menu-button/long-hover', 3, 'long-hovered-image'],
+    ['menu-button/long-hover', 4, 'long-hovered-reactions'],
+  ] as const) {
+    await open(page, state, 'light')
+    await page.mouse.move(0, 0)
+    const row = rows(page).nth(index)
+    // At rest no row shows it.
+    await expect(rows(page).locator('[data-message-more] button:visible')).toHaveCount(0)
+    const before = await boxes(page)
+    await row.locator('[data-msg-text], [data-message-header]').first().hover({ position: { x: 4, y: 4 } })
+    await expect(more(row)).toBeVisible()
+    await expect(rows(page).locator('[data-message-more] button:visible')).toHaveCount(1)
+    expect(await boxes(page)).toEqual(before)
+    const { button, row: box, gutter, line } = await geometry(row)
+    // Its right inset mirrors the avatar's left inset; on a code block first, it sits inside the block's frame.
+    if (name.endsWith('code')) {
+      const frame = (await row.locator('pre').first().boundingBox())!
+      expect(button.right).toBeLessThan(frame.x + frame.width - 1)
+      expect(button.top).toBeGreaterThan(frame.y + 1)
+    } else expect(Math.abs(box.right - button.right - (gutter.left - box.left))).toBeLessThanOrEqual(0.5)
+    // Centred on the first line: the name and time, or the first line of words.
+    if (line !== undefined) expect(Math.abs(button.top + button.height / 2 - (line.top + line.height / 2)), name).toBeLessThanOrEqual(1)
+  }
+})
 
+// The hover fill is a colour, so both themes.
+for (const theme of ['light', 'dark'] as const) {
   test(`the menu button takes the hover fill, opens the menu under it and stays held, in ${theme}`, async ({ page }) => {
     for (const [state, index] of [
       ['menu-button/hover', 3, ''],
