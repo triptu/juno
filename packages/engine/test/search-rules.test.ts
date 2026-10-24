@@ -73,7 +73,8 @@ test('Main headers only join consecutive rows, title-only results stay topics an
   expect(merged.frontier.olderGroupIndex).toBe(2)
   const text = 'Long introduction. '.repeat(50) + 'launch expenses and more'
   const snippet = searchSnippet(text, literalRanges(text, parseSearchQuery('"launch expenses"')))
-  expect(snippet.text.startsWith('…')).toBe(true)
+  // It starts at a whole word, a few words before the match.
+  expect(snippet.text.startsWith('…introduction.') || snippet.text.startsWith('…Long')).toBe(true)
   const range = snippet.ranges[0]
   expect(snippet.text.slice(range?.start, range?.end)).toBe('launch expenses')
 })

@@ -5,10 +5,12 @@ export interface Coverage { readonly through: string | null; readonly complete: 
 export interface SearchPage { readonly rows: ReadonlyArray<SearchHit>; readonly coverage: Coverage }
 const compare = compareTs
 
-/** Window around the first literal match. Offsets always address the returned text. */
+/** Window around the first literal match, starting at a word a few words before it. Offsets always address the returned text. */
 export function searchSnippet(text: string, ranges: ReadonlyArray<{ start: number; end: number }>, max = 220) {
   const first = ranges[0]
-  const start = Math.max(0, (first?.start ?? 0) - 45)
+  const lead = Math.max(0, (first?.start ?? 0) - 45)
+  const space = lead === 0 ? -1 : text.indexOf(' ', lead)
+  const start = space >= 0 && space < (first?.start ?? 0) ? space + 1 : lead
   const end = Math.min(text.length, Math.max(start + max, first?.end ?? 0))
   const prefix = start > 0 ? '…' : ''
   return { text: prefix + text.slice(start, end) + (end < text.length ? '…' : ''), ranges: ranges.filter((r) => r.start >= start && r.end <= end).map((r) => ({ start: r.start - start + prefix.length, end: r.end - start + prefix.length })) }
