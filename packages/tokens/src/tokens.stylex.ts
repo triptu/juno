@@ -173,8 +173,14 @@ export const colors = stylex.defineVars({
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
  * - --selection-background: text selection
+ * - --hl-select: the selected row on the page while its list has focus
+ *   (the Search list), mixed over --background as --hl-nav is over the
+ *   sidebar, and strong enough that it is never fainter than the unfocused
+ *   --secondary-default (10% light, 18% dark; marigold light 19%; ink is
+ *   --secondary-default)
+ * - --mark: the Search reader's matched words (14% light, 20% dark)
  * - --mark-current: the match the Search reader's arrows are on, stronger
- *   than the other matches' --hl-soft so it stays findable after the
+ *   than the other matches' --mark so it stays findable after the
  *   landing flash fades (24% light, 30% dark)
  *
  * Counts outside the sidebar (the topic switcher) stay the soft grey tag.
@@ -199,6 +205,8 @@ export const accent = stylex.defineVars({
   // accent theme gets them; the dark themes mix more of it.
   '--hl-band': `color-mix(in oklch, var(--hl) 14%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 7%, ${colors['--background']})`,
+  '--hl-select': `color-mix(in oklch, var(--hl) 10%, ${colors['--background']})`,
+  '--mark': `color-mix(in oklch, var(--hl) 14%, ${colors['--background']})`,
   '--mark-current': `color-mix(in oklch, var(--hl) 24%, ${colors['--background']})`,
 })
 

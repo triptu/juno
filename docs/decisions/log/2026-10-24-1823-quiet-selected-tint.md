@@ -1,0 +1,1 @@
+- 10-24 18:23 · quiet-selected-tint · Search and the sidebar keep the quiet selected-row tint, not a 3:1 fill; focus always selects the row, so the tint is never missing where focus is. The Search list's focused tint is `--hl-select`, the accent mixed over the page, so it is never fainter than the unfocused `--secondary-default` (docs/design/search/review.md, finding 4).
