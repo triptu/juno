@@ -220,6 +220,30 @@ it('history the first sync left out comes when asked: a searched reply in full o
   })
 })
 
+it('a match past every stored reply of a long thread is fetched by the page before it', async () => {
+  const engine = await synced()
+  // Longer than one open fetches, posted with no events: the open stores the first 500 replies.
+  const now = engine.fake.now()
+  const root = engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Long rollout log', at: now - 2 * DAY, silent: true })
+  const replies = Array.from({ length: 560 }, (_, i) => engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `rollout step ${i + 1}`, threadTs: root.ts, at: now - 2 * DAY + (i + 1) * 1000, silent: true }))
+  const id = `t:C0ENG:${root.ts}`
+  const match = replies[539]!
+
+  await step('the open stores the replies from the root, not as far as the match', async () => {
+    expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
+    const window = await watchList(engine, messagesAtom(id, { anchor: match.ts, before: 10, limit: 20 })).until((value) => value.order.length > 0, 'the window near the match')
+    expect(window.rows.has(match.ts)).toBe(false)
+  })
+
+  await step('the page before the next reply fills forward from the newest stored reply to the match, with one call', async () => {
+    engine.fake.resetCalls()
+    expect(valueOf(await loadOlderMessages(engine.registry, id, replies[540]!.ts))).toEqual({ outcome: 'fetched', complete: false })
+    expect(opens(engine).map((call) => call.method)).toEqual(['conversations.replies'])
+    const window = await watchList(engine, messagesAtom(id, { anchor: match.ts, before: 10, limit: 20 })).until((value) => value.rows.has(match.ts), 'the match')
+    expect(textOf(window.rows.get(match.ts)!)).toBe('rollout step 540')
+  })
+})
+
 it('a window is covered by a page that confirms it, even one that changes no message', async () => {
   const engine = await synced()
 

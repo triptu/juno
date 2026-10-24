@@ -10,6 +10,10 @@
  *   instead, so every unread reply is stored. Once every reply is stored
  *   in full (a search match is not), later opens ask only for replies after
  *   the newest stored one.
+ * - The page before a message: for a thread, the replies from the root up
+ *   to the oldest stored one; for a message past every stored reply (a
+ *   search match deep in a long thread), the replies from the newest stored
+ *   one up to it, at most `OPEN_FETCH_MAX`.
  * - Main: `conversations.history` since the newest synced range (the newest
  *   page when there is none), then older pages until history reaches the
  *   read pointer, at most `OPEN_FETCH_MAX` messages. Each page records the
@@ -184,6 +188,11 @@ const olderThread = (ctx: SyncContext, channel: string, threadTs: string, before
   Effect.gen(function* () {
     const coverage = yield* threadCoverage(channel, threadTs)
     if (repliesComplete(coverage)) return { fetched: false, complete: true, unknownUsers: [] }
+    // A message past every stored reply (a search match deep in a long thread): fill forward from the newest stored reply up to it.
+    if (coverage.newest !== undefined && compareTs(coverage.newest, before) < 0) {
+      const { messages } = yield* pageReplies(ctx, channel, threadTs, { oldest: coverage.newest, latest: before }, OPEN_FETCH_MAX, lane)
+      return { fetched: true, complete: false, unknownUsers: yield* unknownSenders(messages) }
+    }
     // The stored replies have a gap at the start; fetch forward from the root up to the oldest stored one.
     const latest = coverage.oldest !== undefined && compareTs(coverage.oldest, before) < 0 ? coverage.oldest : before
     const { messages, reachedEnd } = yield* pageReplies(ctx, channel, threadTs, { latest }, OPEN_PAGE, lane)
