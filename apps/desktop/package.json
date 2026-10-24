@@ -15,7 +15,7 @@
     "build:web": "rm -rf dist && vite build -c vite.web.config.ts && bun web/build-host.mjs",
     "start": "bun ../../scripts/without-run-as-node.mjs electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json",
-    "test": "bun test",
+    "test": "bun test --randomize --timeout=30000",
     "test:e2e": "bun ../../scripts/without-run-as-node.mjs playwright test",
     "test:browser": "bun ../../scripts/without-run-as-node.mjs playwright test --project=browser",
     "test:electron": "bun ../../scripts/without-run-as-node.mjs playwright test --project=electron",

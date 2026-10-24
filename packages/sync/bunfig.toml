@@ -1,3 +1,5 @@
-# `bun test` in this package: the shared preload (packages/testing/src/preload.ts).
+# `bun test` in this package: the shared preload (packages/testing/src/preload.ts)
+# and a shuffled order (`--seed <n>` repeats one).
 [test]
+randomize = true
 preload = ["../../packages/testing/src/preload.ts"]

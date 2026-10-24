@@ -25,6 +25,8 @@ import { existsSync } from 'node:fs'
 
 // A test that boots an engine against the fake Slack waits on real I/O. The harness's own waits
 // (`WAIT_MS` in packages/engine/test/harness.ts) are half of this, so a slow step fails with its label.
+// A preload runs once per Bun process, and this reaches only the first file the process runs, so the
+// test scripts (scripts/unit.mjs, each package's `test`) also pass `--timeout=30000`.
 setDefaultTimeout(30_000)
 
 const fullSqlite =

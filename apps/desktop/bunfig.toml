@@ -1,5 +1,7 @@
 # `bun test` in this package: the shared preload (packages/testing/src/preload.ts),
-# and only the unit tests under test/ (e2e/ is Playwright).
+# a shuffled order (`--seed <n>` repeats one), and only the unit tests under
+# test/ (e2e/ is Playwright).
 [test]
+randomize = true
 preload = ["../../packages/testing/src/preload.ts"]
 root = "test"

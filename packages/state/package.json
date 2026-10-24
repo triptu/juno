@@ -16,7 +16,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "bun test"
+    "test": "bun test --randomize --timeout=30000"
   },
   "dependencies": {
     "@effect/atom-react": "4.0.3",

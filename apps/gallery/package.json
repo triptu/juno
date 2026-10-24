@@ -10,8 +10,8 @@
     "preview": "vite preview --port 4174 --strictPort",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.shots.json",
     "shots": "bun ../../scripts/build-cached.mjs dist vite build && playwright test --project shots",
-    "test:e2e": "bun test walk-cache.test.mjs && bun ../../scripts/build-cached.mjs dist vite build && playwright test --project=behaviour",
-    "test:cache": "bun test walk-cache.test.mjs"
+    "test:e2e": "bun test --randomize walk-cache.test.mjs && bun ../../scripts/build-cached.mjs dist vite build && playwright test --project=behaviour",
+    "test:cache": "bun test --randomize walk-cache.test.mjs"
   },
   "dependencies": {
     "@juno/highlight": "workspace:*",

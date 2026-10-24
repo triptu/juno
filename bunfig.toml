@@ -8,6 +8,9 @@ globalStore = true
 minimumReleaseAge = 86400
 
 [test]
+# Files, and the tests in each file, run in a shuffled order; Bun prints the
+# seed, and `--seed <n>` repeats that order.
+randomize = true
 # The unit tests of every package that runs `bun test` (scripts/unit.mjs runs
 # them together with --parallel). The same preload as each package's own
 # bunfig.toml: Node-compatible SQLite and the default test timeout.
