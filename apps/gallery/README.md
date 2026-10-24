@@ -19,17 +19,7 @@ Only a completed successful state is recorded. Before rechecking a state its old
 
 `GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS`, `GALLERY_RING_ONLY`, `GALLERY_RING_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass both caches. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its document reset, still has a 30-second limit. Playwright owns context teardown. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
 
-## Measurements, 2026-10-24
-
-One complete run per mode on the remote runner, with two physical cores, four workers and the same pinned Chromium headless shell:
-
-| Version/mode | Root script time | Result | Peak container memory |
-| --- | --- | --- | --- |
-| Original, warm build | 903 s | 359 passed, 6 platform skips | 4.15 GB |
-| Revised, full walk | 1,163 s | 237 passed | 4.62 GB |
-| Revised, cached walk | 67 s | 237 passed | 2.08 GB |
-
-These are single-run observations, not medians. The revised full run includes an 18.68 s build; the other two restored the build in 0.01 s. Container memory includes file cache. The cached run reused exactly 1,810 shift and 774 focus states; its targeted regression tests still ran. That reduced the observed script time by 92.6% from the original. The full run costs more because each state gets a fresh document and the 171 identical-DOM skips in the original are now checked independently. It remains the nightly/full verification mode.
+Measured full and cached timings, including the interrupted Mac comparison, are in [development notes](../../docs/development.md#gallery-measurements-2026-10-24).
 
 ## Spec audit, 2026-10-24
 

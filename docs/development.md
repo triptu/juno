@@ -682,6 +682,25 @@ Tests run in parallel with zero retries, using Playwright's pinned Chromium head
 
 The suite keeps checks for interaction stability, delayed loads, keyboard activation and focus, cursor behavior, readable contrast, clipping and overlap. Fixed design dimensions and decorative screenshot probes belong to gallery review rather than the behavior gate. [The gallery README](../apps/gallery/README.md) records the spec audit and retained coverage.
 
+
+### Gallery measurements, 2026-10-24
+
+Single completed observations using the pinned Chromium headless shell. The runner had two physical cores and four workers; the Mac baseline used three workers.
+
+| Host and mode | Root script time | Result |
+| --- | --- | --- |
+| Runner, original, warm build | 903 s | 359 passed, 6 platform skips |
+| Runner, revised, full walk | 1,231 s | 237 passed |
+| Runner, revised, cached walk | 73 s | 237 passed |
+| Mac, original, warm build | 967.4 s | 373 passed |
+| Mac, revised full/cached | No completed measurement | Interrupted by shared-host overload and restarts |
+
+These are individual runs, not medians. The revised full runner run includes a 21.85 s build; the original restored its build in 0.01 s. Peak container memory was 4.15 GB before and 4.58 GB for the revised full walk, including file cache. Full verification checks 1,810 shift states and 774 focus states. It costs more because every state gets a fresh document and the original's 171 identical-DOM skips are now checked independently. Nightly and no-cache verification use this mode.
+
+The fully cached run restored its build in 0.01 s and reused all 1,810 shift and 774 focus states; targeted regressions still ran. Peak container memory was 2.13 GB. Its observed script time was 91.9% shorter than the original. A separate recovery run checked the 423 states left unfinished by a host reset and passed in 246 s; it is not the warm-cache timing.
+
+The first revised Mac full run reached the former fixed 20-minute part deadline; the workload-based budget replaces that fixed cutoff. Later comparison attempts were interrupted by load above eight or machine restarts and are excluded. Verification stayed on the remote runner after the 10:32 IST reset. No revised Mac speedup is claimed.
+
 ## Web shell
 
 `bun run web` runs the real renderer in a browser, for UI-only work, with no build and no Electron. One Node process holds three things:
