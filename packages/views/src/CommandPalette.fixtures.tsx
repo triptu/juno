@@ -65,12 +65,12 @@ const topicCommands: ReadonlyArray<PaletteItem> = [
   { id: 'k7', icon: 'rename', label: 'Rename thread', compact: true },
 ]
 
-function Palette({ initial, sections, footer, settled = true, tab: initialTab = 'messages' }: { readonly initial: string; readonly sections: ReadonlyArray<PaletteSection>; readonly footer?: PaletteItem; readonly settled?: boolean; readonly tab?: PaletteTab }) {
+// Each state is one tab's rows, so the tab stays put: a switch in the app swaps the rows too.
+function Palette({ initial, sections, footer, settled = true, tab = 'messages' }: { readonly initial: string; readonly sections: ReadonlyArray<PaletteSection>; readonly footer?: PaletteItem; readonly settled?: boolean; readonly tab?: PaletteTab }) {
   const [query, setQuery] = useState(initial)
-  const [tab, setTab] = useState(initialTab)
   return (
     <div {...stylex.props(styles.window)}>
-      <CommandPalette tab={tab} onTab={setTab} query={query} resultsQuery={query} onQuery={setQuery} sections={sections} {...(footer === undefined ? {} : { footer })} settled={settled} now={NOW} onSelect={noop} onMenu={noop} onClose={noop} />
+      <CommandPalette tab={tab} onTab={noop} query={query} resultsQuery={query} onQuery={setQuery} sections={sections} {...(footer === undefined ? {} : { footer })} settled={settled} now={NOW} onSelect={noop} onMenu={noop} onClose={noop} />
     </div>
   )
 }
