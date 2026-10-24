@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 13:13 · Wait for deletion in every compared window · The topic-view flow observes a root deletion in its thread and in Main before measuring the next reply’s row changes. The two subscriptions deliver independently; taking Main’s snapshot before its deletion arrived made the next step include the previous change.
 - 10-24 13:01 · Distinguish upward drags from a held thumb · A pointer held at the bottom is not upward scrolling. Track its last vertical motion so a full message window dropping an old row does not release the bottom hold through scroll anchoring. The existing Main and thread flows also drag upward and check that arrivals do not pull them back down.
 - 10-24 12:55 · Count chat requests when checking reply watches · A menu-created reply watch must not start a chat run. Count the fake model’s chat inputs, excluding background memory compaction; compaction may finish while the menu is used and previously made this check race.
 - 10-24 12:50 · Close backup writers before shared-folder cleanup · The backup canary owns its folder in an automatic fixture, which starts before either app and tears down after both. Removing it while a backup was being written caused ENOTEMPTY; retries would hide the lifetime error.

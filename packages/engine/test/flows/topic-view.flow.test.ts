@@ -286,6 +286,7 @@ it('live changes reach exactly the rows they touch, and names stand in for menti
     after = await list.until((window) => window.rows.get(rootTs)?.kind === 'deleted', 'the deleted root')
     expect(changedRows(before, after)).toEqual([rootTs])
     expect(after.order).toHaveLength(8)
+    await main.until((window) => window.rows.get(rootTs)?.kind === 'deleted', 'the deleted root in Main')
   })
 
   await step("a reply to another thread changes only its root's row in Main", async () => {

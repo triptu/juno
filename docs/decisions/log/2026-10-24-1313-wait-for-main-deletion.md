@@ -1,0 +1,1 @@
+- 10-24 13:13 · Wait for deletion in every compared window · The topic-view flow observes a root deletion in its thread and in Main before measuring the next reply’s row changes. The two subscriptions deliver independently; taking Main’s snapshot before its deletion arrived made the next step include the previous change.
