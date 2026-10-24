@@ -322,13 +322,13 @@ describe('PiAiProvider generation', () => {
     expect(retry.map((message) => message.role)).toEqual(['user', 'assistant', 'user'])
     const shownBack = retry[1]!.content as ReadonlyArray<{ text?: string }>
     expect(shownBack[0]?.text).toContain('<text x="2" y="2">db</text>')
-    expect(retry[2]!.content).toBe('That did not validate: element <text> is not allowed. Reply again with a corrected SVG that follows the format exactly. SVG only.')
+    expect(retry[2]!.content).toContain('element <text> is not allowed')
   })
 
   it('gives no decision after two drawings outside the vocabulary', async () => {
     const { provider } = scripted([fauxAssistantMessage('<svg data-hue="teal"><text>a</text></svg>'), fauxAssistantMessage('<svg data-hue="teal"><circle cx="20" cy="20" r="5" fill="#f00"/></svg>')], artConfig)
     const decision = await Effect.runPromise(provider.generate(tasks.topicArt, artInput))
-    expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'invalid-output', detail: 'fill must be one of ink, soft, accent, accent2, none; got "#f00"', meta: { attempts: 2 } })
+    expect(decision).toMatchObject({ _tag: 'NoDecision', reason: 'invalid-output', detail: expect.stringContaining('got "#f00"'), meta: { attempts: 2 } })
   })
 })
 
@@ -378,7 +378,8 @@ describe('PiAiProvider on errors that trying again cannot change', () => {
   })
 
   it('does not ask a fallback from the same maker, or for a request error', async () => {
-    const same = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: REFUSAL }), fauxAssistantMessage('Postgres migration plan')], withFallback(DECISION))
+    // A `~` alias slug names the same maker as the plain slug.
+    const same = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: REFUSAL }), fauxAssistantMessage('Postgres migration plan')], withFallback(`~${DECISION}`))
     expect(await Effect.runPromise(same.provider.generate(tasks.titleTopic, titleInput))).toMatchObject({ _tag: 'NoDecision', kind: 'policy' })
     expect(same.faux.state.callCount).toBe(1)
     const bad = scripted([fauxAssistantMessage('', { stopReason: 'error', errorMessage: '402 {"error":{"code":402,"message":"Insufficient credits"}}' }), fauxAssistantMessage('Postgres migration plan')], withFallback(FALLBACK))

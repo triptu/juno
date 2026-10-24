@@ -5,7 +5,7 @@
  * OpenRouter's (`{ error: { code, message, metadata } }`); none is real.
  */
 import { describe, expect, it } from 'bun:test'
-import { classifyFailure, modelMaker, refusedBeforeOutput } from '../src/index'
+import { classifyFailure, refusedBeforeOutput } from '../src/index'
 
 const body = (code: number, message: string, metadata?: object) => JSON.stringify({ error: { code, message, ...(metadata ? { metadata } : {}) } })
 
@@ -53,9 +53,4 @@ describe('billing and fallback', () => {
     expect(refusedBeforeOutput(`502 ${body(502, 'Bad gateway')}`)).toBe(false)
   })
 
-  it('names the maker of a slug, so a fallback comes from someone else', () => {
-    expect(modelMaker('anthropic/claude-sonnet-5.5')).toBe('anthropic')
-    expect(modelMaker('~google/gemini-latest')).toBe('google')
-    expect(modelMaker('fake')).toBe('fake')
-  })
 })

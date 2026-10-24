@@ -24,12 +24,9 @@ describe('cache keys', () => {
     expect(cacheKeyOf(bumped, input).inputHash).not.toBe(a.inputHash)
   })
 
-  it('is stable across runs: a fixed input gives a fixed hash', () => {
-    expect(cacheKeyOf(tasks.instructionRule, { text: 'Always notify me about Maya', people: [{ id: 'U1', name: 'Maya' }], channels: [] })).toEqual({
-      task: 'instructionRule',
-      key: '',
-      inputHash: '4442eae0867b8aee',
-    })
+  it('is stable across runs: a fixed input and version give a fixed hash', () => {
+    // Pinned to version 1, so the hash changes only when the hashing does, not when a task is revised.
+    const task = defineStructuredTask({ ...tasks.instructionRule, version: 1 })
+    expect(cacheKeyOf(task, { text: 'Always notify me about Maya', people: [{ id: 'U1', name: 'Maya' }], channels: [] }).inputHash).toBe('4442eae0867b8aee')
   })
-
 })
