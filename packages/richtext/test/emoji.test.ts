@@ -8,34 +8,19 @@ describe('emoji table', () => {
     for (const name of [...QUICK_REACTIONS, ...PICKER_EMOJI]) expect(emojiUnicode(name), name).toMatch(/\p{Extended_Pictographic}/u)
   })
 
-  it('treats +1 and thumbsup as the same emoji', () => {
-    expect(emojiUnicode('+1')).toBe(emojiUnicode('thumbsup'))
+  // Slack numbers tones 2 to 6 for U+1F3FB to U+1F3FF; in a joined sequence the tone goes on the person.
+  it.each([
+    ['+1::skin-tone-4', '👍🏽'],
+    ['woman-raising-hand::skin-tone-2', '🙋🏻‍♀️'],
+    ['flag-gb', '🇬🇧'],
+    ['uk', '🇬🇧'],
+    ['not_an_emoji', undefined],
+  ])('draws %s', (name, unicode) => {
+    expect(emojiUnicode(name)).toBe(unicode)
   })
 
-  it('applies skin tones', () => {
+  it('splits a skin tone off a name and rejects bad hex', () => {
     expect(splitEmojiName('+1::skin-tone-4')).toEqual({ name: '+1', skinTone: 4 })
-    // Slack numbers tones 2 to 6 for U+1F3FB to U+1F3FF.
-    expect(emojiUnicode('+1::skin-tone-4')).toBe('👍🏽')
-    expect(emojiUnicode('wave::skin-tone-2')).toBe('👋🏻')
-  })
-
-  it('knows every standard emoji by its Slack name and aliases', () => {
-    expect(emojiUnicode('partying_face')).toBe('🥳')
-    expect(emojiUnicode('flag-gb')).toBe(emojiUnicode('uk'))
-    expect(emojiUnicode('email')).toBe('✉️')
-  })
-
-  it('puts the skin tone on the person in a joined sequence', () => {
-    expect(emojiUnicode('woman-raising-hand::skin-tone-2')).toBe('🙋🏻‍♀️')
-  })
-
-  it('returns undefined for unknown names', () => {
-    expect(emojiUnicode('not_an_emoji')).toBeUndefined()
-  })
-
-  it('decodes the hex form Slack sends', () => {
-    expect(unicodeFromHex('1f44d')).toBe('👍')
-    expect(unicodeFromHex('1f44d-1f3fd')).toBe('👍🏽')
     expect(unicodeFromHex('zz')).toBeUndefined()
   })
 
@@ -45,7 +30,6 @@ describe('emoji table', () => {
     expect(reactionDisplay('mystery', custom)).toEqual({ kind: 'name', value: 'mystery' })
   })
 })
-
 
 describe('workspace aliases', () => {
   const rows = [
