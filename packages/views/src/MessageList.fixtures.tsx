@@ -142,17 +142,20 @@ const CHIPPED = 3
  */
 /**
  * The delete is asked for a frame after the list has its scroll, as in the
- * app, where it is asked of a list at rest; `settle` runs first in that frame,
- * once the rows have laid out.
+ * app, where it is asked of a list at rest. `settle` runs first in that frame
+ * and each one after until it returns true, so a list still laying out its
+ * rows is asked once they are drawn.
  */
-function useAskAfterScroll(settle?: () => void): boolean {
+function useAskAfterScroll(settle?: () => boolean): boolean {
   const [asking, setAsking] = useState(false)
   const settleRef = useRef(settle)
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      settleRef.current?.()
-      setAsking(true)
-    })
+    let frame = 0
+    const tick = () => {
+      if (settleRef.current?.() === false) frame = requestAnimationFrame(tick)
+      else setAsking(true)
+    }
+    frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
   }, [])
   return asking
@@ -192,10 +195,14 @@ const tallLast = messageWindow([
  */
 function TallLastRow() {
   const scrollRef = useRef<HTMLElement>(null)
-  // The tall row lays out after the first scroll and grows the list: back to its end.
+  // The tall row keeps its content-visibility estimate until a frame finds it
+  // near the view, then grows the list: once it is drawn, back to the end.
   const asking = useAskAfterScroll(() => {
     const scroller = scrollRef.current
-    if (scroller != null) scroller.scrollTop = scroller.scrollHeight
+    const last = [...(scroller?.querySelectorAll(ROW) ?? [])].at(-1)
+    if (scroller == null || last?.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) !== true) return false
+    scroller.scrollTop = scroller.scrollHeight
+    return true
   })
   useLayoutEffect(() => {
     const scroller = scrollRef.current

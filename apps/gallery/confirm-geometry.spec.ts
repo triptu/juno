@@ -117,9 +117,6 @@ test('a row whose top is under the header band gets the confirm below it, clear 
 
 test('a last row taller than the list, ending on the composer, gets the confirm inside it, in full view', async ({ page }) => {
   await open(page, 'interaction/confirm-delete-tall-last')
-  // The fixture's first scroll can precede the bundled fonts settling. Put the
-  // fully drawn list in the state this geometry case describes.
-  await page.locator('[data-fixture-frame] [data-scroll-area]').evaluate((scroller) => { scroller.scrollTop = scroller.scrollHeight })
   const at = await measure(page)
   expect(at.row.top).toBeLessThan(at.listTop)
   // No room below either: a confirm under the row would run past the list's bottom.
