@@ -394,7 +394,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     }
     cache.rows = nextRows
     cache.people = people
-    return { rows: out, total: out.length, windowCovered: yield* windowCovered(target, stored[0]?.ts), refs: { people: [...people.values()] } }
+    return { rows: out, total: out.length, atNewest, windowCovered: yield* windowCovered(target, stored[0]?.ts), refs: { people: [...people.values()] } }
   })
 
 /** Ids a body asked for that the cache lacked, for `readWanted`. */

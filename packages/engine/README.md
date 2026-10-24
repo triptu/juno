@@ -96,7 +96,7 @@ handlers and `agent-host/views.ts`. Saving captures the previous and resulting
 view in the same writer transaction. AgentHost Undo compares that snapshot
 before restoring it, so a later edit is not overwritten.
 
-Message windows publish `meta.windowCovered` from `src/messages/coverage.ts`. Main uses synced history ranges; threads use stored reply counts or the cursor coverage. Coverage-only changes are emitted even when no message changed. The renderer uses this to avoid positioning isolated cached messages before history arrives.
+Message windows publish `meta.windowCovered` from `src/messages/coverage.ts`. Main uses synced history ranges; threads use stored reply counts or the cursor coverage. Coverage-only changes are emitted even when no message changed. The renderer uses this to avoid positioning isolated cached messages before history arrives. They also publish `meta.atNewest`: whether the window holds the topic's newest message. A window around a message (a link, a search match) holds it when the rows after the message fit, and the topic view then counts as at the bottom, with no Jump to latest.
 
 Channel and group DM roots sent from Home use `startedThreads.ts` to resolve durable outbox topic identities. The thread view stays mounted through acknowledgement; dependent replies wait for the root in the normal post worker.
 

@@ -17,6 +17,7 @@ import { useTopicHeader } from './topic/header'
 import { useOlderPages } from './topic/older'
 import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
 import {
+  edgesOf,
   newMessages,
   useFirstFrame,
   useHeldPosition,
@@ -198,8 +199,8 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
     suggestions: messageActions.suggestions,
     onRowKey: messageActions.onRowKey,
     // ↓ past the last row goes to the composer only when that row is the topic's newest message: a window anchored
-    // in history ends before it, and there ↓ on the last row stays put (the pill brings the newest back).
-    onPastEnd: list.spec.anchor === undefined ? messageActions.focusComposer : undefined,
+    // in history can end before it, and there ↓ on the last row stays put (the pill brings the newest back).
+    onPastEnd: edgesOf(list).atEnd ? messageActions.focusComposer : undefined,
     onToggleReaction: messageActions.onToggleReaction,
     onPersonMenu: personMenu,
     onChannelMenu: (chip: { readonly id: string; readonly name: string }) => {

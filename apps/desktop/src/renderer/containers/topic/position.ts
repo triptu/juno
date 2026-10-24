@@ -25,9 +25,9 @@ import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelec
 /** A scroll of the user's that moved the list this recently, in milliseconds, is still going on. */
 const GESTURE_IDLE = 100
 
-/** The list's ends. `atEnd`: the window holds the newest message (no anchor). */
-function edgesOf(list: MessageWindow) {
-  return { first: list.order[0], last: list.order.at(-1), atEnd: list.spec.anchor === undefined }
+/** The list's ends. `atEnd`: the window holds the newest message, as the bottom window does and a window around a message can. */
+export function edgesOf(list: MessageWindow) {
+  return { first: list.order[0], last: list.order.at(-1), atEnd: list.spec.anchor === undefined || list.meta.atNewest === true }
 }
 
 /** The list's scroll state, shared by the hooks below. Its refs and setters keep their identity, so the hooks' dependency lists name them without effect. */
