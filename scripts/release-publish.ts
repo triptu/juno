@@ -26,7 +26,7 @@ import { parseArgs } from 'node:util'
 import { addChangelogEntry, compareVersions, isVersion, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
 import { releaseGate, printGate } from './release-gate.mjs'
 import { highlightLines } from './release-highlights.mjs'
-import { syncReleasedVersion } from './release-main.mjs'
+import { checkPublishedRelease, syncReleasedVersion } from './release-main.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
 
 const scriptRoot = resolve(import.meta.dirname, '..')
@@ -70,7 +70,7 @@ gh(['auth', 'status'])
 const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean }>
 const published = releases.find((release) => release.tagName === tag && !release.isDraft && !release.isPrerelease)
 if (published && !values.prerelease) {
-  if (!dry) syncReleasedVersion(root, version)
+  if (!dry) { checkPublishedRelease(repo, version); syncReleasedVersion(root, version) }
   console.log(`release:publish: ${tag} is already published; only the main version update was needed`)
   process.exit(0)
 }
@@ -163,7 +163,7 @@ try {
     console.log(`release:publish: no full run covers this urgent release; run bun run verify:main --ref ${commit} next`)
   }
   console.log(`release:publish: published ${tag}`)
-  if (!values.prerelease) syncReleasedVersion(root, version)
+  if (!values.prerelease) { checkPublishedRelease(repo, version); syncReleasedVersion(root, version) }
 } finally {
   rmSync(scratch, { recursive: true, force: true })
 }

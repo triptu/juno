@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { compareVersions, isVersion, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
@@ -64,4 +64,22 @@ export function syncReleasedVersion(root, released) {
   } catch {
     throw new Error(`Release ${version} is published, but updating origin/main failed. Rerun bun run release (or release:publish) to finish the version update without publishing again.`)
   }
+}
+
+/** Check the published artifacts before advancing main, including when resuming. */
+export function checkPublishedRelease(repo, version) {
+  const tag = `v${normalizeVersion(version)}`
+  const gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }))
+  const release = gh('release', 'view', tag, '--repo', repo, '--json', 'tagName,isDraft,isPrerelease,assets')
+  const names = release.assets.map((asset) => asset.name).toSorted()
+  const latest = gh('release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isLatest').find((entry) => entry.isLatest)?.tagName
+  const dmg = names.find((name) => name.endsWith('.dmg'))
+  const problems = [
+    ...(release.isDraft || release.isPrerelease ? ['it is a draft or a pre-release'] : []),
+    ...(!dmg ? ['it has no DMG'] : !names.includes(`${dmg}.blockmap`) ? ['it has no matching DMG block map'] : []),
+    ...(names.includes('latest-mac.yml') ? [] : ['it has no latest-mac.yml']),
+    ...(latest === tag ? [] : [`the latest release is ${latest ?? 'none'}`]),
+  ]
+  if (problems.length) throw new Error(`${tag} is published, but ${problems.join('; ')}`)
+  console.log(`release: checked ${tag}: ${names.join(', ')}; marked latest`)
 }

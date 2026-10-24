@@ -1481,7 +1481,7 @@ changes nothing; it does not fetch.
    since a failed run, it refuses to run anything. A failed run stops the
    command before any build, with each failed suite's failures, cause and log,
    and the repair command. With `--nightly` the full run is nightly, and after a
-   green run the command pushes the refreshed coverage map to main.
+   green run the command pushes the refreshed coverage map to main. A failed nightly run saves its map in `.juno-status/release-coverage.json`; the next passing release or repair pushes it, even without `--nightly`.
 4. It waits for the highlights file, which the agent writes while the full run
    goes. It reads the file once it has not changed for a second, and waits for
    a corrected file if it is invalid, up to `--notes-timeout` minutes (60).
@@ -1503,7 +1503,7 @@ covered by the release gate. If the bump is already on main, no second bump is
 added.
 
 Rerun the same command after any failure. Before anything else it repairs
-main from the latest published stable version and exits without publishing,
+main from the latest published stable version, after checking its assets and latest mark, and exits without publishing,
 which needs the `gh` login but no build. A green record covering the tip is
 reused. A failed run keeps its worktree for inspection, and a rerun refuses to
 reuse it. The lock is `.juno-status/release.lock`; a lock whose process has

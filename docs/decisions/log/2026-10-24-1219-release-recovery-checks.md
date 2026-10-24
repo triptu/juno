@@ -1,0 +1,1 @@
+- 10-24 12:19 · Tushar · Check published assets and the latest mark before advancing main, including release recovery; retain a failed nightly coverage map in shared release state until a passing gate allows its commit. Full verification explicitly requires the laptop and the release command rejects signed mode.

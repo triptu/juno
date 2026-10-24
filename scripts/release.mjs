@@ -27,7 +27,7 @@ import { compareVersions, normalizeVersion } from '../apps/desktop/src/main/rele
 import { MAP_PATH } from './coverage-map.mjs'
 import { assessRecord, git, isAncestor, printGate, readRecords, releaseGate, statusFolder } from './release-gate.mjs'
 import { highlightLines, userFacingChanges } from './release-highlights.mjs'
-import { commitOnMain, syncReleasedVersion } from './release-main.mjs'
+import { checkPublishedRelease, commitOnMain, syncReleasedVersion } from './release-main.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
 import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 
@@ -40,6 +40,7 @@ const { values } = parseArgs({
     repo: { type: 'string', default: 'triptu/juno-releases' },
   },
 })
+if (!Number.isFinite(Number(values['notes-timeout'])) || Number(values['notes-timeout']) <= 0) throw new Error('--notes-timeout must be a positive number')
 const dry = values['dry-run']
 const repo = values.repo
 const here = import.meta.dirname
@@ -55,6 +56,7 @@ let locked = false
 try {
   if (!dry) {
     // Checked before the full run, not twenty minutes into it.
+    if (process.env.JUNO_RELEASE === '1') throw new Error('Juno releases are unsigned; unset JUNO_RELEASE')
     if (!process.env.JUNO_UPDATE_TOKEN) throw new Error('JUNO_UPDATE_TOKEN is required for the packaged updater; pass it inline from the keychain (.claude/skills/do-release/SKILL.md)')
     locked = takeLock()
     run('git', ['fetch', 'origin', 'main'])
@@ -71,7 +73,9 @@ async function release() {
   const releases = gh('release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt')
     .filter((release) => !release.isDraft && !release.isPrerelease).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
   const latest = releases[0]
-  if (latest && !dry && syncReleasedVersion(root, latest.tagName)) {
+  if (latest && !dry && compareVersions(latest.tagName, JSON.parse(git(root, 'show', 'origin/main:apps/desktop/package.json')).version) > 0) {
+    checkPublishedRelease(repo, latest.tagName)
+    syncReleasedVersion(root, latest.tagName)
     say(`restored ${latest.tagName} on origin/main; no publish needed`)
     return
   }
@@ -104,6 +108,7 @@ async function release() {
   await timed('highlights wait', { version, source: tip }, () => waitForHighlights(notes))
   publish(tip, version, notes)
   check(version)
+  timedSync('cleanup', { version, source: tip }, () => run(process.execPath, [join(here, 'worktree.mjs'), 'remove', `release-${version}`, '--force']))
   say(`released ${version} from ${tip} in ${Math.round((Date.now() - started) / 1000)} s`)
 }
 
@@ -111,22 +116,28 @@ async function release() {
 async function fullRun(tip) {
   const records = readRecords(status)
   const covered = releaseGate(root, tip, records)
-  if (covered) { printGate(covered); return true }
+  if (covered) { printGate(covered); if (!dry) pushCoverage(tip); return true }
   const newest = records.find((record) => isAncestor(root, record.commit, tip))
-  const repairable = newest && !assessRecord(newest) && newest.version === 2 && newest.identity && newest.required
+  const repairable = newest && !assessRecord(newest) && newest.version === 2 && newest.identity && newest.required && !newest.required.some((suite) => ['test:desktop @mac', 'perf', 'test:feel'].includes(suite))
   if (repairable && newest.commit === tip) {
     report(newest, recordFile(newest))
     throw new Error('the newest full run at the tip failed and main has not changed since; fix the failures first')
   }
   const args = repairable ? ['--ref', tip, '--repair', recordFile(newest)] : ['--ref', tip, ...(values.nightly ? ['--nightly'] : [])]
   if (repairable && values.nightly) say('--nightly does not apply to a repair; the coverage map is not refreshed')
+  args.push('--require-remote')
   const command = `bun run verify:main ${args.join(' ')}`
   if (dry) { say(`no green full run covers ${tip}; would run ${command} on the laptop`); return false }
   say(`no green full run covers ${tip}; running ${command} on the laptop. Write the highlights meanwhile.`)
+  if (values.nightly && git(root, 'status', '--porcelain', '--', MAP_PATH)) throw new Error(`commit or save changes to ${MAP_PATH} before a nightly release`)
   const begun = new Date().toISOString()
   const begunAt = Date.now()
   const exit = spawnSync('bun', ['run', 'verify:main', ...args], { cwd: root, stdio: 'inherit' }).status
   recordReleaseTiming('full run', begunAt, { source: tip, status: exit === 0 ? 'passed' : 'failed' }, root)
+  if (values.nightly && !repairable && git(root, 'status', '--porcelain', '--', MAP_PATH)) {
+    writeFileSync(join(status, 'release-coverage.json'), JSON.stringify({ source: tip, map: readFileSync(join(root, MAP_PATH), 'utf8') }))
+    git(root, 'checkout', '--', MAP_PATH)
+  }
   const gate = exit === 0 ? releaseGate(root, tip) : null
   if (!gate) {
     const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
@@ -135,14 +146,22 @@ async function fullRun(tip) {
     throw new Error('the full run failed; nothing was built or published')
   }
   printGate(gate)
-  if (values.nightly && git(root, 'status', '--porcelain', '--', MAP_PATH)) {
-    const map = readFileSync(join(root, MAP_PATH), 'utf8')
-    commitOnMain(root, 'Refresh the e2e coverage map', (checkout) => { writeFileSync(join(checkout, MAP_PATH), map); return [MAP_PATH] },
-      () => git(root, 'show', `origin/main:${MAP_PATH}`) === map.trim())
-    git(root, 'checkout', '--', MAP_PATH)
-    say(`pushed the refreshed ${MAP_PATH} to main`)
-  }
+  pushCoverage(tip)
   return true
+}
+
+/** Preserve a nightly map across a failed run and publish it after the gate passes. */
+function pushCoverage(tip) {
+  const pending = join(status, 'release-coverage.json')
+  if (!existsSync(pending)) return
+  const { source, map } = JSON.parse(readFileSync(pending, 'utf8'))
+  if (!isAncestor(root, source, tip)) throw new Error('pending nightly coverage is not from an ancestor of this release')
+  commitOnMain(root, 'Refresh the e2e coverage map', (checkout) => {
+    writeFileSync(join(checkout, MAP_PATH), map)
+    return [MAP_PATH]
+  }, () => git(root, 'show', `origin/main:${MAP_PATH}`) === map.trim())
+  rmSync(pending)
+  say(`pushed the refreshed ${MAP_PATH} to main`)
 }
 
 /** The failed suites of a full-run record, their causes and the way on. */
@@ -219,26 +238,15 @@ function publish(source, version, notes) {
   timedSync('package', detail, () => run('bun', ['run', 'package'], checkout))
   timedSync('package-smoke', detail, () => run('bun', ['run', 'test:package'], checkout, { JUNO_E2E_AI_JOBS: '1' }))
   timedSync('publish', detail, () => run(process.execPath, [join(here, 'release-publish.ts'), '--checkout', checkout, '--source', source, '--repo', repo, '--notes', notes], checkout))
-  timedSync('cleanup', detail, () => run(process.execPath, [join(here, 'worktree.mjs'), 'remove', name, '--force']))
 }
 
 /** Checks what installs will see: the release, its files, the latest mark, and main's version. */
 function check(version) {
-  const tag = `v${version}`
-  const release = gh('release', 'view', tag, '--repo', repo, '--json', 'tagName,isDraft,isPrerelease,assets')
-  const names = release.assets.map((asset) => asset.name).toSorted()
-  const latest = gh('release', 'list', '--repo', repo, '--limit', '20', '--json', 'tagName,isLatest').find((entry) => entry.isLatest)?.tagName
+  checkPublishedRelease(repo, version)
   git(root, 'fetch', 'origin', 'main')
   const main = JSON.parse(git(root, 'show', 'origin/main:apps/desktop/package.json')).version
-  const problems = [
-    ...(release.isDraft || release.isPrerelease ? ['it is a draft or a pre-release'] : []),
-    ...[['a DMG', (name) => name.endsWith('.dmg')], ['its block map', (name) => name.endsWith('.dmg.blockmap')], ['latest-mac.yml', (name) => name === 'latest-mac.yml']]
-      .filter(([, match]) => !names.some(match)).map(([what]) => `it has no ${what}`),
-    ...(latest === tag ? [] : [`the latest release is ${latest ?? 'none'}`]),
-    ...(compareVersions(main, version) >= 0 ? [] : [`origin/main is still at version ${main}`]),
-  ]
-  if (problems.length) throw new Error(`${tag} is published, but ${problems.join('; ')}`)
-  say(`checked ${tag}: ${names.join(', ')}; marked latest; origin/main is at version ${main}`)
+  if (compareVersions(main, version) < 0) throw new Error(`origin/main is still at version ${main}`)
+  say(`origin/main is at version ${main}`)
 }
 
 async function timed(step, detail, work) {
