@@ -91,7 +91,7 @@ export function SearchReader(props: SearchReaderProps) {
     if (displayedKey === undefined || measureFrom === undefined) return
     const from = measureFrom
     measureFrom = undefined
-    afterPaint(() => measure('juno.search-reader', from, { replace: true }))
+    afterPaint(() => measure('juno.search-reader', from))
   }, [displayedKey])
 
   return (

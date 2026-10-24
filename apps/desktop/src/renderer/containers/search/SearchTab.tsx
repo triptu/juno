@@ -145,7 +145,7 @@ function useResultsMeasure(generation: number | undefined, current: boolean, row
     const at = keystroke.current
     if (at === undefined || !current) return
     keystroke.current = undefined
-    afterPaint(() => measure('juno.search-results', at, { replace: true, detail: { rows } }))
+    afterPaint(() => measure('juno.search-results', at, { detail: { rows } }))
   }, [generation, current, rows])
   return useCallback(() => {
     keystroke.current = performance.now()

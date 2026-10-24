@@ -96,6 +96,12 @@ export const PERF_INTERACTIONS = [
     paths: ['apps/desktop/src/renderer/containers/Palette.tsx', 'apps/desktop/src/renderer/containers/PaletteContent.tsx', 'apps/desktop/src/renderer/containers/paletteCommands.ts', 'packages/views/src/CommandPalette.tsx', 'packages/views/src/PaletteRow.tsx', 'packages/state/src/palette.ts', 'packages/engine/src/search/'],
   },
   {
+    interaction: 'Search tab: keystroke to results and arrow to reader',
+    perf: 'search: arrow to reader',
+    feel: 'interaction.feel.ts',
+    paths: [/^apps\/desktop\/src\/renderer\/containers\/search\//, /^packages\/views\/src\/search\//, 'packages/state/src/search.ts', 'packages/engine/src/search/'],
+  },
+  {
     interaction: 'typing, mentions and send',
     perf: 'keystroke controls|typing|send',
     feel: 'composer.feel.ts',

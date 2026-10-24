@@ -31,8 +31,15 @@ function searchPage(win: Page) {
 const rowIds = (page: ReturnType<typeof searchPage>, count: number) => page.rows.evaluateAll((rows, n) => rows.slice(0, n).map((row) => row.getAttribute('data-search-row')), count)
 
 /** Optional screenshots of the real UI for docs/progress/search-tab/ (`JUNO_SEARCH_SHOTS=1`). */
+const SHOTS = process.env.JUNO_SEARCH_SHOTS === '1'
+
+/** Screenshots are taken at the mocks' width. */
+async function shotSize(juno: Juno): Promise<void> {
+  if (SHOTS) await juno.surface.setWindowSize(1440, 900)
+}
+
 async function shot(juno: Juno, name: string): Promise<void> {
-  if (process.env.JUNO_SEARCH_SHOTS !== '1') return
+  if (!SHOTS) return
   await juno.win.waitForTimeout(400)
   await juno.win.screenshot({ path: test.info().outputPath(`${name}.png`) })
 }
@@ -43,6 +50,7 @@ async function pickFrom(juno: Juno, name: string): Promise<void> {
   await page.field.pressSequentially(`from:${name.slice(0, 3).toLowerCase()}`)
   const picker = juno.win.locator('#search-picker')
   await expect(picker.getByRole('option').first()).toContainText(name)
+  await shot(juno, 'picker-light')
   await juno.win.keyboard.press('Enter')
   await expect(page.chips.filter({ hasText: name })).toBeVisible()
 }
@@ -51,6 +59,7 @@ type Context = Pick<Fixtures, 'juno' | 'slack' | 'fake'>
 
 test('search: from: chip, local rows first, Slack merges below, the reader follows and marks read only when used, Enter and Back', async ({ juno, slack, fake }) => {
   const context = { juno, slack, fake }
+  await shotSize(juno)
   for (let i = 1; i <= 24; i++) slack.as('Maya').postIn('incidents', `Flamingo note ${i} on the pager`)
   slack.as('Maya').postIn('eng', 'Flamingo rehearsal checklist is ready')
   slack.as('Maya').dm('Flamingo rehearsal notes for you')
@@ -63,7 +72,19 @@ test('search: from: chip, local rows first, Slack merges below, the reader follo
   await test.step('↓ from the field and through three results: the reader follows, and nothing is marked read', () => arrowThrough(context))
   await test.step('Tab into the reader’s composer, a reply sent there marks the topic read; Esc goes back to the list', () => replyInReader(context))
   await test.step('Enter on another result opens it in this tab; Back returns to the same query, selection and scroll', () => openAndBack(context))
+  if (SHOTS) await test.step('shots: one column and dark', () => moreShots(context))
 })
+
+async function moreShots({ juno }: Context): Promise<void> {
+  const page = searchPage(juno.win)
+  await juno.surface.setWindowSize(1100, 760)
+  await page.row('Flamingo note 17 on the pager').press('Enter')
+  await shot(juno, 'narrow-light')
+  await juno.surface.setWindowSize(1440, 900)
+  await juno.setTheme('Dark')
+  await juno.tabs.select('flamingo')
+  await shot(juno, 'tab-dark')
+}
 
 async function openEmpty({ juno }: Context): Promise<void> {
   const page = searchPage(juno.win)
@@ -170,13 +191,15 @@ test('search: ⌘Enter opens results in tabs behind this one and focus stays in 
   await tabs.expectCount(3)
   await tabs.expectActive('heron')
   await expect(page.row('Heron dashboards are live')).toBeFocused()
-  expect(await tabs.titles()).toEqual(expect.arrayContaining([expect.stringMatching(/^design-review/), expect.stringMatching(/^product/)]))
+  await expect.poll(() => tabs.titles()).toEqual(expect.arrayContaining([expect.stringMatching(/^design-review/), expect.stringMatching(/^product/)]))
 })
 
 test('search: ⌘F in a thread searches that thread, and Backspace on its chip widens the search', async ({ juno, slack }) => {
   const { surface, sidebar, win } = juno
   const page = searchPage(win)
-  slack.as('Maya').postIn('eng', 'Osprey rollout plan for the storage tier')
+  await shotSize(juno)
+  // Your own thread, so it is in the sidebar to open.
+  slack.as('Tushar').postIn('eng', 'Osprey rollout plan for the storage tier')
   slack.as('Leo').replyIn('Osprey rollout plan', 'osprey canary looks healthy')
   slack.as('Sam').postIn('product', 'osprey pricing page copy')
   await sidebar.row('Osprey rollout plan').open()
@@ -198,6 +221,7 @@ test('search: ⌘F in a thread searches that thread, and Backspace on its chip w
 test('search: apps and automated channels are hidden; the note shows them, and the toggles are remembered', async ({ juno, slack }) => {
   const { surface, tabs, win } = juno
   const page = searchPage(win)
+  await shotSize(juno)
   slack.as('Grafana').postIn('alerts-prod', 'zebracrossing latency alert fired')
   slack.as('Grafana').postIn('alerts-prod', 'zebracrossing latency alert resolved')
   slack.as('deploybot').postIn('deploys', 'zebracrossing build 412 deployed')
@@ -225,6 +249,7 @@ test('search: apps and automated channels are hidden; the note shows them, and t
 test('search: when Slack fails the local rows stay with a notice, and Try again recovers', async ({ juno, slack, fake }) => {
   const { surface, win, sidebar } = juno
   const page = searchPage(win)
+  await shotSize(juno)
   slack.as('Dev').postIn('eng', 'Kiwifruit standup moved to ten')
   slack.as('Dev').postedLongAgo('platform', 'Kiwifruit archive from the spring', 60)
   await sidebar.row('#eng').expectVisible()
@@ -247,7 +272,8 @@ test('search: when Slack fails the local rows stay with a notice, and Try again 
 test('search: a restart brings the Search tab back with its query and selection, grouped by thread as it was left', async ({ juno, slack, fake, relaunch, userData }) => {
   const { surface, win, sidebar } = juno
   const page = searchPage(win)
-  slack.as('Maya').postIn('eng', 'Pelican migration plan for the queue')
+  await shotSize(juno)
+  slack.as('Tushar').postIn('eng', 'Pelican migration plan for the queue')
   for (const step of ['one', 'two', 'three']) slack.as('Leo').replyIn('Pelican migration plan', `pelican step ${step} is done`)
   await sidebar.row('Pelican migration plan').expectVisible()
 
