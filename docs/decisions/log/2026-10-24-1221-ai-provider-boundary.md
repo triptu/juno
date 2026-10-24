@@ -1,0 +1,1 @@
+- 10-24 12:21 · engine · Let the engine AI layer accept the existing pi model boundary so tests run the real provider without replacing its modules; production still uses OpenRouter.

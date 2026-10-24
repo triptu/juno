@@ -19,7 +19,7 @@
  */
 import { Clock, Context, Effect, Exit, Layer, Stream } from 'effect'
 import type { HostAiCall } from '@juno/agent-contract'
-import { AiProvider, cacheKeyOf, FAKE_MODEL, FakeAiProvider, fallbackFor, isFinal, modelFor, PiAiProvider, type AiConfig, type AiFailureKind, type Decision, type ModelPrefs, type Task, type Tier } from '@juno/ai'
+import { AiProvider, cacheKeyOf, FAKE_MODEL, FakeAiProvider, fallbackFor, isFinal, modelFor, PiAiProvider, type AiConfig, type AiFailureKind, type Decision, type ModelPrefs, type PiModels, type Task, type Tier } from '@juno/ai'
 import { parseTopicId } from '@juno/domain'
 import { prefs, StoreReader, StoreWriter, transaction, type Invalidation } from '@juno/store'
 import { EngineConfig } from './config'
@@ -184,7 +184,7 @@ const refusedBefore = (refusal: Refusal): Decision<never> => ({
   meta: { model: '', latencyMillis: 0, attempts: 0 },
 })
 
-export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Workspace | AiCredentials | AiSpend | AiAudit | AiFallback | HostLink> = Layer.unwrap(
+export const aiProviderLive = (models?: PiModels): Layer.Layer<AiProvider, never, EngineConfig | Workspace | AiCredentials | AiSpend | AiAudit | AiFallback | HostLink> => Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* EngineConfig
     const audit = yield* AiAudit
@@ -217,7 +217,7 @@ export const AiProviderLive: Layer.Layer<AiProvider, never, EngineConfig | Works
           ...(gated ? { admit: spend.admit } : {}),
           fallback: readConfig.pipe(Effect.map((current) => fallbackFor(current, FAKE_MODEL))),
         })
-      : PiAiProvider.layer(readConfig)
+      : PiAiProvider.layer(readConfig, models)
     return Layer.effect(AiProvider, Effect.gen(function* () {
       const provider = yield* AiProvider
       const providerName = config.ai === 'fake' ? 'fake' : 'openrouter'
@@ -263,6 +263,8 @@ export const aiAssistOn = prefs.get<unknown>(AI_ASSIST_PREF).pipe(
   Effect.map((value) => value !== false),
   Effect.catch(() => Effect.succeed(true)),
 )
+
+export const AiProviderLive = aiProviderLive()
 
 /** Whether the background AI jobs may call the model: always in the app; tests turn them off with `aiJobs: false` unless they opt in. */
 export const aiJobsOn = Effect.gen(function* () {
