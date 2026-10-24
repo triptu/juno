@@ -38,6 +38,8 @@ const placeKind = (place: Place): string => {
       return 'Huddle'
     case 'gallery':
       return place.pictureId === undefined ? 'Gallery' : 'Picture'
+    case 'search':
+      return 'Search'
   }
 }
 

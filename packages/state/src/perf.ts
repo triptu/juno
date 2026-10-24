@@ -24,6 +24,10 @@ export type PerfName =
   | 'juno.filter'
   | 'juno.palette-open'
   | 'juno.palette-results'
+  /** A keystroke in the Search tab's field to the list painted with that query's rows. */
+  | 'juno.search-results'
+  /** ↑ or ↓ in the Search tab's list to the reader painted at the chosen match. */
+  | 'juno.search-reader'
   | 'juno.send'
   /** The send's store-only checks answered, the queue command answered, and its row committed. */
   | 'juno.send-checked'

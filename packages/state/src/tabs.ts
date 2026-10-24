@@ -40,6 +40,7 @@ import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
 import { homeDraftAtom, untouched, type HomeDraft } from './homeDraft'
+import { decodeSearchSession, searchSessionAtom, searchTitleAtom, type SearchSession } from './search'
 import { signedInAtom } from './session'
 
 /** The Juno menu's pages that have a tab of their own. Its Connections and Settings are sections of Settings. */
@@ -64,6 +65,8 @@ export type Place =
   | { readonly kind: 'devLog' }
   /** The gallery of Home's pictures, or one picture with its story (SPEC 12, "Pictures and the gallery"). */
   | { readonly kind: 'gallery'; readonly pictureId?: string }
+  /** A Search tab (SPEC 10a). Its field, selection and scroll are `searchSessionAtom(sessionId)`, saved with the tab. */
+  | { readonly kind: 'search'; readonly sessionId: string }
 
 export const homePlace: Place = { kind: 'home' }
 export const allTopicsPlace: Place = { kind: 'allTopics' }
@@ -74,6 +77,7 @@ export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId 
 export const huddlePlace = (channelId: string): Place => ({ kind: 'huddle', channelId })
 export const devLogPlace: Place = { kind: 'devLog' }
 export const galleryPlace = (pictureId?: string): Place => (pictureId === undefined ? { kind: 'gallery' } : { kind: 'gallery', pictureId })
+export const searchPlace = (sessionId: string): Place => ({ kind: 'search', sessionId })
 
 /** The places a tab showed, oldest first, and the one it shows. */
 export interface TabHistory {
@@ -139,6 +143,7 @@ const samePlace = (a: Place, b: Place) =>
   : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page
   : a.kind === 'huddle' ? b.kind === 'huddle' && a.channelId === b.channelId
   : a.kind === 'gallery' ? b.kind === 'gallery' && a.pictureId === b.pictureId
+  : a.kind === 'search' ? b.kind === 'search' && a.sessionId === b.sessionId
   : a.kind === b.kind
 
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
@@ -446,6 +451,7 @@ const PlaceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('junoPage'), page: JunoPage }),
   Schema.Struct({ kind: Schema.Literal('huddle'), channelId: Schema.String }),
   Schema.Struct({ kind: Schema.Literal('gallery'), pictureId: Schema.optionalKey(Schema.String) }),
+  Schema.Struct({ kind: Schema.Literal('search'), sessionId: Schema.String }),
 ])
 
 /** A saved place as it reads today: the pages that became sections of Settings open there. */
@@ -469,7 +475,7 @@ function placeOf(saved: typeof PlaceJson.Type): Place {
  * is dropped.
  */
 const TabJson = Schema.Union([
-  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean), lastViewedAt: Schema.optionalKey(Schema.Number), homeDraft: Schema.optionalKey(Schema.Unknown), newChat: Schema.optionalKey(Schema.Unknown) }),
+  Schema.Struct({ id: Schema.String, pinned: Schema.Boolean, place: PlaceJson, junoPanel: Schema.optionalKey(Schema.Boolean), lastViewedAt: Schema.optionalKey(Schema.Number), homeDraft: Schema.optionalKey(Schema.Unknown), newChat: Schema.optionalKey(Schema.Unknown), search: Schema.optionalKey(Schema.Unknown) }),
   Schema.Struct({ id: Schema.String }),
 ])
 const TabsJson = Schema.Struct({
@@ -532,14 +538,28 @@ function parseHomeDrafts(value: unknown): ReadonlyMap<string, HomeDraft> {
   return drafts
 }
 
-/** What `TABS_PREF` holds: each tab with the place it shows, whether its Juno panel is open, and a Home tab's draft and destination. */
-export function savedTabs(tabs: Tabs, draftOf: (tabId: string) => HomeDraft | undefined = () => undefined): unknown {
+/** The Search sessions saved with the tabs, by session id. One that no longer reads is dropped; the tab opens empty. */
+function parseSearchSessions(value: unknown): ReadonlyMap<string, SearchSession> {
+  const sessions = new Map<string, SearchSession>()
+  Option.map(decodeTabs(value), (saved) => {
+    for (const tab of saved.tabs) {
+      if (!('place' in tab) || tab.place.kind !== 'search' || tab.search === undefined) continue
+      const sessionId = tab.place.sessionId
+      Option.map(decodeSearchSession(tab.search), (session) => sessions.set(sessionId, session))
+    }
+  })
+  return sessions
+}
+
+/** What `TABS_PREF` holds: each tab with the place it shows, whether its Juno panel is open, a Home tab's draft and destination, and a Search tab's session. */
+export function savedTabs(tabs: Tabs, draftOf: (tabId: string) => HomeDraft | undefined = () => undefined, searchOf: (sessionId: string) => SearchSession | undefined = () => undefined): unknown {
   const kept = tabs.tabs.filter((tab) => currentPlace(tab).kind !== 'devLog')
   const ids = new Set(kept.map((tab) => tab.id))
   return {
     tabs: kept.map((tab) => {
       const place = currentPlace(tab)
       const chat = place.kind === 'home' ? draftOf(tab.id) : undefined
+      const search = place.kind === 'search' ? searchOf(place.sessionId) : undefined
       return {
         id: tab.id,
         pinned: tab.pinned,
@@ -547,6 +567,7 @@ export function savedTabs(tabs: Tabs, draftOf: (tabId: string) => HomeDraft | un
         ...(tab.lastViewedAt === undefined ? {} : { lastViewedAt: tab.lastViewedAt }),
         ...(tab.junoPanel === true ? { junoPanel: true } : {}),
         ...(chat === undefined || untouched(chat) ? {} : { homeDraft: savedHomeDraft(chat) }),
+        ...(search === undefined ? {} : { search }),
       }
     }),
     active: tabs.active !== undefined && ids.has(tabs.active) ? tabs.active : null,
@@ -572,21 +593,34 @@ const savedHomeDraftsAtom = Atom.make((get): ReadonlyMap<string, HomeDraft> => {
 /** The draft and destination a Home tab was saved with, read back after a restart. */
 export const savedHomeDraftAtom = Atom.family((tabId: string) => Atom.make((get) => get(savedHomeDraftsAtom).get(tabId)))
 
+const savedSearchSessionsAtom = Atom.make((get): ReadonlyMap<string, SearchSession> => {
+  const saved = get(savedTabsAtom)
+  return AsyncResult.isSuccess(saved) ? parseSearchSessions(saved.value) : new Map()
+})
+
+/** The session a Search tab was saved with, read back after a restart. */
+export const savedSearchSessionAtom = Atom.family((sessionId: string) => Atom.make((get) => get(savedSearchSessionsAtom).get(sessionId)))
+
 /** The tabs as `TABS_PREF` saves them, with each Home tab's draft and destination. */
 function saveTabs(registry: Registry, tabs: Tabs): void {
-  void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(tabs, (id) => registry.get(homeDraftAtom(id))) })
+  void runCommand(registry, prefsSet, { key: TABS_PREF, value: savedTabs(tabs, (id) => registry.get(homeDraftAtom(id)), (id) => registry.get(searchSessionAtom(id))) })
 }
 
 let chatSave: ReturnType<typeof setTimeout> | undefined
 
-/** Sets a Home tab's draft and destination, and saves them with the tabs once typing pauses. */
-export function setHomeDraft(registry: Registry, tabId: string, draft: HomeDraft): void {
-  registry.set(homeDraftAtom(tabId), draft)
+/** Saves the tabs once changes pause: a Home tab's draft, a Search tab's session. */
+export function saveTabsSoon(registry: Registry): void {
   clearTimeout(chatSave)
   chatSave = setTimeout(() => {
     chatSave = undefined
     saveTabs(registry, registry.get(tabsAtom))
   }, 300)
+}
+
+/** Sets a Home tab's draft and destination, and saves them with the tabs once typing pauses. */
+export function setHomeDraft(registry: Registry, tabId: string, draft: HomeDraft): void {
+  registry.set(homeDraftAtom(tabId), draft)
+  saveTabsSoon(registry)
 }
 
 /** Tabs changed in this run of the app, per workspace. Until the first change, the saved ones show. */
@@ -639,6 +673,8 @@ export interface TabSummary {
   readonly place: Place
   /** A topic's header, or a huddle's channel's Main: undefined until it arrives (and for a page), null for a topic the store does not know. */
   readonly detail: TopicDetail | null | undefined
+  /** A Search tab's title, from its query. */
+  readonly title?: string
 }
 
 const sameStrip = (a: ReadonlyArray<TabSummary>, b: ReadonlyArray<TabSummary>) => a.length === b.length && a.every((tab, i) => tab === b[i])
@@ -654,8 +690,9 @@ export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
     const place = currentPlace(tab)
     const result = place.kind === 'topic' ? get(topicAtom(place.topicId)) : place.kind === 'huddle' ? get(topicAtom(mainTopicOf(place.channelId))) : undefined
     const detail = result !== undefined && AsyncResult.isSuccess(result) ? result.value : undefined
+    const title = place.kind === 'search' ? get(searchTitleAtom(place.sessionId)) : undefined
     const held = previous.get(tab.id)
-    return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail ? held : { id: tab.id, pinned: tab.pinned, place, detail }
+    return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail && held.title === title ? held : { id: tab.id, pinned: tab.pinned, place, detail, ...(title === undefined ? {} : { title }) }
   })
 }).pipe(Atom.withEquality(sameStrip))
 
