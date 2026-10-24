@@ -26,8 +26,9 @@ interface RepliesRange {
 /**
  * Pages of `conversations.replies` forward from `range.oldest` (the root
  * when absent), at most `max` messages. Each page lands with the range it
- * proved (`threadRanges.ts`) in one transaction. Returns what it stored and
- * whether it reached the end of the range.
+ * proved (`threadRanges.ts`) in one transaction, or with `atOnce` all of
+ * them in one after the last. Returns what it stored and whether it reached
+ * the end of the range.
  */
 const pageReplies = (
   ctx: SyncContext,
@@ -36,10 +37,22 @@ const pageReplies = (
   range: RepliesRange,
   max: number,
   lane: FetchLane,
+  atOnce = false,
 ): Effect.Effect<{ readonly messages: ReadonlyArray<Message>; readonly reachedEnd: boolean }, OpenError, OpenServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
     const messages: Array<Message> = []
+    // One page's writes: its range and its messages.
+    const land = (page: { readonly messages: ReadonlyArray<Message>; readonly has_more?: boolean | undefined }, oldest: string | undefined, replies: ReadonlyArray<string>, requestedAt: string, connection: ReturnType<typeof connectionOf>) =>
+      Effect.gen(function* () {
+        // Live only when no drop came between the request and now (`stillConnected`), read as the range is written.
+        const live = range.latest === undefined && page.has_more !== true && stillConnected(ctx, connection)
+        yield* addThreadRange(channel, threadTs, pageRange({ threadTs, oldest, latest: range.latest, replies, hasMore: page.has_more === true, live }))
+        // The thread is re-indexed with the range, also when the page changed no message.
+        yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [threadTopicOf(channel, threadTs)] })
+      })
+    // With `atOnce`, every page lands in one transaction after the last one (`fetchThread`).
+    const writes: Array<ReturnType<typeof land>> = []
     let cursor: string | undefined
     // Where the next page starts: after the last reply of the one before.
     let from = range.oldest
@@ -63,17 +76,13 @@ const pageReplies = (
       // More without a cursor is the end of what can be read, not of the thread: it proves only up to its last reply.
       const more = page.has_more && cursor !== undefined && cursor !== ''
       const replies = page.messages.filter((message) => message.ts !== threadTs).map((message) => message.ts)
-      yield* transaction(
-        Effect.gen(function* () {
-          // Live only when no drop came between the request and now (`stillConnected`), read as the range is written.
-          const live = range.latest === undefined && !page.has_more && stillConnected(ctx, connection)
-          yield* addThreadRange(channel, threadTs, pageRange({ threadTs, oldest: from, latest: range.latest, replies, hasMore: page.has_more, live }))
-          // The thread is re-indexed with the range, also when the page changed no message.
-          yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [threadTopicOf(channel, threadTs)] })
-        }),
-      )
+      const write = land(page, from, replies, requestedAt, connection)
+      if (atOnce) writes.push(write)
+      else yield* transaction(write)
       messages.push(...page.messages)
       from = replies.at(-1) ?? from
+      const done = !more || messages.length >= max
+      if (done && writes.length > 0) yield* transaction(Effect.forEach(writes, (each) => each, { discard: true }))
       if (!more) return { messages, reachedEnd: !page.has_more }
       if (messages.length >= max) return { messages, reachedEnd: false }
       yield* Effect.yieldNow
@@ -111,42 +120,17 @@ const neighbours = (channel: string, threadTs: string, ts: string): Effect.Effec
     return { below: rows[0]?.below ?? undefined, above: rows[0]?.above ?? undefined }
   })
 
-/** Replies a thread's first window shows (`MESSAGE_WINDOW_DEFAULT` in `@juno/contract`). */
-const FIRST_WINDOW = 150
-
-/**
- * Where the first open of a thread no page proves yet starts, when the
- * store holds replies of it beyond one page from the floor: the oldest of
- * the newest `FIRST_WINDOW` replies stored in full, the read pointer, and
- * the start of what a `getView` row vouched for, so the unread replies come
- * first. The window stands in with what the store holds while the fetch is
- * out (`standIn` in the engine), and pages from there prove that stretch
- * first, so it stays as it was shown.
- */
-const firstStart = (channel: string, threadTs: string, floor: string | undefined, root: RootContent | undefined, pointer: string | undefined): Effect.Effect<string | undefined, SqlError, StoreWriter> =>
-  Effect.gen(function* () {
-    if ((root?.reply_count ?? 0) < OPEN_PAGE) return undefined
-    const sql = yield* StoreWriter
-    const rows = yield* sql<{ ts: string }>`
-      SELECT ts FROM (SELECT ts FROM messages WHERE channel = ${channel} AND thread_ts = ${threadTs} AND ts <> ${threadTs} AND deleted = 0 AND partial = 0
-        ORDER BY ts DESC LIMIT ${FIRST_WINDOW}) ORDER BY ts LIMIT 1`
-    // The stand-in shows what a `getView` row vouched for too: start no later than that, so the window keeps it.
-    const views = (yield* threadRanges(channel, threadTs)).filter((range) => range.kind === 'view').map((range) => range.from_ts)
-    const start = [rows[0]?.ts, pointer, ...views].reduce<string | undefined>((a, ts) => (ts === undefined ? a : a === undefined || compareTs(ts, a) < 0 ? ts : a), undefined)
-    return start === undefined || compareTs(start, floor ?? threadTs) <= 0 ? undefined : start
-  })
-
 /**
  * Opening a thread proves it back to its floor: the root when the thread
  * fits one open, else the read pointer, so every unread reply is stored and
  * the "N new" count is exact. The first time (no range): the replies from
- * the floor on, or, when the store already holds more of them than a page
- * from the floor reaches, the replies from where the window stands in with
- * them on, and then those from the floor up to there (`firstStart`). After
- * that: the replies after the newest range, then, when it does not reach
- * back to the floor, the replies from the floor up to it. At most
- * `OPEN_FETCH_MAX` messages in all. A long thread never read has no floor:
- * no budget makes its count exact, and the view fetches as it scrolls.
+ * the floor on, landing in one transaction once the last page is in, so the
+ * window that stands in with what the store holds (`standIn` in the engine)
+ * turns into the proven one in one step and never shows a first page alone. After that: the replies after the newest range, then, when
+ * it does not reach back to the floor, the replies from the floor up to it.
+ * At most `OPEN_FETCH_MAX` messages in all. A long thread never read has no
+ * floor: no budget makes its count exact, and the view fetches as it
+ * scrolls.
  */
 export const fetchThread = (ctx: SyncContext, channel: string, threadTs: string, lane: FetchLane): Effect.Effect<FetchReport, OpenError, OpenServices> =>
   Effect.gen(function* () {
@@ -157,13 +141,13 @@ export const fetchThread = (ctx: SyncContext, channel: string, threadTs: string,
     const long = (before.root?.reply_count ?? 0) > OPEN_FETCH_MAX
     const floor = long ? pointer : threadTs
     const messages: Array<Message> = []
-    // From the newest range's edge, also while its tail is live: the replies that came as events then have a page's proof.
-    const edge = newestRange(before.ranges)?.to_ts ?? (yield* firstStart(channel, threadTs, floor, before.root, pointer))
-    if (edge === undefined) {
-      const first = yield* pageReplies(ctx, channel, threadTs, floor === undefined || floor === threadTs ? {} : { oldest: floor }, OPEN_FETCH_MAX, lane)
+    const newest = newestRange(before.ranges)
+    if (newest === undefined) {
+      const first = yield* pageReplies(ctx, channel, threadTs, floor === undefined || floor === threadTs ? {} : { oldest: floor }, OPEN_FETCH_MAX, lane, true)
       messages.push(...first.messages)
     } else {
-      const tail = yield* pageReplies(ctx, channel, threadTs, { oldest: edge }, OPEN_FETCH_MAX, lane)
+      // From the range's edge, also while its tail is live: the replies that came as events then have a page's proof.
+      const tail = yield* pageReplies(ctx, channel, threadTs, { oldest: newest.to_ts }, OPEN_FETCH_MAX, lane)
       messages.push(...tail.messages)
       const ranges = yield* pageRanges(channel, threadTs)
       const after = newestRange(ranges)
