@@ -45,7 +45,8 @@ const PEOPLE = ['U0MAYA', 'U0LEO', 'U0SAM', 'U0PRIYA', 'U0JONAS', 'U0DEV']
 const FOLLOW_FRAMES = ['thread_subscribed', 'thread_unsubscribed', 'thread_marked']
 /** After a refusal the socket waits out its backoff (capped at 2 s against the fake) before the next attempt. */
 const RECONNECT_MS = 20_000
-const SEED = Number(process.env['JUNO_CONVERGENCE_SEED'] ?? 7)
+/** Three seeds by default; `JUNO_CONVERGENCE_SEED` runs one. */
+const SEEDS = process.env['JUNO_CONVERGENCE_SEED'] === undefined ? [7, 11, 23] : [Number(process.env['JUNO_CONVERGENCE_SEED'])]
 const ROUNDS = Number(process.env['JUNO_CONVERGENCE_ROUNDS'] ?? 80)
 
 interface StoredMessage {
@@ -60,7 +61,7 @@ interface StoredMessage {
 }
 
 describe('convergence', () => {
-  it(`after ${ROUNDS} random events with drops (seed ${SEED}) the store matches the fake and the index matches a rebuild`, async () => {
+  for (const seed of SEEDS) it(`after ${ROUNDS} random events with drops (seed ${seed}) the store matches the fake and the index matches a rebuild`, async () => {
     engine = await startTestEngine({
       initial: (fake) => {
         // Enough followed threads that getView takes three pages.
@@ -74,7 +75,7 @@ describe('convergence', () => {
     await engine.phase('live', 30_000)
     await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
     const { fake } = engine
-    const rand = random(SEED)
+    const rand = random(seed)
     const pick = <T>(list: ReadonlyArray<T>): T => list[Math.floor(rand() * list.length)]!
     const conversations = [...fake.workspace.conversations.values()].filter((c) => c.members.has(fake.selfId)).map((c) => c.id)
     const created: Array<{ channel: string; ts: string }> = []
