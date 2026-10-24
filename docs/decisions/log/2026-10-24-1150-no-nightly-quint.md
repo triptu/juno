@@ -1,1 +1,0 @@
-- 10-24 11:50 · Tushar · Quint never runs on a schedule: `verify:main --nightly` no longer picks a random seed or forces `specs:check`; Quint runs only when its spec inputs change (or with an explicit `SPECS_SEED`). Replaces the 10-24 03:14 nightly varied-seed rule.
