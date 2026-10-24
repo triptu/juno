@@ -9,6 +9,8 @@ test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
+test.beforeEach(async ({ win }) => { await win.clock.install() })
+
 const ENG_MAIN = '#eng'
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
@@ -175,7 +177,7 @@ test.describe('with a model slower than the typing pause', () => {
     await topic.expectTitle('Main')
     // Enter while the model is still answering the pause: no bar, no wait.
     await topic.composer.fill(BILL_REPLY)
-    await juno.win.waitForTimeout(500)
+    await juno.win.clock.fastForward(500)
     await topic.composer.press('Enter')
     await expect(topic.composer).toHaveValue('', { timeout: 500 })
     await topic.expectSent(BILL_REPLY)
@@ -192,7 +194,7 @@ test.describe('with a model slower than the typing pause', () => {
     await juno.tabs.newTabButton.click()
     await juno.write.pickConversation('eng', 'eng')
     await juno.write.write(`${BILL_REPLY} next week`)
-    await juno.win.waitForTimeout(500)
+    await juno.win.clock.fastForward(500)
     await juno.write.send()
     await expect(juno.write.composer).toHaveValue('', { timeout: 500 })
     await expect.poll(() => posts(fake).length).toBe(2)
@@ -212,7 +214,7 @@ test('with AI assist off, local checks still work and models stay off', async ({
   await restarted.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
   await topic.composer.fill('The offer for the new backend hire goes out Friday')
-  await restarted.win.waitForTimeout(800)
+  await restarted.win.clock.fastForward(800)
   await expect(topic.audienceWarning).toHaveCount(0)
   await topic.send(BILL_REPLY)
   await topic.expectSent(BILL_REPLY)
@@ -279,7 +281,7 @@ test('Home sends local mistakes unchanged; the fix line waits on the message in 
   await juno.write.send()
   await expect.poll(() => posts(fake).length).toBe(1)
   expect(posts(fake)[0]!.args['text']).toBe(TYPOS)
-  await juno.win.waitForTimeout(1_200)
+  await juno.win.clock.fastForward(1_200)
   await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectSent(TYPOS)
@@ -307,7 +309,7 @@ test('grammar offers its broken as an inline edit after sending, and asks nothin
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.fill('its broken')
   // Past the typing pause: grammar has not been asked.
-  await juno.win.waitForTimeout(1_000)
+  await juno.win.clock.fastForward(1_000)
   expect(grammarRows(userData, fake.teamId)).toBe(0)
   await juno.topic.composer.press('Enter')
   await juno.topic.expectSent('its broken')
@@ -361,7 +363,7 @@ test('Wrong place and grammar can be turned off without disabling local checks',
   await juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true }).uncheck()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.composer.fill(BILL_REPLY)
-  await juno.win.waitForTimeout(900)
+  await juno.win.clock.fastForward(900)
   await juno.topic.composer.press('Enter')
   await juno.topic.expectSent(BILL_REPLY)
   await juno.topic.send('its broken')

@@ -11,6 +11,8 @@ test.use({ synced: true })
 test.describe.configure({ timeout: 90_000 })
 
 // No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
+test.beforeEach(async ({ win }) => { await win.clock.install() })
+
 const RINA = 'Rina finished the onsite'
 const POSTGRES = 'Draft plan is in the doc'
 const ENG_MAIN = '#eng'
@@ -37,13 +39,13 @@ test('a thread marked unread while open stays unread until you leave it', async 
   await expect.poll(() => lastMark(slack.fake.calls)?.read).toBe('0')
 
   // Staying, losing and regaining focus, and a new reply leave it unread.
-  await win.waitForTimeout(STAY_MS)
+  await win.clock.fastForward(STAY_MS)
   await juno.blurWindow()
   await juno.focusWindow()
   slack.as('Maya').replyIn(RINA, 'Happy to join the close call too.')
   await juno.topic.expectMessage('Happy to join the close call too.')
   await rina.expectUnread(2)
-  await win.waitForTimeout(STAY_MS)
+  await win.clock.fastForward(STAY_MS)
   await rina.expectUnread(2)
   expect(lastMark(slack.fake.calls)?.read).toBe('0')
 
@@ -57,7 +59,7 @@ test('a thread marked unread while open stays unread until you leave it', async 
   await rina.chooseInMenu('mark-unread')
   await rina.expectUnread(1)
   await expect.poll(() => lastMark(slack.fake.calls)?.read).toBe('0')
-  await win.waitForTimeout(STAY_MS)
+  await win.clock.fastForward(STAY_MS)
   await rina.expectUnread(1)
   expect(lastMark(slack.fake.calls)?.read).toBe('0')
 })
@@ -78,7 +80,7 @@ test('a Main marked unread from the palette stays unread until you send in it', 
   await expect.poll(() => lastMark(slack.fake.calls)?.ts).not.toBe(read)
   const unread = lastMark(slack.fake.calls)?.ts ?? ''
   expect(unread < (read ?? '')).toBe(true)
-  await win.waitForTimeout(STAY_MS)
+  await win.clock.fastForward(STAY_MS)
   await eng.expectUnread(1)
   expect(lastMark(slack.fake.calls)?.ts).toBe(unread)
 

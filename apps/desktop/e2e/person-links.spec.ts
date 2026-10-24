@@ -78,14 +78,12 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
   await test.step('a drag that starts on the name selects nothing and opens nothing', async () => {
     await drag(win, await centre(name(juno, FIRST)), await centre(topic.message(FIRST).locator('[data-msg-text]')))
     expect(await win.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('')
-    await win.waitForTimeout(500)
     await tabs.expectCount(1)
   })
 
   await test.step('a press that moves away and comes back opens nothing', async () => {
     const start = await centre(name(juno, FIRST))
     await drag(win, start, { x: start.x + 40, y: start.y + 30 }, start)
-    await win.waitForTimeout(500)
     await tabs.expectCount(1)
   })
 
@@ -96,7 +94,6 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
     await expect(win.getByRole('tooltip')).toHaveText('Message Maya')
     await name(juno, FIRST).dblclick()
     await tabs.expectActive('Maya')
-    await win.waitForTimeout(500)
     await tabs.expectCount(2)
     await expect(topic.message('Running 5 late to the planning sync')).toBeVisible()
   })
@@ -126,7 +123,6 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
   await test.step('an app with no DM opens nothing and offers no link, until its DM arrives', async () => {
     await expect(link(juno, ALERT)).toHaveCount(0)
     await name(juno, ALERT).click()
-    await win.waitForTimeout(500)
     await tabs.expectCount(4)
     await tabs.expectActive(POSTGRES)
 

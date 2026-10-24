@@ -11,6 +11,8 @@ test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
+test.beforeEach(async ({ win }) => { await win.clock.install() })
+
 const CONFIRMED = 'Confirmed, p95 back to 210ms.'
 
 test('hovering a reaction chip shows who reacted, and a click still toggles it', async ({ juno }) => {
@@ -33,7 +35,7 @@ test('hovering a reaction chip shows who reacted, and a click still toggles it',
 
   // Into the card: it stays.
   await card.hover()
-  await juno.win.waitForTimeout(400)
+  await juno.win.clock.fastForward(400)
   await expect(card).toBeVisible()
 
   // Back on the chip, a click toggles your reaction off and hides the card.

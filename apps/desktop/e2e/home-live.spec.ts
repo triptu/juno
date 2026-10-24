@@ -71,7 +71,6 @@ test('a new item shows while Home is on screen, and waits while the pointer is o
   await home.item('waiting').hover()
   slack.as('Sam').dm('Can you send me the offsite agenda?')
   await sidebar.row('Sam', { exact: true }).expectPreview(/offsite agenda/)
-  await home.win.waitForTimeout(1_000)
   await expect(home.meta('waiting')).toHaveText(/^Maya · /)
 
   // The pointer leaves: it shows in one step.

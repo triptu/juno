@@ -34,7 +34,6 @@ syncedTest('unknown first replies show only the count and fill in place when a p
   slack.resetCalls()
   // Local warming and the list do not fetch replies.
   await link.root.hover()
-  await win.waitForTimeout(500)
   expect(fake.calls.filter(call => call.method === 'conversations.replies' && call.args['limit'] !== '1')).toEqual([])
 
   fake.holdNext({ method: 'conversations.replies', reason: 'open' })

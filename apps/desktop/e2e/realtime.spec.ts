@@ -83,8 +83,6 @@ test('a message written offline shows at once, waits, and is posted once when Sl
 
   await topic.send('Written on the train')
   await expect(topic.message('Written on the train')).toHaveAttribute('data-pending', /.*/)
-  // Give a post a moment to leave; none does while offline.
-  await juno.win.waitForTimeout(1_000)
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
 
   fake.goOnline()

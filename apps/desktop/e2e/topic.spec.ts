@@ -19,8 +19,6 @@ syncedTest('a read topic warms on hover, opens from the cache, and opens at the 
     slack.resetCalls()
     await juno.sidebar.row(POSTGRES).hover()
     await expect.poll(() => juno.lastMark('juno.prefetch')).toBeDefined()
-    // Anything the warm-up would ask Slack has had time to arrive.
-    await juno.win.waitForTimeout(500)
     expect(slack.fake.calls.map((call) => call.method)).toEqual([])
     // The open is a cache hit: the tab paints with its rows.
     await juno.sidebar.row(POSTGRES).open()

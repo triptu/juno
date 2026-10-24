@@ -26,12 +26,10 @@ test('a DM huddle shows both people and counts up while huddles/info lags the ro
   fake.control('joinHuddle', { channel: 'D0MAYA', user: 'U0MAYA' })
   await addRemote(win, 'U0MAYA')
   // Mount the tab between the bar's ticks: independently mounted clocks used to disagree.
-  await win.waitForTimeout(450)
+  await expect(bar).toContainText(/0:0[1-4]/)
   await bar.getByRole('button', { name: 'Open huddle in Maya' }).click()
   await juno.tabs.expectActive('Maya · Huddle')
 
-  // Long enough for every read the frames called for to answer.
-  await win.waitForTimeout(5_000)
   const tiles = win.getByRole('list', { name: 'People in the huddle' }).getByRole('listitem')
   await expect(tiles).toHaveCount(2)
   await expect(tiles.nth(0)).toHaveAccessibleName('You')
@@ -40,7 +38,7 @@ test('a DM huddle shows both people and counts up while huddles/info lags the ro
   await expect(page).not.toContainText("You're the only one here")
   await expect(win.locator('[data-huddle-bar] button [role="img"]')).toHaveAccessibleName('Maya')
   // The huddle has run for more than five seconds, and the line counts on.
-  await expect(bar).toContainText(/0:(0[5-9]|[1-5]\d)/)
+  await expect(bar).toContainText(/0:(0[5-9]|[1-5]\d)/, { timeout: 10_000 })
   await expect(bar).not.toContainText('0:00')
   await expect(row.root.locator('[data-huddle-indicator]')).toBeVisible()
   const durations = await win.evaluate(async () => {

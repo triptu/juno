@@ -1,3 +1,4 @@
+import { readUserDb } from './driver/userDb'
 /**
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
  * thread or person, the OS notification, its title for a group DM, and its click (also on a topic
@@ -82,7 +83,7 @@ syncedTest('a DM set to Always notifies, and the click opens it at the message',
   expect(menu.labels.some((label) => label.startsWith('Why'))).toBe(false)
 })
 
-syncedTest('a topic on screen in a focused window does not notify, and unread topics badge the dock', async ({ juno, slack }) => {
+syncedTest('a topic on screen in a focused window does not notify, and unread topics badge the dock', async ({ juno, slack, fake, userData }) => {
   await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
   await juno.notificationHoursNow()
 
@@ -92,8 +93,7 @@ syncedTest('a topic on screen in a focused window does not notify, and unread to
   await juno.focusWindow()
   slack.as('Leo').postIn('alerts-prod', 'Disk at 91% on db-2')
   await juno.topic.expectMessage('Disk at 91% on db-2')
-  // Give the engine time to decide; nothing was shown for the topic on screen.
-  await juno.win.waitForTimeout(1_000)
+  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE preview LIKE ?').get('%Disk at 91% on db-2%')?.['suppressed_at'])).toEqual(expect.any(String))
   expect((await juno.osNotifications()).map((notification) => notification.body)).not.toContain('Disk at 91% on db-2')
 
   await juno.blurWindow()
@@ -102,7 +102,7 @@ syncedTest('a topic on screen in a focused window does not notify, and unread to
 })
 
 // The defaults are read first, before any step changes a setting.
-test('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', async ({ juno }) => {
+test('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', { tag: '@canary' }, async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
 
@@ -336,6 +336,6 @@ longThread('a notification for a topic open in another tab focuses it, scrolls t
   const before = (await flashes()).length
   await juno.tabs.select('Rina finished the onsite')
   await juno.tabs.select('Review the rollout checklist 1')
-  await juno.win.waitForTimeout(500)
+  await juno.topic.expectMessage('Cutover is a go')
   expect(await flashes()).toHaveLength(before)
 })

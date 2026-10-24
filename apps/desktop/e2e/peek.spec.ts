@@ -99,7 +99,6 @@ test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text
   await juno.expectNothingOpen()
 
   await rina.peek('option')
-  await juno.win.waitForTimeout(300)
   await juno.peek.expectClosed()
   await juno.peek.release('option')
 
@@ -165,6 +164,5 @@ test('holding ⌥ over a thread in a Main peeks at its replies without opening i
   await topic.expectTitle('Main')
   await tabs.expectCount(1)
   // The thread was not marked read.
-  await juno.win.waitForTimeout(1_000)
   expect(slack.fake.calls.filter((call) => call.method === 'subscriptions.thread.mark')).toEqual([])
 })

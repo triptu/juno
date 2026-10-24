@@ -36,7 +36,7 @@ function replyIn(fake: { injectMessage: (input: { channel: string; threadTs: str
 /** The pointer away from the list, at its top, with the motion loaded: it loads when the browser is idle after the first rows, within 2 s. */
 async function atTheTop(juno: Juno, win: Page): Promise<void> {
   await juno.sidebar.leave()
-  await win.waitForTimeout(2_500)
+  await expect.poll(() => win.evaluate(() => performance.getEntriesByType('resource').some((entry) => /\/sidebarMoves-[^/]+\.js$/.test(new URL(entry.name).pathname)))).toBe(true)
   await expect.poll(() => juno.sidebar.list.evaluate((list) => list.scrollTop)).toBe(0)
 }
 

@@ -156,8 +156,7 @@ syncedTest('⌘W held down closes a tab per press, even when the tabs it lands o
   // Three presses in one go, as the key repeats.
   await restarted.surface.appMenu('close-tab', 3)
   await restarted.tabs.expectCount(topics.length - 3)
-  await restarted.win.waitForTimeout(500)
-  await restarted.tabs.expectCount(topics.length - 3)
+  await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs.length).toBe(topics.length - 3)
   expect(await restarted.tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
 })
 

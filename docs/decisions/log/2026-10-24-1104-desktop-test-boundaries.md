@@ -1,0 +1,1 @@
+- 10-24 11:04 · Keep native desktop checks and eight canaries in Electron · Established agent flows start from synced workspace copies. Keep three process crash points in Electron and the full crash matrix in package tests; remove duplicate provider and hello cases. Browser and Electron write separate timing reports and opt-in coverage partials.

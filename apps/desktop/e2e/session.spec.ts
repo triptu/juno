@@ -28,6 +28,7 @@ test('signed out at launch, then imports and verifies the Slack app’s session'
 
     // The engine verified the session with the captured token and cookie...
     expect(fake.callCount('auth.test')).toBe(1)
+    expect(await juno.slackKeychainReads()).toBe(1)
     expect(fake.calls.find((call) => call.method === 'auth.test')?.ok).toBe(true)
     // ...and holds a socket open through main's cookie handshake.
     await expect.poll(() => fake.socketCount(), { timeout: 10_000 }).toBe(1)
@@ -122,7 +123,7 @@ test('a relaunch opens on the shell and never paints the sign-in page while Slac
     await expect.poll(() => fake.heldCount({ method: 'auth.test' }), { timeout: 15_000 }).toBe(1)
     // The shell and the cached rows, from before Slack has answered.
     await restarted.sidebar.row('Draft plan is in the doc').expectVisible()
-    await again.win.waitForTimeout(500)
+    await expect.poll(() => again.win.evaluate(() => (window as unknown as { __signInFrames: SignInFrames }).__signInFrames.frames)).toBeGreaterThan(10)
     fake.release({ method: 'auth.test' })
     await restarted.expectSignedIn('Juno Fake')
     const frames = await stop()
@@ -207,19 +208,6 @@ test('signing out, and Slack expiring the session, both return to the sign-in pa
     await juno.signIn()
     await juno.expectSignedIn('Juno Fake')
   })
-})
-
-test('imports the Slack app’s session through the test seam', async ({ juno, fake, slackApp }) => {
-  await juno.expectSignedOut()
-  await juno.importFromSlackApp()
-  await juno.expectSignedIn('Juno Fake')
-  // One keychain read, which is one macOS prompt outside tests.
-  expect(await juno.slackKeychainReads()).toBe(1)
-  // The imported token and decrypted cookie are the fixture's, and they work.
-  const authTest = fake.calls.find((call) => call.method === 'auth.test')
-  expect(authTest?.ok).toBe(true)
-  await expect.poll(() => fake.socketCount(), { timeout: 10_000 }).toBe(1)
-  expect(slackApp.credentials.userId).toBe(fake.selfId)
 })
 
 test('explains a Mac without Slack', async ({ fake, userData }) => {

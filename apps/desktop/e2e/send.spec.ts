@@ -36,7 +36,7 @@ function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray
   }
 }
 
-test('a reply in a thread shows at once and settles in place, posted once', async ({ juno, fake }) => {
+test('a reply in a thread shows at once and settles in place, posted once', { tag: '@canary' }, async ({ juno, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -83,9 +83,11 @@ test('a message in Main settles when the echo comes before the answer', async ({
   await topic.send('Lunch order goes in at noon')
   await topic.expectSent('Lunch order goes in at noon')
   fake.release()
-  await juno.win.waitForTimeout(500)
+  // The same channel's next send waits for the first HTTP answer to finish.
+  await topic.send('Then book a table for six')
+  await topic.expectSent('Then book a table for six')
   await topic.expectSent('Lunch order goes in at noon')
-  expect(fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['C0ENG'])
+  expect(fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['C0ENG', 'C0ENG'])
 })
 
 test('a refused send stays in the row with Retry and Delete draft', async ({ juno, fake }) => {
