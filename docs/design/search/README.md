@@ -72,7 +72,7 @@ In both modes the reader's "2 of N" counts matches in the whole thread as Juno h
 - Typing `from:` or `in:` opens a picker, searched as ⌘K's Conversations tab is. The pick becomes a chip in the field. Clicking a chip edits it; Backspace at its edge removes it. Dates offer Today, Yesterday, This week, Last week, This month and a date.
 - Under the field, a quiet row of filter buttons for the mouse: **From**, **In**, **Date**, **Has**, then the sort, and at the end the **Apps hidden** and **Automated hidden** toggles (see 6).
 - Local filters must agree with Slack's: `has:link` checks attachment URLs too. `has:pin` means Slack-pinned messages and is Slack-only in stage A: Juno has no Slack message-pin cache, so this query returns no local rows and reports `needsSlack`. Offline it shows the offline state. Juno's sidebar topic pins are different; the v2 `is:pinned` filter will cover them.
-- **Juno turns off Slack's own query rewriting** (`query_rewrite_disabled`). Slack quietly reads plain words as filters by default ("from me last week" became a person and a date and changed 163 matches to 805). Juno shows that reading as a suggestion you accept instead (section 7), so what you see in the field is what was searched.
+- **Juno turns off Slack's own query rewriting** (`query_rewrite_disabled`). Slack quietly reads plain words as filters by default ("from me last week" became a person and a date and changed 163 matches to 805). What you see in the field is what was searched. Ask Juno to turn a question into a search (section 7).
 - **The From and In menus show counts.** Slack's answer carries `filter_suggestions` with the top people and conversations and their match counts, even with rewriting off. The menus list them first ("Maya Chen 34"), so narrowing is one click.
 
 ### 5. Instant first, then complete, without rows jumping
@@ -91,17 +91,13 @@ In both modes the reader's "2 of N" counts matches in the whole thread as Juno h
 - When a search finds nothing but hidden rows would match, the empty state says so: "4 matches, all from apps and automated channels." with **Show 4 matches**.
 - An `in:` chip naming an automated channel searches it whatever the toggle says.
 
-### 7. AI, quietly
+### 7. Ask Juno
 
-Each of these never delays a result, never applies itself, and is gone when AI assist is off.
+There are no separate AI search features: no words-to-filters suggestion, no Answer from results, no Summarize. Ask Juno instead: “What did Maya say about the vendor contract last month?”, “Find the thread where we moved the cutover” or “Show alerts from #ops yesterday, including bots.” Juno writes the query and filters itself and runs this tab's search: the same parser, names, local index and Slack history, newest first. It includes apps and automated conversations when the question needs them, can search oldest first and asks for more pages. Its answer cites the messages it found, and a citation opens the message in its topic. If Slack search fails, Juno says it searched only this Mac. Juno cannot open this tab from the chat; its citations open topics.
 
-- **Words to filters.** "maya's messages about the vendor contract last week" searches the plain words at once. After a pause, the suggestion appears inside the field at its right end: "from: Maya Chen · Last week · vendor contract", with Tab to apply. It sits in the field so its arrival moves nothing below; when the text is too long to leave room, it is left out. It uses the existing command parse task (decision tier, cached by text), and only runs when the text names a person, a channel or a time.
-- **Answer from results.** When the query reads like a question ("when did we move the cutover?"), the empty reader shows one button, **Answer from results**. The answer appears in the reader, at most a few sentences, each claim followed by a small number; the cited rows carry the same number, and a number selects its row. It reads the matched threads, not just snippets, and says "No answer in these results" rather than guess. It never appears on its own.
-- **Summarize** in the reader header for long threads (over about 20 messages), on request, with citations.
-- **Matching AI titles** (section 3) is the quietest AI of all: it is already there.
-- **v2: Try other words.** When a search finds little, offer up to 3 other queries you can pick ("vendor contract" → "MSA renewal"). Only the one you pick runs.
+**Matching AI titles** (section 3) stays: Juno's existing titles match alongside message text, without another model call.
 
-Rejected: an answer card above the results, AI reranking, an AI "top hit", merging similar results with a model, auto-summaries on selection, confidence scores, badges for saved searches.
+Rejected: an answer card above the results, AI reranking, an AI top hit, merging similar results with a model, auto-summaries on selection, confidence scores, badges for saved searches.
 
 ### 8. Empty field
 
@@ -119,9 +115,9 @@ v1, in order:
 4. Done (10-24): merge with the completeness line, paging, highlighting, the four states, the Apps and Automated toggles.
 5. Done (10-24): flat rows and Group by thread, Main rows, title matches, stepping between matches.
 6. Done (10-24): recent searches; privacy mode.
-7. Words to filters; Answer from results; Summarize.
+7. Done (10-24): Juno answers search questions with this tab's search and cites the messages (section 7).
 
-v2: Best match, Juno-only filters, Try other words, Files, and a semantic index only if we see many searches that find nothing.
+v2: Best match, Juno-only filters, Files, and a semantic index only if we see many searches that find nothing.
 
 Tests: end-to-end flows against the fake Slack (which needs the extra operators, paging and `search_exclude_bots`), a perf spec for keystroke-to-results and arrow-to-reader, and unit tests only for the parser and compilers.
 
