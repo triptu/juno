@@ -147,6 +147,8 @@ syncedTest('the viewer covers only its tab, and each tab keeps its own picture o
   await topic.expectTitle('Main')
   fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Rack photos', media: [{ name: 'rack-front.png', width: 900, height: 600 }, { name: 'rack-back.png', width: 900, height: 600 }] })
   await topic.message('Rack photos').getByRole('button', { name: 'Open rack-front.png' }).click()
+  // The new message moves #eng to the top. Wait for that move before aiming at #product.
+  await sidebar.expectTop(ENG_MAIN)
   const viewer = win.getByRole('dialog')
   await expect(viewer.locator('[data-viewer-item]')).toHaveAttribute('data-viewer-item', '1')
   await win.keyboard.press('ArrowRight')
