@@ -1,9 +1,10 @@
 import { Effect, Fiber, Layer, ManagedRuntime, Stream } from 'effect'
-import { AiProvider, PiAiProvider, tasks } from '@juno/ai'
+import { AiProvider, tasks, type PiModels } from '@juno/ai'
 import type { HostSpendAsk } from '@juno/agent-contract'
 import type { TopicId } from '@juno/domain'
-import { expect, it, vi } from 'bun:test'
-import { AiProviderLive } from '../src/ai'
+import { expect, it } from 'bun:test'
+import { fakeProvider, reply } from '@juno/agent-testing'
+import { aiProviderLive } from '../src/ai'
 import { AiCredentials } from '../src/aiCredentials'
 import { AiBackground, AiSpend } from '../src/aiSpend'
 import { AiAudit } from '../src/aiAudit'
@@ -17,9 +18,9 @@ import { waitFor } from './harness'
 const input = { topicId: 't:C:test' as TopicId, channel: 'eng', messages: [{ sender: 'Sam', text: 'Postgres migration', at: new Date(0).toISOString() }] }
 const generate = AiProvider.use(p => p.generate(tasks.titleTopic, input))
 
-function engineAi(config: Config) {
+function engineAi(config: Config, models?: PiModels) {
   const host = memoryHost()
-  const runtime = ManagedRuntime.make(AiProviderLive.pipe(
+  const runtime = ManagedRuntime.make(aiProviderLive(models).pipe(
     Layer.provideMerge(AiCredentials.layer),
     Layer.provideMerge(AiSpend.layer),
     Layer.provideMerge(AiAudit.layer),
@@ -92,20 +93,28 @@ it('makes no call outside the daily cap: blocked by the ledger, or with no agent
 })
 
 it('reads the latest key for every live provider call and reserves before it', async () => {
-  const provider = vi.spyOn(PiAiProvider, 'layer').mockImplementation(config => Layer.succeed(AiProvider, {
-    decide: () => Effect.die('unused'),
-    generate: () => config.pipe(Effect.map(value => ({ _tag: 'Decided' as const, value: value.apiKey === 'fake-first-key' && value.admit !== undefined ? 'First provider' : 'Second provider', meta: { model: 'scripted', latencyMillis: 0, attempts: 1 } }))),
-  }))
-  const { runtime, setKey } = engineAi({ userData: '', e2e: true, dev: false, ai: 'live' })
+  const provider = fakeProvider({ compactionModels: [] })
+  provider.script([reply('First provider'), reply('Second provider')])
+  const { runtime, setKey, ledger } = engineAi({ userData: '', e2e: true, dev: false, ai: 'live' }, provider.models)
   try {
     expect(await runtime.runPromise(generate)).toMatchObject({ reason: 'missing-key' })
     await setKey('fake-first-key')
-    expect(await runtime.runPromise(generate)).toMatchObject({ value: 'First provider' })
-    await setKey('fake-next-key')
-    expect(await runtime.runPromise(generate)).toMatchObject({ value: 'Second provider' })
+    // With no agent to reserve the cost, the real provider must send nothing.
+    expect(await runtime.runPromise(generate)).toMatchObject({ reason: 'budget' })
+    expect(provider.requests).toHaveLength(0)
+    const agent = ledger(() => 'reserved')
+    try {
+      expect(await runtime.runPromise(generate)).toMatchObject({ value: 'First provider' })
+      await setKey('fake-next-key')
+      expect(await runtime.runPromise(generate)).toMatchObject({ value: 'Second provider' })
+      expect(provider.requests.map(request => request.options?.apiKey)).toEqual(['fake-first-key', 'fake-next-key'])
+      expect(agent.answered.filter(ask => ask._tag === 'reserve')).toHaveLength(2)
+      await waitFor(() => agent.answered.filter(ask => ask._tag === 'settle').length === 2 || undefined)
+    } finally {
+      await agent.stop()
+    }
   } finally {
     await runtime.dispose()
-    provider.mockRestore()
   }
 })
 
