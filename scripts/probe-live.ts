@@ -32,6 +32,13 @@
  * on which hosts), and GETs one photo built from `avatar_hash` for a user
  * with a custom photo and one without, with and without the cookie.
  *
+ * `--only external` answers why Slack Connect people show as "Someone":
+ * `client.userBoot` and `client.counts` pick the six most recently active
+ * shared member channels, one history page each (with `user_profile`), then
+ * the senders and joiners go through the edge `users/info` as the sync asks,
+ * and the ones not returned are asked again after 20 s, with `updated_ids`,
+ * and through the Web API `users.info`. Counts and key names only.
+ *
  * `--only usergroups` reads `client.userBoot`, `usergroups.list` and
  * recent history pages, and prints how user groups are listed and how a
  * group mention is spelled in `text` and in rich text blocks.
@@ -88,6 +95,7 @@ const READ_ONLY_METHODS = [
   'users.list',
   'usergroups.list',
   'reactions.get',
+  'users.info',
 ] as const
 /** Edge methods `--only users` and `--only emoji` may call, all reads. */
 const READ_ONLY_EDGE = ['users/info', 'users/list', 'emojis/list'] as const
@@ -254,7 +262,7 @@ async function main(): Promise<number> {
     console.log(JSON.stringify(await usergroupsOnly(call), null, 2))
     return writeShapes(out)
   }
-  if (flag('--only') === 'users' || flag('--only') === 'emoji') {
+  if (flag('--only') === 'users' || flag('--only') === 'emoji' || flag('--only') === 'external') {
     const edge = async (method: (typeof READ_ONLY_EDGE)[number], base: string, body: Json, purpose: string): Promise<Json | undefined> => {
       if (!(READ_ONLY_EDGE as ReadonlyArray<string>).includes(method)) throw new Error(`refusing edge ${method}`)
       const wait = lastStart + SPACING_MILLIS - Date.now()
@@ -278,7 +286,8 @@ async function main(): Promise<number> {
       if (json !== undefined && !shapes.has(`edge.${method.replace('/', '.')}.${purpose}`)) shapes.set(`edge.${method.replace('/', '.')}.${purpose}`, redact(json))
       return json
     }
-    console.log(JSON.stringify(flag('--only') === 'emoji' ? await emojiOnly(call, edge) : await usersOnly(call, edge, session.teamId, cookie), null, 2))
+    const only = flag('--only')
+    console.log(JSON.stringify(only === 'emoji' ? await emojiOnly(call, edge) : only === 'external' ? await externalOnly(call, edge, session.teamId) : await usersOnly(call, edge, session.teamId, cookie), null, 2))
     return writeShapes(out)
   }
 
@@ -541,6 +550,112 @@ async function usersOnly(call: Call, edge: Edge, teamId: string, cookie: string)
       photos,
     },
   }
+}
+
+type Role = 'sender' | 'joiner'
+type EdgeAnswer = { readonly where: ReadonlyMap<string, string>; readonly users: ReadonlyArray<Json> }
+
+/** `--only external`: what the edge says about the people of Slack Connect channels. Counts and key names only. */
+async function externalOnly(call: Call, edge: Edge, teamId: string): Promise<unknown> {
+  const people = await sharedChannelPeople(call, teamId)
+  const flannel = await call('api.getFlannelHttpUrl', { include_external_workspaces: true }, 'external')
+  const base = String(flannel?.['url'] ?? '').replace(/\/+$/, '')
+  const ask = async (body: Json, purpose: string): Promise<EdgeAnswer> => {
+    const answer = await edge('users/info', base, body, purpose)
+    const results = answer?.['results']
+    const users = Array.isArray(results) ? (results as Array<Json>) : results !== null && typeof results === 'object' ? Object.values(results as Record<string, Json>) : []
+    const where = new Map(users.map((user) => [String(user['id']), 'results']))
+    for (const key of ['failed_ids', 'pending_ids', 'invalid_ids', 'disconnected_ids']) for (const id of (answer?.[key] as Array<string> | undefined) ?? []) where.set(id, key)
+    return { where, users }
+  }
+  const all = [...people.roles.keys()].filter((id) => /^[UW][A-Z0-9]+$/.test(id))
+  const landing = new Map<string, string>()
+  const results: Array<Json> = []
+  for (let i = 0; i < all.length && base !== ''; i += 100) {
+    const answer = await ask({ ids: all.slice(i, i + 100) }, 'external')
+    for (const [id, list] of answer.where) landing.set(id, list)
+    results.push(...answer.users)
+  }
+  const byRole = (where: ReadonlyMap<string, string>, subset: ReadonlyArray<string>) => countBy(subset, (id) => `${people.roles.get(id)} -> ${where.get(id) ?? 'absent'}`)
+  const notReturned = all.filter((id) => landing.get(id) !== 'results').slice(0, 100)
+  const team = (user: Json | undefined) => `otherTeam:${user?.['team_id'] !== teamId} stranger:${user?.['is_stranger'] === true} deleted:${user?.['deleted'] === true} bot:${user?.['is_bot'] === true}`
+  return {
+    calls: summariseCalls(),
+    ...people.census,
+    ids: { all: all.length, byRole: countBy(all, (id) => people.roles.get(id)!), idPrefix: countBy(all, (id) => id[0]!) },
+    usersInfo: byRole(landing, all),
+    usersInfoByTeam: countBy(results, team),
+    resultsKeys: keyCensus(results),
+    notReturned: notReturned.length,
+    again: notReturned.length === 0 || base === '' ? {} : await askAgain(call, ask, byRole, notReturned, team),
+  }
+}
+
+/** The senders and joiners of the most recently active shared channels, and a census of their messages. */
+async function sharedChannelPeople(call: Call, teamId: string) {
+  const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'external')
+  const counts = await call('client.counts', { thread_counts_by_channel: true }, 'external')
+  const channels = (boot?.['channels'] as Array<Json> | undefined) ?? []
+  const latest = new Map(((counts?.['channels'] as Array<{ id: string; latest?: string }> | undefined) ?? []).map((e) => [e.id, e.latest]))
+  const shared = channels
+    .filter((c) => (c['is_ext_shared'] === true || c['is_shared'] === true) && latest.get(String(c['id'])) !== undefined)
+    .toSorted((a, b) => tsSeconds(latest.get(String(b['id']))!) - tsSeconds(latest.get(String(a['id']))!))
+    .slice(0, Number(flag('--channels') ?? 6))
+  const roles = new Map<string, Role>()
+  const messages: Array<Msg> = []
+  for (const channel of shared) {
+    const page = await call('conversations.history', { channel: String(channel['id']), limit: 100, ignore_replies: true }, 'external')
+    messages.push(...((page?.['messages'] as Array<Msg> | undefined) ?? []))
+  }
+  for (const m of messages) {
+    if (typeof m['user'] !== 'string') continue
+    if (m.subtype !== 'channel_join') roles.set(m['user'], 'sender')
+    else if (!roles.has(m['user'])) roles.set(m['user'], 'joiner')
+  }
+  const fromOtherTeam = (m: Msg) => m['user_team'] !== undefined && m['user_team'] !== teamId
+  return {
+    roles,
+    census: {
+      channelFlags: countBy(channels, (c) => `ext:${c['is_ext_shared'] === true} shared:${c['is_shared'] === true} org:${c['is_org_shared'] === true} pendingExt:${c['is_pending_ext_shared'] === true}`),
+      sharedChannelsRead: shared.length,
+      messages: messages.length,
+      joins: messages.filter((m) => m.subtype === 'channel_join').length,
+      teamFields: countBy(messages, (m) => ['team', 'user_team', 'source_team'].filter((key) => key in m).join('+') || 'none'),
+      userProfile: countBy(messages, (m) => `fromOtherTeam:${fromOtherTeam(m)} join:${m.subtype === 'channel_join'} profile:${m['user_profile'] !== undefined}`),
+      userProfileKeys: keyCensus(messages.flatMap((m) => (m['user_profile'] === undefined ? [] : [m['user_profile']]))),
+    },
+  }
+}
+
+/** The ids the edge did not return, asked again: later, with `updated_ids`, as Slack's client asks, and through the Web API. */
+async function askAgain(
+  call: Call,
+  ask: (body: Json, purpose: string) => Promise<EdgeAnswer>,
+  byRole: (where: ReadonlyMap<string, string>, subset: ReadonlyArray<string>) => Record<string, number>,
+  ids: ReadonlyArray<string>,
+  team: (user: Json | undefined) => string,
+): Promise<unknown> {
+  await sleep(20_000)
+  const after20s = byRole((await ask({ ids }, 'external-again')).where, ids)
+  const updatedIds = byRole((await ask({ updated_ids: Object.fromEntries(ids.map((id) => [id, 0])) }, 'external-updated')).where, ids)
+  // As Slack's client fetches missing members: profile-only users included, pending ids asked again.
+  const profileOnly: Array<unknown> = []
+  let pending = [...ids]
+  for (const wait of [0, 500, 1_000, 1_500, 5_000, 15_000]) {
+    if (pending.length === 0) break
+    await sleep(wait)
+    const { where } = await ask({ ids: pending, include_profile_only_users: true, check_interaction: true }, 'external-profile-only')
+    profileOnly.push({ waitedMillis: wait, ...byRole(where, pending) })
+    pending = pending.filter((id) => where.get(id) === 'pending_ids')
+  }
+  const web = new Map<string, string>()
+  for (const id of ids.slice(0, 10)) {
+    const answer = await call('users.info', { user: id }, 'external')
+    const user = answer?.['user'] as Json | undefined
+    const named = String((user?.['profile'] as Json | undefined)?.['real_name'] ?? '').trim() !== ''
+    web.set(id, answer === undefined ? 'error' : `${named ? 'named' : 'unnamed'} ${team(user)}`)
+  }
+  return { after20s, updatedIds, profileOnly, webUsersInfo: byRole(web, ids.slice(0, 10)), webErrors: countBy(calls.filter((c) => c.method === 'users.info' && !c.ok), (c) => c.error ?? 'none') }
 }
 
 /** `--only links`: how Slack's own clients encode links in `blocks` and `text`. Counts only. */
