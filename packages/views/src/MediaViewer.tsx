@@ -88,6 +88,7 @@ export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownl
 
   const go = (next: number) => {
     const shown = Math.min(Math.max(0, next), items.length - 1)
+    if (shown !== index && root.current?.querySelector('[data-viewer-item]')?.contains(document.activeElement)) root.current.focus()
     setIndex(shown)
     onShowItem?.(shown)
   }
@@ -166,9 +167,8 @@ function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count:
 }
 
 /**
- * Focus on Close when the viewer first opens, and back on `opener` after a
- * close. A hidden tab runs the cleanup and then the effect again when it
- * shows, so neither moves focus then. Returns the viewer's root and its close.
+ * Focus Close on opening and restore `opener` on closing. Hiding or showing
+ * the tab also runs this effect, but must not move focus.
  */
 function useViewerFocus(opener: Element | null | undefined, onClose: () => void): { readonly root: RefObject<HTMLDivElement | null>; readonly close: () => void } {
   const root = useRef<HTMLDivElement>(null)

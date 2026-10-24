@@ -5,6 +5,11 @@
  * Every other file runs only in the electron project.
  */
 export const BROWSER_SPECS: ReadonlyArray<string> = [
+  'app.spec.ts',
+  'file-viewer.spec.ts',
+  'image-menu.spec.ts',
+  'privacy.spec.ts',
+  'session.spec.ts',
   'browser-isolation.spec.ts',
   'juno-agent/backup.spec.ts',
   'juno-agent/transfer.spec.ts',

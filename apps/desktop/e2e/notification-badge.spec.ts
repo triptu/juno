@@ -23,7 +23,7 @@ const badgeTest = test.extend({
   },
 })
 
-badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake and engine restart', { tag: '@electron' }, async ({ juno, slack, fake }) => {
+badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake, engine restart and permanent failure', { tag: '@electron' }, async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.notificationHoursNow()
@@ -60,6 +60,10 @@ badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wa
   await hooks(juno.app, 'wake')
   await badge('•')
   await juno.sidebar.row('Maya, Leo', { exact: true }).chooseInMenu('mark-read')
+  await badge('')
+  slack.as('Maya').dm('Unread when the engine stops')
+  await badge('•')
+  await hooks(juno.app, 'failEngine')
   await badge('')
 })
 
@@ -109,14 +113,6 @@ badgeTest('badge regression: no permission prompt during onboarding', async ({ j
   expect(await juno.surface.system('notificationRequests')).toBe(0)
   await juno.skipSetUp()
   await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
-})
-
-badgeTest('badge regression: an engine that gives up clears the dot', { tag: '@electron' }, async ({ juno, app }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-  await hooks(app, 'failEngine')
-  await expect.poll(() => juno.dockBadge()).toBe('')
 })
 
 badgeTest('a denied request is remembered across a full app restart', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {

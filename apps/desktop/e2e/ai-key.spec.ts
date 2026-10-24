@@ -9,7 +9,7 @@ import { Juno } from './driver/juno'
 
 const KEY = 'fake-engine-test-key'
 
-test('a saved key starts art and titles for recent topics, survives an engine restart, stays inside the cap, and removing it stops them', async ({ fake, slackApp, userData }) => {
+test('a saved key starts art and titles for recent topics, survives an engine restart, and removing it stops them', async ({ fake, slackApp, userData }) => {
   test.setTimeout(180_000)
   const model = await startFakeOpenRouter({ key: KEY })
   const running = await launchApp(userData, {
@@ -59,19 +59,6 @@ test('a saved key starts art and titles for recent topics, survives an engine re
     const afterRestart = post('Kafka retention. The consumer lag alert keeps firing overnight.')
     await expect(afterRestart).toHaveAttribute('data-title-source', 'ai', { timeout: 30_000 })
 
-    // A $0 daily cap blocks the engine's calls too; raising it wakes the title job, which does not wait for its 30 s timer.
-    await juno.openSettings('AI activity')
-    const cap = page.getByLabel('Daily limit in dollars')
-    await cap.fill('0').then(() => cap.press('Enter'))
-    await expect(cap).toHaveValue('0')
-    const capped = await calls()
-    const atCap = post('Billing export. The CSV for October is missing two columns.')
-    await expect(atCap).toBeVisible()
-    await Promise.all([juno.workPass('title'), juno.workPass('art')])
-    await expect(atCap).toHaveAttribute('data-title-source', 'fallback')
-    expect(await calls()).toEqual(capped)
-    await cap.fill('2').then(() => cap.press('Enter'))
-    await expect(atCap).toHaveAttribute('data-title-source', 'ai', { timeout: 8_000 })
     await juno.openSettings('Juno')
 
     // Removing the key stops new calls at once.

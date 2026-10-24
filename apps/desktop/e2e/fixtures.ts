@@ -174,20 +174,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     { scope: 'worker' },
   ],
   freshContext: [false, { option: true }],
-  webPage: async ({ lane, webPages, viewport, permissions, freshContext }, use, info) => {
+  webPage: async ({ lane, webPages, viewport, permissions, freshContext }, use) => {
     if (lane !== 'web') return use(undefined)
     const pages = await webPages()
     if (freshContext) await pages.close()
     const page = await pages.open({ viewport, permissions })
-    const context = page.context()
-    const trace = process.env.JUNO_E2E_TRACE === '1'
-    if (trace) await context.tracing.start({ screenshots: true, snapshots: true, sources: true })
     try { await use(page) } finally {
-      if (trace) {
-        const path = info.outputPath('trace.zip')
-        await context.tracing.stop(info.status === info.expectedStatus ? {} : { path })
-        if (info.status !== info.expectedStatus) await info.attach('trace', { path, contentType: 'application/zip' })
-      }
       await pages.release(page)
       if (freshContext) await pages.close()
     }

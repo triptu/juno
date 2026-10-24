@@ -2,12 +2,12 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CONVERSATIONS } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
-import { expect, launchApp, test } from './fixtures'
+import { expect, hooks, launchApp, test } from './fixtures'
 
 const LOG_LIMIT = 5 * 1024 * 1024
 const processes = ['Main', 'Window', 'Engine', 'Juno agent', 'Graphics', 'Network']
 
-test('About shows every process, copies content-free diagnostics and rotates each process log', async ({ fake, slackApp, userData }, testInfo) => {
+test('About shows every process, copies content-free diagnostics and rotates each process log', async ({ fake, slackApp, userData }) => {
   test.setTimeout(120_000)
   const folder = join(userData, 'logs')
   await mkdir(folder, { recursive: true })
@@ -29,13 +29,19 @@ test('About shows every process, copies content-free diagnostics and rotates eac
     await expect(juno.topic.failed('Diagnostics private draft must never be logged').row).toContainText('Not sent.')
     await juno.openSettings('About')
     const table = win.getByRole('region', { name: 'Processes' })
-    for (const name of processes) await expect(table.locator(`[data-process="${name}"]`)).toBeVisible()
+    for (const name of processes) await expect(table.locator(`[data-process="${name}"]`)).toContainText(/\d+(\.\d)? %.*\d+ MB/)
+    const engine = await hooks(app, 'enginePid')
+    await expect(table.locator('[data-process="Engine"]')).toContainText(`Utility, pid ${engine}`)
     await app.evaluate(({ clipboard }) => clipboard.clear())
     await win.getByRole('button', { name: 'Copy diagnostics', exact: true }).click()
     await expect(win.getByText('Copied', { exact: true })).toBeVisible()
     const report = await app.evaluate(({ clipboard }) => clipboard.readText())
     expect(report.length).toBeGreaterThan(4096)
-    expect(report).toContain('Juno diagnostics')
+    expect(report).toMatch(/^Juno diagnostics\nJuno \S+ on \w+, Electron [\d.]+\n/)
+    expect(report).toMatch(/\nView: Settings about, \d tabs?; window [a-z ]+\n/)
+    expect(report).toMatch(/\nTabs: (Home|topic|All topics|Juno tab|Settings [a-z-]+|Juno page [a-z-]+)(, (Home|topic|All topics|Juno tab|Settings [a-z-]+|Juno page [a-z-]+))*\n/)
+    expect(report).toContain('Engine: Engine live (process ready)')
+    for (const word of ['Draft plan', '#eng', 'Maya', 'Tushar', 'xox']) expect(report).not.toContain(word)
     expect(report).toContain('Outbox counts by kind and state:')
     expect(report).toContain('post failed: 1')
     expect(report).not.toContain('Diagnostics private draft must never be logged')
@@ -58,14 +64,7 @@ test('About shows every process, copies content-free diagnostics and rotates eac
     }
     await win.getByRole('button', { name: 'Show logs in Finder' }).click()
     await expect.poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { logsOpened: () => number } }).junoTest.logsOpened())).toBe(1)
-    for (const theme of ['light', 'dark'] as const) {
-      await juno.settings.show('Appearance')
-      await juno.settings.themeRadio(theme === 'light' ? 'Light' : 'Dark').click()
-      await juno.settings.show('About')
-      await table.scrollIntoViewIfNeeded()
-      await win.screenshot({ path: testInfo.outputPath(`about-${theme}.png`) })
-      await testInfo.attach(`about-${theme}`, { path: testInfo.outputPath(`about-${theme}.png`), contentType: 'image/png' })
-    }
+
   } finally { await running.close() }
 })
 

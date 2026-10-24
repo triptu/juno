@@ -112,6 +112,12 @@ test('an engine restart mid-session keeps the open topic, the unsent text and th
   // The new engine's port carries live updates to the same topic.
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Back after the restart.' })
   await topic.expectMessage('Back after the restart.')
+  await topic.send('Half a thought')
+  await topic.expectSent('Half a thought')
+  await juno.openSettings('About')
+  await expect(juno.settings.engineStatus).toHaveText('Engine live')
+  await juno.settings.pingButton.click()
+  await expect(juno.settings.root.getByText(/Pong \d+/)).toBeVisible()
 })
 
 test('a channel renamed while the socket is down shows its new name once it is back', async ({ juno, fake }) => {

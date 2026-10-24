@@ -15,20 +15,18 @@ test.use({ synced: true })
 const RINA = 'Rina finished the onsite'
 const ALERTS_MAIN = '#alerts-prod'
 
-test('privacy mode blurs previews from the account menu, hides notification text, survives a relaunch and turns off from the footer', async ({ juno, slack, fake, slackApp, userData, running }) => {
+test('privacy mode blurs previews from the account menu, hides notification text, survives a relaunch and turns off from the footer', async ({ juno, slack, relaunch }) => {
   const { sidebar, privacy, accountMenu } = juno
   const rina = sidebar.row(RINA)
   await rina.expectVisible()
   await privacy.expectBlurred(rina.preview, false)
   await expect(privacy.footer).toHaveCount(0)
-  expect(await privacy.menuLabel()).toBe('Hide Message Text')
 
   await accountMenu.open()
   await accountMenu.item(/^Hide message text/).click()
   await expect(accountMenu.root).toHaveCount(0)
   await privacy.expectBlurred(rina.preview)
   await expect(privacy.footer).toBeVisible()
-  expect(await privacy.menuLabel()).toBe('Show Message Text')
   // With AI off the title is the message's first words, so it blurs too; hovering the row reveals nothing.
   await privacy.expectBlurred(rina.titleText)
   await rina.root.hover()
@@ -56,46 +54,26 @@ test('privacy mode blurs previews from the account menu, hides notification text
   await privacy.expectBlurred(row.preview)
 
   // Still on after a relaunch, from the first render.
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const second = new Juno(again.app, again.win)
-    await expect(second.privacy.footer).toBeVisible({ timeout: 30_000 })
-    expect(await again.win.evaluate(() => document.documentElement.hasAttribute('data-privacy'))).toBe(true)
-    const rinaAgain = second.sidebar.row(RINA)
-    await rinaAgain.expectVisible()
-    await second.privacy.expectBlurred(rinaAgain.preview)
-
-    // Show in the footer turns it off in one click.
-    await second.privacy.showButton.click()
-    await expect(second.privacy.footer).toHaveCount(0)
-    await second.privacy.expectBlurred(rinaAgain.preview, false)
-    expect(await second.privacy.menuLabel()).toBe('Hide Message Text')
-
-    // View › Hide Message Text (⌃⌘H) turns it on and off again.
-    await second.privacy.toggleWithMenu()
-    await expect(second.privacy.footer).toBeVisible()
-    await second.privacy.expectBlurred(rinaAgain.preview)
-    await second.privacy.toggleWithMenu()
-    await expect(second.privacy.footer).toHaveCount(0)
-  } finally {
-    await again.close()
-  }
+  const second = await relaunch()
+  await expect(second.privacy.footer).toBeVisible()
+  expect(await second.win.evaluate(() => document.documentElement.hasAttribute('data-privacy'))).toBe(true)
+  const rinaAgain = second.sidebar.row(RINA)
+  await rinaAgain.expectVisible()
+  await second.privacy.expectBlurred(rinaAgain.preview)
+  await second.privacy.showButton.click()
+  await expect(second.privacy.footer).toHaveCount(0)
+  await second.privacy.expectBlurred(rinaAgain.preview, false)
 
   // Off is remembered too.
-  const third = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const last = new Juno(third.app, third.win)
-    const rinaLast = last.sidebar.row(RINA)
-    await rinaLast.expectVisible()
-    await last.privacy.expectBlurred(rinaLast.preview, false)
-    await expect(last.privacy.footer).toHaveCount(0)
-  } finally {
-    await third.close()
-  }
+  const last = await relaunch()
+  const rinaLast = last.sidebar.row(RINA)
+  await rinaLast.expectVisible()
+  await last.privacy.expectBlurred(rinaLast.preview, false)
+  await expect(last.privacy.footer).toHaveCount(0)
 })
 
-test('View › Reload keeps privacy mode on', async ({ juno, app }) => {
+test('View › Reload keeps privacy mode on', { tag: '@electron' }, async ({ juno, app }) => {
+  expect(await juno.privacy.menuLabel()).toBe('Hide Message Text')
   await juno.privacy.toggleWithMenu()
   await expect(juno.privacy.footer).toBeVisible()
 
@@ -105,9 +83,12 @@ test('View › Reload keeps privacy mode on', async ({ juno, app }) => {
   await expect(juno.privacy.footer).toBeVisible()
   await juno.privacy.expectBlurred(rina.preview)
   expect(await juno.privacy.menuLabel()).toBe('Show Message Text')
+  await juno.privacy.toggleWithMenu()
+  await expect(juno.privacy.footer).toHaveCount(0)
+  expect(await juno.privacy.menuLabel()).toBe('Hide Message Text')
 })
 
-test('a launch.json field the app cannot read does not turn privacy mode off', async ({ running, userData, fake, slackApp }) => {
+test('a launch.json field the app cannot read does not turn privacy mode off', { tag: '@electron' }, async ({ running, userData, fake, slackApp }) => {
   await running.close()
   // An accent this version does not know, as after going back to an older version.
   await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'dark', privacy: true, accent: 'ultraviolet' }))

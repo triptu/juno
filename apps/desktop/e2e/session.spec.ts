@@ -2,10 +2,10 @@
 import { readFile, access, readdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
-import { expect, launchApp, test, writeSlackApp } from './fixtures'
+import { expect, launchApp, syncedTest, test, writeSlackApp } from './fixtures'
 import { Juno } from './driver/juno'
 
-test('signed out at launch, then imports and verifies the Slack app’s session', async ({ juno, win, fake, userData }) => {
+test('signed out at launch, then imports and verifies the Slack app’s session', { tag: '@electron' }, async ({ juno, win, fake, userData, relaunch }) => {
   await test.step('starts signed out with one primary action', async () => {
     await juno.expectSignedOut()
     await expect(juno.importButton).toBeVisible()
@@ -18,7 +18,6 @@ test('signed out at launch, then imports and verifies the Slack app’s session'
     await expect(win.getByRole('group', { name: 'Accent' })).toBeVisible()
     await expect(win.getByText('Theme', { exact: true })).toHaveCount(0)
     await expect(win.getByRole('status', { name: 'Engine status' })).toHaveCount(0)
-    await win.screenshot({ path: test.info().outputPath('slack-session-sign-in.png') })
   })
 
   await test.step('imports the token and cookie and verifies the session', async () => {
@@ -39,21 +38,12 @@ test('signed out at launch, then imports and verifies the Slack app’s session'
     await juno.openSettings('About')
     await expect(juno.settings.engineStatus).toHaveText('Engine live')
   })
-})
-
-test('comes back signed in after a relaunch', async ({ juno, fake, userData, running }) => {
-  await juno.signIn()
-  await juno.expectSignedIn('Juno Fake')
-  // Quit as soon as the ready UI appears; ready now includes the durable store acknowledgement.
-  await running.close()
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url })
-  try {
-    await new Juno(again.app, again.win).expectSignedIn('Juno Fake')
+  await test.step('opens the stored session after a relaunch without reading the keychain again', async () => {
+    const again = await relaunch()
+    await again.expectSignedIn('Juno Fake')
     expect(fake.callCount('auth.test')).toBe(2)
-  } finally {
-    await again.close()
-  }
+    expect(await again.slackKeychainReads()).toBe(0)
+  })
 })
 
 /** Resolves once main has saved the verified session for the next launch's first frame (`launch.json`). */
@@ -108,7 +98,7 @@ async function watchSignInFrames(win: Page): Promise<() => Promise<SignInFrames>
     })
 }
 
-test('a relaunch opens on the shell and never paints the sign-in page while Slack checks the session', async ({ juno, fake, userData, running }) => {
+test('a relaunch opens on the shell and never paints the sign-in page while Slack checks the session', { tag: '@electron' }, async ({ juno, fake, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
   await sessionSaved(userData, fake.teamId)
@@ -136,7 +126,7 @@ test('a relaunch opens on the shell and never paints the sign-in page while Slac
   }
 })
 
-test('a relaunch whose session Slack no longer accepts shows "Slack signed you out", then opens on it', async ({ juno, fake, userData, running }) => {
+test('a relaunch whose session Slack no longer accepts shows "Slack signed you out", then opens on it', { tag: '@electron' }, async ({ juno, fake, userData, running }) => {
   await juno.signIn()
   await juno.expectSignedIn('Juno Fake')
   await sessionSaved(userData, fake.teamId)
@@ -153,25 +143,17 @@ test('a relaunch whose session Slack no longer accepts shows "Slack signed you o
   }
 })
 
-test('comes back signed in when the local cache is damaged, and syncs it again', async ({ juno, fake, userData, running, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await running.close()
-  const [workspace] = await readdir(join(userData, 'workspaces'))
-  await writeFile(join(userData, 'workspaces', workspace!, 'cache.db'), 'not a database '.repeat(400))
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.expectSignedIn('Juno Fake')
-    await restarted.sidebar.row('Draft plan is in the doc').expectVisible()
-  } finally {
-    await again.close()
-  }
+syncedTest('comes back signed in when the local cache is damaged, and syncs it again', async ({ relaunch, userData }) => {
+  const restarted = await relaunch({ whileClosed: async () => {
+    const [workspace] = await readdir(join(userData, 'workspaces'))
+    await writeFile(join(userData, 'workspaces', workspace!, 'cache.db'), 'not a database '.repeat(400))
+  } })
+  await restarted.expectSignedIn('Juno Fake')
+  await restarted.sidebar.row('Draft plan is in the doc').expectVisible()
 })
 
 // Signing out ends with a fresh sign-in, which the expiry step starts from.
-test('signing out, and Slack expiring the session, both return to the sign-in page', async ({ juno, win, fake, userData, slackApp }) => {
+test('signing out, and Slack expiring the session, both return to the sign-in page', { tag: '@electron' }, async ({ juno, win, fake, userData, slackApp }) => {
   await test.step('signs out: the secrets, the cookies and the session are gone', async () => {
     await juno.signIn()
     await juno.expectSignedIn('Juno Fake')
@@ -210,7 +192,7 @@ test('signing out, and Slack expiring the session, both return to the sign-in pa
   })
 })
 
-test('explains a Mac without Slack', async ({ fake, userData }) => {
+test('explains a Mac without Slack', { tag: '@electron' }, async ({ fake, userData }) => {
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: join(userData, 'no-such-dir'), keychainPassword: 'x' })
   try {
     const juno = new Juno(running.app, running.win)
@@ -222,7 +204,7 @@ test('explains a Mac without Slack', async ({ fake, userData }) => {
   }
 })
 
-test('explains a Slack app that is not signed in', async ({ fake, userData }) => {
+test('explains a Slack app that is not signed in', { tag: '@electron' }, async ({ fake, userData }) => {
   const slackApp = await writeSlackApp(fake, join(userData, 'slack-signed-out'), { signedOut: true })
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
@@ -241,7 +223,7 @@ test('explains a Slack app that is not signed in', async ({ fake, userData }) =>
   }
 })
 
-test('explains a keychain password that does not unlock the cookie, and does not ask for it again', async ({ fake, slackApp, userData }) => {
+test('explains a keychain password that does not unlock the cookie, and does not ask for it again', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: 'wrong' })
   try {
     const juno = new Juno(running.app, running.win)

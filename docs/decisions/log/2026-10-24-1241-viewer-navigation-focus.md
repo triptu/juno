@@ -1,0 +1,1 @@
+- 10-24 12:41 · Keep focus when changing viewer files · Moving from a focused Markdown link to another file removes that link. Move focus to the viewer before replacing its item so arrows and Escape keep working; the combined file-reading flow checks that it closes before opening audio.

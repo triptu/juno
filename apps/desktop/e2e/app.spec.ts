@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { join } from 'node:path'
 import type { FakeSlack } from '@juno/fake-slack'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
 /** Resolves a CSS custom property to the colour Chromium computes for it. */
@@ -25,10 +25,13 @@ function brightness(rgb: string): number {
 }
 
 // Signed out, on the sign-in page. The theme switch goes last, so the other steps see the light theme.
-test('the signed-out shell: fonts, colours, the bridge and the theme', async ({ win }) => {
+test('the signed-out shell uses bundled fonts, token colours and the chosen theme', async ({ win }) => {
   await test.step('renders the shell with bundled fonts and token colours', () => shellFontsAndColours(win))
-  await test.step('exposes only the bridge to the page', () => onlyTheBridge(win))
   await test.step('switches to the dark theme in place', () => darkThemeInPlace(win))
+})
+
+test('the preload exposes only the isolated bridge', { tag: '@electron' }, async ({ win }) => {
+  await onlyTheBridge(win)
 })
 
 async function shellFontsAndColours(win: Page): Promise<void> {
@@ -142,10 +145,7 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 }
 
 // Signed in. The drag regions are counted first, before any surface has opened.
-test('the signed-in shell: drag regions, surfaces over the title bars, and the build line', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('the signed-in shell: drag regions, surfaces over the title bars, and the build line', { tag: '@electron' }, async ({ juno, fake }) => {
   await test.step('only the title bars drag the window, and every control on them opts out', () => dragRegions(juno))
   await test.step('every surface that can open over a title bar opts out of its drag region', () => surfacesOptOut(juno, fake))
   await test.step('answers app.getInfo over the typed IPC bridge', () => buildLine(juno))
@@ -234,7 +234,7 @@ async function buildLine(juno: Juno): Promise<void> {
   await expect(juno.settings.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
 }
 
-test('a second launch on the same data hands over to the open window', async ({ app: electronApp, win, userData }, testInfo) => {
+test('a second launch on the same data hands over to the open window', { tag: '@electron' }, async ({ app: electronApp, win, userData }, testInfo) => {
   // Two process launches can take longer on the shared Mac.
   test.slow()
   await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
@@ -267,7 +267,7 @@ test('a second launch on the same data hands over to the open window', async ({ 
   await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
 })
 
-test('a window saved on a display that is gone opens on screen', async ({ running, userData }) => {
+test('a window saved on a display that is gone opens on screen', { tag: '@electron' }, async ({ running, userData }) => {
   await running.close()
   await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'light', bounds: { x: -6000, y: -6000, width: 1100, height: 760 } }))
   const again = await launchApp(userData)

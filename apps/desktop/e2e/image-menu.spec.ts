@@ -28,7 +28,7 @@ async function clipboardImageSize(juno: Juno) {
   })
 }
 
-test('image menus copy image data, download, open a temporary copy and open the viewer; text keeps its message menu', async ({ juno, fake }) => {
+test('image menus copy image data, download, open a temporary copy and open the viewer; text keeps its message menu', { tag: '@electron' }, async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Image menu sample', media: [{ name: 'image-menu.png', width: 800, height: 600 }] })
   const row = juno.topic.message('Image menu sample')
