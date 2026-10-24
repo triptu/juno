@@ -89,6 +89,8 @@ standingByTest('outside notification hours a DM is held with its reason and show
   expect(model.inputs()).toHaveLength(0)
 })
 
+/** Slack's name for a day in its per-day prefs: `monday`. */
+const dayName = (day: number) => weekdays[day]!.toLowerCase()
 const clock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 
 syncedTest('hours saved by an older version still load; a day with its own hours reaches Slack as a custom schedule and decides by those hours', async ({ fake, slack, userData, relaunch }) => {
@@ -127,7 +129,6 @@ syncedTest('hours saved by an older version still load; a day with its own hours
   expect(saved().notificationHours.days).not.toContain(yesterday)
 
   // Slack holds the same hours: today its own, tomorrow the shared ones, yesterday none.
-  const dayName = (day: number) => weekdays[day]!.toLowerCase()
   await expect.poll(() => fake.workspace.prefs).toMatchObject({
     dnd_days: 'custom',
     [`dnd_enabled_${dayName(yesterday)}`]: 'all_day',
