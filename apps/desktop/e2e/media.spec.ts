@@ -166,6 +166,8 @@ syncedTest('the viewer covers only its tab, and each tab keeps its own picture o
   await expect(viewer).toHaveCount(0)
   fake.injectMedia({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'Pricing page mock', media: [{ name: 'pricing.png', width: 800, height: 800 }] })
   await topic.message('Pricing page mock').getByRole('button', { name: 'Open pricing.png' }).click()
+  // The new message moves #product to the top. Let the sidebar finish that move before later rows are clicked.
+  await sidebar.expectTop('#product')
   await expect(viewer.locator('[data-viewer-name]')).toHaveText('pricing.png')
 
   // Back through the strip: the first tab still shows its picture at the same item, and the second keeps its own.
