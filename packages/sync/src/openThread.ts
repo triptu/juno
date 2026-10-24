@@ -141,9 +141,8 @@ const firstStart = (channel: string, threadTs: string, floor: string | undefined
  * fits one open, else the read pointer, so every unread reply is stored and
  * the "N new" count is exact. The first time (no range): the replies from
  * the floor on, or, when the store already holds more of them than a page
- * from the floor reaches, the replies from the oldest of the newest stored
- * ones (or the read pointer, when older) on and then those from the floor up
- * to them (`firstStart`). After
+ * from the floor reaches, the replies from where the window stands in with
+ * them on, and then those from the floor up to there (`firstStart`). After
  * that: the replies after the newest range, then, when it does not reach
  * back to the floor, the replies from the floor up to it. At most
  * `OPEN_FETCH_MAX` messages in all. A long thread never read has no floor:
