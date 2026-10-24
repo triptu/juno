@@ -1,0 +1,1 @@
+- 10-24 22:51 · window-at-newest · A topic window around a message (a link, a search match) counts as at the newest message when the engine says it holds it (`meta.atNewest`), not only when it has no anchor, so a short thread opened at a match shows no Jump to latest; in Search, Show more takes no focus on a press, so unfolding a card does not select it.
