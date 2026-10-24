@@ -123,6 +123,8 @@ async function expectPanelWidth(juno: Juno, width: number): Promise<void> {
  * bottom. Each is shot before it is checked.
  */
 async function expectWholeEverywhere(chat: JunoChatPane, name: string): Promise<void> {
+  // Release a newly mounted chat's bottom hold with user input before revealing individual rows.
+  await scrollTo(chat, 'top')
   await toTop(chat, 'Answering quote me first')
   await shoot(chat, `${name}-top`)
   expect(await expectBadgesWhole(chat, 4)).toContain('owner:🎉')
