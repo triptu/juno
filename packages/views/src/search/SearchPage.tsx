@@ -6,7 +6,7 @@
  * one column: the list, or the reader once the owner shows it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useEffectEvent, useRef, type FocusEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, type FocusEvent, type ReactNode, type Ref } from 'react'
 import { TOPIC_MIN_WIDTH } from '@juno/tokens/layout'
 import { SEARCH_COLUMN_WIDTH } from '@juno/contract'
 import { colors, spacing, z } from '@juno/tokens/tokens.stylex'
@@ -43,6 +43,11 @@ export function SearchPage({ field, filters, results, reader, readerRef, readerS
   const narrow = useNarrowerThan(root, ONE_COLUMN_BELOW)
   const reportNarrow = useEffectEvent((value: boolean) => onNarrow?.(value))
   useEffect(() => reportNarrow(narrow), [narrow])
+  // The column's width is written on the box, as the sidebar's is (Shell), so it follows the preference after its edge wrote a width straight onto it.
+  const column = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (column.current !== null) column.current.style.width = narrow ? '' : `${columnWidth}px`
+  }, [narrow, columnWidth])
 
   // The field and the list count as one place for focus, as ⌘K's field and rows do. The column's resize edge does not.
   const isEdge = (target: EventTarget | null) => target instanceof Element && target.matches('[data-resize-edge]')
@@ -62,7 +67,7 @@ export function SearchPage({ field, filters, results, reader, readerRef, readerS
         {filters}
       </div>
       <div {...stylex.props(styles.split)}>
-        <div data-search-column="" {...listFocus} {...stylex.props(styles.column, widthOf(columnWidth), narrow && (readerShown ? styles.gone : styles.whole))}>
+        <div ref={column} data-search-column="" {...listFocus} {...stylex.props(styles.column, narrow && (readerShown ? styles.gone : styles.whole))}>
           {results}
           {narrow ? null : <ResizeEdge width={columnWidth} min={SEARCH_COLUMN_WIDTH.min} max={SEARCH_COLUMN_WIDTH.max} label="Resize results" onResize={onResizeColumn} onReset={onResetColumn} />}
         </div>
@@ -73,10 +78,6 @@ export function SearchPage({ field, filters, results, reader, readerRef, readerS
     </div>
   )
 }
-
-const widthOf = stylex.create({
-  at: (width: number) => ({ width }),
-}).at
 
 const styles = stylex.create({
   page: {
