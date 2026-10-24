@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url'
 import { MAP_PATH } from './coverage-map.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, graphCandidates, mapProblem, COVERAGE_BUDGET_SECONDS, rankComponents, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
-import { HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
+import { guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { bunTestScripts, unitTestItems } from './affected-tests.mjs'
 import { inputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
@@ -297,6 +297,12 @@ if (!wide && selection.specs) {
   for (const spec of named.filter((file) => file.startsWith('apps/desktop/'))) {
     selection.specs.set(spec, ['named with --spec', ...(selection.specs.get(spec) ?? [])])
     selection.required.add(spec)
+  }
+  // A guard spec runs whenever a change is in its area (`GUARD_SPECS`).
+  if (!batch) for (const guard of guardSpecsChanged(changed)) {
+    if (!files.has(guard.spec)) continue
+    selection.specs.set(guard.spec, [`${guard.file} is in its area: ${guard.guards}`, ...(selection.specs.get(guard.spec) ?? [])])
+    selection.required.add(guard.spec)
   }
   const smoke = 'apps/desktop/e2e/app.spec.ts'
   if (!batch && toolChanged.length > 0 && files.has(smoke) && !selection.specs.has(smoke)) {

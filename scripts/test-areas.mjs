@@ -7,6 +7,9 @@
 // - PERF_INTERACTIONS: the interactions with a budget in docs/performance.md,
 //   and the files each one owns. The plan suggests perf and feel on the Mac only
 //   when one of these changed.
+// - GUARD_SPECS: desktop specs that guard the most frequent paths. A plan
+//   always runs one when a changed file is in its area, whatever the coverage
+//   map ranks or the time budget leaves.
 //
 // A path ending in / is a folder; any other string is one file; a RegExp
 // matches the repo path.
@@ -139,6 +142,39 @@ export const PERF_INTERACTIONS = [
   },
 ]
 
+/** Specs a plan requires when a change is in their area. */
+export const GUARD_SPECS = [
+  {
+    spec: 'apps/desktop/e2e/instant-paths.spec.ts',
+    guards: 'the most frequent paths paint from what Juno holds, with Slack holding every answer',
+    // Topic, sync, store, search and palette code.
+    paths: [
+      'apps/desktop/src/renderer/containers/TopicView.tsx',
+      'apps/desktop/src/renderer/containers/topic/',
+      'apps/desktop/src/renderer/containers/Peek.tsx',
+      'apps/desktop/src/renderer/containers/PeekTopic.tsx',
+      'apps/desktop/src/renderer/containers/navigation.ts',
+      'apps/desktop/src/renderer/containers/slackLinks.ts',
+      'apps/desktop/src/renderer/containers/Palette.tsx',
+      'apps/desktop/src/renderer/containers/PaletteContent.tsx',
+      'apps/desktop/src/renderer/containers/paletteCommands.ts',
+      'apps/desktop/src/renderer/containers/search/',
+      'packages/views/src/MessageList.tsx',
+      'packages/views/src/PeekView.tsx',
+      'packages/views/src/CommandPalette.tsx',
+      'packages/views/src/search/',
+      'packages/state/src/',
+      'packages/engine/src/messages/',
+      'packages/engine/src/topics/',
+      'packages/engine/src/protocol/',
+      'packages/engine/src/search/',
+      /^packages\/engine\/src\/search[A-Za-z]*\.ts$/,
+      'packages/sync/',
+      'packages/store/',
+    ],
+  },
+]
+
 /** Whether a repo path is in one of the paths above. */
 export const inPaths = (paths, file) => paths.some((path) => (path instanceof RegExp ? path.test(file) : path.endsWith('/') ? file.startsWith(path) : file === path))
 
@@ -148,3 +184,10 @@ export const heavyAreasChanged = (changed) => HEAVY_AREAS.filter((area) => chang
 /** The interactions a change reaches, each with the changed files it owns. */
 export const perfInteractionsChanged = (changed) =>
   PERF_INTERACTIONS.map((entry) => ({ ...entry, files: changed.filter((file) => inPaths(entry.paths, file)) })).filter((entry) => entry.files.length > 0)
+
+/** The guard specs a change reaches, each with the first changed file in its area. */
+export const guardSpecsChanged = (changed) =>
+  GUARD_SPECS.flatMap((entry) => {
+    const file = changed.find((path) => inPaths(entry.paths, path))
+    return file === undefined ? [] : [{ spec: entry.spec, guards: entry.guards, file }]
+  })
