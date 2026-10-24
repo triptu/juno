@@ -1,0 +1,39 @@
+{
+  "filters": {
+    "after": "redacted",
+    "before": "redacted",
+    "from": [
+      "redacted"
+    ]
+  },
+  "manual_filters": {},
+  "ai_filters": {
+    "after": "redacted",
+    "before": "redacted",
+    "from": [
+      "redacted"
+    ]
+  },
+  "filter_suggestions": {
+    "in": [
+      {
+        "id": "redacted",
+        "facet_count": 0,
+        "checked": false
+      },
+      {
+        "id": "redacted",
+        "facet_count": 0,
+        "checked": false
+      }
+    ],
+    "from": [
+      {
+        "id": "redacted",
+        "facet_count": 0
+      }
+    ]
+  },
+  "query": "redacted",
+  "original_query": "redacted"
+}

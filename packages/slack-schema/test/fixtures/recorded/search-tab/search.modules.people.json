@@ -1,0 +1,76 @@
+{
+  "ok": true,
+  "query": "redacted",
+  "filters": {},
+  "ai_filters": {},
+  "manual_filters": {},
+  "module": "redacted",
+  "items": [
+    {
+      "iid": "redacted",
+      "id": "redacted",
+      "profile": {
+        "title": "redacted",
+        "phone": null,
+        "skype": "redacted",
+        "real_name": "redacted",
+        "real_name_normalized": "redacted",
+        "display_name": "redacted",
+        "display_name_normalized": "redacted",
+        "fields": {
+          "redacted": {
+            "value": "redacted",
+            "alt": "redacted"
+          }
+        },
+        "status_text": "redacted",
+        "status_emoji": "redacted",
+        "status_emoji_display_info": [],
+        "status_expiration": 0,
+        "status_clear_on_focus_end": false,
+        "avatar_hash": "redacted",
+        "start_date": "redacted",
+        "image_original": "redacted",
+        "is_custom_image": true,
+        "email": "redacted",
+        "huddle_state": "redacted",
+        "huddle_state_expiration_ts": 0,
+        "first_name": "redacted",
+        "last_name": "redacted",
+        "image_24": "redacted",
+        "image_32": "redacted",
+        "image_48": "redacted",
+        "image_72": "redacted",
+        "image_192": "redacted",
+        "image_512": "redacted",
+        "image_1024": "redacted",
+        "status_text_canonical": "redacted",
+        "team": "redacted"
+      },
+      "username": "redacted",
+      "is_restricted": false,
+      "is_ultra_restricted": false,
+      "phone": "redacted",
+      "team_id": "redacted",
+      "enterprise_user": null,
+      "timestamp": 0
+    }
+  ],
+  "pagination": {
+    "total_count": 0,
+    "page": 0,
+    "per_page": 0,
+    "page_count": 0,
+    "first": 0,
+    "last": 0
+  },
+  "filter_suggestions": {
+    "title": [
+      {
+        "value": "redacted",
+        "facet_count": 0,
+        "checked": false
+      }
+    ]
+  }
+}
