@@ -1,7 +1,7 @@
 import { describe, expect } from 'bun:test'
 import { itEffect, itLive } from '@juno/testing/effect'
 import { Effect, Fiber } from 'effect'
-import { RequestQueue, SlackApi, SlackEdge } from '../src/index.ts'
+import { SlackApi, SlackEdge } from '../src/index.ts'
 import { CHANNEL, clientLayer, eventually, fakeSlack, SELF } from './helpers.ts'
 
 describe('SlackApi.call', () => {
@@ -89,24 +89,23 @@ describe('SlackApi.call', () => {
     }),
   )
 
-  itLive('a paused method does not hold the interactive lane: it fails fast with SlackRateLimited', () =>
+  // On the test clock: a call that waited out the 30 s pause would never return.
+  itEffect('a paused method does not hold the interactive lane: it fails fast with SlackRateLimited', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       fake.force429({ method: 'conversations.history', retryAfter: 30, times: 1 })
       const layer = clientLayer(fake)
-      const started = Date.now()
       const result = yield* SlackApi.use((api) => api.call('conversations.history', { channel: CHANNEL })).pipe(
         Effect.provide(layer),
         Effect.flip,
       )
       expect(result._tag).toBe('SlackRateLimited')
       if (result._tag === 'SlackRateLimited') expect(result.retryAfterMillis).toBeGreaterThanOrEqual(25_000)
-      expect(Date.now() - started).toBeLessThan(2_000)
       expect(fake.callCount('conversations.history')).toBe(1)
     }),
   )
 
-  itLive('a 429 on one method pauses only that method', () =>
+  itEffect('a 429 on one method pauses only that method', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       fake.force429({ method: 'conversations.history', retryAfter: 30, times: 1 })
@@ -121,36 +120,6 @@ describe('SlackApi.call', () => {
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)))
     }),
-  )
-
-  itLive('queued calls respect a new Retry-After after waiting for a permit', () =>
-    Effect.gen(function* () {
-      const fake = yield* fakeSlack
-      const program = Effect.gen(function* () {
-        const api = yield* SlackApi
-        const queue = yield* RequestQueue
-        const history = api.call('conversations.history', { channel: CHANNEL, limit: 1 }, { lane: 'background' })
-        yield* history
-        const waiting = yield* Effect.forkScoped(history)
-        yield* api.call('client.counts', {}, { lane: 'interactive' })
-        // The history call is already waiting for its slot when the pause arrives.
-        const pausedAt = Date.now()
-        yield* queue.pause('conversations.history', 1_000)
-        yield* Fiber.join(waiting)
-        yield* history
-        const calls = fake.calls.filter((call) => call.method === 'conversations.history')
-        expect(calls).toHaveLength(3)
-        expect(calls[1]!.at - pausedAt).toBeGreaterThanOrEqual(950)
-        // A 429 doubles the method interval (1 s here) until the quiet period.
-        expect(calls[2]!.at - calls[1]!.at).toBeGreaterThanOrEqual(1_900)
-        const counts = fake.calls.find((call) => call.method === 'client.counts')!
-        expect(counts.at).toBeLessThan(calls[1]!.at)
-        expect(fake.calls.every((call) => call.status === 200)).toBe(true)
-      })
-      // History is spaced 1 s apart, not 1.5 s, to keep the waits short.
-      yield* program.pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundConcurrency: 1, backgroundMinIntervalMillis: 1_000 } })))
-    }),
-    10_000,
   )
 
   itEffect('a flood of background calls does not starve the interactive lane', () =>

@@ -130,3 +130,17 @@ itEffect('a later 429 resets the five-minute quiet period', () => Effect.gen(fun
   yield* TestClock.adjust(6_000)
   expect(yield* Fiber.join(next)).toBe(306_000)
 }).pipe(Effect.provide(RequestQueue.layer)))
+
+itEffect('a background call already waiting for its slot rechecks a pause that arrives meanwhile, and the pause doubles the interval', () => Effect.gen(function* () {
+  const queue = yield* RequestQueue
+  yield* queue.run('background', 'conversations.history', Effect.void)
+  const waiting = yield* startAt(queue, 'conversations.history')
+  yield* TestClock.adjust(0)
+  // Its slot comes at 1.5 s; the pause holds the method until 2 s.
+  yield* queue.pause('conversations.history', 2_000)
+  yield* TestClock.adjust(2_000)
+  expect(yield* Fiber.join(waiting)).toBe(2_000)
+  const next = yield* startAt(queue, 'conversations.history')
+  yield* TestClock.adjust(3_000)
+  expect(yield* Fiber.join(next)).toBe(5_000)
+}).pipe(Effect.provide(RequestQueue.layer)))
