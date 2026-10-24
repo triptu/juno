@@ -149,9 +149,12 @@ interface TopicProps {
    * nothing read until it is used. A press anywhere in it, or a key that
    * acts (typing, a reaction, a message's keys), counts as opening it, and
    * from then on it marks as an open topic does. Esc in its empty
-   * composer goes back to the results.
+   * composer goes back to the results. Its window shows as soon as it holds
+   * the match it landed on (`landing`), which shows its sender even inside
+   * their group, and the topic asks Slack for what the store lacks only
+   * once `fetch` is set, so a held arrow asks only where it stops.
    */
-  readonly reader?: { readonly header: TopicHeaderReader; readonly onEscape: () => void; readonly onUsed?: () => void }
+  readonly reader?: { readonly header: TopicHeaderReader; readonly onEscape: () => void; readonly onUsed?: () => void; readonly landing?: string | undefined; readonly fetch?: boolean }
 }
 
 /** Keys that only move focus, step the reader's matches or leave it do not count as using the topic. */
@@ -226,8 +229,9 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
   // The hooks run their effects in this order; keep it.
   const position = usePosition(list)
   const { readAtOpen, at, dividerBefore } = useDivider(id, detail.lastReadTs, detail.markedUnread === true, list, readOnly)
-  const loading = useTopicFetch(detail.id, view)
-  const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState)
+  const loading = useTopicFetch(detail.id, view, reader?.fetch ?? true)
+  const landing = reader?.landing
+  const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState) || (landing !== undefined && list.rows.has(landing))
   const files = useTopicFiles(view)
   const openMedia = onOpenPreviewMedia ?? files.setViewing
   useOpenPosition(position, view, readOnly, list, showWindow)
@@ -258,6 +262,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
       status={listStatus(showWindow, list, loading)}
       older={!showWindow || list.order.length === 0 ? 'none' : older}
       {...(dividerBefore === undefined ? {} : { dividerBefore })}
+      startsGroupAt={landing}
       scrollRef={position.scrollRef}
       underHeader={!peek}
       popover={peek}

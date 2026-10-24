@@ -50,13 +50,16 @@ export function useDivider(id: string, lastReadTs: string | undefined, markedUnr
   return { readAtOpen: readAtOpen.lastReadTs, at, dividerBefore }
 }
 
-/** What Slack has that the store lacks, once per mount; a hidden tab coming back does not ask again. `slow`: still asking after 300 ms. */
-export function useTopicFetch(id: string, view: string) {
+/**
+ * What Slack has that the store lacks, once per mount, from when `enabled`; a hidden tab coming back does not
+ * ask again. `slow`: still asking after 300 ms.
+ */
+export function useTopicFetch(id: string, view: string, enabled = true) {
   'use no memo'
   const [fetchState, setFetchState] = useState<FetchState>('pending')
   const fetched = useRef(false)
   useEffect(() => {
-    if (fetched.current) return
+    if (fetched.current || !enabled) return
     fetched.current = true
     void fetchTopic(registry, id).then((exit) => {
       const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
@@ -65,7 +68,7 @@ export function useTopicFetch(id: string, view: string) {
       if (done && registry.get(messageListAtom(view)).meta.windowCovered !== true) refreshMessages(registry, view)
       setFetchState(done ? 'done' : 'offline')
     })
-  }, [id, view])
+  }, [id, view, enabled])
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     if (fetchState !== 'pending') return

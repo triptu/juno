@@ -56,6 +56,8 @@ export interface MessageListProps {
   readonly notDrawnAbove?: number
   /** The `ts` of the first unread message: the "N new" divider goes before it. */
   readonly dividerBefore?: string
+  /** A message that shows its sender's name and avatar even when it continues their group: the Search reader's landing match. */
+  readonly startsGroupAt?: string | undefined
   readonly older?: OlderStatus
   /** The scroll element, for the container's open position and stick-to-bottom. */
   readonly scrollRef?: Ref<HTMLElement>
@@ -267,6 +269,7 @@ export function MessageList({
   eager,
   notDrawnAbove = 0,
   dividerBefore,
+  startsGroupAt,
   older = 'none',
   scrollRef,
   underHeader = true,
@@ -377,7 +380,7 @@ export function MessageList({
                 time={messageHeaderTime(item.message.at, now)}
                 now={now}
                 main={main}
-                startsGroup={atDivider}
+                startsGroup={atDivider || item.message.ts === startsGroupAt}
                 eager={eager?.has(item.message.ts) ?? false}
                 flush={first || atDivider}
                 tabbable={item.message.ts === tabbable}
