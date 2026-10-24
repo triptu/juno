@@ -54,3 +54,5 @@ Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (l
 `messages.attention` is a derived cache projection for the badge existence query. Sync derives it from unread rich-text bodies while reindexing. It is reused only for the same message content and mention context; a trigger clears it when content changes. It is not a Slack field.
 
 `huddle_history` in user.db keeps recent room facts with local joined and seen marks. End and join evidence only accumulates; rereading Slack history never clears an acknowledgement.
+
+`messages_search_date (ts DESC, channel) WHERE deleted = 0` supports chronological search without a positive FTS term. Search filter compilation stays in the engine.

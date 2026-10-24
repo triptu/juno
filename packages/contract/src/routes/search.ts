@@ -1,18 +1,7 @@
-/**
- * ⌘K (spec section 10, inventory 9).
- *
- * - `search.query`, a live value that never calls Slack: topic titles,
- *   message text, channels and people from the local FTS indexes. Empty
- *   text returns recent topics.
- * - `search.slack`, a command: Slack's own message search, for what the
- *   local cache does not hold. It writes nothing to the store; the palette
- *   adds its matches under the local ones.
- * - `search.command`, a command: what the typed text means as a command
- *   (spec section 15, "Command routing"), from the grammar in
- *   `@juno/domain` and then the model. `null` when it is a search, or when
- *   AI assist is off.
- */
+/** Local palette search, paged Search sessions, and the existing command reader. */
 import { Schema } from 'effect'
+import { SearchQuery } from '@juno/domain'
+export { SearchQuery, parseSearchQuery, printSearchQuery } from '@juno/domain'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
@@ -88,7 +77,7 @@ export const searchQuery = liveValueRoute('search.query', {
 /** Matches `search.slack` returns at most. */
 export const SLACK_SEARCH_MAX = 20
 
-/** Slack's message search, newest Slack ranking first. Empty when Slack cannot be reached. */
+/** Legacy one-shot search for existing clients. The palette no longer calls this route. */
 export const searchSlack = Rpc.make('search.slack', {
   payload: { query: Schema.String },
   success: Schema.Array(SearchMessage),
@@ -119,4 +108,46 @@ export const searchCommand = Rpc.make('search.command', {
   error: NotSignedIn,
 })
 
-export const SearchRoutes = RpcGroup.make(searchQuery, searchSlack, searchCommand)
+export const SearchRange = Schema.Struct({ start: Schema.Int, end: Schema.Int })
+export const SearchHit = Schema.Struct({ ...SearchMessage.fields, ranges: Schema.Array(SearchRange) })
+export type SearchHit = typeof SearchHit.Type
+export const SearchTitleHit = Schema.Struct({ ...SearchTopic.fields, ranges: Schema.Array(SearchRange) })
+export type SearchTitleHit = typeof SearchTitleHit.Type
+export const SearchGroup = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.Literals(['thread', 'main', 'topic']),
+  topicId: Schema.String,
+  title: Schema.String,
+  titleRanges: Schema.Array(SearchRange),
+  place: SearchPlace,
+  at: Schema.String,
+  messages: Schema.Array(SearchHit),
+  older: Schema.Boolean,
+  matchCount: Schema.Int,
+})
+export type SearchGroup = typeof SearchGroup.Type
+export const SearchSnapshot = Schema.Struct({
+  sessionId: Schema.String,
+  generation: Schema.Int,
+  query: SearchQuery,
+  needsSlack: Schema.Boolean,
+  state: Schema.Literals(['searching', 'done', 'slackUnavailable', 'offline', 'onlyHidden']),
+  groups: Schema.Array(SearchGroup),
+  frontier: Schema.Struct({ through: Schema.NullOr(Schema.String), complete: Schema.Boolean, olderGroupIndex: Schema.Int }),
+  facets: Schema.Struct({ from: Schema.Array(Schema.Struct({ id: Schema.String, count: Schema.Int })), in: Schema.Array(Schema.Struct({ id: Schema.String, count: Schema.Int })) }),
+  counts: Schema.Struct({ local: Schema.Int, slackLoaded: Schema.Int, hidden: Schema.Int, slackTotal: Schema.NullOr(Schema.Int) }),
+  pagination: Schema.Struct({ page: Schema.Int, pageCount: Schema.Int, perPage: Schema.Int, first: Schema.Int, last: Schema.Int, hasMore: Schema.Boolean }),
+  window: Schema.Struct({ offset: Schema.Int, totalGroups: Schema.Int, totalRows: Schema.Int }),
+})
+export type SearchSnapshot = typeof SearchSnapshot.Type
+/** Subscribe once per query generation. Unsubscribing releases the session. */
+export const searchSession = liveValueRoute('search.session', {
+  payload: { sessionId: Schema.String, generation: Schema.Int, query: SearchQuery, immediate: Schema.optionalKey(Schema.Boolean) },
+  value: SearchSnapshot,
+})
+/** One sequential page, or retry after failure. Offset selects a 100-match/topic window from the loaded results. */
+export const searchMore = Rpc.make('search.more', {
+  payload: { sessionId: Schema.String, generation: Schema.Int, offset: Schema.optionalKey(Schema.Int) },
+  success: Schema.Boolean,
+})
+export const SearchRoutes = RpcGroup.make(searchQuery, searchSlack, searchCommand, searchSession, searchMore)

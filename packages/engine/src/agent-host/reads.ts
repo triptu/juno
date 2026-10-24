@@ -1,3 +1,5 @@
+import { resolveSearch } from '../searchResolve'
+import { compileSearchSql } from '../searchCompiler'
 /**
  * The agent's Slack and topic reads, from the local store (architecture 10,
  * plan v3 §9 Tier 0). Reads never call Slack: the sync keeps the store
@@ -19,7 +21,7 @@ import {
   resolveTitle,
   type ChannelInfo,
 } from '@juno/domain'
-import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
+import { StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { AgentHostError, HostChannelId, HostCursor, type HostUserId, type Place, type TopicLink } from '@juno/agent-contract'
 import type { Message, MessagePage, Topic } from '@juno/agent-juno'
@@ -93,9 +95,6 @@ const named = (sql: SqlClient.SqlClient, rows: ReadonlyArray<MessageRow>) =>
 
 const notFound = (message: string) => new AgentHostError({ reason: 'notFound', message })
 
-/** A channel the owner sees in Juno: a member, and not ignored. */
-const VISIBLE = 'c.is_member = 1 AND NOT EXISTS (SELECT 1 FROM ignored_channels g WHERE g.channel = c.id)'
-
 export const history = (channelId: string, before: string | undefined, limit: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
@@ -123,76 +122,16 @@ export const replies = (channelId: string, threadTs: string, after: string | und
     return { messages: yield* named(sql, page), ...(rows.length > limit && last ? { next: cursor(last.ts) } : {}) } satisfies MessagePage
   })
 
-/** A search split into its words and Slack's `from:` and `in:` modifiers. */
-export interface ParsedSearch {
-  readonly text: string
-  readonly from: ReadonlyArray<string>
-  readonly in: ReadonlyArray<string>
-}
-
-/** `from:@maya`, `from:<@U1>`, `from:U1`, `from:me` (the signed-in user), `in:#eng`, `in:<#C1|eng>`, `in:C1`; everything else is text. */
-export function parseSearch(query: string): ParsedSearch {
-  const words: Array<string> = []
-  const from: Array<string> = []
-  const into: Array<string> = []
-  for (const token of query.split(/\s+/).filter((t) => t.length > 0)) {
-    const modifier = /^(from|in):(.+)$/i.exec(token)
-    if (modifier === null) {
-      words.push(token)
-      continue
-    }
-    const value = modifier[2]!.replace(/^<[@#]([^|>]+)(?:\|[^>]*)?>$/, '$1').replace(/^[@#]/, '')
-    if (modifier[1]!.toLowerCase() === 'from') from.push(value)
-    else into.push(value)
-  }
-  return { text: words.join(' '), from, in: into }
-}
-
-const lower = (values: ReadonlyArray<string>) => values.map((v) => v.toLowerCase())
-
-/** Ids for names or ids; `undefined` when there was no modifier, empty when it names nobody. */
-const resolveIds = (sql: SqlClient.SqlClient, kind: 'users' | 'conversations', values: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    if (values.length === 0) return undefined
-    const names = lower(values)
-    const marks = names.map(() => '?').join(', ')
-    const columns = kind === 'users' ? ['lower(name)', 'lower(display_name)', 'lower(real_name)'] : ['lower(name)']
-    const rows = yield* sql.unsafe<{ id: string }>(
-      `SELECT id FROM ${kind} WHERE id IN (${values.map(() => '?').join(', ')}) OR ${columns.map((c) => `${c} IN (${marks})`).join(' OR ')}`,
-      [...values, ...columns.flatMap(() => names)],
-    )
-    return rows.map((r) => r.id)
-  })
-
+/** The agent shares the palette's local query rules and never spends Slack's request budget. */
 export const search = (query: string, offsetCursor: string | undefined, limit: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const parsed = parseSearch(query)
-    const [team] = parsed.from.some((name) => name.toLowerCase() === 'me') ? yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1` : []
-    const from = yield* resolveIds(sql, 'users', parsed.from.map((name) => (name.toLowerCase() === 'me' ? (team?.self_user_id ?? name) : name)))
-    const into = yield* resolveIds(sql, 'conversations', parsed.in)
-    const terms = ftsQuery(parsed.text)
+    if (query.trim() === '') return { messages: [] } satisfies MessagePage
+    const compiled = compileSearchSql(yield* resolveSearch(query))
     const offset = Math.max(0, Number(offsetCursor ?? 0) || 0)
-    if (from?.length === 0 || into?.length === 0 || (terms === '' && from === undefined && into === undefined)) return { messages: [] } satisfies MessagePage
-    const where: Array<string> = ['m.deleted = 0', VISIBLE]
-    const params: Array<unknown> = []
-    if (terms !== '') {
-      where.push('messages_fts MATCH ?')
-      params.push(terms)
-    }
-    if (from !== undefined) {
-      where.push(`m.user_id IN (${from.map(() => '?').join(', ')})`)
-      params.push(...from)
-    }
-    if (into !== undefined) {
-      where.push(`m.channel IN (${into.map(() => '?').join(', ')})`)
-      params.push(...into)
-    }
-    const source = terms === '' ? 'messages m' : 'messages_fts f JOIN messages m ON m.rowid = f.rowid'
     const rows = yield* sql.unsafe<MessageRow>(
-      `SELECT ${MESSAGE_COLUMNS} FROM ${source} JOIN conversations c ON c.id = m.channel
-       WHERE ${where.join(' AND ')} ORDER BY ${terms === '' ? '' : 'f.rank, '}m.ts DESC LIMIT ? OFFSET ?`,
-      [...params, limit + 1, offset],
+      `SELECT ${MESSAGE_COLUMNS} FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${compiled.order} LIMIT ? OFFSET ?`,
+      [...compiled.params, limit + 1, offset],
     )
     return { messages: yield* named(sql, rows.slice(0, limit)), ...(rows.length > limit ? { next: cursor(String(offset + limit)) } : {}) } satisfies MessagePage
   })

@@ -1,17 +1,15 @@
-import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult } from '@juno/contract'
+import { compileSearchSql, searchFts, type ResolvedSearch } from '../searchCompiler'
+import { resolveSearch } from '../searchResolve'
+import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult, type SearchTopic } from '@juno/contract'
 import { FALLBACK_TITLE_WORDS, firstWords, mainLabel, mentionedUserIds, mentionedUsergroupIds, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
 import { messageBody, readableText, type Lookups, type MessageContent, type UsergroupName } from '@juno/richtext'
-import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
+import { StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
 
 const topicColumns = `i.topic_id AS id, i.channel, i.kind, i.last_activity_ts,
   COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,
   COALESCE(json_extract(i.preview_json, '$.rootText'), '') AS title`
-const topicJoins = `JOIN conversations c ON c.id = i.channel
-  LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-  LEFT JOIN ignored_channels g ON g.channel = i.channel`
-const visible = `c.is_member = 1 AND g.channel IS NULL`
 
 interface TopicHit {
   readonly id: string
@@ -22,7 +20,7 @@ interface TopicHit {
   readonly title: string
 }
 
-interface MessageHit {
+export interface MessageHit {
   readonly attachments_json?: string | null
   readonly blocks_json?: string | null
   readonly bot_name?: string | null
@@ -43,13 +41,11 @@ interface ConversationRow {
 }
 
 /** The statements used by the query, also compiled by the benchmark profiler. */
-export function searchStatements(sql: SqlClient.SqlClient, query: string, limit: number) {
-  const topics = sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM (
-      SELECT i.topic_id, rank AS score FROM topic_titles_fts f JOIN topic_index i ON i.rowid = f.rowid WHERE topic_titles_fts MATCH ?
-      UNION ALL
-      SELECT o.topic_id, rank AS score FROM overlay_titles_fts f JOIN topic_overlay o ON o.rowid = f.rowid WHERE overlay_titles_fts MATCH ?
-    ) hits JOIN topic_index i ON i.topic_id = hits.topic_id ${topicJoins}
-    WHERE ${visible} GROUP BY i.topic_id ORDER BY MIN(hits.score), i.last_activity_ts DESC, i.topic_id LIMIT ?`, [query, query, limit])
+export function searchStatements(sql: SqlClient.SqlClient, search: ResolvedSearch, limit: number) {
+  const query = searchFts(search.query, true)
+  const titleQuery = compileSearchSql(search, { titles: true, prefix: true })
+  const messageQuery = compileSearchSql(search, { prefix: true })
+  const topics = sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM ${titleQuery.source} WHERE ${titleQuery.where} ORDER BY ${titleQuery.order} LIMIT ?`, [...titleQuery.params, limit])
   const places = Math.min(limit, SEARCH_PLACES_MAX)
   const channels = sql<{ id: string; main: 0 | 1 }>`SELECT c.id, EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || c.id) AS main
     FROM channels_fts f JOIN conversations c ON c.rowid = f.rowid LEFT JOIN ignored_channels g ON g.channel = c.id
@@ -59,10 +55,8 @@ export function searchStatements(sql: SqlClient.SqlClient, query: string, limit:
       (SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1
         AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1) AS dm
     FROM people_fts f JOIN users u ON u.rowid = f.rowid WHERE people_fts MATCH ${query} AND u.deleted = 0 ORDER BY f.rank, u.id LIMIT ${places}`
-  const messages = sql<MessageHit>`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name
-    FROM messages_fts f JOIN messages m ON m.rowid = f.rowid JOIN conversations c ON c.id = m.channel
-    LEFT JOIN ignored_channels g ON g.channel = m.channel
-    WHERE messages_fts MATCH ${query} AND m.deleted = 0 AND c.is_member = 1 AND g.channel IS NULL ORDER BY f.rank, m.channel, m.ts LIMIT ${limit}`
+  const messages = sql.unsafe<MessageHit>(`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name
+    FROM ${messageQuery.source} WHERE ${messageQuery.where} ORDER BY ${query === '' ? messageQuery.order : 'f.rank, m.channel, m.ts'} LIMIT ?`, [...messageQuery.params, limit])
   return { topics, channels, people, messages }
 }
 
@@ -210,21 +204,22 @@ export const messageResults = (
 export const querySearch = Effect.fn('search.query')(function* (text: string, requestedLimit = SEARCH_LIMIT_MAX) {
   const sql = yield* StoreReader
   const limit = Math.max(1, Math.min(SEARCH_LIMIT_MAX, requestedLimit))
-  const terms = ftsQuery(text.trim())
-  if (terms === '') {
-    const recent = yield* sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM topic_index i ${topicJoins}
-      WHERE ${visible} ORDER BY i.last_activity_ts DESC, i.topic_id LIMIT ?`, [limit])
+  const resolved = yield* resolveSearch(text)
+  const terms = searchFts(resolved.query, true)
+  if (text.trim() === '') {
+    const recent = yield* titleHits(resolved, limit)
     const places = yield* readPlaces(sql, new Set(recent.map((hit) => hit.channel)))
     const names = yield* titleLookups(sql, recent.map((hit) => hit.title))
     return recent.map((hit) => topicResult(hit, placeOf(places, hit.channel), names))
   }
   // Only the last word is a prefix, matching an input still being typed.
-  const statements = searchStatements(sql, `${terms}*`, limit)
-  const channels = yield* statements.channels
-  const people = yield* statements.people
+  const navigation = resolved.query.clauses.every((c) => c.kind === 'term' || c.kind === 'phrase') && terms !== ''
+  const statements = searchStatements(sql, resolved, limit)
+  const channels = navigation ? yield* statements.channels : []
+  const people = navigation ? yield* statements.people : []
   const room = limit - channels.length - people.length
-  const topics = room > 0 ? yield* statements.topics : []
-  const messages = room - topics.length > 0 ? yield* statements.messages : []
+  const topics = room > 0 ? yield* titleHits(resolved, room, true) : []
+  const messages = room - topics.length > 0 ? yield* messageHits(resolved, room - topics.length, { prefix: true, ranked: true }) : []
   const places = yield* readPlaces(sql, new Set([...channels.map((hit) => hit.id), ...topics.map((hit) => hit.channel)]))
   const names = yield* titleLookups(sql, topics.map((hit) => hit.title))
   const results: SearchResult[] = [
@@ -238,6 +233,28 @@ export const querySearch = Effect.fn('search.query')(function* (text: string, re
   return [...results, ...(yield* messageResults(found))]
 })
 
-function topicResult(hit: TopicHit, place: SearchPlace, names: Lookups): SearchResult {
+function topicResult(hit: TopicHit, place: SearchPlace, names: Lookups): SearchTopic {
   return { kind: 'topic', id: hit.id, title: topicTitle(hit, place, names), place, at: millisOf(hit.last_activity_ts) }
 }
+
+export const messageHits = (search: ResolvedSearch, limit: number, options: { prefix?: boolean; ranked?: boolean; offset?: number } = {}) => Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const compiled = compileSearchSql(search, options)
+  const order = options.ranked && searchFts(search.query) !== '' ? 'f.rank, m.channel, m.ts' : compiled.order
+  return yield* sql.unsafe<MessageHit>(`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name
+    FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${order} LIMIT ? OFFSET ?`, [...compiled.params, limit, options.offset ?? 0])
+})
+
+const titleHits = (search: ResolvedSearch, limit: number, prefix = false) => Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const compiled = compileSearchSql(search, { titles: true, prefix })
+  return yield* sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${compiled.order} LIMIT ?`, [...compiled.params, limit])
+})
+export const titleResults = (search: ResolvedSearch, limit: number) => Effect.gen(function* () {
+  if (searchFts(search.query) === '') return []
+  const sql = yield* StoreReader
+  const hits = yield* titleHits(search, limit)
+  const places = yield* readPlaces(sql, new Set(hits.map((h) => h.channel)))
+  const names = yield* titleLookups(sql, hits.map((h) => h.title))
+  return hits.map((hit) => topicResult(hit, placeOf(places, hit.channel), names))
+})

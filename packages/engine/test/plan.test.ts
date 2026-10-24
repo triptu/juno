@@ -1,3 +1,4 @@
+import { parseSearchQuery } from '@juno/domain'
 // Every live query statement reads through an index (performance 6): its plan may not scan messages,
 // topic_index, reactions or topic_overlay, which grow with the workspace. Which index each one picks is
 // the planner's business; only a full scan fails. The list names the statements of every live query:
@@ -138,7 +139,7 @@ function statements(): ReadonlyArray<readonly [string, Statement]> {
 itEffect('no live query statement scans a table that grows with the workspace', () =>
   Effect.gen(function* () {
     const reader = yield* StoreReader
-    const search = Object.entries(searchStatements(reader, '"roll"*', 50)).map(([name, statement]) => {
+    const search = Object.entries(searchStatements(reader, { query: parseSearchQuery('roll'), timeZone: 'UTC', identities: new Map() }, 50)).map(([name, statement]) => {
       const [sql, params] = statement.compile()
       return [`⌘K search ${name}`, { sql, params }] as const
     })

@@ -1,3 +1,4 @@
+import searchDates from './202610241600_search_dates'
 import messageAttention from './202610201300_message_attention'
 import mutationRepair from './202610190100_mutation_repair'
 import dmPartnerIndex from './202610201301_dm_partner_index'
@@ -55,4 +56,5 @@ export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlCli
   '202610190100_mutation_repair': mutationRepair,
   '202610201300_message_attention': messageAttention,
   '202610201301_dm_partner_index': dmPartnerIndex,
+  '202610241600_search_dates': searchDates,
 }

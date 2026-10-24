@@ -1,3 +1,5 @@
+import { SyncLink } from '../syncLink'
+import { searchSessions } from './session'
 import { NotSignedIn, SearchRoutes } from '@juno/contract'
 import { AiProvider } from '@juno/ai'
 import { liveQuery } from '@juno/store'
@@ -14,18 +16,21 @@ export const SearchHandlers = SearchRoutes.toLayer(
     const workspace = yield* Workspace
     const session = yield* SessionClient
     const provider = yield* AiProvider
+    const sessions = searchSessions(session, yield* SyncLink)
     const store = Effect.gen(function* () {
       const open = yield* workspace.current
       if (open === undefined) return yield* new NotSignedIn()
       return open.context
     })
     return {
+      'search.session': (input) => serveLiveValue(workspace.changes.pipe(Stream.switchMap((open) => open === undefined ? Stream.empty : sessions.stream(open, input)))).pipe(Stream.orDie),
+      'search.more': ({ sessionId, generation, offset }) => sessions.more(sessionId, generation, offset),
       'search.query': ({ query, limit }) => {
         const runs = workspace.changes.pipe(
           Stream.switchMap((open) => {
             if (open === undefined) return Stream.empty
             return liveQuery(
-              ['messages', 'topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels'],
+              ['messages', 'topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'sidebar_view_channels', 'reactions'],
               timed(querySearch(query, limit)),
             ).pipe(Stream.provide(open.context))
           }),

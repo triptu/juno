@@ -1,15 +1,7 @@
-/**
- * State for ⌘K (spec section 10, performance 4.3): whether the palette is
- * open, the local search live value, and the two one-shot calls that come
- * after it, Slack's search and the command reading.
- *
- * Local search has no debounce: the container feeds `searchAtom` through
- * `useDeferredValue`, so typing is never blocked. The command and Slack's
- * search wait for a pause in typing (`COMMAND_DELAY_MS`, `SLACK_DELAY_MS`)
- * and never delay the local rows.
- */
+/** Local-only ⌘K search. The command reader waits briefly; local results have no debounce. */
+import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { newChatRanked, searchCommand, searchQuery, searchSlack } from '@juno/contract'
+import { newChatRanked, searchCommand, searchQuery, type SearchMessage } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 
@@ -48,8 +40,8 @@ const conversationsFamily = liveQuery(newChatRanked)
 /** The Conversations tab's rows for the text (without a leading ">"), trimmed. */
 export const paletteConversationsAtom = (query: string) => conversationsFamily({ query: query.trim() })
 
-/** Slack's message search for `query`. Empty when Slack cannot be reached. */
-export const searchSlackMessages = (registry: Registry, query: string) => runCommand(registry, searchSlack, { query: query.trim() })
+/** Compatibility for the current palette container until stage B removes its remote-results slot. */
+export const searchSlackMessages = (_registry: Registry, _query: string) => Promise.resolve(Exit.succeed<ReadonlyArray<SearchMessage>>([]))
 
 /** What the text means as a command, or `null`. */
 export const readCommand = (registry: Registry, text: string) => runCommand(registry, searchCommand, { text: text.trim() })
