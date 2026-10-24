@@ -287,7 +287,7 @@ export {
   searchFocusAtom,
   prefetchSearchResult,
   searchPicksAtom,
-  readerWindow,
+  matchWindow,
   requestSearchFocus,
   searchIsEmpty,
   searchPrefsAtom,

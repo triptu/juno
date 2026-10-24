@@ -10,7 +10,7 @@
  */
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { afterPaint, mark, measure } from '@juno/state/perf'
-import { flashMessage, loadOlderMessages, messageListAtom, messageWindowSpecAtom, readerWindow, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
+import { bottomWindow, flashMessage, loadOlderMessages, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { openTopicAtInBackground, openTopicInBackground } from '../navigation'
 import { justAfter } from '../slackLinks'
@@ -44,11 +44,12 @@ export function moveReader(sessionId: string, target: SearchSelection, how: 'poi
   const view = readerView(sessionId, target.topicId)
   if (shownTopics.get(sessionId) === target.topicId) {
     if (target.ts === undefined) return
-    if (!registry.get(messageListAtom(view)).rows.has(target.ts)) registry.set(messageWindowSpecAtom(view), readerWindow(target.ts))
+    if (!registry.get(messageListAtom(view)).rows.has(target.ts)) registry.set(messageWindowSpecAtom(view), matchWindow(target.ts))
     flashMessage(registry, target.topicId, target.ts)
     return
   }
-  registry.set(messageWindowSpecAtom(view), readerWindow(target.ts))
+  // The newest messages first, as a topic opens; the waiter moves the window to an older match (`Waiter`).
+  registry.set(messageWindowSpecAtom(view), bottomWindow)
   registry.set(scrollSnapshotAtom(view), target.ts === undefined ? undefined : { anchorKey: target.ts, offset: READER_TOP })
 }
 
@@ -108,7 +109,7 @@ function Waiter({ sessionId, target, onReady }: { readonly sessionId: string; re
   const list = useAtomValue(messageListAtom(view))
   useLayoutEffect(() => {
     // A restored selection had no event to set the view; a match only Slack found is fetched first, as ⌘K does.
-    if (registry.get(messageWindowSpecAtom(view)).anchor !== target.ts) moveReader(sessionId, target, 'pointer')
+    moveReader(sessionId, target, 'pointer')
     if (target.stored === false && target.ts !== undefined) void loadOlderMessages(registry, target.topicId, justAfter(target.ts))
   }, [sessionId, view, target])
   const [late, setLate] = useState(false)
@@ -116,6 +117,12 @@ function Waiter({ sessionId, target, onReady }: { readonly sessionId: string; re
     const timer = setTimeout(() => setLate(true), READY_WAIT_MS)
     return () => clearTimeout(timer)
   }, [])
+  // A match older than the newest messages: the window around it instead, as a link to an old message opens.
+  const ts = target.ts
+  const older = list.ready && list.spec.anchor === undefined && ts !== undefined && !list.rows.has(ts)
+  useLayoutEffect(() => {
+    if (older && ts !== undefined) registry.set(messageWindowSpecAtom(view), matchWindow(ts))
+  }, [older, view, ts])
   const known = detail._tag === 'Success'
   const ready = known && (detail.value === null || late || (list.ready && (target.ts === undefined || list.rows.has(target.ts))))
   const report = useEffectEvent(onReady)

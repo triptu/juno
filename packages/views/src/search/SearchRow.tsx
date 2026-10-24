@@ -58,7 +58,8 @@ function Stop({ row, now, selected, focused, tabbable, onSelect, onOpen, onExpan
       </div>
     )
   }
-  const look = [styles.stop, focusRing.inset, selected && styles.selected, selected && focused && styles.selectedFocused] as const
+  // The selection's tint is the focus indicator, as in ⌘K: no ring on every arrow press (review.md).
+  const look = [styles.stop, selected && styles.selected, selected && focused && styles.selectedFocused] as const
   return (
     <div {...option} role="option" aria-selected={selected} {...stylex.props(...shapeOf(row.kind), ...look)}>
       <RowContent row={row} now={now} />
@@ -186,6 +187,7 @@ function Marked({ text: value, ranges }: { readonly text: string; readonly range
 const styles = stylex.create({
   // A row the arrows stop on: in flow, laid out only near the view.
   stop: {
+    outlineStyle: 'none',
     contain: 'content',
     contentVisibility: 'auto',
     cursor: 'default',

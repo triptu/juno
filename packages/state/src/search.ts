@@ -72,8 +72,11 @@ export type SearchSession = typeof SearchSession.Type
 export const emptySearchSession: SearchSession = { text: '', chips: [], sort: 'newest', commit: 0 }
 export const decodeSearchSession = Schema.decodeUnknownOption(SearchSession)
 
+/** A from: or in: still being typed at the end of the words: the picker is open, and the search waits for the pick. */
+const TYPING_IDENTITY = /(^|\s)-?(from|in):\S*$/i
+
 /** Nothing to search for: the empty field shows recent searches. A topic scope alone is still empty. */
-export const searchIsEmpty = (session: SearchSession): boolean => session.text.trim() === '' && session.chips.length === 0
+export const searchIsEmpty = (session: SearchSession): boolean => session.text.replace(TYPING_IDENTITY, '').trim() === '' && session.chips.length === 0
 
 /** A new Search tab's id. */
 export const newSearchSessionId = (): string => `search-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
@@ -166,7 +169,8 @@ export function setSearchPrefs(registry: Registry, change: Partial<SearchPrefs>)
 
 /** The session as one `SearchQuery`: the chips' tokens, then the typed text, with the toggles, sort and topic scope. */
 export function searchQueryOf(session: SearchSession, prefs: SearchPrefs): SearchQuery {
-  const raw = [...session.chips.map((chip) => chip.token), session.text.trim()].filter((part) => part !== '').join(' ')
+  const words = session.text.replace(TYPING_IDENTITY, '').trim()
+  const raw = [...session.chips.map((chip) => chip.token), words].filter((part) => part !== '').join(' ')
   const topic = session.topic === undefined ? undefined : { channel: session.topic.channel, ...(session.topic.threadTs === undefined ? {} : { threadTs: session.topic.threadTs }) }
   return parseSearchQuery(raw, { scope: { hideApps: prefs.hideApps, hideAutomated: prefs.hideAutomated, sort: session.sort, groupByThread: prefs.groupByThread, ...(topic === undefined ? {} : { topic }) } })
 }
@@ -245,12 +249,12 @@ export const searchPicksAtom = (query: string | undefined) => (query === undefin
 
 // The reader
 
-/** The window the reader shows a match in: the messages around it, so it opens at the match in one frame. */
-export const readerWindow = (ts: string | undefined): MessageWindowSpec => (ts === undefined ? bottomWindow : { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
+/** The window around an older match, for the reader when the topic's newest messages do not reach back to it. */
+export const matchWindow = (ts: string): MessageWindowSpec => ({ anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
 
-/** Warms a result the arrows may reach next: its header and the window the reader would show (performance 4.2). */
-export function prefetchSearchResult(registry: Registry, topicId: string, ts: string | undefined): void {
-  prefetch(registry, [messagesAtom(topicId, readerWindow(ts)), topicAtom(topicId)])
+/** Warms a result the arrows may reach next: its header and the newest messages, where most matches are (performance 4.2). */
+export function prefetchSearchResult(registry: Registry, topicId: string): void {
+  prefetch(registry, [messagesAtom(topicId, bottomWindow), topicAtom(topicId)])
 }
 
 // Recent searches

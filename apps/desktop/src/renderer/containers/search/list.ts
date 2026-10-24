@@ -32,7 +32,8 @@ export async function openResultHere(target: SearchSelection): Promise<void> {
 /** Rows for the snapshot; undefined for an empty field. A search scoped to one thread shows all its matches. */
 export function useResultRows(session: SearchSession, empty: boolean, snapshot: SearchSnapshot | undefined, grouped: boolean, expanded: ReadonlySet<string>) {
   const groups = snapshot?.groups
-  const olderIndex = snapshot?.frontier.olderGroupIndex
+  // The line shows where Slack's pages stop; before Slack's first page, or without Slack, the local rows show plainly.
+  const olderIndex = snapshot === undefined || snapshot.pagination.page === 0 ? undefined : snapshot.frontier.olderGroupIndex
   const scopedThread = session.topic?.threadTs !== undefined
   const rows = useMemo(() => {
     if (empty) return undefined
@@ -103,7 +104,7 @@ export function useWarmNeighbours(selectedId: string | undefined, stops: Readonl
     const at = stops.findIndex((row) => row.id === selectedId)
     for (const row of [stops[at - 1], stops[at + 1]]) {
       const target = row === undefined ? undefined : readerTarget(row)
-      if (target !== undefined) prefetchSearchResult(registry, target.topicId, target.ts)
+      if (target !== undefined) prefetchSearchResult(registry, target.topicId)
     }
   }, [selectedId, stops])
 }
