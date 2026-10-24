@@ -1,5 +1,6 @@
-// Setting up a model provider from the Juno tab, as a first-time user does:
-// "Juno needs a model", the provider section of Settings › Juno, then the chat.
+// Setting up a model provider as a first-time user does (SPEC 13.10): "Set up Juno" right
+// after the first Slack sign-in, or Skip for now and later "Juno needs a model", the provider
+// section of Settings › Juno, then the chat.
 import { startFakeOpenAi } from '@juno/agent-testing/openai'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
@@ -24,10 +25,15 @@ test.describe.configure({ timeout: 90_000 })
 
 const junoNav = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ })
 
-test('with no provider the tab and the panel say Juno needs a model, and Add a provider sets one up', { tag: '@canary' }, async ({ juno, model }) => {
-  await juno.signIn()
+test('after Skip for now the tab and the panel say Juno needs a model, and Add a provider sets one up', { tag: '@canary' }, async ({ juno, model }) => {
+  await juno.signIn({ skipSetUp: false })
+  await expect(juno.setUp.getByRole('heading', { name: 'Set up Juno' })).toBeVisible({ timeout: 15_000 })
+  await juno.setUp.getByRole('button', { name: 'Skip for now' }).click()
   await juno.waitForSync()
   expect(await hooks(juno.surface, 'agentState')).toBe('stopped')
+  // AI assist stays on: Home writes to Juno by default.
+  await juno.home.open()
+  await juno.write.expectDestination('Juno')
   await juno.setWindowSize(1400, 900)
 
   // The panel beside a topic says so too, with no composer.
@@ -66,6 +72,30 @@ test('with no provider the tab and the panel say Juno needs a model, and Add a p
   await chat.expectJuno('You said: what is on today?')
   expect(model.requests.at(-1)?.key).toBe(KEY)
   expect(model.requests.filter((request) => !request.model.includes('haiku')).at(-1)?.model).toBe('anthropic/claude-opus-5.5')
+})
+
+test('after sign-in, Set up Juno takes an OpenRouter key and the default model, and the first chat is answered', async ({ juno, model }) => {
+  await juno.signIn({ skipSetUp: false })
+  const { setUp } = juno
+  await expect(setUp.getByRole('heading', { name: 'Set up Juno' })).toBeVisible({ timeout: 15_000 })
+  // Codex is not installed under tests, so two choices.
+  await expect(setUp.getByRole('radio')).toHaveText(['OpenRouter', 'OpenAI-compatible'])
+  await expect(setUp.getByRole('button', { name: 'Continue' })).toBeDisabled()
+  await setUp.getByLabel('API key').fill(KEY)
+  await setUp.getByLabel('API key').press('Enter')
+  // Saved: the agent starts, and the model row offers its models with Sonnet chosen.
+  const select = setUp.locator('[data-set-up-model]').getByRole('combobox', { name: 'Model' })
+  await expect(select).toBeVisible({ timeout: 20_000 })
+  await expect(select.locator('option:checked')).toHaveText(/^Claude Sonnet/)
+  await setUp.getByRole('button', { name: 'Continue' }).click()
+
+  // The app, with Juno ready on the key just saved.
+  await juno.waitForSync()
+  await junoNav(juno).click()
+  const chat = JunoChatPane.tab(juno.win)
+  await chat.send('what is on today?')
+  await chat.expectJuno('You said: what is on today?')
+  expect(model.requests.at(-1)?.key).toBe(KEY)
 })
 
 test('an OpenAI-compatible endpoint that lists no models takes a typed model id', async ({ juno }) => {

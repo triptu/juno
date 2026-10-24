@@ -23,7 +23,7 @@ async function switchTo(juno: Juno, where: 'aside[data-juno-panel]' | 'main', la
   await juno.win.getByRole('menu', { name: 'Juno pages' }).getByRole('menuitem', { name: label, exact: true }).click()
 }
 
-test('the panel switches to Activity and back in place, and a run says what started it, what it read and what it did', async ({ juno }) => {
+test('the panel switches to Activity and back in place, a run says what started it, what it read and what it did, and in the Juno tab Back and Forward walk the switches', async ({ juno }) => {
   await ready(juno)
   await juno.sidebar.row(TOPIC).open()
   await juno.tabs.menu('juno')
@@ -61,10 +61,8 @@ test('the panel switches to Activity and back in place, and a run says what star
   await panel.expectJuno('You said: what is on today?')
   await expect(juno.win.locator('aside[data-juno-panel] [data-juno-header="chat"]')).toBeVisible()
   await juno.topic.expectTitle(TOPIC)
-})
 
-test('in the Juno tab the switcher moves within the tab, and Back and Forward walk it', async ({ juno }) => {
-  await ready(juno)
+  // In the Juno tab the switcher moves within the tab, and each move is a history entry.
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const chat = JunoChatPane.tab(juno.win)
   await chat.send('hello there')
@@ -72,7 +70,7 @@ test('in the Juno tab the switcher moves within the tab, and Back and Forward wa
 
   await switchTo(juno, 'main', 'Activity')
   await juno.tabs.expectActive('Activity')
-  await expect(juno.win.locator('main [data-activity-run]').first().locator('[data-activity-trigger]')).toHaveText('hello there')
+  await expect(juno.win.locator('main [data-activity-run] [data-activity-trigger]').filter({ hasText: 'hello there' })).toBeVisible()
   // Every Juno page has the same switcher in the same place.
   await switchTo(juno, 'main', 'Scheduled')
   await juno.tabs.expectActive('Scheduled')

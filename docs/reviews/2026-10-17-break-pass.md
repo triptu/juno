@@ -9,9 +9,9 @@ The aim was to use the features that landed on 10-16 and 10-17 together, the
 way a busy day does: several tabs on one topic, the Juno panel, New chat with
 Frequent, Settings, emoji suggestions, a dropped connection and a relaunch.
 
-The tests are in `apps/desktop/e2e/break-pass-1017.spec.ts`,
-`apps/desktop/e2e/break-pass-1017-input.spec.ts` and
-`apps/desktop/e2e/juno-agent/break-pass-1017.spec.ts`.
+The tests are in `apps/desktop/e2e/break-pass-1017.spec.ts` and
+`apps/desktop/e2e/break-pass-1017-input.spec.ts`; the Juno panel's are part of
+the panel flows in `apps/desktop/e2e/juno-agent/panel.spec.ts`.
 
 ## Fixed
 

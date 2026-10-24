@@ -79,7 +79,7 @@ test('Ask Juno on highlighted text opens the panel with the selection quoted, an
   await expect(chip).toHaveCount(0)
 })
 
-test('⌘J with text selected across messages asks about it without closing the panel, and Backspace on the chip removes it', async ({ juno, model }) => {
+test('⌘J with text selected across messages asks about it without closing the panel, Backspace on the chip removes it, and a drag while the field has focus gives a new chip', async ({ juno, model }) => {
   await ready(juno)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
@@ -114,17 +114,11 @@ test('⌘J with text selected across messages asks about it without closing the 
   await panel.send('and now?')
   await panel.expectJuno('You said: and now?')
   expect(model.inputs().at(-1)).not.toContain('<selection')
-})
 
-test('a drag over a message highlights it while the panel\'s field has focus, and the chip takes it', async ({ juno }) => {
-  await ready(juno)
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.expectTitle(POSTGRES)
-  await juno.tabs.menu('juno')
-  const panel = JunoChatPane.panel(juno.win)
-  await expect(panel.composer).toBeFocused()
+  // A drag over a message highlights it while the panel's field has focus, and the chip takes it.
   // The press takes focus from the field; resting a few frames before moving, as a person does, must not lose the drag's start.
   // The message's first words, at the start of the line: the hover toolbar sits at its end.
+  await expect(panel.composer).toBeFocused()
   await highlight(juno, juno.topic.message(POSTGRES), 'Draft plan is in the doc')
-  await expect(panel.root.locator('[data-panel-selection]')).toHaveText('Leo: “Draft plan is in the doc”')
+  await expect(chip).toHaveText('Leo: “Draft plan is in the doc”')
 })

@@ -5,7 +5,7 @@
 import type { FakeMcpServer } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { addServer, card, configure, openChat, readySynced as ready } from './agent'
+import { addServer, card, configure, openChat, openPage, readySynced as ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 function answer(request: OpenRouterRequest): string | ToolCallAnswer {
@@ -70,81 +70,60 @@ test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
-test('a search with no read-only mark runs under Auto with no card', async ({ juno, mcp, searchGate }) => {
+test('a search with no read-only mark runs under Auto, an approved call runs once and shows its result, a failed one shows the error, and a read under Always ask says what it found', async ({ juno, mcp, searchGate }) => {
   await ready(juno)
-  const { id } = await addServer(juno, 'Context', mcp.url)
+  const { id, row } = await addServer(juno, 'Context', mcp.url)
   const pane = await openChat(juno)
+  const changes = card(pane, 'change')
   searchGate.hold()
   await pane.send(`learn about me on ${id}`)
   // While the call runs, the status bubble names the connection and what the tool does.
   await expect(pane.root.locator('[data-chat-status]')).toHaveText('Searching Context')
-
   searchGate.release()
   await pane.expectJuno('You prefer short messages.')
-  await expect(card(pane, 'change')).toHaveCount(0)
+  await expect(changes).toHaveCount(0)
   expect(mcp.calls.map((call) => call.name)).toEqual(['search_user_context'])
-})
 
-test('an approved call runs once, the card shows its result, and Juno goes on with it', async ({ juno, mcp }) => {
-  await ready(juno)
-  const { id } = await addServer(juno, 'Context', mcp.url)
-  const pane = await openChat(juno)
   await pane.send(`keep a note on ${id} about lunch`)
-  await pane.expectJuno('That needs your OK.')
-  const asked = card(pane, 'change')
-  await expect(asked).toBeVisible()
+  const asked = changes.nth(0)
+  await expect(asked).toBeVisible({ timeout: 15_000 })
   // Named by what it does, with a short verb on the button, and its values without JSON quotes.
   await expect(asked.locator('[data-chat-card-kind]')).toHaveText('Create note in Context')
   await expect(asked.locator('[data-change-field="title"]')).toContainText('Lunch')
   await expect(asked.locator('[data-change-field="title"]')).not.toContainText('"')
-  expect(mcp.calls).toHaveLength(0)
-
+  expect(mcp.calls).toHaveLength(1)
   await asked.getByRole('button', { name: 'Create note' }).click()
   await expect(asked).toHaveAttribute('data-card-status', 'done')
   await expect(asked).toContainText('Done')
   // A plain line, never the server's JSON; all of it is behind Show result.
   await expect(asked.locator('[data-card-result]')).toHaveText('Saved')
   expect(await asked.innerText()).not.toContain('{"')
-
   await asked.getByRole('button', { name: 'Show result' }).click()
   await expect(asked.locator('[data-card-result-full]')).toHaveText('id: note-1\nsaved: true')
-
-  expect(mcp.calls.map((call) => call.name)).toEqual(['create_note'])
+  expect(mcp.calls.map((call) => call.name)).toEqual(['search_user_context', 'create_note'])
   // The run goes on with the result.
   await pane.expectJuno('Saved. note-1')
-})
 
-test('a failed call shows the server error, and Juno hears it', async ({ juno, mcp }) => {
-  await ready(juno)
-  const { id } = await addServer(juno, 'Context', mcp.url)
-  const pane = await openChat(juno)
   await pane.send(`keep a note on ${id}, the failing one`)
-  await pane.expectJuno('That needs your OK.')
-  const asked = card(pane, 'change')
-  await asked.getByRole('button', { name: 'Create note' }).click()
-  await expect(asked).toHaveAttribute('data-card-status', 'failed')
-  await expect(asked.locator('[data-card-result]')).toContainText('Notes are full for this workspace.')
-
+  const failing = changes.nth(1)
+  await failing.getByRole('button', { name: 'Create note' }).click()
+  await expect(failing).toHaveAttribute('data-card-status', 'failed')
+  await expect(failing.locator('[data-card-result]')).toContainText('Notes are full for this workspace.')
   await pane.expectJuno('Saving the note failed.')
-})
 
-test('a read under Always ask says Done once it ran, with how many it found', async ({ juno, mcp }) => {
-  await ready(juno)
-  const { id, row } = await addServer(juno, 'Context', mcp.url)
+  await openPage(juno, 'Connections')
   const sheet = await configure(juno, row)
   await sheet.locator('[data-tool="search_user_context"]').getByRole('combobox', { name: 'Auto-review: search_user_context' }).selectOption('always')
   await expect(sheet.locator('[data-tool="search_user_context"]')).toHaveAttribute('data-tool-review', 'always')
   await sheet.getByRole('button', { name: 'Done' }).click()
-  const pane = await openChat(juno)
+  await openChat(juno)
   await pane.send(`learn about me on ${id}`)
-  await pane.expectJuno('That needs your OK.')
-  const asked = card(pane, 'change')
-  await expect(asked.locator('[data-chat-card-kind]')).toHaveText('Search Context')
-  await asked.getByRole('button', { name: 'Search' }).click()
-  await expect(asked).toHaveAttribute('data-card-status', 'done')
-  await expect(asked).toContainText('Done')
-  await expect(asked).not.toContainText('Applied')
-  await expect(asked.locator('[data-card-result]')).toHaveText('Found 1 result')
-
-  await pane.expectJuno('You prefer short messages.')
+  const search = changes.nth(2)
+  await expect(search.locator('[data-chat-card-kind]')).toHaveText('Search Context', { timeout: 15_000 })
+  await search.getByRole('button', { name: 'Search' }).click()
+  await expect(search).toHaveAttribute('data-card-status', 'done')
+  await expect(search).toContainText('Done')
+  await expect(search).not.toContainText('Applied')
+  await expect(search.locator('[data-card-result]')).toHaveText('Found 1 result')
+  await expect(pane.junoBubble('You prefer short messages.')).toHaveCount(2, { timeout: 15_000 })
 })

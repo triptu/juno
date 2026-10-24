@@ -1,5 +1,5 @@
-// Cards the owner clicks (plan v3 §16, flows 3, 5 and 11): a multi-send card where one post
-// fails, Dismiss on a Send card, a hostile Slack message that turns a task into a card with a
+// Cards the owner clicks (plan v3 §16, flows 3, 5 and 11): Dismiss on a Send card, a multi-send
+// card where one post fails, a hostile Slack message that turns a task into a card with a
 // Because line, and the Budget card at the daily cap.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
@@ -50,14 +50,23 @@ test.use({ synced: true })
 test.describe.configure({ timeout: 150_000 })
 
 test(
-  'a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has both',
+  'Dismiss on a Send card sends nothing; a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has all three',
   async ({ juno, fake, slack }) => {
     await ready(juno)
     const eng = slack.channel('eng')
     const product = slack.channel('product')
     const chat = await openChat(juno)
+    await chat.send(`send the draft is ready to m:${eng}`)
+    const dismissed = card(chat, 'sendMessage').nth(0)
+    await expect(dismissed).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
+    await chat.expectJuno('It is ready for you.')
+    await dismissed.getByRole('button', { name: 'Dismiss', exact: true }).last().click()
+    await expect(dismissed).toHaveAttribute('data-card-status', 'dismissed')
+    await expect(dismissed.getByText('Dismissed', { exact: true })).toBeVisible()
+    expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
+
     await chat.send(`send the launch moved to Tuesday to m:${eng} and m:${product}`)
-    const sendCard = card(chat, 'sendMessage')
+    const sendCard = card(chat, 'sendMessage').nth(1)
     await expect(sendCard).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
     await expect(sendCard.locator('[data-send-row]')).toHaveCount(2)
 
@@ -77,37 +86,17 @@ test(
 
     const posted = [eng, product].flatMap((channel) => fake.messages(channel)).filter((message) => message.text?.startsWith('the launch moved to Tuesday') === true)
     expect(posted).toHaveLength(1)
+    expect(fake.messages(eng).filter((message) => message.text?.startsWith('the draft is ready') === true)).toEqual([])
 
     const page = await openPage(juno, 'Activity')
     await openRuns(page)
     const actions = page.locator('[data-activity-action]')
-    await expect(actions).toHaveCount(2)
+    await expect(actions).toHaveCount(3)
     await expect(page.locator('[data-activity-action="done"]')).toContainText('Approved')
     await expect(page.locator('[data-activity-action="failed"]')).toContainText('Approved')
+    await expect(actions.filter({ hasText: 'Declined' })).toHaveCount(1)
   },
 )
-
-test('Dismiss on a Send card sends nothing, and Activity records it as declined', async ({ juno, fake, slack }) => {
-  await ready(juno)
-  const eng = slack.channel('eng')
-  const chat = await openChat(juno)
-  await chat.send(`send the launch moved to Tuesday to m:${eng}`)
-  const sendCard = card(chat, 'sendMessage')
-  await expect(sendCard).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
-  await chat.expectJuno('It is ready for you.')
-
-  await sendCard.getByRole('button', { name: 'Dismiss', exact: true }).last().click()
-  await expect(sendCard).toHaveAttribute('data-card-status', 'dismissed')
-  await expect(sendCard.getByText('Dismissed', { exact: true })).toBeVisible()
-
-  const page = await openPage(juno, 'Activity')
-  await openRuns(page)
-  const action = page.locator('[data-activity-action]')
-  await expect(action).toHaveCount(1)
-  await expect(action).toContainText('Declined')
-  expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
-  expect(fake.messages(eng).filter((message) => message.text?.startsWith('the launch moved to Tuesday') === true)).toEqual([])
-})
 
 test('after reading a hostile Slack message, a task becomes a card with a Because line and nothing starts', async ({ juno, fake, slack, model }) => {
   await ready(juno)

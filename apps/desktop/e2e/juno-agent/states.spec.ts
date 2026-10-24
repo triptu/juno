@@ -1,13 +1,14 @@
-// The chat's states in the app (plan v3 §16 flows 12, 13 and 15, SPEC 13.7): the model picker,
-// Pause and AI off, and every other state a user can reach against the fakes. The gallery shows
-// each state from fixtures (`packages/views/src/juno-chat/*.fixtures.tsx`).
+// The chat's states in the app (plan v3 §16 flows 2, 12, 13 and 15, SPEC 13.2, 13.5 and 13.7):
+// a run while it works and when it fails, steering it, and every other state a user can reach
+// against the fakes. Pause and the model picker are on the pages walk (pages.spec.ts). The gallery
+// shows each state from fixtures (`packages/views/src/juno-chat/*.fixtures.tsx`).
 import { readdirSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { chatCopy } from '@juno/agent-contract'
-import { agentReady, openChat, openPage, openSettings, readySynced as ready } from './agent'
+import { agentReady, openChat, openPage, readySynced as ready } from './agent'
 import { answer, expect, JunoChatPane, test as base } from './chat'
-import { startScriptedModel, type CatalogueModel, type ScriptedModel } from './model'
+import { startScriptedModel, type ScriptedModel } from './model'
 
 /** The echo model, except that the first message saying "fail once" gets a server error. */
 const test = base.extend<{ readonly model: ScriptedModel }>({
@@ -32,61 +33,26 @@ test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
-const NEWER = 1_800_000_000
-
-/** Newer models in four families: one fit to use, and three the picker must hide. */
-function withNewer(models: ReadonlyArray<CatalogueModel>): ReadonlyArray<CatalogueModel> {
-  const like = (id: string) => models.find((model) => model.id === id)!
-  return [
-    ...models,
-    { ...like('anthropic/claude-sonnet-5.5'), id: 'anthropic/claude-sonnet-6', name: 'Anthropic: Claude Sonnet 6', created: NEWER },
-    { ...like('anthropic/claude-opus-5.5'), id: 'anthropic/claude-opus-6:batch', name: 'Anthropic: Claude Opus 6 (batch)', created: NEWER },
-    { ...like('x-ai/grok-4.7'), id: 'x-ai/grok-5', name: 'xAI: Grok 5', created: NEWER, supported_parameters: ['max_tokens'] },
-    { ...like('meta/muse-wonder'), id: 'meta/muse-zenith', name: 'Meta: Muse Zenith', created: NEWER, context_length: 4_096 },
-  ]
-}
-
-const picker = base.extend<{ readonly model: ScriptedModel }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startScriptedModel({ answer, catalogue: withNewer })
-    await use(model)
-    await model.close()
-  },
-})
-
-picker('the chat model picker offers the newest usable model per family and hides batch, no-tools and small-window models', async ({ juno }) => {
-  await ready(juno)
-  const page = await openSettings(juno, 'Juno')
-  const names = () =>
-    page
-      .getByLabel('Chat model')
-      .locator('option')
-      .evaluateAll((options) => options.map((option) => option.textContent!.split(' · ')[0]))
-  await expect.poll(names, { timeout: 15_000 }).toEqual(['Claude Sonnet 6', 'Claude Opus 5.5', 'Muse Wonder', 'GPT-6.1 Sol', 'Grok 4.7'])
-  await expect(page.getByLabel('Chat model').locator('option').filter({ hasText: /Codex/ })).toHaveCount(0)
-})
-
-test('while Juno is paused a message waits for Resume, then runs', async ({ juno, model }) => {
-  await ready(juno)
-  const settings = await openSettings(juno, 'Juno')
-  await settings.getByLabel('Pause Juno').check()
-  const chat = await openChat(juno)
-  await expect(chat.root.locator('[data-banner="paused"]')).toHaveText(`${chatCopy.banner.paused.chip} · ${chatCopy.banner.paused.resume}`)
-
-  await chat.send('anything new?')
-  await expect(chat.ownerBubble('anything new?').locator('[data-delivery="waiting"]')).toHaveText(chatCopy.delivery.waiting.resume)
-  expect(model.inputs()).toEqual([])
-
-  await chat.root.locator('[data-banner="paused"]').getByRole('button', { name: 'Resume' }).click()
-  await chat.expectJuno('You said: anything new?')
-  await expect(chat.ownerBubble('anything new?').locator('[data-delivery]')).toHaveCount(0)
-})
-
-test('an empty chat asks what you need, a run shows the status bubble, and a run the model fails says so with Try again', async ({ juno, model }) => {
+test('an empty chat asks what you need, "stop" sent while Juno works joins the same run, and a run the model fails says so with Try again', async ({ juno, model }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await expect(chat.root.getByText(chatCopy.empty.title)).toBeVisible()
+
+  // A message sent during a run joins it at its next step, and "stop" is a message like any other: no Stop anywhere.
+  const busy = model.hold('what is on today?')
+  await chat.send('what is on today?')
+  await expect.poll(() => busy.arrived()).toBe(true)
+  await expect(chat.root.getByRole('status')).toHaveAttribute('aria-label', 'Juno is working')
+  await expect(chat.root.getByRole('button', { name: 'Stop' })).toHaveCount(0)
+  await chat.send('stop')
+  await chat.expectOwner('stop')
+  await expect(chat.ownerBubble('stop').locator('[data-delivery]')).toHaveCount(0)
+  busy.release()
+  await chat.expectJuno('You said: what is on today?')
+  await chat.expectJuno('You said: stop')
+  await expect(chat.root.locator('[data-chat-status]')).toHaveCount(0)
+  await expect(chat.root.locator('[data-chat-ending]')).toHaveCount(0)
+  expect(model.inputs()).toEqual(['<message id="n1">what is on today?</message>', expect.stringMatching(/^<message id="n\d+">stop<\/message>$/)])
 
   const gate = model.hold('fail once')
   await chat.send('fail once')
@@ -100,17 +66,26 @@ test('an empty chat asks what you need, a run shows the status bubble, and a run
   await ending.getByRole('button', { name: chatCopy.ending.tryAgain }).click()
   await chat.expectJuno('You said: fail once')
 
+  // One run answered the message and "stop"; the failed run and its retry are two more.
   const activity = await openPage(juno, 'Activity')
   await expect(activity.locator('[data-activity-run="failed"]')).toHaveCount(1)
-  await expect(activity.locator('[data-activity-run="replied"]')).toHaveCount(1)
+  await expect(activity.locator('[data-activity-run="replied"]')).toHaveCount(2)
+  await expect(activity.locator('[data-activity-trigger="message"]').filter({ hasText: /^stop$/ })).toHaveCount(0)
 })
 
-test('a message over the size limit stays in the chat, marked too long, and never reaches the model', async ({ juno, model }) => {
+test('a message over the size limit is marked too long, one at the limit is kept when request framing makes it too large, and neither reaches the model', async ({ juno, model }) => {
   await ready(juno)
   const chat = await openChat(juno)
   const long = 'word '.repeat(14_000).trim()
   await chat.send(long)
   await expect(chat.root.locator('[data-chat-owner] [data-delivery="failed"]')).toHaveText(chatCopy.delivery.tooLong)
+
+  // The composer accepts 65,536 bytes, but the active request must also fit its framing.
+  const text = 'x'.repeat(65_536)
+  await chat.send(text)
+  await expect(chat.root.locator('[data-chat-ending]')).toHaveText(chatCopy.ending.blocked.tooLarge, { timeout: 15_000 })
+  await expect(chat.ownerBubble(text)).toHaveCount(1)
+  await expect(chat.root.locator('[data-delivery="failed"]')).toHaveCount(1)
   expect(model.inputs()).toEqual([])
 })
 
@@ -140,19 +115,7 @@ test('a storage failure keeps the message as Not delivered, and Try again stores
   }
 })
 
-test('a message at the send limit is kept when request framing makes it too large', async ({ juno, model }) => {
-  await ready(juno)
-  const chat = await openChat(juno)
-  // The composer accepts 65,536 bytes, but the active request must also fit its framing.
-  const text = 'x'.repeat(65_536)
-  await chat.send(text)
-  await expect(chat.root.locator('[data-chat-ending]')).toHaveText(chatCopy.ending.blocked.tooLarge, { timeout: 15_000 })
-  await expect(chat.ownerBubble(text)).toHaveCount(1)
-  await expect(chat.root.locator('[data-delivery="failed"]')).toHaveCount(0)
-  expect(model.inputs()).toEqual([])
-})
-
-test('offline, the chat shows the chip, a message waits for the network, and both clear once back', async ({ juno, fake }) => {
+test('offline, the chat shows the chip, a message waits for the network, and both clear once back with one model request', async ({ juno, fake, model }) => {
   const chipShows = 'offline, the chat shows the chip and its composer still works, and the chip goes once back'
   const messageWaits = 'offline, a message waits for the network and runs once back'
   await ready(juno)
@@ -168,6 +131,7 @@ test('offline, the chat shows the chip, a message waits for the network, and bot
     await chat.send('what did I miss?')
     await expect(chat.ownerBubble('what did I miss?').locator('[data-delivery="waiting"]')).toHaveText(chatCopy.delivery.waiting.network)
     await expect(chat.junoBubble('You said: what did I miss?')).toHaveCount(0)
+    expect(model.inputs()).toEqual([])
   })
 
   fake.goOnline()
@@ -176,6 +140,7 @@ test('offline, the chat shows the chip, a message waits for the network, and bot
   })
   await test.step(messageWaits, async () => {
     await chat.expectJuno('You said: what did I miss?')
+    expect(model.inputs()).toHaveLength(1)
   })
 })
 

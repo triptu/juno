@@ -195,20 +195,7 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
 })
 
 
-test('a Juno custom reaction is stored by name and drawn as an image', async ({ juno, model }) => {
-  await ready(juno)
-  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
-  const panel = JunoChatPane.tab(juno.win)
-  await expect(panel.composer).toBeFocused()
-  await panel.send('custom reaction target')
-  await panel.expectJuno('You said: custom reaction target')
-  await panel.reactWithPicker('You said: custom reaction target', 'hello_juno', 'juno_wave')
-  const badge = panel.junoBubble('You said: custom reaction target').getByLabel('Reacted juno_wave')
-  await expect(badge.locator('img')).toBeVisible()
-  await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="juno_wave"'))).toBe(true)
-})
-
-test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line, and the menu’s keys react', async ({ juno }) => {
+test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line, the menu’s keys react, and a custom emoji shows as an image', async ({ juno, model }) => {
   await ready(juno)
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const chat = JunoChatPane.tab(juno.win)
@@ -262,4 +249,10 @@ test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line,
   await expect(menu.root).toHaveCount(0)
   await expect(chat.junoBubble('You said: keyboard menu target').getByLabel('Reacted 👍')).toBeVisible()
   await expect(bubble).toBeFocused()
+
+  // A workspace's custom emoji from the picker: stored by name, drawn as an image, and Juno hears its name.
+  await chat.reactWithPicker('You said: keyboard menu target', 'hello_juno', 'juno_wave')
+  const custom = chat.junoBubble('You said: keyboard menu target').getByLabel('Reacted juno_wave')
+  await expect(custom.locator('img')).toBeVisible()
+  await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="juno_wave"'))).toBe(true)
 })

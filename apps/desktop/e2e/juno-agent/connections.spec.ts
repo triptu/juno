@@ -6,6 +6,7 @@
 import type { FakeLittlebird } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
+import type { Locator } from '@playwright/test'
 import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
 import { configure } from './agent'
@@ -67,7 +68,14 @@ test('adds a server, signs in, configures its tools, uses a read in chat, turns 
   await ready(juno)
   await openConnections(juno)
   const page = juno.win.locator('main')
+  await test.step('Notion, Littlebird and T3 Code are offered, off until connected', () => offeredRows(juno, page))
+  const { row, id } = await test.step('a server added by its address signs in with OAuth', () => addAndSignIn(page, mcp))
+  await test.step('Configure lists, searches and sets rules for its tools', () => configureTools(juno, row))
+  await test.step('a read runs with no click, and a tool turned off is never called', () => useAndTurnOff(juno, row, id, mcp))
+  await test.step('Disconnect forgets the sign-in, and an added server can be removed', () => disconnectAndRemove(juno, page, row, mcp))
+})
 
+async function offeredRows(juno: Juno, page: Locator): Promise<void> {
   // Notion, Littlebird and T3 Code are offered as compact rows, off until connected; T3 Code is on this Mac.
   for (const label of ['Notion', 'Littlebird', 'T3 Code']) await expect(page.locator('[data-connection-name]').filter({ hasText: new RegExp(`^${label}$`) })).toBeVisible()
   await expect(page.locator('[data-connection-id="notion"]').getByRole('button', { name: 'Connect' })).toBeVisible()
@@ -75,7 +83,9 @@ test('adds a server, signs in, configures its tools, uses a read in chat, turns 
   await expect(t3.getByLabel('T3 Code address')).toHaveValue('http://localhost:3773/mcp')
   await t3.getByRole('button', { name: 'Done' }).click()
   await expect(t3).toHaveCount(0)
+}
 
+async function addAndSignIn(page: Locator, mcp: FakeLittlebird): Promise<{ readonly row: Locator; readonly id: string }> {
   // An address off this Mac must be https.
   const add = page.locator('[data-add-server]')
   await add.getByLabel('Address').fill('http://example.com/mcp')
@@ -95,22 +105,45 @@ test('adds a server, signs in, configures its tools, uses a read in chat, turns 
   await row.getByRole('button', { name: 'Connect' }).click()
   await expect(row).toHaveAttribute('data-connection', 'ready', { timeout: 20_000 })
   expect(mcp.oauth.stats()).toMatchObject({ registrations: 1, exchanges: 1 })
+  return { row, id }
+}
 
-  // Configure lists every tool across the server's pages, each on; the server marks the lookups read-only.
+async function configureTools(juno: Juno, row: Locator): Promise<void> {
+  // Configure lists every tool across the server's pages, each on and Auto; the server marks the lookups read-only.
+  // A delete always asks, and says why.
   const sheet = await configure(juno, row)
+  await expect(sheet.locator('[data-tool]')).toHaveCount(9)
   for (const tool of ['search_meetings', 'get_account', 'add_material', 'update_routine']) await expect(sheet.locator(`[data-tool="${tool}"]`)).toHaveAttribute('data-tool-enabled', 'true')
+  await expect(sheet.locator('[data-tool][data-tool-enabled="false"]')).toHaveCount(0)
   await expect(sheet.locator('[data-tool="search_meetings"]')).toHaveAttribute('data-tool-read-only', 'true')
   await expect(sheet.locator('[data-tool="add_material"]')).toHaveAttribute('data-tool-review', 'auto')
+  await expect(sheet.locator('[data-tool="delete_material"]')).toHaveAttribute('data-tool-review', 'always')
+  await expect(sheet.locator('[data-tool="delete_material"]')).toContainText("Deleting can't be undone, so Juno always asks.")
+  await expect(sheet.getByRole('combobox', { name: 'Auto-review: delete_material' })).toHaveCount(0)
+  // The search box narrows the list.
+  await sheet.getByRole('textbox', { name: 'Search tools' }).fill('routine')
+  await expect(sheet.locator('[data-tool]')).toHaveCount(3)
+  await sheet.getByRole('textbox', { name: 'Search tools' }).fill('calendar')
+  await expect(sheet.locator('[data-tool]')).toHaveCount(0)
+  await expect(sheet.getByText('No tools match.')).toBeVisible()
+  // A rule for one tool; the connection's own rule is at the top.
+  await sheet.getByRole('textbox', { name: 'Search tools' }).fill('routine')
+  const routine = sheet.locator('[data-tool="update_routine"]')
+  await routine.getByRole('combobox', { name: 'Auto-review: update_routine' }).selectOption('always')
+  await expect(routine).toHaveAttribute('data-tool-review', 'always')
+  await expect(sheet.getByRole('combobox', { name: 'Auto-review for all tools' })).toHaveValue('auto')
+  await sheet.press('Escape')
+  await expect(sheet).toHaveCount(0)
+}
 
+async function useAndTurnOff(juno: Juno, row: Locator, id: string, mcp: FakeLittlebird): Promise<void> {
   // A read runs with no click, and Juno answers from its result.
-  await sheet.getByRole('button', { name: 'Done' }).click()
   await openChat(juno)
   const pane = JunoChatPane.tab(juno.win)
   await pane.send(`search meetings on ${id}`)
   await pane.expectJuno('Found the Planning meeting.')
   expect(mcp.calls.map((call) => call.name)).toContain('search_meetings')
-
-  // Turning a tool off: the switch follows the agent's answer, and Juno is no longer offered the tool.
+  // Turning a tool off: the switch follows the agent's answer, so it holds once the agent kept it, and Juno is no longer offered the tool.
   await openConnections(juno)
   const again = await configure(juno, row)
   const material = again.locator('[data-tool="add_material"]')
@@ -123,7 +156,9 @@ test('adds a server, signs in, configures its tools, uses a read in chat, turns 
   await expect(pane.root.locator('[data-chat-card="change"]')).toHaveCount(0)
   expect(mcp.calls.map((call) => call.name)).not.toContain('add_material')
   expect(mcp.materials()).toHaveLength(0)
+}
 
+async function disconnectAndRemove(juno: Juno, page: Locator, row: Locator, mcp: FakeLittlebird): Promise<void> {
   // Disconnect forgets the sign-in: the next Connect signs in again.
   await openConnections(juno)
   await row.getByRole('button', { name: 'Disconnect' }).click()
@@ -137,4 +172,4 @@ test('adds a server, signs in, configures its tools, uses a read in chat, turns 
   await row.getByRole('button', { name: 'Remove' }).click()
   await expect(page.locator('[data-connection-id^="server-"]')).toHaveCount(0)
   await expect(page.locator('[data-connection-id="notion"]').getByRole('button', { name: 'Remove' })).toHaveCount(0)
-})
+}

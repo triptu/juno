@@ -1,9 +1,9 @@
-// A DM outside notification hours is held quietly; Ask Juno in a message's menu quotes it beside the topic.
+// A DM outside notification hours is held quietly and starts no Juno run.
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Juno } from '../driver/juno'
 import { readySynced as ready } from './agent'
-import { expect, JunoChatPane, test } from './chat'
+import { expect, test } from './chat'
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -79,18 +79,4 @@ test('outside notification hours a DM is held with its reason and shows no notif
   }).toMatchObject({ outcome: 'stay', reason: expect.stringContaining('Outside your notification hours.') })
   expect(await juno.osNotifications()).toHaveLength(0)
   expect(model.inputs()).toHaveLength(0)
-})
-
-test('Ask Juno in a message’s menu opens the chat beside the topic with the message quoted', async ({ juno, slack }) => {
-  await ready(juno)
-  slack.as('Maya').dm('Are we still on for the board deck review?')
-  await juno.sidebar.row('Maya', { exact: true }).open()
-  await juno.topic.expectMessage('Are we still on for the board deck review?')
-  await juno.topic.chooseInMessageMenu('Are we still on for the board deck review?', 'ask-juno')
-
-  const panel = JunoChatPane.panel(juno.win)
-  const quote = juno.win.locator('aside[data-juno-panel] [data-panel-selection]')
-  await expect(quote).toContainText(/^Maya[^:]*: “Are we still on for the…”$/)
-  await expect(quote).toHaveAttribute('data-tooltip', /^Maya[^:]*: Are we still on for the board deck review\?/)
-  await expect(panel.composer).toBeFocused()
 })
