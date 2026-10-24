@@ -151,6 +151,45 @@ export function normalHours(hours: Hours): Hours {
   return differ.length === 0 ? base : { ...base, dayHours: differ.toSorted((a, b) => a.day - b.day).map(({ day, from, to }) => ({ day, from, to })) }
 }
 
+/** The three rows of hours in Settings: Monday to Friday together, then Saturday and Sunday. */
+export type HoursGroup = 'weekdays' | 'saturday' | 'sunday'
+
+const groupDays: Readonly<Record<HoursGroup, ReadonlyArray<Weekday>>> = { weekdays, saturday: [6], sunday: [0] }
+
+/**
+ * A row's hours, undefined when it is off. Weekdays read as the hours most
+ * of them have, or off when most are off, so hours saved with different
+ * weekdays still read as one row; a tie goes to the earlier day.
+ */
+export function groupHours(hours: Hours, group: HoursGroup): Span | undefined {
+  const spans = groupDays[group].map((day) => hoursOn(hours, day))
+  const count = (span: Span | undefined) => spans.filter((other) => other?.from === span?.from && other?.to === span?.to).length
+  return spans.reduce((best, span) => (count(span) > count(best) ? span : best), spans[0])
+}
+
+/**
+ * The hours with one row changed. Off takes the row's days out. A from or
+ * to gives every day of the row the same hours, the other edge kept from
+ * the row, or from the weekdays when the row was off. A change that would
+ * leave no time between from and to keeps the row's length instead.
+ */
+export function withGroupHours(hours: Hours, group: HoursGroup, change: Partial<Span> | 'off'): Hours {
+  const days = groupDays[group]
+  if (change === 'off') return normalHours({ ...hours, days: hours.days.filter((day) => !days.includes(day)) })
+  const base = groupHours(hours, group) ?? groupHours(hours, 'weekdays') ?? hours
+  let { from = base.from, to = base.to } = change
+  if (from === to) {
+    const length = (base.to - base.from + DAY) % DAY || 60
+    if (change.from === undefined) from = (to - length + DAY) % DAY
+    else to = (from + length) % DAY
+  }
+  return normalHours({
+    ...hours,
+    days: allWeekdays.filter((day) => hours.days.includes(day) || days.includes(day)),
+    dayHours: [...(hours.dayHours ?? []).filter((own) => !days.includes(own.day)), ...days.map((day) => ({ day, from, to }))],
+  })
+}
+
 /** Whether `at` falls inside `hours`. A span that crosses midnight belongs to the day it starts on. */
 export function inHours(at: LocalTime, hours: Hours): boolean {
   const m = ((at.minutes % DAY) + DAY) % DAY

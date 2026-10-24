@@ -8,6 +8,8 @@ import {
   nextSwitch,
   nextHoursStart,
   normalHours,
+  groupHours,
+  withGroupHours,
   localTime,
   pausedLabel,
   slackScheduleFor,
@@ -203,6 +205,33 @@ describe('hours', () => {
       dnd_enabled_saturday: 'partial', dnd_before_saturday: '11:00', dnd_after_saturday: '14:00',
       dnd_enabled_sunday: 'all_day',
     })
+  })
+})
+
+describe('hours by row', () => {
+  it('Settings reads weekdays as the hours most of them have, and a row sets every day in it', () => {
+    // Saved before the rows: Monday to Thursday only, Thursday later.
+    const old: Hours = { days: [1, 2, 3, 4], from: 600, to: 1020, dayHours: [{ day: 4, from: 720, to: 1200 }] }
+    expect(groupHours(old, 'weekdays')).toEqual({ from: 600, to: 1020 })
+    expect(groupHours(old, 'saturday')).toBeUndefined()
+    expect(groupHours({ days: [1, 5], from: 600, to: 1020 }, 'weekdays')).toBeUndefined()
+    // A tie goes to the earlier day: Monday and Tuesday off, Wednesday and Thursday 10 to 5, Friday 9 to 7.
+    expect(groupHours({ days: [3, 4, 5], from: 600, to: 1020, dayHours: [{ day: 5, from: 540, to: 1140 }] }, 'weekdays')).toBeUndefined()
+
+    // Changing the row gives all five weekdays the shown hours with the new edge.
+    expect(withGroupHours(old, 'weekdays', { to: 1080 })).toEqual({ days: [1, 2, 3, 4, 5], from: 600, to: 1080 })
+    // An off Saturday turned on keeps the weekdays' other edge; a from on that edge keeps the row's length.
+    const saturday = withGroupHours(old, 'saturday', { from: 660 })
+    expect(groupHours(saturday, 'saturday')).toEqual({ from: 660, to: 1020 })
+    expect(groupHours(withGroupHours(old, 'saturday', { from: 1020 }), 'saturday')).toEqual({ from: 1020, to: 0 })
+    expect(groupHours(withGroupHours(saturday, 'weekdays', 'off'), 'weekdays')).toBeUndefined()
+
+    // Active hours follow the same rows: Saturday 11 to 2 is active, Sunday off is away.
+    const active = withGroupHours(withGroupHours({ days: [1, 2, 3, 4, 5], from: 540, to: 1140 }, 'saturday', { from: 660, to: 840 }), 'sunday', 'off')
+    expect(scheduledPresence(at(SAT, 12), active)).toBe('active')
+    expect(scheduledPresence(at(SAT, 15), active)).toBe('away')
+    expect(scheduledPresence(at(0, 12), active)).toBe('away')
+    expect(presenceLabel(at(5, 20), 'away', active)).toBe('Away until tomorrow 11am')
   })
 })
 
