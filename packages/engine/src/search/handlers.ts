@@ -1,3 +1,4 @@
+import { resolveSearch } from '../searchResolve'
 import { SyncLink } from '../syncLink'
 import { searchSessions } from './session'
 import { NotSignedIn, SearchRoutes } from '@juno/contract'
@@ -24,6 +25,11 @@ export const SearchHandlers = SearchRoutes.toLayer(
     })
     return {
       'search.session': (input) => serveLiveValue(workspace.changes.pipe(Stream.switchMap((open) => open === undefined ? Stream.empty : sessions.stream(open, input)))).pipe(Stream.orDie),
+      'search.matches': (input) => serveLiveValue(workspace.changes.pipe(Stream.switchMap((open) => open === undefined ? Stream.empty : liveQuery(['messages', 'topics', 'reactions', 'users', 'conversations', 'ignored_channels', 'sidebar_view_channels'], timed(sessions.matches(input))).pipe(Stream.provide(open.context))))).pipe(Stream.orDie),
+      'search.calendar': () => Effect.gen(function* () {
+        const context = yield* store
+        return yield* resolveSearch('').pipe(Effect.map((search) => search.timeZone), Effect.provide(context), Effect.orDie)
+      }),
       'search.more': ({ sessionId, generation, offset }) => sessions.more(sessionId, generation, offset),
       'search.query': ({ query, limit, places }) => {
         const runs = workspace.changes.pipe(

@@ -1,3 +1,4 @@
+export { searchRanges } from '@juno/domain'
 /** Local palette search, paged Search sessions, and the existing command reader. */
 import { Schema } from 'effect'
 import { SearchQuery } from '@juno/domain'
@@ -155,17 +156,27 @@ export const SearchSnapshot = Schema.Struct({
   facets: Schema.Struct({ from: Schema.Array(SearchFacetPerson), in: Schema.Array(SearchFacetPlace) }),
   counts: Schema.Struct({ local: Schema.Int, slackLoaded: Schema.Int, hidden: Schema.Int, slackTotal: Schema.NullOr(Schema.Int) }),
   pagination: Schema.Struct({ page: Schema.Int, pageCount: Schema.Int, perPage: Schema.Int, first: Schema.Int, last: Schema.Int, hasMore: Schema.Boolean }),
-  window: Schema.Struct({ offset: Schema.Int, totalGroups: Schema.Int, totalRows: Schema.Int }),
+  window: Schema.Struct({ offset: Schema.Int, totalGroups: Schema.Int, totalRows: Schema.Int, hasMoreLocal: Schema.Boolean }),
 })
 export type SearchSnapshot = typeof SearchSnapshot.Type
+/** Metadata plus only changed groups. The order also removes groups outside the window. */
+export const SearchUpdate = Schema.Struct({ ...SearchSnapshot.fields, groupOrder: Schema.Array(Schema.String) })
+export type SearchUpdate = typeof SearchUpdate.Type
 /** Subscribe once per query generation. Unsubscribing releases the session. */
 export const searchSession = liveValueRoute('search.session', {
   payload: { sessionId: Schema.String, generation: Schema.Int, query: SearchQuery, immediate: Schema.optionalKey(Schema.Boolean) },
-  value: SearchSnapshot,
+  value: SearchUpdate,
 })
 /** One sequential page, or retry after failure. Offset selects a 100-match/topic window from the loaded results. */
 export const searchMore = Rpc.make('search.more', {
   payload: { sessionId: Schema.String, generation: Schema.Int, offset: Schema.optionalKey(Schema.Int) },
   success: Schema.Boolean,
 })
-export const SearchRoutes = RpcGroup.make(searchQuery, searchSlack, searchCommand, searchSession, searchMore)
+export const SearchNavigation = Schema.Struct({ count: Schema.Int, index: Schema.Int, previous: Schema.NullOr(Schema.String), next: Schema.NullOr(Schema.String), marked: Schema.Array(Schema.String) })
+export type SearchNavigation = typeof SearchNavigation.Type
+export const searchMatches = liveValueRoute('search.matches', {
+  payload: { sessionId: Schema.String, generation: Schema.Int, topicId: Schema.String, ts: Schema.optionalKey(Schema.String), first: Schema.optionalKey(Schema.String), last: Schema.optionalKey(Schema.String) },
+  value: SearchNavigation,
+})
+export const searchCalendar = Rpc.make('search.calendar', { success: Schema.String, error: NotSignedIn })
+export const SearchRoutes = RpcGroup.make(searchQuery, searchSlack, searchCommand, searchSession, searchMore, searchMatches, searchCalendar)

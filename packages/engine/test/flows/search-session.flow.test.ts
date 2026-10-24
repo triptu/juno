@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'bun:test'
-import { parseSearchQuery, printSearchQuery, searchSession, searchMore, searchQuery, viewsSortChannel, topicsRename, type SearchSnapshot, type SearchQuery } from '@juno/contract'
-import { liveQuery, runCommand } from '@juno/state'
+import { parseSearchQuery, printSearchQuery, searchMore, searchQuery, viewsSortChannel, topicsRename, type SearchSnapshot, type SearchQuery } from '@juno/contract'
+import { liveQuery, runCommand, searchSnapshots } from '@juno/state'
 import { syncedEngine } from '../synced'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { valueOf } from '../scenario'
@@ -13,7 +13,7 @@ afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 const session = (engine: RunningEngine, query: SearchQuery, sessionId: string, generation = 1) => {
-  const atom = liveQuery(searchSession)({ sessionId, generation, query, immediate: true })
+  const atom = searchSnapshots({ sessionId, generation, query, immediate: true })
   releases.push(engine.registry.mount(atom))
   const read = () => {
     const result = engine.registry.get(atom)
@@ -56,6 +56,51 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
   expect(complete.facets.from.find((f) => f.id === 'U0LEO')).toMatchObject({ count: 75, person: { id: 'U0LEO' } })
   expect(complete.groups.flatMap((g) => g.messages).every((m) => m.ranges.length > 0)).toBe(true)
 
+  await step('a completed title row keeps its anchor when an older message arrives on a later page', async () => {
+    const root = fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'A separate title anchor', at: now - 200_000 })
+    fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'New activity without the needle', threadTs: root.ts, at: now })
+    await engine.socketIdle()
+    valueOf(await runCommand(engine.registry, topicsRename, { id: `t:C0ENG:${root.ts}`, title: 'anchorneedle title' }))
+    for (let i = 0; i < 60; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'anchorneedle elsewhere', at: now - 1000 - i * 1000, silent: true })
+    fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'anchorneedle older reply', threadTs: root.ts, at: now - 100_000, silent: true })
+    const titles = session(engine, parseSearchQuery('anchorneedle'), 'title-anchor')
+    const before = await titles.until((s) => s.state === 'done')
+    const anchor = before.groups.find((g) => g.topicId === `t:C0ENG:${root.ts}`)
+    expect(anchor).toMatchObject({ kind: 'topic', older: false })
+    valueOf(await runCommand(engine.registry, searchMore, { sessionId: 'title-anchor', generation: 1 }))
+    const after = await titles.until((s) => s.state === 'done' && s.pagination.page === 2)
+    expect(after.groups[before.groups.indexOf(anchor!)]).toBe(anchor)
+    expect(after.groups.flatMap((g) => g.messages).some((m) => m.text.includes('older reply'))).toBe(true)
+  })
+  await step('loaded windows move without asking Slack for more pages, including a request held behind the first page', async () => {
+    for (let i = 0; i < 260; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `windowprobe ${i}`, at: now - i * 1000 })
+    await engine.socketIdle()
+    fake.holdNext({ method: 'search.modules.messages', reason: 'search' })
+    const windows = session(engine, parseSearchQuery('windowprobe'), 'windows')
+    await windows.until((s) => s.counts.local === 200)
+    await waitFor(() => fake.heldCount({ method: 'search.modules.messages' }) > 0 ? true : undefined)
+    expect(valueOf(await runCommand(engine.registry, searchMore, { sessionId: 'windows', generation: 1, offset: 150 }))).toBe(true)
+    fake.release({ method: 'search.modules.messages' })
+    await windows.until((s) => s.window.offset === 150 && s.state === 'done')
+    const calls = fake.callCount('search.modules.messages')
+    for (const offset of [50, 100, 0, 150, 50]) {
+      valueOf(await runCommand(engine.registry, searchMore, { sessionId: 'windows', generation: 1, offset }))
+      const moved = await windows.until((s) => s.window.offset === offset)
+      expect(ids(moved)).toHaveLength(100)
+    }
+    expect(fake.callCount('search.modules.messages')).toBe(calls)
+  })
+  await step('closing a typed search before the pause cancels its remote work', async () => {
+    const atom = searchSnapshots({ sessionId: 'closed', generation: 1, query: parseSearchQuery('frontiertest'), immediate: false })
+    const close = engine.registry.mount(atom)
+    await waitFor(() => engine.registry.get(atom)._tag === 'Success' ? true : undefined)
+    const calls = fake.callCount('search.modules.messages')
+    close()
+    // There is no completion signal for cancelled work. Wait past its 400 ms start deadline.
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(fake.callCount('search.modules.messages')).toBe(calls)
+  })
+
   await step('an answer from an older generation cannot replace the new query', async () => {
     fake.holdNext({ method: 'search.modules.messages', reason: 'search' })
     const stale = session(engine, parseSearchQuery('frontiertest'), 'typing', 1)
@@ -90,6 +135,45 @@ it('local and Slack identity/date filters agree; apps and Automated are hidden w
     expect(ids(done)).toEqual(ids(local))
     expect(done.counts.slackTotal).toBe(local.counts.local)
   }
+  await step('bound query values execute safely and filters select message identities in the real store', async () => {
+    const post = (channel: string, user: string, text: string, extra = {}) => fake.workspace.post({ channel, user, text, ...extra })
+    const maya = post('C0ENG', 'U0MAYA', 'ruleprobe rollout plan', { attachments: [{ title_link: 'https://example.test/plan' }] })
+    const dm = post('D0MAYA', 'U0MAYA', 'ruleprobe rollout plan')
+    const leo = post('C0ENG', 'U0LEO', 'ruleprobe obsolete rollout plan')
+    const bot = post('C0ENG', 'U0GRAFANA', 'ruleprobe rollout plan')
+    const anonymous = post('C0ENG', 'U0MAYA', 'ruleprobe anonymous', { silent: true })
+    const { user: _user, ...noUser } = anonymous
+    const messages = fake.workspace.all('C0ENG')
+    messages[messages.findIndex((m) => m.ts === anonymous.ts)] = noUser
+    fake.emitFrame({ ...noUser, channel: 'C0ENG', type: 'message' })
+    const hostile = post('C0ENG', 'U0MAYA', 'ruleprobe quoted "plan" colon:value (ready) 🚀 café')
+    await engine.socketIdle()
+    const cases: ReadonlyArray<readonly [string, ReadonlyArray<string>]> = [
+      ['ruleprobe in:C0ENG in:D0MAYA -from:U0LEO', [maya.ts, dm.ts, anonymous.ts, hostile.ts]],
+      ['ruleprobe -in:D0MAYA -obsolete', [maya.ts, anonymous.ts, hostile.ts]],
+      ['ruleprobe has:link', [maya.ts]],
+      ['ruleprobe "rollout plan"', [maya.ts, dm.ts, leo.ts]],
+      ['ruleprobe "colon:value" "(ready)"', [hostile.ts]],
+      [String.raw`ruleprobe "quoted \"plan\""`, [hostile.ts]],
+      ['ruleprobe "🚀 café"', [hostile.ts]],
+      ['ruleprobe cafe', [hostile.ts]],
+      ['ruleprobe from:missing', []],
+      ['ruleprobe is:saved', []],
+      ['ruleprobe has:pin', []],
+    ]
+    for (const [text, expected] of cases) {
+      const local = liveQuery(searchQuery)({ query: text, limit: 50, places: false })
+      const release = engine.registry.mount(local)
+      const rows = await waitFor(() => { const result = engine.registry.get(local); return result._tag === 'Success' ? result.value : undefined })
+      release()
+      expect(rows.flatMap((row) => row.kind === 'message' ? [row.ts] : []).toSorted(), `local ${text}`).toEqual([...expected].sort())
+      const found = session(engine, parseSearchQuery(text), text)
+      const result = await found.until((s) => s.state === 'done')
+      expect(result.groups.flatMap((g) => g.messages.map((m) => m.ts)).toSorted(), text).toEqual([...expected].sort())
+    }
+    const bots = await session(engine, parseSearchQuery('ruleprobe from:U0GRAFANA', { scope: { hideApps: false } }), 'bots').until((s) => s.state === 'done')
+    expect(bots.groups.flatMap((g) => g.messages.map((m) => m.ts))).toEqual([bot.ts])
+  })
   await step('hidden-only results can be revealed, and an explicit channel overrides Automated hiding', async () => {
     fake.workspace.post({ channel: 'C0ENG', user: 'U0GRAFANA', text: 'hiddenonlyprobe bot' })
     fake.workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: 'hiddenonlyprobe automated' })

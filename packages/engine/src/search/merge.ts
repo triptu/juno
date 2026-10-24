@@ -1,5 +1,5 @@
 import type { SearchGroup, SearchHit, SearchTitleHit } from '@juno/contract'
-import { compareTs, type SearchQuery } from '@juno/domain'
+import { compareTs, searchRanges, type SearchQuery } from '@juno/domain'
 
 export interface Coverage { readonly through: string | null; readonly complete: boolean }
 export interface SearchPage { readonly rows: ReadonlyArray<SearchHit>; readonly coverage: Coverage }
@@ -16,18 +16,7 @@ export function searchSnippet(text: string, ranges: ReadonlyArray<{ start: numbe
   return { text: prefix + text.slice(start, end) + (end < text.length ? '…' : ''), ranges: ranges.filter((r) => r.start >= start && r.end <= end).map((r) => ({ start: r.start - start + prefix.length, end: r.end - start + prefix.length })) }
 }
 export function literalRanges(text: string, query: SearchQuery) {
-  const found: Array<{ start: number; end: number }> = []
-  const lower = text.toLowerCase()
-  for (const clause of query.clauses) if ((clause.kind === 'term' || clause.kind === 'phrase') && !clause.negated && clause.value !== '') {
-    for (let at = lower.indexOf(clause.value.toLowerCase()); at >= 0; at = lower.indexOf(clause.value.toLowerCase(), at + clause.value.length)) found.push({ start: at, end: at + clause.value.length })
-  }
-  const merged: Array<{ start: number; end: number }> = []
-  for (const range of found.sort((a, b) => a.start - b.start)) {
-    const previous = merged.at(-1)
-    if (previous !== undefined && range.start <= previous.end) previous.end = Math.max(previous.end, range.end)
-    else merged.push({ ...range })
-  }
-  return merged
+  return searchRanges(text, query.clauses.flatMap((clause) => (clause.kind === 'term' || clause.kind === 'phrase') && !clause.negated ? [clause.value] : []))
 }
 
 /**
@@ -42,6 +31,7 @@ export function mergeSearch(input: {
   readonly localCoverage: Coverage
   readonly pages: ReadonlyArray<SearchPage>
   readonly sort: 'newest' | 'oldest'
+  readonly establishedTitles?: ReadonlySet<string>
   readonly group?: boolean
 }): { groups: ReadonlyArray<SearchGroup>; frontier: { through: string | null; complete: boolean; olderGroupIndex: number } } {
   const direction = input.sort === 'newest' ? -1 : 1
@@ -56,7 +46,7 @@ export function mergeSearch(input: {
   type Entry = { kind: 'message'; at: string; row: SearchHit } | { kind: 'title'; at: string; row: SearchTitleHit }
   const entries: Entry[] = [...rows.values()].map((row) => ({ kind: 'message', at: row.ts, row }))
   const matchedTopics = new Set([...rows.values()].map((row) => row.topicId))
-  for (const row of input.titles) if (!matchedTopics.has(row.id)) entries.push({ kind: 'title', at: (row.at / 1000).toFixed(6), row })
+  for (const row of input.titles) if (!matchedTopics.has(row.id) || input.establishedTitles?.has(row.id)) entries.push({ kind: 'title', at: (row.at / 1000).toFixed(6), row })
   entries.sort((a, b) => direction * compare(a.at, b.at) || a.row.id.localeCompare(b.row.id))
   const groups: SearchGroup[] = []
   const threads = new Map<string, number>()

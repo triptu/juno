@@ -1,0 +1,1 @@
+- 10-24 17:47 · search-session-review · Search coalesces window requests, pages local sources incrementally, preserves established title anchors, and cancels network work with zero idle TTL. Reader navigation uses the same resolved query in the engine across the whole stored topic; state folds changed-group updates by id, and date presets use the profile calendar.

@@ -244,21 +244,25 @@ function topicResult(hit: TopicHit, place: SearchPlace, names: Lookups): SearchT
 
 export const messageHits = (search: ResolvedSearch, limit: number, options: { prefix?: boolean; ranked?: boolean; offset?: number } = {}) => Effect.gen(function* () {
   const sql = yield* StoreReader
-  const compiled = compileSearchSql(search, options)
-  const order = options.ranked && searchFts(search.query) !== '' ? 'f.rank, m.channel, m.ts' : compiled.order
+  const fts = searchFts(search.query, options.prefix)
+  const needed = limit + (options.offset ?? 0)
+  // A small FTS set is cheap to sort. A larger one uses the date index and stops at the requested window.
+  const candidates = !options.ranked && fts !== '' ? yield* sql<{ rowid: number }>`SELECT rowid FROM messages_fts WHERE messages_fts MATCH ${fts} LIMIT ${needed + 1}` : []
+  const compiled = compileSearchSql(search, { ...options, chronological: candidates.length > needed })
+  const order = options.ranked && fts !== '' ? 'f.rank, m.channel, m.ts' : compiled.order
   return yield* sql.unsafe<MessageHit>(`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name
     FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${order} LIMIT ? OFFSET ?`, [...compiled.params, limit, options.offset ?? 0])
 })
 
-const titleHits = (search: ResolvedSearch, limit: number, prefix = false) => Effect.gen(function* () {
+const titleHits = (search: ResolvedSearch, limit: number, prefix = false, offset = 0) => Effect.gen(function* () {
   const sql = yield* StoreReader
   const compiled = compileSearchSql(search, { titles: true, prefix })
-  return yield* sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${compiled.order} LIMIT ?`, [...compiled.params, limit])
+  return yield* sql.unsafe<TopicHit>(`SELECT ${topicColumns} FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${compiled.order} LIMIT ? OFFSET ?`, [...compiled.params, limit, offset])
 })
-export const titleResults = (search: ResolvedSearch, limit: number) => Effect.gen(function* () {
+export const titleResults = (search: ResolvedSearch, limit: number, offset = 0) => Effect.gen(function* () {
   if (searchFts(search.query) === '') return []
   const sql = yield* StoreReader
-  const hits = yield* titleHits(search, limit)
+  const hits = yield* titleHits(search, limit, false, offset)
   const places = yield* readPlaces(sql, new Set(hits.map((h) => h.channel)))
   const names = yield* titleLookups(sql, hits.map((h) => h.title))
   return hits.map((hit) => topicResult(hit, placeOf(places, hit.channel), names))

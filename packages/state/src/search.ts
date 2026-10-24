@@ -18,7 +18,7 @@
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { MESSAGE_WINDOW_BEFORE, MESSAGE_WINDOW_DEFAULT, parseSearchQuery, Person, prefsGet, prefsSet, SEARCH_COLUMN_WIDTH, searchMore, searchSession, type PickConversation, type SearchQuery, type SearchSnapshot } from '@juno/contract'
+import { MESSAGE_WINDOW_BEFORE, MESSAGE_WINDOW_DEFAULT, parseSearchQuery, Person, prefsGet, prefsSet, SEARCH_COLUMN_WIDTH, searchMore, searchSession, searchMatches, type PickConversation, type SearchQuery, type SearchSnapshot, type SearchUpdate } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import { paletteConversationsAtom } from './palette'
 import { bottomWindow, messagesAtom, topicAtom, type MessageWindowSpec } from './messages'
@@ -82,6 +82,8 @@ export const searchIsEmpty = (session: SearchSession): boolean => session.text.r
 export const newSearchSessionId = (): string => `search-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
 /** Changed in this run of the app. Until the first change, the one saved with the tabs shows. */
+const typedSessionAtom = Atom.family((_id: string) => Atom.make(false).pipe(Atom.keepAlive))
+
 const changedSessionAtom = Atom.family((_id: string) => Atom.make<SearchSession | undefined>(undefined).pipe(Atom.keepAlive))
 
 export const searchSessionAtom = Atom.family((id: string) =>
@@ -89,10 +91,11 @@ export const searchSessionAtom = Atom.family((id: string) =>
 )
 
 /** Changes a session and saves it with the tabs once changes pause. */
-export function updateSearchSession(registry: Registry, id: string, change: (session: SearchSession) => SearchSession): SearchSession {
+export function updateSearchSession(registry: Registry, id: string, change: (session: SearchSession) => SearchSession, source: 'action' | 'typing' = 'action'): SearchSession {
   const current = registry.get(searchSessionAtom(id))
   const next = change(current)
   if (next === current) return current
+  registry.set(typedSessionAtom(id), source === 'typing')
   registry.set(changedSessionAtom(id), next)
   saveTabsSoon(registry)
   return next
@@ -187,7 +190,7 @@ interface Run {
 
 /**
  * What the session asks the engine for. The same query keeps its generation, so coming back to the tab
- * within the idle time finds its snapshot still there. Typing waits for the engine's pause before Slack;
+ * starts a fresh subscription when it returns. Typing waits for the engine's pause before Slack;
  * anything else (a chip, a toggle, the sort, Enter, a restored tab) asks Slack at once.
  */
 const runAtom = Atom.family((id: string) =>
@@ -198,12 +201,24 @@ const runAtom = Atom.family((id: string) =>
     const key = JSON.stringify(query)
     const previous = Option.getOrUndefined(get.self<Run | undefined>())
     if (previous !== undefined && previous.key === key && previous.commit === session.commit) return previous
-    const typing = previous !== undefined && previous.text !== session.text && previous.commit === session.commit
+    const typing = get(typedSessionAtom(id)) && (previous === undefined || (previous.text !== session.text && previous.commit === session.commit))
     return { key, text: session.text, commit: session.commit, payload: { sessionId: id, generation: ++generation, query, ...(typing ? {} : { immediate: true }) } }
   }).pipe(Atom.keepAlive),
 )
 
-const sessionFamily = liveQuery(searchSession)
+/** Fold every wire delta before the atom publishes; React may skip intermediate renders. */
+function reconcileSearch(previous: SearchUpdate | undefined, value: SearchUpdate): SearchUpdate {
+  const old = previous?.groups ?? []
+  const cache = new Map(old.map((group) => [group.id, group]))
+  for (const group of value.groups) {
+    const known = cache.get(group.id)
+    cache.set(group.id, known !== undefined && JSON.stringify(known) === JSON.stringify(group) ? known : group)
+  }
+  const next = value.groupOrder.flatMap((id) => { const group = cache.get(id); return group === undefined ? [] : [group] })
+  const groups = next.length === old.length && next.every((group, i) => group === old[i]) ? old : next
+  return { ...value, groups }
+}
+export const searchSnapshots = liveQuery(searchSession, { idleTTL: 0, reconcile: reconcileSearch })
 
 export interface SearchResults {
   readonly snapshot: SearchSnapshot
@@ -216,8 +231,13 @@ export const searchResultsAtom = Atom.family((id: string) =>
   Atom.make((get): SearchResults | undefined => {
     const run = get(runAtom(id))
     if (run === undefined) return undefined
-    const result = get(sessionFamily(run.payload))
-    if (AsyncResult.isSuccess(result)) return { snapshot: result.value, current: true }
+    const result = get(searchSnapshots(run.payload))
+    if (AsyncResult.isSuccess(result)) {
+      const previous = Option.getOrUndefined(get.self<SearchResults | undefined>())
+      const old = previous?.snapshot
+      const snapshot = reconcileSearch(old === undefined ? undefined : { ...old, groupOrder: old.groups.map((group) => group.id) }, result.value)
+      return { snapshot, current: true }
+    }
     const previous = Option.getOrUndefined(get.self<SearchResults | undefined>())
     return previous === undefined ? undefined : previous.current ? { ...previous, current: false } : previous
   }),
@@ -225,7 +245,7 @@ export const searchResultsAtom = Atom.family((id: string) =>
 
 /**
  * The next page, or Try again after Slack did not answer. `offset` moves the 100-row window the engine
- * sends. False when the engine is still busy with the last request or the query has changed.
+ * sends. Busy sessions coalesce requests; false means the subscription or generation is gone.
  */
 export async function loadMoreSearch(registry: Registry, id: string, offset?: number): Promise<boolean> {
   const run = registry.get(runAtom(id))
@@ -248,6 +268,8 @@ const picksFamily = Atom.family((query: string) =>
 export const searchPicksAtom = (query: string | undefined) => (query === undefined ? noPicks : picksFamily(query.trim()))
 
 // The reader
+
+export const searchMatchesAtom = liveQuery(searchMatches, { idleTTL: 0 })
 
 /** The window around an older match, for the reader when the topic's newest messages do not reach back to it. */
 export const matchWindow = (ts: string): MessageWindowSpec => ({ anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })

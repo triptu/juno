@@ -1,3 +1,5 @@
+import { compileSearchSql } from '../src/searchCompiler'
+import { searchNavigationStatements } from '../src/search/navigation'
 import { parseSearchQuery } from '@juno/domain'
 // Every live query statement reads through an index (performance 6): its plan may not scan messages,
 // topic_index, reactions or topic_overlay, which grow with the workspace. Which index each one picks is
@@ -143,8 +145,14 @@ itEffect('no live query statement scans a table that grows with the workspace', 
       const [sql, params] = statement.compile()
       return [`⌘K search ${name}`, { sql, params }] as const
     })
+    const navigation = ['roll has:file', 'has:file', '-obsolete'].flatMap((text) => ['main', 'thread'].flatMap((kind) =>
+      Object.entries(searchNavigationStatements({ query: parseSearchQuery(text), timeZone: 'UTC', identities: new Map() }, { kind, channel: 'C0ENG', root_ts: '1700000000.000100' }, { ts: '1700000001.000100', first: '1700000000.000100', last: '1700000002.000100' })).map(([name, statement]) => [`Search reader ${kind} ${text} ${name}`, statement] as const)))
+    const sessions = [false, true].map((chronological) => {
+      const compiled = compileSearchSql({ query: parseSearchQuery('rollout has:file'), timeZone: 'UTC', identities: new Map() }, { chronological })
+      return [`Search session chronological=${chronological}`, { sql: `SELECT m.ts FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${compiled.order} LIMIT 201`, params: compiled.params }] as const
+    })
     const scanning: Array<string> = []
-    for (const [name, statement] of [...statements(), ...search]) {
+    for (const [name, statement] of [...statements(), ...search, ...navigation, ...sessions]) {
       const lines = yield* plan(statement.sql, statement.params)
       if (scans(lines).length > 0) scanning.push(`${name}\n  ${lines.join('\n  ')}`)
     }

@@ -28,7 +28,7 @@ export function includedChannels(search: ResolvedSearch): ReadonlyArray<string> 
 export const automatedChannelsSql = "SELECT channel FROM sidebar_view_channels WHERE view_id = 'automated'"
 
 /** All values are bound parameters; only the fixed column vocabulary enters SQL. */
-export function compileSearchSql(search: ResolvedSearch, options: { prefix?: boolean; titles?: boolean } = {}): SearchSql {
+export function compileSearchSql(search: ResolvedSearch, options: { prefix?: boolean; titles?: boolean; chronological?: boolean } = {}): SearchSql {
   const { query, timeZone } = search
   const titles = options.titles === true
   const fts = searchFts(query, options.prefix)
@@ -41,6 +41,10 @@ export function compileSearchSql(search: ResolvedSearch, options: { prefix?: boo
         UNION SELECT o.topic_id FROM overlay_titles_fts f JOIN topic_overlay o ON o.rowid = f.rowid WHERE overlay_titles_fts MATCH ?) hits
         JOIN topic_index i ON i.topic_id = hits.topic_id LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id`
       params.push(fts, fts)
+    } else if (options.chronological) {
+      source = 'messages m INDEXED BY messages_search_date'
+      where.push("m.ts >= ''", 'm.rowid IN (SELECT rowid FROM messages_fts WHERE messages_fts MATCH ?)')
+      params.push(fts)
     } else {
       source = 'messages_fts f JOIN messages m ON m.rowid = f.rowid'
       where.push('messages_fts MATCH ?')

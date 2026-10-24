@@ -20,7 +20,9 @@ export interface SearchRun {
   publish: () => void
   local: ReadonlyArray<SearchHit>
   titles: ReadonlyArray<SearchTitleHit>
-  localLimit: number
+  localDone: boolean
+  titlesDone: boolean
+  establishedTitles: Set<string>
   localCoverage: Coverage
   pages: SearchPage[]
   facets: SearchSnapshot['facets']
@@ -31,6 +33,7 @@ export interface SearchRun {
   automatedHidden: Set<string>
   hiddenApps: number
   offset: number
+  desiredOffset: number
   online: boolean
   automated: Set<string>
   explicit: Set<string>
@@ -38,30 +41,44 @@ export interface SearchRun {
 }
 
 export const prepareSearch = (input: SearchRun['input'], client: SearchRun['client'], link: SearchRun['link'], current: () => boolean) => Effect.gen(function* () {
-  const resolved = yield* resolveSearch(input.query)
+  const local = yield* initialSearch(input.query)
+  const resolved = local.resolved
   const sql = yield* StoreReader
   const online = yield* link.online
   const explicit = new Set(includedChannels(resolved))
   if (resolved.query.scope.topic !== undefined) explicit.add(resolved.query.scope.topic.channel)
   const run: SearchRun = {
-    input, resolved, client, link, current, publish: () => {}, online, explicit,
-    local: [], localLimit: 200, localCoverage: { through: null, complete: false }, pages: [],
-    titles: [],
+    input, client, link, current, publish: () => {}, online, explicit,
+    ...local, establishedTitles: new Set(), pages: [],
     facets: { from: [], in: [] }, pagination: { page: 0, pageCount: 0, perPage: 50, first: 0, last: 0, hasMore: false },
-    state: online ? 'searching' : 'offline', slackTotal: null, hidden: new Set(), automatedHidden: new Set(), hiddenApps: 0, offset: 0,
+    state: online ? 'searching' : 'offline', slackTotal: null, hidden: new Set(), automatedHidden: new Set(), hiddenApps: 0, offset: 0, desiredOffset: 0,
     automated: new Set((yield* sql.unsafe<{ channel: string }>(automatedChannelsSql)).map((r) => r.channel)),
     visibleChannels: new Set((yield* sql<{ id: string }>`SELECT c.id FROM conversations c WHERE c.is_member = 1 AND NOT EXISTS (SELECT 1 FROM ignored_channels g WHERE g.channel = c.id)`).map((r) => r.id)),
   }
-  yield* loadLocal(run)
   return run
 })
-export const loadLocal = (run: SearchRun) => Effect.gen(function* () {
-  const rows = yield* messageHits(run.resolved, run.localLimit + 1)
-  run.local = yield* localHits(rows.slice(0, run.localLimit), run.resolved.query)
-  const titles = yield* titleResults(run.resolved, run.localLimit + 1)
-  run.titles = yield* withArt(titles.slice(0, run.localLimit).map((title) => ({ ...title, ranges: literalRanges(title.title, run.resolved.query) })), (title) => title.id)
-  const bounds = [...(rows.length > run.localLimit ? [run.local.at(-1)?.ts] : []), ...(titles.length > run.localLimit ? [((run.titles.at(-1)?.at ?? 0) / 1000).toFixed(6)] : [])].filter((ts): ts is string => ts !== undefined)
-  run.localCoverage = { through: bounds.toSorted((a, b) => (run.resolved.query.scope.sort === 'newest' ? -1 : 1) * compareTs(a, b))[0] ?? null, complete: bounds.length === 0 }
+type LocalSearch = Pick<SearchRun, 'resolved' | 'local' | 'titles' | 'localDone' | 'titlesDone' | 'localCoverage'>
+
+const initialSearch = (query: SearchQuery) => Effect.gen(function* () {
+  const resolved = yield* resolveSearch(query)
+  const local: LocalSearch = { resolved, local: [], titles: [], localDone: false, titlesDone: false, localCoverage: { through: null, complete: false } }
+  yield* loadLocal(local)
+  return local
+})
+
+export const loadLocal = (run: LocalSearch) => Effect.gen(function* () {
+  if (!run.localDone) {
+    const rows = yield* messageHits(run.resolved, 201, { offset: run.local.length })
+    run.local = [...run.local, ...yield* localHits(rows.slice(0, 200), run.resolved.query)]
+    run.localDone = rows.length <= 200
+  }
+  if (!run.titlesDone) {
+    const titles = yield* titleResults(run.resolved, 201, run.titles.length)
+    run.titles = [...run.titles, ...yield* withArt(titles.slice(0, 200).map((title) => ({ ...title, ranges: literalRanges(title.title, run.resolved.query) })), (title) => title.id)]
+    run.titlesDone = titles.length <= 200
+  }
+  const bounds = [...(!run.localDone ? [run.local.at(-1)?.ts] : []), ...(!run.titlesDone ? [((run.titles.at(-1)?.at ?? 0) / 1000).toFixed(6)] : [])].filter((ts): ts is string => ts !== undefined)
+  run.localCoverage = { through: bounds.toSorted((a, b) => (run.resolved.query.scope.sort === 'newest' ? -1 : 1) * compareTs(a, b))[0] ?? null, complete: run.localDone && run.titlesDone }
 })
 export const localHidden = (run: SearchRun) => Effect.gen(function* () {
   const { resolved } = run
@@ -71,7 +88,8 @@ export const localHidden = (run: SearchRun) => Effect.gen(function* () {
 })
 
 export function snapshot(run: SearchRun): SearchSnapshot {
-  const merged = mergeSearch({ local: run.local, titles: run.titles, localCoverage: run.localCoverage, pages: run.pages, sort: run.resolved.query.scope.sort, group: run.resolved.query.scope.groupByThread === true })
+  const merged = mergeSearch({ local: run.local, titles: run.titles, establishedTitles: run.establishedTitles, localCoverage: run.localCoverage, pages: run.pages, sort: run.resolved.query.scope.sort, group: run.resolved.query.scope.groupByThread === true })
+  for (const group of merged.groups) if (group.kind === 'topic' && !group.older) run.establishedTitles.add(group.topicId)
   const window = windowSearchGroups(merged.groups, run.offset, 100)
   const olderIndex = window.groups.findIndex((g) => g.older)
   const hidden = Math.max(run.hidden.size, run.automatedHidden.size + run.hiddenApps)
@@ -80,7 +98,7 @@ export function snapshot(run: SearchRun): SearchSnapshot {
     state: run.state === 'done' && merged.groups.length === 0 && hidden > 0 && !run.pagination.hasMore ? 'onlyHidden' : run.state,
     groups: window.groups, frontier: { ...merged.frontier, olderGroupIndex: olderIndex < 0 ? window.groups.length : olderIndex }, facets: run.facets,
     counts: { local: run.local.length, slackLoaded: new Set(run.pages.flatMap((p) => p.rows.map((r) => r.id))).size, hidden, slackTotal: run.slackTotal },
-    pagination: run.pagination, window: { offset: run.offset, totalGroups: merged.groups.length, totalRows: window.totalRows },
+    pagination: run.pagination, window: { offset: run.offset, totalGroups: merged.groups.length, totalRows: window.totalRows, hasMoreLocal: !run.localCoverage.complete },
   }
 }
 

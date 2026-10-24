@@ -292,6 +292,8 @@ export {
   searchIsEmpty,
   searchPrefsAtom,
   searchResultsAtom,
+  searchMatchesAtom,
+  searchSnapshots,
   searchSessionAtom,
   searchTitleAtom,
   setSearchPrefs,

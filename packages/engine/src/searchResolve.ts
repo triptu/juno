@@ -26,5 +26,5 @@ export const resolveSearch = (input: SearchQuery | string) => Effect.gen(functio
     if (topic !== undefined) topicSlack = topic.kind === 'im' && topic.user_id !== null ? `<@${topic.user_id}>` : `<#${topic.id}>`
     else diagnostics.push({ code: 'unresolved', span: { start: 0, end: 0 }, message: 'Unknown conversation in topic scope.' })
   }
-  return { query: { ...query, diagnostics }, timeZone, identities, ...(topicSlack === undefined ? {} : { topicSlack }) } satisfies ResolvedSearch
+  return { query: { ...query, timeZone, diagnostics }, timeZone, identities, ...(topicSlack === undefined ? {} : { topicSlack }) } satisfies ResolvedSearch
 })

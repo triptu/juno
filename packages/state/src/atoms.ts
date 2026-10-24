@@ -9,7 +9,7 @@
  *
  * Both are memoized per route, so two modules asking for the same route get
  * the same atoms: one subscription, one result. Live query atoms carry a 30 s
- * idle TTL, so a hidden tab keeps its subscription warm across a quick
+ * idle TTL by default (network-owning Search streams use zero), so a hidden tab keeps its subscription warm across a quick
  * unmount and remount. `prefetch` warms the subscription underneath, which
  * has no TTL, so a prefetch that is never opened ends when it is evicted.
  *
@@ -88,22 +88,23 @@ const liveFamilies = new WeakMap<Rpc.Any, (payload: unknown) => Atom.Atom<unknow
 const subscriptionOf = new WeakMap<Atom.Atom<unknown>, Atom.Atom<unknown>>()
 
 /** See the module comment. */
-export function liveQuery<R extends Rpc.Any>(route: R): (payload: Payload<R>) => LiveAtomFor<R> {
+export function liveQuery<R extends Rpc.Any>(route: R, options: { idleTTL?: number; reconcile?: (previous: ValueOf<R> | undefined, value: ValueOf<R>) => ValueOf<R> } = {}): (payload: Payload<R>) => LiveAtomFor<R> {
   const existing = liveFamilies.get(route)
   if (existing) return existing as (payload: Payload<R>) => LiveAtomFor<R>
   const tag = route._tag
   const kind = liveKindOf(route)
   if (kind === undefined) throw new Error(`${tag} is not a live query route`)
   // The subscription itself, with no TTL: it ends as soon as nothing reads it.
-  const subscriptions = Atom.family((key: string) => {
+  const subscriptions = Atom.family((key: string): Atom.Atom<unknown> => {
     const payload: unknown = key === 'undefined' ? undefined : JSON.parse(key)
     return kind === 'value'
       ? EngineClient.runtime.atom(
-          liveStream<LiveValue<unknown>, unknown>(tag, payload).pipe(
-            Stream.map((message) => {
+          liveStream<LiveValue<ValueOf<R>>, unknown>(tag, payload).pipe(
+            Stream.scan((): ValueOf<R> | undefined => undefined, (previous, message) => {
               recordUpdate(tag, message.meta)
-              return message.value
+              return options.reconcile === undefined ? message.value : options.reconcile(previous, message.value)
             }),
+            Stream.drop(1),
           ),
         )
       : EngineClient.runtime.atom(
@@ -119,7 +120,7 @@ export function liveQuery<R extends Rpc.Any>(route: R): (payload: Payload<R>) =>
   // What containers read: the subscription, kept for the idle TTL after the last reader leaves.
   const family = Atom.family((key: string) => {
     const subscription = subscriptions(key)
-    const atom = Atom.make((get) => get(subscription)).pipe(Atom.setIdleTTL(IDLE_TTL))
+    const atom = Atom.make((get) => get(subscription)).pipe(Atom.setIdleTTL(options.idleTTL ?? IDLE_TTL))
     subscriptionOf.set(atom, subscription)
     return atom
   })
