@@ -135,7 +135,7 @@ export interface ListRun<Row> {
   readonly gapBefore?: boolean
   /** The same after its last proven row, whose ts it is (`LiveMeta.gapAfter`). */
   readonly gapAfter?: string
-  /** No page proves the thread up to its newest reply; the window shows what the store holds (`LiveMeta.standIn`). */
+  /** No page proves any stretch of the thread; the window shows what the store holds (`LiveMeta.standIn`). */
   readonly standIn?: boolean
   /**
    * Every person and channel the rows name. `serveLiveList` sends only the

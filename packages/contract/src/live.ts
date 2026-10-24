@@ -77,11 +77,11 @@ export const LiveMeta = Schema.Struct({
    */
   gapAfter: Schema.optionalKey(Schema.String),
   /**
-   * A thread no replies page has proven up to its newest reply (stored
-   * before ranges, known only from Slack's thread list, or partway through
-   * its first open): the window shows what the store holds, as far as
-   * Slack's thread list and the reply count vouch for it, where that keeps
-   * more than pages prove. It is not proof; the open's pages prove it.
+   * A thread no replies page proves any stretch of (stored before ranges,
+   * or known only from Slack's thread list): the window shows what the
+   * store holds, as far as Slack's thread list and the reply count vouch for
+   * it, or its newest stored reply alone when only replies above it can come
+   * in. It is not proof; the thread's first open proves it in one step.
    */
   standIn: Schema.optionalKey(Schema.Boolean),
   /** The last query run failed; the data shown is from the previous run. */

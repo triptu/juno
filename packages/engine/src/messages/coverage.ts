@@ -10,18 +10,14 @@ export interface ThreadCoverage {
   /** The root, for its counters and whether it is only a stub. */
   readonly root: Pick<WindowMessage, 'reply_count' | 'latest_reply' | 'user_id' | 'text' | 'blocks_json'> | undefined
   /**
-   * The replies stored in full, counted only while no page proves the thread's newest reply and no reply is stored
+   * The replies stored in full, counted only while no page proves any stretch of the thread and no reply is stored
    * from a search match alone (`standInRanges`); undefined when nothing may stand in for proof.
    */
   readonly held?: number
 }
 
-/** No page proves the thread up to its newest reply: what the store holds may stand in for proof (`standInRanges`). */
-const endUnproven = (ranges: ReadonlyArray<ThreadRange>, latestReply: string | null | undefined): boolean =>
-  latestReply != null && !ranges.some((range) => range.kind === 'page' && provenToEnd([range], range.from_ts, latestReply))
-
 /**
- * A thread's ranges and root, two primary-key reads, and, while no page proves its newest reply, a count of its
+ * A thread's ranges and root, two primary-key reads, and, while no page proves any stretch of it, a count of its
  * stored replies.
  */
 export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>) =>
@@ -31,7 +27,7 @@ export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>
     const roots = yield* sql<NonNullable<ThreadCoverage['root']>>`
       SELECT reply_count, latest_reply, user_id, text, blocks_json FROM messages WHERE channel = ${target.channel} AND ts = ${target.threadTs}`
     const root = roots[0]
-    if (!endUnproven(ranges, root?.latest_reply)) return { ranges, root } satisfies ThreadCoverage
+    if (ranges.some((range) => range.kind === 'page')) return { ranges, root } satisfies ThreadCoverage
     const counts = yield* sql<{ full: number | null; partial: number | null }>`SELECT sum(partial = 0) AS full, sum(partial <> 0) AS partial FROM messages
       WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} AND ts <> ${target.threadTs} AND deleted = 0`
     // A reply a search match stored has no reactions or files yet: a window that showed it would grow when its page landed.
@@ -40,10 +36,11 @@ export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>
   })
 
 /**
- * What may stand in for proof while no page proves the thread up to its newest reply (`LiveMeta.standIn`): the
- * replies Slack's thread list vouched for (`view` ranges), and every stored reply when the store holds as many as
- * the root counts, as before ranges. Neither is proof, and the window says so; the open's pages prove the stretch
- * it stood in with first, and once one reaches the newest reply the window keeps to what pages prove.
+ * What may stand in for proof while no page proves any stretch of a thread (`LiveMeta.standIn`): a thread stored
+ * before ranges, or known only from Slack's thread list. The replies Slack's thread list vouched for (`view`
+ * ranges), and every stored reply when the store holds as many as the root counts, as before ranges. Neither is
+ * proof, and the window says so; the thread's first open lands every page it reads at once (`fetchThread` in
+ * `@juno/sync`), and from then on the window keeps to what pages prove.
  */
 function standInRanges(threadTs: string, rows: ReadonlyArray<WindowMessage>, coverage: ThreadCoverage): ReadonlyArray<ThreadRange> {
   const lent: Array<ThreadRange> = coverage.ranges.map((range) => ({ ...range, kind: 'page' as const }))
@@ -76,9 +73,8 @@ interface Clipped {
  * (`@juno/sync` `threadRanges.ts`): the rows around the anchor (without
  * one, the newest row a page range holds, else the newest row) up to the
  * first boundary on either side that no range covers. The view then asks across that boundary when it scrolls near it,
- * and the replies come in at the window's edge, so nothing inside it moves. While no page proves the thread up to
- * its newest reply, the window is cut by what may stand in for proof (`standInRanges`) where that keeps more of it,
- * and says so (`standIn`): the open's first pages then land inside what it shows instead of taking its place.
+ * and the replies come in at the window's edge, so nothing inside it moves. While no page proves any stretch of the
+ * thread, the window is cut by what may stand in for proof (`standInRanges`), and says so (`standIn`).
  *
  * `previous`: the message just before the rows, `next` the one just after
  * them, when the statements read one. `atNewest`: no stored row comes after
@@ -91,9 +87,10 @@ export function clipThread(rows: ReadonlyArray<WindowMessage>, options: ClipOpti
   if (rows.length === 0 || options.coverage.held === undefined) return { ...proven, standIn: false }
   const stood = clipWith(rows, options, standInRanges(options.threadTs, rows, options.coverage))
   const same = stood.rows.length === proven.rows.length && stood.rows[0] === proven.rows[0] && stood.gapBefore === proven.gapBefore && stood.gapAfter === proven.gapAfter
-  // A window no page holds a row of stands in too, with what the store holds: one reply alone claims nothing.
-  const unproven = !proven.rows.some((row) => rangeHolding(options.coverage.ranges, row.ts) !== undefined)
-  return same && !unproven ? { ...proven, standIn: false } : { ...stood, standIn: true }
+  // What the store holds of a thread's end stands in too, alone (one reply claims nothing), when only replies above
+  // it can come in. A root alone does not: its replies would come in below it.
+  const tail = proven.gapBefore && proven.gapAfter === undefined
+  return same && !tail ? { ...proven, standIn: false } : { ...stood, standIn: true }
 }
 
 function clipWith(rows: ReadonlyArray<WindowMessage>, options: ClipOptions, ranges: ReadonlyArray<ThreadRange>): Clipped {
