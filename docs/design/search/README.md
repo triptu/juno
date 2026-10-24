@@ -24,7 +24,11 @@ How we got here: a map of today's search (below), web research on what people li
 
 - A new place, `search`. Each Search tab is its own session, with its own query, selection and scroll, so two searches can sit side by side.
 - **Opening it.** ⌘⇧F opens Search in the current tab, or focuses the field when a Search tab is active. The sidebar's magnifier opens it too. In a topic, ⌘F opens Search scoped to that topic: a thread searches that thread, a Main searches its channel or DM. The scope is a chip ("in: Acme MSA renewal terms") that Backspace removes to widen the search. From ⌘K's Messages tab, a footer row "All results for "…" ⌘⇧F" carries the text and filters over.
-- ⌘K stays for fast navigation. Its Messages tab shows quick results from this Mac only (no Slack call, so it never waits), with the same hiding rules, and a last row "All results for "…"" with ⌘⇧F that opens the Search tab with the text and filters.
+- ⌘K stays for fast navigation, and always searches everything. Its tabs are **All**, **Conversations** and **Messages**, and it opens on All.
+  - **All** mixes the best of each kind in fixed groups: Conversations (up to 4), then Topics and messages (up to 5), then Pages, settings and commands (up to 3). Each group's heading has "⌘2" or "⌘3" to jump to its tab. Rows stay where they are as you type; a group only fills in below what is shown.
+  - **Conversations** is today's Conversations tab. **Messages** is the quick message list.
+  - Messages come from this Mac only, with no Slack call, so ⌘K never waits. The same hiding rules apply.
+  - The last row on All and Messages is "All results for "…"" with ⌘⇧F. It opens the Search tab with the text and filters.
 - The tab title is the query, or "Search" when empty. Privacy mode shows "Search".
 - Search state lives outside the mounted page, so Back and Forward, a closed and reopened tab (⌘⇧T) and a restart all bring back the query, the selection and the scroll. The results are fetched again.
 
@@ -107,4 +111,4 @@ Tests: end-to-end flows against the fake Slack (which needs the extra operators,
 
 ## Decisions
 
-None. Decided with Tushar (10-24): the reader is not read-only; ⌘F in a topic searches that topic; the field spans the tab above the split; apps and automated channels are hidden by default behind visible toggles; ⌘K stays for fast navigation with local-only quick results and a row into the Search tab.
+None. Decided with Tushar (10-24): the reader is not read-only; ⌘F in a topic searches that topic; the field spans the tab above the split; apps and automated channels are hidden by default behind visible toggles; ⌘K stays for fast navigation: All, Conversations and Messages tabs, opening on All, local-only results and a row into the Search tab.
