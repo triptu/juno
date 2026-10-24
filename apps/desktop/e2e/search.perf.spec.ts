@@ -29,6 +29,8 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
   for (let i = 0; i < 20; i++) {
     await juno.win.keyboard.press('ArrowDown')
     await expect(rows.nth(i)).toBeFocused()
+    // An arrow only selects until Space (or → or a click) shows the topic beside the results; after that, each arrow moves it.
+    if (i === 0) await juno.win.keyboard.press('Space')
     // The reader shows the match before the next press, as a reader would look.
     const id = await rows.nth(i).getAttribute('data-search-row')
     expect(id).not.toBeNull()
