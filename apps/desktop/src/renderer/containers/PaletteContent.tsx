@@ -18,22 +18,20 @@
  * budget. All waits for both of its sources, so its groups appear together
  * and a later group never pushes down rows already shown. The command
  * reading is asked for after a pause in typing and shows as "Juno": under
- * the rows on All and Conversations, above the results on Messages. The
- * last row on All and Messages, "All results for …", opens the Search tab
- * with the text. Rows open topics (at a message, which then flashes), a
- * channel's Main or a person's DM, open Home addressed to someone never
- * messaged, or run a command. Its own chunk: `Palette.tsx` loads it on idle
+ * the rows on All and Conversations, above the results on Messages. Rows
+ * open topics (at a message, which then flashes), a channel's Main or a
+ * person's DM, open Home addressed to someone never messaged, or run a
+ * command. Its own chunk: `Palette.tsx` loads it on idle
  * after the first paint.
  */
 import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { parseSearchQuery, type ConversationKind, type PaletteCommand, type PickConversation, type SearchPerson, type SearchResult } from '@juno/contract'
+import type { ConversationKind, PaletteCommand, PickConversation, SearchPerson, SearchResult } from '@juno/contract'
 import { COMMAND_DELAY_MS, nowAtom, PALETTE_RECENT, PALETTE_RESULTS, paletteConversationsAtom, paletteTabAtom, readCommand, registry, searchAtom, sendMessage, showToast, type OpenOptions, type Registry } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
 import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from '@juno/views'
 import { junoCommands, openJunoTab } from './juno/actions'
 import { newMessage, openTopic, openTopicAt, warmTopic } from './navigation'
-import { openSearch } from './openSearchStub'
 import { closePalette } from './paletteActions'
 import { commandGroups, globalCommands, labelStartsWith, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
@@ -185,15 +183,6 @@ const commandRow = (command: PaletteCommand): Row => ({
   run: () => void runPaletteCommand(command),
 })
 
-/** The last row on All and Messages: the Search tab, with the text and the filters it types. */
-const searchRow = (text: string): Row => ({
-  id: 'search-all',
-  icon: 'search',
-  label: `All results for “${text}”`,
-  shortcut: '⌘⇧F',
-  run: () => openSearch({ text, query: parseSearchQuery(text) }),
-})
-
 /** Closes the palette and does what the row does. */
 function runRow(row: Row, options: { readonly newTab: boolean }): void {
   closePalette(row.stays === true)
@@ -210,7 +199,6 @@ interface PaletteAnswer {
   readonly inputs: ReadonlyArray<unknown>
   readonly text: string
   readonly sections: ReadonlyArray<PaletteSection>
-  readonly footer: Row | undefined
   readonly rows: ReadonlyArray<Row>
 }
 
@@ -251,7 +239,6 @@ export function OpenPalette() {
   const matches = matchRows(messagesValue ?? [])
   const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
   const topic = commands.topic
-  const footer = shownText !== '' && (tab === 'all' || tab === 'messages') ? searchRow(shownText) : undefined
   let sections: ReadonlyArray<PaletteSection & { readonly items: ReadonlyArray<Row> }>
   switch (tab) {
     case 'all': {
@@ -287,14 +274,14 @@ export function OpenPalette() {
       sections = [...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: matchCommands(topic.rows, shownText) }]), ...globalSections(commands.global, shownText)]
       break
   }
-  const rows = [...sections.flatMap((section) => section.items), ...(footer === undefined ? [] : [footer])]
+  const rows = sections.flatMap((section) => section.items)
   // Hold the whole rendered answer per tab, including empty and command
   // states. A delayed answer for the new edit may arrive before its local
   // query does.
   const [answers, setAnswers] = useState<Partial<Record<PaletteTab, PaletteAnswer>>>({})
   const previous = answers[tab]
   const inputs = [request, needsConversations ? conversationsValue : undefined, needsMatches ? messagesValue : undefined, command]
-  const fresh: PaletteAnswer = { inputs, text: shownText, sections, footer, rows }
+  const fresh: PaletteAnswer = { inputs, text: shownText, sections, rows }
   if (settled && (previous === undefined || previous.inputs.some((input, at) => input !== inputs[at]))) {
     setAnswers({ ...answers, [tab]: fresh })
   }
@@ -350,7 +337,6 @@ export function OpenPalette() {
       resultsQuery={answer.text}
       onQuery={onQuery}
       sections={answer.sections}
-      {...(answer.footer === undefined ? {} : { footer: answer.footer })}
       settled={settled}
       resultsReady={resultsReady}
       now={now}

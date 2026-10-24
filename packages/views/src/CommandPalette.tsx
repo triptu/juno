@@ -45,7 +45,7 @@ export interface CommandPaletteProps {
   /** The query that produced the displayed rows, which may lag the input. */
   readonly resultsQuery: string
   readonly sections: ReadonlyArray<PaletteSection>
-  /** The last row, under a line below the list, reached by the arrows like the others: "All results for …". ⌘⇧F runs it too. */
+  /** The last row, under a line below the list, reached by the arrows like the others: "All results for …". */
   readonly footer?: PaletteItem
   /** The results belong to the current input, rather than a held previous query. */
   readonly settled: boolean
@@ -130,11 +130,6 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
         const option = tabOptions[Number(event.key) - 1]
         return option === undefined ? undefined : onTab(option.value)
       }
-      case 'f':
-      case 'F':
-        if (!event.metaKey || !event.shiftKey || footer === undefined) return
-        event.preventDefault()
-        return onSelect(footer.id, { newTab: false })
       case 'Enter':
         if (event.nativeEvent.isComposing || activeId === undefined) return
         event.preventDefault()
