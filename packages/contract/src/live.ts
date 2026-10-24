@@ -77,8 +77,8 @@ export const LiveMeta = Schema.Struct({
    */
   gapAfter: Schema.optionalKey(Schema.String),
   /**
-   * A thread no replies page proves any stretch of (stored before ranges,
-   * or known only from Slack's thread list): the window shows what the
+   * A thread of 500 replies or fewer that no replies page proves any stretch
+   * of (stored before ranges, or known only from Slack's thread list): the window shows what the
    * store holds, as far as Slack's thread list and the reply count vouch for
    * it, or its newest stored reply alone when only replies above it can come
    * in. It is not proof; the thread's first open proves it in one step.
