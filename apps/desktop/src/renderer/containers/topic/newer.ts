@@ -22,9 +22,9 @@ const NEWER_MARGIN = '0px 0px 1000px 0px'
 export function useNewerPages(position: Position, id: string, view: string, list: MessageWindow): void {
   'use no memo'
   const { scrollRef, pinRef, pinnedTopRef, drawnAll, setHeldAt } = position
-  // Juno's own replies still sending come last and have no place in Slack's order.
-  const last = list.order.findLast((ts) => !ts.startsWith('pending:'))
-  const gap = list.meta.gapAfter === true
+  // The last row the store proved, which the user's own replies and sends may follow.
+  const last = list.meta.gapAfter
+  const gap = last !== undefined
   const [loading, setLoading] = useState(false)
   const { stalled, settle } = useStepStall()
   useEffect(() => {

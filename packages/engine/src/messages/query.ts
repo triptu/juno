@@ -206,7 +206,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     // A thread shows only the stretch around the anchor that its ranges prove continuous (`clipThread`).
     let coverage: ThreadCoverage | undefined
     let gapBefore = false
-    let gapAfter = false
+    let gapAfter: string | undefined
     if (target.kind === 'thread' && !target.threadTs.startsWith('pending:')) {
       coverage = yield* threadCoverage(target)
       const clipped = clipThread(stored, { threadTs: target.threadTs, anchor: range.anchor, previous: beforeWindow, next: afterWindow, atNewest, coverage, own: (row) => row.user_id === selfId })
@@ -417,7 +417,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       atNewest,
       windowCovered: yield* windowCovered(target, stored[0]?.ts, coverage),
       ...(gapBefore ? { gapBefore } : {}),
-      ...(gapAfter ? { gapAfter } : {}),
+      ...(gapAfter === undefined ? {} : { gapAfter }),
       refs: { people: [...people.values()] },
     }
   })

@@ -71,10 +71,11 @@ export const LiveMeta = Schema.Struct({
   gapBefore: Schema.optionalKey(Schema.Boolean),
   /**
    * A thread's window stops before replies the store cannot prove continuous
-   * with its last row, or cannot prove its last row is the newest: scrolling
-   * down asks for them (`messages.loadNewer`).
+   * with this row, its last proven one, or cannot prove this row is the
+   * newest: scrolling down asks for the replies after it
+   * (`messages.loadNewer`). The user's own replies may follow it.
    */
-  gapAfter: Schema.optionalKey(Schema.Boolean),
+  gapAfter: Schema.optionalKey(Schema.String),
   /** The last query run failed; the data shown is from the previous run. */
   error: Schema.optionalKey(Schema.String),
 })

@@ -105,7 +105,7 @@ it('a jump deep into a 1,200-reply thread, then scrolling up and down, closes th
   await step('scrolling down past the jump brings the last replies in one call', async () => {
     const last = thread.replies[1197]!.ts
     const before = await windowOf(engine, thread.id, { anchor: last, before: 0, limit: 10 }, (value) => value.order.includes(last), 'the end of the jump page')
-    expect(before.meta.gapAfter).toBe(true)
+    expect(before.meta.gapAfter).toBe(last)
     engine.fake.resetCalls()
     expect(valueOf(await loadNewerMessages(engine.registry, thread.id, last))).toEqual({ outcome: 'fetched', complete: true })
     expect(opens(engine)).toHaveLength(1)
@@ -137,7 +137,7 @@ it('replies arriving live during a jump never make the thread look complete', as
     expect(steps(bottom)[0]).toBe(1100)
     expect(steps(bottom).at(-1)).toBe(1198)
     expect(bottom.meta.gapBefore).toBe(true)
-    expect(bottom.meta.gapAfter).toBe(true)
+    expect(bottom.meta.gapAfter).toBe(thread.replies[1197]!.ts)
     expect(indexRow(engine, thread.id)?.unread_exact).toBe(0)
   })
 

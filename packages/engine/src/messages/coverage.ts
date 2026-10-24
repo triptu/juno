@@ -30,8 +30,9 @@ export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>
  *
  * `previous`: the message just before the rows, `next` the one just after
  * them, when the statements read one. `atNewest`: no stored row comes after
- * the rows. Returns the rows kept and which edges stop at an unknown
- * boundary; `previous` is dropped when it is across one.
+ * the rows. Returns the rows kept, whether the first stops at an unknown
+ * boundary, and the last proven row when the end does (the user's own rows
+ * may follow it); `previous` is dropped when it is across a boundary.
  */
 export function clipThread(
   rows: ReadonlyArray<WindowMessage>,
@@ -45,9 +46,9 @@ export function clipThread(
     /** The user's own messages, which a window with no anchor keeps at its end as it keeps their pending sends. */
     readonly own: (row: WindowMessage) => boolean
   },
-): { readonly rows: ReadonlyArray<WindowMessage>; readonly previous: WindowMessage | undefined; readonly gapBefore: boolean; readonly gapAfter: boolean } {
+): { readonly rows: ReadonlyArray<WindowMessage>; readonly previous: WindowMessage | undefined; readonly gapBefore: boolean; readonly gapAfter: string | undefined } {
   const { ranges, root } = options.coverage
-  if (rows.length === 0) return { rows, previous: options.previous, gapBefore: false, gapAfter: false }
+  if (rows.length === 0) return { rows, previous: options.previous, gapBefore: false, gapAfter: undefined }
   const joined = (older: string, newer: string) => continuous(ranges, older, newer)
   // With no anchor, the newest row a page proved: later rows that only an event or a search brought wait beyond
   // the window's end, so a reply stored across a gap never takes the window away from the rows shown.
@@ -65,7 +66,8 @@ export function clipThread(
   const below = low > 0 ? rows[low - 1] : options.previous
   const gapBefore = below === undefined ? first.ts !== options.threadTs : !joined(below.ts, first.ts)
   const above = high < rows.length - 1 ? rows[high + 1] : options.next
-  const gapAfter = above === undefined ? options.atNewest && !provenToEnd(ranges, last.ts, root?.latest_reply ?? undefined) : !joined(last.ts, above.ts)
+  const unknownAfter = above === undefined ? options.atNewest && !provenToEnd(ranges, last.ts, root?.latest_reply ?? undefined) : !joined(last.ts, above.ts)
+  const gapAfter = unknownAfter ? last.ts : undefined
   // Juno's own replies come in at once, before a page proves them: they stay at the end of a window at the bottom.
   const tail = anchor === undefined ? rows.slice(high + 1).filter(options.own) : []
   const kept = low === 0 && high === rows.length - 1 ? rows : [...rows.slice(low, high + 1), ...tail]
