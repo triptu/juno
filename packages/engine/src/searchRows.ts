@@ -3,9 +3,9 @@ import type { SearchQuery } from '@juno/domain'
 import { decodeSearchHighlights, type SearchPageMatch } from '@juno/slack'
 import { StoreReader } from '@juno/store'
 import { Effect } from 'effect'
-import { literalRanges, searchSnippet } from './merge'
-import { messageResults, readPlaces, readUsers, topicOfMessage, type MessageHit } from './query'
-import { personFrom } from '../topicRows'
+import { literalRanges, searchSnippet } from './searchMerge'
+import { messageResults, readPlaces, readUsers, topicOfMessage, type MessageHit } from './searchQuery'
+import { personFrom } from './topicRows'
 
 export const localHits = (rows: ReadonlyArray<MessageHit>, query: SearchQuery) => messageResults(rows.map((row) => ({ ...row, topicId: topicOfMessage(row.channel, row.ts, row.thread_ts, row.reply_count), stored: true }))).pipe(Effect.map((rows) => rows.map((row) => ({ ...row, ...searchSnippet(row.text, literalRanges(row.text, query)) }))), Effect.flatMap((hits) => withArt(hits, (hit) => hit.topicId)))
 export const threadOf = (match: SearchPageMatch) => match.thread_ts ?? /[?&]thread_ts=(\d+\.\d+)/.exec(match.permalink ?? '')?.[1]

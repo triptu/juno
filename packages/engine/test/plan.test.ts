@@ -29,7 +29,7 @@ import { movesStatements } from '../src/home/moves'
 import { activityStatement, frequentConversationsStatement, frequentSendsStatement, pickerStatements } from '../src/newchat/query'
 import { mentionStatements } from '../src/mentions/query'
 import { ignorableStatement } from '../src/topics/ignored'
-import { searchStatements } from '../src/search/query'
+import { searchStatements } from '../src/searchQuery'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { listStatements, type ListFilter } from '../src/topics/query'
 

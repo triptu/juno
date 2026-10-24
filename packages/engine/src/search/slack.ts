@@ -12,7 +12,7 @@ import { SLACK_SEARCH_MAX } from '@juno/contract'
 import { searchMessages, type SlackApiShape } from '@juno/slack'
 import { StoreReader } from '@juno/store'
 import { Effect } from 'effect'
-import { messageResults, topicOfMessage } from './query'
+import { messageResults, topicOfMessage } from '../searchQuery'
 
 export const searchSlack = (api: SlackApiShape, query: string) =>
   Effect.gen(function* () {

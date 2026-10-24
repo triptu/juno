@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { parseSearchQuery } from '@juno/domain'
 import type { SearchHit, SearchTitleHit } from '@juno/contract'
-import { literalRanges, mergeSearch, searchSnippet } from '../src/search/merge'
+import { literalRanges, mergeSearch, searchSnippet } from '../src/searchMerge'
 
 const place = { id: 'C1', kind: 'public', name: 'eng', label: '#eng', tint: 'public', icon: 'hash', color: 'jordy' } as const
 const hit = (ts: number, thread = false, channel = 'C1'): SearchHit => ({ kind: 'message', id: `${channel}:${ts}`, ts: `${ts}.000000`, topicId: thread ? `t:${channel}:10` : `m:${channel}`, title: 'Launch', text: 'launch found', sender: 'Maya', place: { ...place, id: channel }, stored: true, ranges: [{ start: 0, end: 6 }] })

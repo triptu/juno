@@ -3,7 +3,7 @@ import type { SearchUpdate } from '@juno/contract'
 import { Effect, Queue, Result, Stream } from 'effect'
 import type { Run } from '../protocol/live'
 import type { OpenWorkspace } from '../workspace'
-import { fetchSearch, loadLocal, localHidden, prepareSearch, snapshot, type SearchRun } from './sessionRun'
+import { fetchSearch, loadLocal, localHidden, prepareSearch, snapshot, type SearchRun } from '../searchRun'
 
 type Request = { kind: 'more'; offset?: number } | { kind: 'online'; online: boolean } | { kind: 'close' }
 interface Controller { run?: SearchRun; generation: number; offer: (request: Request) => void; pending?: { kind: 'more'; offset?: number } }

@@ -12,7 +12,7 @@ import { largeSeed, startFakeSlack } from '@juno/fake-slack'
 import { inBatches, Store, StoreReader, StoreWriter, transaction, workspacePathsFromDir } from '@juno/store'
 import { parseSearchQuery } from '@juno/domain'
 import { compileSearchSql } from '../../src/searchCompiler'
-import { querySearch } from '../../src/search/query'
+import { querySearch } from '../../src/searchQuery'
 
 const encode = Schema.encodeSync(Schema.toCodecJson(SearchUpdate))
 const decode = Schema.decodeUnknownSync(Schema.toCodecJson(SearchUpdate))

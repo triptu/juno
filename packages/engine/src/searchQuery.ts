@@ -1,12 +1,12 @@
-import { compileSearchSql, searchFts, type ResolvedSearch } from '../searchCompiler'
-import { resolveSearch } from '../searchResolve'
+import { compileSearchSql, searchFts, type ResolvedSearch } from './searchCompiler'
+import { resolveSearch } from './searchResolve'
 import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult, type SearchTopic } from '@juno/contract'
 import { FALLBACK_TITLE_WORDS, firstWords, mainLabel, mentionedUserIds, mentionedUsergroupIds, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
 import { messageBody, readableText, type Lookups, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
-import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
-import { literalRanges, searchSnippet } from './merge'
+import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from './topicRows'
+import { literalRanges, searchSnippet } from './searchMerge'
 
 const topicColumns = `i.topic_id AS id, i.channel, i.kind, i.last_activity_ts,
   COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,

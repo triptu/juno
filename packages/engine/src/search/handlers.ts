@@ -9,7 +9,7 @@ import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { SessionClient } from '../sessionClient'
 import { Workspace } from '../workspace'
 import { queryCommand } from './command'
-import { querySearch } from './query'
+import { querySearch } from '../searchQuery'
 import { searchSlack } from './slack'
 
 export const SearchHandlers = SearchRoutes.toLayer(
