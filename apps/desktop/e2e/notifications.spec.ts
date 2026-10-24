@@ -114,17 +114,15 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await juno.openNotifications()
   const page = juno.notifications
 
-  await page.setFrom('Notifications', '10am')
-  await page.setTo('Active in Slack', '8pm')
-  await page.day('Notifications', 'Saturday').click()
+  await page.edge('Notifications', 'Weekdays', 'from').selectOption({ label: '10am' })
+  await page.edge('Active in Slack', 'Weekdays', 'to').selectOption({ label: '8pm' })
 
   // Every value comes back from the engine: close Settings and open it again.
   await juno.tabs.close('Settings')
   await juno.openNotifications()
-  await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
-  await expect(page.root.getByRole('combobox', { name: 'Active in Slack to' })).toHaveValue(String(20 * 60))
-  await expect(page.day('Notifications', 'Saturday')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
+  await page.expectRow('Notifications', 'Weekdays', { from: 10 * 60, to: 19 * 60 })
+  await page.expectRow('Active in Slack', 'Weekdays', { from: 9 * 60, to: 20 * 60 })
+  await page.expectRow('Active in Slack', 'Saturday', 'off')
 
   // Settings is one tab: the avatar menu's Settings shows General in it, and the list moves between sections.
   await juno.openSettings('Appearance')
@@ -136,7 +134,7 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await juno.settings.densityRadio('Comfortable').click()
   await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('comfortable')
   await juno.settings.show('Notifications')
-  await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
+  await expect(page.edge('Notifications', 'Weekdays', 'from')).toHaveValue(String(10 * 60))
 }
 
 syncedTest('Your instructions: add one with a direction, see it in the list, remove it', async ({ juno }) => {

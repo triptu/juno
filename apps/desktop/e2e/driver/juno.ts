@@ -634,6 +634,10 @@ export class SettingsPage {
 
 export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Tidy up' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'
 
+export type HoursSection = 'Notifications' | 'Active in Slack'
+export type HoursRowName = 'Weekdays' | 'Saturday' | 'Sunday'
+export const hoursRows: ReadonlyArray<HoursRowName> = ['Weekdays', 'Saturday', 'Sunday']
+
 /** Settings › Notifications (inventory 13). */
 export class NotificationsPage {
   readonly root: Locator
@@ -642,21 +646,32 @@ export class NotificationsPage {
     this.root = win.getByRole('main')
   }
 
-  /** The Notification hours or Active in Slack row. */
-  hoursRow(which: 'Notifications' | 'Active in Slack'): Locator {
-    return this.root.getByLabel(which === 'Notifications' ? 'Notification hours' : which, { exact: true })
+  /** The Notification hours or Active in Slack rows. */
+  hours(which: HoursSection): Locator {
+    return this.root.getByRole('group', { name: which === 'Notifications' ? 'Notification hours' : which, exact: true })
   }
 
-  async setFrom(which: 'Notifications' | 'Active in Slack', label: string): Promise<void> {
-    await this.root.getByRole('combobox', { name: `${which} from` }).selectOption({ label })
+  /** One row's from or to. Off is the first choice in from; an off row has no to. */
+  edge(which: HoursSection, row: HoursRowName, edge: 'from' | 'to'): Locator {
+    return this.hours(which).getByRole('combobox', { name: `${row} ${edge}`, exact: true })
   }
 
-  async setTo(which: 'Notifications' | 'Active in Slack', label: string): Promise<void> {
-    await this.root.getByRole('combobox', { name: `${which} to` }).selectOption({ label })
+  /** Sets a row's from and to, in minutes since midnight, or turns it off. */
+  async setRow(which: HoursSection, row: HoursRowName, hours: { readonly from: number; readonly to: number } | 'off'): Promise<void> {
+    if (hours === 'off') return void (await this.edge(which, row, 'from').selectOption('off'))
+    await this.edge(which, row, 'from').selectOption(String(hours.from))
+    await this.edge(which, row, 'to').selectOption(String(hours.to))
   }
 
-  day(which: 'Notifications' | 'Active in Slack', day: string): Locator {
-    return this.root.getByRole('group', { name: `${which} days` }).getByRole('button', { name: day })
+  /** Checks a row as the engine saved it: from and to, or off with no to. */
+  async expectRow(which: HoursSection, row: HoursRowName, hours: { readonly from: number; readonly to: number } | 'off'): Promise<void> {
+    if (hours === 'off') {
+      await expect(this.edge(which, row, 'from')).toHaveValue('off')
+      await expect(this.edge(which, row, 'to')).toHaveCount(0)
+      return
+    }
+    await expect(this.edge(which, row, 'from')).toHaveValue(String(hours.from))
+    await expect(this.edge(which, row, 'to')).toHaveValue(String(hours.to))
   }
 
   /** The add row's field, disabled until a direction is chosen. */
@@ -1030,17 +1045,10 @@ export class Juno {
     const half = Math.floor(minutes / 30) * 30
     const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
     const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
-    for (const day of ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']) {
-      const button = this.notifications.day('Notifications', day)
-      if (await button.getAttribute('aria-pressed') === 'false') await button.click()
-      await expect(button).toHaveAttribute('aria-pressed', 'true')
-    }
-    await this.notifications.root.getByRole('combobox', { name: 'Notifications from' }).selectOption(String(from))
-    await this.notifications.root.getByRole('combobox', { name: 'Notifications to' }).selectOption(String(to))
+    for (const row of hoursRows) await this.notifications.setRow('Notifications', row, { from, to })
     await this.tabs.close('Settings')
     await this.openNotifications()
-    await expect(this.notifications.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(from))
-    await expect(this.notifications.root.getByRole('combobox', { name: 'Notifications to' })).toHaveValue(String(to))
+    for (const row of hoursRows) await this.notifications.expectRow('Notifications', row, { from, to })
   }
 
   /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. `silent` only on one posted without a sound. */
