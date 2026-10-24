@@ -7,7 +7,7 @@ import { layout } from '@juno/tokens/tokens.stylex'
 import { ContextPill, IconButton, Popover, type ContextTint } from '@juno/ui'
 import { HeaderTitleButton, JunoToggle, MoreButton, type MenuAnchor } from './header/HeaderControls'
 import { HeaderIslands } from './header/HeaderIslands'
-import { ReaderBack, ReaderOpen, ReaderStep, WideOnly, type TopicHeaderReader } from './header/ReaderControls'
+import { ReaderBack, ReaderClose, ReaderOpen, ReaderStep, WideOnly, type TopicHeaderReader } from './header/ReaderControls'
 import { kindIcon } from './look'
 import { RenameField } from './RenameField'
 
@@ -120,6 +120,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
           {reader === undefined ? resolve : <WideOnly>{resolve}</WideOnly>}
           {reader === undefined ? junoButton : <WideOnly>{junoButton}</WideOnly>}
           <MoreButton expanded={menuOpen} onOpen={onMenu} />
+          {reader?.onClose === undefined ? null : <ReaderClose onClose={reader.onClose} />}
         </>
       }
       {...(switcher === undefined

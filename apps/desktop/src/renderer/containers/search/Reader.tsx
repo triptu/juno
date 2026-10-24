@@ -90,11 +90,12 @@ export interface SearchReaderProps {
   /** The selected row, for the result's header and message while its topic is not local. */
   readonly row: SearchRowItem | undefined
   readonly snapshot: SearchSnapshot | undefined
-  /** The page is one column: Back to results leads the header. */
+  /** The panel covers the results: Back to results leads the header. Beside them, Close ends it. */
   readonly narrow: boolean
   readonly readerRef: RefObject<HTMLDivElement | null>
   /** While a topic shows: how ⌘↑ and ⌘↓ from the list or the field step its matches. */
   readonly onStepper: (step: ((direction: 1 | -1) => void) | undefined) => void
+  /** Back to results, or Close: the panel goes and the selected card takes focus. */
   readonly onBack: () => void
   /** Esc in the empty composer: back to the list. */
   readonly onEscape: () => void
@@ -162,7 +163,7 @@ function ReaderTopic({ sessionId, selection, row, snapshot, narrow, readerRef, o
   useMarks(readerRef, marked, ts, words)
 
   const step = nav !== undefined && nav.count > 1 ? { index: nav.index, count: nav.count, onPrevious: () => go(-1), onNext: () => go(1) } : undefined
-  const header = { onOpenInNewTab: () => void openResultBehind(selection), ...(narrow ? { onBack } : {}), ...(step === undefined ? {} : { step }) }
+  const header = { onOpenInNewTab: () => void openResultBehind(selection), ...(narrow ? { onBack } : { onClose: onBack }), ...(step === undefined ? {} : { step }) }
   if (landed !== undefined && detail != null) return <Topic id={topicId} view={view} detail={detail} reader={{ header, onEscape, onUsed, landing: landed.at, fetch }} />
   return <ReaderPreview view={view} selection={selection} row={row} detail={detail ?? undefined} header={header} />
 }
@@ -266,9 +267,10 @@ function KnownHeader({ detail, reader }: { readonly detail: TopicDetail; readonl
   return useTopicHeader(detail, false, false, reader)
 }
 
-/** A search hit as the topic draws its message: the sender's name and colour, and the text the row shows. */
+/** A search hit as the topic draws its message: its card's sender, body, files and reactions, or its sender's name and the text the row shows. */
 function previewItem(hit: SearchHit, topicId: string): MessageListItem {
-  const senderId = hit.senderId ?? hit.id
+  const card = hit.card
+  const senderId = card?.sender.id ?? hit.senderId ?? hit.id
   return {
     message: {
       id: hit.id,
@@ -278,15 +280,15 @@ function previewItem(hit: SearchHit, topicId: string): MessageListItem {
       kind: 'message',
       senderId,
       fromMe: false,
-      body: { blocks: [{ kind: 'paragraph', children: [{ kind: 'text', text: hit.text }] }] },
+      body: card?.body ?? { blocks: [{ kind: 'paragraph', children: [{ kind: 'text', text: hit.text }] }] },
       edited: false,
       groupStart: true,
       broadcast: false,
       root: topicId === threadTopicOf(hit.place.id, hit.ts),
-      reactions: [],
-      files: [],
+      reactions: card?.reactions ?? [],
+      files: card?.files ?? [],
     },
-    sender: { id: senderId, name: hit.sender, color: defaultPersonColor(senderId), ...(hit.senderId === undefined ? { unreachable: true as const } : {}) },
+    sender: card?.sender ?? { id: senderId, name: hit.sender, color: defaultPersonColor(senderId), ...(hit.senderId === undefined ? { unreachable: true as const } : {}) },
   }
 }
 

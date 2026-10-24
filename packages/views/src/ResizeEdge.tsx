@@ -6,13 +6,19 @@
  * `collapseBelow`, a drag that ends narrower than that hides the pane
  * instead. It is a window splitter for the keyboard too: Tab reaches it,
  * ← and → move it 8px, Home and End go to the minimum and the maximum, and
- * Enter asks for the default. The sidebar and the Search tab's results
- * column use it.
+ * Enter asks for the default. The sidebar uses it on its right edge, and
+ * the Search tab's topic panel on its left (`side="start"`), where a drag
+ * to the left and ← widen it.
  */
 import * as stylex from '@stylexjs/stylex'
 import { useRef, type KeyboardEvent, type PointerEvent } from 'react'
 import { layout } from '@juno/tokens/tokens.stylex'
 import { focusRing } from '@juno/ui'
+
+/** The pane's width, written straight onto its box. */
+const write = (box: HTMLElement, next: number) => {
+  box.style.width = `${next}px`
+}
 
 /** How far ← and → move the edge. */
 const KEY_STEP = 8
@@ -27,16 +33,16 @@ export interface ResizeEdgeProps {
   readonly onReset: (() => void) | undefined
   readonly collapseBelow?: number
   readonly onCollapse?: (() => void) | undefined
+  /** Which edge of the pane: its right (`end`, the default) or its left. */
+  readonly side?: 'start' | 'end'
 }
 
-export function ResizeEdge({ width, min, max, label, onResize, onReset, collapseBelow, onCollapse }: ResizeEdgeProps) {
+export function ResizeEdge({ width, min, max, label, onResize, onReset, collapseBelow, onCollapse, side = 'end' }: ResizeEdgeProps) {
+  /** A move to the right widens a pane whose right edge this is, and narrows one whose left edge it is. */
+  const sign: 1 | -1 = side === 'end' ? 1 : -1
   /** The drag in progress, with the pane's box: the edge's parent. */
   const drag = useRef<{ readonly box: HTMLElement; readonly startX: number; raw: number; frame: number | undefined } | undefined>(undefined)
   const clamp = (raw: number) => Math.round(Math.min(max, Math.max(min, raw)))
-  const write = (box: HTMLElement, next: number) => {
-    box.style.width = `${next}px`
-  }
-
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
     event.preventDefault()
@@ -48,7 +54,7 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current
     if (current === undefined) return
-    current.raw = width + event.clientX - current.startX
+    current.raw = width + sign * (event.clientX - current.startX)
     if (current.frame !== undefined) return
     current.frame = requestAnimationFrame(() => {
       current.frame = undefined
@@ -62,7 +68,7 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
     if (current.frame !== undefined) cancelAnimationFrame(current.frame)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     // Where the button came up decides, even when the last moves before it were not delivered.
-    if (event.type === 'pointerup') current.raw = width + event.clientX - current.startX
+    if (event.type === 'pointerup') current.raw = width + sign * (event.clientX - current.startX)
     if (event.type === 'pointerup' && collapseBelow !== undefined && current.raw < collapseBelow) {
       write(current.box, width)
       onCollapse?.()
@@ -79,7 +85,7 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
       event.preventDefault()
       return onReset?.()
     }
-    const to = event.key === 'ArrowLeft' ? width - KEY_STEP : event.key === 'ArrowRight' ? width + KEY_STEP : event.key === 'Home' ? min : event.key === 'End' ? max : undefined
+    const to = keyedWidth(event.key, width, min, max, sign)
     if (to === undefined) return
     event.preventDefault()
     const box = event.currentTarget.parentElement
@@ -105,9 +111,16 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
       onPointerCancel={end}
       onDoubleClick={onReset}
       onKeyDown={onKeyDown}
-      {...stylex.props(styles.edge, focusRing.inset)}
+      {...stylex.props(styles.edge, side === 'start' && styles.start, focusRing.inset)}
     />
   )
+}
+
+/** Where ←, →, Home and End move the edge to; undefined for any other key. */
+function keyedWidth(key: string, width: number, min: number, max: number, sign: 1 | -1): number | undefined {
+  if (key === 'ArrowLeft') return width - sign * KEY_STEP
+  if (key === 'ArrowRight') return width + sign * KEY_STEP
+  return key === 'Home' ? min : key === 'End' ? max : undefined
 }
 
 const styles = stylex.create({
@@ -122,5 +135,9 @@ const styles = stylex.create({
     cursor: 'col-resize',
     touchAction: 'none',
     WebkitAppRegion: 'no-drag',
+  },
+  start: {
+    right: 'auto',
+    left: `calc(${layout['--sidebar-resize-hit']} / -2)`,
   },
 })

@@ -1,4 +1,4 @@
-import { searchPage, restoreWindow, navigateMatches, profileDates, readerWithoutCache, tabAndEdge } from './searchSteps'
+import { searchPage, restoreWindow, navigateMatches, profileDates, readerWithoutCache, tabAndEdge, foldedMatch, topCard } from './searchSteps'
 import { expect, test, type Fixtures } from './fixtures'
 import { readUserDb } from './driver/userDb'
 import type { Juno } from './driver/juno'
@@ -40,7 +40,7 @@ async function pickFrom(juno: Juno, name: string): Promise<void> {
 
 type Context = Pick<Fixtures, 'juno' | 'slack' | 'fake'>
 
-test('search: from: chip, local rows first, Slack merges below, the reader follows and marks read only when used, Enter and Back', async ({ juno, slack, fake }) => {
+test('search: from: chip, local cards first, Slack merges below, Space shows the topic and it follows the arrows, it marks read only when used, Esc hides it, Enter and Back', async ({ juno, slack, fake }) => {
   const context = { juno, slack, fake }
   await shotSize(juno)
   for (let i = 1; i <= 24; i++) slack.as('Maya').postIn('incidents', `Flamingo note ${i} on the pager`)
@@ -52,11 +52,15 @@ test('search: from: chip, local rows first, Slack merges below, the reader follo
   await juno.sidebar.row('#product').expectVisible()
   await test.step('⌘⇧F opens Search on an empty field that points to ⌘K', () => openEmpty(context))
   await test.step('a from: chip and words show this Mac’s rows at once; Slack’s older row joins below without moving them', () => localThenSlack(context))
-  await test.step('↓ from the field and through three results: the reader follows, and nothing is marked read', () => arrowThrough(context))
-  await test.step('Tab into the reader’s composer, a reply sent there marks the topic read; Esc goes back to the list', () => replyInReader(context))
-  await test.step('Enter on another result opens it in this tab; Back returns to the same query, selection and scroll', () => openAndBack(context))
-  await test.step('a pointer opens the narrow reader and Back restores results', async () => {
+  await test.step('↓ from the field selects a card and no topic shows; Space shows it beside the list, it follows the arrows, and nothing is marked read', () => arrowThrough(context))
+  await test.step('Tab into the topic’s composer, a reply sent there marks the topic read; Esc goes back to the list, and Esc again hides the topic', () => replyInReader(context))
+  await test.step('Enter on another result opens it in this tab; Back returns to the same query, selection, topic and scroll', () => openAndBack(context))
+  await test.step('in a narrow window a press shows the topic over the list, and Back to results restores it', async () => {
     const page = searchPage(juno.win)
+    // Esc on the card hides the topic first; a narrow window with the topic shown would cover the list at once.
+    await page.row('Flamingo note 17 on the pager').focus()
+    await juno.win.keyboard.press('Escape')
+    await expect(page.reader).toHaveCount(0)
     await juno.surface.setWindowSize(1000, 760)
     await page.row('Flamingo note 17 on the pager').click()
     await expect(page.reader.getByText('Flamingo note 17 on the pager')).toBeVisible()
@@ -69,10 +73,12 @@ test('search: from: chip, local rows first, Slack merges below, the reader follo
 
 async function moreShots({ juno }: Context): Promise<void> {
   const page = searchPage(juno.win)
-  await juno.surface.setWindowSize(1100, 760)
-  // One column once the column's edge is gone; before that Enter would open the topic in this tab.
-  await expect(page.root.getByRole('separator', { name: 'Resize results' })).toHaveCount(0)
-  await page.row('Flamingo note 17 on the pager').press('Enter')
+  await page.row('Flamingo note 17 on the pager').focus()
+  await juno.win.keyboard.press('Escape')
+  await juno.surface.setWindowSize(1000, 760)
+  // The topic covers the list once its edge is gone; before that Enter would open the topic in this tab.
+  await page.row('Flamingo note 17 on the pager').click()
+  await expect(page.root.getByRole('separator', { name: 'Resize topic' })).toHaveCount(0)
   await expect(page.reader.getByRole('button', { name: 'Back to results', exact: true })).toBeVisible()
   await shot(juno, 'narrow-light')
   await juno.surface.setWindowSize(1440, 900)
@@ -83,6 +89,11 @@ async function moreShots({ juno }: Context): Promise<void> {
   await juno.surface.appMenu('tab-1')
   await juno.tabs.expectActive('flamingo')
   await shot(juno, 'tab-dark')
+  // Esc on the selected card hides the topic: the cards alone.
+  await page.row('Flamingo note 17 on the pager').focus()
+  await juno.win.keyboard.press('Escape')
+  await expect(page.reader).toHaveCount(0)
+  await shot(juno, 'cards-dark')
 }
 
 async function openEmpty({ juno, fake }: Context): Promise<void> {
@@ -123,13 +134,14 @@ async function localThenSlack({ juno, fake }: Context): Promise<void> {
   await expect(page.row('Flamingo plan from last quarter')).toHaveCount(1)
   await expect(page.results.getByText('Searching Slack…')).toHaveCount(0)
   expect(await rowIds(page, 6)).toEqual(first)
-  // With Slack's answer, a fresh search shows its first result in the reader as a peek; focus stays in the field (arrowThrough checks nothing was read).
-  await expect(page.row('Flamingo launch moved to Thursday')).toHaveAttribute('aria-selected', 'true')
-  await expect(page.reader.getByText('Flamingo launch moved to Thursday')).toBeVisible()
+  // Nothing is chosen yet, so no topic shows and focus stays in the field.
+  await expect(page.rows.and(page.root.locator('[aria-selected="true"]'))).toHaveCount(0)
+  await expect(page.reader).toHaveCount(0)
   await expect(page.field).toBeFocused()
-  // Flat, a run of matches from one topic shows the topic's line once.
+  // Each card is the whole message; a run of matches from one topic shows its place line once.
   await expect(page.rows.filter({ hasText: 'on the pager' })).toHaveCount(24)
-  await expect(page.rows.filter({ hasText: '#incidents' })).toHaveCount(1)
+  await expect(page.places.filter({ hasText: 'incidents' })).toHaveCount(1)
+  await shot(juno, 'cards-light')
   await juno.tabs.expectActive('flamingo')
 }
 
@@ -138,6 +150,10 @@ async function arrowThrough({ juno, slack }: Context): Promise<void> {
   const page = searchPage(win)
   slack.resetCalls()
   await page.field.press('ArrowDown')
+  await expect(page.row('Flamingo launch moved to Thursday')).toBeFocused()
+  await expect(page.row('Flamingo launch moved to Thursday')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.reader).toHaveCount(0)
+  await win.keyboard.press('Space')
   for (const text of ['Flamingo launch moved to Thursday', 'Flamingo rehearsal notes for you', 'Flamingo rehearsal checklist is ready']) {
     if (text !== 'Flamingo launch moved to Thursday') await win.keyboard.press('ArrowDown')
     await expect(page.row(text)).toBeFocused()
@@ -164,6 +180,13 @@ async function replyInReader({ juno, slack, fake }: Context): Promise<void> {
   await expect(sidebar.row('#product').titleText).toHaveCSS('font-weight', '600')
   await win.keyboard.press('Escape')
   await expect(page.row('Flamingo rehearsal checklist is ready')).toBeFocused()
+  await expect(page.reader).toBeVisible()
+  await win.keyboard.press('Escape')
+  await expect(page.reader).toHaveCount(0)
+  await expect(page.row('Flamingo rehearsal checklist is ready')).toBeFocused()
+  // → shows it again.
+  await win.keyboard.press('ArrowRight')
+  await expect(page.reader.getByText('Flamingo rehearsal checklist is ready')).toBeVisible()
 }
 
 async function openAndBack({ juno }: Context): Promise<void> {
@@ -175,10 +198,12 @@ async function openAndBack({ juno }: Context): Promise<void> {
   // Part way down, so Back's restore is not clamped at the list's end.
   await win.mouse.wheel(0, 160)
   await expect.poll(() => page.results.evaluate((list) => list.scrollTop)).toBeGreaterThan(100)
-  const scrolled = await page.results.evaluate((list) => list.scrollTop)
   const target = page.row('Flamingo note 17 on the pager')
   await target.click()
   await expect(target).toHaveAttribute('aria-selected', 'true')
+  // The topic beside the list narrows it, so where it is scrolled is read once that has settled.
+  await expect(page.reader.getByText('Flamingo note 17 on the pager')).toBeVisible()
+  const scrolled = await topCard(page)
   await win.keyboard.press('Enter')
   await tabs.expectActive('incidents')
   await expect(page.root).toHaveCount(0)
@@ -187,7 +212,8 @@ async function openAndBack({ juno }: Context): Promise<void> {
   await expect(page.field).toHaveValue('flamingo')
   await expect(page.chips.filter({ hasText: 'Maya' })).toBeVisible()
   await expect(page.row('Flamingo note 17 on the pager')).toHaveAttribute('aria-selected', 'true')
-  await expect.poll(() => page.results.evaluate((list) => list.scrollTop)).toBe(scrolled)
+  await expect(page.reader.getByText('Flamingo note 17 on the pager')).toBeVisible()
+  await expect.poll(() => topCard(page)).toBe(scrolled)
 }
 
 test('search: ⌘Enter opens results in tabs behind this one and focus stays in the list', async ({ juno, slack }) => {
@@ -290,7 +316,7 @@ test('search: when Slack fails the local rows stay with a notice, and Try again 
   await expect(page.row('Kiwifruit standup moved to ten')).toBeVisible()
 })
 
-test('search: a restart brings the Search tab back with its query and selection, grouped by thread as it was left', async ({ juno, slack, fake, relaunch, userData }) => {
+test('search: a restart brings the Search tab back with its query, its selection and the topic beside it', async ({ juno, slack, fake, relaunch, userData }) => {
   const { surface, win, sidebar } = juno
   const page = searchPage(win)
   await shotSize(juno)
@@ -300,29 +326,21 @@ test('search: a restart brings the Search tab back with its query and selection,
 
   await surface.appMenu('search-messages')
   await page.field.pressSequentially('pelican')
-  // Flat by default: one row per match, newest first.
+  // A flat list: one card per match, newest first; the replies share their thread's place line.
   await expect(page.rows).toHaveCount(4)
-  await expect(page.results.getByText(/more in this thread/)).toHaveCount(0)
+  await expect(page.places.filter({ hasText: 'Pelican migration plan' })).toHaveCount(1)
   await page.row('pelican step two is done').click()
   await expect(page.reader.getByText('pelican step two is done')).toBeVisible()
+  await shot(juno, 'tab-panel-light')
 
-  await page.filter('Group by thread').click()
-  await expect(page.filter('Group by thread')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.results.getByText('2 more in this thread')).toBeVisible()
-  await expect(page.row('pelican step two is done')).toHaveAttribute('aria-selected', 'true')
-  await shot(juno, 'grouped-light')
-
-  // The session and the preference have reached the engine.
+  // The session has reached the engine.
   const pref = (key: string) => readUserDb(userData, fake.teamId, (db) => (db.prepare(`SELECT value_json FROM prefs WHERE key = ?`).get(key) as { value_json: string } | undefined)?.value_json ?? '')
-  await expect.poll(() => pref('tabs')).toMatch(/"search":\{"text":"pelican".*"selected":/)
-  await expect.poll(() => pref('search')).toContain('"groupByThread":true')
+  await expect.poll(() => pref('tabs')).toMatch(/"search":\{"text":"pelican".*"selected":.*"panel":true/)
 
   const restarted = await relaunch()
   const again = searchPage(restarted.win)
   await restarted.tabs.expectActive('pelican')
   await expect(again.field).toHaveValue('pelican')
-  await expect(again.filter('Group by thread')).toHaveAttribute('aria-pressed', 'true')
-  await expect(again.results.getByText('2 more in this thread')).toBeVisible()
   await expect(again.row('pelican step two is done')).toHaveAttribute('aria-selected', 'true')
   await expect(again.reader.getByText('pelican step two is done')).toBeVisible()
 })
@@ -373,5 +391,6 @@ test('search: ⌘K’s last row takes the typed text to the Search tab, and so d
 test('search: a held Slack answer restores a saved window beyond 200 matches', async ({ juno, fake, relaunch, userData }) => restoreWindow({ juno, fake, relaunch, userData }))
 test('search: reader navigation applies the whole query beyond the message window', async ({ juno, fake }) => navigateMatches({ juno, fake }))
 test('search: date presets use the Slack profile calendar across midnight', async ({ juno, fake }) => profileDates({ juno, fake }))
-test('search: Tab from the field lands on a row and the reader follows, and the column’s edge moves with the keys', async ({ juno, slack }) => tabAndEdge({ juno, slack }))
+test('search: Tab from the field lands on a card, Space shows its topic, and the topic’s edge moves with the keys', async ({ juno, slack }) => tabAndEdge({ juno, slack }))
+test('search: a long message folds with its match in view, and Show more unfolds it in place', async ({ juno, slack }) => foldedMatch({ juno, slack }))
 test('search: a result not on this Mac shows in the reader at once, never the last topic, and held arrows load only where they stop', async ({ juno, slack, fake }) => readerWithoutCache({ juno, slack, fake }))

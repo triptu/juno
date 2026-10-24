@@ -6,9 +6,9 @@
  *   scope, sort, selection and scroll. It lives outside the mounted page, so
  *   Back, ⌘⇧T and a restart bring it back; it is saved with the tabs
  *   (`savedTabs`). Change it with `updateSearchSession`.
- * - `searchPrefsAtom`: Apps hidden, Automated hidden, Group by thread and the
- *   results column's width, one for every Search tab, saved to the workspace
- *   preference `SEARCH_PREF`.
+ * - `searchPrefsAtom`: Apps hidden, Automated hidden and the topic panel's
+ *   width, one for every Search tab, saved to the workspace preference
+ *   `SEARCH_PREF`.
  * - `searchResultsAtom(id)`: the engine's `search.session` snapshot for the
  *   session's query. A new query is a new generation; until its first
  *   snapshot arrives the last one shows, so the list never flashes empty.
@@ -18,7 +18,7 @@
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { MESSAGE_WINDOW_BEFORE, MESSAGE_WINDOW_DEFAULT, parseSearchQuery, Person, prefsGet, prefsSet, SEARCH_COLUMN_WIDTH, searchMore, searchSession, searchMatches, type PickConversation, type SearchQuery, type SearchSnapshot, type SearchUpdate } from '@juno/contract'
+import { MESSAGE_WINDOW_BEFORE, MESSAGE_WINDOW_DEFAULT, parseSearchQuery, Person, prefsGet, prefsSet, SEARCH_PANEL_WIDTH, searchMore, searchSession, searchMatches, type PickConversation, type SearchQuery, type SearchSnapshot, type SearchUpdate } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import { paletteConversationsAtom } from './palette'
 import { bottomWindow, messagesAtom, topicAtom, type MessageWindowSpec } from './messages'
@@ -61,9 +61,15 @@ export const SearchSession = Schema.Struct({
   topic: Schema.optionalKey(SearchTopicScope),
   sort: Schema.Literals(['newest', 'oldest']),
   selected: Schema.optionalKey(SearchSelection),
-  /** The results window's first row, and the list's scroll offset, to come back to. */
+  /** The selected result's topic shows in the panel beside the results. */
+  panel: Schema.optionalKey(Schema.Boolean),
+  /**
+   * The results window's first row, and where the list was scrolled to come back to: the card at its top and how
+   * far that card's top was from the list's. Cards differ in height and lay out only near the view, so a pixel
+   * offset alone would land elsewhere.
+   */
   offset: Schema.optionalKey(Schema.Int),
-  scrollTop: Schema.optionalKey(Schema.Number),
+  scrolled: Schema.optionalKey(Schema.Struct({ id: Schema.String, top: Schema.Number })),
   /** Bumped by Enter in the field: Slack is asked at once. */
   commit: Schema.Int,
 })
@@ -129,19 +135,18 @@ export const SEARCH_PREF = 'search'
 export interface SearchPrefs {
   readonly hideApps: boolean
   readonly hideAutomated: boolean
-  readonly groupByThread: boolean
-  readonly column: number
+  /** The topic panel's width beside the results. */
+  readonly panel: number
 }
 
-const defaultPrefs: SearchPrefs = { hideApps: true, hideAutomated: true, groupByThread: false, column: SEARCH_COLUMN_WIDTH.default }
+const defaultPrefs: SearchPrefs = { hideApps: true, hideAutomated: true, panel: SEARCH_PANEL_WIDTH.default }
 const PrefsJson = Schema.Struct({
   hideApps: Schema.optionalKey(Schema.Boolean),
   hideAutomated: Schema.optionalKey(Schema.Boolean),
-  groupByThread: Schema.optionalKey(Schema.Boolean),
-  column: Schema.optionalKey(Schema.Number),
+  panel: Schema.optionalKey(Schema.Number),
 })
 const decodePrefs = Schema.decodeUnknownOption(PrefsJson)
-const validColumn = (width: number) => Number.isInteger(width) && width >= SEARCH_COLUMN_WIDTH.min && width <= SEARCH_COLUMN_WIDTH.max
+const validPanel = (width: number) => Number.isInteger(width) && width >= SEARCH_PANEL_WIDTH.min && width <= SEARCH_PANEL_WIDTH.max
 
 const savedPrefsAtom = liveQuery(prefsGet)({ key: SEARCH_PREF })
 const changedPrefsAtom = Atom.family((_teamId: string) => Atom.make<SearchPrefs | undefined>(undefined).pipe(Atom.keepAlive))
@@ -154,16 +159,16 @@ export const searchPrefsAtom = Atom.make((get): SearchPrefs => {
   if (!AsyncResult.isSuccess(saved)) return defaultPrefs
   return Option.match(decodePrefs(saved.value), {
     onNone: () => defaultPrefs,
-    onSome: (json) => ({ ...defaultPrefs, ...json, column: json.column !== undefined && validColumn(json.column) ? json.column : defaultPrefs.column }),
+    onSome: (json) => ({ ...defaultPrefs, ...json, panel: json.panel !== undefined && validPanel(json.panel) ? json.panel : defaultPrefs.panel }),
   })
-}).pipe(Atom.withEquality((a: SearchPrefs, b: SearchPrefs) => a.hideApps === b.hideApps && a.hideAutomated === b.hideAutomated && a.groupByThread === b.groupByThread && a.column === b.column))
+}).pipe(Atom.withEquality((a: SearchPrefs, b: SearchPrefs) => a.hideApps === b.hideApps && a.hideAutomated === b.hideAutomated && a.panel === b.panel))
 
 export function setSearchPrefs(registry: Registry, change: Partial<SearchPrefs>): void {
   const teamId = registry.get(signedInAtom)?.teamId
   if (teamId === undefined) return
   const current = registry.get(searchPrefsAtom)
   const next = { ...current, ...change }
-  if (!validColumn(next.column)) return
+  if (!validPanel(next.panel)) return
   registry.set(changedPrefsAtom(teamId), next)
   void runCommand(registry, prefsSet, { key: SEARCH_PREF, value: next })
 }
@@ -175,7 +180,7 @@ export function searchQueryOf(session: SearchSession, prefs: SearchPrefs): Searc
   const words = session.text.replace(TYPING_IDENTITY, '').trim()
   const raw = [...session.chips.map((chip) => chip.token), words].filter((part) => part !== '').join(' ')
   const topic = session.topic === undefined ? undefined : { channel: session.topic.channel, ...(session.topic.threadTs === undefined ? {} : { threadTs: session.topic.threadTs }) }
-  return parseSearchQuery(raw, { scope: { hideApps: prefs.hideApps, hideAutomated: prefs.hideAutomated, sort: session.sort, groupByThread: prefs.groupByThread, ...(topic === undefined ? {} : { topic }) } })
+  return parseSearchQuery(raw, { scope: { hideApps: prefs.hideApps, hideAutomated: prefs.hideAutomated, sort: session.sort, ...(topic === undefined ? {} : { topic }) } })
 }
 
 /** Generations only grow, across sessions and restarts, so the engine never takes a new query for an old one. */

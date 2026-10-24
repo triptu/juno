@@ -1,28 +1,13 @@
 /**
  * The reader's matches (SPEC 10a, "The reader is the topic itself"): which
  * messages of the topic, as Juno holds it, match the search, oldest first,
- * for "2 of 5" and ⌘↑ ⌘↓; and the matched words marked with CSS highlights,
- * which change no layout, so marking never moves a message.
+ * for "2 of 5" and ⌘↑ ⌘↓; and the matched words marked with the search
+ * mark's CSS highlights (`@juno/views` `marks.ts`), which move nothing.
  */
-import { searchRanges } from '@juno/contract'
+import { matchRanges } from '@juno/views'
 
 const MATCH = 'search-match'
 const CURRENT = 'search-current'
-
-/** Ranges over each matched word in the message's text nodes. A phrase split across elements is left unmarked. */
-function rangesIn(element: Element, words: ReadonlyArray<string>): Range[] {
-  const ranges: Range[] = []
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-    for (const { start, end } of searchRanges(node.textContent ?? '', words)) {
-      const range = new Range()
-      range.setStart(node, start)
-      range.setEnd(node, end)
-      ranges.push(range)
-    }
-  }
-  return ranges
-}
 
 /**
  * Marks the matched words of the `marked` messages under `root`, the
@@ -38,7 +23,7 @@ export function markMatches(root: Element, marked: ReadonlyArray<string>, curren
   for (const ts of marked) {
     const text = root.querySelector(`[data-message-row="${CSS.escape(ts)}"] [data-msg-text]`)
     if (text === null) continue
-    for (const range of rangesIn(text, words)) (ts === current ? strong : all).add(range)
+    for (const range of matchRanges(text, words)) (ts === current ? strong : all).add(range)
   }
   registry.set(MATCH, all)
   registry.set(CURRENT, strong)

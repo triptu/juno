@@ -106,7 +106,7 @@ export function useSearchField(sessionId: string, session: SearchSession, inputR
     },
     onRemoveChip: (key: string) => (key === 'topic' ? update(({ topic: _topic, ...current }) => current) : update((current) => ({ ...current, chips: current.chips.toSpliced(chipIndex(key), 1) }))),
     onClear: () => {
-      place('', 0, ({ topic: _topic, selected: _selected, scrollTop: _top, offset: _offset, ...current }) => ({ ...current, chips: [] }))
+      place('', 0, ({ topic: _topic, selected: _selected, panel: _panel, scrolled: _scrolled, offset: _offset, ...current }) => ({ ...current, chips: [] }))
       inputRef.current?.focus()
     },
     onFocus: () => setCaret(inputRef.current?.selectionStart ?? session.text.length),

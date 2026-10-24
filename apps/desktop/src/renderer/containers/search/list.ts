@@ -1,19 +1,19 @@
 /**
  * The Search list's wiring (SPEC 10a): its rows from the engine's groups,
  * where it was scrolled (kept with the session for Back, ⌘⇧T and a
- * restart), the engine's 100-row window moved as the list nears either
+ * restart), the engine's window of cards moved as the list nears either
  * end, and the arrows' next stops and the hovered row kept warm so the
  * reader follows in one frame.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import type { SearchSnapshot } from '@juno/contract'
+import { SEARCH_WINDOW, type SearchSnapshot } from '@juno/contract'
 import { loadMessageAt, loadMoreSearch, prefetchSearchResult, registry, updateSearchSession, type SearchSelection, type SearchSession } from '@juno/state'
-import { isStop, readerTarget, searchRows, type SearchRowItem } from '@juno/views'
+import { isStop, readerTarget, searchRowDomId, searchRows, type SearchRowItem } from '@juno/views'
 import { openTopic, openTopicAt } from '../navigation'
 
-/** The engine sends 100 rows at a time; near either end the window moves by half. */
-const WINDOW = 100
-const WINDOW_STEP = 50
+/** Near either end the engine's window moves by half. */
+const WINDOW = SEARCH_WINDOW
+const WINDOW_STEP = SEARCH_WINDOW / 2
 
 export function selectionOf(row: SearchRowItem | undefined): SearchSelection | undefined {
   const target = row === undefined ? undefined : readerTarget(row)
@@ -28,18 +28,16 @@ export async function openResultHere(target: SearchSelection): Promise<void> {
   openTopicAt(target.topicId, target.ts, { flash: true })
 }
 
-/** Rows for the snapshot; undefined for an empty field. A search scoped to one thread shows all its matches. */
-export function useResultRows(session: SearchSession, empty: boolean, snapshot: SearchSnapshot | undefined, grouped: boolean, expanded: ReadonlySet<string>) {
+/** Rows for the snapshot; undefined for an empty field. */
+export function useResultRows(empty: boolean, snapshot: SearchSnapshot | undefined) {
   const groups = snapshot?.groups
   // The line shows where Slack's pages stop; before Slack's first page, or without Slack, the local rows show plainly.
   const olderIndex = snapshot === undefined || snapshot.pagination.page === 0 ? undefined : snapshot.frontier.olderGroupIndex
-  const scopedThread = session.topic?.threadTs !== undefined
   const rows = useMemo(() => {
     if (empty) return undefined
     if (groups === undefined) return []
-    const open = scopedThread ? new Set([...expanded, ...groups.map((group) => group.id)]) : expanded
-    return searchRows(groups, grouped, olderIndex ?? groups.length, open)
-  }, [empty, groups, grouped, olderIndex, expanded, scopedThread])
+    return searchRows(groups, olderIndex ?? groups.length)
+  }, [empty, groups, olderIndex])
   const [held, setHeld] = useState({ source: rows, rows })
   let stable = held.rows
   if (rows !== held.source) {
@@ -54,29 +52,47 @@ export function useResultRows(session: SearchSession, empty: boolean, snapshot: 
   return { rows: stable, stops }
 }
 
-/** The list comes back where it was left, and remembers where it is once a scroll ends. */
-export function useListScroll(sessionId: string, listRef: RefObject<HTMLDivElement | null>, rows: ReadonlyArray<SearchRowItem> | undefined, scrollTop: number | undefined, windowReady: boolean) {
+/** The card at the top of the list's view, and how far its top is from the list's; none at the very top. */
+function topCard(list: HTMLElement): SearchSession['scrolled'] {
+  if (list.scrollTop === 0) return undefined
+  const top = list.getBoundingClientRect().top
+  for (const row of list.querySelectorAll<HTMLElement>('[data-search-row]')) {
+    const box = row.getBoundingClientRect()
+    if (box.bottom > top) return { id: row.dataset.searchRow ?? '', top: Math.round(box.top - top) }
+  }
+  return undefined
+}
+
+/**
+ * The list comes back where it was left: the same card at the same place
+ * at its top. Where it is is kept with the session once a scroll ends.
+ */
+export function useListScroll(sessionId: string, listRef: RefObject<HTMLDivElement | null>, rows: ReadonlyArray<SearchRowItem> | undefined, scrolled: SearchSession['scrolled'], windowReady: boolean) {
   const restored = useRef(false)
   const ready = windowReady && rows !== undefined && rows.length > 0
   useLayoutEffect(() => {
     const list = listRef.current
     if (restored.current || list === null || !ready) return
     restored.current = true
-    if (scrollTop !== undefined) list.scrollTop = scrollTop
-  }, [listRef, ready, scrollTop])
+    const row = scrolled === undefined ? null : document.getElementById(searchRowDomId(scrolled.id))
+    if (scrolled === undefined || row === null) return
+    list.scrollTop += row.getBoundingClientRect().top - list.getBoundingClientRect().top - scrolled.top
+  }, [listRef, ready, scrolled])
   const empty = rows === undefined
   useEffect(() => {
     const list = listRef.current
     if (list === null || !windowReady) return
     const save = () => {
-      const top = list.scrollTop
-      updateSearchSession(registry, sessionId, (current) => (current.scrollTop === top ? current : { ...current, scrollTop: top }))
+      const at = topCard(list)
+      updateSearchSession(registry, sessionId, (current) => (current.scrolled?.id === at?.id && current.scrolled?.top === at?.top ? current : { ...withoutScroll(current), ...(at === undefined ? {} : { scrolled: at }) }))
     }
     list.addEventListener('scrollend', save)
     return () => list.removeEventListener('scrollend', save)
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- The empty-to-ready transition is when the list DOM appears.
   }, [sessionId, listRef, empty, windowReady])
 }
+
+const withoutScroll = ({ scrolled: _scrolled, ...rest }: SearchSession): SearchSession => rest
 
 /** The engine's window: moved near either end, and asked for again where a restored session left it. */
 export function useWindowPaging(sessionId: string, snapshot: SearchSnapshot | undefined, savedOffset: number) {
@@ -130,5 +146,6 @@ function warmRow(sessionId: string, generation: number, row: SearchRowItem | und
 }
 
 function sameRow(a: SearchRowItem, b: SearchRowItem): boolean {
-  return a.kind === b.kind && (a.kind !== 'match' || b.kind !== 'match' || a.flat === b.flat) && (!('group' in a) || ('group' in b && a.group === b.group)) && (!('hit' in a) || ('hit' in b && a.hit === b.hit)) && (!('count' in a) || ('count' in b && a.count === b.count))
+  if (a.kind === 'card' && b.kind === 'card') return a.hit === b.hit && a.group === b.group && a.run === b.run
+  return a.kind === b.kind && (!('group' in a) || ('group' in b && a.group === b.group))
 }

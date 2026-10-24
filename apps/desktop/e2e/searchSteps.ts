@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, type Fixtures } from './fixtures'
+import { SEARCH_WINDOW } from '@juno/contract'
 import { readUserDb } from './driver/userDb'
 const SEARCH = 'search.modules.messages'
 
@@ -12,13 +13,28 @@ export function searchPage(win: Page) {
     field: root.locator('input[data-search-field]'),
     chips: root.locator('[data-search-chip]'),
     results,
-    // The rows the arrows stop on; the Main header and the older line are disabled options.
+    // The cards the arrows stop on; the older line is a disabled option.
     rows: results.locator('[data-search-row]'),
     row: (text: string) => results.locator('[data-search-row]').filter({ hasText: text }),
+    // The place lines over the cards: one for a run of cards from one topic.
+    places: results.locator('[data-search-place]'),
+    // The topic beside the results, once asked for.
     reader: root.locator('[data-search-reader]'),
     filter: (name: string) => root.getByRole('toolbar', { name: 'Filters' }).getByRole('button', { name }),
     hint: root.locator('[data-palette-hint]'),
   }
+}
+
+/** The card at the top of the results' view and how far its top is from the list's, as the session keeps it. */
+export function topCard(page: ReturnType<typeof searchPage>): Promise<string> {
+  return page.results.evaluate((list) => {
+    const top = list.getBoundingClientRect().top
+    for (const row of list.querySelectorAll<HTMLElement>('[data-search-row]')) {
+      const box = row.getBoundingClientRect()
+      if (box.bottom > top) return `${row.dataset.searchRow} ${Math.round(box.top - top)}`
+    }
+    return ''
+  })
 }
 
 export async function restoreWindow({ juno, fake, relaunch, userData }: Pick<Fixtures, 'juno' | 'fake' | 'relaunch' | 'userData'>) {
@@ -30,26 +46,28 @@ export async function restoreWindow({ juno, fake, relaunch, userData }: Pick<Fix
   const page = searchPage(juno.win)
   await juno.surface.appMenu('search-messages')
   await page.field.fill('restorationprobe')
-  await expect(page.rows).toHaveCount(100)
+  await expect(page.rows).toHaveCount(SEARCH_WINDOW)
   const saved = () => readUserDb(userData, fake.teamId, (db) => (db.prepare("SELECT value_json FROM prefs WHERE key = 'tabs'").get() as { value_json: string } | undefined)?.value_json ?? '')
-  for (let i = 0; i < 4; i++) {
+  // Each move at the end takes the window on by half of it: to 200 in eight.
+  for (let i = 0; i < 8; i++) {
     const before = await page.rows.first().getAttribute('data-search-row')
     await page.results.evaluate((list) => { list.scrollTop = list.scrollHeight })
     await expect.poll(() => page.rows.first().getAttribute('data-search-row')).not.toBe(before)
   }
   // Stop between the sentinels and wait for scrollend persistence before restarting.
   await page.results.evaluate((list) => { list.scrollTop = 700 })
-  await expect.poll(saved).toMatch(/"offset":(?:150|200)/)
+  await expect.poll(saved).toMatch(/"offset":(?:175|200)/)
   const first = await page.rows.first().getAttribute('data-search-row')
-  const top = await page.results.evaluate((list) => list.scrollTop)
-  await expect.poll(saved).toContain(`"scrollTop":${top}`)
+  const top = await topCard(page)
+  const [id, offset] = top.split(' ')
+  await expect.poll(saved).toContain(`"scrolled":{"id":"${id}","top":${offset}}`)
   fake.holdNext({ method: SEARCH, reason: 'search' })
   const restarted = await relaunch()
   const again = searchPage(restarted.win)
   await expect.poll(() => fake.heldCount({ method: SEARCH })).toBe(1)
   fake.release({ method: SEARCH })
   await expect(again.rows.first()).toHaveAttribute('data-search-row', first!)
-  await expect.poll(() => again.results.evaluate((list) => list.scrollTop)).toBe(top)
+  await expect.poll(() => topCard(again)).toBe(top)
 }
 
 export async function navigateMatches({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>) {
@@ -111,23 +129,26 @@ export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack
   await expect(page.rows).toHaveCount(2)
   await page.row('Heron migration is done').click()
   await expect(page.reader.getByText('Heron migration is done')).toBeVisible()
-  // The chosen row is not among the next query's rows: Tab lands on the first row, selects it, and the reader follows.
+  // The chosen card is not among the next query's: the selection and its topic go, and Tab lands on the first card and selects it.
   await page.field.fill('heron dashboards')
   await expect(page.rows).toHaveCount(1)
   const row = page.row('Heron dashboards are live')
   await expect(row).toHaveAttribute('aria-selected', 'false')
+  await expect(page.reader).toHaveCount(0)
   for (let i = 0; i < 20 && !(await row.evaluate((element) => element === document.activeElement)); i++) await win.keyboard.press('Tab')
   await expect(row).toBeFocused()
   await expect(row).toHaveAttribute('aria-selected', 'true')
+  await win.keyboard.press('Space')
   await expect(page.reader.getByText('Heron dashboards are live')).toBeVisible()
 
-  const edge = page.root.getByRole('separator', { name: 'Resize results' })
-  const column = page.root.locator('[data-search-column]')
-  const width = () => column.evaluate((element) => Math.round(element.getBoundingClientRect().width))
+  // The topic's left edge: ← widens it, as a drag to the left does. The window has room for it to grow.
+  await juno.surface.setWindowSize(1440, 900)
+  const edge = page.root.getByRole('separator', { name: 'Resize topic' })
+  const panel = page.root.locator('[data-search-panel]')
+  const width = () => panel.evaluate((element) => Math.round(element.getBoundingClientRect().width))
   const start = await width()
-  // Tab from a row goes on to the reader's composer; the edge comes after the rows.
   await edge.focus()
-  await win.keyboard.press('ArrowRight')
+  await win.keyboard.press('ArrowLeft')
   await expect.poll(width).toBeGreaterThan(start)
   await win.keyboard.press('End')
   await expect(edge).toHaveAttribute('aria-valuenow', (await edge.getAttribute('aria-valuemax'))!)
@@ -135,6 +156,53 @@ export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack
   await expect(edge).toHaveAttribute('aria-valuenow', (await edge.getAttribute('aria-valuemin'))!)
   await win.keyboard.press('Enter')
   await expect.poll(width).toBe(start)
+}
+
+/** Where a card's first match sits inside its folded message, and whether it shows there. */
+async function matchInView(page: ReturnType<typeof searchPage>, text: string, word: string): Promise<boolean> {
+  return page.row(text).locator('[data-search-body]').evaluate((body, word) => {
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      const at = (node.textContent ?? '').toLowerCase().indexOf(word)
+      if (at < 0) continue
+      const range = new Range()
+      range.setStart(node, at)
+      range.setEnd(node, at + word.length)
+      const box = body.getBoundingClientRect()
+      const mark = range.getBoundingClientRect()
+      return mark.height > 0 && mark.top >= box.top && mark.bottom <= box.bottom
+    }
+    return false
+  }, word)
+}
+
+/** A long message whose match is near its end: folded, its match still shows; Show more unfolds it whole, in place. */
+export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>) {
+  const { surface, sidebar, win } = juno
+  const page = searchPage(win)
+  const lines = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of the launch notes, about the rollout order and who signs off on each step.`)
+  slack.as('Elena').postIn('product', [...lines, 'The gannet pilot starts on Thursday with the billing team.'].join('\n'))
+  await sidebar.row('#product').expectVisible()
+
+  await surface.appMenu('search-messages')
+  await page.field.pressSequentially('gannet')
+  const card = page.row('Line 1 of the launch notes')
+  await expect(card).toBeVisible()
+  const body = card.locator('[data-search-body]')
+  await expect(body).toHaveAttribute('data-folded', '')
+  await expect.poll(() => matchInView(page, 'Line 1 of the launch notes', 'gannet')).toBe(true)
+  // The search mark is on the word, from the card's own highlight.
+  await expect.poll(() => win.evaluate(() => CSS.highlights.get('search-card')?.size ?? 0)).toBeGreaterThan(0)
+
+  const top = await card.evaluate((element) => Math.round(element.getBoundingClientRect().top))
+  await card.getByRole('button', { name: 'Show more' }).click()
+  await expect(body).not.toHaveAttribute('data-folded', '')
+  await expect(card.getByRole('button', { name: 'Show less' })).toBeVisible()
+  await expect.poll(() => body.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1)
+  await expect.poll(() => matchInView(page, 'Line 1 of the launch notes', 'gannet')).toBe(true)
+  // Unfolding grows the card downward; the card itself stays where it was, and no topic opened.
+  expect(await card.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(top)
+  await expect(page.reader).toHaveCount(0)
 }
 
 const HISTORY = 'conversations.history'
@@ -185,7 +253,8 @@ export async function readerWithoutCache({ juno, slack, fake }: Pick<Fixtures, '
   await surface.appMenu('search-messages')
   await page.field.pressSequentially('osprey')
   await expect(page.rows).toHaveCount(6)
-  // Slack has answered: the newest result, on this Mac, shows as the peek.
+  // A press on the newest result, on this Mac, shows its topic beside the list.
+  await page.row('Osprey launch moved to Thursday').click()
   await expect(page.reader.getByText('Osprey launch moved to Thursday')).toBeVisible()
   await expect(page.reader.locator('[data-composer] textarea')).toBeVisible()
 

@@ -1,13 +1,12 @@
 /**
  * The Search tab's filter row (SPEC 10a, inventory 9a): From, In, Date and
- * Has, then the sort and Group by thread after a 10px space, then the Apps
- * and Automated toggles at the end. A filter that is set takes the
+ * Has, then the sort after a 10px space, then the Apps and Automated
+ * toggles at the end. A filter that is set takes the
  * secondary fill. Each menu opens on mouse down under its button; the
  * toggles act on click and say what they do now ("Apps hidden", "Apps
  * shown"). At the smallest widths the toggles wrap to a line of their own.
  */
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
-import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import * as stylex from '@stylexjs/stylex'
@@ -16,13 +15,12 @@ import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/token
 import { focusRing, Icon, type PhosphorIcon } from '@juno/ui'
 
 export type SearchFilterMenu = 'from' | 'in' | 'date' | 'has' | 'sort'
-export type SearchToggle = 'group' | 'apps' | 'automated'
+export type SearchToggle = 'apps' | 'automated'
 
 export interface SearchFiltersProps {
   /** Which filters the query sets. */
   readonly set: { readonly from: boolean; readonly in: boolean; readonly date: boolean; readonly has: boolean }
   readonly sort: 'newest' | 'oldest'
-  readonly groupByThread: boolean
   readonly hideApps: boolean
   readonly hideAutomated: boolean
   /** Opens a filter's menu at the point under its button. */
@@ -37,7 +35,7 @@ const menus: ReadonlyArray<{ readonly menu: Exclude<SearchFilterMenu, 'sort'>; r
   { menu: 'has', label: 'Has' },
 ]
 
-export function SearchFilters({ set, sort, groupByThread, hideApps, hideAutomated, onMenu, onToggle }: SearchFiltersProps) {
+export function SearchFilters({ set, sort, hideApps, hideAutomated, onMenu, onToggle }: SearchFiltersProps) {
   return (
     <div role="toolbar" aria-label="Filters" {...stylex.props(styles.row)}>
       {menus.map(({ menu, label }) => (
@@ -45,7 +43,6 @@ export function SearchFilters({ set, sort, groupByThread, hideApps, hideAutomate
       ))}
       <span {...stylex.props(styles.sort)}>
         <MenuButton label={sort === 'newest' ? 'Newest' : 'Oldest'} accessibleName={`Sort: ${sort === 'newest' ? 'Newest first' : 'Oldest first'}`} set={false} onOpen={(at) => onMenu('sort', at)} />
-        <ToggleButton icon={ChatsCircle} label="Group by thread" pressed={groupByThread} onToggle={() => onToggle('group')} />
       </span>
       <span data-search-toggles="" {...stylex.props(styles.toggles)}>
         <ToggleButton icon={hideApps ? EyeSlash : Eye} label={hideApps ? 'Apps hidden' : 'Apps shown'} onToggle={() => onToggle('apps')} />
@@ -82,14 +79,10 @@ function MenuButton({ label, accessibleName, set, onOpen }: { readonly label: st
   )
 }
 
-/**
- * A toggle whose label says its state ("Apps hidden"), so it is a plain
- * button named by its label. Group by thread keeps its label and is
- * pressed while on.
- */
-function ToggleButton({ icon, label, pressed, onToggle }: { readonly icon: PhosphorIcon; readonly label: string; readonly pressed?: boolean; readonly onToggle: () => void }) {
+/** A toggle whose label says its state ("Apps hidden"), so it is a plain button named by its label. */
+function ToggleButton({ icon, label, onToggle }: { readonly icon: PhosphorIcon; readonly label: string; readonly onToggle: () => void }) {
   return (
-    <button type="button" aria-pressed={pressed} onClick={onToggle} {...stylex.props(styles.button, styles.toggle, pressed === true && styles.set, focusRing.outside)}>
+    <button type="button" onClick={onToggle} {...stylex.props(styles.button, styles.toggle, focusRing.outside)}>
       <span {...stylex.props(styles.toggleIcon)}>
         <Icon icon={icon} size={13} />
       </span>

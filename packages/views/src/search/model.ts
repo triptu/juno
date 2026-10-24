@@ -4,7 +4,7 @@
  * draw them.
  */
 import type { ConversationKind, Person, SearchPlace } from '@juno/contract'
-import { messageTime, relativeTime } from '../time'
+import { messageHeaderTime, messageTime } from '../time'
 import type { TextRanges } from '../Highlighted'
 
 /** What a chip in the field stands for. `topic` is ⌘F's scope, "in:" a topic's title. */
@@ -45,11 +45,9 @@ export const chipOperator: Readonly<Record<SearchChipOp, string | undefined>> = 
   topic: 'in:',
 }
 
-const FORTNIGHT = 14 * 24 * 60 * 60 * 1000
-
-/** A result's time: "2h", "Yesterday", "3d" for two weeks, then the date ("Sep 18"). */
-export function searchTime(at: number, now: number): string {
-  return now - at < FORTNIGHT ? relativeTime(at, now) : messageTime(at, now)
+/** A result's time: the date and time a message header shows ("Oct 22, 20:41", "Yesterday 19:42", "10:41"), or `short`, the day alone ("Yesterday"). */
+export function searchTime(at: number, now: number, short = false): string {
+  return short ? messageTime(at, now) : messageHeaderTime(at, now)
 }
 
 /** Epoch milliseconds of a Slack ts. */

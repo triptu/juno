@@ -1,14 +1,15 @@
 /**
- * The Search reader's controls in the topic header (SPEC 10a, inventory
- * 9a): Back to results at the start of the left island in the one-column
- * page, "2 of 5" with the arrows in an island of their own, and Open in new
- * tab beside Resolve. Under 480px Back is its icon, the count goes to the
+ * The Search panel's controls in the topic header (SPEC 10a, inventory
+ * 9a): Back to results at the start of the left island when the panel
+ * covers the results, "2 of 5" with the arrows in an island of their own,
+ * Open in new tab beside Resolve, and Close at the end beside the results. Under 480px Back is its icon, the count goes to the
  * arrows' tooltips, and Open in new tab, Resolve and Juno give way to ⋯.
  */
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/icons/ArrowSquareOut'
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { CaretLeft } from '@phosphor-icons/react/dist/icons/CaretLeft'
 import { CaretUp } from '@phosphor-icons/react/dist/icons/CaretUp'
+import { X } from '@phosphor-icons/react/dist/icons/X'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
@@ -21,6 +22,8 @@ export interface TopicHeaderReader {
   readonly step?: { readonly index: number; readonly count: number; readonly onPrevious: () => void; readonly onNext: () => void }
   /** Open in new tab, beside Resolve. */
   readonly onOpenInNewTab: () => void
+  /** The panel beside the results: Close ends the right island (Esc does the same). */
+  readonly onClose?: () => void
 }
 
 const NARROW = '@container (width < 480px)'
@@ -58,6 +61,10 @@ export function ReaderOpen({ onOpen }: { readonly onOpen: () => void }) {
       <IconButton icon={ArrowSquareOut} label="Open in new tab" shortcut="⌘↵" size={28} iconSize={16} radius="full" variant="island" onClick={onOpen} />
     </WideOnly>
   )
+}
+
+export function ReaderClose({ onClose }: { readonly onClose: () => void }) {
+  return <IconButton icon={X} label="Close" shortcut="Esc" size={28} iconSize={16} radius="full" variant="island" onClick={onClose} />
 }
 
 const styles = stylex.create({

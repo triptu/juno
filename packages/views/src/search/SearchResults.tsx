@@ -1,26 +1,30 @@
 /**
- * The Search tab's results column (SPEC 10a, inventory 9a): the rows of
+ * The Search tab's results (SPEC 10a, inventory 9a): the cards of
  * `searchRows`, the states, and on an empty field the recent searches.
- * Dumb: the owner keeps the selection and runs what is chosen.
+ * Dumb: the owner keeps the selection, the panel and runs what is chosen.
  *
- * - A press selects a row and the reader follows; ⌘-press opens it in a tab
- *   behind this one and the selection stays.
- * - ↑ and ↓ move the selection and focus with it; ↑ on the first row goes
- *   back to the field. Enter opens the row, ⌘Enter in a tab behind. Tab
- *   goes on to the reader's composer when the owner has one. A character
- *   typed goes to the field.
+ * - A press on a card selects it and shows its topic beside the list;
+ *   ⌘-press opens it in a tab behind this one and the selection stays.
+ * - ↑ and ↓ move the selection and focus with it (the panel, when open,
+ *   follows); ↑ on the first card goes back to the field. Space shows or
+ *   hides the topic, → shows it, Esc hides it. Enter opens the card's
+ *   topic, ⌘Enter in a tab behind. Tab goes on to the panel's composer
+ *   when there is one. A character typed goes to the field.
+ * - The matched words are marked in every card (`useCardMarks`).
  * - Rows are in flow with `content-visibility: auto`. The owner moves the
- *   engine's 100-row window when the list nears either end.
+ *   engine's window when the list nears either end.
  */
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useEffectEvent, useRef, type ComponentType, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
+import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import type { SearchSnapshot } from '@juno/contract'
-import { colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Button } from '@juno/ui'
+import { colors, layout, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { Button, type ActivateEvent } from '@juno/ui'
+import type { LinkInfo } from '../MessageLink'
+import { useCardMarks } from './marks'
 import { isStop, type SearchRowItem } from './rows'
 import { SearchRecent, type SearchRecentProps } from './SearchRecent'
-import { SearchRow, searchRowDomId } from './SearchRow'
+import { SearchRow, searchRowDomId, type SearchTimeLeaf } from './SearchRow'
 
 /** What the list shows besides rows. `pending`: the query's first answer has not come. */
 export type SearchListState = SearchSnapshot['state'] | 'pending'
@@ -38,15 +42,26 @@ export interface SearchResultsProps extends SearchRecentProps {
   /** An operator the search does not support, said quietly over the rows. */
   readonly note?: string | undefined
   readonly selectedId: string | undefined
-  /** The list or the field has focus: the selected row takes the nav tint. */
+  /** The list or the field has focus: the selected card takes the accent edge. */
   readonly focused: boolean
+  /** The query's words, marked in the cards. */
+  readonly marks: ReadonlyArray<string>
   readonly now?: number
-  readonly time?: ComponentType<{ at: number }>
+  readonly time?: SearchTimeLeaf
   readonly listRef?: Ref<HTMLDivElement>
-  /** A row chosen by a press or by the arrows. */
+  /** A card chosen by the arrows or by focus. */
   readonly onSelect: (id: string, how: 'pointer' | 'keyboard') => void
+  /** A press on a card: select it and show its topic. */
+  readonly onPress: (id: string) => void
   readonly onOpen: (id: string, options: { readonly newTab: boolean }) => void
-  readonly onExpand: (groupId: string) => void
+  /** Space on a card: show its topic beside the list, or hide it. */
+  readonly onToggleTopic: (id: string) => void
+  /** → on a card: show its topic. */
+  readonly onShowTopic: (id: string) => void
+  /** Esc in the list: hide the topic. False when there was none to hide. */
+  readonly onHideTopic: () => boolean
+  readonly onLink?: ((url: string, event: ActivateEvent) => void) | undefined
+  readonly linkInfo?: LinkInfo | undefined
   /** The pointer came onto a row: warm what the reader would show for it. */
   readonly onHoverRow?: (id: string) => void
   /** ↑ on the first row. */
@@ -108,7 +123,7 @@ function nothingLine(words: string, filtered: boolean): string {
 }
 
 function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<SearchRowItem> }) {
-  const { rows, state, note, selectedId, focused, now, time, onSelect, onOpen, onExpand, onHoverRow, onTryAgain, onNearEnd, onNearStart, windowKey } = props
+  const { rows, state, note, selectedId, focused, marks, now, time, onSelect, onPress, onOpen, onLink, linkInfo, onHoverRow, onTryAgain, onNearEnd, onNearStart, windowKey } = props
   const stops = rows.filter(isStop).map((row) => row.id)
   // The selection, or the first row when the selection is not among these rows: Tab always has a row to land on.
   const tabStop = selectedId !== undefined && stops.includes(selectedId) ? selectedId : stops[0]
@@ -117,6 +132,8 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
   useNear(end, onNearEnd, '0px 0px 480px 0px', windowKey)
   useNear(start, onNearStart, '480px 0px 0px 0px', windowKey)
   const onListKey = useListKeys(props, stops)
+  const list = useRef<HTMLDivElement>(null)
+  useCardMarks(list, marks)
   // The row last warmed, so moving within one row warms it once.
   const hovered = useRef<string | undefined>(undefined)
   const empty = rows.length === 0
@@ -138,6 +155,7 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
         <EmptyNote {...props} />
       ) : (
         <div
+          ref={list}
           role="listbox"
           aria-label="Results"
           tabIndex={-1}
@@ -155,7 +173,7 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
           {...stylex.props(styles.list)}
         >
           {rows.map((row) => (
-            <SearchRow key={row.id} row={row} now={now} time={time} selected={row.id === selectedId} focused={focused} tabbable={row.id === tabStop} onSelect={onSelect} onOpen={onOpen} onExpand={onExpand} />
+            <SearchRow key={row.id} row={row} now={now} time={time} words={marks} selected={row.id === selectedId} focused={focused} tabbable={row.id === tabStop} onSelect={onSelect} onPress={onPress} onOpen={onOpen} onLink={onLink} linkInfo={linkInfo} />
           ))}
         </div>
       )}
@@ -165,8 +183,8 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
   )
 }
 
-/** The list's keys: the arrows, Enter, Tab, and a character typed, which goes to the field. */
-function useListKeys({ rows, onSelect, onOpen, onExpand, onLeaveTop, onTab, onType }: SearchResultsProps & { readonly rows: ReadonlyArray<SearchRowItem> }, stops: ReadonlyArray<string>) {
+/** The list's keys: the arrows, Space, → and Esc for the topic beside it, Enter, Tab, and a character typed, which goes to the field. */
+function useListKeys({ onSelect, onOpen, onToggleTopic, onShowTopic, onHideTopic, onLeaveTop, onTab, onType }: SearchResultsProps, stops: ReadonlyArray<string>) {
   const move = (from: string, step: 1 | -1) => {
     const at = stops.indexOf(from)
     if (step === -1 && at <= 0) return onLeaveTop()
@@ -180,15 +198,26 @@ function useListKeys({ rows, onSelect, onOpen, onExpand, onLeaveTop, onTab, onTy
   return (event: KeyboardEvent<HTMLDivElement>) => {
     const id = (event.target as HTMLElement).closest<HTMLElement>('[data-search-row]')?.dataset.searchRow
     if (id === undefined) return
-    const item = rows.find((candidate) => candidate.id === id)
     const plain = !event.metaKey && !event.ctrlKey && !event.altKey
     if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && plain) {
       event.preventDefault()
       return move(id, event.key === 'ArrowDown' ? 1 : -1)
     }
-    if (event.key === 'Enter' || (event.key === ' ' && item?.kind === 'more')) {
+    if (event.key === 'Enter') {
       event.preventDefault()
-      return item?.kind === 'more' ? onExpand(item.group.id) : onOpen(id, { newTab: event.metaKey })
+      return onOpen(id, { newTab: event.metaKey })
+    }
+    if (event.key === ' ' && plain && !event.shiftKey) {
+      event.preventDefault()
+      return onToggleTopic(id)
+    }
+    if (event.key === 'ArrowRight' && plain) {
+      event.preventDefault()
+      return onShowTopic(id)
+    }
+    if (event.key === 'Escape' && plain) {
+      if (onHideTopic()) event.preventDefault()
+      return
     }
     if (event.key === 'Tab' && !event.shiftKey && plain) {
       if (onTab()) event.preventDefault()
@@ -254,10 +283,14 @@ const styles = stylex.create({
     overscrollBehavior: 'contain',
     scrollbarGutter: 'stable',
   },
+  // The cards at most --search-measure wide, in the middle of the results.
   column: {
-    paddingTop: spacing['--space-2'],
-    paddingBottom: spacing['--space-3'],
-    paddingInline: spacing['--space-3'],
+    boxSizing: 'content-box',
+    maxWidth: layout['--search-measure'],
+    marginInline: 'auto',
+    paddingTop: spacing['--space-1'],
+    paddingBottom: spacing['--space-4'],
+    paddingInline: spacing['--space-4'],
   },
   sentinel: {
     height: 0,

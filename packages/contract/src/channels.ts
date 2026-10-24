@@ -174,8 +174,8 @@ export const SIDEBAR_WIDTH = { min: 312, max: 480, default: 384 } as const
 /** The Juno panel's width in CSS pixels: `--juno-panel-min-width`, `--juno-panel-max-width` and `--juno-panel-width`. */
 export const JUNO_PANEL_WIDTH = { min: 360, max: 640, default: 440 } as const
 
-/** The Search tab's results column, resizable as the sidebar is; double-click its edge for the default. */
-export const SEARCH_COLUMN_WIDTH = { min: 312, max: 480, default: 384 } as const
+/** The Search tab's topic panel beside the results, resizable by its edge as the sidebar is; double-click it for the default. Its minimum is a topic's (`TOPIC_MIN_WIDTH`). */
+export const SEARCH_PANEL_WIDTH = { min: 480, max: 800, default: 560 } as const
 
 /** The tag the preload puts on the `window.postMessage` that forwards the port. */
 export const PORT_HANDOFF_TAG = 'juno.enginePort'
