@@ -14,6 +14,7 @@ import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
 import { downloadMessageFile, quickLookMessageFile, showMessageImageMenu, useTopicFiles } from './topic/files'
 import { useTopicHeader } from './topic/header'
+import { useNewerPages } from './topic/newer'
 import { useOlderPages } from './topic/older'
 import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
 import {
@@ -243,6 +244,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
   useSendMeasure(list)
   useScrollRelease(position, view, readOnly)
   const older = useOlderPages(position, detail.id, view, list)
+  useNewerPages(position, detail.id, view, list)
   const { used, use, escape, activity } = useReaderUse(reader)
   useMarkRead(detail.id, readOnly || !used, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
   const header = useTopicHeader(detail, readOnly, position.drawnAll, reader?.header)
