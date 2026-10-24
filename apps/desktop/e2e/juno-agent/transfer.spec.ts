@@ -16,11 +16,12 @@ const test = base.extend<{ readonly shared: string; readonly model: FakeOpenRout
     } })
     try { await use(model) } finally { await model.close() }
   },
+  // Start before either app so both close before this folder is removed.
   // oxlint-disable-next-line no-empty-pattern
-  shared: async ({}, use) => {
+  shared: [async ({}, use) => {
     const folder = await mkdtemp(join(tmpdir(), 'juno-move-'))
     try { await use(folder) } finally { await rm(folder, { recursive: true, force: true }) }
-  },
+  }, { auto: true }],
   agentOptions: async ({ model }, use) => use({ agent: true, fakeOpenRouterUrl: model.origin, backupIntervalMs: 1_000 }),
 })
 
