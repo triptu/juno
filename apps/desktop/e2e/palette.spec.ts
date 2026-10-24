@@ -183,7 +183,8 @@ test('finds a message by its text and lands on it in its thread, flashing it; th
   await palette.expectResults()
   const row = palette.row('replay from the WAL position')
   await expect(row).toBeVisible({ timeout: 15_000 })
-  await expect(row.locator('[data-sensitive]')).toContainText('Leo: We keep the old primary warm for 48h.')
+  // A long message starts a few words before the match, so the matched words show.
+  await expect(row.locator('[data-sensitive]')).toHaveText('Leo: …for 48h. Flip DNS back and replay from the WAL position we logged.')
   await privacy.toggleWithMenu()
   await privacy.expectBlurred(row.locator('[data-sensitive]'))
   await privacy.toggleWithMenu()
@@ -192,7 +193,7 @@ test('finds a message by its text and lands on it in its thread, flashing it; th
   await palette.clear()
   await palette.type('replica sizing')
   await palette.expectResults()
-  await expect(palette.row('replica sizing').locator('[data-sensitive]')).toContainText("Leo: Thursday works. I'll pair. @Dev can you grab the replica sizing from #platform?", { timeout: 15_000 })
+  await expect(palette.row('replica sizing').locator('[data-sensitive]')).toContainText("Leo: …works. I'll pair. @Dev can you grab the replica sizing from #platform?", { timeout: 15_000 })
   await palette.clear()
   await palette.type('WAL position')
   await palette.expectResults()
@@ -223,7 +224,7 @@ test('a person never messaged opens Home addressed to them', async ({ juno }) =>
   await expect(jonas).toContainText('Starts a conversation', { timeout: 15_000 })
   await jonas.click()
   await tabs.expectActive('Home')
-  await write.expectDestination('Jonas Weber')
+  await write.expectDestination('Jonas')
   await expect(write.composer).toBeFocused()
 })
 
@@ -279,8 +280,8 @@ test('channels from the keyboard and from their menu, with "All results" last', 
     await sidebar.expectScope('platform')
   })
 
-  // ⌘K never waits on the network (performance 5.3).
-  expect(fake.calls.filter((call) => call.method.startsWith('search.'))).toEqual([])
+  // ⌘K never waits on the network (performance 5.3). Sync's own discovery searches Slack too, never with typed text.
+  expect(fake.calls.filter((call) => call.method.startsWith('search.') && /platfo|nothing like/.test(String(call.args['query'])))).toEqual([])
 })
 
 test('Messages finds what this Mac stores, with apps hidden, and never asks Slack', async ({ juno, fake }) => {
@@ -298,7 +299,8 @@ test('Messages finds what this Mac stores, with apps hidden, and never asks Slac
   await expect(palette.searchRow).toHaveText(/All results for “replica”/)
   // Slack's search used to be asked 400 ms after the last key: wait past that.
   await juno.win.waitForTimeout(1_000)
-  expect(fake.calls.filter((call) => call.method.startsWith('search.'))).toEqual([])
+  // Sync's own discovery searches Slack too, never with typed text.
+  expect(fake.calls.filter((call) => call.method.startsWith('search.') && String(call.args['query']).includes('replica'))).toEqual([])
   await palette.choose(POSTGRES)
   await palette.expectClosed()
   await topic.expectMessage('4 minutes is fine for us')

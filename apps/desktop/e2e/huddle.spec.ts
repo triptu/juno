@@ -180,14 +180,14 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
   // Show huddle opens the huddle tab.
   await palette.open()
   await palette.type('show huddle')
-  await palette.root.getByRole('option', { name: 'Show huddle' }).click()
+  await palette.root.getByRole('option', { name: 'Show huddle', exact: true }).click()
   await juno.tabs.expectActive('eng · Huddle')
 
   // Leave from the palette: the bar goes and the menu dims again.
   const attendeeId = await attendee(win)
   await palette.open()
   await palette.type('leave huddle')
-  await palette.root.getByRole('option', { name: 'Leave huddle' }).click()
+  await palette.root.getByRole('option', { name: 'Leave huddle', exact: true }).click()
   await expect(bar).toBeHidden()
   await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.leave').length).toBe(1)
   await chimeDrops(win, fake, attendeeId!)
