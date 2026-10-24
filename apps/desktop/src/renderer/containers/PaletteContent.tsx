@@ -286,7 +286,8 @@ export function OpenPalette() {
   if (settled && (previous === undefined || previous.inputs.some((input, at) => input !== inputs[at]))) {
     setAnswers({ ...answers, [tab]: fresh })
   }
-  const answer = settled ? fresh : (previous ?? fresh)
+  // Before its sources settle, a tab shows its last answer, or nothing: the local commands alone would take the first selection.
+  const answer = settled ? fresh : (previous ?? { ...fresh, sections: [], rows: [] })
   const resultsReady = settled || previous !== undefined
   const byId = new Map<string, Row>(answer.rows.map((row) => [row.id, row]))
 
