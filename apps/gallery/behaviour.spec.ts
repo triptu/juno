@@ -362,7 +362,7 @@ test('palette keeps the highlighted item through late commands and reordered res
   await expect(palette.getByRole('option').first()).toContainText('Send to Maya Chen')
   await expect(input).toHaveAttribute('aria-activedescendant', 'palette-c1')
   await page.evaluate(() => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.['reverse-results']?.())
-  await expect(palette.getByRole('option').last()).toContainText('Public channel · Main')
+  await expect(palette.getByRole('listbox', { name: 'Results' }).getByRole('option').last()).toContainText('Eng offsite agenda')
   await input.press('Enter')
   await expect(log(page)).toHaveText('c1')
   await page.evaluate(() => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.['remove-first']?.())

@@ -19,19 +19,15 @@ const recent: ReadonlyArray<PaletteItem> = [
 ]
 
 const results: ReadonlyArray<PaletteItem> = [
-  { id: 'c1', icon: 'public', label: '#eng', sub: 'Public channel · Main', opensTab: true, menu: true },
-  { id: 'c1-scope', icon: 'scope', label: '#eng', sub: 'Public channel · show its topics', menu: true },
-  { id: 't1', icon: 'thread', label: 'Postgres 16 migration plan', sub: '#eng', at: minutes(3), opensTab: true },
-  { id: 'm1', icon: 'message', label: 'Staging bill doubled since August', sub: '#eng', snippet: { sender: 'Leo Park', text: 'the engineering budget review moved to Thursday' }, opensTab: true },
-  { id: 'm2', icon: 'message', label: '#eng · Main', sub: '#eng', snippet: { sender: 'Maya Chen', text: 'Engineering all-hands notes are in the doc' }, opensTab: true },
+  { id: 'c1', icon: 'thread', label: 'Eng offsite agenda', labelHighlight: [[0, 3]], sub: '#leads', at: minutes(40), opensTab: true },
+  { id: 't1', icon: 'thread', label: 'Postgres 16 migration plan', sub: '#eng', snippet: { sender: 'Dev Patel', text: 'The eng review is Thursday at 10', highlight: [[4, 7]] }, opensTab: true },
+  { id: 'm1', icon: 'thread', label: 'Staging bill doubled since August', sub: '#eng', snippet: { sender: 'Leo Park', text: 'the engineering budget review moved to Thursday', highlight: [[4, 7]] }, opensTab: true },
+  { id: 'm2', icon: 'public', label: '#eng · Main', sub: '#eng', snippet: { sender: 'Maya Chen', text: 'Engineering all-hands notes are in the doc', highlight: [[0, 3]] }, opensTab: true },
 ]
+
+const searchRow = (text: string): PaletteItem => ({ id: 'search-all', icon: 'search', label: `All results for “${text}”`, shortcut: '⌘⇧F' })
 
 const command: PaletteItem = { id: 'cmd', icon: 'send', label: 'Send to Maya Chen', sub: '"the wednesday slot works"', badge: '95%', hint: '↵ Send' }
-
-const people: ReadonlyArray<PaletteItem> = [
-  { id: 'p1', icon: 'person', label: 'Message Maya Chen', sub: 'Direct message · Main', opensTab: true },
-  { id: 'p2', icon: 'person', label: 'Message Maya Lindqvist', sub: 'Starts a conversation' },
-]
 
 const maya = { id: 'U0MAYA', name: 'Maya Chen', color: 'cyan' as const }
 const leo = { id: 'U0LEO', name: 'Leo Park', color: 'plum' as const }
@@ -69,12 +65,12 @@ const topicCommands: ReadonlyArray<PaletteItem> = [
   { id: 'k7', icon: 'rename', label: 'Rename thread', compact: true },
 ]
 
-function Palette({ initial, sections, settled = true, tab: initialTab = 'messages' }: { readonly initial: string; readonly sections: ReadonlyArray<PaletteSection>; readonly settled?: boolean; readonly tab?: PaletteTab }) {
+function Palette({ initial, sections, footer, settled = true, tab: initialTab = 'messages' }: { readonly initial: string; readonly sections: ReadonlyArray<PaletteSection>; readonly footer?: PaletteItem; readonly settled?: boolean; readonly tab?: PaletteTab }) {
   const [query, setQuery] = useState(initial)
   const [tab, setTab] = useState(initialTab)
   return (
     <div {...stylex.props(styles.window)}>
-      <CommandPalette tab={tab} onTab={setTab} query={query} resultsQuery={query} onQuery={setQuery} sections={sections} settled={settled} now={NOW} onSelect={noop} onMenu={noop} onClose={noop} />
+      <CommandPalette tab={tab} onTab={setTab} query={query} resultsQuery={query} onQuery={setQuery} sections={sections} {...(footer === undefined ? {} : { footer })} settled={settled} now={NOW} onSelect={noop} onMenu={noop} onClose={noop} />
     </div>
   )
 }
@@ -114,19 +110,67 @@ const styles = stylex.create({
   },
 })
 
+const engConversations: ReadonlyArray<PaletteItem> = [
+  { id: 'v2', icon: 'public', label: 'eng', labelHighlight: [[0, 3]], compact: true, opensTab: true },
+  { id: 'v8', icon: 'public', label: 'eng-oncall', labelHighlight: [[0, 3]], compact: true, opensTab: true },
+  { id: 'v9', icon: 'private', label: 'eng-leads', labelHighlight: [[0, 3]], compact: true, opensTab: true },
+]
+
+const engCommands: ReadonlyArray<PaletteItem> = [{ id: 'g11', icon: 'settings', label: 'Settings: General', compact: true }]
+
 export default defineFixtures(
   CommandPalette,
   {
+    All: {
+      // Each open: the most used conversations, then the latest topics.
+      empty: scene(() => (
+        <Palette
+          tab="all"
+          initial=""
+          sections={[
+            { heading: 'Frequent', hint: '⌘2', items: frequent.slice(0, 4) },
+            { heading: 'Recent', hint: '⌘3', items: recent.slice(0, 5) },
+          ]}
+        />
+      )),
+      search: scene(() => (
+        <Palette
+          tab="all"
+          initial="eng"
+          sections={[
+            { heading: 'Conversations', hint: '⌘2', items: engConversations },
+            { heading: 'Topics and messages', hint: '⌘3', items: results },
+            { key: 'commands', heading: 'Pages, settings and commands', hint: '⌘4', items: engCommands },
+          ]}
+          footer={searchRow('eng')}
+        />
+      )),
+      // The command reading arrives late, so it sits under the groups.
+      command: scene(() => (
+        <Palette
+          tab="all"
+          initial="tell maya the wednesday slot works"
+          sections={[
+            { heading: 'Conversations', hint: '⌘2', items: [frequent[0]!] },
+            { heading: 'Juno', items: [command] },
+          ]}
+          footer={searchRow('tell maya the wednesday slot works')}
+        />
+      )),
+      'no-matches': scene(() => <Palette tab="all" initial="zebra crossing" sections={[]} footer={searchRow('zebra crossing')} />),
+    },
     Conversations: {
       frequent: scene(() => <Palette tab="conversations" initial="" sections={[{ heading: 'Frequent', items: frequent }]} />),
       search: scene(() => <Palette tab="conversations" initial="ma" sections={[{ heading: 'Conversations', items: [frequent[0]!, frequent[3]!] }]} />),
-      'all-commands': scene(() => <Palette tab="conversations" initial=">" sections={[{ heading: 'Commands', items: globalCommands }]} />),
-      'matching-commands': scene(() => <Palette tab="conversations" initial="theme" sections={[{ heading: 'Commands', items: globalCommands.slice(0, 3) }]} />),
+    },
+    Commands: {
+      all: scene(() => <Palette tab="commands" initial="" sections={[{ heading: 'Commands', items: globalCommands }]} />),
+      matching: scene(() => <Palette tab="commands" initial="theme" sections={[{ heading: 'Commands', items: globalCommands.slice(0, 3) }]} />),
       // A topic is open: its commands come first, under its name.
       'topic-commands': scene(() => (
         <Palette
-          tab="conversations"
-          initial=">"
+          tab="commands"
+          initial=""
           sections={[
             { key: 'topic', heading: 'Postgres 16 migration plan', items: topicCommands },
             { heading: 'Commands', items: globalCommands },
@@ -136,37 +180,27 @@ export default defineFixtures(
       // A resolved topic offers Reopen, with the header's filled check.
       'resolved-topic-commands': scene(() => (
         <Palette
-          tab="conversations"
-          initial=">"
+          tab="commands"
+          initial=""
           sections={[{ key: 'topic', heading: 'Postgres 16 migration plan', items: [{ id: 'k1', icon: 'reopen', label: 'Reopen', compact: true }, ...topicCommands.slice(1)] }]}
-        />
-      )),
-      'topic-and-conversations': scene(() => (
-        <Palette
-          tab="conversations"
-          initial="re"
-          sections={[
-            { key: 'topic', heading: 'Postgres 16 migration plan', items: [topicCommands[0]!, topicCommands[6]!] },
-            { heading: 'Conversations', items: [{ id: 'v8', icon: 'public', label: 'release', compact: true, opensTab: true }] },
-          ]}
         />
       )),
     },
     States: {
       recent: scene(() => <Palette initial="" sections={[{ heading: 'Recent', items: recent }]} />),
-      results: scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: results }]} />),
-      command: scene(() => <Palette initial="tell maya the wednesday slot works" sections={[{ heading: 'Juno', items: [command] }, { heading: 'Results', items: people }]} />),
-      overflowing: scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: [...results, ...recent] }]} />),
-      people: scene(() => <Palette initial="maya" sections={[{ heading: 'Results', items: people }]} />),
+      results: scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: results }]} footer={searchRow('eng')} />),
+      command: scene(() => <Palette initial="tell maya the wednesday slot works" sections={[{ heading: 'Juno', items: [command] }, { heading: 'Results', items: results.slice(0, 2) }]} footer={searchRow('tell maya the wednesday slot works')} />),
+      overflowing: scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: [...results, ...recent] }]} footer={searchRow('eng')} />),
       // The minimum window (720 by 480): the list gives up height, so the palette ends above the bottom edge.
-      'minimum-window': scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: [...results, ...recent] }]} />, { width: 720, height: 480, padded: false }),
-      'no-matches': scene(() => <Palette initial="zebra crossing" sections={[]} />),
+      'minimum-window': scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: [...results, ...recent] }]} footer={searchRow('eng')} />, { width: 720, height: 480, padded: false }),
+      'no-matches': scene(() => <Palette initial="zebra crossing" sections={[]} footer={searchRow('zebra crossing')} />),
       waiting: scene(() => <Palette initial="zebra" sections={[]} settled={false} />),
     },
     Interaction: {
       updates: scene(() => <UpdatingResults />),
-      'hover-second': scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: results }]} />, { hover: '#palette-c1-scope' }),
+      'hover-second': scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: results }]} footer={searchRow('eng')} />, { hover: '#palette-t1' }),
+      'footer-active': scene(() => <Palette initial="eng" sections={[{ heading: 'Results', items: results }]} footer={searchRow('eng')} />, { hover: '#palette-search-all' }),
     },
   },
-  { width: 760, height: 620 },
+  { width: 760, height: 820 },
 )

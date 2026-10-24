@@ -28,6 +28,7 @@ import { LinkSimple } from '@phosphor-icons/react/dist/icons/LinkSimple'
 import { ImageSquare } from '@phosphor-icons/react/dist/icons/ImageSquare'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { MonitorArrowUp } from '@phosphor-icons/react/dist/icons/MonitorArrowUp'
 import { Microphone } from '@phosphor-icons/react/dist/icons/Microphone'
 import { MicrophoneSlash } from '@phosphor-icons/react/dist/icons/MicrophoneSlash'
@@ -104,6 +105,7 @@ export type PaletteIconName =
   | 'leave-huddle'
   | 'share-screen'
   | 'stop-sharing'
+  | 'search'
 
 const icons: Record<PaletteIconName, PhosphorIcon> = {
   thread: ChatsCircle,
@@ -154,6 +156,7 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   'leave-huddle': PhoneX,
   'share-screen': MonitorArrowUp,
   'stop-sharing': StopCircle,
+  search: MagnifyingGlass,
 }
 
 // Reopen is the filled check, as in the topic header: the thread is done, and choosing it undoes that.
@@ -169,8 +172,8 @@ export interface PaletteItem {
   readonly sub?: string
   /** Epoch milliseconds, shown after `sub` as "4m". */
   readonly at?: number
-  /** A matched message, shown after `sub` as "Leo: text". Hidden in privacy mode. */
-  readonly snippet?: { readonly sender: string; readonly text: string }
+  /** A matched message, shown after `sub` as "Leo: text", the matched parts in semibold. Hidden in privacy mode. */
+  readonly snippet?: { readonly sender: string; readonly text: string; readonly highlight?: TextRanges }
   /** A command's confidence, "95%". */
   readonly badge?: string
   /** The key hint on the active row: its keys, a space, then what they do ("↵ Send"). "⌘↵ New tab" by default when `opensTab`, else "↵". */
@@ -185,6 +188,8 @@ export interface PaletteItem {
   readonly accent?: AccentName
   /** One line, 36px: conversations and commands. `sub` sits at the row's end. */
   readonly compact?: boolean
+  /** A key shown at the row's end whether or not it is active ("⌘⇧F"), in place of the active row's hint. */
+  readonly shortcut?: string
 }
 
 export const rowDomId = (id: string) => `palette-${id}`
@@ -192,36 +197,40 @@ export const rowDomId = (id: string) => `palette-${id}`
 interface PaletteRowProps {
   readonly item: PaletteItem
   readonly active: boolean
+  /** The last row, under the list: one line, 40px. */
+  readonly footer?: boolean
   readonly now: number
   readonly onSelect: (newTab: boolean) => void
   readonly onActivate: () => void
   readonly onMenu?: (at: { readonly x: number; readonly y: number }) => void
 }
 
-export function PaletteRow({ item, active, now, onSelect, onActivate, onMenu }: PaletteRowProps) {
+export function PaletteRow({ item, active, footer = false, now, onSelect, onActivate, onMenu }: PaletteRowProps) {
   const sub = subLine(item, now)
   const hint = <KeyHint item={item} />
-  const compact = item.compact === true
+  const compact = item.compact === true || footer
   return (
     <OptionRow
       id={rowDomId(item.id)}
-      size={compact ? 36 : 55}
+      size={footer ? 40 : compact ? 36 : 55}
       active={active}
       leading={
         <>
           <Glyph item={item} />
           {/* Laid over the row's end: moving the active row must not reflow any row's text. */}
-          {active && item.badge === undefined ? (
+          {active && item.badge === undefined && item.shortcut === undefined ? (
             <span aria-hidden="true" {...stylex.props(styles.hintOver)}>
               {hint}
             </span>
           ) : null}
         </>
       }
-      label={item.icon === 'public' && item.label.startsWith('#') ? item.label.slice(1) : <Highlighted text={item.label} ranges={item.labelHighlight} />}
+      label={<Highlighted text={item.label} ranges={item.labelHighlight} />}
       {...(sub === undefined ? {} : { sub, subPlacement: compact ? ('end' as const) : ('below' as const) })}
       trailing={
-        // A command keeps its hint's place in flow, hidden while another row is active.
+        item.shortcut !== undefined ? (
+          <Kbd look="key">{item.shortcut}</Kbd>
+        ) : // A command keeps its hint's place in flow, hidden while another row is active.
         item.badge === undefined ? undefined : (
           <>
             <Chip variant="filled" size={20} icon={Sparkle} iconSize={12} title="Juno's read of what you typed" numeric>
@@ -262,7 +271,7 @@ function subLine(item: PaletteItem, now: number): ReactNode {
             <bdi>{item.snippet.sender}</bdi>:{' '}
           </>
         )}
-        {item.snippet.text}
+        <Highlighted text={item.snippet.text} ranges={item.snippet.highlight} tone="subtle" />
       </span>
     </>
   )

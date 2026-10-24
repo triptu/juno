@@ -55,7 +55,7 @@ export function OptionList({ role = 'listbox', label, activeId, focusable = fals
 }
 
 /** 44 and 55 are two-line rows: the label over `sub`. */
-export type OptionRowSize = 30 | 32 | 34 | 36 | 44 | 55
+export type OptionRowSize = 30 | 32 | 34 | 36 | 40 | 44 | 55
 
 export interface OptionRowProps {
   readonly id: string
@@ -392,6 +392,7 @@ const rowSizes = stylex.create({
   32: { minHeight: sizes['--control-32'] },
   34: { minHeight: sizes['--control-34'] },
   36: { minHeight: sizes['--control-36'] },
+  40: { minHeight: sizes['--control-40'] },
   44: { minHeight: sizes['--control-44'] },
   55: { minHeight: 'auto' },
 })

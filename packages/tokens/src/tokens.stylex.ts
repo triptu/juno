@@ -972,6 +972,8 @@ export const layout = stylex.defineVars({
   '--palette-width': '560px',
   '--palette-top': '96px',
   '--palette-list-max-height': '400px',
+  // ⌘K's All tab fits its three groups whole: 4 one-line rows, 5 two-line rows and 3 one-line rows under their headings.
+  '--palette-all-list-max-height': '624px',
   // A tool row of the Configure sheet: two lines (20 + 16) and 10px above and below, on the 4px grid.
   '--tool-row-height': '56px',
   '--menu-width': '236px',

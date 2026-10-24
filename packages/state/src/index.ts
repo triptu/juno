@@ -267,19 +267,15 @@ export { withAsks } from './homeAsks'
 export { ensurePicture, loadedPictures, loadPictures, notePicture, pictureFilesAtom, readPictureFiles } from './pictureFiles'
 export { actOnSuggested } from './suggested'
 export {
-  appendUnseen,
   COMMAND_DELAY_MS,
   PALETTE_RECENT,
   PALETTE_RESULTS,
-  PALETTE_SLACK_RESULTS,
+  PALETTE_TABS,
   paletteConversationsAtom,
   paletteOpenAtom,
   paletteTabAtom,
   readCommand,
   searchAtom,
-  searchSlackMessages,
-  SLACK_DELAY_MS,
-  SLACK_MIN_LENGTH,
 } from './palette'
 export { attachFiles } from './staging'
 export {

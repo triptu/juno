@@ -1,42 +1,52 @@
 import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { useEffect, useEffectEvent, useState, type KeyboardEvent, type PointerEvent } from 'react'
-import { colors, layout, spacing, text, weights, z } from '@juno/tokens/tokens.stylex'
-import { Icon, Kbd, OptionGroupLabel, OptionList, Segmented, Surface, Text } from '@juno/ui'
+import { colors, layout, radii, sizes, spacing, text, weights, z } from '@juno/tokens/tokens.stylex'
+import { Icon, Kbd, OptionGroupLabel, OptionList, Surface, Text } from '@juno/ui'
 import { PaletteRow, rowDomId, type PaletteItem } from './PaletteRow'
 
 export type { PaletteIconName, PaletteItem } from './PaletteRow'
 
-/** The palette's two tabs (spec section 10). */
-export type PaletteTab = 'conversations' | 'messages'
+/** The palette's four tabs (spec section 10), in the order of ⌘1 to ⌘4. */
+export type PaletteTab = 'all' | 'conversations' | 'messages' | 'commands'
 
 const tabOptions: ReadonlyArray<{ readonly value: PaletteTab; readonly label: string }> = [
+  { value: 'all', label: 'All' },
   { value: 'conversations', label: 'Conversations' },
   { value: 'messages', label: 'Messages' },
+  { value: 'commands', label: 'Commands' },
 ]
 
 const placeholders: Record<PaletteTab, string> = {
-  conversations: 'Find a conversation, or type >',
-  messages: 'Search, or ask Juno',
+  all: 'Search, or ask Juno',
+  conversations: 'Find a conversation',
+  messages: 'Search messages',
+  commands: 'Find a page, setting or command',
 }
 
+const HOVER = '@media (hover: hover)'
+
 export interface PaletteSection {
-  /** "Frequent", "Conversations", "Pages", "Settings", "Commands", "Recent", "Results", "Juno", or the open topic's name over its commands. */
+  /** "Frequent", "Conversations", "Recent", "Topics and messages", "Results", "Pages, settings and commands", "Pages", "Settings", "Commands", "Juno", or the open topic's name over its commands. */
   readonly heading: string
   /** Unique among the sections; the heading by default. */
   readonly key?: string
+  /** A quiet key at the heading's end: the tab that shows more of the group ("⌘2"). */
+  readonly hint?: string
   readonly items: ReadonlyArray<PaletteItem>
 }
 
 export interface CommandPaletteProps {
   readonly tab: PaletteTab
-  /** Tab and Shift Tab, ⌘1 and ⌘2, and the segmented control. */
+  /** Tab and Shift Tab, ⌘1 to ⌘4, and the tab row. */
   readonly onTab: (tab: PaletteTab) => void
   readonly query: string
   readonly onQuery: (query: string) => void
   /** The query that produced the displayed rows, which may lag the input. */
   readonly resultsQuery: string
   readonly sections: ReadonlyArray<PaletteSection>
+  /** The last row, under a line below the list, reached by the arrows like the others: "All results for …". ⌘⇧F runs it too. */
+  readonly footer?: PaletteItem
   /** The results belong to the current input, rather than a held previous query. */
   readonly settled: boolean
   /** The displayed query has answered, including an empty answer held while the next query loads. */
@@ -52,15 +62,17 @@ export interface CommandPaletteProps {
 }
 
 /**
- * ⌘K (spec section 10, inventory 9): a search field and the two tabs over
- * sections of results. Dumb: the owner gives the rows and runs what is
- * chosen. The active row keeps its identity until the displayed query or
- * the tab changes; Enter runs it, ⌘Enter opens it in a new tab, Tab and
- * Shift Tab or ⌘1 and ⌘2 switch tabs, Esc and a press outside close.
+ * ⌘K (spec section 10, inventory 9): a search field, the row of four tabs
+ * under it, and sections of results. Dumb: the owner gives the rows and
+ * runs what is chosen. The active row keeps its identity until the
+ * displayed query or the tab changes; Enter runs it, ⌘Enter opens it in a
+ * new tab, Tab and Shift Tab or ⌘1 to ⌘4 switch tabs, Esc and a press
+ * outside close.
  */
-export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, sections, settled, resultsReady = settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
-  const items = sections.flatMap((section) => section.items)
-  const hasBody = resultsReady || items.length > 0
+export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, sections, footer, settled, resultsReady = settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
+  const listed = sections.flatMap((section) => section.items)
+  const items = footer === undefined ? listed : [...listed, footer]
+  const hasBody = resultsReady || listed.length > 0
   const ids = items.map((item) => item.id)
   const shown = `${tab}\n${resultsQuery}`
   const [selection, setSelection] = useState({ query: shown, id: ids[0] })
@@ -90,6 +102,11 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
       // A row the arrows reach comes into view; the list scrolls, never the page. The pointer never scrolls it.
       document.getElementById(rowDomId(id))?.scrollIntoView({ block: 'nearest' })
     }
+    const step = (delta: number) => {
+      const at = tabOptions.findIndex((option) => option.value === tab)
+      const next = tabOptions[(at + delta + tabOptions.length) % tabOptions.length]
+      if (next !== undefined) onTab(next.value)
+    }
     switch (event.key) {
       case 'ArrowDown':
         return ids.length === 0 ? undefined : move(index + 1)
@@ -101,12 +118,21 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
       // The field is the palette's one stop: Tab switches tabs and never reaches the window under the dim.
       case 'Tab':
         event.preventDefault()
-        return onTab(tab === 'conversations' ? 'messages' : 'conversations')
+        return step(event.shiftKey ? -1 : 1)
       case '1':
       case '2':
+      case '3':
+      case '4': {
         if (!event.metaKey) return
         event.preventDefault()
-        return onTab(event.key === '1' ? 'conversations' : 'messages')
+        const option = tabOptions[Number(event.key) - 1]
+        return option === undefined ? undefined : onTab(option.value)
+      }
+      case 'f':
+      case 'F':
+        if (!event.metaKey || !event.shiftKey || footer === undefined) return
+        event.preventDefault()
+        return onSelect(footer.id, { newTab: false })
       case 'Enter':
         if (event.nativeEvent.isComposing || activeId === undefined) return
         event.preventDefault()
@@ -127,10 +153,25 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
     if (event.target === event.currentTarget) onClose()
   }
 
+  const row = (item: PaletteItem, isFooter = false) => (
+    <PaletteRow
+      key={item.id}
+      item={item}
+      active={item.id === activeId}
+      footer={isFooter}
+      now={now}
+      onSelect={(newTab) => onSelect(item.id, { newTab })}
+      onActivate={() => {
+        if (item.id !== activeId) activate(item.id)
+      }}
+      {...(item.menu === true && onMenu !== undefined ? { onMenu: (at: { readonly x: number; readonly y: number }) => onMenu(item.id, at) } : {})}
+    />
+  )
+
   return (
     <div {...stylex.props(styles.overlay)} onPointerDown={onOverlayDown}>
       <Surface kind="popover" radius="palette" padding="none" role="dialog" aria-modal="true" aria-label="Search and commands" sx={styles.panel}>
-        <label {...stylex.props(styles.header, hasBody && styles.divider)}>
+        <label {...stylex.props(styles.header)}>
           <span {...stylex.props(styles.searchIcon)}>
             <Icon icon={MagnifyingGlass} size={18} />
           </span>
@@ -138,7 +179,7 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
             autoFocus
             role="combobox"
             aria-expanded="true"
-            aria-controls="palette-results"
+            aria-controls={footer === undefined ? 'palette-results' : 'palette-results palette-footer'}
             aria-autocomplete="list"
             aria-activedescendant={activeId === undefined ? undefined : rowDomId(activeId)}
             aria-label={placeholders[tab]}
@@ -151,41 +192,58 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
             onKeyDown={onKeyDown}
             {...stylex.props(styles.input)}
           />
-          {/* A press keeps focus in the field, the palette's one stop. */}
-          <span {...stylex.props(styles.tabs)} onMouseDown={(event) => event.preventDefault()}>
-            <Segmented label="Search in" options={tabOptions} value={tab} onChange={onTab} />
-          </span>
           <Kbd look="key">esc</Kbd>
         </label>
-        <div {...stylex.props(styles.scroll)}>
-          <OptionList id="palette-results" label="Results" aria-busy={!settled} {...(activeId === undefined ? {} : { activeId: rowDomId(activeId) })}>
+        {/* A press switches on mouse down and keeps focus in the field, the palette's one stop. */}
+        <div role="radiogroup" aria-label="Search in" {...stylex.props(styles.tabs, hasBody && styles.divider)}>
+          {tabOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={option.value === tab}
+              tabIndex={-1}
+              onMouseDown={(event) => {
+                event.preventDefault()
+                if (event.button === 0) onTab(option.value)
+              }}
+              {...stylex.props(styles.tab, option.value === tab && styles.tabOn)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div {...stylex.props(styles.scroll, tab === 'all' && styles.scrollAll)}>
+          <OptionList id="palette-results" label="Results" aria-busy={!settled} {...(activeId === undefined || activeId === footer?.id ? {} : { activeId: rowDomId(activeId) })}>
             {sections.map((section) =>
               section.items.length === 0 ? null : (
                 <div key={section.key ?? section.heading} role="group" aria-label={section.heading}>
-                  <OptionGroupLabel>{section.heading}</OptionGroupLabel>
-                  {section.items.map((item) => (
-                    <PaletteRow
-                      key={item.id}
-                      item={item}
-                      active={item.id === activeId}
-                      now={now}
-                      onSelect={(newTab) => onSelect(item.id, { newTab })}
-                      onActivate={() => {
-                        if (item.id !== activeId) activate(item.id)
-                      }}
-                      {...(item.menu === true && onMenu !== undefined ? { onMenu: (at: { readonly x: number; readonly y: number }) => onMenu(item.id, at) } : {})}
-                    />
-                  ))}
+                  <OptionGroupLabel>
+                    {section.heading}
+                    {section.hint === undefined ? null : (
+                      <span aria-hidden="true" {...stylex.props(styles.groupHint)}>
+                        {section.hint}
+                      </span>
+                    )}
+                  </OptionGroupLabel>
+                  {section.items.map((item) => row(item))}
                 </div>
               ),
             )}
-            {resultsReady && items.length === 0 ? (
+            {resultsReady && listed.length === 0 ? (
               <Text variant="ui" tone="muted" as="div" sx={styles.empty}>
                 No matches.
               </Text>
             ) : null}
           </OptionList>
         </div>
+        {footer === undefined || !hasBody ? null : (
+          <div {...stylex.props(styles.footer)}>
+            <OptionList id="palette-footer" label="Search" {...(activeId === footer.id ? { activeId: rowDomId(footer.id) } : {})}>
+              {row(footer, true)}
+            </OptionList>
+          </div>
+        )}
       </Surface>
     </div>
   )
@@ -220,7 +278,8 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-2-5'],
-    paddingBlock: spacing['--space-3-5'],
+    paddingTop: spacing['--space-3-5'],
+    paddingBottom: spacing['--space-2'],
     paddingInline: spacing['--space-4'],
     flexShrink: 0,
     cursor: 'text',
@@ -259,10 +318,63 @@ const styles = stylex.create({
     overscrollBehavior: 'contain',
     padding: spacing['--space-1-5'],
   },
-  // Room for the input to shrink into: the control never gives up its width.
+  // At the heading's end, not part of its name.
+  groupHint: {
+    float: 'inline-end',
+    fontWeight: weights['--weight-regular'],
+  },
+  scrollAll: {
+    maxHeight: layout['--palette-all-list-max-height'],
+  },
+  // The first tab's text starts where the field's text does: past the 18px icon and the gap, less the tab's own padding.
   tabs: {
-    display: 'inline-flex',
+    display: 'flex',
+    gap: spacing['--space-0-5'],
     flexShrink: 0,
+    paddingInlineStart: `calc(${spacing['--space-4']} + ${sizes['--icon-18']})`,
+    paddingInlineEnd: spacing['--space-4'],
+    paddingBottom: spacing['--space-2'],
+  },
+  // The quick-filter look (the sidebar's All, Channels, DMs). The weight stays medium when chosen, so a switch never changes a tab's width.
+  tab: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    height: sizes['--control-26'],
+    margin: 0,
+    paddingBlock: 0,
+    paddingInline: spacing['--space-2-5'],
+    borderWidth: 0,
+    borderRadius: radii['--radius-md-plus'],
+    fontFamily: text['--text-meta-family'],
+    fontSize: text['--text-meta-size'],
+    fontWeight: weights['--weight-medium'],
+    lineHeight: text['--text-meta-leading'],
+    whiteSpace: 'nowrap',
+    color: {
+      default: colors['--foreground-subtle'],
+      ':hover': { default: null, [HOVER]: colors['--foreground-default'] },
+    },
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
+    },
+  },
+  tabOn: {
+    color: colors['--foreground-default'],
+    backgroundColor: {
+      default: colors['--secondary-default'],
+      ':hover': { default: null, [HOVER]: colors['--secondary-hover'] },
+    },
+  },
+  // The list's gutters too, so the last row lines up with the rows above whatever the scrollbars.
+  footer: {
+    flexShrink: 0,
+    overflow: 'hidden',
+    scrollbarGutter: 'stable both-edges',
+    padding: spacing['--space-1-5'],
+    borderTopWidth: '1px',
+    borderTopStyle: 'solid',
+    borderTopColor: colors['--border-default'],
   },
   empty: {
     paddingBlock: spacing['--space-5'],

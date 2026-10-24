@@ -1,57 +1,45 @@
 /** Local-only ⌘K search. The command reader waits briefly; local results have no debounce. */
-import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { newChatRanked, searchCommand, searchQuery, type SearchMessage } from '@juno/contract'
+import { newChatRanked, searchCommand, searchQuery } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 
 /** The palette is open. Kept for the session, so a hidden window brings it back as it was. */
 export const paletteOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
 
-/** The palette's two tabs (spec section 10): conversations and commands, or message search. */
-export type PaletteTab = 'conversations' | 'messages'
+/** The palette's four tabs (spec section 10), in the order of ⌘1 to ⌘4. */
+export const PALETTE_TABS = ['all', 'conversations', 'messages', 'commands'] as const
+export type PaletteTab = (typeof PALETTE_TABS)[number]
 
-/** The tab shown. Each open starts on Conversations; ⌘1 and ⌘2 from the app menu set it while it is open. */
-export const paletteTabAtom = Atom.make<PaletteTab>('conversations').pipe(Atom.keepAlive)
+/** The tab shown. Each open starts on All; ⌘1 to ⌘4 from the app menu set it while it is open. */
+export const paletteTabAtom = Atom.make<PaletteTab>('all').pipe(Atom.keepAlive)
 
-/** Results the palette asks the engine for: it shows 8 rows, 6 under a command (inventory 9). */
+/** Results the Messages tab shows: 8 rows, 6 under a command (inventory 9). */
 export const PALETTE_RESULTS = 8
 /** Rows with an empty query: the most recent topics. */
 export const PALETTE_RECENT = 6
-/** Slack's matches the palette adds under the local rows, at most. */
-export const PALETTE_SLACK_RESULTS = 4
+/** More results than rows: a thread's title and message matches share one row. */
+const SEARCH_HEADROOM = 4
 /** The pause in typing before the command reading is asked for (architecture 7). */
 export const COMMAND_DELAY_MS = 150
-/** The pause in typing before Slack's search is asked; it calls Slack, so it waits longer. */
-export const SLACK_DELAY_MS = 400
-/** Slack's search runs only for text at least this long. */
-export const SLACK_MIN_LENGTH = 3
 
 const searchFamily = liveQuery(searchQuery)
 
-/** Local results for the palette's text, trimmed so trailing spaces share one subscription. */
+/**
+ * Local topics and messages for the palette's text, trimmed so trailing
+ * spaces share one subscription. All and Messages read the same rows.
+ * Channels and people are left out: the palette lists conversations from
+ * `paletteConversationsAtom`.
+ */
 export const searchAtom = (query: string) => {
   const text = query.trim()
-  return searchFamily({ query: text, limit: text === '' ? PALETTE_RECENT : PALETTE_RESULTS })
+  return searchFamily({ query: text, limit: text === '' ? PALETTE_RECENT : PALETTE_RESULTS + SEARCH_HEADROOM, places: false })
 }
 
 const conversationsFamily = liveQuery(newChatRanked)
 
-/** The Conversations tab's rows for the text (without a leading ">"), trimmed. */
+/** The Conversations tab's rows for the text, trimmed. */
 export const paletteConversationsAtom = (query: string) => conversationsFamily({ query: query.trim() })
-
-/** Compatibility for the current palette container until stage B removes its remote-results slot. */
-export const searchSlackMessages = (_registry: Registry, _query: string) => Promise.resolve(Exit.succeed<ReadonlyArray<SearchMessage>>([]))
 
 /** What the text means as a command, or `null`. */
 export const readCommand = (registry: Registry, text: string) => runCommand(registry, searchCommand, { text: text.trim() })
-
-/**
- * The rows shown, then `more` that are not among them, up to `max` added.
- * Rows already on screen never move when later results arrive.
- */
-export function appendUnseen<T extends { readonly id: string }>(shown: ReadonlyArray<T>, more: ReadonlyArray<T>, max: number): ReadonlyArray<T> {
-  const seen = new Set(shown.map((row) => row.id))
-  const added = more.filter((row) => !seen.has(row.id)).slice(0, max)
-  return added.length === 0 ? shown : [...shown, ...added]
-}
