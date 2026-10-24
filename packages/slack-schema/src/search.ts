@@ -7,9 +7,9 @@
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
-import { FormNumber, ResponseMetadata } from './common.ts'
+import { FormBoolean, FormNumber, ResponseMetadata } from './common.ts'
 import { Ts } from './ts.ts'
-import { Attachment, BotProfile, File } from './message.ts'
+import { Attachment, BotProfile, File, Reaction } from './message.ts'
 
 const opt = S.optionalKey
 
@@ -29,7 +29,8 @@ export const SearchMessagesArgs = S.Struct({
   client_req_id: opt(S.String),
   search_session_id: opt(S.String),
   browse_session_id: opt(S.String),
-  query_rewrite_disabled: opt(FormNumber),
+  query_rewrite_disabled: opt(FormBoolean),
+  search_exclude_bots: opt(FormBoolean),
 })
 export type SearchMessagesArgs = typeof SearchMessagesArgs.Type
 
@@ -50,6 +51,9 @@ export const SearchChannel = S.Struct({
   is_ext_shared: opt(S.Boolean),
 })
 
+export const SearchExtract = S.Struct({ text: S.String, truncated_head: opt(S.Boolean), truncated_tail: opt(S.Boolean) })
+export const SearchFacet = S.Struct({ id: S.String, facet_count: S.Number, checked: opt(S.Boolean) })
+
 /** The fields of one matched message. */
 const searchMessageFields = {
   iid: opt(S.String),
@@ -67,6 +71,10 @@ const searchMessageFields = {
   blocks: opt(Blocks),
   attachments: opt(S.Array(Attachment)),
   files: opt(S.Array(File)),
+  reactions: opt(S.Array(Reaction)),
+  extracts: opt(S.Array(SearchExtract)),
+  blocks_extracts: opt(S.Unknown),
+  blocks_extracts_typed: opt(S.Unknown),
   score: opt(S.Number),
 } as const
 
@@ -83,27 +91,11 @@ export type SearchItemMessage = typeof SearchItemMessage.Type
  * older one; both decode, and `searchMatches` flattens them.
  */
 export const SearchMatch = S.Struct({
-  iid: opt(S.String),
+  ...searchMessageFields,
   team: opt(S.String),
-  /** An object in the public API; a bare id is tolerated in case the module API differs. */
   channel: S.Union([SearchChannel, S.String]),
   messages: opt(S.Array(SearchItemMessage)),
-  type: opt(S.String),
-  user: opt(S.String),
-  username: opt(S.String),
-  bot_id: opt(S.String),
-  bot_profile: opt(BotProfile),
-  subtype: opt(S.String),
   ts: opt(Ts),
-  text: opt(S.String),
-  permalink: opt(S.String),
-  thread_ts: opt(Ts),
-  reply_count: opt(S.Number),
-  latest_reply: opt(Ts),
-  blocks: opt(Blocks),
-  attachments: opt(S.Array(Attachment)),
-  files: opt(S.Array(File)),
-  score: opt(S.Number),
   is_mpim: opt(S.Boolean),
 })
 export type SearchMatch = typeof SearchMatch.Type
@@ -133,6 +125,7 @@ export const SearchMessagesFields = {
   paging: opt(SearchPaging),
   total: opt(S.Number),
   filters: opt(S.Unknown),
+  filter_suggestions: opt(S.Struct({ from: opt(S.Array(SearchFacet)), in: opt(S.Array(SearchFacet)) })),
   response_metadata: opt(ResponseMetadata),
 } as const
 

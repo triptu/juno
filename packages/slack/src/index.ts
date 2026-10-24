@@ -37,3 +37,5 @@ export const SlackClient = {
     Layer.provideMerge(RequestQueue.layer),
   ) as Layer.Layer<SlackSocket | SlackEdge | SlackApi | RequestQueue, never, SlackSession | HttpTransport | SocketHandshake>,
 }
+export { searchMessagePage, type SearchPageArgs, type SearchPageMatch } from './client/search'
+export { decodeSearchHighlights } from './client/search-highlights'

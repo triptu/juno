@@ -5,7 +5,7 @@
  * API), each match is one message with its conversation and, when Slack
  * says, its thread.
  */
-import { searchMatchChannelId, searchMatches, type FlatSearchMatch } from '@juno/slack-schema'
+import { searchMatchChannelId, searchMatches, type FlatSearchMatch, type SearchMessagesArgs } from '@juno/slack-schema'
 import { Effect } from 'effect'
 import type { SlackApiShape } from './api.ts'
 import type { SlackApiError } from './errors.ts'
@@ -51,3 +51,14 @@ export const searchMessages = (api: SlackApiShape, query: string, count: number)
         }
       }),
   )
+
+export type SearchPageArgs = SearchMessagesArgs
+export type SearchPageMatch = FlatSearchMatch & { readonly channel: string }
+/** Full page metadata and facets survive decoding for Search sessions. */
+export const searchMessagePage = (api: SlackApiShape, args: SearchPageArgs) =>
+  api.call('search.modules.messages', args, { lane: 'interactive', reason: 'search' }).pipe(Effect.map((answer) => ({
+    matches: searchMatches(answer).map((match): SearchPageMatch => ({ ...match, channel: searchMatchChannelId(match) })),
+    pagination: answer.pagination,
+    total: answer.pagination?.total_count ?? answer.total,
+    facets: answer.filter_suggestions,
+  })))

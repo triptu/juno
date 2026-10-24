@@ -40,3 +40,5 @@ A 429 retains Retry-After and doubles that method's background interval once per
 ## Testing
 
 `bun run --cwd packages/slack test`. Tests start a real `@juno/fake-slack` per test and point the client layer at it (`test/helpers.ts`): the request lanes, the 429 handling, the auth failures and the socket lifecycle are all checked against the fake's HTTP and websocket server. Under `it.effect` the `TestClock` stops the per-method background lane spacing; set `backgroundMinIntervalMillis: 0` or use `it.live` for tests that make several background calls.
+
+`searchMessagePage` returns decoded matches, pagination, totals and From/In facets for Search sessions. Its arguments expose bot exclusion and query-rewriting control. `decodeSearchHighlights` produces UTF-16 ranges from supported wrappers. The recorded 10-24 extract fixture redacts every string, so the precise live marker pair remains unverified.

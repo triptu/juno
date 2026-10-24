@@ -1,3 +1,4 @@
+import { parseQuery, termMatches, highlightExtract } from './search-query'
 /**
  * One handler per Web API method. Each takes decoded arguments and returns
  * the success fields (without `ok`) or an `ApiError`. The server encodes the
@@ -9,7 +10,7 @@ import { compareTs, isReply, permalinkPath, Ts } from '@juno/slack-schema'
 import { fileObject } from './files.ts'
 import { withListedReactors } from './reactors.ts'
 import { blocksToText } from './richtext.ts'
-import { edgeUserObject, NEVER_READ, type Workspace } from './state.ts'
+import { edgeUserObject, NEVER_READ, type Workspace, type ConversationRecord } from './state.ts'
 
 export class ApiError {
   readonly error: string
@@ -433,52 +434,34 @@ export const coreMethods = {
 
   'search.modules.messages': (ctx, args) => {
     const ws = ctx.workspace
-    const query = parseQuery(args.query)
+    const query = parseQuery(args.query, ws.users.get(ws.selfId)?.tz ?? 'UTC')
     const matches: SearchMatch[] = []
     for (const conversation of ws.conversations.values()) {
       if (!conversation.members.has(ws.selfId) && conversation.kind !== 'public') continue
-      if (query.channel !== undefined && query.channel !== conversation.name && query.channel !== conversation.id) continue
+      const channelNames = [conversation.id.toLowerCase(), conversation.name.toLowerCase(), ...(conversation.kind === 'im' ? [...conversation.members].filter((id) => id !== ws.selfId).map((id) => id.toLowerCase()) : [])]
+      if (query.channels.length > 0 && !query.channels.some((id) => channelNames.includes(id))) continue
+      if (query.excludeChannels.some((id) => channelNames.includes(id))) continue
       for (const message of ws.all(conversation.id)) {
         if (message.subtype === 'tombstone') continue
         const full = withChannel(ws, conversation.id, message)
         const inThread = isReply(full) || (full.reply_count ?? 0) > 0
-        if (query.isThread && !inThread) continue
-        if (query.after !== undefined && compareTs(full.ts, query.after) <= 0) continue
-        if (query.before !== undefined && compareTs(full.ts, query.before) >= 0) continue
-        if (query.from !== undefined && full.user !== query.from && ws.users.get(full.user ?? '')?.name !== query.from) continue
-        const text = (full.text ?? '').toLowerCase()
-        if (!query.terms.every((term) => text.includes(term))) continue
+        if (query.thread && !inThread) continue
+        if (Number(full.ts) < query.earliest || Number(full.ts) >= query.latest) continue
         const user = full.user === undefined ? undefined : ws.users.get(full.user)
-        // The module returns one message per item; thread fields require extra_message_data.
-        matches.push({
-          iid: `${conversation.id}-${full.ts}`,
-          team: ws.team.id,
-          channel: {
-            id: conversation.id,
-            name: conversation.name,
-            is_archived: conversation.archived,
-            is_group: conversation.kind === 'private',
-            is_shared: false,
-            is_ext_shared: false,
-            is_org_shared: false,
-            ...(conversation.kind === 'im' ? { user: [...conversation.members].find((id) => id !== ws.selfId) } : {}),
-            is_channel: conversation.kind === 'public' || conversation.kind === 'private',
-            is_im: conversation.kind === 'im',
-            is_mpim: conversation.kind === 'mpim',
-            is_private: conversation.kind !== 'public',
-          },
-          messages: [
-            {
-              iid: `${conversation.id}-${full.ts}-m`,
-              ts: full.ts,
-              ...(args.extra_message_data === 1 ? { ...(inThread ? { thread_ts: full.thread_ts ?? full.ts } : {}), ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }), ...(full.latest_reply === undefined ? {} : { latest_reply: full.latest_reply }) } : {}),
-              text: full.text ?? '',
-              ...(full.user === undefined ? {} : { user: full.user }),
-              ...(user?.name === undefined ? {} : { username: user.name }),
-              permalink: `${ctx.baseUrl}${permalinkPath(conversation.id, full.ts, full.thread_ts)}`,
-            },
-          ],
-        })
+        const names = [full.user, user?.name, user?.real_name, user?.profile?.display_name, full.user === ws.selfId ? 'me' : undefined].flatMap((n) => n === undefined ? [] : [n.toLowerCase()])
+        if (query.from.length > 0 && !query.from.some((id) => names.includes(id))) continue
+        if (query.excludeFrom.some((id) => names.includes(id))) continue
+        if (args.search_exclude_bots && (full.bot_id != null || full.bot_profile !== undefined || full.subtype === 'bot_message' || user?.is_bot)) continue
+        const text = [full.text ?? '', ...((full.attachments ?? []).flatMap((a) => [a.title ?? '', a.text ?? '', a.fallback ?? '']))].join(' ')
+        if (!query.terms.every((term) => term.negative !== termMatches(text, term.value))) continue
+        if (!query.has.every((has) => {
+          if (has === 'file') return (full.files?.length ?? 0) > 0
+          if (has === 'link') return /https?:\/\//.test((full.text ?? '') + JSON.stringify(full.attachments ?? []))
+          if (has === 'reaction') return full.reactions?.some((r) => (r.count ?? 0) > 0) === true
+          if (has === 'pin') return (full.pinned_to?.length ?? 0) > 0
+          return full.reactions?.some((r) => (r.count ?? 0) > 0 && r.name === has.slice(1, -1)) === true
+        })) continue
+        matches.push(searchItem(ctx, args, conversation, full, query.terms))
       }
     }
     // Slack sorts by relevance unless asked for `sort=timestamp`. Relevance is not time order, so the fake
@@ -489,7 +472,7 @@ export const coreMethods = {
     } else {
       matches.sort((a, b) => relevance(a.iid ?? '') - relevance(b.iid ?? ''))
     }
-    const perPage = args.count ?? 20
+    const perPage = args.count !== undefined && [20, 50, 100].includes(args.count) ? args.count : 20
     const page = Math.max(1, args.page ?? 1)
     const start = (page - 1) * perPage
     const items = matches.slice(start, start + perPage)
@@ -506,7 +489,10 @@ export const coreMethods = {
         first: matches.length === 0 ? 0 : start + 1,
         last: start + items.length,
       },
-      total: matches.length,
+      filter_suggestions: {
+        from: facets(matches.flatMap((m) => m.messages?.flatMap((m) => m.user === undefined ? [] : [m.user]) ?? [])),
+        in: facets(matches.map((m) => typeof m.channel === 'string' ? m.channel : m.channel.id)),
+      },
     }
   },
 
@@ -579,28 +565,10 @@ export const coreMethods = {
 
 } satisfies Partial<Handlers>
 
-interface ParsedQuery {
-  terms: string[]
-  isThread: boolean
-  after?: string
-  before?: string
-  channel?: string
-  from?: string
-}
-
-/** Understands `is:thread`, `after:YYYY-MM-DD`, `before:`, `in:#channel`, `from:@user` and free words. */
-function parseQuery(query: string): ParsedQuery {
-  const parsed: ParsedQuery = { terms: [], isThread: false }
-  for (const token of query.split(/\s+/).filter((t) => t !== '')) {
-    const [key, value] = token.includes(':') ? [token.slice(0, token.indexOf(':')), token.slice(token.indexOf(':') + 1)] : ['', token]
-    if (key === 'is' && value === 'thread') parsed.isThread = true
-    else if (key === 'after') parsed.after = `${Math.floor(Date.parse(`${value}T23:59:59.999Z`) / 1000)}.999999`
-    else if (key === 'before') parsed.before = `${Math.floor(Date.parse(`${value}T00:00:00.000Z`) / 1000)}.000000`
-    else if (key === 'in') parsed.channel = value.replace(/^#/, '')
-    else if (key === 'from') parsed.from = value.replace(/^@/, '')
-    else parsed.terms.push(token.toLowerCase())
-  }
-  return parsed
+function facets(ids: ReadonlyArray<string>) {
+  const counts = new Map<string, number>()
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1)
+  return [...counts].map(([id, facet_count]) => ({ id, facet_count })).sort((a, b) => b.facet_count - a.facet_count || a.id.localeCompare(b.id))
 }
 
 /** A stable pseudo-score for a match id (FNV-1a), so relevance order is deterministic but unrelated to time. */
@@ -611,4 +579,46 @@ function relevance(id: string): number {
     hash = Math.imul(hash, 0x01000193) >>> 0
   }
   return hash
+}
+
+function searchItem(ctx: MethodContext, args: MethodArgs<'search.modules.messages'>, conversation: ConversationRecord, full: Message, terms: ReturnType<typeof parseQuery>['terms']): SearchMatch {
+  const ws = ctx.workspace
+  const user = full.user === undefined ? undefined : ws.users.get(full.user)
+  const inThread = isReply(full) || (full.reply_count ?? 0) > 0
+  return {
+          iid: `${conversation.id}-${full.ts}`,
+          team: ws.team.id,
+          channel: {
+            id: conversation.id,
+            name: conversation.name,
+            is_archived: conversation.archived,
+            is_group: conversation.kind === 'private',
+            is_shared: false,
+            is_ext_shared: false,
+            is_org_shared: false,
+            ...(conversation.kind === 'im' ? { user: [...conversation.members].find((id) => id !== ws.selfId) } : {}),
+            is_channel: conversation.kind === 'public' || conversation.kind === 'private',
+            is_im: conversation.kind === 'im',
+            is_mpim: conversation.kind === 'mpim',
+            is_private: conversation.kind !== 'public',
+          },
+          messages: [
+            {
+              iid: `${conversation.id}-${full.ts}-m`,
+              ts: full.ts,
+              ...(args.extra_message_data === 1 ? { ...(inThread ? { thread_ts: full.thread_ts ?? full.ts } : {}), ...(full.reply_count === undefined ? {} : { reply_count: full.reply_count }), ...(full.latest_reply === undefined ? {} : { latest_reply: full.latest_reply }) } : {}),
+              text: full.text ?? '',
+              ...(full.files === undefined ? {} : { files: full.files }),
+              ...(full.reactions === undefined ? {} : { reactions: full.reactions }),
+              ...(full.attachments === undefined ? {} : { attachments: full.attachments }),
+              ...(full.bot_profile === undefined ? {} : { bot_profile: full.bot_profile }),
+              ...(full.bot_id == null ? {} : { bot_id: full.bot_id }),
+              ...(full.subtype === undefined ? {} : { subtype: full.subtype }),
+              ...(args.extracts === 1 ? { extracts: [highlightExtract(full.text ?? '', terms, args.highlight === 1, args.max_extract_len)], blocks_extracts: [], blocks_extracts_typed: [] } : {}),
+              ...(full.user === undefined ? {} : { user: full.user }),
+              ...(user?.name === undefined ? {} : { username: user.name }),
+              permalink: `${ctx.baseUrl}${permalinkPath(conversation.id, full.ts, full.thread_ts)}`,
+            },
+          ],
+        }
 }
