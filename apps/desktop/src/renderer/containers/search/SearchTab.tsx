@@ -101,12 +101,16 @@ function useListActions({ sessionId, session, rows, stops, narrow, inputRef }: L
     if (selection.id !== current().selected?.id) update(sessionId, (session) => ({ ...session, selected: selection }))
     void openResultHere(selection)
   }, [find, current, narrow, show, sessionId])
-  /** ↓ in the field: the selected card, or the first. */
+  /**
+   * ↓ in the field: the selected card, or the first. It takes focus in the same keydown, as the arrows in the list
+   * do, so a key pressed straight after (Space) is the card's and never types into the field. A card not drawn
+   * yet takes it after the next paint.
+   */
   const toList = () => {
     const id = session.selected !== undefined && stops.some((row) => row.id === session.selected?.id) ? session.selected.id : stops[0]?.id
     if (id === undefined) return
     if (session.selected?.id !== id) select(id, 'keyboard')
-    afterPaint(() => focusRow(id))
+    if (!focusRow(id)) afterPaint(() => focusRow(id))
   }
   return {
     select,
