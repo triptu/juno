@@ -18,6 +18,8 @@ export interface SourceRef {
   readonly ts: string
   /** The channel as the owner sees it ("#eng"), when the host named it. */
   readonly place?: string
+  /** A reply's thread root, so the source opens in its thread when this Mac has no copy. */
+  readonly threadTs?: string
 }
 
 /** A bubble's text with each source resolved, or dropped when it names no message read in the run. */
@@ -28,12 +30,12 @@ export function assignHandles(store: Store, runId: string, messages: ReadonlyArr
   return transaction(store.db, () => {
     const known = store.db.prepare('SELECT handle FROM sources WHERE run_id = ? AND channel_id = ? AND ts = ?')
     const count = store.db.prepare('SELECT count(*) AS n FROM sources WHERE run_id = ?')
-    const insert = store.db.prepare('INSERT INTO sources (run_id, handle, channel_id, ts, place) VALUES (?, ?, ?, ?, ?)')
+    const insert = store.db.prepare('INSERT INTO sources (run_id, handle, channel_id, ts, place, thread_ts) VALUES (?, ?, ?, ?, ?, ?)')
     return messages.map((m) => {
       const row = known.get(runId, m.channelId, m.ts) as { handle: string } | undefined
       if (row !== undefined) return row.handle
       const handle = `m${(count.get(runId) as { n: number }).n + 1}`
-      insert.run(runId, handle, m.channelId, m.ts, m.place ?? null)
+      insert.run(runId, handle, m.channelId, m.ts, m.place ?? null, m.threadTs ?? null)
       return handle
     })
   })
@@ -41,13 +43,14 @@ export function assignHandles(store: Store, runId: string, messages: ReadonlyArr
 
 /** Run `runId`'s handle table. */
 export function sourceTable(store: Store, runId: string): ReadonlyMap<string, SourceRef> {
-  const rows = store.db.prepare('SELECT handle, channel_id AS channelId, ts, place FROM sources WHERE run_id = ?').all(runId) as Array<{
+  const rows = store.db.prepare('SELECT handle, channel_id AS channelId, ts, place, thread_ts AS threadTs FROM sources WHERE run_id = ?').all(runId) as Array<{
     handle: string
     channelId: string
     ts: string
     place: string | null
+    threadTs: string | null
   }>
-  return new Map(rows.map((r) => [r.handle, { channelId: r.channelId, ts: r.ts, ...(r.place === null ? {} : { place: r.place }) }]))
+  return new Map(rows.map((r) => [r.handle, { channelId: r.channelId, ts: r.ts, ...(r.place === null ? {} : { place: r.place }), ...(r.threadTs === null ? {} : { threadTs: r.threadTs }) }]))
 }
 
 export function resolveSpans(spans: ReadonlyArray<Span>, table: ReadonlyMap<string, SourceRef>): ReadonlyArray<BubbleSpan> {

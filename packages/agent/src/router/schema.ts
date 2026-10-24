@@ -109,4 +109,9 @@ const turns5 = [
   'CREATE INDEX runs_by_start ON runs (started_at DESC, id DESC) WHERE ended_at IS NOT NULL',
 ]
 
-export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2, turns3, turns4, turns5] }
+const turns6 = [
+  // A reply's thread, so a source Juno found through Slack search opens in its thread even when this Mac has no copy.
+  'ALTER TABLE sources ADD COLUMN thread_ts TEXT',
+]
+
+export const TURNS_MIGRATIONS: MigrationSet = { name: 'turns', steps: [turns1, turns2, turns3, turns4, turns5, turns6] }

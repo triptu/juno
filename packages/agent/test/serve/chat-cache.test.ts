@@ -43,7 +43,7 @@ it('after edits, reactions, read marks, live runs, cards and rolled-back writes,
             db.prepare('UPDATE messages SET text = ? WHERE id = 1').run('<say reply-to="n001">Quoted</say>')
             break
           case 9:
-            db.prepare("INSERT INTO sources VALUES (?, 'm1', 'C_TEST', '1.0', ?) ON CONFLICT (run_id, handle) DO UPDATE SET place = excluded.place").run(`run-${event.row}`, `Place ${seq}`)
+            db.prepare("INSERT INTO sources (run_id, handle, channel_id, ts, place) VALUES (?, 'm1', 'C_TEST', '1.0', ?) ON CONFLICT (run_id, handle) DO UPDATE SET place = excluded.place").run(`run-${event.row}`, `Place ${seq}`)
             db.prepare('UPDATE messages SET text = ? WHERE id = ?').run('<say><src m="m1">Source</src></say>', event.row * 2 + 1)
             break
           case 10:

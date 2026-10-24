@@ -149,7 +149,7 @@ export const JunoInline = Schema.Union([
   Schema.TaggedStruct('text', { text: Schema.String, ...Marks }),
   Schema.TaggedStruct('code', { text: Schema.String }),
   Schema.TaggedStruct('cite', { text: Schema.String, messageId: ChatMessageId, ...Marks }),
-  Schema.TaggedStruct('source', { text: Schema.String, channelId: Schema.String, ts: Schema.String, place: Schema.String, ...Marks }),
+  Schema.TaggedStruct('source', { text: Schema.String, channelId: Schema.String, ts: Schema.String, place: Schema.String, threadTs: Schema.optionalKey(Schema.String), ...Marks }),
 ])
 export type JunoInline = typeof JunoInline.Type
 

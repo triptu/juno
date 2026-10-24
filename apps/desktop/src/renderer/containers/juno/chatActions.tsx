@@ -135,7 +135,7 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
           case 'chatMessage':
             return scrollToRow(scrollRef, pinnedRef, { _tag: 'message', id: target.messageId })
           case 'message':
-            return void openSlackMessage(target.channelId, target.ts, { newTab: event.metaKey })
+            return void openSlackMessage(target.channelId, target.ts, { newTab: event.metaKey }, target.threadTs)
           case 'url':
             return openWebLink(target.url, event)
           case 'page':

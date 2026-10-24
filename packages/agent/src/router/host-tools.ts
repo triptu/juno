@@ -51,7 +51,7 @@ const line = (m: Page['messages'][number], handle: string | undefined) => {
 const lines = async (page: Page, handles: Handles): Promise<ToolOutput> => {
   const summary = plural(page.messages.length, 'message', 'messages')
   if (page.messages.length === 0) return { text: 'No messages.', summary }
-  const refs = page.messages.map((m) => ({ channelId: m.channelId, ts: m.ts, ...(m.channelName === undefined ? {} : { place: m.channelName }) }))
+  const refs = page.messages.map((m) => ({ channelId: m.channelId, ts: m.ts, ...(m.channelName === undefined ? {} : { place: m.channelName }), ...(m.threadTs === undefined ? {} : { threadTs: m.threadTs }) }))
   const assigned = await handles(refs)
   return { text: page.messages.map((m, i) => line(m, assigned[i])).join('\n'), summary }
 }
@@ -115,7 +115,8 @@ const searchTool = (host: HostReads, handles: Handles) =>
       // A title match without a thread root names no message, so it gets no handle.
       const cited = page.matches.flatMap((m) => {
         const ts = m.message?.ts ?? m.rootTs
-        return ts === undefined ? [] : [{ match: m, ref: { channelId: m.channelId, ts, place: m.topic.where } }]
+        const threadTs = m.message?.threadTs
+        return ts === undefined ? [] : [{ match: m, ref: { channelId: m.channelId, ts, place: m.topic.where, ...(threadTs === undefined ? {} : { threadTs }) } }]
       })
       const assigned = await handles(cited.map((c) => c.ref))
       const handleOf = new Map(cited.map((c, i) => [c.match, assigned[i]]))

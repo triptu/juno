@@ -70,10 +70,10 @@ const source: Reader = (s, i, marks, sources) => {
   const found = PLACEHOLDER_AT.exec(s)
   const span = found === null ? undefined : sources[Number(found[1])]
   if (found === null || span === undefined) return { text: '', next: i + 1 }
-  const { channelId, ts, place } = span.source
+  const { channelId, ts, place, threadTs } = span.source
   const inlines = parse(span.text, marks, sources).map((inline): JunoInline => {
     const own = inline._tag === 'text' ? { ...(inline.bold ? { bold: true as const } : {}), ...(inline.italic ? { italic: true as const } : {}) } : marks
-    return { _tag: 'source', text: inline.text, channelId, ts, place: place ?? channelId, ...own }
+    return { _tag: 'source', text: inline.text, channelId, ts, place: place ?? channelId, ...(threadTs === undefined ? {} : { threadTs }), ...own }
   })
   return { inlines, next: found.index + found[0].length }
 }

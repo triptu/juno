@@ -75,7 +75,7 @@ function Inline({ inline, now, actions }: { readonly inline: JunoInline; readonl
         <InlineLink
           data-source={`${inline.channelId}/${inline.ts}`}
           title={`${inline.place} · ${messageTime(tsMillis(inline.ts), now)}`}
-          onOpen={(event) => actions.onOpen({ _tag: 'message', channelId: inline.channelId, ts: inline.ts }, event)}
+          onOpen={(event) => actions.onOpen({ _tag: 'message', channelId: inline.channelId, ts: inline.ts, ...(inline.threadTs === undefined ? {} : { threadTs: inline.threadTs }) }, event)}
         >
           {marked(inline, inline.text)}
         </InlineLink>

@@ -598,8 +598,8 @@ export function openTopicAtInBackground(id: string, ts: string): void {
 }
 
 /** A Juno source link (SPEC 13.1): the topic that holds the message, opened at it, and the message flashes. */
-export async function openSlackMessage(channel: string, ts: string, options: OpenOptions = {}): Promise<void> {
-  const located = await locateMessage(registry, channel, ts)
+export async function openSlackMessage(channel: string, ts: string, options: OpenOptions = {}, threadTs?: string): Promise<void> {
+  const located = await locateMessage(registry, channel, ts, threadTs)
   if (located._tag === 'Success') openTopicAt(located.value.topicId, ts, { ...options, flash: true })
 }
 
