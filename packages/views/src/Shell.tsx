@@ -1,7 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { useLayoutEffect, useRef, type PointerEvent, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { SIDEBAR_WIDTH } from '@juno/contract/channels'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { ResizeEdge } from './ResizeEdge'
 
 export interface ShellProps {
   /** The left pane. Without one (signed out) the page fills the window under a drag strip. */
@@ -49,7 +50,7 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
       <div {...stylex.props(styles.shell, styles.panes)}>
         <div ref={slot} {...stylex.props(styles.sidebarSlot, sidebarHidden && styles.hidden)}>
           {sidebar}
-          <SidebarEdge width={sidebarWidth} onResize={onSidebarResize} onReset={onSidebarResetWidth} onCollapse={onSidebarCollapse} />
+          <ResizeEdge width={sidebarWidth} min={SIDEBAR_WIDTH.min} max={SIDEBAR_WIDTH.max} label="Resize sidebar" onResize={onSidebarResize} onReset={onSidebarResetWidth} collapseBelow={COLLAPSE_BELOW} onCollapse={onSidebarCollapse} />
           {peek}
         </div>
         {children}
@@ -63,82 +64,6 @@ export function Shell({ sidebar, sidebarWidth = SIDEBAR_WIDTH.default, sidebarHi
       <header {...stylex.props(styles.titlebar)} aria-label="Window title bar" />
       <main {...stylex.props(styles.page)}>{children}</main>
     </div>
-  )
-}
-
-interface SidebarEdgeProps {
-  readonly width: number
-  readonly onResize: ((width: number) => void) | undefined
-  readonly onReset: (() => void) | undefined
-  readonly onCollapse: (() => void) | undefined
-}
-
-function write(box: HTMLElement, width: number): void {
-  box.style.width = `${width}px`
-}
-
-const clamp = (width: number) => Math.round(Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, width)))
-
-/**
- * The sidebar's resize edge: a 6px hit area centred on its border. A drag
- * writes the sidebar's width at most once per frame and
- * reports it when it ends; a double-click asks for the default.
- */
-function SidebarEdge({ width, onResize, onReset, onCollapse }: SidebarEdgeProps) {
-  /** The drag in progress, with the sidebar's box: the edge's parent. */
-  const drag = useRef<{ readonly box: HTMLElement; readonly startX: number; raw: number; frame: number | undefined } | undefined>(undefined)
-
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return
-    event.preventDefault()
-    const box = event.currentTarget.parentElement
-    if (box === null) return
-    event.currentTarget.setPointerCapture(event.pointerId)
-    drag.current = { box, startX: event.clientX, raw: width, frame: undefined }
-  }
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const current = drag.current
-    if (current === undefined) return
-    current.raw = width + event.clientX - current.startX
-    if (current.frame !== undefined) return
-    current.frame = requestAnimationFrame(() => {
-      current.frame = undefined
-      write(current.box, clamp(current.raw))
-    })
-  }
-  const end = (event: PointerEvent<HTMLDivElement>) => {
-    const current = drag.current
-    if (current === undefined) return
-    drag.current = undefined
-    if (current.frame !== undefined) cancelAnimationFrame(current.frame)
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    // Where the button came up decides, even when the last moves before it were not delivered.
-    if (event.type === 'pointerup') current.raw = width + event.clientX - current.startX
-    if (event.type === 'pointerup' && current.raw < COLLAPSE_BELOW) {
-      write(current.box, width)
-      onCollapse?.()
-      return
-    }
-    const next = event.type === 'pointerup' ? clamp(current.raw) : width
-    write(current.box, next)
-    if (next !== width) onResize?.(next)
-  }
-
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize sidebar"
-      aria-valuemin={SIDEBAR_WIDTH.min}
-      aria-valuemax={SIDEBAR_WIDTH.max}
-      aria-valuenow={width}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={end}
-      onPointerCancel={end}
-      onDoubleClick={onReset}
-      {...stylex.props(styles.edge)}
-    />
   )
 }
 
@@ -169,18 +94,6 @@ const styles = stylex.create({
   },
   hidden: {
     display: 'none',
-  },
-  // Centred on the sidebar's border, over both panes, and above the title bars' drag regions.
-  edge: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: `calc(${layout['--sidebar-resize-hit']} / -2)`,
-    width: layout['--sidebar-resize-hit'],
-    zIndex: 1,
-    cursor: 'col-resize',
-    touchAction: 'none',
-    WebkitAppRegion: 'no-drag',
   },
   column: {
     flexDirection: 'column',
