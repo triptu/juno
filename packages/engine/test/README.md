@@ -39,7 +39,7 @@ The engine runs the fake AI, but its background AI jobs (titles, topic art, Home
 `stress-flakes.mjs` starts eight CPU-burning Node processes, runs the command serially, saves each run under `.juno-status/flake-check/<label>/`, and stops the load processes even when tests fail. Retries stay off.
 
 ```sh
-bun scripts/heavy.mjs bun scripts/stress-flakes.mjs engine 20 sh -c "cd packages/engine && bun test test/sync.test.ts test/reconnect.test.ts -t 'warm boot reads every page|Unsubscribe|rejected unsubscribe'"
+bun scripts/heavy.mjs bun scripts/stress-flakes.mjs engine 20 sh -c "cd packages/engine && bun test test/flows/follow-races.flow.test.ts -t 'every getView page|Unsubscribe'"
 ```
 
 Build before repeating desktop tests:
@@ -73,7 +73,7 @@ one worker so the files' CPU profiles do not compete. Sampling distorts CPU
 use, so keep profiling off for validation, the perf files and before/after suite timings.
 
 ```sh
-bun run remote --machine linux/amd64:4x8 --env JUNO_TEST_WORKERS=1 --env JUNO_UNIT_PROFILE=1 test --files packages/engine/test/sync.test.ts packages/engine/test/send.test.ts
+bun run remote --machine linux/amd64:4x8 --env JUNO_TEST_WORKERS=1 --env JUNO_UNIT_PROFILE=1 test --files packages/engine/test/flows/first-sync.flow.test.ts packages/engine/test/flows/follow.flow.test.ts
 ```
 
 The profile's wall and CPU figures include asynchronous engine work; phases can

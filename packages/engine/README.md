@@ -72,8 +72,8 @@ Renderer command middleware marks writes through `CommandWrite`. Live queries ca
 `bun run --cwd packages/engine test`. The tests start the real engine on a `memoryTransport` and talk to it with the real `@juno/state` client over a Node `MessageChannel` (`test/harness.ts`), so they cover the wire end to end.
 
 - `test/live.test.ts`: the serve helpers, and recovery from SQL errors on a real store.
-- `test/sync.test.ts`: boots against the fake, reads the sidebar rows and runs the subscribe commands. `test/convergence.test.ts` is the randomised sync test.
-- `test/sidebar-rule.test.ts`: the sidebar and counts SQL against `sidebarPlacement` over a table of every topic status, and the two mention branches end to end.
+- `test/flows/*.flow.test.ts`: user journeys against the fake, most starting warm on the synced default workspace (`test/synced.ts`): `first-sync` (sign-in to live, cold), `live-events`, `gap-and-restart` (drops and restarts), `follow` and `follow-races` (specs/follow.qnt), `rate-limits`. `test/convergence.test.ts` is the randomised sync test.
+- `test/sidebar-rule.test.ts`: the sidebar and counts SQL against `sidebarPlacement` over a table of every topic status.
 - `test/sidebar-state.test.ts`: the renderer's sidebar atoms across filter changes and a profile change.
 - `test/reads.test.ts`: the read commands against the fake: the calls each kind of topic makes, coalescing, retries and a restart with a pending mark, marks from other clients during and after a pending mark, the mirror setting, and that nothing marks by itself.
 - `test/session.test.ts`: sign-in, sign-out and session expiry. `test/plan.test.ts` checks the query plans of the sidebar and the topic view.

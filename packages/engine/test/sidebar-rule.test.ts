@@ -1,17 +1,14 @@
 // The sidebar rule of spec section 5 ("What shows up") exists twice: as SQL
 // in the sidebar and counts queries (`topics/query.ts`) and as the pure rule
-// in `@juno/domain` (`sidebarPlacement`). These tests hold the two together:
-// first over a table of every status a topic can have, straight against a
-// store, then end to end for the two mention branches.
+// in `@juno/domain` (`sidebarPlacement`). These tests hold the two together
+// over a table of every status a topic can have, straight against a store.
+// The mention branches run end to end in `flows/follow.flow.test.ts`.
 import { Effect } from 'effect'
-import { afterEach, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { byLatestActivity, isDm, matchesSidebarFilter, sidebarPlacement, type ChannelId, type SidebarFilter, type Topic } from '@juno/domain'
 import type { TopicCounts } from '@juno/contract'
-import { SELF_ID } from '@juno/fake-slack'
-import { topicCountsAtom } from '@juno/state'
 import { StoreWriter } from '@juno/store'
 import { countTopics, listTopics, type ListFilter } from '../src/topics/query'
-import { startTestEngine, type RunningEngine } from './harness'
 import { NOW, seed, shownConversation, statusTable, tempStore, topicOf, tsOf } from './statusTable'
 
 const FILTERS: ReadonlyArray<ListFilter> = [
@@ -156,78 +153,5 @@ describe('the sidebar rule, query against domain', () => {
     expect([...all.pinned, ...all.recent].some((id) => id.startsWith('t:C0THREADS:'))).toBe(false)
     expect(expected({ kind: 'all', unreadOnly: false, scope: 'C0THREADS' }).recent.length).toBeGreaterThan(0)
     expect(expectedCounts(undefined).viewMentions).toContain('vbots')
-  })
-})
-
-// End to end: the engine on the fake, the two mention branches arriving over the socket.
-
-const engines: Array<RunningEngine> = []
-afterEach(async () => {
-  for (const engine of engines.splice(0)) await engine.stop()
-})
-
-async function liveEngine(): Promise<RunningEngine> {
-  const engine = await startTestEngine({ initial: (fake) => fake.signIn() })
-  engines.push(engine)
-  await engine.status('ready')
-  await engine.phase('live')
-  return engine
-}
-
-/** The counts the engine sends, once they equal what the sidebar shows: unread channel and DM rows. */
-async function countsMatchRows(engine: RunningEngine): Promise<TopicCounts> {
-  const atom = topicCountsAtom()
-  const unmount = engine.registry.mount(atom)
-  try {
-    let counts: TopicCounts | undefined
-    await engine.rowsUntil((rows) => {
-      const result = engine.registry.get(atom)
-      if (result._tag !== 'Success') return false
-      const channels = rows.filter((r) => r.unreadCount > 0 && !isDm(r.channel.kind)).length
-      const dms = rows.filter((r) => r.unreadCount > 0 && isDm(r.channel.kind)).length
-      counts = result.value
-      return counts.channelsUnread === channels && counts.dmsUnread === dms
-    }, 'the counts to match the rows')
-    return counts!
-  } finally {
-    unmount()
-  }
-}
-
-describe('the mention branches, end to end', () => {
-  it('a mention in a thread Slack said nothing about follows it, as in Slack: the thread comes in, and the counts go up', async () => {
-    const engine = await liveEngine()
-    await engine.rowsUntil((rows) => rows.length >= 20, 'rows')
-    const before = await countsMatchRows(engine)
-
-    const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Who owns the flaky checkout test?' })
-    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: `<@${SELF_ID}> can you take a look?`, threadTs: root.ts })
-    const id = `t:C0ENG:${root.ts}`
-
-    const rows = await engine.rowsUntil((list) => list.some((r) => r.id === id), 'the mentioned thread')
-    // SPEC 5: you follow a thread when you are mentioned in it.
-    expect((await engine.rowsUntil((list) => list.some((r) => r.id === id && r.subscribed), 'the mentioned thread followed')).find((r) => r.id === id)).toMatchObject({ kind: 'thread', mentionsMe: true, subscribed: true, section: 'recent' })
-    expect(rows.find((r) => r.id === id)!.unreadCount).toBeGreaterThan(0)
-    const after = await countsMatchRows(engine)
-    expect(after.channelsUnread).toBeGreaterThan(before.channelsUnread)
-  })
-
-  it('a mention after an explicit unfollow follows the thread again: it comes back with its mention, and the counts match the rows', async () => {
-    const engine = await liveEngine()
-    const rows = await engine.rowsUntil((list) => list.length >= 20, 'rows')
-    const root = engine.fake.messages('C0ENG').find((m) => m.text?.startsWith('Draft plan is in the doc.'))!
-    const id = `t:C0ENG:${root.ts}`
-    expect(rows.find((r) => r.id === id)).toMatchObject({ subscribed: true })
-
-    engine.fake.workspace.unsubscribe('C0ENG', root.ts as Parameters<typeof engine.fake.workspace.unsubscribe>[1])
-    await engine.rowsUntil((list) => !list.some((r) => r.id === id), 'the unfollowed thread gone')
-    const before = await countsMatchRows(engine)
-
-    // SPEC 5: as in Slack, a later mention of you follows it again.
-    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: `<@${SELF_ID}> one more thing on the plan.`, threadTs: root.ts })
-    const after = await engine.rowsUntil((list) => list.some((r) => r.id === id && r.subscribed), 'the thread followed again')
-    expect(after.find((r) => r.id === id)).toMatchObject({ subscribed: true, mentionsMe: true, section: 'recent' })
-    const counts = await countsMatchRows(engine)
-    expect(counts.channelsUnread).toBeGreaterThanOrEqual(before.channelsUnread)
   })
 })
