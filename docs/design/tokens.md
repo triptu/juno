@@ -488,6 +488,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--all-topics-columns` | All topics grid: `minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px`; `--all-topics-columns-narrow` drops Where under a 648px table, `--all-topics-columns-narrowest` drops Msgs under 576px; `--all-topics-columns-compact` (`minmax(0, 1fr) 84px`) drops Status under 516px, so the table never scrolls sideways |
 | `--palette-width` | 560px, max calc(100% − 48px), top offset 96px |
 | `--palette-list-max-height` | 400px; the palette list scrolls within this height |
+| `--palette-all-list-max-height` | 624px; ⌘K's All tab, tall enough for its three groups whole |
 | `--tool-row-height` | 56px; a Configure sheet tool row, whose list is seven of them tall |
 | `--tooltip-max-width` | 280px; a longer tooltip wraps |
 | `--menu-width` | 236px context menu; `--menu-width-account` 248px avatar menu, `--menu-width-browse` 300px, `--menu-width-mention` 280px mention popover, `--send-to-width` 320px Home's "Send to" list for a first @ or #, `--menu-width-picker` 340px Home's destination list and All topics' place list |
