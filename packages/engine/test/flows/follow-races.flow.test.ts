@@ -124,8 +124,9 @@ it('an undated thread_unsubscribed is not trusted: Slack is asked for the root, 
 })
 
 it('a follow last seen before the window is checked with Slack when its thread gets a reply', async () => {
-  // Cold: a warm start's follow pass records the observation in memory (FollowFence), which outranks the aged row.
-  const engine = await bootedEngine(engines)
+  // Cold, and no follow pass after it: a pass that finds the thread unchanged records the observation in memory
+  // (FollowFence), which outranks the aged row.
+  const engine = await bootedEngine(engines, { timing: { followPassMillis: 60 * 60_000 } })
   const id = followed(engine)
   // Juno last saw this follow a month ago, and it was dropped elsewhere since without an event reaching Juno.
   // A month cannot pass in a test, so the stored observation is aged in place.
