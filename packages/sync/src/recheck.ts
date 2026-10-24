@@ -30,10 +30,12 @@ import { compareTs, type Message } from '@juno/slack-schema'
 import { StoreWriter, transaction } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { BootError, BootServices } from './boot'
-import { awaitEarlierFetches, type SyncContext } from './context'
+import { awaitEarlierFetches, connectionOf, reindexOptions, stillConnected, type SyncContext } from './context'
 import { writeDeleted } from './events'
+import { reindexTopics } from './reindex'
 import { RECHECK_KEY } from './sent'
-import { setSyncState } from './write'
+import { pageRange } from './threadRanges'
+import { addThreadRange, setSyncState } from './write'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 
 export interface RecheckOptions {
@@ -87,6 +89,7 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
     const known = yield* storedSince(target, from)
     const requestedMillis = yield* Clock.currentTimeMillis
     const requestedAt = millisToTs(requestedMillis)
+    const connection = connectionOf(ctx)
     const limit = ctx.config.historyPageLimit
     const page =
       target.kind === 'main'
@@ -115,6 +118,20 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
     yield* transaction(
       Effect.gen(function* () {
         yield* Effect.forEach(gone, (ts) => writeDeleted(ctx, target.channel, ts, { kind: 'page', requestedAt }), { discard: true })
+        // A thread's page proves the replies it covered, as an open's does (`threadRanges.ts`): from `from`, or from the root
+        // when `from` is before it, once the deletions it showed are stored. A page Slack cut short
+        // for the plan's history limit proves nothing.
+        if (target.kind === 'thread' && page.is_limited !== true) {
+          yield* addThreadRange(target.channel, target.threadTs, pageRange({
+            threadTs: target.threadTs,
+            oldest: compareTs(from, target.threadTs) > 0 ? from : undefined,
+            replies: page.messages.filter((message) => message.ts !== target.threadTs).map((message) => message.ts),
+            hasMore: page.has_more,
+            live: !page.has_more && stillConnected(ctx, connection),
+          }))
+          // The unread count may turn exact with the range.
+          yield* reindexTopics([topic], reindexOptions(ctx))
+        }
         yield* sql`INSERT INTO rechecked_topics (topic_id, requested_at, from_ts, to_ts) VALUES (${topic}, ${requestedMillis}, ${fromTs}, ${toTs})
           ON CONFLICT (topic_id) DO UPDATE SET requested_at = excluded.requested_at, from_ts = excluded.from_ts, to_ts = excluded.to_ts`
       }),
