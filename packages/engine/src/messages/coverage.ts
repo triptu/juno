@@ -15,7 +15,7 @@ export interface ThreadCoverage {
 export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const ranges = yield* sql<ThreadRange>`SELECT kind, from_ts, to_ts, tail FROM thread_ranges WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} ORDER BY from_ts`
+    const ranges = yield* sql<ThreadRange>`SELECT kind, from_ts, to_ts, tail, heard_ts FROM thread_ranges WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} ORDER BY from_ts`
     const roots = yield* sql<NonNullable<ThreadCoverage['root']>>`
       SELECT reply_count, latest_reply, user_id, text, blocks_json FROM messages WHERE channel = ${target.channel} AND ts = ${target.threadTs}`
     return { ranges, root: roots[0] } satisfies ThreadCoverage
@@ -42,6 +42,8 @@ export function clipThread(
     readonly next: WindowMessage | undefined
     readonly atNewest: boolean
     readonly coverage: ThreadCoverage
+    /** The user's own messages, which a window with no anchor keeps at its end as it keeps their pending sends. */
+    readonly own: (row: WindowMessage) => boolean
   },
 ): { readonly rows: ReadonlyArray<WindowMessage>; readonly previous: WindowMessage | undefined; readonly gapBefore: boolean; readonly gapAfter: boolean } {
   const { ranges, root } = options.coverage
@@ -64,7 +66,10 @@ export function clipThread(
   const gapBefore = below === undefined ? first.ts !== options.threadTs : !joined(below.ts, first.ts)
   const above = high < rows.length - 1 ? rows[high + 1] : options.next
   const gapAfter = above === undefined ? options.atNewest && !provenToEnd(ranges, last.ts, root?.latest_reply ?? undefined) : !joined(last.ts, above.ts)
-  return { rows: low === 0 && high === rows.length - 1 ? rows : rows.slice(low, high + 1), previous: gapBefore ? undefined : below, gapBefore, gapAfter }
+  // Juno's own replies come in at once, before a page proves them: they stay at the end of a window at the bottom.
+  const tail = anchor === undefined ? rows.slice(high + 1).filter(options.own) : []
+  const kept = low === 0 && high === rows.length - 1 ? rows : [...rows.slice(low, high + 1), ...tail]
+  return { rows: kept, previous: gapBefore ? undefined : below, gapBefore, gapAfter }
 }
 
 /**

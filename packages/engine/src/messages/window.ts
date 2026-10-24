@@ -142,7 +142,7 @@ export function firstRepliesStatement(channel: string, roots: ReadonlyArray<stri
         FROM messages root WHERE root.channel = ? AND root.ts IN (${roots.map(() => '?').join(', ')})
       ) first
       WHERE first.reply_count = 1 OR EXISTS (SELECT 1 FROM thread_ranges c
-        WHERE c.channel = ? AND c.thread_ts = first.root_ts AND c.kind = 'page' AND c.from_ts <= first.root_ts AND (c.tail = 'live' OR c.to_ts >= first.ts))
+        WHERE c.channel = ? AND c.thread_ts = first.root_ts AND c.kind = 'page' AND c.from_ts <= first.root_ts AND (c.tail = 'live' OR c.to_ts >= first.ts OR c.heard_ts >= first.ts))
     )`,
     params: [channel, channel, ...roots, channel],
   }

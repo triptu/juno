@@ -201,13 +201,15 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const root = (yield* sql.unsafe<WindowMessage>(statement.sql, statement.params))[0]
       if (root !== undefined) stored = [root, ...stored]
     }
+    const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
+    const selfId = team[0]?.self_user_id ?? undefined
     // A thread shows only the stretch around the anchor that its ranges prove continuous (`clipThread`).
     let coverage: ThreadCoverage | undefined
     let gapBefore = false
     let gapAfter = false
     if (target.kind === 'thread' && !target.threadTs.startsWith('pending:')) {
       coverage = yield* threadCoverage(target)
-      const clipped = clipThread(stored, { threadTs: target.threadTs, anchor: range.anchor, previous: beforeWindow, next: afterWindow, atNewest, coverage })
+      const clipped = clipThread(stored, { threadTs: target.threadTs, anchor: range.anchor, previous: beforeWindow, next: afterWindow, atNewest, coverage, own: (row) => row.user_id === selfId })
       // Juno's own sends still show at the bottom: they come after everything, known or not.
       if (range.anchor !== undefined && clipped.rows.at(-1) !== stored.at(-1)) atNewest = false
       stored = clipped.rows
@@ -216,8 +218,6 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       gapAfter = clipped.gapAfter
     }
 
-    const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
-    const selfId = team[0]?.self_user_id ?? undefined
     const me = (yield* syncState.get<Me>('me')) ?? (selfId === undefined ? undefined : { userId: selfId as UserId })
     const membership = JSON.stringify(me) ?? ''
 
