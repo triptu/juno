@@ -5,7 +5,7 @@
  * end, and the arrows' next stops kept warm so the reader follows in one
  * frame.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { SearchSnapshot } from '@juno/contract'
 import { loadMoreSearch, loadOlderMessages, prefetchSearchResult, registry, updateSearchSession, type SearchSelection, type SearchSession } from '@juno/state'
 import { isStop, readerTarget, searchRows, type SearchRowItem } from '@juno/views'
@@ -41,14 +41,24 @@ export function useResultRows(session: SearchSession, empty: boolean, snapshot: 
     const open = scopedThread ? new Set([...expanded, ...groups.map((group) => group.id)]) : expanded
     return searchRows(groups, grouped, olderIndex ?? groups.length, open)
   }, [empty, groups, grouped, olderIndex, expanded, scopedThread])
-  const stops = useMemo(() => (rows ?? []).filter(isStop), [rows])
-  return { rows, stops }
+  const [held, setHeld] = useState({ source: rows, rows })
+  let stable = held.rows
+  if (rows !== held.source) {
+    const cache = new Map(held.rows?.map((row) => [row.id, row]))
+    stable = rows?.map((row) => {
+      const previous = cache.get(row.id)
+      return previous !== undefined && sameRow(previous, row) ? previous : row
+    })
+    setHeld({ source: rows, rows: stable })
+  }
+  const stops = useMemo(() => (stable ?? []).filter(isStop), [stable])
+  return { rows: stable, stops }
 }
 
 /** The list comes back where it was left, and remembers where it is once a scroll ends. */
-export function useListScroll(sessionId: string, listRef: RefObject<HTMLDivElement | null>, rows: ReadonlyArray<SearchRowItem> | undefined, scrollTop: number | undefined) {
+export function useListScroll(sessionId: string, listRef: RefObject<HTMLDivElement | null>, rows: ReadonlyArray<SearchRowItem> | undefined, scrollTop: number | undefined, windowReady: boolean) {
   const restored = useRef(false)
-  const ready = rows !== undefined && rows.length > 0
+  const ready = windowReady && rows !== undefined && rows.length > 0
   useLayoutEffect(() => {
     const list = listRef.current
     if (restored.current || list === null || !ready) return
@@ -58,18 +68,19 @@ export function useListScroll(sessionId: string, listRef: RefObject<HTMLDivEleme
   const empty = rows === undefined
   useEffect(() => {
     const list = listRef.current
-    if (list === null) return
+    if (list === null || !windowReady) return
     const save = () => {
       const top = list.scrollTop
       updateSearchSession(registry, sessionId, (current) => (current.scrollTop === top ? current : { ...current, scrollTop: top }))
     }
     list.addEventListener('scrollend', save)
     return () => list.removeEventListener('scrollend', save)
-  }, [sessionId, listRef, empty])
+  }, [sessionId, listRef, empty, windowReady])
 }
 
 /** The engine's window: moved near either end, and asked for again where a restored session left it. */
 export function useWindowPaging(sessionId: string, snapshot: SearchSnapshot | undefined, savedOffset: number) {
+  const restoring = useRef(savedOffset > 0 ? savedOffset : undefined)
   const known = snapshot !== undefined
   const windowOffset = snapshot?.window.offset ?? 0
   useEffect(() => {
@@ -78,22 +89,25 @@ export function useWindowPaging(sessionId: string, snapshot: SearchSnapshot | un
     // Once, when the first snapshot of a restored session arrives.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, known])
-  const move = (next: number) => {
-    updateSearchSession(registry, sessionId, (current) => ({ ...current, offset: next }))
-    void loadMoreSearch(registry, sessionId, next)
-  }
+  useEffect(() => {
+    if (snapshot === undefined) return
+    if (restoring.current !== undefined && windowOffset !== restoring.current) return
+    restoring.current = undefined
+    updateSearchSession(registry, sessionId, (current) => current.offset === windowOffset ? current : { ...current, offset: windowOffset })
+  }, [sessionId, snapshot, savedOffset, windowOffset])
+  const move = (next: number) => { void loadMoreSearch(registry, sessionId, next) }
   return {
     nearEnd: () => {
-      if (snapshot === undefined) return
+      if (snapshot === undefined || restoring.current !== undefined) return
       const { offset, totalRows } = snapshot.window
       const next = offset + WINDOW < totalRows ? offset + WINDOW_STEP : offset
       if (next !== offset) return move(next)
-      if (snapshot.pagination.hasMore || !snapshot.frontier.complete) void loadMoreSearch(registry, sessionId, offset)
+      if (snapshot.state !== 'searching' && snapshot.state !== 'slackUnavailable' && (snapshot.pagination.hasMore || snapshot.window.hasMoreLocal)) void loadMoreSearch(registry, sessionId)
     },
     nearStart: () => {
-      if (windowOffset > 0) move(Math.max(0, windowOffset - WINDOW_STEP))
+      if (restoring.current === undefined && windowOffset > 0) move(Math.max(0, windowOffset - WINDOW_STEP))
     },
-    windowKey: `${snapshot?.generation ?? 0}:${windowOffset}:${snapshot?.window.totalRows ?? 0}`,
+    windowKey: `${snapshot?.generation ?? 0}:${windowOffset}:${snapshot?.window.totalRows ?? 0}:${snapshot?.state ?? 'pending'}`,
   }
 }
 
@@ -107,4 +121,8 @@ export function useWarmNeighbours(selectedId: string | undefined, stops: Readonl
       if (target !== undefined) prefetchSearchResult(registry, target.topicId)
     }
   }, [selectedId, stops])
+}
+
+function sameRow(a: SearchRowItem, b: SearchRowItem): boolean {
+  return a.kind === b.kind && (!('group' in a) || ('group' in b && a.group === b.group)) && (!('hit' in a) || ('hit' in b && a.hit === b.hit)) && (!('count' in a) || ('count' in b && a.count === b.count))
 }

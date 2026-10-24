@@ -1,3 +1,4 @@
+import { MESSAGE_LANDING_OFFSET } from '@juno/tokens/layout'
 /**
  * The Search tab's reader (SPEC 10a): the chosen result's topic itself,
  * with its header, composer, reactions and menus, landed at the match with
@@ -8,17 +9,18 @@
  * the reader never flashes empty; a move within the shown topic flashes
  * the match there (`moveReader`).
  */
-import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useState, type RefObject } from 'react'
 import { afterPaint, mark, measure } from '@juno/state/perf'
-import { bottomWindow, flashMessage, loadOlderMessages, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
+import { searchMatchesAtom, bottomWindow, flashMessage, loadOlderMessages, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { openTopicAtInBackground, openTopicInBackground } from '../navigation'
 import { justAfter } from '../slackLinks'
 import { Topic } from '../TopicView'
-import { markMatches, readerMatches, type ReaderTerms } from './matches'
+import { markMatches } from './matches'
+import type { SearchSnapshot } from '@juno/contract'
 
 /** Where a match lands: under the header band, as a notification's message does. */
-const READER_TOP = 80
+const READER_TOP = MESSAGE_LANDING_OFFSET
 /** The longest the reader keeps the last topic while the next one loads. */
 const READY_WAIT_MS = 1500
 
@@ -63,7 +65,7 @@ export async function openResultBehind(target: SearchSelection): Promise<void> {
 export interface SearchReaderProps {
   readonly sessionId: string
   readonly selection: SearchSelection | undefined
-  readonly terms: ReaderTerms
+  readonly snapshot: SearchSnapshot | undefined
   /** The page is one column: Back to results leads the header. */
   readonly narrow: boolean
   readonly readerRef: RefObject<HTMLDivElement | null>
@@ -85,14 +87,6 @@ export function SearchReader(props: SearchReaderProps) {
   const sameTopic = shown !== undefined && selection !== undefined && shown.topicId === selection.topicId
   const displayed = sameTopic ? selection : shown
   const waiting = selection !== undefined && !sameTopic ? selection : undefined
-
-  const displayedKey = displayed === undefined ? undefined : `${displayed.topicId}\n${displayed.ts ?? ''}`
-  useEffect(() => {
-    if (displayedKey === undefined || measureFrom === undefined) return
-    const from = measureFrom
-    measureFrom = undefined
-    afterPaint(() => measure('juno.search-reader', from))
-  }, [displayedKey])
 
   return (
     <>
@@ -132,16 +126,25 @@ function Waiter({ sessionId, target, onReady }: { readonly sessionId: string; re
   return null
 }
 
-function ShownTopic({ sessionId, selection, terms, narrow, readerRef, onStepper, onBack, onEscape, onStep, onUsed }: SearchReaderProps & { readonly selection: SearchSelection }) {
+function ShownTopic({ sessionId, selection, snapshot, narrow, readerRef, onStepper, onBack, onEscape, onStep, onUsed }: SearchReaderProps & { readonly selection: SearchSelection }) {
   const view = readerView(sessionId, selection.topicId)
   const result = useAtomValue(topicAtom(selection.topicId))
   const detail = result._tag === 'Success' ? result.value : undefined
   const list = useAtomValue(messageListAtom(view))
-  const found = useMemo(() => readerMatches(list, terms, selection.ts), [list, terms, selection.ts])
-  const index = selection.ts === undefined ? -1 : found.indexOf(selection.ts)
+  const painted = list.ready && (selection.ts === undefined || list.rows.has(selection.ts))
+  useEffect(() => {
+    if (!painted || measureFrom === undefined) return
+    const from = measureFrom
+    measureFrom = undefined
+    afterPaint(() => measure('juno.search-reader', from))
+  }, [painted, selection.topicId, selection.ts])
+
+  const navigation = useAtomValue(searchMatchesAtom({ sessionId, generation: snapshot?.generation ?? 0, topicId: selection.topicId, ...(selection.ts === undefined ? {} : { ts: selection.ts }), ...(list.order[0] === undefined ? {} : { first: list.order[0] }), ...(list.order.at(-1) === undefined ? {} : { last: list.order.at(-1)! }) }))
+  const nav = navigation._tag === 'Success' ? navigation.value : undefined
+  const words = (snapshot?.query.clauses ?? []).flatMap((clause) => (clause.kind === 'term' || clause.kind === 'phrase') && !clause.negated ? [clause.value] : [])
   const go = (direction: 1 | -1) => {
-    const ts = found[index + direction]
-    if (index >= 0 && ts !== undefined) onStep(ts)
+    const ts = direction === -1 ? nav?.previous : nav?.next
+    if (ts != null) onStep(ts)
   }
   const stepTo = useEffectEvent(go)
   useEffect(() => {
@@ -152,10 +155,10 @@ function ShownTopic({ sessionId, selection, terms, narrow, readerRef, onStepper,
       onStepper(undefined)
     }
   }, [sessionId, selection.topicId, onStepper])
-  useMarks(readerRef, found, selection.ts, terms.include)
+  useMarks(readerRef, nav?.marked ?? [], selection.ts, words)
 
   if (detail == null) return null
-  const step = found.length > 1 && index >= 0 ? { index: index + 1, count: found.length, onPrevious: () => go(-1), onNext: () => go(1) } : undefined
+  const step = nav !== undefined && nav.count > 1 ? { index: nav.index, count: nav.count, onPrevious: () => go(-1), onNext: () => go(1) } : undefined
   const header = { onOpenInNewTab: () => void openResultBehind(selection), ...(narrow ? { onBack } : {}), ...(step === undefined ? {} : { step }) }
   return <Topic id={selection.topicId} view={view} detail={detail} reader={{ header, onEscape, onUsed }} />
 }

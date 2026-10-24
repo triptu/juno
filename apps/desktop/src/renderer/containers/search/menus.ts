@@ -4,8 +4,8 @@
  * then a way to pick anyone else in the field; Date its presets; Has its
  * four kinds; and the sort. Native menus, as every menu in Juno is.
  */
-import type { ContextMenuItem, SearchSnapshot } from '@juno/contract'
-import { popupContextMenu, registry, updateSearchSession, type SearchChip, type SearchSession } from '@juno/state'
+import { searchCalendar, type ContextMenuItem, type SearchSnapshot } from '@juno/contract'
+import { popupContextMenu, registry, runCommand, updateSearchSession, type SearchChip, type SearchSession } from '@juno/state'
 import type { SearchFilterMenu } from '@juno/views'
 import { dateChip, datePresets, type DatePreset } from './chips'
 
@@ -43,9 +43,9 @@ function menuItems(menu: SearchFilterMenu, session: SearchSession, facets: Facet
 }
 
 /** A facet, a kind or a preset as a chip; one chosen again is taken off. */
-function chipFor(chosen: string, facets: Facets): SearchChip | undefined {
+function chipFor(chosen: string, facets: Facets, timeZone: string): SearchChip | undefined {
   if (chosen.startsWith('has:')) return { op: 'has', token: chosen, label: chosen.slice(4) }
-  if (chosen.startsWith('date:')) return dateChip(chosen.slice(5) as DatePreset)
+  if (chosen.startsWith('date:')) return dateChip(chosen.slice(5) as DatePreset, timeZone)
   if (chosen.startsWith('from:')) {
     const person = facets?.from.find((facet) => `from:${facet.id}` === chosen)?.person
     return person === undefined ? undefined : { op: 'from', token: chosen, label: person.name, person }
@@ -57,11 +57,11 @@ function chipFor(chosen: string, facets: Facets): SearchChip | undefined {
   return undefined
 }
 
-function apply(chosen: string, facets: Facets) {
+function apply(chosen: string, facets: Facets, timeZone: string) {
   return (current: SearchSession): SearchSession => {
     if (chosen.startsWith('sort:')) return { ...current, sort: chosen === 'sort:oldest' ? 'oldest' : 'newest' }
     if (chosen.startsWith('any:')) return { ...current, chips: current.chips.filter((chip) => chip.op !== chosen.slice(4)) }
-    const chip = chipFor(chosen, facets)
+    const chip = chipFor(chosen, facets, timeZone)
     if (chip === undefined) return current
     if (current.chips.some((other) => other.token === chip.token)) return { ...current, chips: current.chips.filter((other) => other.token !== chip.token) }
     // One date range at a time.
@@ -78,6 +78,8 @@ export async function showFilterMenu(sessionId: string, session: SearchSession, 
     typeOperator(chosen.slice(6))
     return true
   }
-  updateSearchSession(registry, sessionId, apply(chosen, facets))
+  const calendar = chosen.startsWith('date:') ? await runCommand(registry, searchCalendar, undefined) : undefined
+  if (calendar !== undefined && calendar._tag !== 'Success') return false
+  updateSearchSession(registry, sessionId, apply(chosen, facets, calendar?.value ?? 'UTC'))
   return true
 }

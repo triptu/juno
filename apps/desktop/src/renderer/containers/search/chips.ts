@@ -62,7 +62,7 @@ export function takeChips(text: string, caret: number, identities = false): { re
   let moved = caret
   for (const clause of query.clauses) {
     const finished = clause.span.end < text.length || identities
-    const chip = finished && clause.span.end !== caret ? chipOf(clause, text, identities) : undefined
+    const chip = finished && (identities || clause.span.end !== caret) ? chipOf(clause, text, identities) : undefined
     if (chip === undefined) continue
     chips.push(chip)
     // Drop the token and one space after it.
@@ -103,8 +103,8 @@ export function chipText(chip: SearchChip): string {
   return chip.token
 }
 
-const iso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-const shift = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
+const iso = (date: Date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+const shift = (date: Date, days: number) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days))
 
 export type DatePreset = 'today' | 'yesterday' | 'this-week' | 'last-week' | 'this-month'
 
@@ -116,10 +116,12 @@ export const datePresets: ReadonlyArray<{ readonly id: DatePreset; readonly labe
   { id: 'this-month', label: 'This month' },
 ]
 
-/** A Date preset as a chip, in days of this Mac's calendar. Weeks start on Monday. `after:` is the day before the range. */
-export function dateChip(preset: DatePreset, now = new Date()): SearchChip {
-  const today = shift(now, 0)
-  const monday = shift(today, -((today.getDay() + 6) % 7))
+/** A Date preset as a chip, in days of the effective search calendar. Weeks start on Monday. `after:` is the day before the range. */
+export function dateChip(preset: DatePreset, timeZone: string, now = new Date()): SearchChip {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
+  const part = (type: string) => Number(parts.find((part) => part.type === type)?.value)
+  const today = new Date(Date.UTC(part('year'), part('month') - 1, part('day')))
+  const monday = shift(today, -((today.getUTCDay() + 6) % 7))
   const label = datePresets.find((item) => item.id === preset)!.label
   switch (preset) {
     case 'today':
@@ -134,7 +136,3 @@ export function dateChip(preset: DatePreset, now = new Date()): SearchChip {
       return { op: 'date', token: `during:${iso(today).slice(0, 7)}`, label }
   }
 }
-
-/** The ids a session's from: chips name, for the reader's matches. */
-export const fromIds = (chips: ReadonlyArray<SearchChip>): ReadonlySet<string> =>
-  new Set(chips.filter((chip) => chip.op === 'from' && !chip.token.startsWith('-') && chip.person !== undefined).map((chip) => chip.person!.id))

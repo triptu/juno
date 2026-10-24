@@ -42,7 +42,7 @@ function startOf(options: OpenSearchOptions): Partial<SearchSession> {
   const typed = options.text === undefined ? undefined : takeChips(options.text.trim(), options.text.trim().length, true)
   return {
     ...fromQuery,
-    ...(typed === undefined ? {} : { text: typed.text, chips: [...(fromQuery?.chips ?? []), ...typed.chips] }),
+    ...(typed === undefined ? {} : { text: typed.text.trim(), chips: [...(fromQuery?.chips ?? []), ...typed.chips] }),
     ...(options.topic === undefined ? {} : { topic: options.topic }),
   }
 }

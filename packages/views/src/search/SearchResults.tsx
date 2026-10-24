@@ -14,7 +14,7 @@
  */
 import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
+import { useEffect, useEffectEvent, useRef, type ComponentType, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import type { SearchSnapshot } from '@juno/contract'
 import { colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button } from '@juno/ui'
@@ -40,7 +40,8 @@ export interface SearchResultsProps extends SearchRecentProps {
   readonly selectedId: string | undefined
   /** The list or the field has focus: the selected row takes the nav tint. */
   readonly focused: boolean
-  readonly now: number
+  readonly now?: number
+  readonly time?: ComponentType<{ at: number }>
   readonly listRef?: Ref<HTMLDivElement>
   /** A row chosen by a press or by the arrows. */
   readonly onSelect: (id: string, how: 'pointer' | 'keyboard') => void
@@ -79,7 +80,7 @@ export function SearchResults(props: SearchResultsProps) {
 }
 
 function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<SearchRowItem> }) {
-  const { rows, state, note, selectedId, focused, now, onSelect, onOpen, onExpand, onTryAgain, onNearEnd, onNearStart, windowKey } = props
+  const { rows, state, note, selectedId, focused, now, time, onSelect, onOpen, onExpand, onTryAgain, onNearEnd, onNearStart, windowKey } = props
   const stops = rows.filter(isStop).map((row) => row.id)
   const end = useRef<HTMLDivElement>(null)
   const start = useRef<HTMLDivElement>(null)
@@ -91,7 +92,7 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
   return (
     <>
       <div ref={start} {...stylex.props(styles.sentinel)} />
-      {note === undefined ? null : <p data-search-note="" {...stylex.props(styles.quiet, styles.note)}>{note}</p>}
+      {note === undefined ? null : <p data-sensitive="" data-search-note="" {...stylex.props(styles.quiet, styles.note)}>{note}</p>}
       {banner ? (
         <Notice text={state === 'offline' ? copy.offline : copy.unavailable}>
           {state === 'slackUnavailable' ? (
@@ -106,7 +107,7 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
       ) : (
         <div role="listbox" aria-label="Results" tabIndex={-1} onKeyDown={onListKey} {...stylex.props(styles.list)}>
           {rows.map((row) => (
-            <SearchRow key={row.id} row={row} now={now} selected={row.id === selectedId} focused={focused} tabbable={row.id === (selectedId ?? stops[0])} onSelect={onSelect} onOpen={onOpen} onExpand={onExpand} />
+            <SearchRow key={row.id} row={row} now={now} time={time} selected={row.id === selectedId} focused={focused} tabbable={row.id === (selectedId ?? stops[0])} onSelect={onSelect} onOpen={onOpen} onExpand={onExpand} />
           ))}
         </div>
       )}

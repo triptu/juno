@@ -6,7 +6,7 @@
  * where the list stops being complete. Matched words are semibold.
  */
 import * as stylex from '@stylexjs/stylex'
-import { memo, type PointerEvent, type ReactNode } from 'react'
+import { memo, type ComponentType, type PointerEvent, type ReactNode } from 'react'
 import type { SearchGroup, SearchHit } from '@juno/contract'
 import { accent, colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, TopicArt } from '@juno/ui'
@@ -18,7 +18,8 @@ export const searchRowDomId = (id: string) => `search-row-${id}`
 
 export interface SearchRowProps {
   readonly row: SearchRowItem
-  readonly now: number
+  readonly now?: number
+  readonly time?: ComponentType<{ at: number }>
   readonly selected: boolean
   /** The list or the field has focus: the selection takes the nav tint. */
   readonly focused: boolean
@@ -36,7 +37,7 @@ export const SearchRow = memo(function SearchRow(props: SearchRowProps) {
   return <Stop {...props} row={row} />
 })
 
-function Stop({ row, now, selected, focused, tabbable, onSelect, onOpen, onExpand }: SearchRowProps & { readonly row: Exclude<SearchRowItem, { readonly kind: 'older' | 'mainHeader' }> }) {
+function Stop({ row, now, time, selected, focused, tabbable, onSelect, onOpen, onExpand }: SearchRowProps & { readonly row: Exclude<SearchRowItem, { readonly kind: 'older' | 'mainHeader' }> }) {
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.ctrlKey) return
     if (row.kind === 'more') {
@@ -62,7 +63,7 @@ function Stop({ row, now, selected, focused, tabbable, onSelect, onOpen, onExpan
   const look = [styles.stop, selected && styles.selected, selected && focused && styles.selectedFocused] as const
   return (
     <div {...option} role="option" aria-selected={selected} {...stylex.props(...shapeOf(row.kind), ...look)}>
-      <RowContent row={row} now={now} />
+      <RowContent row={row} now={now} time={time} />
     </div>
   )
 }
@@ -70,7 +71,8 @@ function Stop({ row, now, selected, focused, tabbable, onSelect, onOpen, onExpan
 const shapeOf = (kind: 'flat' | 'title' | 'topic' | 'match') =>
   kind === 'flat' ? [styles.flat] : kind === 'match' ? [styles.line, styles.matchLine] : kind === 'topic' ? [styles.line, styles.topicLine, styles.groupStart] : [styles.line, styles.topicLine]
 
-function RowContent({ row, now }: { readonly row: Extract<SearchRowItem, { readonly kind: 'flat' | 'title' | 'topic' | 'match' }>; readonly now: number }) {
+function RowContent({ row, now, time: TimeLeaf }: { readonly row: Extract<SearchRowItem, { readonly kind: 'flat' | 'title' | 'topic' | 'match' }>; readonly now?: number
+  readonly time?: ComponentType<{ at: number }> }) {
   const art = (size: 16 | 20) => <TopicArt topicId={row.group.topicId} {...(row.group.art === undefined ? {} : { recipe: row.group.art })} size={size} />
   switch (row.kind) {
     case 'flat':
@@ -80,7 +82,7 @@ function RowContent({ row, now }: { readonly row: Extract<SearchRowItem, { reado
             {art(16)}
             <Title group={row.group} />
             <Where group={row.group} />
-            <Time at={tsMillis(row.hit.ts)} now={now} />
+            <Time at={tsMillis(row.hit.ts)} now={now} time={TimeLeaf} />
           </span>
           <span {...stylex.props(styles.flatBottom)}>
             <Snippet hit={row.hit} />
@@ -91,7 +93,7 @@ function RowContent({ row, now }: { readonly row: Extract<SearchRowItem, { reado
       return (
         <>
           <Snippet hit={row.hit} />
-          <Time at={tsMillis(row.hit.ts)} now={now} />
+          <Time at={tsMillis(row.hit.ts)} now={now} time={TimeLeaf} />
         </>
       )
     default:
@@ -100,7 +102,7 @@ function RowContent({ row, now }: { readonly row: Extract<SearchRowItem, { reado
           {art(row.kind === 'topic' ? 20 : 16)}
           <Title group={row.group} />
           <Where group={row.group} />
-          <Time at={tsMillis(row.group.at)} now={now} />
+          <Time at={tsMillis(row.group.at)} now={now} time={TimeLeaf} />
         </>
       )
   }
@@ -148,8 +150,9 @@ function Where({ group }: { readonly group: SearchGroup }) {
   )
 }
 
-function Time({ at, now }: { readonly at: number; readonly now: number }) {
-  return <span {...stylex.props(styles.time)}>{searchTime(at, now)}</span>
+function Time({ at, now = 0, time: TimeLeaf }: { readonly at: number; readonly now?: number
+  readonly time?: ComponentType<{ at: number }> }) {
+  return <span {...stylex.props(styles.time)}>{TimeLeaf === undefined ? searchTime(at, now) : <TimeLeaf at={at} />}</span>
 }
 
 function Snippet({ hit }: { readonly hit: SearchHit }) {

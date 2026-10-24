@@ -5,7 +5,7 @@
  * restart bring back the query, the selection and the scroll; the results
  * are fetched again.
  */
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { SEARCH_COLUMN_WIDTH, type SearchSnapshot } from '@juno/contract'
 import {
   forgetSearch,
@@ -25,12 +25,10 @@ import {
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { SearchField, SearchFilters, SearchPage, SearchResults, searchRowDomId, type SearchRowItem, type SearchToggle } from '@juno/views'
+import { searchTime, SearchField, SearchFilters, SearchPage, SearchResults, searchRowDomId, type SearchRowItem, type SearchToggle } from '@juno/views'
 import { openPalette } from '../paletteActions'
-import { fromIds } from './chips'
 import { chipViewsOf, useSearchField } from './field'
 import { openResultHere, selectionOf, useListScroll, useResultRows, useWarmNeighbours, useWindowPaging } from './list'
-import { readerTerms } from './matches'
 import { showFilterMenu } from './menus'
 import { moveReader, openResultBehind, SearchReader } from './Reader'
 
@@ -59,13 +57,25 @@ interface ListContext {
 
 /** What the list's rows do: select (the reader follows), open here or behind, and the moves between the list, the field and the reader. */
 function useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown }: ListContext) {
-  const find = (id: string) => selectionOf(rows?.find((candidate) => candidate.id === id))
-  const select = (id: string, how: 'pointer' | 'keyboard') => {
+  const currentRows = useRef(rows)
+  useLayoutEffect(() => { currentRows.current = rows }, [rows])
+  const find = useCallback((id: string) => selectionOf(currentRows.current?.find((candidate) => candidate.id === id)), [])
+  const select = useCallback((id: string, how: 'pointer' | 'keyboard') => {
     const selection = find(id)
     if (selection === undefined) return
+    if (narrow && how === 'pointer') setReaderShown(true)
     moveReader(sessionId, selection, how)
     update(sessionId, (current) => ({ ...current, selected: selection }))
-  }
+  }, [find, narrow, sessionId, setReaderShown])
+  const open = useCallback((id: string, { newTab }: { readonly newTab: boolean }) => {
+    const selection = find(id)
+    if (selection === undefined) return
+    rememberSearch(registry, sessionId)
+    if (newTab) return void openResultBehind(selection)
+    if (selection.id !== registry.get(searchSessionAtom(sessionId)).selected?.id) select(id, 'pointer')
+    if (narrow) return setReaderShown(true)
+    void openResultHere(selection)
+  }, [find, narrow, select, sessionId, setReaderShown])
   /** ↓ in the field: the selected row, or the first. */
   const toList = () => {
     const id = session.selected !== undefined && stops.some((row) => row.id === session.selected?.id) ? session.selected.id : stops[0]?.id
@@ -75,15 +85,7 @@ function useListActions({ sessionId, session, rows, stops, narrow, inputRef, set
   }
   return {
     select,
-    open: (id: string, { newTab }: { readonly newTab: boolean }) => {
-      const selection = find(id)
-      if (selection === undefined) return
-      rememberSearch(registry, sessionId)
-      if (newTab) return void openResultBehind(selection)
-      if (selection.id !== session.selected?.id) select(id, 'pointer')
-      if (narrow) return setReaderShown(true)
-      void openResultHere(selection)
-    },
+    open,
     backToResults: () => {
       setReaderShown(false)
       afterPaint(() => focusRow(session.selected?.id) || inputRef.current?.focus())
@@ -184,7 +186,6 @@ interface ColumnProps {
 /** The results column: the rows and states for the query, or the recent searches on an empty field. */
 function ResultsColumn({ sessionId, session, snapshot, prefs, rows, empty, listRef, inputRef, readerRef, narrow, readerShown, listFocused, actions, paging, setText, onExpand }: ColumnProps) {
   const recent = useAtomValue(recentSearchesAtom)
-  const now = useAtomValue(nowAtom, (time) => Math.floor(time / 60_000) * 60_000)
   return (
     <SearchResults
       rows={rows}
@@ -195,7 +196,7 @@ function ResultsColumn({ sessionId, session, snapshot, prefs, rows, empty, listR
       note={empty ? undefined : snapshot?.query.diagnostics.find((diagnostic) => diagnostic.code !== 'incomplete')?.message}
       selectedId={session.selected?.id}
       focused={listFocused}
-      now={now}
+      time={SearchTime}
       recent={recent.map((search) => ({ text: search.text, chips: chipViewsOf(search.chips) }))}
       listRef={listRef}
       onSelect={actions.select}
@@ -241,6 +242,7 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
   const [narrow, setNarrow] = useState(false)
   const [readerShown, setReaderShown] = useState(false)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set())
+  const expand = useCallback((groupId: string) => setExpanded((current) => new Set([...current, groupId])), [])
 
   const snapshot = results?.snapshot
   const empty = searchIsEmpty(session)
@@ -249,7 +251,7 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
   const { field, typeOperator, setText, pickerOpen, closePicker } = useSearchField(sessionId, session, inputRef, edited)
   const paging = useWindowPaging(sessionId, snapshot, session.offset ?? 0)
   useFieldFocus(sessionId, inputRef)
-  useListScroll(sessionId, listRef, rows, session.scrollTop)
+  useListScroll(sessionId, listRef, rows, session.scrollTop, snapshot?.window.offset === (session.offset ?? 0))
   useWarmNeighbours(session.selected?.id, stops)
   const actions = useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown })
   const onStepper = useCallback((step: ((direction: 1 | -1) => void) | undefined) => {
@@ -258,7 +260,6 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
   const stepBy = useCallback((direction: 1 | -1) => stepper.current?.(direction), [])
 
   usePageKeys(readerRef, narrow, stepBy, actions.backToResults)
-  const terms = useMemo(() => readerTerms(snapshot?.query, fromIds(session.chips)), [snapshot?.query, session.chips])
 
   return (
     <SearchPage
@@ -277,12 +278,12 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
           }}
         />
       }
-      results={<ResultsColumn {...{ sessionId, session, snapshot, prefs, rows, empty, listRef, inputRef, readerRef, narrow, readerShown, listFocused, actions, paging, setText }} onExpand={(groupId) => setExpanded((current) => new Set([...current, groupId]))} />}
+      results={<ResultsColumn {...{ sessionId, session, snapshot, prefs, rows, empty, listRef, inputRef, readerRef, narrow, readerShown, listFocused, actions, paging, setText }} onExpand={expand} />}
       reader={
         <SearchReader
           sessionId={sessionId}
           selection={empty ? undefined : session.selected}
-          terms={terms}
+          snapshot={snapshot}
           narrow={narrow}
           readerRef={readerRef}
           onStepper={onStepper}
@@ -301,4 +302,9 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
       onListFocus={setListFocused}
     />
   )
+}
+
+function SearchTime({ at }: { readonly at: number }) {
+  const now = useAtomValue(nowAtom, (time) => Math.floor(time / 60_000) * 60_000)
+  return searchTime(at, now)
 }

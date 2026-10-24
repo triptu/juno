@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import { searchPage, restoreWindow, navigateMatches, profileDates } from './searchSteps'
 import { expect, test, type Fixtures } from './fixtures'
 import { readUserDb } from './driver/userDb'
 import type { Juno } from './driver/juno'
@@ -9,23 +9,6 @@ test.use({ synced: true })
 test.describe.configure({ timeout: 180_000 })
 
 const SEARCH = 'search.modules.messages'
-
-/** The Search tab's page (SPEC 10a). */
-function searchPage(win: Page) {
-  const root = win.locator('[data-search-page]').locator('visible=true')
-  const results = root.locator('[data-search-results]')
-  return {
-    root,
-    field: root.locator('input[data-search-field]'),
-    chips: root.locator('[data-search-chip]'),
-    results,
-    rows: results.getByRole('option'),
-    row: (text: string) => results.getByRole('option').filter({ hasText: text }),
-    reader: root.locator('[data-search-reader]'),
-    filter: (name: string) => root.getByRole('toolbar', { name: 'Filters' }).getByRole('button', { name }),
-    hint: root.locator('[data-palette-hint]'),
-  }
-}
 
 /** The rows' ids in order, to see that nothing above moved. */
 const rowIds = (page: ReturnType<typeof searchPage>, count: number) => page.rows.evaluateAll((rows, n) => rows.slice(0, n).map((row) => row.getAttribute('data-search-row')), count)
@@ -72,6 +55,15 @@ test('search: from: chip, local rows first, Slack merges below, the reader follo
   await test.step('↓ from the field and through three results: the reader follows, and nothing is marked read', () => arrowThrough(context))
   await test.step('Tab into the reader’s composer, a reply sent there marks the topic read; Esc goes back to the list', () => replyInReader(context))
   await test.step('Enter on another result opens it in this tab; Back returns to the same query, selection and scroll', () => openAndBack(context))
+  await test.step('a pointer opens the narrow reader and Back restores results', async () => {
+    const page = searchPage(juno.win)
+    await juno.surface.setWindowSize(1000, 760)
+    await page.row('Flamingo note 17 on the pager').click()
+    await expect(page.reader.getByText('Flamingo note 17 on the pager')).toBeVisible()
+    await page.reader.getByRole('button', { name: 'Back to results', exact: true }).click()
+    await expect(page.row('Flamingo note 17 on the pager')).toBeVisible()
+    await juno.surface.setWindowSize(1440, 900)
+  })
   if (SHOTS) await test.step('shots: one column and dark', () => moreShots(context))
 })
 
@@ -90,13 +82,23 @@ async function moreShots({ juno }: Context): Promise<void> {
   await shot(juno, 'tab-dark')
 }
 
-async function openEmpty({ juno }: Context): Promise<void> {
+async function openEmpty({ juno, fake }: Context): Promise<void> {
   const page = searchPage(juno.win)
   await juno.surface.appMenu('search-messages')
   await juno.tabs.expectActive('Search')
   await expect(page.field).toBeFocused()
   await expect(page.hint).toContainText('To jump to a conversation, topic or command, press')
   await shot(juno, 'empty-light')
+  const calls = fake.calls.filter((call) => call.method === SEARCH).length
+  await page.field.pressSequentially('f')
+  // There is no signal for a call that must not start; sample inside the actual 400 ms pause.
+  await juno.win.waitForTimeout(150)
+  expect(fake.calls.filter((call) => call.method === SEARCH)).toHaveLength(calls)
+  await page.field.pressSequentially('lamingo')
+  await expect(page.row('Flamingo launch moved to Thursday')).toBeVisible()
+  await expect.poll(() => fake.calls.filter((call) => call.method === SEARCH).length).toBe(calls + 1)
+  expect(String(fake.calls.filter((call) => call.method === SEARCH).at(-1)?.args['query'])).toContain('flamingo')
+  await page.root.getByRole('button', { name: 'Clear search', exact: true }).click()
 }
 
 async function localThenSlack({ juno, fake }: Context): Promise<void> {
@@ -321,16 +323,17 @@ test('search: ⌘K’s last row takes the typed text to the Search tab, and so d
   await sidebar.row('#eng').expectVisible()
 
   await palette.open()
-  await palette.type('cormorant')
+  await palette.type('cormorant in:C0ENG')
   await palette.expectResults()
   // The first selection stays on a result; the arrows reach the last row as any other.
   await expect(palette.activeText()).resolves.not.toMatch(/All results for/)
-  await palette.arrowTo(/All results for “cormorant”/)
+  await palette.arrowTo(/All results for “cormorant in:C0ENG”/)
   await palette.press('Enter')
   await palette.expectClosed()
   await tabs.expectActive('cormorant')
   await expect(page.field).toHaveValue('cormorant')
   await expect(page.row('Cormorant budget is approved')).toBeVisible()
+  await expect(page.chips.filter({ hasText: 'C0ENG' })).toBeVisible()
 
   await palette.open()
   await palette.type('budget')
@@ -338,4 +341,24 @@ test('search: ⌘K’s last row takes the typed text to the Search tab, and so d
   await palette.expectClosed()
   await tabs.expectActive('budget')
   await expect(page.field).toHaveValue('budget')
+  await palette.open()
+  await palette.type('from:U0MAYA')
+  await surface.appMenu('search-messages')
+  await expect(page.field).toHaveValue('')
+  await expect(page.chips.filter({ hasText: 'U0MAYA' })).toBeVisible()
+  await expect(page.row('Cormorant budget is approved')).toBeVisible()
+  await juno.privacy.toggleWithMenu()
+  await tabs.expectActive('Search')
+  await juno.privacy.expectBlurred(page.field)
+  await juno.privacy.expectBlurred(page.chips.locator('[data-sensitive]').first())
+  await juno.privacy.expectBlurred(page.row('Cormorant budget is approved').locator('[data-sensitive]').last())
+  await page.field.fill('confidential:acquisition')
+  const note = page.root.locator('[data-search-note]')
+  await expect(note).toContainText('confidential:acquisition')
+  await juno.privacy.expectBlurred(note)
 })
+
+
+test('search: a held Slack answer restores a saved window beyond 200 matches', async ({ juno, fake, relaunch, userData }) => restoreWindow({ juno, fake, relaunch, userData }))
+test('search: reader navigation applies the whole query beyond the message window', async ({ juno, fake }) => navigateMatches({ juno, fake }))
+test('search: date presets use the Slack profile calendar across midnight', async ({ juno, fake }) => profileDates({ juno, fake }))

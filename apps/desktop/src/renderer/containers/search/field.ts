@@ -49,9 +49,9 @@ function usePickerRows(op: 'from' | 'in' | undefined, query: string | undefined)
 }
 
 export function useSearchField(sessionId: string, session: SearchSession, inputRef: RefObject<HTMLInputElement | null>, onEdit: () => void) {
-  const update = (change: (current: SearchSession) => SearchSession) => {
+  const update = (change: (current: SearchSession) => SearchSession, source: 'action' | 'typing' = 'action') => {
     onEdit()
-    updateSearchSession(registry, sessionId, change)
+    updateSearchSession(registry, sessionId, change, source)
   }
   const [caret, setCaret] = useState(session.text.length)
   const [dismissed, setDismissed] = useState<string | undefined>(undefined)
@@ -95,7 +95,7 @@ export function useSearchField(sessionId: string, session: SearchSession, inputR
       const taken = takeChips(text, at)
       setCaret(taken.caret)
       if (taken.chips.length > 0) pendingCaret.current = taken.caret
-      update((current) => ({ ...current, text: taken.text, chips: [...current.chips, ...taken.chips] }))
+      update((current) => ({ ...current, text: taken.text, chips: [...current.chips, ...taken.chips] }), 'typing')
     },
     onChip: (key: string) => {
       const chip = key === 'topic' ? undefined : session.chips[chipIndex(key)]
