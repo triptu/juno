@@ -169,7 +169,7 @@ export default defineFixtures(
   SearchPage,
   {
     Results: {
-      // Flat, the default: one row per match, newest first; the selected match in the reader with "2 of 4".
+      // Flat, the default: one row per match, newest first, and a run from one topic under its topic line once; the selected match in the reader with "2 of 4".
       flat: page({ selected: matches.caps.id, step }),
       // Group by thread: the thread's topic line, two match lines and "2 more in this thread"; Main matches under one header.
       grouped: page({ groups: grouped, grouped: true, selected: matches.caps.id, step }),
@@ -202,6 +202,10 @@ export default defineFixtures(
       'one-column': page({ selected: matches.caps.id, reader: true }, { width: 720, height: 640, padded: false }),
       // One column with the reader shown: Back to results leads its header.
       'one-column-reader': page({ selected: matches.caps.id, step, page: { readerShown: true } }, { width: 720, height: 640, padded: false }),
+      // The list at the minimum window: rows end in an ellipsis inside the page.
+      'minimum-list': page({ selected: matches.caps.id }, { width: 400, height: 640, padded: false }),
+      // A long query with nothing matching at the minimum window: the line wraps.
+      'minimum-no-matches': page({ chips: [], text: 'rollout staging cutover window for the storage tier', groups: [], reader: false }, { width: 400, height: 640, padded: false }),
       // The minimum window: the toggles wrap to their own line; the header keeps Back, the place icon, the title, the arrows and ⋯.
       'minimum-window': page({ selected: matches.caps.id, step, page: { readerShown: true } }, { width: 400, height: 640, padded: false }),
     },

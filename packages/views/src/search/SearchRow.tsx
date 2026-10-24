@@ -1,7 +1,8 @@
 /**
  * One row of the Search list (SPEC 10a, "Rows"), as `searchRows` lays them
  * out. Flat: the topic's line (art 16, title, place, time) over the match's
- * (sender, snippet). Grouped: a thread's topic line, its match lines, "N
+ * (sender, snippet), and the next match from the same topic as a match line
+ * under it. Grouped: a thread's topic line, its match lines, "N
  * more in this thread"; a run of Main matches under one header. The line
  * where the list stops being complete. Matched words are semibold.
  */
@@ -51,10 +52,14 @@ function Stop({ row, now, time, selected, focused, tabbable, onSelect, onOpen, o
     }
     onSelect(row.id, 'pointer')
   }
-  const option = { id: searchRowDomId(row.id), tabIndex: tabbable ? 0 : -1, 'data-search-row': row.id, onPointerDown } as const
+  // Focus selects the row, so Tab into the list gets the tint the arrows give and the reader follows.
+  const onFocus = () => {
+    if (!selected && row.kind !== 'more') onSelect(row.id, 'keyboard')
+  }
+  const option = { id: searchRowDomId(row.id), tabIndex: tabbable ? 0 : -1, 'data-search-row': row.id, onPointerDown, onFocus } as const
   if (row.kind === 'more') {
     return (
-      <div {...option} role="button" {...stylex.props(styles.line, styles.more, focusRing.inset)}>
+      <div {...option} role="option" aria-selected={false} {...stylex.props(styles.line, styles.more, focusRing.inset)}>
         {`${row.count} more in this thread`}
       </div>
     )
@@ -62,14 +67,14 @@ function Stop({ row, now, time, selected, focused, tabbable, onSelect, onOpen, o
   // The selection's tint is the focus indicator, as in ⌘K: no ring on every arrow press (review.md).
   const look = [styles.stop, selected && styles.selected, selected && focused && styles.selectedFocused] as const
   return (
-    <div {...option} role="option" aria-selected={selected} {...stylex.props(...shapeOf(row.kind), ...look)}>
+    <div {...option} role="option" aria-selected={selected} {...stylex.props(...shapeOf(row), ...look)}>
       <RowContent row={row} now={now} time={time} />
     </div>
   )
 }
 
-const shapeOf = (kind: 'flat' | 'title' | 'topic' | 'match') =>
-  kind === 'flat' ? [styles.flat] : kind === 'match' ? [styles.line, styles.matchLine] : kind === 'topic' ? [styles.line, styles.topicLine, styles.groupStart] : [styles.line, styles.topicLine]
+const shapeOf = (row: Exclude<SearchRowItem, { readonly kind: 'older' | 'mainHeader' | 'more' }>) =>
+  row.kind === 'flat' ? [styles.flat] : row.kind === 'match' ? [styles.line, styles.matchLine, row.flat === true && styles.runLine] : row.kind === 'topic' ? [styles.line, styles.topicLine, styles.groupStart] : [styles.line, styles.topicLine]
 
 function RowContent({ row, now, time: TimeLeaf }: { readonly row: Extract<SearchRowItem, { readonly kind: 'flat' | 'title' | 'topic' | 'match' }>; readonly now?: number
   readonly time?: ComponentType<{ at: number }> }) {
@@ -110,7 +115,7 @@ function RowContent({ row, now, time: TimeLeaf }: { readonly row: Extract<Search
 
 function OlderLine() {
   return (
-    <div role="presentation" data-search-older="" {...stylex.props(styles.older)}>
+    <div role="option" aria-disabled="true" aria-selected={false} data-search-older="" {...stylex.props(styles.older)}>
       <span>Older matches on this Mac</span>
       <span {...stylex.props(styles.olderRule)} />
     </div>
@@ -119,7 +124,7 @@ function OlderLine() {
 
 function MainHeader({ group }: { readonly group: SearchGroup }) {
   return (
-    <div role="presentation" {...stylex.props(styles.line, styles.topicLine)}>
+    <div role="option" aria-disabled="true" aria-selected={false} {...stylex.props(styles.line, styles.topicLine)}>
       <span {...stylex.props(styles.slot)}>
         <Icon icon={kindIcon(group.place.kind)} size={14} />
       </span>
@@ -161,8 +166,10 @@ function Snippet({ hit }: { readonly hit: SearchHit }) {
       <span data-sensitive="" {...stylex.props(styles.sender)}>
         {hit.sender}
       </span>
-      <span data-sensitive="" dir="auto" {...stylex.props(styles.snippet)}>
-        <Marked text={hit.text} ranges={hit.ranges} />
+      <span data-sensitive="" {...stylex.props(styles.snippet)}>
+        <bdi>
+          <Marked text={hit.text} ranges={hit.ranges} />
+        </bdi>
       </span>
     </>
   )
@@ -201,8 +208,9 @@ const styles = stylex.create({
     backgroundColor: colors['--secondary-default'],
     '--foreground-muted': colors['--foreground-muted-on-fill'],
   },
+  // Mixed over the page, as the column sits on it, so it is never fainter than the unfocused fill.
   selectedFocused: {
-    backgroundColor: accent['--hl-nav'],
+    backgroundColor: accent['--hl-select'],
   },
   line: {
     display: 'flex',
@@ -223,6 +231,10 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
     height: sizes['--control-32'],
     paddingInlineStart: spacing['--space-10'],
+  },
+  // Flat: a match from the same topic as the row before, its snippet under that row's.
+  runLine: {
+    paddingInlineStart: `calc(${spacing['--space-2-5']} + ${spacing['--space-6']})`,
   },
   more: {
     height: sizes['--control-26'],

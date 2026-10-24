@@ -1,7 +1,8 @@
 /**
  * The Search list's rows, from the engine's groups (SPEC 10a, "Rows"). Flat,
  * the default, is one row per match in time order, and a title-only topic
- * as one line. Grouped, a thread has its topic line, up to two match lines
+ * as one line; a match from the same topic as the row before it is a match
+ * line, so a run from one topic shows its topic line once. Grouped, a thread has its topic line, up to two match lines
  * and "N more in this thread" (all of them once expanded); Main matches sit
  * under one header line per run of a channel. The container and the list
  * read the same rows, so the arrows and the reader agree on what is next.
@@ -17,8 +18,8 @@ export type SearchRowItem =
   | { readonly kind: 'topic'; readonly id: string; readonly group: SearchGroup }
   /** Grouped: the header over a run of Main matches. Not a stop for the arrows. */
   | { readonly kind: 'mainHeader'; readonly id: string; readonly group: SearchGroup }
-  /** Grouped: a match line under its topic or Main header. */
-  | { readonly kind: 'match'; readonly id: string; readonly group: SearchGroup; readonly hit: SearchHit }
+  /** A match line under its topic or Main header; in flat, under the row before it from the same topic. */
+  | { readonly kind: 'match'; readonly id: string; readonly group: SearchGroup; readonly hit: SearchHit; readonly flat?: true }
   /** Grouped: "3 more in this thread", which shows them in place. */
   | { readonly kind: 'more'; readonly id: string; readonly group: SearchGroup; readonly count: number }
   /** "Older matches on this Mac": the rows under it are local only, until Slack's pages reach them. */
@@ -29,14 +30,23 @@ export const THREAD_LINES = 2
 
 export function searchRows(groups: ReadonlyArray<SearchGroup>, grouped: boolean, olderIndex: number, expanded: ReadonlySet<string>): ReadonlyArray<SearchRowItem> {
   const rows: SearchRowItem[] = []
+  /** Flat: the topic of the match row just before, which a match from the same topic runs on from. */
+  let previous: string | undefined
   groups.forEach((group, index) => {
-    if (index === olderIndex) rows.push({ kind: 'older', id: 'older' })
+    if (index === olderIndex) {
+      rows.push({ kind: 'older', id: 'older' })
+      previous = undefined
+    }
     if (group.kind === 'topic' || group.messages.length === 0) {
       rows.push({ kind: 'title', id: group.id, group })
+      previous = undefined
       return
     }
     if (!grouped) {
-      for (const hit of group.messages) rows.push({ kind: 'flat', id: hit.id, group, hit })
+      for (const hit of group.messages) {
+        rows.push(previous === group.topicId ? { kind: 'match', id: hit.id, group, hit, flat: true } : { kind: 'flat', id: hit.id, group, hit })
+        previous = group.topicId
+      }
       return
     }
     if (group.kind === 'main') {

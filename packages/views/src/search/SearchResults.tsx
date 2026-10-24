@@ -74,14 +74,40 @@ export function SearchResults(props: SearchResultsProps) {
   const { rows, listRef } = props
   return (
     <div ref={listRef} data-scroll-area="" data-search-results="" {...stylex.props(styles.scroller)}>
+      {/* Always there, so screen readers announce the state lines as their text changes. */}
+      <p role="status" data-sensitive="" {...stylex.props(styles.live)}>{stateLine(props)}</p>
       <div {...stylex.props(styles.column)}>{rows === undefined ? <SearchRecent {...props} /> : <Results {...props} rows={rows} />}</div>
     </div>
   )
 }
 
+/** The state the list is in, in words: what its notices and its "Searching Slack…" line say. */
+function stateLine({ rows, state, words, filtered, hidden }: SearchResultsProps): string {
+  if (rows === undefined || state === 'pending') return ''
+  const empty = rows.length === 0
+  if (state === 'searching') return copy.searching
+  if (state === 'slackUnavailable') return copy.unavailable
+  if (state === 'offline') return empty ? copy.offlineEmpty : copy.offline
+  if (!empty) return ''
+  return state === 'onlyHidden' ? hiddenLine(hidden).text : nothingLine(words, filtered)
+}
+
+function hiddenLine(hidden: SearchResultsProps['hidden']) {
+  const where = hidden.apps && hidden.automated ? 'apps and automated channels' : hidden.apps ? 'apps' : 'automated channels'
+  const count = hidden.count === 1 ? '1 match' : `${hidden.count} matches`
+  return { count, text: hidden.count === 1 ? `1 match, from ${where}.` : `${count}, all from ${where}.` }
+}
+
+function nothingLine(words: string, filtered: boolean): string {
+  const quoted = words.trim() === '' ? 'Nothing matches.' : `Nothing matches “${words.trim()}”.`
+  return `${quoted} ${filtered ? 'Try fewer words, or remove a filter.' : 'Try fewer or other words.'}`
+}
+
 function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<SearchRowItem> }) {
   const { rows, state, note, selectedId, focused, now, time, onSelect, onOpen, onExpand, onTryAgain, onNearEnd, onNearStart, windowKey } = props
   const stops = rows.filter(isStop).map((row) => row.id)
+  // The selection, or the first row when the selection is not among these rows: Tab always has a row to land on.
+  const tabStop = selectedId !== undefined && stops.includes(selectedId) ? selectedId : stops[0]
   const end = useRef<HTMLDivElement>(null)
   const start = useRef<HTMLDivElement>(null)
   useNear(end, onNearEnd, '0px 0px 480px 0px', windowKey)
@@ -107,11 +133,11 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
       ) : (
         <div role="listbox" aria-label="Results" tabIndex={-1} onKeyDown={onListKey} {...stylex.props(styles.list)}>
           {rows.map((row) => (
-            <SearchRow key={row.id} row={row} now={now} time={time} selected={row.id === selectedId} focused={focused} tabbable={row.id === (selectedId ?? stops[0])} onSelect={onSelect} onOpen={onOpen} onExpand={onExpand} />
+            <SearchRow key={row.id} row={row} now={now} time={time} selected={row.id === selectedId} focused={focused} tabbable={row.id === tabStop} onSelect={onSelect} onOpen={onOpen} onExpand={onExpand} />
           ))}
         </div>
       )}
-      {state === 'searching' && !empty ? <p role="status" {...stylex.props(styles.quiet, styles.tail)}>{copy.searching}</p> : null}
+      {state === 'searching' && !empty ? <p {...stylex.props(styles.quiet, styles.tail)}>{copy.searching}</p> : null}
       <div ref={end} {...stylex.props(styles.sentinel)} />
     </>
   )
@@ -172,7 +198,7 @@ function useNear(target: RefObject<HTMLDivElement | null>, onNear: (() => void) 
 
 function Notice({ text: line, sensitive = false, children }: { readonly text: string; readonly sensitive?: boolean; readonly children?: ReactNode }) {
   return (
-    <div role="status" {...stylex.props(styles.notice)}>
+    <div {...stylex.props(styles.notice)}>
       <p data-sensitive={sensitive ? '' : undefined} {...stylex.props(styles.noticeText)}>{line}</p>
       {children === null || children === undefined ? null : <span {...stylex.props(styles.actions)}>{children}</span>}
     </div>
@@ -181,20 +207,18 @@ function Notice({ text: line, sensitive = false, children }: { readonly text: st
 
 function EmptyNote({ state, words, filtered, hidden, onClearFilters, onShowHidden }: SearchResultsProps) {
   if (state === 'pending') return null
-  if (state === 'searching') return <p role="status" {...stylex.props(styles.quiet, styles.tail)}>{copy.searching}</p>
+  if (state === 'searching') return <p {...stylex.props(styles.quiet, styles.tail)}>{copy.searching}</p>
   if (state === 'offline') return <Notice text={copy.offlineEmpty} />
   if (state === 'onlyHidden') {
-    const where = hidden.apps && hidden.automated ? 'apps and automated channels' : hidden.apps ? 'apps' : 'automated channels'
-    const count = hidden.count === 1 ? '1 match' : `${hidden.count} matches`
+    const line = hiddenLine(hidden)
     return (
-      <Notice text={hidden.count === 1 ? `1 match, from ${where}.` : `${count}, all from ${where}.`}>
-        <Button size="sm" onClick={onShowHidden}>{`Show ${count}`}</Button>
+      <Notice text={line.text}>
+        <Button size="sm" onClick={onShowHidden}>{`Show ${line.count}`}</Button>
       </Notice>
     )
   }
-  const quoted = words.trim() === '' ? 'Nothing matches.' : `Nothing matches “${words.trim()}”.`
   return (
-    <Notice sensitive={words.trim() !== ''} text={`${quoted} ${filtered ? 'Try fewer words, or remove a filter.' : 'Try fewer or other words.'}`}>
+    <Notice sensitive={words.trim() !== ''} text={nothingLine(words, filtered)}>
       {filtered ? <Button size="sm" onClick={onClearFilters}>Clear filters</Button> : null}
     </Notice>
   )
@@ -215,6 +239,15 @@ const styles = stylex.create({
   },
   sentinel: {
     height: 0,
+  },
+  live: {
+    position: 'absolute',
+    width: '1px', // tokens-allow: the visually hidden pattern
+    height: '1px', // tokens-allow: the visually hidden pattern
+    margin: 0,
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    whiteSpace: 'nowrap',
   },
   list: {
     display: 'flex',

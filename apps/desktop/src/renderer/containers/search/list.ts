@@ -125,5 +125,5 @@ export function useWarmNeighbours(selectedId: string | undefined, stops: Readonl
 }
 
 function sameRow(a: SearchRowItem, b: SearchRowItem): boolean {
-  return a.kind === b.kind && (!('group' in a) || ('group' in b && a.group === b.group)) && (!('hit' in a) || ('hit' in b && a.hit === b.hit)) && (!('count' in a) || ('count' in b && a.count === b.count))
+  return a.kind === b.kind && (a.kind !== 'match' || b.kind !== 'match' || a.flat === b.flat) && (!('group' in a) || ('group' in b && a.group === b.group)) && (!('hit' in a) || ('hit' in b && a.hit === b.hit)) && (!('count' in a) || ('count' in b && a.count === b.count))
 }

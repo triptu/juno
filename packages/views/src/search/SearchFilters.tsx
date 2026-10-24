@@ -73,7 +73,7 @@ function MenuButton({ label, accessibleName, set, onOpen }: { readonly label: st
     onOpen(anchorOf(event.currentTarget))
   }
   return (
-    <button type="button" aria-haspopup="menu" aria-label={accessibleName} onPointerDown={onPointerDown} onKeyDown={onKeyDown} {...stylex.props(styles.button, styles.menu, set && styles.set, focusRing.outside)}>
+    <button type="button" aria-haspopup="menu" aria-label={accessibleName ?? (set ? `${label}, set` : undefined)} onPointerDown={onPointerDown} onKeyDown={onKeyDown} {...stylex.props(styles.button, styles.menu, set && styles.set, focusRing.outside)}>
       {label}
       <span {...stylex.props(styles.caret)}>
         <Icon icon={CaretDown} size={12} weight="bold" />

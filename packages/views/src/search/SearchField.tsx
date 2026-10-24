@@ -9,7 +9,7 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlas
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref } from 'react'
-import { colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Icon, IconButton } from '@juno/ui'
 import { FieldChip } from './FieldChip'
 import type { SearchChipView } from './model'
@@ -106,7 +106,7 @@ function usePickerLeft(at: number | undefined, text: string, chipCount: number) 
 }
 
 const styles = stylex.create({
-  // 36px with one line; it grows with wrapped chips. Input border, surface fill, as a text field.
+  // 36px with one line; it grows with wrapped chips. Input border, surface fill and the focus border, as a text field.
   field: {
     position: 'relative',
     display: 'flex',
@@ -119,7 +119,7 @@ const styles = stylex.create({
     paddingInlineEnd: spacing['--space-1-5'],
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: colors['--input-border'],
+    borderColor: { default: colors['--input-border'], ':focus-within': accent['--focus-ring'] },
     borderRadius: radii['--radius-lg'],
     backgroundColor: colors['--surface-default'],
   },

@@ -53,20 +53,25 @@ interface ListContext {
   readonly narrow: boolean
   readonly inputRef: RefObject<HTMLInputElement | null>
   readonly setReaderShown: (shown: boolean) => void
+  /** A row was chosen, so the first-result peek leaves the selection alone. */
+  readonly onChosen: () => void
 }
 
 /** What the list's rows do: select (the reader follows), open here or behind, and the moves between the list, the field and the reader. */
-function useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown }: ListContext) {
+function useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown, onChosen }: ListContext) {
   const currentRows = useRef(rows)
   useLayoutEffect(() => { currentRows.current = rows }, [rows])
   const find = useCallback((id: string) => selectionOf(currentRows.current?.find((candidate) => candidate.id === id)), [])
   const select = useCallback((id: string, how: 'pointer' | 'keyboard') => {
     const selection = find(id)
     if (selection === undefined) return
+    onChosen()
+    // A row that takes focus selects itself; the arrows and a press have already selected it.
+    if (how === 'keyboard' && registry.get(searchSessionAtom(sessionId)).selected?.id === id) return
     if (narrow && how === 'pointer') setReaderShown(true)
     moveReader(sessionId, selection, how)
     update(sessionId, (current) => ({ ...current, selected: selection }))
-  }, [find, narrow, sessionId, setReaderShown])
+  }, [find, narrow, sessionId, setReaderShown, onChosen])
   const open = useCallback((id: string, { newTab }: { readonly newTab: boolean }) => {
     const selection = find(id)
     if (selection === undefined) return
@@ -128,6 +133,29 @@ function usePageKeys(readerRef: RefObject<HTMLDivElement | null>, narrow: boolea
   useEffect(() => {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  }, [])
+}
+
+/**
+ * Until a row is chosen, each new search's first result shows in the reader
+ * as a peek: it marks nothing read (the reader marks read only when used)
+ * and focus stays where it is. Returns what a choice calls.
+ */
+function usePeekFirst(sessionId: string, selectedId: string | undefined, stops: ReadonlyArray<SearchRowItem>, generation: number | undefined) {
+  const peeked = useRef<number | undefined>(undefined)
+  const chosen = useRef(selectedId !== undefined)
+  const first = stops[0]
+  useEffect(() => {
+    if (chosen.current && selectedId !== undefined) return
+    if (first === undefined || generation === undefined || peeked.current === generation) return
+    const selection = selectionOf(first)
+    if (selection === undefined) return
+    peeked.current = generation
+    chosen.current = false
+    if (selection.id !== selectedId) update(sessionId, (current) => ({ ...current, selected: selection }))
+  }, [sessionId, selectedId, first, generation])
+  return useCallback(() => {
+    chosen.current = true
   }, [])
 }
 
@@ -254,7 +282,8 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
   useFieldFocus(sessionId, inputRef)
   useListScroll(sessionId, listRef, rows, session.scrollTop, snapshot?.window.offset === (session.offset ?? 0))
   useWarmNeighbours(session.selected?.id, stops)
-  const actions = useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown })
+  const onChosen = usePeekFirst(sessionId, session.selected?.id, stops, snapshot?.generation)
+  const actions = useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown, onChosen })
   const onStepper = useCallback((step: ((direction: 1 | -1) => void) | undefined) => {
     stepper.current = step
   }, [])
