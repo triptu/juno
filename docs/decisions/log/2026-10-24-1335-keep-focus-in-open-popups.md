@@ -1,0 +1,1 @@
+- 10-24 13:35 · Keep focus in open popups · A late composer mount or deferred page-focus callback leaves focus in a visible dialog, menu or expanded popup trigger, just as it already leaves another text field alone. A broadcast flow exposed the callback closing the Account menu after a thread opened.

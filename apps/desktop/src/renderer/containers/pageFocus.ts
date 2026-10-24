@@ -28,15 +28,14 @@ export function wantComposerFocus(view: string): void {
 /**
  * Focuses the composer field of `view` if a topic open asked for it, with
  * the caret at the end of the draft. Not while focus is in another visible
- * field, where typing may have started before the topic landed (⌘K's
- * field, a search, the Juno panel).
+ * field or popup, where the user may have moved before the topic landed.
  */
 export function takeComposerFocus(view: string, field: HTMLTextAreaElement): void {
   const typedAhead = performance.now() < typedAheadUntil
   if (composerWanted !== view && !typedAhead) return
   composerWanted = undefined
   typedAheadUntil = 0
-  if (!typedAhead && typingElsewhere(document.activeElement)) return
+  if (!typedAhead && focusElsewhere(document.activeElement)) return
   focusPage(field)
   field.setSelectionRange(field.value.length, field.value.length)
   if (typedAhead) releaseKeys()
@@ -50,7 +49,7 @@ export function takeComposerFocus(view: string, field: HTMLTextAreaElement): voi
 export function focusPage(element: HTMLElement): void {
   element.focus({ preventScroll: true })
   setTimeout(() => {
-    if (document.activeElement !== element && element.isConnected && element.checkVisibility() && !typingElsewhere(document.activeElement)) element.focus({ preventScroll: true })
+    if (document.activeElement !== element && element.isConnected && element.checkVisibility() && !focusElsewhere(document.activeElement)) element.focus({ preventScroll: true })
   }, 0)
 }
 
@@ -64,9 +63,9 @@ export function takeForcedPageFocus(tabId: string): boolean {
   return forced
 }
 
-function typingElsewhere(element: Element | null): boolean {
+function focusElsewhere(element: Element | null): boolean {
   if (!(element instanceof HTMLElement) || !element.checkVisibility()) return false
-  return element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement || element.isContentEditable
+  return element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement || element.isContentEditable || element.closest('[role="dialog"], [role="menu"], [aria-haspopup][aria-expanded="true"]') !== null
 }
 
 /** The composer of the page on screen, if it has one. */
