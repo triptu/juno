@@ -111,10 +111,13 @@ export function useTopicFetch(id: string, view: string, enabled = true, shown = 
  * above its rows, `useFromBottom`), or for a thread no page proves yet what stands in for it (`meta.standIn`). A
  * partial cache (socket or search messages alone) is not an opening window: the header and composer paint, and the
  * messages wait for the fetch, or show what is stored when it cannot finish. A window that does not reach back to
- * the read pointer waits for the fetch too, since the topic opens at its "N new" divider (SPEC 7).
+ * the read pointer (or a thread's root) waits for the fetch too, since the topic opens at its "N new" divider
+ * (SPEC 7).
  */
 export function windowShown(positioned: boolean, list: MessageWindow, readAtOpen: string | undefined, fetchState: FetchState): boolean {
-  const contextLoaded = readAtOpen === undefined || (list.order[0] !== undefined && list.order[0] <= readAtOpen)
+  const first = list.order[0]
+  // A thread's root has nothing before it, so a window from the root reaches any pointer, a thread never read too.
+  const contextLoaded = readAtOpen === undefined || (first !== undefined && (first <= readAtOpen || list.rows.get(first)?.root === true))
   const held = list.meta.windowCovered === true || list.meta.standIn === true
   return positioned || (held && (contextLoaded || fetchState === 'done')) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
 }
