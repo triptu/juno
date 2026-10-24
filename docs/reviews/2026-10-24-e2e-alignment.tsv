@@ -1,0 +1,183 @@
+file	lane	verdict	reason
+apps/desktop/e2e/actions.spec.ts	browser	folded	Topic actions with Undo; the Rename test is the last step of the menu-actions test from the same synced start (3→2 tests).
+apps/desktop/e2e/ai-activity.spec.ts	browser	keep	One flow (AI title, art, Redraw, AI activity log); fa0236ce5 added the stored-redraw check for a real lost-redraw bug.
+apps/desktop/e2e/ai-errors.spec.ts	browser	keep	One flow: a refused title goes to the fallback model, and with no fallback the refusal is not retried after a wake.
+apps/desktop/e2e/ai-key.spec.ts	electron	keep	A key saved in Settings starts jobs without a restart, main resends it after an engine SIGKILL, and removing it stops calls; needs main and the keychain.
+apps/desktop/e2e/all-topics.spec.ts	browser	keep	Two journeys with different starts: one resolves a topic, the other needs the Resolved count at 0 from fresh.
+apps/desktop/e2e/app.spec.ts	browser+electron	fixed	The bridge check pinned the full method-name list, edited by about 20 of 51 commits (one per new method) and never caught a bug; it now asserts no require/process/ipcRenderer, only functions per group and no raw IPC names. Drag region (10-16), off-screen window and second instance regressions kept.
+apps/desktop/e2e/art.spec.ts	browser	folded	The AI-assist-off test is a final relaunch step of the first test, saving a cold sign-in; the key and limit test keeps its own launch options (3→2 tests).
+apps/desktop/e2e/attachments.spec.ts	browser+electron	left	Hands-off (flake fix in progress elsewhere). Real coverage (upload outbox, Retry, late thumbnails, layout guards), but eleven launches; the read_error/bad_chunk pair and several #eng Main tests could share flows.
+apps/desktop/e2e/automated-record.spec.ts	browser	folded	The people-take-over card is step 2 after the bot-channel record opens, which also checks a new move makes a new card (3→2 tests).
+apps/desktop/e2e/automated.spec.ts	browser	folded	The taken-out/deleted-view test is step 2 of the first-sync test on the same seed and cold sign-in (4→3 tests).
+apps/desktop/e2e/avatars-unfurls.spec.ts	browser+electron	folded	The avatar-hash photo test repeated most of the unfurl test; its DM-row photo and default-image checks moved into it (4→3 tests).
+apps/desktop/e2e/break-pass-1017-input.spec.ts	browser	folded	Five launches became one synced flow (Cmd-N with Enter right after typing, :thumbs, edit-field emoji, dark mode last); the two Cmd-N tests were nearly identical (5→1 tests).
+apps/desktop/e2e/break-pass-1017.spec.ts	browser	folded	Break-pass regressions kept; shared-draft, send-from-Home and offline sends are one test; two relaunch tests and the tab-switch destination test are one relaunch test; the classifier check is a step of the Settings test (13→9 tests).
+apps/desktop/e2e/break-pass-1017b.spec.ts	browser	folded	Eight synced Home-composer tests became three, grouped by where each leaves Home (8→3 tests).
+apps/desktop/e2e/break-pass.spec.ts	browser+electron	folded	Four synced #eng input tests are steps of one; the deleted-sender test (changes the seed) and the two @electron tests stay (7→4 tests).
+apps/desktop/e2e/browser-isolation.spec.ts	browser	keep	Guards that a reused browser host leaks no session, settings, cookies or storage between tests.
+apps/desktop/e2e/cache-update.spec.ts	browser	keep	Cache migration on update keeps rows and makes no cold-boot calls; needs a real sign-in.
+apps/desktop/e2e/classifier.spec.ts	browser	deleted	A whole launch for one checkbox; its check (off is stored as an empty classifier slug) is a step of break-pass-1017's Settings test (1→0 tests).
+apps/desktop/e2e/code-highlight.spec.ts	browser	keep	One test of token runs and that the ::highlight rule colours them; history is test hardening, not churn.
+apps/desktop/e2e/composer-up.spec.ts	browser	folded	The Esc and hovered-key test follows the Up-arrow steps in one #eng flow (2→1 tests).
+apps/desktop/e2e/conversation-search.spec.ts	browser	keep	The matching rule has a domain unit test; this covers the palette path (group DM label, highlights, Enter opens) with custom users before sign-in.
+apps/desktop/e2e/dev-log.spec.ts	browser	keep	One synced flow, including that the token never reaches the log.
+apps/desktop/e2e/diagnostics.spec.ts	electron	folded	The unhandled-rejection test is a final step of the About diagnostics flow; the clipboard is cleared first so an old report cannot pass (2→1 tests).
+apps/desktop/e2e/emoji-colon.spec.ts	browser	folded	The workspace-emoji and Juno-panel tests signed in to the same topic and are two steps of one test; the colon flow stays (3→2 tests).
+apps/desktop/e2e/emoji-frequents.spec.ts	browser	keep	One flow over restart and update with a first-paint check (0d66ca165).
+apps/desktop/e2e/emoji-picker-loading.spec.ts	browser	folded	Standard emoji open while workspace emoji are delayed is the first step of the cold-picker test before its relaunch (2→1 tests).
+apps/desktop/e2e/engine.spec.ts	electron	fixed	The juno: scheme check is a step of the engine-failure flow; a full-URL pin of the query string (changed in 5c10713c1, 548abf6d5, af8639c47, 869c7796e) became protocol, host and path; the traversal 404 stays (2→1 tests).
+apps/desktop/e2e/file-viewer.spec.ts	browser+electron	folded	The three @electron checks (PDF viewer, sandboxed HTML, Quick Look zip) are steps of one Electron launch; the browser test stays (4→2 tests).
+apps/desktop/e2e/formatting.spec.ts	browser	folded	Four warm tests are one flow with relative post and update counts; nine cold-chunk tests are one test with a step per action that clears the draft before each reload (13→2 tests).
+apps/desktop/e2e/forward.spec.ts	browser	folded	Three synced tests on the same message are one flow: F key, Forward with a note, refused forward and Retry (3→1 tests).
+apps/desktop/e2e/grammar-spelling.spec.ts	browser	folded	The self-DM and channel runs are two steps with relative chat.update counts (2→1 tests).
+apps/desktop/e2e/home-live.spec.ts	browser	fixed	Took over home.spec's Mark done / Resolve all checks (Tidy up meta, Resolved toast, sidebar row gone and back after Undo); the pointer test starts from the synced workspace.
+apps/desktop/e2e/home-pictures-screens.spec.ts	manual	keep	Manual screenshot tool (JUNO_SCREENS=1); its settle wait times the capture only.
+apps/desktop/e2e/home-pictures.spec.ts	browser	folded	Three tests each signing in and waiting up to 30 s for a picture are one flow: picture, page, gallery, setting off (3→1 tests).
+apps/desktop/e2e/home-screens.spec.ts	manual	keep	Manual screenshot tool (JUNO_SCREENS=1), outside the suite.
+apps/desktop/e2e/home-send-tab.spec.ts	browser	folded	The send-goes-when-another-tab-is-chosen regression (65f9c9fa1) is a step at the end of the Main-send flow; the thread test needs fresh tabs (3→2 tests).
+apps/desktop/e2e/home-topic.spec.ts	browser	keep	One two-step flow covering keyboard order, layout stability and reply routing.
+apps/desktop/e2e/home-write.spec.ts	browser	folded	The refused send is a step before the first-DM step; two pairs of tests sharing a start are folded; Cmd-N stays alone because it needs no Home tab (8→4 tests).
+apps/desktop/e2e/home.spec.ts	browser	folded	Removed the Mark done test duplicated in home-live; folded the DM-photo and Never/Auto tests, where the Auto check now waits for Maya's own row instead of a poll that had already passed on another row (6→4 tests).
+apps/desktop/e2e/huddle-dm.spec.ts	browser	keep	Regression for huddles/info lagging the room frames (3fff66029) and shared clocks (0a30fdb1c); its in-page sampling is a measurement window.
+apps/desktop/e2e/huddle-incoming.spec.ts	browser	folded	Started-on-another-device shows no card is the first step of the ignored-channel, dock and Ring-off test, with a notification baseline (3→2 tests).
+apps/desktop/e2e/huddle-missed.spec.ts	browser	folded	Two synced tests are one flow with the relaunch last; three seeding tests (offline miss, expired history, same-second join f637176c3) are one seed checking the exact missed list (5→2 tests).
+apps/desktop/e2e/huddle-share.spec.ts	electron	folded	Needs Electron's screen capture; three tests each starting a huddle with Maya are one call: share and stop, Screen Recording steps, ways a share ends (3→1 tests).
+apps/desktop/e2e/huddle.spec.ts	browser+electron	folded	Start/mute/leave with rejoin, and share-watching with Switch, are each one test with relative join counts; palette/menu and blocked microphone share an Electron launch; the two quit tests stay (8→5 tests).
+apps/desktop/e2e/idle-cpu.spec.ts	electron	keep	Idle CPU and process budgets (@mac/@heavy) guarding the 10-16 and 10-18 spins, plus the portable idle journey; its timers are measurement windows, not waits for a signal.
+apps/desktop/e2e/image-menu.spec.ts	browser+electron	keep	The @electron test covers the native image menu, clipboard image data, Download and Open in Preview's temporary copy; the browser test covers Open from a peek; one flow each.
+apps/desktop/e2e/integration-messages.spec.ts	browser	keep	One flow: a bot attachment card's thread title, blur under Hide message text, Show more, link hrefs, the cursor rule and no interactive calls to Slack.
+apps/desktop/e2e/juno-agent/auto-review.spec.ts	browser	keep	One flow wiring auto-review (read-only mark, changed schema, delete always asks) through Configure, cards and Activity; the rule logic is in packages/agent tests, this checks the UI.
+apps/desktop/e2e/juno-agent/backup.spec.ts	browser+electron	keep	One two-Mac flow: backup, phrase export with focus trap and return, restore, Activate and the old Mac going read-only; the package test covers the protocol, not the UI.
+apps/desktop/e2e/juno-agent/break-pass.spec.ts	browser	folded	Both tests paid a launch plus a relaunch; now one journey: Resolve, double click, relaunch, Undo, then a second Resolve card and a relaunch with AI off (2→1 tests).
+apps/desktop/e2e/juno-agent/cards.spec.ts	browser	folded	Hostile-message test folded into the Send-card flow with a relative count (5→4 tests); the two budget tests stay apart because the agent makes one Budget card per day and raise.
+apps/desktop/e2e/juno-agent/chat-reactions.spec.ts	browser	left	Hands-off. Guards badge clipping in panel and tab in both themes, picker, quick reactions and Shift+F10; it saves screenshots on every run, which belongs behind JUNO_SCREENS.
+apps/desktop/e2e/juno-agent/chat.spec.ts	browser	folded	Copy-long-message regression and the two-Juno-tabs test are now the end of the Juno tab flow; dropped a picker-reaction step that chat-reactions.spec.ts covers (5→3 tests).
+apps/desktop/e2e/juno-agent/codemode.spec.ts	browser+electron	keep	@canary: the built app loads the QuickJS worker and wasm and a script's read is cited and listed; codemode.test.ts covers the sandbox, not packaging.
+apps/desktop/e2e/juno-agent/connections.spec.ts	browser	keep	Already one stepped flow: add a server, OAuth sign-in, Configure, a read, a disabled tool, Disconnect and Remove.
+apps/desktop/e2e/juno-agent/crash.spec.ts	electron	fixed	Crash and recovery with real utility processes (port re-linking, inbox.committed, attempt.beforeReceipt); removed the fake model's dead branches left from deleted tests.
+apps/desktop/e2e/juno-agent/images.spec.ts	browser	folded	Dropped-image and text-only-model checks are now the second half of the Home image flow, with relative counts (2→1 tests).
+apps/desktop/e2e/juno-agent/learn.spec.ts	browser	fixed	One learning flow; replaced pinned copy (ask title, Done line, tooltip) with chatCopy, since 101cbe2b6 edited the test only because the copy changed.
+apps/desktop/e2e/juno-agent/memory.spec.ts	browser	keep	Two real journeys: a pin edited then removed with its source under a held compaction, and Remember/Undo plus a selection Remember and Remove.
+apps/desktop/e2e/juno-agent/pages.spec.ts	browser	fixed	One walk of the Juno menu's pages, rules list, picker and Pause; removed heading lists and copy pins ("Coming soon", plan and provider lines) that commits 2c64fa639, 087a9063b, 8bb8469cd and 30f9c3a6b edited only for copy or layout changes.
+apps/desktop/e2e/juno-agent/panel-shots.spec.ts	manual	keep	Manual review-shot writer behind JUNO_SCREENS=1, outside the suite; waits on animations rather than sleeping.
+apps/desktop/e2e/juno-agent/panel.spec.ts	browser	keep	Six flows already folded on 10-24 (open/close and width, two tabs on one topic, About and selection reaching the model, first frame with no jump, Ask Juno entry points); each needs a fresh chat.
+apps/desktop/e2e/juno-agent/people.spec.ts	browser	fixed	One person-files journey including privacy blur; removed a tooltip copy check that the owner data attribute already covers.
+apps/desktop/e2e/juno-agent/providers-ui.spec.ts	browser+electron	keep	Three first-run paths, each needing a fresh app with no provider (Skip then Add @canary, Set up Juno, a typed model id for a compatible endpoint); no copy churn in history.
+apps/desktop/e2e/juno-agent/schedule.spec.ts	browser	keep	Wake once across two relaunches, Pause/Resume/Delete, a Start-gated schedule, reply watches; agent tests cover the rules, this covers cards, the Scheduled page and Activity.
+apps/desktop/e2e/juno-agent/selection.spec.ts	browser	folded	Toolbar Ask Juno and the open panel following later selections are two steps of one launch; removed a tooltip copy pin that churned in fe94d298c (2→1 tests).
+apps/desktop/e2e/juno-agent/source-link.spec.ts	browser	keep	Regression guard: the cited message holds its place after a source jump when a reply arrives (685ad9c8d, df84e49cd).
+apps/desktop/e2e/juno-agent/states.spec.ts	browser	folded	Steering/stop/failure, storage failure, offline and over-limit are steps of one launch with baseline-relative model input counts; interrupted reply and Update needed share one test with two relaunches (6→2 tests).
+apps/desktop/e2e/juno-agent/switcher.spec.ts	browser	keep	One flow: panel to Activity and back in place, Activity rows, Back/Forward in the Juno tab, single h1 (41e63c2c7).
+apps/desktop/e2e/juno-agent/t3.spec.ts	browser	keep	Two flows against the fake T3 (loopback before LAN with a question card and Done; Stop and a blocked key); policy cases live in packages/agent/test/t3.test.ts.
+apps/desktop/e2e/juno-agent/tool-approval.spec.ts	browser	keep	One flow against a fake MCP server: unmarked search under Auto, an approved call runs once, a failure shows the server error, a read under Always ask.
+apps/desktop/e2e/juno-agent/transfer.spec.ts	browser+electron	keep	Move between two Macs; the restore.swapped crash variant needs a native crash, so it is @electron.
+apps/desktop/e2e/juno-agent/writes.spec.ts	browser	folded	Send-once (held-post guard, e5535d251) and the refused send retried from the topic are two steps of one launch; the second proposal has its own text so the check cannot pass on the first message (2→1 tests).
+apps/desktop/e2e/layout-shift.spec.ts	browser	folded	Layout-shift guards on interaction kept; the two late-reaction checks are steps of one launch (13→12 tests).
+apps/desktop/e2e/link-menu.spec.ts	browser	keep	One test of link menus against the message menu, including the selection-precedence rule (375816db4).
+apps/desktop/e2e/links.spec.ts	browser	folded	The rich-paste regression (c98c29cfe) is a step of the links flow (2→1 tests).
+apps/desktop/e2e/live.spec.ts	browser	folded	Read state at the bottom (with the shift measure) and unread while in the background are steps of one launch; the scrolled-up topic300 test stays apart (3→2 tests).
+apps/desktop/e2e/main-new-threads.spec.ts	browser	keep	One test: the Main row's new-threads count grows, leaves out your own thread, clears on read, and the row keeps its height (120657c5a).
+apps/desktop/e2e/mark-unread.spec.ts	browser	folded	Read state: Mark as unread holds while the topic is open; thread and Main cases are two steps of one flow, the Main step reading only #eng's mark (2→1 tests).
+apps/desktop/e2e/media.spec.ts	browser	left	Hands-off. Real late-thumbnail and partial-file regressions; zoom and viewer-tabs could be steps of the #eng media flow, the retry test waits up to 60 s on real backoff, and it pins exact pixel sizes.
+apps/desktop/e2e/mentions.spec.ts	browser	keep	One five-step flow checking the exact Slack markup posted for people, groups and channels; the Home test needs a fresh Home.
+apps/desktop/e2e/menus.spec.ts	browser	folded	One active row per menu and open-on-press; the press test is a third step of the same launch (2→1 tests).
+apps/desktop/e2e/message-actions.spec.ts	browser	folded	Outbox and edit regressions kept; the two edit-while-sending tests (eafa7834a) share a launch with an update-count baseline, Cmd-click Start thread joined the thread test, a duplicate shortcuts pin went and an 11-label menu list became the own-message tail (5→3 tests).
+apps/desktop/e2e/message-menu.spec.ts	browser	folded	Open on release, placement, morph frame check and keys kept; grid/picker and keys are steps of the right-click flow; morph and header-gap need their own start (5→3 tests).
+apps/desktop/e2e/mirror-reads.spec.ts	browser	keep	One flow guarding read mirroring to Slack and catch-up, with a no-shift check on the progress line.
+apps/desktop/e2e/navigation.spec.ts	browser+electron	folded	The unread-dot test is the end of the Cmd-Shift-T test; swipe, the @mac sidebar and full screen rightly stay in Electron (7→6 tests).
+apps/desktop/e2e/new-message-typing.spec.ts	browser	keep	Typing-race tests (e1b89d554); each needs a different clean start, so folding would weaken the draft-untouched check.
+apps/desktop/e2e/notification-badge.spec.ts	browser+electron	keep	Badge regressions named after bugs, an engine SIGKILL recovery and an Electron restart check; each needs its own seed, permission or onboarding state.
+apps/desktop/e2e/notification-decisions.spec.ts	browser	folded	Notify decisions read from the log; two tests are two steps (2→1 tests).
+apps/desktop/e2e/notification-hours.spec.ts	browser	folded	Presence-by-day is the last step of the relaunch/old-prefs test; the held-DM test keeps its agent fixture (3→2 tests).
+apps/desktop/e2e/notification-instructions.spec.ts	browser	keep	One short flow: add, persist and remove an instruction.
+apps/desktop/e2e/notifications.spec.ts	browser+electron	folded	Notify-me levels, on-screen suppression, group-DM title and DM Always plus click are one ordered flow; Tidy up's rapid-save race (ddfe3601a) is a step of the Settings flow; the person-menu label list (changed in 5 commits) is reduced to the two labels that matter (7→3 tests).
+apps/desktop/e2e/palette-pages.spec.ts	browser	fixed	A hard-coded list of 10 Settings sections (changed in 4 commits) is now compared with Settings' own section list.
+apps/desktop/e2e/palette-stable-results.spec.ts	browser	keep	Frame-by-frame guard that results never collapse while typing (d9843f0ff).
+apps/desktop/e2e/palette.spec.ts	browser	folded	Three flows: conversations and commands; messages (topic, flash and privacy, person, Juno command); answer stability (Slack search races, later better match, channels last); a hand-written animate spy is replaced by driver/flashes (9→3 tests).
+apps/desktop/e2e/peek.spec.ts	browser	folded	Layout-shift and no-mark guards kept; four tests are one flow with the Space-key step last (4→1 tests).
+apps/desktop/e2e/pending-menu.spec.ts	browser	keep	Regression test (7bd8f93f4): Edit from a menu held while a send settles.
+apps/desktop/e2e/perf.spec.ts	perf-mac	keep	Mac-only budgets with one launch per scenario and shared warm user-data; its sleeps space perf samples. Budgets untouched; its quick start test (full large seed, 5 s) is the real quick-start budget.
+apps/desktop/e2e/person-links.spec.ts	browser	folded	Real person-link journeys (drag, double-click, Cmd-click, apps, deactivated people, peek); the no-DM Home and address-yourself test had the same start, now two steps at the end of the main flow (5→4 tests).
+apps/desktop/e2e/presence-others.spec.ts	browser	keep	One stepped flow asserting what reached the fake (presence_sub lists) and the header and dot following a real setting.
+apps/desktop/e2e/presence.spec.ts	browser	folded	Away/active from the menu and Slack's timeout or socket-down state were two launches of the same synced start; now one five-step flow (2→1 tests).
+apps/desktop/e2e/privacy-sharing.spec.ts	electron	folded	Needs main's screen watch; the capture-never-stops test now runs on the relaunched app of the launch-baseline test, which already starts with a capture running (3→2 tests).
+apps/desktop/e2e/privacy.spec.ts	browser+electron	folded	Browser privacy journey (blur, hidden notification text, relaunch) kept; the two @electron tests (View > Reload, unreadable launch.json field, regression d74b43858) are two steps of one launch (3→2 tests).
+apps/desktop/e2e/quick-reactions.spec.ts	browser	left	Hands-off (flake fix in progress elsewhere). Workspace-alias and no-recent-use tests are one launch per check and could be steps of the main flow.
+apps/desktop/e2e/quick-start.perf.spec.ts	perf-mac	fixed	Its first test repeated every correctness check of quick-start.spec.ts with a weaker 30 s ceiling than perf.spec.ts quick start (5 s); deleted it, kept the preview-search timing (2→1 tests).
+apps/desktop/e2e/quick-start.spec.ts	browser	keep	Three first sign-ins on the medium seed, each needing a fresh app and different fake gating; tagged @heavy; history shows real product fixes.
+apps/desktop/e2e/quiet-window.spec.ts	browser	keep	One flow from the Settings control to sidebar rows with a no-shift check and persistence; cheap overlap with the engine quiet-window flow.
+apps/desktop/e2e/reaction-delivery.spec.ts	browser	left	Hands-off. Seven launches; an uncommented pause(1500); retry, offline and deleted-message rules overlap packages/engine/test/flows/outbox-reactions.flow.test.ts and could be steps of one flow.
+apps/desktop/e2e/reactions-dialog.spec.ts	browser	left	Hands-off. One sound flow (See all, names held then released, strip, Esc returns focus); could absorb reactors.spec.ts.
+apps/desktop/e2e/reactors.spec.ts	browser	left	Hands-off. One test (card on hover, pointer into card, click toggles); could be a step of reactions-dialog.spec.ts (needs freshContext and clock).
+apps/desktop/e2e/realtime.spec.ts	browser+electron	folded	Offline edit/delete/reaction, offline send and offline rename/leave/archive are one stepped offline-window flow; the three snapshot-race tests were deleted because packages/engine/test/metadata.test.ts checks the same races against engine rows. 429 storm and @electron engine restart kept (10→4 tests).
+apps/desktop/e2e/review-cards.spec.ts	browser	keep	Two journeys with different starts (AI jobs from a cold sign-in for follow-ups that look done; a synced relaunch with aged drafts): each walks a sheet through act, Undo, decline and the suggestion not coming back.
+apps/desktop/e2e/screens.spec.ts	manual	keep	Hand-run screenshot tool, skipped unless JUNO_SCREENS=1; its short waits let paint settle before a picture, not before an assertion.
+apps/desktop/e2e/scroll-rest.spec.ts	browser+electron	folded	Guards bottom-pinning regressions (f5ec1cff6, ced3579d4, b5be62f9c); two browser tests are steps of one launch, and its private copy of openLongMain now comes from stickBottomLists.ts (3→2 tests).
+apps/desktop/e2e/send-checks.spec.ts	browser	folded	Real wrong-place, grammar and fix-line flows against the fake model; Home's local-mistakes check and Capital i became steps of existing flows with a full posts-order check; removed an unchecked screenshot (13→11 tests).
+apps/desktop/e2e/send-to-channel.spec.ts	browser	folded	Broadcast outbox coverage (lost answer, refused, edit-then-broadcast order) no engine flow covers; the two "title in Main opens the topic" tests are one test with steps (6→5 tests).
+apps/desktop/e2e/send-while-staging.spec.ts	browser	folded	Send while a file stages; the file-ready and file-unreadable tests are steps of one launch (3→2 tests).
+apps/desktop/e2e/send.spec.ts	browser+electron	folded	Outbox flows named after real lost-answer bugs (6bdcc9c46) kept in full; echo and refused share a test, composer growth is a step of the draft relaunch test, and the post/edit/reaction lost-answer tests are one test (8→4 tests).
+apps/desktop/e2e/session.spec.ts	browser+electron	fixed	Sign-in, relaunch frames, expiry and import errors; removed tagline and highlight-label pins (churned in c4ac28ce0) and cut expired-page and keychain text to their key phrase (8 tests).
+apps/desktop/e2e/settled-review.spec.ts	browser	folded	Two aiJobs cold starts each waiting up to 60 s for the card; the Enter-opens-a-proposal and Tidy-up checks are steps before the main review flow (2→1 tests).
+apps/desktop/e2e/shared-messages.spec.ts	browser	folded	Three cold starts on the same seed are one flow (video share, closed-room footer, in-app link); its private watchFlashes copy is replaced by driver/flashes (3→1 tests).
+apps/desktop/e2e/sidebar-first-sync.spec.ts	browser	moved	The first-sync list and the before-sign-in preview and group-DM tests, split from sidebar.spec.ts so it stays under 400 lines (new file, 2 tests).
+apps/desktop/e2e/sidebar-hold.spec.ts	browser	folded	Order-hold flows (a97ad5e38, 07f68f39b); pointer, keyboard and own-send holds are steps of one test, each taking its baseline from the list (3→1 tests).
+apps/desktop/e2e/sidebar-motion.spec.ts	browser	folded	Reorder motion guards; the three no-animation checks (own Resolve, scrolled down, reduced motion) are one test; the three that slow animations stay separate (6→4 tests).
+apps/desktop/e2e/sidebar-preview.spec.ts	browser	deleted	Its one cold-start test is a step of sidebar.spec.ts's cold group-DM test, which seeds before sign-in the same way (1→0 tests).
+apps/desktop/e2e/sidebar.spec.ts	browser+electron	folded	The reply-from-another-client test repeated the unread-people step and is now that step; the cold group-DM test holds the preview checks; fixed a stale title naming a removed Resolve (8→7 tests).
+apps/desktop/e2e/slack-links.spec.ts	browser	folded	The two in-app link tests are one flow (hover, Main link, reply link, never-stored message, tab reuse) using driver/flashes; the Cmd-click test stays apart because it needs a single tab (3→2 tests).
+apps/desktop/e2e/stick-bottom.spec.ts	browser	fixed	Layout and scroll regressions from many bug-named commits kept; the concurrent-growth escape is the last step of the upward-gesture test; removed a debug console.log (11→10 tests).
+apps/desktop/e2e/suggestions.spec.ts	browser	fixed	Three flows that change the fake before sign-in (Unfollow, Ignore, a mention breaking through an ignored channel); full-sentence copy checks that churned in df545d55f now check a key phrase.
+apps/desktop/e2e/sync-failed.spec.ts	browser	keep	Recovery: bad data shows the sync failure and Copy log copies the right content, and a boot that never reaches Slack says offline under real timing; different fake setups.
+apps/desktop/e2e/tab-scroll.spec.ts	browser	keep	Each tab keeps its scroll position (regressions in 106cfe269); each test needs a fresh topic300 window measured from estimated row heights.
+apps/desktop/e2e/tables.spec.ts	browser	folded	The table-edit regression (c53bd4678) is a step of the main table flow on its own channel (2→1 tests).
+apps/desktop/e2e/tabs.spec.ts	browser	folded	New tab while a topic opens, tab art and "+" placement are steps of the main flow; tabs-survive-restart joined the drag/restart test, which now restores a non-first active tab; freshContext applies only to the clock test (8→4 tests).
+apps/desktop/e2e/text-menu.spec.ts	electron	keep	Electron's native text menu and spellchecker guesses, which the browser lane cannot produce.
+apps/desktop/e2e/theme.spec.ts	electron	keep	One relaunch flow on launch.json and the native window background, both main-only, with a lost-write guard (bda2c96ba).
+apps/desktop/e2e/thread-link-preview.spec.ts	browser	folded	The reply_users test is a step after the first-reply preview; removed a light/dark screenshot loop that checked nothing (5→4 tests).
+apps/desktop/e2e/thread-root.spec.ts	browser	keep	One synced stepped flow: Start thread shows the root at once, without an empty state or a move, in a channel, a DM and a group DM.
+apps/desktop/e2e/topic-titles.spec.ts	browser	keep	One flow on a large seed: two-line titles keep the scrolled row anchored, cause no layout shift and survive a relaunch.
+apps/desktop/e2e/topic.perf.spec.ts	perf-mac	keep	Mac-only budget for opening a topic; its one sleep shows nothing reaches Slack and says so.
+apps/desktop/e2e/topic.spec.ts	browser	folded	Pill/chip, Follow, header press, switcher search and minimum window size are steps of three flows; the 18-item menu list (changed in 9 commits) and an exact 6 px offset are replaced by checks of the items and position that matter (8→4 tests).
+apps/desktop/e2e/updates.spec.ts	electron	keep	Main's updater against a fake releases server, including that the token never reaches the redirected download host.
+apps/desktop/e2e/usergroups.spec.ts	browser	keep	One flow: group handles, never ids, in Main, a thread and the sidebar, plus a deleted group and a live rename.
+apps/desktop/e2e/views.spec.ts	browser	folded	Icon view, named view and Add-to-view are three steps of one launch; colour/relaunch and pill-row geometry stay separate (5→3 tests).
+apps/desktop/e2e/web-panel.spec.ts	electron	folded	Wide-window lifecycle, narrow window and Open links in Juno off are steps of one launch (3→1 tests).
+apps/desktop/e2e/web/web-shell.spec.ts	web	fixed	Removed a host shared at module level through beforeAll/afterAll; one test owns its host and runs the host security check first (2→1 tests).
+apps/desktop/e2e/welcome.spec.ts	browser	folded	The Hide/Cmd-K/Help/About test continues on the last relaunch of the older-install test (3→2 tests).
+apps/gallery/activation.spec.ts	gallery	keep	Three pointer, nested-control and keyboard activation flows; no desktop duplicate.
+apps/gallery/all-topics-filters-geometry.spec.ts	gallery	fixed	Clip, overlap and equal-height checks kept; removed single-theme loops left by the earlier audit, an unasserted measurement and a stale comment.
+apps/gallery/attachment-images.spec.ts	gallery	keep	Late-image box reservation and a failed unfurl image: delayed-load regressions.
+apps/gallery/behaviour.spec.ts	gallery	fixed	Cursor, scroll chaining, truncation and late-palette regressions kept; two name-tooltip tests merged, a doc comment moved to its test, and the one negative wait now says it shows nothing happens (25→24 tests).
+apps/gallery/button-press.spec.ts	gallery	keep	A held press keeps its box and transform frame by frame (dadbd3161).
+apps/gallery/card-working.spec.ts	gallery	keep	A working card disables input from mouse and keyboard (ea872dc1d); the only coverage.
+apps/gallery/confirm-geometry.spec.ts	gallery	keep	Delete-confirm placement at band, under-band and tall-last edges; relations, not pins.
+apps/gallery/contrast.spec.ts	gallery	keep	Readability per accent and theme; each accent is a different colour set.
+apps/gallery/emoji-picker.spec.ts	gallery	folded	Six search and pick tests on one fixture are steps of one flow, each pick checked for a new value; the theme loop went (8→3 tests).
+apps/gallery/focus-ring.spec.ts	gallery	keep	Cached walk proving no focus ring is clipped; light only.
+apps/gallery/formatting.spec.ts	gallery	fixed	Glyph geometry and code/quote fills kept in both themes; removed a right-to-left loop that desktop formatting.spec.ts checks more strongly against the real caret.
+apps/gallery/geometry.spec.ts	gallery	keep	Filter row height, middle-cut backup path and count edge; the remaining pins never churned.
+apps/gallery/home-geometry.spec.ts	gallery	keep	The syncing line keeps its start as its text changes (fa418c130).
+apps/gallery/list-geometry.spec.ts	gallery	keep	The switcher opens on the current topic with one row lit (0914f192f).
+apps/gallery/memory-edit.spec.ts	gallery	keep	One edit, save and cancel flow; no desktop coverage of note editing.
+apps/gallery/message-geometry.spec.ts	gallery	fixed	The older-line test had lost its measurement in the earlier audit (still named 24px, checking only copy); it now measures that the first row holds in the more-above and loading-older states.
+apps/gallery/message-hover.spec.ts	gallery	keep	No hover fill (a colour, so both themes), arrow cursor, drag still selects.
+apps/gallery/message-menu.spec.ts	gallery	keep	Edge placement and picker growth anchors at all four corners.
+apps/gallery/message-more.spec.ts	gallery	fixed	The size-only hover test runs in light only, per the theme rule; the fill test stays in both themes (5→4 tests).
+apps/gallery/narrow-geometry.spec.ts	gallery	fixed	A rail count of 10 (edited when a section was added, 386066e05) and one tooltip copy pin became "every rail icon's tooltip is its accessible name".
+apps/gallery/peek-contrast.spec.ts	gallery	fixed	Opens with the accent through openState instead of a second navigation with its own waits; removed unasserted values.
+apps/gallery/popover-anchor-geometry.spec.ts	gallery	keep	A popover starts at its trigger's left edge and moves in at the window edge.
+apps/gallery/roving.spec.ts	gallery	keep	Radio groups are one Tab stop and the arrows choose (6a634d48e).
+apps/gallery/settings.spec.ts	gallery	keep	The saved-key chip matches between Set up Juno and Settings.
+apps/gallery/shift.spec.ts	gallery	fixed	Broad cached walk and injected-shift self-tests kept; a 200 ms sleep now waits for the status text, the 28 px Resolve, 68 px band and 8 px inset pins (Resolve rewritten three times) became relative checks or went, and two size-only tests run in light only (47→45 tests).
+apps/gallery/shots.spec.ts	manual	keep	Review screenshot tool outside the gate; its waits only time the capture.
+apps/gallery/sidebar-rows.spec.ts	gallery	keep	Row views moved here from e2e (ccf5107ce); desktop covers the wiring, not placement.
+apps/gallery/table.spec.ts	gallery	folded	The wide-table-still-scrolls check is the end of the wrap test (5→4 tests).
+apps/gallery/tabs-geometry.spec.ts	gallery	fixed	Keyboard semantics and fill contrast kept; removed an unasserted close-button offset and a stale 7 px comment.
+apps/gallery/thread-link.spec.ts	gallery	fixed	The size-only late-photo test runs in light only (2→1 tests).
+apps/gallery/tooltip.spec.ts	gallery	keep	Delay, warm switch and dismissal driven by page.clock, plus edge containment.
+apps/gallery/topic-art.spec.ts	gallery	keep	Off-screen art is whole on its first frame (b41f3a31a); its short wait stays because reading animations would compute style in a skipped subtree.
+apps/gallery/topic-titles.spec.ts	gallery	fixed	Removed two single-theme loops left by the earlier audit.
+apps/gallery/trigger-open.spec.ts	gallery	keep	Hover, press and open fills match in both themes (a colour check).
+apps/gallery/walk-cache.test.mjs	gallery	keep	Fail-closed cache invalidation, tricky logic, temp folder per test.
+apps/gallery/welcome-geometry.spec.ts	gallery	fixed	Deleted "room kept after Hide", which desktop welcome.spec.ts checks with expectNoLayoutShift on the real Hide; removed the theme loop (7→6 tests).
