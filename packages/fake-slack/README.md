@@ -50,7 +50,7 @@ Startup merges both maps before opening a port and throws on a duplicate method 
 
 ## Testing
 
-`bun run --cwd packages/fake-slack test`. The tests call the fake over real HTTP and websockets: auth failures, pagination, posting and echoes, the upload flow, and each control. Any behaviour the client tests rely on is checked here first.
+The Slack client and engine tests exercise the fake through real HTTP and websockets: pagination, posting and echoes, uploads, reconnects and mutation recovery. Test the real client against this boundary; do not add tests of the fake itself. Recorded Slack responses and live research establish the protocol shapes.
 
 `holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them, and `picture:small`, `picture:large` or `picture:<file name>` to hold Juno's picture files.
 

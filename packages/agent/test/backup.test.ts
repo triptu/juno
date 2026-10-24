@@ -55,11 +55,10 @@ async function restart(mac: Mac): Promise<Mac> {
   return startMac(mac.name, mac.keychain, { dir: mac.h.dir, slack: mac.slack })
 }
 
-let said = 0
-/** Op ids are global across restores, so each Mac's sends get their own. */
+/** A restored inbox can already hold an op id, so each send gets a fresh one. */
 async function converse(mac: Mac, text: string, answer: string) {
   mac.h.fake.script([reply(say(answer))])
-  await mac.h.ended(mac.h.send(text, { opId: `${mac.name}-${++said}` }))
+  await mac.h.ended(mac.h.send(text, { opId: `${mac.name}-${crypto.randomUUID()}` }))
 }
 
 const texts = (turns: Turns) => turns.messages().map((m) => m.text)
@@ -75,9 +74,8 @@ const holding = (turns: Turns, word: string) =>
 
 const manifestOf = (folder: string, gen: number) => parseManifest(readText(manifestPath(folder, gen))!)!.manifest
 
-let calls = 0
 const sendCall = (text: string) =>
-  reply({ type: 'toolCall', id: `call-send-${++calls}`, name: 'send_message', arguments: { messages: [{ topic: `m:${TEST_CHANNEL}`, text }] } as never })
+  reply({ type: 'toolCall', id: `call-send-${crypto.randomUUID()}`, name: 'send_message', arguments: { messages: [{ topic: `m:${TEST_CHANNEL}`, text }] } as never })
 
 /** One model turn that proposes a Send message card. */
 async function proposeSend(mac: Mac, text: string) {

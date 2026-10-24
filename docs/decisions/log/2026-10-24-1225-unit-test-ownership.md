@@ -1,0 +1,1 @@
+- 10-24 12:25 · tests · Remove fake Slack self-tests and duplicate timestamp checks; keep timestamp rules in slack-schema, the domain-only predecessor boundary in domain, and exercise Slack quirks through client and engine flows. Fold rename trimming into its precedence case and leave view-name copy to UI flows.

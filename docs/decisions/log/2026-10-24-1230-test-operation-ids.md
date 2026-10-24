@@ -1,0 +1,1 @@
+- 10-24 12:30 · tests · Give agent fixture calls, clicks and sends fresh operation ids instead of module-level counters, so prior cases cannot affect a later case or a restored inbox.

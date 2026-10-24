@@ -22,8 +22,7 @@ afterEach(async () => {
   for (const h of harnesses.splice(0)) await h.close()
 })
 
-let calls = 0
-const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `call-${name}-${++calls}`, name, arguments: args as never })
+const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `call-${name}-${crypto.randomUUID()}`, name, arguments: args as never })
 
 /** Every table and row of agent.sqlite that still holds the marker. */
 function leaks(turns: Turns): ReadonlyArray<string> {

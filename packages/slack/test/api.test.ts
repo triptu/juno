@@ -1,7 +1,8 @@
 import { describe, expect } from 'bun:test'
 import { itEffect, itLive } from '@juno/testing/effect'
 import { Effect, Fiber } from 'effect'
-import { SlackApi, SlackEdge } from '../src/index.ts'
+import { TestClock } from 'effect/testing'
+import { RequestQueue, SlackApi, SlackEdge } from '../src/index.ts'
 import { CHANNEL, clientLayer, eventually, fakeSlack, SELF } from './helpers.ts'
 
 describe('SlackApi.call', () => {
@@ -51,16 +52,25 @@ describe('SlackApi.call', () => {
     }),
   )
 
-  itLive('a 429 is retried after Retry-After and then succeeds', () =>
+  itEffect('a 429 is retried after Retry-After and then succeeds', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       fake.force429({ method: 'conversations.history', retryAfter: 1, times: 1 })
-      const started = Date.now()
-      const history = yield* SlackApi.use((api) => api.call('conversations.history', { channel: CHANNEL, limit: 2 })).pipe(
-        Effect.provide(clientLayer(fake)),
-      )
+      const program = Effect.gen(function* () {
+        const api = yield* SlackApi
+        const queue = yield* RequestQueue
+        const request = yield* Effect.forkChild(api.call('conversations.history', { channel: CHANNEL, limit: 2 }))
+        // Wait until the client has read Retry-After, before moving its clock.
+        while ((yield* queue.pausedUntil('conversations.history')) === undefined) {
+          yield* Effect.promise(() => new Promise<void>(resolve => setImmediate(resolve)))
+        }
+        yield* TestClock.adjust(999)
+        expect(fake.callCount('conversations.history')).toBe(1)
+        yield* TestClock.adjust(1)
+        return yield* Fiber.join(request)
+      })
+      const history = yield* program.pipe(Effect.provide(clientLayer(fake)))
       expect(history.messages.length).toBeGreaterThanOrEqual(1)
-      expect(Date.now() - started).toBeGreaterThanOrEqual(900)
       const [first, second] = fake.calls
       expect(first?.status).toBe(429)
       expect(second?.status).toBe(200)

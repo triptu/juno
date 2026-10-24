@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { firstWords, manualTitleAfterRename, resolveTitle, viewName } from '../src/index'
+import { firstWords, manualTitleAfterRename, resolveTitle } from '../src/index'
 import { eng, hiring, maya, topic } from './fixtures'
 
 describe('title resolution', () => {
@@ -64,19 +64,12 @@ describe('first words', () => {
 })
 
 describe('rename', () => {
-  it('saves trimmed text', () => {
+  it('trims a rename and clears it on empty input or the AI title text', () => {
     expect(manualTitleAfterRename('  Pricing page  ', 'AI title')).toBe('Pricing page')
-  })
-
-  it('clears the manual title on empty input or the AI title text', () => {
     expect(manualTitleAfterRename('   ', 'AI title')).toBeUndefined()
     expect(manualTitleAfterRename('AI title', 'AI title')).toBeUndefined()
     expect(manualTitleAfterRename('AI title', undefined)).toBe('AI title')
   })
 
-  it('saves a view name trimmed and at most 32 characters', () => {
-    expect(viewName('  Bots  ')).toBe('Bots')
-    expect(viewName('   ')).toBe('')
-    expect(viewName('x'.repeat(40))).toBe('x'.repeat(32))
-  })
+
 })

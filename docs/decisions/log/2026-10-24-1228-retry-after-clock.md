@@ -1,0 +1,1 @@
+- 10-24 12:28 · tests · Check the HTTP Retry-After boundary with 999 ms and 1 ms of virtual time after the client records the pause, rather than accepting a wall-clock lower bound.

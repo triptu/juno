@@ -22,8 +22,7 @@ async function open(options: Parameters<typeof turnsHarness>[0] & { readonly sla
   return { h, slack }
 }
 
-let calls = 0
-const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `call-${name}-${++calls}`, name, arguments: args as never })
+const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `call-${name}-${crypto.randomUUID()}`, name, arguments: args as never })
 const sendCall = (...messages: ReadonlyArray<string>) =>
   call('send_message', { messages: messages.map((text, i) => ({ topic: i === 0 ? `m:${TEST_CHANNEL}` : `t:${TEST_CHANNEL}:1760400000.000100`, text })) })
 
@@ -35,9 +34,8 @@ const only = (h: Harness): View => {
   return all[0]!
 }
 const statusOf = (view: View) => ('status' in view.card ? view.card.status : undefined)
-let clicks = 0
 /** The owner's click on the card's main button, with the binding the page gave. */
-const click = (h: Harness, view: View, opId = `click-${++clicks}`) => h.turns.actions.approve(opId, view.binding!.identity, view.binding!.children)
+const click = (h: Harness, view: View, opId = `click-${crypto.randomUUID()}`) => h.turns.actions.approve(opId, view.binding!.identity, view.binding!.children)
 const settle = (h: Harness) => h.turns.actions.idle()
 
 /** One model turn that proposes a Send message card, then a bubble. */

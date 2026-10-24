@@ -13,8 +13,7 @@ afterEach(async () => {
   for (const close of cleanups.splice(0)) await close()
 })
 
-let calls = 0
-const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `call-${name}-${++calls}`, name, arguments: args as never })
+const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `call-${name}-${crypto.randomUUID()}`, name, arguments: args as never })
 
 /** Two placeholder messages in one channel, as the host returns them. */
 const page = Schema.decodeUnknownSync(HostMessagePage)({

@@ -11,8 +11,7 @@ import { served, run, closeServed } from './serve-harness'
 
 afterEach(closeServed)
 const account = AccountId.make('test-owner')
-let calls = 0
-const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `view-call-${++calls}`, name, arguments: args as never })
+const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `view-call-${crypto.randomUUID()}`, name, arguments: args as never })
 function fakeViews() {
   const views = new Map<string, typeof HostView.Type>()
   let sequence = 0
