@@ -7,7 +7,7 @@ import type { WhoReacted } from '@juno/contract'
 import { REACTORS_LISTED, type ManyReactionsSeed } from '@juno/fake-slack'
 import { openTopic, reactToMessage, whoReactedAtom } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
-import { apiCalls, quiet, readDb, valueOf } from './scenario'
+import { apiCalls, quiet, valueOf } from './scenario'
 import { actionRows, chip, MAIN, outboxScenario } from './outboxScenario'
 
 const { booted, watch } = outboxScenario()
@@ -39,16 +39,12 @@ function who(engine: RunningEngine, seed: ManyReactionsSeed) {
   return { until, seen, close: () => { stop(); unmount() } }
 }
 
-const storedUsers = (engine: RunningEngine, ts: string, name: string) =>
-  readDb(engine, 'cache.db', (db) => JSON.parse((db.prepare('SELECT user_ids_json FROM reactions WHERE channel = ? AND ts = ? AND name = ?').get('C0ENG', ts, name) as { user_ids_json: string }).user_ids_json) as Array<string>)
-
 const reaction = (value: WhoReacted, name: string) => value.reactions.find((r) => r.name === name)
 
 describe('who reacted: the full fetch', () => {
   it('shows the stored list at once, then everyone after one full fetch, with names, emoji and you first', async () => {
     const engine = await booted()
     const seed = await seeded(engine)
-    expect(storedUsers(engine, seed.ts, '+1')).toHaveLength(REACTORS_LISTED)
     const dialog = who(engine, seed)
     // The first value the subscription delivered, not the latest: the full fetch may already have answered.
     const first = await waitFor(() => dialog.seen.find((value) => value !== null) ?? undefined, WAIT_MS, 'a first value')

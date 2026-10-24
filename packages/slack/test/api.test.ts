@@ -1,6 +1,6 @@
 import { describe, expect } from 'bun:test'
 import { itEffect, itLive } from '@juno/testing/effect'
-import { Effect, Fiber } from 'effect'
+import { Clock, Effect, Fiber } from 'effect'
 import { TestClock } from 'effect/testing'
 import { RequestQueue, SlackApi, SlackEdge } from '../src/index.ts'
 import { CHANNEL, clientLayer, eventually, fakeSlack, SELF } from './helpers.ts'
@@ -59,14 +59,21 @@ describe('SlackApi.call', () => {
       const program = Effect.gen(function* () {
         const api = yield* SlackApi
         const queue = yield* RequestQueue
-        const request = yield* Effect.forkChild(api.call('conversations.history', { channel: CHANNEL, limit: 2 }))
+        const sentAt: number[] = []
+        const request = yield* Effect.forkChild(api.call('conversations.history', { channel: CHANNEL, limit: 2 }, {
+          beforeSend: Effect.gen(function* () { sentAt.push(yield* Clock.currentTimeMillis) }),
+        }))
         // Wait until the client has read Retry-After, before moving its clock.
+        const deadline = Date.now() + 10_000
         while ((yield* queue.pausedUntil('conversations.history')) === undefined) {
+          if (Date.now() > deadline) throw new Error('The client did not apply Retry-After')
           yield* Effect.promise(() => new Promise<void>(resolve => setImmediate(resolve)))
         }
         yield* TestClock.adjust(999)
-        expect(fake.callCount('conversations.history')).toBe(1)
+        expect(sentAt).toHaveLength(1)
         yield* TestClock.adjust(1)
+        yield* eventually(() => fake.callCount('conversations.history') === 2)
+        expect(sentAt[1]! - sentAt[0]!).toBe(1_000)
         return yield* Fiber.join(request)
       })
       const history = yield* program.pipe(Effect.provide(clientLayer(fake)))

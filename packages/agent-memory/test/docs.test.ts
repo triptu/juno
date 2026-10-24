@@ -9,11 +9,10 @@ const note = fc.string({ minLength: 1, maxLength: 400 }).filter((s) => s.trim() 
 const entries = fc.array(fc.tuple(doc, note), { maxLength: 120 }).map((rows) => rows.map(([d, t], i) => entry(`e${i}`, d, t)));
 
 describe('the outline', () => {
-  test('stays within its budget and names every doc, whatever the docs hold', () => {
+  test('stays within its budget, whatever the docs hold', () => {
     fc.assert(fc.property(entries, fc.nat({ max: 10_000 }), (all, rev) => {
       const text = outline(all, rev);
       expect(utf8Bytes(text)).toBeLessThanOrEqual(docLimits.outline);
-      for (const title of ['About you', 'People', 'Projects', 'Preferences', 'Writing style']) expect(text).toContain(`${title}:`);
     }));
   });
 

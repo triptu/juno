@@ -101,14 +101,13 @@ async function hostWithAgent(writes: 'enabled' | 'disabled') {
   return { engine, transport, agent, account }
 }
 
-let sequence = 0
 /** A dispatch as the agent's dispatcher makes it after consuming the authorization: the payload and its digest. */
-function dispatchOf(n: number, payload: Record<string, unknown>) {
-  const hex = n.toString(16).padStart(12, '0')
+function dispatchOf(payload: Record<string, unknown>) {
+  const id = crypto.randomUUID()
   const decoded = Schema.decodeUnknownSync(HostDispatch)({
-    actionId: `0190a000-0000-7000-8000-${hex}`,
-    authorizationId: `auth-${n}`,
-    attemptId: `attempt-${n}`,
+    actionId: id,
+    authorizationId: `auth-${id}`,
+    attemptId: `attempt-${id}`,
     digest: '0'.repeat(64),
     mode: 'single-attempt',
     payload,
@@ -117,8 +116,8 @@ function dispatchOf(n: number, payload: Record<string, unknown>) {
 }
 
 /** A dispatch of one Slack send. */
-function send(account: string, text: string, ids: { readonly n?: number } = {}) {
-  return dispatchOf(ids.n ?? ++sequence, {
+function send(account: string, text: string) {
+  return dispatchOf({
     connection_id: 'slack',
     account_id: account,
     destination_ids: [CHANNEL],
@@ -144,7 +143,7 @@ describe('the AgentHost port', () => {
     const topics = await ok(client['host.topics.list']({ limit: 20 }))
     const topic = topics.topics[0]!
     const base = send(account, '')
-    const dispatch = dispatchOf(++sequence, { ...base.payload, tool: 'topics_resolve', destination_ids: [topic.topicId], args: { topicIds: [topic.topicId] } })
+    const dispatch = dispatchOf({ ...base.payload, tool: 'topics_resolve', destination_ids: [topic.topicId], args: { topicIds: [topic.topicId] } })
     expect(await failure(client['host.topics.resolve'](dispatch))).toMatchObject({ reason: 'rejected' })
     expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
     await approve(engine, dispatch)
@@ -155,7 +154,7 @@ describe('the AgentHost port', () => {
     await ok(client['host.topics.undoResolve']({ accountId: account, actionId: dispatch.actionId }))
     expect(await ok(client['host.topics.resolve'](dispatch))).toEqual(result)
     expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
-    const bad = dispatchOf(++sequence, { ...dispatch.payload, args: { topicIds: [topic.topicId, 'missing'] }, destination_ids: [topic.topicId, 'missing'] })
+    const bad = dispatchOf({ ...dispatch.payload, args: { topicIds: [topic.topicId, 'missing'] }, destination_ids: [topic.topicId, 'missing'] })
     await approve(engine, bad)
     expect(await failure(client['host.topics.resolve'](bad))).toMatchObject({ reason: 'rejected' })
     expect((await ok(client['host.topics.get']({ topicId: HostTopicId.make(topic.topicId) }))).resolved).toBe(false)
@@ -362,7 +361,7 @@ describe('the AgentHost port', () => {
     const wrong = { ...otherAccount, digest: actionDigest(otherAccount.payload) }
     await approve(engine, wrong)
     expect(await failure(agent.client['host.outbox.send'](wrong))).toMatchObject({ reason: 'stale' })
-    const notSend = dispatchOf(++sequence, { ...dispatch.payload, tool: 'notion-update-page' })
+    const notSend = dispatchOf({ ...dispatch.payload, tool: 'notion-update-page' })
     await approve(engine, notSend)
     expect(await failure(agent.client['host.outbox.send'](notSend))).toMatchObject({ reason: 'rejected' })
     expect(engine.fake.callCount('chat.postMessage')).toBe(1)

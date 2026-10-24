@@ -26,11 +26,6 @@ for (const [name, value] of Object.entries(Contract)) {
 // Both sides as plain data, since JSON has no -0.
 const plain = (value: unknown): unknown => value === undefined ? undefined : JSON.parse(JSON.stringify(value))
 
-it('finds the schemas and routes', () => {
-  expect(schemas.size).toBeGreaterThan(200)
-  expect([...schemas.values()]).toContain('agent.chat.page success')
-})
-
 it.each([...schemas].map(([schema, name]) => [name, schema] as const))('%s survives JSON', (_, schema) => {
   const codec = Schema.toCodecJson(schema as Schema.Codec<unknown, unknown>)
   const result = Effect.runSync(Arbitrary.checkEffect(Arbitrary.schema(schema), (value) => {

@@ -84,7 +84,7 @@ it('removing a message clears its run\'s words and step arguments, and later run
   await h.ended(first)
   h.fake.script([call('slack_search', { query: 'hiring' }), reply(say('Nothing.'))])
   await h.ended(h.send('and hiring?'))
-  const id = (h.turns.store.db.prepare("SELECT min(id) AS id FROM messages WHERE kind = 'user' AND origin_op = ?").get(first) as { id: number }).id
+  const id = h.turns.messages().find(message => message.kind === 'user' && message.opId === first)!.id
   await h.turns.redaction.remove({ opId: 'remove-1', messageIds: [id], alsoRemoveReply: false })
   const [later, removed] = activityPage(h.turns.store, { limit: 50 }).runs
   expect(removed!.trigger).toEqual({ _tag: 'message', words: '', files: 0 })

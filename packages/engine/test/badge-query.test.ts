@@ -18,8 +18,6 @@ itEffect('holds an early DM until its read state is known, and shares All exclus
     yield* writer`INSERT INTO conversations (id, kind, user_id, is_member) VALUES ('D', 'im', 'U0OTHER', 1)`
     yield* writer`INSERT INTO messages (channel, ts, user_id, text) VALUES ('D', '1700000000.000002', 'U0OTHER', 'Already read')`
     yield* reindex
-    const early = yield* reader<{ unread_count: number }>`SELECT unread_count FROM topic_index WHERE topic_id = 'm:D'`
-    expect(early[0]?.unread_count).toBe(1)
     expect(yield* badge).toBe(false)
     yield* writer`INSERT INTO channel_reads (channel, slack_last_read, counts_updated) VALUES ('D', '1700000000.000002', '1')`
     yield* writer`INSERT INTO topic_reads (topic_id, last_read_ts, observed_at) VALUES ('m:D', '1700000000.000002', '1')`

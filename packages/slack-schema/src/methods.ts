@@ -128,7 +128,6 @@ export type MethodName = keyof Methods
 export type MethodArgs<M extends MethodName> = Methods[M]['args']['Type']
 /** The success payload of a method, `ok: true` included. */
 export type MethodOk<M extends MethodName> = Methods[M]['ok']['Type']
-export type MethodResponse<M extends MethodName> = Methods[M]['response']['Type']
 
 export function isMethodName(name: string): name is MethodName {
   return Object.hasOwn(Methods, name)

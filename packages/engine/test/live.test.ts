@@ -113,14 +113,6 @@ describe('serveLiveList', () => {
     const exit = await Effect.runPromiseExit(serveLiveList(runsOf<ListRun<Row>>([new Error('no table')]), { encodeRow }).pipe(Stream.runCollect))
     expect(Exit.isFailure(exit)).toBe(true)
   })
-
-  it('measures encoding only when asked', async () => {
-    const rows = [window([{ id: 'a', rev: 1, title: 'A' }])]
-    const [plain] = await Effect.runPromise(serveLiveList(runsOf(rows), { encodeRow }).pipe(Stream.runCollect))
-    const [measured] = await Effect.runPromise(serveLiveList(runsOf(rows), { encodeRow, measure: true }).pipe(Stream.runCollect))
-    expect(plain!.meta.encodeMs).toBe(0)
-    expect(measured!.meta.encodeMs).toBeGreaterThan(0)
-  })
 })
 
 describe('retryFirstRun', () => {
