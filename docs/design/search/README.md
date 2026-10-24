@@ -56,23 +56,25 @@ How we got here: a map of today's search (below), web research on what people li
 ### 4. The query: typed operators and chips are one thing
 
 - One `SearchQuery` object, shared by the Search tab, ⌘K and the Juno agent's search tool. One parser, and two compilers: to SQL for the local index, and to Slack's modifier syntax.
-- Operators: `from:`, `in:`, `with:`, `before:`, `after:`, `on:`, `during:`, `has:` (link, file, reaction, pin), `is:thread`, quoted phrases, `-` to exclude, `word*`. Juno adds `is:resolved`, `is:unresolved`, `is:pinned` and `in:` a sidebar view (v2), which Slack has no idea of.
+- Operators: `from:`, `in:`, `before:`, `after:`, `on:`, `during:`, `has:` (link, file, reaction, pin), `is:thread`, quoted phrases and `-` to exclude. Two `in:` chips mean either conversation, as in Slack. Dates are days in your own time zone, as Slack reads them. `with:`, `is:saved` and `word*` are left out: the live check found `with:` unclear, and `is:saved` and `*` doing nothing. Juno adds `is:resolved`, `is:unresolved`, `is:pinned` and `in:` a sidebar view (v2), which Slack has no idea of.
 - Typing `from:` or `in:` opens a picker, searched as ⌘K's Conversations tab is. The pick becomes a chip in the field. Clicking a chip edits it; Backspace at its edge removes it. Dates offer Today, Yesterday, This week, Last week, This month and a date.
 - Under the field, a quiet row of filter buttons for the mouse: **From**, **In**, **Date**, **Has**, then the sort, and at the end the **Apps hidden** and **Automated hidden** toggles (see 6).
-- An operator that can't be answered locally (`with:`, `is:saved`) searches Slack only and says so, rather than show wrong local rows.
+- Local filters must agree with Slack's: `has:link` checks attachment URLs too, and `has:pin` uses Juno's pins data, since Slack's search rows leave the pin out.
+- **Juno turns off Slack's own query rewriting** (`query_rewrite_disabled`). Slack quietly reads plain words as filters by default ("from me last week" became a person and a date and changed 163 matches to 805). Juno shows that reading as a suggestion you accept instead (section 7), so what you see in the field is what was searched.
+- **The From and In menus show counts.** Slack's answer carries `filter_suggestions` with the top people and conversations and their match counts, even with rewriting off. The menus list them first ("Maya Chen 34"), so narrowing is one click.
 
 ### 5. Instant first, then complete, without rows jumping
 
-- Local results paint on every keystroke (100 ms budget). Slack is asked after a 400 ms pause or at once on Enter, 50 per page, newest first.
+- Local results paint on every keystroke (100 ms budget). Slack is asked after a 400 ms pause or at once on Enter, 50 per page, newest first (Slack honours 20, 50 and 100; larger values fall back to 20). Its snippets come with matched words marked; Juno marks local snippets itself.
 - **One list, newest first, with a line where it stops being complete.** The local store holds about the last 7 days, plus older topics you've opened. Rows newer than what both sources have covered are complete. Older local rows sit under one quiet line, "Older matches on this Mac", and move up as Slack's pages reach them. Nothing above the line reorders. Rows that arrive above what you're reading keep your place, as the topic view does.
 - More pages load as you near the end, one request at a time. A Slack answer for an old query is dropped.
 - The states are different and say so: searching, no matches, Slack unavailable ("Showing matches on this Mac. Slack search didn't answer." with Try again), and offline.
-- Sort: **Newest** and **Oldest**. **Best match** waits until we verify, read-only, that the internal endpoint honours a score sort. We won't label an unknown order as relevance.
+- Sort: **Newest** and **Oldest** in v1. Slack's score sort is real (it reorders results, not just reverses them), so **Best match** comes in v2, with local matches as a small block above Slack's order, since the two rankings can't be merged.
 
 ### 6. Apps, bots and automated channels are hidden by default
 
 - Two toggles at the end of the filter row, each remembered: **Apps hidden** (messages from apps and bots) and **Automated hidden** (the conversations in the Automated view, SPEC 5). One click shows them; the label then reads **Apps shown** or **Automated shown**. Nothing is hidden without a visible toggle saying so.
-- Apps maps to `search_exclude_bots` on Slack and the bot flag locally, once a live check shows both agree.
+- Apps maps to `search_exclude_bots` on Slack (checked live: it removes every bot message) and the bot flag locally.
 - Automated is Juno's own list, so Slack can't filter it: Slack's rows from those conversations are dropped after they arrive, and paging asks for more when a page thins out. Locally it is a `NOT IN` on the channel.
 - When a search finds nothing but hidden rows would match, the empty state says so: "4 matches, all from apps and automated channels." with **Show 4 matches**.
 - An `in:` chip naming an automated channel searches it whatever the toggle says.
@@ -98,7 +100,7 @@ Rejected: an answer card above the results, AI reranking, an AI "top hit", mergi
 
 v1, in order:
 
-1. Read-only live checks of Slack search: identity syntax for `from:`/`in:`, combined and excluded modifiers, date boundaries and time zone, `with:`, score sort, `search_exclude_bots`, page limits, the `filters`/`filter_suggestions` shape. Only counts, timings and redacted shapes are kept.
+1. Done (10-24): read-only live checks of Slack search, in `docs/research/slack-data-access.md`, "Search for the Search tab, live (2026-10-24)". Their results are folded into this page.
 2. `SearchQuery`, the parser and both compilers. ⌘K and the agent tool move onto it.
 3. The `search` place with sessions, the two-pane page, the reader, keys, ⌘⇧F, ⌘F in a topic, the ⌘K handoff.
 4. Merge with the completeness line, paging, highlighting, the four states, the Apps and Automated toggles.
@@ -106,7 +108,7 @@ v1, in order:
 6. Recent searches; privacy mode.
 7. Words to filters; Answer from results; Summarize.
 
-v2: Best match (if verified), facet counts as one-click filters (from Slack's `filters`, once verified), Juno-only filters, Try other words, Files, and a semantic index only if we see many searches that find nothing.
+v2: Best match, Juno-only filters, Try other words, Files, and a semantic index only if we see many searches that find nothing.
 
 Tests: end-to-end flows against the fake Slack (which needs the extra operators, paging and `search_exclude_bots`), a perf spec for keystroke-to-results and arrow-to-reader, and unit tests only for the parser and compilers.
 
