@@ -6,6 +6,7 @@
  */
 export { runSync, type SyncPhase, type SyncStep, type TopicFetcher } from './sync'
 export { type FetchReport } from './open'
+export { OPEN_FETCH_MAX } from './openShared'
 export { syncConfigLayer, type SyncConfigShape } from './config'
 export { followFenceLayer } from './followFence'
 

@@ -1,6 +1,6 @@
 import { Effect } from 'effect'
 import { StoreReader } from '@juno/store'
-import { continuous, provenToEnd, rangeHolding, type ThreadRange } from '@juno/sync'
+import { continuous, OPEN_FETCH_MAX, provenToEnd, rangeHolding, type ThreadRange } from '@juno/sync'
 import { compareTs } from '@juno/domain'
 import type { WindowMessage, WindowTarget } from './window'
 
@@ -10,8 +10,8 @@ export interface ThreadCoverage {
   /** The root, for its counters and whether it is only a stub. */
   readonly root: Pick<WindowMessage, 'reply_count' | 'latest_reply' | 'user_id' | 'text' | 'blocks_json'> | undefined
   /**
-   * The replies stored in full, counted only while no page proves any stretch of the thread (`standInRanges`);
-   * undefined when nothing may stand in for proof.
+   * The replies stored in full, counted only while no page proves any stretch of the thread and its first open
+   * reads it whole (`standInRanges`); undefined when nothing may stand in for proof.
    */
   readonly held?: number
 }
@@ -27,15 +27,16 @@ export const threadCoverage = (target: Extract<WindowTarget, { kind: 'thread' }>
     const roots = yield* sql<NonNullable<ThreadCoverage['root']>>`
       SELECT reply_count, latest_reply, user_id, text, blocks_json FROM messages WHERE channel = ${target.channel} AND ts = ${target.threadTs}`
     const root = roots[0]
-    if (ranges.some((range) => range.kind === 'page')) return { ranges, root } satisfies ThreadCoverage
+    // A longer thread's first open reads from the read pointer only, so it would not prove what stood in above it.
+    if (ranges.some((range) => range.kind === 'page') || (root?.reply_count ?? 0) > OPEN_FETCH_MAX) return { ranges, root } satisfies ThreadCoverage
     const counts = yield* sql<{ n: number }>`SELECT count(*) AS n FROM messages
       WHERE channel = ${target.channel} AND thread_ts = ${target.threadTs} AND ts <> ${target.threadTs} AND deleted = 0 AND partial = 0`
     return { ranges, root, held: counts[0]?.n ?? 0 } satisfies ThreadCoverage
   })
 
 /**
- * What may stand in for proof while no page proves any stretch of a thread (`LiveMeta.standIn`): a thread stored
- * before ranges, or known only from Slack's thread list. The replies Slack's thread list vouched for (`view`
+ * What may stand in for proof while no page proves any stretch of a thread its first open reads whole, 500
+ * replies or fewer (`LiveMeta.standIn`): a thread stored before ranges, or known only from Slack's thread list. The replies Slack's thread list vouched for (`view`
  * ranges), and every stored reply when the store holds as many as the root counts, as before ranges. Neither is
  * proof, and the window says so; the thread's first open lands every page it reads at once (`fetchThread` in
  * `@juno/sync`), and from then on the window keeps to what pages prove.
@@ -90,7 +91,10 @@ export function clipThread(rows: ReadonlyArray<WindowMessage>, options: ClipOpti
   // What the store holds of a thread's end stands in too, alone (one reply claims nothing), when only replies above
   // it can come in. A root alone does not: its replies would come in below it.
   const tail = proven.gapBefore && proven.gapAfter === undefined
-  if (stood.rows.some((row) => row.partial !== 0) || (same && !tail)) return { ...proven, standIn: false }
+  // A stand-in at the thread's end that stops before a reply the store holds or the root counts would see it land
+  // below its rows: it waits for the open instead.
+  const below = options.anchor === undefined && stood.gapAfter !== undefined
+  if (below || stood.rows.some((row) => row.partial !== 0) || (same && !tail)) return { ...proven, standIn: false }
   return { ...stood, standIn: true }
 }
 

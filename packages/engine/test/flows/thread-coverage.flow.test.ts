@@ -308,6 +308,31 @@ it('a long thread from before ranges shows the replies it holds at once, and its
   })
 })
 
+it('a thread over 500 replies from before ranges does not stand in, since its first open reads from the read pointer only', async () => {
+  const first = await syncedEngine(engines)
+  const thread = longThread(first.fake, 600)
+  // Every reply stored: the open reads 500 messages from the root, then the view steps down to the end.
+  expect(valueOf(await openTopic(first.registry, thread.id)).outcome).toBe('fetched')
+  const stored = () => readDb(first, 'cache.db', (db) => db.prepare('SELECT count(*) AS n, max(ts) AS last FROM messages WHERE channel = ? AND thread_ts = ? AND ts <> thread_ts').get('C0ENG', thread.root.ts)) as { n: number; last: string }
+  for (let i = 0; i < 5 && !valueOf(await loadNewerMessages(first.registry, thread.id, stored().last)).complete; i++);
+  expect(stored().n).toBe(600)
+  await quiet(first)
+  const engine = await restart(engines, first, () => {
+    const db = new DatabaseSync(join(first.userData, 'workspaces', first.fake.teamId, 'cache.db'))
+    try {
+      db.prepare('DELETE FROM thread_ranges').run()
+    } finally {
+      db.close()
+    }
+  }, { recheckTopics: 0 })
+
+  await step('the window does not stand in with the replies it holds, so the view waits for the open', async () => {
+    const window = await windowOf(engine, thread.id, { limit: 150 }, (value) => value.order.length > 0, 'the stored thread')
+    expect(window.meta.standIn).toBeUndefined()
+    expect(window.meta.windowCovered).toBe(false)
+  })
+})
+
 it('the reconnect\'s recheck proves an unfollowed thread it reads again: its count is exact and its window whole before any open', async () => {
   let unfollowed = ''
   const engine = await bootedEngine(engines, { initial: (fake) => {
