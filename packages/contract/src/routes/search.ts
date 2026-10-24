@@ -7,6 +7,9 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 import { ChannelRef, Person } from '../refs'
+import { MessageBody } from '../body'
+import { FileView } from './files'
+import { ReactionView } from './messages'
 
 /** Where a result lives, without the DM partner's or group members' ids. */
 const { partnerId: _partnerId, memberIds: _memberIds, ...placeFields } = ChannelRef.fields
@@ -123,7 +126,26 @@ export const searchCommand = Rpc.make('search.command', {
 
 /** A topic's art recipe (`@juno/topic-art`) when it is drawn and AI assist is on; absent draws the placeholder. */
 const art = Schema.optionalKey(Schema.String)
-export const SearchHit = Schema.Struct({ ...SearchMessage.fields, ranges: Schema.Array(SearchRange), art })
+/**
+ * A result's whole message, as the Search tab's card draws it (SPEC 10a, "Cards"): the body as the topic renders
+ * it, the files, the reactions (read-only: no users), the sender with their photo, and where it stands in its thread.
+ */
+export const SearchCard = Schema.Struct({
+  body: MessageBody,
+  files: Schema.Array(FileView),
+  reactions: Schema.Array(ReactionView),
+  sender: Person,
+  /** Sent by an app or a bot: the card says "App". */
+  app: Schema.Boolean,
+  /** A reply in a thread, not its first message. */
+  reply: Schema.Boolean,
+  /** A thread's first message: its replies, when it has any. `repliers` are the first three Slack lists, when Juno knows them. */
+  thread: Schema.optionalKey(Schema.Struct({ replyCount: Schema.Int, lastReplyAt: Schema.optionalKey(Schema.Number), repliers: Schema.Array(Person) })),
+})
+export type SearchCard = typeof SearchCard.Type
+/** Results a Search window holds: each is a whole message, so a snapshot stays under the live-query budget (performance 1). */
+export const SEARCH_WINDOW = 50
+export const SearchHit = Schema.Struct({ ...SearchMessage.fields, ranges: Schema.Array(SearchRange), art, card: Schema.optionalKey(SearchCard) })
 export type SearchHit = typeof SearchHit.Type
 export const SearchTitleHit = Schema.Struct({ ...SearchTopic.fields, ranges: Schema.Array(SearchRange), art })
 export type SearchTitleHit = typeof SearchTitleHit.Type
@@ -168,7 +190,7 @@ export const searchSession = liveValueRoute('search.session', {
   payload: { sessionId: Schema.String, generation: Schema.Int, query: SearchQuery, immediate: Schema.optionalKey(Schema.Boolean) },
   value: SearchUpdate,
 })
-/** One sequential page, or retry after failure. Offset selects a 100-match/topic window from the loaded results. */
+/** One sequential page, or retry after failure. Offset selects a `SEARCH_WINDOW`-result window from the loaded results. */
 export const searchMore = Rpc.make('search.more', {
   payload: { sessionId: Schema.String, generation: Schema.Int, offset: Schema.optionalKey(Schema.Int) },
   success: Schema.Boolean,

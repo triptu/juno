@@ -2,7 +2,7 @@ import { searchSessions } from '../../src/search/session'
 import { serveLiveValue } from '../../src/protocol/live'
 import { SyncLink } from '../../src/syncLink'
 import type { OpenWorkspace, StoreServices } from '../../src/workspace'
-import { NotSignedIn, SearchUpdate } from '@juno/contract'
+import { NotSignedIn, SEARCH_WINDOW, SearchUpdate } from '@juno/contract'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { loadavg, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -94,7 +94,7 @@ describe('local FTS on 100 k messages', () => {
 const measureSession = (sessions: ReturnType<typeof searchSessions>, open: OpenWorkspace, run: number) => Effect.gen(function* () {
   const [first] = yield* serveLiveValue(sessions.stream(open, { sessionId: `bench-${run}`, generation: run, query: parseSearchQuery('rollout') })).pipe(Stream.take(1), Stream.runCollect)
   if (first === undefined) throw new Error('Search session did not publish')
-  expect(first.value.groups.flatMap((group) => group.messages)).toHaveLength(100)
+  expect(first.value.groups.flatMap((group) => group.messages)).toHaveLength(SEARCH_WINDOW)
   const encodeStart = performance.now()
   const wire = encode(first.value)
   const encodeMs = performance.now() - encodeStart

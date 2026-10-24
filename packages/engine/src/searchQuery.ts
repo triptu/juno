@@ -25,6 +25,11 @@ export interface MessageHit {
   readonly attachments_json?: string | null
   readonly blocks_json?: string | null
   readonly bot_name?: string | null
+  readonly bot_icon?: string | null
+  readonly files_json?: string | null
+  readonly subtype?: string | null
+  readonly latest_reply?: string | null
+  readonly reply_users_json?: string | null
   readonly channel: string
   readonly ts: string
   readonly thread_ts: string | null
@@ -251,7 +256,8 @@ export const messageHits = (search: ResolvedSearch, limit: number, options: { pr
   const candidates = !options.ranked && fts !== '' ? yield* sql<{ rowid: number }>`SELECT rowid FROM messages_fts WHERE messages_fts MATCH ${fts} LIMIT ${needed + 1}` : []
   const compiled = compileSearchSql(search, { ...options, chronological: candidates.length > needed })
   const order = options.ranked && fts !== '' ? 'f.rank, m.channel, m.ts' : compiled.order
-  return yield* sql.unsafe<MessageHit>(`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name
+  return yield* sql.unsafe<MessageHit>(`SELECT m.channel, m.ts, m.thread_ts, m.reply_count, m.user_id, m.text, m.blocks_json, m.attachments_json, m.bot_name,
+      m.bot_icon, m.files_json, m.subtype, m.latest_reply, m.reply_users_json
     FROM ${compiled.source} WHERE ${compiled.where} ORDER BY ${order} LIMIT ? OFFSET ?`, [...compiled.params, limit, options.offset ?? 0])
 })
 

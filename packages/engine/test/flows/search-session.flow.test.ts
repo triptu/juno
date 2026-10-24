@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'bun:test'
-import { parseSearchQuery, printSearchQuery, searchMore, searchQuery, viewsSortChannel, topicsRename, type SearchSnapshot, type SearchQuery } from '@juno/contract'
+import { parseSearchQuery, printSearchQuery, SEARCH_WINDOW, searchMore, searchQuery, viewsSortChannel, topicsRename, type SearchSnapshot, type SearchQuery } from '@juno/contract'
 import { liveQuery, runCommand, searchSnapshots } from '@juno/state'
 import { syncedEngine } from '../synced'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
@@ -51,10 +51,26 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
   expect(valueOf(await runCommand(engine.registry, searchMore, { sessionId: 'frontier', generation: 1 }))).toBe(true)
   const complete = await search.until((s) => s.state === 'done' && s.pagination.page === 2)
   expect(ids(complete).slice(0, established.length)).toEqual(established)
-  expect(new Set(ids(complete)).size).toBe(77)
+  expect(complete.window.totalRows).toBe(77)
+  expect(new Set(ids(complete)).size).toBe(SEARCH_WINDOW)
   expect(complete.frontier.complete).toBe(true)
   expect(complete.facets.from.find((f) => f.id === 'U0LEO')).toMatchObject({ count: 75, person: { id: 'U0LEO' } })
   expect(complete.groups.flatMap((g) => g.messages).every((m) => m.ranges.length > 0)).toBe(true)
+
+  await step('every result carries its whole message for its card, a match only Slack found too', async () => {
+    const remote = complete.groups.flatMap((g) => g.messages).find((m) => m.text.endsWith('frontiertest remote 7'))
+    expect(remote?.stored).toBe(false)
+    expect(remote?.card).toMatchObject({ sender: { id: 'U0LEO' }, app: false, reply: false, files: [], reactions: [] })
+    expect(JSON.stringify(remote?.card?.body)).toContain('frontiertest remote 7')
+    const root = fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'cardprobe the start of a thread', at: now - 30_000 })
+    fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'cardprobe a reply in it', threadTs: root.ts, at: now - 29_000 })
+    fake.addReaction({ channel: 'C0ENG', ts: root.ts, name: 'white_check_mark', user: 'U0LEO' })
+    await engine.socketIdle()
+    const cards = await session(engine, parseSearchQuery('cardprobe'), 'cards').until((s) => s.state === 'done' && ids(s).length === 2)
+    const hits = cards.groups.flatMap((g) => g.messages)
+    expect(hits.find((m) => m.ts === root.ts)?.card).toMatchObject({ reply: false, sender: { id: 'U0MAYA' }, thread: { replyCount: 1, repliers: [{ id: 'U0LEO' }] }, reactions: [{ name: 'white_check_mark', count: 1, unicode: '✅' }] })
+    expect(hits.find((m) => m.ts !== root.ts)?.card).toMatchObject({ reply: true, sender: { id: 'U0LEO' } })
+  })
 
   await step('a completed title row keeps its anchor when an older message arrives on a later page', async () => {
     const root = fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'A separate title anchor', at: now - 200_000 })
@@ -63,17 +79,19 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
     valueOf(await runCommand(engine.registry, topicsRename, { id: `t:C0ENG:${root.ts}`, title: 'anchorneedle title' }))
     for (let i = 0; i < 60; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'anchorneedle elsewhere', at: now - 1000 - i * 1000, silent: true })
     fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'anchorneedle older reply', threadTs: root.ts, at: now - 100_000, silent: true })
-    for (const groupByThread of [false, true]) {
-      const sessionId = `title-anchor-${groupByThread}`
-      const titles = session(engine, parseSearchQuery('anchorneedle', { scope: { groupByThread } }), sessionId)
-      const before = await titles.until((s) => s.state === 'done')
-      const anchor = before.groups.find((g) => g.topicId === `t:C0ENG:${root.ts}`)
-      expect(anchor).toMatchObject({ kind: 'topic', older: false })
-      valueOf(await runCommand(engine.registry, searchMore, { sessionId, generation: 1 }))
-      const after = await titles.until((s) => s.state === 'done' && s.pagination.page === 2)
-      expect(after.groups[before.groups.indexOf(anchor!)]).toBe(anchor)
-      expect(after.groups.flatMap((g) => g.messages).some((m) => m.text.includes('older reply'))).toBe(true)
-    }
+    const sessionId = 'title-anchor'
+    const titles = session(engine, parseSearchQuery('anchorneedle'), sessionId)
+    const before = await titles.until((s) => s.state === 'done')
+    const anchor = before.groups.find((g) => g.topicId === `t:C0ENG:${root.ts}`)
+    expect(anchor).toMatchObject({ kind: 'topic', older: false })
+    valueOf(await runCommand(engine.registry, searchMore, { sessionId, generation: 1 }))
+    const after = await titles.until((s) => s.state === 'done' && s.pagination.page === 2)
+    expect(after.groups[before.groups.indexOf(anchor!)]).toBe(anchor)
+    // The older reply is past the first window: move the window to the end to see it.
+    const offset = Math.max(0, after.window.totalRows - SEARCH_WINDOW)
+    valueOf(await runCommand(engine.registry, searchMore, { sessionId, generation: 1, offset }))
+    const end = await titles.until((s) => s.window.offset === offset)
+    expect(end.groups.flatMap((g) => g.messages).some((m) => m.text.includes('older reply'))).toBe(true)
   })
   await step('loaded windows move without asking Slack for more pages, including a request held behind the first page', async () => {
     for (let i = 0; i < 260; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `windowprobe ${i}`, at: now - i * 1000 })
@@ -86,10 +104,10 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
     fake.release({ method: 'search.modules.messages' })
     await windows.until((s) => s.window.offset === 150 && s.state === 'done')
     const calls = fake.callCount('search.modules.messages')
-    for (const offset of [50, 100, 0, 150, 50]) {
+    for (const offset of [50, 100, 0, 150, 25]) {
       valueOf(await runCommand(engine.registry, searchMore, { sessionId: 'windows', generation: 1, offset }))
       const moved = await windows.until((s) => s.window.offset === offset)
-      expect(ids(moved)).toHaveLength(100)
+      expect(ids(moved)).toHaveLength(SEARCH_WINDOW)
     }
     expect(fake.callCount('search.modules.messages')).toBe(calls)
   })
@@ -198,10 +216,9 @@ it('local and Slack identity/date filters agree; apps and Automated are hidden w
     const thin = await session(engine, parseSearchQuery('scopedprobe'), 'thin').until((s) => s.state === 'done')
     expect(thin.pagination.page).toBe(2)
     expect(ids(thin)).toHaveLength(2)
-    const scoped = await session(engine, parseSearchQuery('scopedprobe', { scope: { topic: { channel: 'C0ENG', threadTs: root.ts }, groupByThread: true } }), 'topic').until((s) => s.state === 'done')
+    const scoped = await session(engine, parseSearchQuery('scopedprobe', { scope: { topic: { channel: 'C0ENG', threadTs: root.ts } } }), 'topic').until((s) => s.state === 'done')
     expect(ids(scoped)).toEqual(ids(thin))
-    expect(scoped.groups).toHaveLength(1)
-    expect(scoped.groups[0]?.kind).toBe('thread')
+    expect(scoped.groups.map((group) => group.kind)).toEqual(['thread', 'thread'])
     valueOf(await runCommand(registry, topicsRename, { id: `t:C0ENG:${root.ts}`, title: 'Named title needle' }))
     const title = await session(engine, parseSearchQuery('"Named title needle" from:U0MAYA in:C0ENG'), 'title-author').until((s) => s.state === 'done')
     expect(title.groups).toEqual([expect.objectContaining({ kind: 'topic', topicId: `t:C0ENG:${root.ts}`, title: 'Named title needle' })])

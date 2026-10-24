@@ -1,28 +1,34 @@
 import type { SearchHit, SearchSnapshot } from '@juno/contract'
 import type { SearchQuery } from '@juno/domain'
 import { decodeSearchHighlights, type SearchPageMatch } from '@juno/slack'
+import { toMessageRow } from '@juno/sync'
 import { StoreReader } from '@juno/store'
 import { Effect } from 'effect'
 import { literalRanges, searchSnippet } from './searchMerge'
+import type { CardRow } from './searchCards'
 import { messageResults, readPlaces, readUsers, topicOfMessage, type MessageHit } from './searchQuery'
 import { personFrom } from './topicRows'
 
 export const localHits = (rows: ReadonlyArray<MessageHit>, query: SearchQuery) => messageResults(rows.map((row) => ({ ...row, topicId: topicOfMessage(row.channel, row.ts, row.thread_ts, row.reply_count), stored: true }))).pipe(Effect.map((rows) => rows.map((row) => ({ ...row, ...searchSnippet(row.text, literalRanges(row.text, query)) }))), Effect.flatMap((hits) => withArt(hits, (hit) => hit.topicId)))
 export const threadOf = (match: SearchPageMatch) => match.thread_ts ?? /[?&]thread_ts=(\d+\.\d+)/.exec(match.permalink ?? '')?.[1]
 
+/** Slack's matches as hits, and each one's row as sync would store it, with Slack's reactions, for its card (`searchCards`). */
 export const remoteHits = (matches: ReadonlyArray<SearchPageMatch>, query: SearchQuery) => Effect.gen(function* () {
   const sql = yield* StoreReader
-  if (matches.length === 0) return []
+  if (matches.length === 0) return { hits: [], cards: [] }
   const stored = new Map((yield* sql<{ channel: string; ts: string; deleted: number }>`SELECT channel, ts, deleted FROM messages WHERE channel IN ${sql.in([...new Set(matches.map((m) => m.channel))])} AND ts IN ${sql.in(matches.map((m) => m.ts))}`).map((r) => [`${r.channel}:${r.ts}`, r]))
-  const rows = yield* messageResults(matches.filter((m) => stored.get(`${m.channel}:${m.ts}`)?.deleted !== 1).map((match) => {
+  const shown = matches.filter((m) => stored.get(`${m.channel}:${m.ts}`)?.deleted !== 1)
+  const cards = shown.map((match): CardRow => ({ ...toMessageRow(match.channel, match as unknown as Parameters<typeof toMessageRow>[1]), thread_ts: threadOf(match) ?? null, slackReactions: match.reactions ?? [] }))
+  const rows = yield* messageResults(shown.map((match) => {
     const channel = match.channel
     const ts = threadOf(match)
     return { channel, ts: match.ts, thread_ts: ts ?? null, reply_count: match.reply_count ?? 0, user_id: match.user ?? null, username: match.username, bot_name: match.bot_profile?.name, text: match.extracts?.find((e) => e.text !== '')?.text ?? match.text ?? '', attachments_json: JSON.stringify(match.attachments), topicId: topicOfMessage(channel, match.ts, ts ?? null, match.reply_count ?? 0), stored: stored.has(`${channel}:${match.ts}`) }
   }))
-  return yield* withArt(rows.map((row): SearchHit => {
+  const hits = yield* withArt(rows.map((row): SearchHit => {
     const decoded = decodeSearchHighlights(row.text)
     return { ...row, ...searchSnippet(decoded.text, decoded.ranges.length > 0 ? decoded.ranges : literalRanges(decoded.text, query)) }
   }), (hit) => hit.topicId)
+  return { hits, cards }
 })
 
 /** Each result with its topic's art recipe, as the sidebar draws it: only a confident drawing, and none while AI assist is off. */

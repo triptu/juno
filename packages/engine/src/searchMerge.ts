@@ -21,9 +21,7 @@ export function literalRanges(text: string, query: SearchQuery) {
 
 /**
  * Coverage follows raw source pages, before hidden rows are removed. Local copies win dedupe.
- * Flat (the default) gives each match and each title-only topic a group of its own, in time order, so a later
- * page only adds rows at the end. `group` gathers a thread's matches under its newest, and consecutive Main
- * matches from one channel.
+ * Each match and each title-only topic is a group of its own, in time order, so a later page only adds rows at the end.
  */
 export function mergeSearch(input: {
   readonly local: ReadonlyArray<SearchHit>
@@ -32,7 +30,6 @@ export function mergeSearch(input: {
   readonly pages: ReadonlyArray<SearchPage>
   readonly sort: 'newest' | 'oldest'
   readonly establishedTitles?: ReadonlySet<string>
-  readonly group?: boolean
 }): { groups: ReadonlyArray<SearchGroup>; frontier: { through: string | null; complete: boolean; olderGroupIndex: number } } {
   const direction = input.sort === 'newest' ? -1 : 1
   const slack = input.pages.at(-1)?.coverage ?? { through: null, complete: false }
@@ -48,26 +45,16 @@ export function mergeSearch(input: {
   const matchedTopics = new Set([...rows.values()].map((row) => row.topicId))
   for (const row of input.titles) if (!matchedTopics.has(row.id) || input.establishedTitles?.has(row.id)) entries.push({ kind: 'title', at: (row.at / 1000).toFixed(6), row })
   entries.sort((a, b) => direction * compare(a.at, b.at) || a.row.id.localeCompare(b.row.id))
-  const groups: SearchGroup[] = []
-  const threads = new Map<string, number>()
-  for (const entry of entries) {
+  const groups = entries.map((entry): SearchGroup => {
     const isOlder = older(entry.at)
     const topicId = entry.kind === 'message' ? entry.row.topicId : entry.row.id
     const kind = entry.kind === 'title' ? 'topic' : topicId.startsWith('t:') ? 'thread' : 'main'
     const key = `${isOlder ? 'older:' : ''}${topicId}`
-    const previous = groups.at(-1)
-    const index = input.group !== true ? undefined : kind === 'thread' ? threads.get(key) : kind === 'main' && previous?.kind === 'main' && previous.place.id === entry.row.place.id && previous.older === isOlder ? groups.length - 1 : undefined
     const title = titles.get(topicId)
-    if (index !== undefined && entry.kind === 'message') {
-      const group = groups[index]
-      if (group !== undefined) groups[index] = { ...group, messages: [...group.messages, entry.row], matchCount: group.matchCount + 1 }
-    } else {
-      if (kind === 'thread') threads.set(key, groups.length)
-      const art = title?.art ?? entry.row.art
-      const id = kind === 'main' || (input.group !== true && entry.kind === 'message') ? `${key}:${entry.row.id}` : kind === 'thread' && input.establishedTitles?.has(topicId) ? `${key}:matches` : key
-      groups.push({ id, kind, topicId, title: title?.title ?? entry.row.title, titleRanges: title?.ranges ?? [], place: entry.row.place, ...(art === undefined ? {} : { art }), at: entry.at, messages: entry.kind === 'message' ? [entry.row] : [], older: isOlder, matchCount: entry.kind === 'message' ? 1 : 0 })
-    }
-  }
+    const art = title?.art ?? entry.row.art
+    const id = entry.kind === 'message' ? `${key}:${entry.row.id}` : kind === 'thread' && input.establishedTitles?.has(topicId) ? `${key}:matches` : key
+    return { id, kind, topicId, title: title?.title ?? entry.row.title, titleRanges: title?.ranges ?? [], place: entry.row.place, ...(art === undefined ? {} : { art }), at: entry.at, messages: entry.kind === 'message' ? [entry.row] : [], older: isOlder, matchCount: entry.kind === 'message' ? 1 : 0 }
+  })
   const index = groups.findIndex((g) => g.older)
   return { groups, frontier: { through, complete, olderGroupIndex: index < 0 ? groups.length : index } }
 }

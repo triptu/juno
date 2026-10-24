@@ -290,45 +290,8 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     for (const list of reactions.values()) for (const reaction of list) for (const id of reaction.users.slice(0, REACTORS_SHOWN + 1)) senders.add(id)
     for (const ids of repliers.values()) for (const id of ids) senders.add(id)
     yield* readUsers(sql, cache, senders)
-    const wanted = { users: new Set<string>(), channels: new Set<string>(), usergroups: new Set<string>(), emoji: new Set<string>() }
-    const user = (id: string) => {
-      const row = cache.users.get(id)
-      if (row === undefined) wanted.users.add(id)
-      return row === undefined || row === null ? undefined : userName(id, row)
-    }
-    const lookups = {
-      ...(selfId === undefined ? {} : { me: selfId }),
-      ...(me?.usergroupIds === undefined ? {} : { myUsergroups: me.usergroupIds }),
-      user,
-      unreachable: (id: string) => unreachable(cache.users.get(id)),
-      channel: (id: string) => {
-        const row = cache.channels.get(id)
-        if (row === undefined) wanted.channels.add(id)
-        return row?.name ?? undefined
-      },
-      // A DM is named by its people, as the sidebar names it.
-      place: (id: string) => {
-        const row = cache.channels.get(id)
-        if (row === undefined) wanted.channels.add(id)
-        if (row === undefined || row === null) return undefined
-        const nameOf = (member: string) => user(member) ?? member
-        if (row.kind === 'im') return row.user_id === null ? undefined : { kind: row.kind, name: nameOf(row.user_id) }
-        if (row.name === null) return undefined
-        const members = row.kind === 'mpim' ? placeMembers(row, selfId) : []
-        return { kind: row.kind, name: channelLabelBare({ kind: row.kind, name: row.name, memberNames: members.map(nameOf) }) }
-      },
-      usergroup: (id: string) => {
-        const group = cache.usergroups.get(id)
-        if (group === undefined) wanted.usergroups.add(id)
-        return group ?? undefined
-      },
-      emoji: (name: string) => {
-        const url = cache.emoji.get(name)
-        if (url === undefined) wanted.emoji.add(name)
-        return url ?? undefined
-      },
-      emojiAlias: (name: string) => cache.emojiAliases.get(name),
-    }
+    const wanted = wantedNothing()
+    const lookups = bodyLookups(cache, selfId, me, wanted)
     const parse = (row: WindowMessage): CachedBody => {
       const content: MessageContent = {
         text: row.text,
@@ -353,16 +316,8 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     }
     // Emoji names in reactions are looked up too, so the second pass has them.
     for (const list of reactions.values()) for (const reaction of list) if (emojiUnicode(reaction.name) === undefined) lookups.emoji(splitEmojiName(reaction.name).name)
-    if (wanted.users.size + wanted.channels.size + wanted.usergroups.size + wanted.emoji.size > 0) {
-      yield* readChannels(sql, cache, wanted.channels)
-      // The people a DM a shared message came from is named by.
-      const placePeople = [...wanted.channels].flatMap((id) => {
-        const row = cache.channels.get(id)
-        return row?.kind === 'im' && row.user_id !== null ? [row.user_id] : row?.kind === 'mpim' ? placeMembers(row, selfId) : []
-      })
-      yield* readUsers(sql, cache, [...wanted.users, ...placePeople])
-      yield* readUsergroups(sql, cache, wanted.usergroups)
-      yield* readEmoji(sql, cache, wanted.emoji)
+    if (wantsAny(wanted)) {
+      yield* readWanted(sql, cache, wanted, selfId)
       for (const row of parsedNow) bodies.set(row.ts, parse(row))
     }
     cache.bodies = bodies
@@ -442,7 +397,74 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     return { rows: out, total: out.length, windowCovered: yield* windowCovered(target, stored[0]?.ts), refs: { people: [...people.values()] } }
   })
 
-const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>
+/** Ids a body asked for that the cache lacked, for `readWanted`. */
+export interface Wanted {
+  readonly users: Set<string>
+  readonly channels: Set<string>
+  readonly usergroups: Set<string>
+  readonly emoji: Set<string>
+}
+
+export const wantedNothing = (): Wanted => ({ users: new Set(), channels: new Set(), usergroups: new Set(), emoji: new Set() })
+export const wantsAny = (wanted: Wanted): boolean => wanted.users.size + wanted.channels.size + wanted.usergroups.size + wanted.emoji.size > 0
+
+/** What `messageBody` asks while it parses, answered from the cache. What the cache lacks goes into `wanted`. */
+export function bodyLookups(cache: MessageCache, selfId: string | undefined, me: Me | undefined, wanted: Wanted) {
+  const user = (id: string) => {
+    const row = cache.users.get(id)
+    if (row === undefined) wanted.users.add(id)
+    return row === undefined || row === null ? undefined : userName(id, row)
+  }
+  return {
+    ...(selfId === undefined ? {} : { me: selfId }),
+    ...(me?.usergroupIds === undefined ? {} : { myUsergroups: me.usergroupIds }),
+    user,
+    unreachable: (id: string) => unreachable(cache.users.get(id)),
+    channel: (id: string) => {
+      const row = cache.channels.get(id)
+      if (row === undefined) wanted.channels.add(id)
+      return row?.name ?? undefined
+    },
+    // A DM is named by its people, as the sidebar names it.
+    place: (id: string) => {
+      const row = cache.channels.get(id)
+      if (row === undefined) wanted.channels.add(id)
+      if (row === undefined || row === null) return undefined
+      const nameOf = (member: string) => user(member) ?? member
+      if (row.kind === 'im') return row.user_id === null ? undefined : { kind: row.kind, name: nameOf(row.user_id) }
+      if (row.name === null) return undefined
+      const members = row.kind === 'mpim' ? placeMembers(row, selfId) : []
+      return { kind: row.kind, name: channelLabelBare({ kind: row.kind, name: row.name, memberNames: members.map(nameOf) }) }
+    },
+    usergroup: (id: string) => {
+      const group = cache.usergroups.get(id)
+      if (group === undefined) wanted.usergroups.add(id)
+      return group ?? undefined
+    },
+    emoji: (name: string) => {
+      const url = cache.emoji.get(name)
+      if (url === undefined) wanted.emoji.add(name)
+      return url ?? undefined
+    },
+    emojiAlias: (name: string) => cache.emojiAliases.get(name),
+  }
+}
+
+/** Reads what the lookups wanted into the cache, so a second parse has it. */
+export const readWanted = (sql: SqlClient.SqlClient, cache: MessageCache, wanted: Wanted, selfId: string | undefined) =>
+  Effect.gen(function* () {
+    yield* readChannels(sql, cache, wanted.channels)
+    // The people a DM a shared message came from is named by.
+    const placePeople = [...wanted.channels].flatMap((id) => {
+      const row = cache.channels.get(id)
+      return row?.kind === 'im' && row.user_id !== null ? [row.user_id] : row?.kind === 'mpim' ? placeMembers(row, selfId) : []
+    })
+    yield* readUsers(sql, cache, [...wanted.users, ...placePeople])
+    yield* readUsergroups(sql, cache, wanted.usergroups)
+    yield* readEmoji(sql, cache, wanted.emoji)
+  })
+
+export const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>
   Effect.gen(function* () {
     const missing = [...ids].filter((id) => !cache.users.has(id))
     if (missing.length === 0) return
@@ -908,8 +930,14 @@ function boxOf(src: string, width: number, height: number): NonNullable<FileView
   return { src, width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
 }
 
+/** A stored message's files and the files of the messages it shares, as a row shows them, without staged copies. */
+export function storedFiles(row: Pick<WindowMessage, 'files_json' | 'attachments_json'>): ReadonlyArray<FileView> {
+  const none = new Map<string, LocalFile>()
+  return [...filesOf(parseJson<ReadonlyArray<SlackFile>>(row.files_json), none), ...filesOf(sharedFiles(row), none)]
+}
+
 /** The files of the messages a row shares, which its cards draw (`richtext` `attachmentBlock`). */
-function sharedFiles(row: WindowMessage): ReadonlyArray<SlackFile> | undefined {
+function sharedFiles(row: Pick<WindowMessage, 'attachments_json'>): ReadonlyArray<SlackFile> | undefined {
   if (row.attachments_json === null || !row.attachments_json.includes('"files"')) return undefined
   return (parseJson<ReadonlyArray<{ readonly files?: ReadonlyArray<SlackFile> }>>(row.attachments_json) ?? []).flatMap((attachment) => attachment.files ?? [])
 }
