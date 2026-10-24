@@ -223,9 +223,11 @@ export async function readerWithoutCache({ juno, slack, fake }: Pick<Fixtures, '
   await expect.poll(() => fake.heldCount({ method: HISTORY })).toBe(1)
   // There is no signal for a load that must not start; give a stray one time to arrive.
   await win.waitForTimeout(300)
+  // The fake records a call once it answers: the held ones are the loads in flight.
   const passed = new Set(places.map((place) => slack.channel(place)))
-  const loads = fake.calls.slice(from).filter((call) => call.method === HISTORY && call.args['_x_reason'] === 'open' && passed.has(String(call.args['channel'])))
-  expect(loads.map((call) => call.args['channel'])).toEqual([slack.channel(last.place)])
+  const answered = fake.calls.slice(from).filter((call) => call.method === HISTORY && call.args['_x_reason'] === 'open').map((call) => String(call.args['channel']))
+  const held = fake.heldCalls({ method: HISTORY }).map((args) => String(args['channel']))
+  expect([...answered, ...held].filter((channel) => passed.has(channel))).toEqual([slack.channel(last.place)])
   fake.release({ method: HISTORY })
   await expect(page.reader.locator('[data-composer] textarea')).toBeVisible()
   await expect(page.reader.locator(`[data-message-row="${last.ts}"]`)).toBeVisible()
