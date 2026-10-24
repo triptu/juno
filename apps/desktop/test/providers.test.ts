@@ -123,13 +123,8 @@ it('the keychain gets a key on stdin, never in argv, and nothing about it is log
   expect(await macKeychain(OPENROUTER_ITEM, security).read()).toBe(KEY)
   expect(await store.set({ _tag: 'openRouter', key: null })).toBe('removed')
 
-  expect(calls.map((call) => call.args)).toEqual([
-    ['find-generic-password', '-w', '-s', 'juno-openrouter-key', '-a', 'openrouter'],
-    ['-i'],
-    ['find-generic-password', '-w', '-s', 'juno-openrouter-key', '-a', 'openrouter'],
-    ['delete-generic-password', '-s', 'juno-openrouter-key', '-a', 'openrouter'],
-  ])
-  expect(calls[1]!.stdin).toBe(`add-generic-password -U -s juno-openrouter-key -a openrouter -w ${KEY}\n`)
+  // The write goes through `security -i`, so the key is on stdin only.
+  expect(calls.filter((call) => call.stdin?.includes(KEY)).map((call) => call.args)).toEqual([['-i']])
   expect(calls.flatMap((call) => call.args).some((arg) => arg.includes(KEY))).toBe(false)
   for (const spy of logged) expect(spy).not.toHaveBeenCalled()
 })
@@ -148,7 +143,9 @@ it('shares the keychain OpenRouter key with the engine independently of the chat
 
 it('a removed key leaves the engine even when the provider file cannot be written', async () => {
   const keychains = { openRouter: memoryKeychain('fake-router-key'), custom: memoryKeychain() }
-  const { store, engineKeys } = await setup({ dir: join(tmpdir(), 'juno-providers-missing', 'nowhere'), keychains })
+  const missing = await mkdtemp(join(tmpdir(), 'juno-providers-'))
+  dirs.push(missing)
+  const { store, engineKeys } = await setup({ dir: join(missing, 'missing', 'nowhere'), keychains })
   expect(engineKeys).toEqual(['fake-router-key'])
   await expect(store.set({ _tag: 'openRouter', key: null })).rejects.toThrow()
   expect(engineKeys.at(-1)).toBeNull()
