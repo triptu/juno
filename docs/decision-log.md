@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 13:46 · Use the reserved install budget · Worktree installs inside an allocated remote container do not wait on host-wide load. The release fixture timed out at “load 12.0 is above 8” after desktop verification, despite owning reserved cores; local installs keep the load guard. Interrupted release fixtures now print their captured subprocess output.
 - 10-24 13:35 · Keep focus in open popups · A late composer mount or deferred page-focus callback leaves focus in a visible dialog, menu or expanded popup trigger, just as it already leaves another text field alone. A broadcast flow exposed the callback closing the Account menu after a thread opened.
 - 10-24 13:26 · Reserve late topic content · Thread-link fallback icons match the first avatar’s size. All topics keeps the preview line when empty, and status counts reserve four tabular digits; the narrow status picker appears earlier to fit. These fix measured shifts during live reply arrival and cold sync.
 - 10-24 13:22 · Forward serial plans to the laptop · A local JUNO_PLAN_SERIAL=1 now reaches the remote plan as well as disabling split SSH jobs; an explicit --env value wins. This lets one-agent, one-job verification run suites in sequence without starving timed repository-tool checks beside the browser workers.

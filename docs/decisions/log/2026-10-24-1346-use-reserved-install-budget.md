@@ -1,0 +1,1 @@
+- 10-24 13:46 · Use the reserved install budget · Worktree installs inside an allocated remote container do not wait on host-wide load. The release fixture timed out at “load 12.0 is above 8” after desktop verification, despite owning reserved cores; local installs keep the load guard. Interrupted release fixtures now print their captured subprocess output.

@@ -14,7 +14,7 @@
 // logging and Spotlight are off there), else in <repo>/.claude/worktrees
 // (`worktreeFolder` in scripts/worktree-folder.mjs).
 // Either folder gets a .metadata_never_index file so Spotlight skips it.
-// The install waits while the load average is above 8.
+// Local installs wait while load is above 8; an allocated remote container owns its CPU budget.
 //
 // See docs/development.md, "Worktrees and installs".
 
@@ -59,7 +59,7 @@ async function add(name) {
     else git('-C', main, 'worktree', 'add', '--quiet', '-b', branch, path, base)
   }
   if (!rest.includes('--no-install')) {
-    for (let waited = 0; loadavg()[0] > 8; waited += 30) {
+    for (let waited = 0; process.env.JUNO_REMOTE_CONTAINER !== '1' && loadavg()[0] > 8; waited += 30) {
       if (waited % 300 === 0) console.error(`worktree: load ${loadavg()[0].toFixed(1)} is above 8; waiting to install`)
       await sleep(30_000)
     }

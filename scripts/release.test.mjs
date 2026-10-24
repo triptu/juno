@@ -125,6 +125,7 @@ function fixture(t) {
     const read = (chunk) => { output += chunk; onOutput(output) }
     child.stdout.on('data', read)
     child.stderr.on('data', read)
+    child.on('exit', (_code, signal) => { if (signal !== null) console.error(`Release fixture stopped by ${signal}:\n${output}`) })
     child.on('close', (code) => resolve({ code, output }))
   })
   return { folder, repo, remote, env, git, commit, release, github, lines, plan: (...outcomes) => writeFileSync(file('plan'), outcomes.join('\n')), file }
