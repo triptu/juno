@@ -115,7 +115,7 @@ export const searchTitleAtom = Atom.family((id: string) =>
   Atom.make((get): string => {
     if (get(privacyAtom)) return 'Search'
     const session = get(searchSessionAtom(id))
-    return session.text.trim() || session.chips.map((chip) => chip.label).join(' ') || 'Search'
+    return session.text.replace(TYPING_IDENTITY, '').trim() || session.chips.map((chip) => chip.label).join(' ') || 'Search'
   }),
 )
 

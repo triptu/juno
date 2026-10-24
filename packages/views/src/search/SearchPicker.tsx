@@ -18,6 +18,8 @@ export interface SearchFieldPicker {
   readonly at: number
   /** "People" for from:, "Conversations" for in:. */
   readonly heading: string
+  /** Conversations show their kind at the row's end; people do not. */
+  readonly kinds: boolean
   readonly rows: ReadonlyArray<SearchPickerRow>
   readonly onPick: (id: string) => void
   readonly onClose: () => void
@@ -78,8 +80,7 @@ export function SearchPicker({ picker, left, activeId, onActivate }: { readonly 
               active={row.id === activeId}
               leading={<PickerMark row={row} />}
               label={<Highlighted text={row.name} ranges={row.highlight} />}
-              sub={kindLabels[row.kind]}
-              subPlacement="end"
+              {...(picker.kinds ? { sub: kindLabels[row.kind], subPlacement: 'end' as const } : {})}
               onActivate={() => onActivate(row.id)}
               onSelect={() => picker.onPick(row.id)}
             />

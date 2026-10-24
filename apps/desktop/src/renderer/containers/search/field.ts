@@ -110,7 +110,7 @@ export function useSearchField(sessionId: string, session: SearchSession, inputR
       inputRef.current?.focus()
     },
     onFocus: () => setCaret(inputRef.current?.selectionStart ?? session.text.length),
-    picker: pickerOpen && rows.length > 0 ? { at: operator.at, heading: operator.op === 'from' ? 'People' : 'Conversations', rows, onPick: pick, onClose: () => setDismissed(pickerKey) } : undefined,
+    picker: pickerOpen && rows.length > 0 ? { at: operator.at, heading: operator.op === 'from' ? 'People' : 'Conversations', kinds: operator.op === 'in', rows, onPick: pick, onClose: () => setDismissed(pickerKey) } : undefined,
   }
   return {
     field,

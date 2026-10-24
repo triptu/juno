@@ -176,7 +176,7 @@ export default defineFixtures(
       // ⌘F in a thread: its chip leads the field, In shows set.
       scoped: page({ chips: [{ key: 'topic', op: 'topic', label: 'Acme MSA renewal terms', topic: { id: acme } }], text: 'notice period', groups: [matches.redline, matches.caps, matches.older1].map((m) => group(`flat:${m.id}`, 'thread', [m])), selected: matches.caps.id, step }),
       // in: typed: the picker under the operator, ⌘K's Conversations rows.
-      picker: page({ chips: [], text: 'vendor contract in:pro', picker: { at: 16, heading: 'Conversations', rows: pickRows, onPick: noop, onClose: noop }, reader: false }),
+      picker: page({ chips: [], text: 'vendor contract in:pro', picker: { at: 16, heading: 'Conversations', kinds: true, rows: pickRows, onPick: noop, onClose: noop }, reader: false }),
     },
     State: {
       // The empty field: recent searches, the operators and ⌘K.
