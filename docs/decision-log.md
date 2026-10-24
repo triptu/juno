@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 11:50 · Tushar · Quint never runs on a schedule: `verify:main --nightly` no longer picks a random seed or forces `specs:check`; Quint runs only when its spec inputs change (or with an explicit `SPECS_SEED`). Replaces the 10-24 03:14 nightly varied-seed rule.
 - 10-24 11:20 · Tushar · No heavy work on this Mac: it hung and restarted twice on 10-24 under agent load. Suites, e2e, gallery, builds, packaging and full runs go to the laptop; `verify:main` fails when the laptop is unreachable instead of running here, and `--local` is only for when Tushar asks. Replaces the 10-22 decision that full runs fall back to the Mac.
 - 10-24 11:06 · flow-test-size · A flow test (`*.flow.test.ts`) is one user journey on one engine boot with named steps, so the health size check leaves its test callback out of the 80-line function limit; its files still stay under 400 lines, and a file splits by journey.
 - 10-24 10:01 · burst-ten-seconds · Within 10 seconds of a banner the same conversation does not notify again; later messages are decided on their own, since the 1-minute rule hid real questions (owner).

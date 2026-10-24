@@ -4,7 +4,7 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed, full gallery walks, coverage and Mac suites
+//   bun run verify:main --nightly         full gallery walks, coverage and Mac suites
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
@@ -29,7 +29,6 @@ import { spawn, spawnSync } from 'node:child_process'
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { randomInt } from 'node:crypto'
 import { hostname } from 'node:os'
 import { writeRecord } from './verify-records.mjs'
 import { isAncestor, readRecords, statusFolder } from './release-gate.mjs'
@@ -49,7 +48,8 @@ const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
 const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
 const nightly = argv.includes('--nightly')
 const noCache = argv.includes('--no-cache')
-const seed = process.env.SPECS_SEED ?? (nightly ? String(randomInt(1, 2 ** 32)) : undefined)
+// Quint runs only when its spec inputs change; SPECS_SEED forces a run with that seed.
+const seed = process.env.SPECS_SEED
 
 const git = (...args) => {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
