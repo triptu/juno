@@ -4,7 +4,7 @@ import {
   type ChannelId,
   type Ts,
 } from '@juno/domain'
-import { StoreWriter, syncedRanges, type SqlError } from '@juno/store'
+import { Invalidation, StoreWriter, syncedRanges, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 
 import { invalidate, type Writer } from './shared'
@@ -39,13 +39,17 @@ export const markRepliesComplete = (channel: string, threadTs: string, complete:
  * reconnect pages `getView` over every thread with activity since the store
  * was last in step and marks their coverage again from Slack's pointer, and
  * a followed thread with no activity since then missed nothing.
+ * Returns the threads' topics: their unread counts may no longer be exact,
+ * so the caller re-indexes them.
  */
-export const endEventCoverage: Writer = Effect.gen(function* () {
+export const endEventCoverage: Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter | Invalidation> = Effect.gen(function* () {
   const sql = yield* StoreWriter
-  yield* sql`UPDATE thread_cursors SET complete_from = NULL
+  const ended = yield* sql<{ channel: string; thread_ts: string }>`UPDATE thread_cursors SET complete_from = NULL
     WHERE complete_from IS NOT NULL AND NOT EXISTS (
-      SELECT 1 FROM thread_subs s WHERE s.channel = thread_cursors.channel AND s.thread_ts = thread_cursors.thread_ts AND s.subscribed = 1)`
+      SELECT 1 FROM thread_subs s WHERE s.channel = thread_cursors.channel AND s.thread_ts = thread_cursors.thread_ts AND s.subscribed = 1)
+    RETURNING channel, thread_ts`
   yield* invalidate(['thread_cursors'])
+  return ended.map((row) => threadTopicId(row.channel as ChannelId, row.thread_ts as Ts))
 })
 
 /** The synced range a page covered, merged with the ranges it touches. */

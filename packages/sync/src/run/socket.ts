@@ -3,6 +3,8 @@ import { transaction } from '@juno/store'
 import { Clock, Deferred, Effect, FiberSet, Scope } from 'effect'
 import { applyFrame } from '../events'
 import { endEventCoverage } from '../write'
+import { reindexOptions } from '../context'
+import { reindexTopics } from '../reindex'
 
 import type { SyncServices } from '../sync'
 import type { SyncRuntime } from './runtime'
@@ -23,7 +25,7 @@ export const handleSocketEvent = (runtime: SyncRuntime, reconcile: Effect.Effect
         return Clock.currentTimeMillis.pipe(
           Effect.tap((now) => Effect.sync(() => { state.droppedAt ??= now })),
           Effect.andThen(options.onConnection?.(false) ?? Effect.void),
-          Effect.andThen(transaction(endEventCoverage)),
+          Effect.andThen(transaction(endEventCoverage.pipe(Effect.flatMap((topics) => reindexTopics(topics, reindexOptions(ctx)))))),
           Effect.catchCause((cause) => Effect.logError('sync: coverage not reset', { cause })),
           Effect.andThen(phase({ _tag: 'offline' })),
         )
