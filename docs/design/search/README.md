@@ -35,7 +35,8 @@ How we got here: a map of today's search (below), web research on what people li
 ### 2. The field across the top, results on the left, the conversation on the right
 
 - **The field and the filter row span the whole tab**, above the split, so long queries and several chips have room. The split starts under them.
-- **Results column** 384 px wide, resizable from 312 to 480, like the sidebar. The **reader** takes the rest.
+- **Results column** 384 px wide, resizable from 312 to 480 by its edge, like the sidebar, with the mouse or, with the edge focused, ← → Home End and Enter. The **reader** takes the rest.
+- Until you choose a row, a new search's first result shows in the reader as a peek, so the reader is never a blank pane; it marks nothing read and focus stays in the field. A row that takes focus (Tab into the list, a click) is selected, so the tint always shows where you are.
 - Up and Down move through the results, and the reader follows at once (it reads from the local store, within the 50 ms cached topic budget). Moving the selection never opens a tab or adds a history entry.
 - **Enter** opens the topic at the message in the current tab, with Back returning to the search exactly as it was. **⌘Enter** or ⌘-click opens it in a new tab in the background, and focus stays in the list, so you can open several in a row.
 - **The reader is the topic itself**, with its composer, reactions and message menus, scrolled to the match with the matched words marked. You can reply without leaving the search. Its header has the title, the place, **Open in new tab** and the topic's ⋯ menu. When a thread has several matches, "2 of 5" with up and down arrows (⌘↑ ⌘↓) step between them, counted in the thread's reading order (oldest first), whatever the list's sort.
@@ -50,6 +51,7 @@ How we got here: a map of today's search (below), web research on what people li
 **By default the list is flat**: one row per matching message, in time order (newest first, or oldest with the sort). This is the order Slack returns, so pages only ever add rows at the end.
 
 - A row is two lines. Line 1: the topic's art (16), its Juno title (a Main reads "#procurement · Main"), the place, and the time. Line 2: the sender and the snippet, with the matched words in semibold.
+- A match from the same topic as the row just before it is a one-line match line instead (sender, snippet, time, as grouped mode draws them), under that row's snippet. A run from one topic, as alert and incident channels often are, shows its topic line once and the snippets that differ under it; topics that alternate keep a full row each. This only looks at the row before, so the time order and the pages that add rows at the end do not change.
 - A snippet starts a few words before the first match, with a leading "…" when cut, so the matched words are always visible.
 - **Topic titles match too.** Juno's titles are AI-made, so "staging bill" can find the topic titled "Staging bill doubled since August" even when nobody wrote those words. A topic whose title matches shows as a one-line row with the words marked, at the time of its latest message. Once above the completeness line, it stays for this query even when a later page finds an older matching message in that topic. Slack can't do this. Title matches obey `in:` and dates; with `from:`, only topics that person wrote in.
 
