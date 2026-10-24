@@ -22,6 +22,7 @@
 // tests"); --wide plans as before 10-18. scripts/affected-run.mjs runs the plan.
 
 import { spawnSync } from 'node:child_process'
+import { randomInt } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -121,7 +122,9 @@ const pending = (items) =>
 const unitItems = unitTestItems(root, files, changed, closure)
 const unit = pending(unitItems)
 // Repository paths, so a file never selects a namesake in another package.
-if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)], items: unit, why: `${unit.length} unit test file(s)` })
+// One shuffled order, kept in the step's arguments: `bun run test --seed <n>` repeats it.
+const testSeed = process.env.JUNO_TEST_SEED || String(randomInt(1, 2 ** 32))
+if (unit.length > 0) plan.push({ script: 'test', args: [`--seed=${testSeed}`, ...(unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)])], items: unit, why: `${unit.length} unit test file(s)` })
 
 // Protocol checks follow their inputs, independently of the breadth of e2e selection.
 const protocols = protocolInputs(git('ls-files', '--cached', '--others', '--exclude-standard'), closure)

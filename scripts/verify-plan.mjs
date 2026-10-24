@@ -8,10 +8,10 @@ export function planOutcomes(lines, suites, planned) {
   return planned.code !== 0 && results.every((result) => result.code === 0) ? [...results, { ...planned, suite: 'plan' }] : results
 }
 
-export function fullSuites(scripts, { nightly = false, noCache = false, seed } = {}) {
+export function fullSuites(scripts, { nightly = false, noCache = false, seed, testSeed } = {}) {
   const apps = scripts['test:browser'] && scripts['test:electron'] ? ['test:browser', 'test:electron'] : ['test:desktop']
   return [
-    { name: 'test', words: ['test'] },
+    { name: 'test', words: ['test', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] },
     { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
     { name: 'specs:conformance', words: ['specs:conformance'] },
     { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },

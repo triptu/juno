@@ -216,7 +216,7 @@ for (const [index, step] of parsePlan(process.argv.slice(process.argv.indexOf('t
   assert.equal(smokeRecord.smoke, true)
   assert.equal(releaseGate(root, smokeRecord.commit, [smokeRecord]), null)
   assert.ok(!readRecords(join(root, '.juno-status')).some((record) => record.smoke))
-  assert.deepEqual(smokeRecord.suites[0].command, ['test', '--files', 'packages/domain/test/title.test.ts'])
+  assert.deepEqual(smokeRecord.suites[0].command, ['test', `--seed=${smokeRecord.testSeed}`, '--files', 'packages/domain/test/title.test.ts'])
   const mixed = { ...linux, suites: linux.suites.map((suite) => suite.suite === 'test:gallery' ? { ...suite, identity: { ...suite.identity, platform: 'darwin' } } : suite) }
   assert.equal(releaseGate(root, mixed.commit, [mixed]), null)
   writeFileSync(join(root, 'scripts/remote.mjs'), `

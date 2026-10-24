@@ -54,6 +54,8 @@ const smoke = argv.includes('--smoke')
 if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
 const noCache = argv.includes('--no-cache')
 const seed = process.env.SPECS_SEED ?? (nightly ? String(randomInt(1, 2 ** 32)) : undefined)
+// The unit tests' shuffled order, kept in the record: `bun run test --seed <n>` repeats it.
+const testSeed = process.env.JUNO_TEST_SEED || String(randomInt(1, 2 ** 32))
 
 const git = (...args) => {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
@@ -81,7 +83,7 @@ if (local && argv.includes('--require-remote')) throw new Error('This run requir
 const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
-const required = smoke ? [{ name: 'test', words: ['test', '--files', 'packages/domain/test/title.test.ts'] }] : fullSuites(scripts, { nightly, noCache, seed })
+const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }] : fullSuites(scripts, { nightly, noCache, seed, testSeed })
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
 const baseline = repairArg === 'latest' ? records[0] : repairArg ? JSON.parse(readFileSync(resolve(repairArg), 'utf8')) : undefined
 if (repairArg && (!baseline || baseline.version !== 2 || !isAncestor(root, baseline.commit, commit)))
@@ -196,7 +198,7 @@ const protocols = protocolInputs(tracked, (file) => graph.closure(file))
 let affected
 if (baseline) {
   // The graph is deliberately broader than coverage: a repair has no sampling or heavy exclusions.
-  const selected = spawnSync(process.execPath, [join(checkout, 'scripts/affected.mjs'), '--plan', '--json', '--wide', '--graph', '--no-cache', '--range', `${baseline.commit}..${commit}`, ...(local ? ['--local'] : [])], { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const selected = spawnSync(process.execPath, [join(checkout, 'scripts/affected.mjs'), '--plan', '--json', '--wide', '--graph', '--no-cache', '--range', `${baseline.commit}..${commit}`, ...(local ? ['--local'] : [])], { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, JUNO_TEST_SEED: testSeed } })
   if (selected.status !== 0) throw new Error(`Could not plan repair: ${selected.stderr}`)
   affected = JSON.parse(selected.stdout)
   const repair = repairPlan({ baseline, identity, suites: required, affected: affected.steps })
@@ -298,7 +300,7 @@ const summary = {
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
-  coverage: coverageNote, nightly, seed,
+  coverage: coverageNote, nightly, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
   allocation: Object.fromEntries(['DESKTOP', 'GALLERY', 'UNIT', 'SPECS'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
@@ -313,6 +315,8 @@ const markdown = [
   `Full plan ran on ${execution.host} (${execution.mode}).`,
   '',
   `${coverageNote[0].toUpperCase()}${coverageNote.slice(1)}.`,
+  '',
+  `Unit test order seed ${testSeed}; \`bun run test --seed ${testSeed}\` repeats it.`,
   '',
   '| Suite | Result | Time | Log |',
   '| --- | --- | --- | --- |',
