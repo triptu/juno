@@ -389,9 +389,9 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 
 if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
   for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors', 'threadranges'])) {
-    // Thread coverage posts at most six replies; 60 transitions reach every interleaving of them within the job budget.
+    // Thread coverage posts at most six replies: 4,000 traces of 60 transitions reach their interleavings within the job budget.
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
-      drained.has(file) ? { witnesses: ['reachedAgreement'] } : file === 'threadranges' ? { steps: 60 } : {})
+      drained.has(file) ? { witnesses: ['reachedAgreement'] } : file === 'threadranges' ? { steps: 60, samples: 4000 } : {})
   }
   for (const [file, schedule, invariant, name, guardedInvariant = 'invariants'] of regressions.filter(([file]) => !outboxOnly || file === 'outbox')) {
     simulate(file, `${schedule}Step`, guardedInvariant, `${name}.itf.json`, false, false,

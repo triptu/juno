@@ -8,8 +8,8 @@
 // the newest reply on an unbroken connection has a live tail. Events reach
 // Juno in the order Slack sent them, only while the socket is up; a drop (or
 // a restart, the same here) loses the ones in flight, and each live range
-// closes at the newest reply the socket delivered on that connection
-// (`heard`). `message_replied` is left out: it can arrive late or not at
+// keeps the newest reply the socket delivered on that connection (`heard`)
+// beside the end its pages proved, so the next read starts from there. `message_replied` is left out: it can arrive late or not at
 // all, so the root's count is the maximum of what pages said and the
 // replies stored.
 //
@@ -25,7 +25,7 @@
 // `reply_count` (`liveCount`), stored replies were shown as continuous
 // (`jumpGap`), and coverage outlived a restart (`restartGap`).
 module threadranges {
-  type Range = { kind: str, from: int, to: int, tail: str }
+  type Range = { kind: str, from: int, to: int, heard: int, tail: str }
   type Page = { oldest: int, latest: int, bounded: bool, epoch: int, up: bool, replies: Set[int], more: bool, count: int, rootLatest: int }
 
   val PAGE = 2
@@ -59,8 +59,9 @@ module threadranges {
 
   pure def mx(a: int, b: int): int = if (a > b) a else b
   pure def mn(a: int, b: int): int = if (a < b) a else b
-  pure def shownTo(r: Range): int = if (r.tail == "live") END else r.to
-  pure def countedTo(r: Range): int = if (r.tail == "none") r.to else END
+  pure def reach(r: Range): int = mx(r.to, r.heard)
+  pure def shownTo(r: Range): int = if (r.tail == "live") END else reach(r)
+  pure def countedTo(r: Range): int = if (r.tail == "none") reach(r) else END
 
   // Ranges merge only where pages of the same kind make them touch: a live tail's later replies came by event.
   pure def merge(rs: Set[Range], n: Range): Set[Range] = {
@@ -70,6 +71,7 @@ module threadranges {
       kind: n.kind,
       from: touching.fold(n.from, (a, r) => mn(a, r.from)),
       to: touching.fold(n.to, (a, r) => mx(a, r.to)),
+      heard: touching.fold(n.heard, (a, r) => mx(a, r.heard)),
       tail: if (tails.contains("live")) "live" else if (tails.contains("held")) "held" else "none",
     }
     rs.exclude(touching).union(Set(merged))
@@ -78,15 +80,15 @@ module threadranges {
   pure def proven(rs: Set[Range], x: int, y: int): bool = rs.exists(r => r.kind == "page" and r.from <= x and y <= shownTo(r))
 
   pure def exactBy(rs: Set[Range], p: int, latest: int): bool =
-    latest <= p or rs.exists(n => n.from <= p and p <= countedTo(n) and (n.tail != "none" or latest <= n.to))
+    latest <= p or rs.exists(n => n.from <= p and p <= countedTo(n) and (n.tail != "none" or latest <= reach(n)))
 
   // What one page proved (`pageRange`); empty when nothing. Never past its last reply: a live tail covers the rest.
   pure def pageRange(kind: str, oldest: int, replies: Set[int], more: bool, bounded: bool, latest: int, live: bool): Set[Range] = {
     val last = replies.fold(oldest, (a, r) => mx(a, r))
-    val closed: Set[Range] = if (last > oldest) Set({ kind: kind, from: oldest, to: last, tail: "none" }) else Set()
+    val closed: Set[Range] = if (last > oldest) Set({ kind: kind, from: oldest, to: last, heard: 0, tail: "none" }) else Set()
     if (more) closed
-    else if (bounded) (if (latest > oldest) Set({ kind: kind, from: oldest, to: latest, tail: "none" }) else Set())
-    else if (live) Set({ kind: kind, from: oldest, to: last, tail: "live" })
+    else if (bounded) (if (latest > oldest) Set({ kind: kind, from: oldest, to: latest, heard: 0, tail: "none" }) else Set())
+    else if (live) Set({ kind: kind, from: oldest, to: last, heard: 0, tail: "live" })
     else closed
   }
 
@@ -96,10 +98,10 @@ module threadranges {
 
   def inFlight(p: int): bool = events.foldl(false, (a, e) => a or e == p)
   // The count's proof leans on a held tail: no live tail or closed range proves it alone.
-  def heldOnly: bool = not(ranges.exists(n => n.tail != "held" and n.from <= pointer and pointer <= countedTo(n) and (n.tail == "live" or latestKnown <= n.to)))
+  def heldOnly: bool = not(ranges.exists(n => n.tail != "held" and n.from <= pointer and pointer <= countedTo(n) and (n.tail == "live" or latestKnown <= reach(n))))
 
   // Every reply a range proves is stored.
-  val rangesProven = ranges.forall(r => posted.forall(p => (r.from < p and p <= r.to) implies stored.contains(p)))
+  val rangesProven = ranges.forall(r => posted.forall(p => (r.from < p and p <= reach(r)) implies stored.contains(p)))
   // A live tail: every later reply is stored or on its way.
   val liveProven = ranges.forall(r => r.tail != "live" or posted.forall(p => p > r.from implies (stored.contains(p) or inFlight(p))))
   // The view never shows two replies as continuous across a missing one; a reply whose event is still on the
@@ -154,7 +156,7 @@ module threadranges {
     up' = false, epoch' = epoch + 1, events' = [], heard' = 0,
     ranges' = if (keepTails) ranges else ranges.map(r =>
       if (r.tail == "none") r
-      else { ...r, to: if (r.tail == "live" and heard > r.to) heard else r.to, tail: if (followed) "held" else "none" }),
+      else { ...r, heard: if (r.tail == "live") mx(r.heard, heard) else r.heard, tail: if (followed) "held" else "none" }),
     viewDue' = (followed and not(keepTails)),
     clock' = clock, posted' = posted,
     stored' = stored, inflight' = inflight, pointer' = pointer, latestKnown' = latestKnown, countKnown' = countKnown,
