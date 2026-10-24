@@ -14,10 +14,10 @@
 // replies stored.
 //
 // The view shows two stored replies as continuous only when one page range
-// covers both (`shownContinuous`). Until a page proves the thread up to its
-// newest reply, the view may show what the store holds as a stand-in (the
-// engine's `meta.standIn`): it says so, makes no claim of continuity, and
-// ends when the open's pages reach the newest reply, so it is outside
+// covers both (`shownContinuous`). While no page proves any stretch of the
+// thread, the view may show what the store holds as a stand-in (the engine's
+// `meta.standIn`): marked as such and not proof, drawn as continuous until the
+// thread's first open, which lands all its pages at once. It is outside
 // `shownContinuous` and not modelled. The unread count is exact only when one
 // range of any kind covers the read pointer and reaches the end
 // (`countSound`). A getView row (`view`) proves every reply after the read
