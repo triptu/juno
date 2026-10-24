@@ -54,7 +54,8 @@ export const mergeOne = (
         WHERE message_updates.server_version <> excluded.server_version`
     }
     // A reaction event came before this message was stored; a page requested before it does not have it.
-    if (source.kind !== 'event') {
+    // A search match carries no reactions, so it neither answers the note nor ends it.
+    if (source.kind !== 'event' && source.kind !== 'partial') {
       const key = `${channel}:${message.ts}`
       const lateAt = ctx.lateReactions.get(key)
       if (lateAt !== undefined) {
