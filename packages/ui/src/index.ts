@@ -34,7 +34,7 @@ export { Popover } from './Popover'
 export { ProgressRing } from './ProgressRing'
 export { ringRoom } from './ringRoom'
 export { ScrollArea } from './ScrollArea'
-export { Segmented } from './Segmented'
+export { Segmented, countLabel } from './Segmented'
 export { Select, SelectButton } from './Select'
 
 export { Surface } from './Surface'

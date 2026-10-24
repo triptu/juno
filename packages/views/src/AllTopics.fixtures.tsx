@@ -99,6 +99,8 @@ export default defineFixtures(
       resolved: page({ list: resolvedOnly, filter: { status: 'resolved', kind: 'all', sort: 'recent' } }),
       // Shot 40c.
       empty: page({ list: [], query: 'nothing like this', counts: { all: 0, open: 0, resolved: 0, quiet: 0, unsubscribed: 0 } }),
+      // A large workspace: counts above 99 show as 99+, in the same three-digit room.
+      'large counts': page({ counts: { all: 1240, open: 312, resolved: 905, quiet: 23, unsubscribed: 0 } }),
       // Before the first window: the chrome, and no rows yet.
       loading: page({ list: [], ready: false }),
       // Privacy mode: the previews blur, and so do titles that are only the first words; AI and renamed titles stay readable.

@@ -19,6 +19,7 @@ import {
   PageHeader,
   pointerMoved,
   Segmented,
+  countLabel,
   Select,
   Text,
   TextField,
@@ -289,7 +290,7 @@ export function AllTopics({
               size={28}
               label="Status"
               value={filter.status}
-              options={CHIPS.map((chip) => ({ value: chip.id, label: `${chip.label} (${counts[chip.id]})` }))}
+              options={CHIPS.map((chip) => ({ value: chip.id, label: `${chip.label} (${countLabel(counts[chip.id])})` }))}
               onChange={(event) => onStatus(event.currentTarget.value as AllTopicsChip)}
             />
           </span>
@@ -419,8 +420,6 @@ const NARROWER = '@container all-topics (width < 576px)'
 // button, as Finder's view control does in a narrow window; Status hides from the table, the title takes the rest and
 // the side padding narrows, so the table never scrolls sideways and a focused row's ring stays whole.
 const COMPACT = '@container all-topics (width < 516px)'
-// Count slots keep four digits; below this width the status picker leaves room for the other filters.
-const STATUS_COMPACT = '@container all-topics (width < 640px)'
 // StyleX does not keep the order of conditions on one property, so the grid's three tiers do not overlap.
 const NARROW_ONLY = '@container all-topics (576px <= width < 664px)'
 const NARROWER_ONLY = '@container all-topics (516px <= width < 576px)'
@@ -462,10 +461,10 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
   },
   statusTabs: {
-    display: { default: 'contents', [STATUS_COMPACT]: 'none' },
+    display: { default: 'contents', [COMPACT]: 'none' },
   },
   statusMenu: {
-    display: { default: 'none', [STATUS_COMPACT]: 'contents' },
+    display: { default: 'none', [COMPACT]: 'contents' },
   },
   // In a compact page the controls flow with the status pop-up, so the four take two lines, not three.
   controls: {

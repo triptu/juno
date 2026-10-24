@@ -73,12 +73,17 @@ export function Segmented<T extends string>({ options, value, onChange, label, d
             )}
           >
             {option.label}
-            {option.count === undefined ? null : <span {...stylex.props(styles.count, numeric.tabular)}>{option.count}</span>}
+            {option.count === undefined ? null : <span {...stylex.props(styles.count, numeric.tabular)}>{countLabel(option.count)}</span>}
           </button>
         )
       })}
     </div>
   )
+}
+
+/** Counts above 99 show as 99+, so a count never needs more than three digits of room. */
+export function countLabel(count: number): string {
+  return count > 99 ? '99+' : String(count)
 }
 
 const styles = stylex.create({
@@ -107,7 +112,7 @@ const styles = stylex.create({
     },
   },
   count: {
-    minWidth: '4ch', // tokens-allow: reserve four tabular digits while live counts fill
+    minWidth: '3ch', // tokens-allow: reserve three tabular digits (up to 99+) while live counts fill
     textAlign: 'end',
     marginInlineStart: spacing['--space-1-5'],
     fontWeight: weights['--weight-regular'],

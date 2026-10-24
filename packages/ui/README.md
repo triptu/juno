@@ -6,7 +6,7 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 
 - No `cursor: pointer`, ever. The body sets the arrow cursor; text inputs and textareas set the text cursor; checkboxes, ranges and selects keep the arrow. The gallery's behaviour spec checks every fixture for this.
 - Hover styles only under `@media (hover: hover)`, nested with `default: null` so they fall back to nothing.
-- Counted segments reserve four tabular digits, so ordinary live count updates keep the neighboring controls in place.
+- Counted segments reserve three tabular digits and show counts above 99 as 99+, so ordinary live count updates keep the neighboring controls in place.
 - Buttons keep their geometry on press and toggle. Hover and press colours change at once. Disabled controls use `pointer-events: none`.
 - The focus ring shows on `:focus-visible` only: 2px `--focus-ring`, offset 2px (inset for tabs, segments and rows that sit flush).
 - Buttons have no transform transition or toggle pop. Toast and empty-state entrances use `--duration-appear`; menus and popovers open and close at once. Other motion uses only transform and opacity and collapses under reduced motion through the tokens.
