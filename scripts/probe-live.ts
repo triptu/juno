@@ -73,6 +73,7 @@
  * once after that wait (capped at 120 s). The probe never bursts.
  */
 import { probeIntegrations } from './probe-integrations.ts'
+import { probeSearch } from './probe-search.ts'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -147,6 +148,10 @@ async function main(): Promise<number> {
   if (cached === undefined) {
     console.error('probe-live: no cached session; run `JUNO_LIVE=1 bun run smoke:live --cache-session` first')
     return 2
+  }
+  if (flag('--only') === 'search2') {
+    await probeSearch(cached, flag('--out'), flag('--section'))
+    return 0
   }
   const { session, cookie } = cached
   const base = apiBaseFromWorkspace(session.workspaceUrl)
@@ -1291,7 +1296,7 @@ function pick(object: Json, keys: ReadonlyArray<string>): Record<string, unknown
 main().then(
   (code) => process.exit(code),
   (error: unknown) => {
-    console.error(flag('--only') === 'integrations' ? 'probe-live: integration probe failed (details suppressed)' : `probe-live: ${error instanceof Error ? error.message : String(error)}`)
+    console.error(['integrations', 'search2'].includes(flag('--only') ?? '') ? 'probe-live: probe failed (details suppressed)' : `probe-live: ${error instanceof Error ? error.message : String(error)}`)
     process.exit(1)
   },
 )

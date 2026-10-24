@@ -1,0 +1,1 @@
+- 10-24 15:01 · Tushar · Keep Search tab live research in a separate read-only probe with a 75-call cap, 3-second spacing and no rate-limit retries; retain aggregate evidence and redacted, unmodelled shapes separately from production schema fixtures.
