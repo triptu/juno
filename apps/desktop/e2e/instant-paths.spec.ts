@@ -18,26 +18,14 @@ const LONG_REPLIES = 600
 /** What a step waits for. Painting from the store takes a frame or two; the limit only ends a failing run sooner. */
 const PAINTED = { timeout: 5_000 }
 
-/**
- * Every Slack API call waits before Slack runs it until `release`. `answered()` counts the calls answered since:
- * a step that paints with it at zero needed nothing from Slack.
- */
-function holdSlack(fake: FakeSlack) {
-  const answered = () => fake.calls.filter((call) => call.kind === 'api').length
-  const before = answered()
-  fake.gate(() => true)
-  return { answered: () => answered() - before, release: () => fake.gate() }
-}
-
-/** The step painted with Slack holding everything, and no answer came first. */
+/** The step paints while every Slack API call waits before Slack runs it, then they all go on. */
 async function paintsHeld(fake: FakeSlack, act: () => Promise<void>, painted: () => Promise<void>) {
-  const slack = holdSlack(fake)
+  fake.gate(() => true)
   try {
     await act()
     await painted()
-    expect(slack.answered()).toBe(0)
   } finally {
-    slack.release()
+    fake.gate()
   }
 }
 

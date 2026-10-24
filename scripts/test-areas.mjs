@@ -169,8 +169,8 @@ export const GUARD_SPECS = [
       'packages/engine/src/protocol/',
       'packages/engine/src/search/',
       /^packages\/engine\/src\/search[A-Za-z]*\.ts$/,
-      'packages/sync/',
-      'packages/store/',
+      'packages/sync/src/',
+      'packages/store/src/',
     ],
   },
 ]

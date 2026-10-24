@@ -239,11 +239,10 @@ it('a thread stored before ranges existed is unknown until its first open, which
     fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: 'old reply 20', threadTs: root as never, at: fake.now() - 20 * 60_000, silent: true })
   }, { recheckTopics: 0 })
 
-  await step('before the open the window stands in with its newest reply alone, since the root counts one more than it holds, and the count is not exact', async () => {
+  await step('before the open nothing stands in, since the root knows of a newer reply than it holds, and the count is not exact', async () => {
     const window = await windowOf(engine, id, { limit: 150 }, (value) => value.order.length > 0, 'the stored thread')
     expect(window.meta.windowCovered).toBe(false)
-    expect(window.meta.standIn).toBe(true)
-    expect(window.meta.gapBefore).toBe(true)
+    expect(window.meta.standIn).toBeUndefined()
     expect(texts(window)).toEqual(['old reply 30'])
     expect(indexRow(engine, id)?.unread_exact).toBe(0)
   })
@@ -260,7 +259,7 @@ it('a thread stored before ranges existed is unknown until its first open, which
   })
 })
 
-it('a long thread from before ranges shows the replies it holds at once, and its first open proves that stretch before the rest', async () => {
+it('a long thread from before ranges shows the replies it holds at once, and its first open proves them all in one step', async () => {
   const first = await syncedEngine(engines)
   const thread = longThread(first.fake, 300)
   expect(valueOf(await openTopic(first.registry, thread.id)).outcome).toBe('fetched')
@@ -283,24 +282,28 @@ it('a long thread from before ranges shows the replies it holds at once, and its
     expect(steps(window)).toEqual(newest)
   })
 
-  await step('the open proves those replies first, in two calls, and the window keeps them as they were', async () => {
+  await step('while the open reads its pages, none lands alone and the window stays as it was', async () => {
     let asked = 0
     engine.fake.resetCalls()
     engine.fake.gate((method, args) => method === 'conversations.replies' && args['_x_reason'] === 'open' && ++asked > 2)
     const open = openTopic(engine.registry, thread.id)
-    const proven = await windowOf(engine, thread.id, { limit: 150 }, (value) => value.meta.standIn === undefined, 'the proven stretch')
-    expect(steps(proven)).toEqual(newest)
-    expect(proven.meta.windowCovered).toBe(true)
-    expect(proven.meta.gapBefore).toBe(true)
+    await waitFor(() => (engine.fake.gated().length > 0 ? true : undefined), WAIT_MS, 'the third page held')
     expect(opens(engine)).toHaveLength(2)
+    const during = await windowOf(engine, thread.id, { limit: 150 }, (value) => value.order.length > 0, 'the window during the open')
+    expect(during.meta.standIn).toBe(true)
+    expect(steps(during)).toEqual(newest)
+    expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM thread_ranges WHERE thread_ts = ?').get(thread.root.ts)) as { n: number }).toEqual({ n: 0 })
     engine.fake.gate()
     expect(valueOf(await open).outcome).toBe('fetched')
   })
 
-  await step('the rest comes in from the root up to them, and the thread is whole', async () => {
+  await step('then the same window is proven, and the thread is whole from its root', async () => {
     expect(opens(engine)).toHaveLength(4)
+    const proven = await windowOf(engine, thread.id, { limit: 150 }, (value) => value.meta.standIn === undefined, 'the proven window')
+    expect(steps(proven)).toEqual(newest)
+    expect(proven.meta.windowCovered).toBe(true)
+    expect(proven.meta.gapBefore).toBeUndefined()
     const whole = await windowOf(engine, thread.id, { anchor: thread.root.ts, before: 0, limit: MESSAGE_WINDOW_MAX }, (value) => value.order.length === 301, 'the whole thread')
-    expect(whole.meta.gapBefore).toBeUndefined()
     expect(steps(whole).slice(1)).toEqual(Array.from({ length: 300 }, (_, i) => i + 1))
   })
 })

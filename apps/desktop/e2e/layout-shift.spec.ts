@@ -106,11 +106,11 @@ syncedTest('a late reaction above the view moves no row in view, and one on the 
   }, { edge: 'bottom' })
 })
 
-// A thread no page proves, with 30 replies Juno never stored and the latest it heard live: the latest paints at
-// once, at the foot of the list, and the 30 come in above it without moving it, the "N new" divider among them
-// when the thread was read partway.
+// A thread no page proves, with 30 replies Juno never stored and the latest it heard live. At the bottom the
+// latest paints at once, at the foot of the list, and the 30 come in above it without moving its text. At the
+// "N new" divider the list waits for them, since the topic opens at the divider, which belongs among them.
 for (const divider of [false, true]) {
-  syncedTest(`a partial thread paints what it holds and grows above it${divider ? ', its divider too' : ''}`, async ({ juno, win, slack, fake, userData }) => {
+  syncedTest(`a partial thread ${divider ? 'waits for history at its divider' : 'paints what it holds at the bottom and grows above it'}`, async ({ juno, win, slack, fake, userData }) => {
     const channel = slack.channel('eng')
     const user = slack.as('Leo').id
     // The root is not posted live: a root heard on this connection proves its thread from the root (`liveRoots`),
@@ -130,13 +130,13 @@ for (const divider of [false, true]) {
     await link.click()
     await expect.poll(() => fake.heldCount({ method: 'conversations.replies' })).toBe(1)
     const rows = juno.topic.list.locator('[data-message-row]')
-    await expect(rows).toHaveCount(1)
-    await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
+    await expect(rows).toHaveCount(divider ? 0 : 1)
+    // The same sender's replies above it take the latest into their group, so its name line goes; its text stays.
+    await expectStableAnchor(win, divider ? '[data-new-divider]' : `[data-message-row="${latest.ts}"] [data-msg-text]`, async () => {
       fake.release({ method: 'conversations.replies' })
       await juno.topic.expectMessage('Earlier reply 0')
       await expect(rows).toHaveCount(32)
     })
-    if (divider) await juno.topic.expectDividerBefore('Earlier reply 25')
   })
 }
 
