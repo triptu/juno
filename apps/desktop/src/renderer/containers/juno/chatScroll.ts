@@ -158,6 +158,7 @@ export function useStickToBottom(scrollRef: Scroller, pinnedRef: RefObject<boole
     const scroller = scrollRef.current
     if (scroller === null || !positioned) return
     if (!moreBelow) holdEnd(scroller, pinnedRef)
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- A changed row keeps the held bottom before paint even though the effect reads the committed DOM.
   }, [positioned, items, moreBelow, scrollRef, pinnedRef])
   useEffect(() => {
     const scroller = scrollRef.current
@@ -298,5 +299,6 @@ export function useReadMarks(scrollRef: Scroller, positioned: boolean, items: Re
       globalThis.removeEventListener('focus', onFocus)
       if (timer !== undefined) clearTimeout(timer)
     }
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- Reconnect when rows change so newly rendered unread bubbles are observed.
   }, [positioned, items, scrollRef])
 }

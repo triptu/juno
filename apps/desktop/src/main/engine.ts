@@ -137,6 +137,7 @@ export class EngineSupervisor {
         clearTimeout(timer)
         resolve()
       })
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin -- ChildProcess IPC has no target origin.
       child.postMessage({ _tag: 'quit' } satisfies MainToEngine)
     })
   }

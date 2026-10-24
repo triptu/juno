@@ -40,5 +40,5 @@ export function chunk<M>(importer: () => Promise<M>) {
   function useReady(): boolean {
     return useSyncExternalStore(subscribe, ready, ready)
   }
-  return { load, component, useReady }
+  return { load, component, useReady, subscribe, ready }
 }

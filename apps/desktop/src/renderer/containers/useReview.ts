@@ -19,7 +19,7 @@ export function useReview() {
   useEffect(() => {
     const undone = [...undos.current].filter(([, { entry }]) => !stack.includes(entry)).map(([id]) => id)
     for (const id of undone) undos.current.delete(id)
-    if (undone.length > 0) set(undone.map((id) => [id, 'open'] as const))
+    if (undone.length > 0) setStatuses((before) => new Map([...before, ...undone.map((id) => [id, 'open'] as const)]))
   }, [stack])
   const statusOf = (id: string) => statuses.get(id) ?? 'open'
   /** Marks the row, runs the command, and puts the row back when nothing changed. */

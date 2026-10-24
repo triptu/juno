@@ -62,6 +62,7 @@ export function WebPanel({ url }: { readonly url: string }) {
       if (frame !== undefined) cancelAnimationFrame(frame)
       void window.juno.webPanel.hide().catch(() => {})
     }
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- A new initial URL must recreate the native panel even though the current URL is read through its ref.
   }, [url, paletteOpen])
 
   return (

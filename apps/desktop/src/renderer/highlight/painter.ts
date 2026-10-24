@@ -94,10 +94,10 @@ function thread(): Worker | undefined {
     failures = MAX_FAILURES
     return undefined
   }
-  worker.onmessage = ({ data }: MessageEvent<HighlightReply>) => settle(data.id, data.result)
-  worker.onerror = () => {
+  worker.addEventListener('message', ({ data }: MessageEvent<HighlightReply>) => settle(data.id, data.result))
+  worker.addEventListener('error', () => {
     if (current !== undefined) giveUp(current.id)
-  }
+  })
   return worker
 }
 
@@ -132,6 +132,7 @@ function pump() {
   waiting.delete(request.key)
   const id = next++
   current = { request, id, timer: setTimeout(() => giveUp(id), TIMEOUT_MS) }
+  // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Worker messages have no target origin.
   target.postMessage({ id, code: request.code, language: request.language } satisfies HighlightRequest)
 }
 

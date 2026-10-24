@@ -123,6 +123,7 @@ export function useMessageFlash(position: Position, id: string, readOnly: boolea
       pinnedTopRef.current = scroller.scrollTop
       flashChatRow(row)
     })
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- The requested row may enter the DOM only when the eager frame expands.
   }, [id, readOnly, flash, positioned, drawnAll, list.rows, scrollRef, pinRef, pinnedTopRef, setHeldAt])
   return flash
 }
@@ -139,6 +140,7 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller !== null && positioned) hold(scroller, pinRef, pinnedTopRef)
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- These values mark layout changes after which the pin must be restored.
   }, [positioned, first, drawnAll, heldAt, list.rows, scrollRef, pinRef, pinnedTopRef])
 
   // The list's box changes size (the window, the composer growing, the Juno panel beside it), or its rows do (a

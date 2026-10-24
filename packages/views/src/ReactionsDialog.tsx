@@ -75,6 +75,7 @@ function Strip({ id, reactions, chosen, onSelect }: { readonly id: string; reado
     const room = tab.offsetWidth
     if (tab.offsetLeft - room < scroller.scrollLeft) scroller.scrollLeft = Math.max(0, tab.offsetLeft - room)
     else if (tab.offsetLeft + tab.offsetWidth + room > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = tab.offsetLeft + tab.offsetWidth + room - scroller.clientWidth
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- A new choice must be brought into view from the committed DOM.
   }, [chosen])
   const choose = (name: string) => {
     if (name !== chosen) onSelect(name)

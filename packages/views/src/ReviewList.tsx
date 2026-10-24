@@ -134,7 +134,7 @@ export function ReviewList({ entries, statuses, verbs, label, initialActive, aut
   const focusRow = (id: string) => list.current?.querySelector<HTMLElement>(`[data-review-row="${CSS.escape(id)}"] a`)?.focus()
   const first = useRef(autoFocus ? active : undefined)
   useEffect(() => {
-    if (first.current !== undefined) focusRow(first.current)
+    if (first.current !== undefined) list.current?.querySelector<HTMLElement>(`[data-review-row="${CSS.escape(first.current)}"] a`)?.focus()
   }, [])
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>) => {
     const index = entries.findIndex((entry) => entry.id === active)

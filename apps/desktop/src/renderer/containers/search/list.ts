@@ -75,6 +75,7 @@ export function useListScroll(sessionId: string, listRef: RefObject<HTMLDivEleme
     }
     list.addEventListener('scrollend', save)
     return () => list.removeEventListener('scrollend', save)
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- The empty-to-ready transition is when the list DOM appears.
   }, [sessionId, listRef, empty, windowReady])
 }
 

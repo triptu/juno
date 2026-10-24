@@ -31,7 +31,7 @@ export const SearchQuery = Schema.Struct({
 }).check(Schema.makeFilter((query) => {
   if (query.clauses.some((clause) => clause.span.start < 0 || clause.span.end < clause.span.start || clause.span.end > query.raw.length)) return false
   if (query.clauses.some((clause) => clause.kind === 'date' && calendarParts(clause.value, clause.operator === 'during') === undefined)) return false
-  try { if (query.timeZone !== undefined) new Intl.DateTimeFormat('en', { timeZone: query.timeZone }) } catch { return false }
+  try { if (query.timeZone !== undefined) Intl.DateTimeFormat('en', { timeZone: query.timeZone }) } catch { return false }
   return true
 }))
 export type SearchQuery = typeof SearchQuery.Type

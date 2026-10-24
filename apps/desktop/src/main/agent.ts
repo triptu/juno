@@ -112,6 +112,7 @@ export class AgentSupervisor {
       }
       if (message._tag === 'credential') {
         const reply = (answer: Omit<Extract<MainToAgent, { _tag: 'credentialReply' }>, '_tag' | 'requestId'>) => {
+          // oxlint-disable-next-line unicorn/require-post-message-target-origin -- ChildProcess IPC has no target origin.
           if (this.child === child) child.postMessage({ _tag: 'credentialReply', requestId: message.requestId, ...answer } satisfies MainToAgent)
         }
         // No detail crosses back: a keychain error could echo what it was given.
@@ -120,6 +121,7 @@ export class AgentSupervisor {
       }
       if (message._tag === 'secret') {
         const reply = (answer: Omit<Extract<MainToAgent, { _tag: 'secretReply' }>, '_tag' | 'requestId'>) => {
+          // oxlint-disable-next-line unicorn/require-post-message-target-origin -- ChildProcess IPC has no target origin.
           if (this.child === child) child.postMessage({ _tag: 'secretReply', requestId: message.requestId, ...answer } satisfies MainToAgent)
         }
         // As for credentials: no detail crosses back.

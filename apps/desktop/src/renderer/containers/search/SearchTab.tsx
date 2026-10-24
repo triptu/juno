@@ -148,6 +148,7 @@ function useResultsMeasure(generation: number | undefined, current: boolean, row
     if (at === undefined || !current) return
     keystroke.current = undefined
     afterPaint(() => measure('juno.search-results', at, { detail: { rows } }))
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- A new generation completes the measure even when the row count is unchanged.
   }, [generation, current, rows])
   return useCallback(() => {
     keystroke.current = performance.now()

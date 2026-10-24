@@ -18,8 +18,8 @@ function naturalSize(win: Page, src: string): Promise<{ width: number; height: n
     (url) =>
       new Promise<{ width: number; height: number }>((resolve, reject) => {
         const image = new Image()
-        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
-        image.onerror = () => reject(new Error('poster did not load'))
+        image.addEventListener('load', () => resolve({ width: image.naturalWidth, height: image.naturalHeight }), { once: true })
+        image.addEventListener('error', () => reject(new Error('poster did not load')), { once: true })
         image.src = url
       }),
     src,

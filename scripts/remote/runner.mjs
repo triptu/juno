@@ -40,7 +40,7 @@ export function runnerConfig(env = process.env) {
   const path = join(home, '.config/juno/runner.json')
   let file = {}
   try { file = JSON.parse(readFileSync(path, 'utf8')) } catch (error) {
-    if (error.code !== 'ENOENT') throw new Error(`Cannot read ${path}: ${error.message}`)
+    if (error.code !== 'ENOENT') throw new Error(`Cannot read ${path}: ${error.message}`, { cause: error })
   }
   if (!file || typeof file !== 'object' || Array.isArray(file)) throw new Error(`${path} must contain an object`)
   const host = env.JUNO_RUNNER_HOST ?? file.host

@@ -27,6 +27,7 @@ function TabChat({ tabId }: { readonly tabId: string }) {
       column="page"
       draftKey={`tab:${tabId}`}
       onOpenPage={showJunoView}
+      // oxlint-disable-next-line react/no-unstable-nested-components -- This is a render callback, not a component type.
       header={(banner) => <JunoHeader banner={banner} current="chat" menuOpen={menuOpen} onMenu={setMenuOpen} onOpenPage={showJunoView} onResume={resumeJuno} />}
       contextOf={() => (about === undefined ? undefined : chipContext(about))}
       composerContext={about === undefined ? undefined : <JunoPanelContext about={about} onRemoveAbout={() => registry.set(junoAboutAtom(JUNO_TAB_ABOUT), undefined)} />}

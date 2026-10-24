@@ -12,6 +12,7 @@ export function driveScheduler(scheduler: Scheduler, report: (error: unknown) =>
       do {
         again = false
         await scheduler.tick()
+        // oxlint-disable-next-line no-unmodified-loop-condition -- `close()` can change `closed` during the awaited tick.
       } while (again && !closed)
     })().catch(report).finally(() => { pending = undefined })
     return pending

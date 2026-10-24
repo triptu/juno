@@ -122,6 +122,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
       {...(switcher === undefined
         ? {}
         : {
+            // oxlint-disable-next-line react/no-unstable-nested-components -- This is a render callback, not a component type.
             wrapLeft: (island: ReactNode) => (
               <Popover open={switcher.open} onClose={() => switcher.onOpen(false)} anchor={island} placement="bottom-start" alignTo='[aria-haspopup="dialog"]' width="browse" padding="none" label="Topics in this channel" returnFocusTo='[aria-haspopup="dialog"]'>
                 {switcher.content}

@@ -22,6 +22,7 @@ export function useRowAccessory(row: TopicRow | undefined): RowAccessory | undef
   let shown: RowAccessory | undefined
   // Every hook runs on every render, so the hook order holds.
   for (const useAccessory of rowAccessories) {
+    // oxlint-disable-next-line react-hooks/rules-of-hooks -- This module-level list is fixed, so the hook order cannot change.
     const accessory = useAccessory(row)
     if (shown === undefined) shown = accessory
   }

@@ -105,7 +105,7 @@ function Waiter({ sessionId, target, onReady }: { readonly sessionId: string; re
     // A restored selection had no event to set the view; a match only Slack found is fetched first, as ⌘K does.
     moveReader(sessionId, target, 'pointer')
     if (target.stored === false && target.ts !== undefined) void loadOlderMessages(registry, target.topicId, justAfter(target.ts))
-  }, [sessionId, view, target])
+  }, [sessionId, target])
   const [late, setLate] = useState(false)
   useEffect(() => {
     const timer = setTimeout(() => setLate(true), READY_WAIT_MS)
@@ -137,7 +137,8 @@ function ShownTopic({ sessionId, selection, snapshot, narrow, readerRef, onStepp
     const from = measureFrom
     measureFrom = undefined
     afterPaint(() => measure('juno.search-reader', from))
-  }, [painted, selection.topicId, selection.ts])
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- A same-topic move starts a new measure even while `painted` stays true.
+  }, [painted, selection.ts])
 
   const navigation = useAtomValue(searchMatchesAtom({ sessionId, generation: snapshot?.generation ?? 0, topicId: selection.topicId, ...(selection.ts === undefined ? {} : { ts: selection.ts }), ...(list.order[0] === undefined ? {} : { first: list.order[0] }), ...(list.order.at(-1) === undefined ? {} : { last: list.order.at(-1)! }) }))
   const nav = navigation._tag === 'Success' ? navigation.value : undefined

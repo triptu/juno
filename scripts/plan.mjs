@@ -138,9 +138,11 @@ if (import.meta.main) {
     for (const step of lane) {
       if (stopRun) break
       // The local full run owns the lock, but unrelated processes may still be busy.
-      while (serial && loadavg()[0] > Number(process.env.JUNO_PLAN_MAX_LOAD ?? Infinity)) {
-        console.log(`plan: load ${loadavg()[0].toFixed(1)} is above ${process.env.JUNO_PLAN_MAX_LOAD}; waiting before ${step.script}`)
-        await sleep(30_000)
+      if (serial) {
+        while (loadavg()[0] > Number(process.env.JUNO_PLAN_MAX_LOAD ?? Infinity)) {
+          console.log(`plan: load ${loadavg()[0].toFixed(1)} is above ${process.env.JUNO_PLAN_MAX_LOAD}; waiting before ${step.script}`)
+          await sleep(30_000)
+        }
       }
       results.push(await run(step, index > 0 && planned.length > 1))
     }

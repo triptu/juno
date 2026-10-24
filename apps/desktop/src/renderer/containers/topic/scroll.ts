@@ -160,7 +160,7 @@ export function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pin
 export function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number): ReadonlySet<string> {
   const eager = new Set<string>()
   for (let i = Math.max(0, openAt - rows); i < Math.min(order.length, openAt + rows); i++) eager.add(order[i]!)
-  for (let i = Math.max(0, heldAt - rows); heldAt >= 0 && i < Math.min(order.length, heldAt + rows); i++) eager.add(order[i]!)
+  if (heldAt >= 0) for (let i = Math.max(0, heldAt - rows); i < Math.min(order.length, heldAt + rows); i++) eager.add(order[i]!)
   for (let i = Math.max(0, order.length - rows); i < order.length; i++) eager.add(order[i]!)
   return eager
 }

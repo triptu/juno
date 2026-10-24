@@ -43,7 +43,7 @@ export async function runTool(name, file, args, options = {}, base = BASE_LIMIT_
     const limit = timeLimit(base * factor)
     limits.push(limit)
     try { return await once(file, args, options, limit) } catch (error) {
-      if (!error.timedOut) throw new Error(`${name}: ${error.message} ${error.stderr ?? ''}`.trim())
+      if (!error.timedOut) throw new Error(`${name}: ${error.message} ${error.stderr ?? ''}`.trim(), { cause: error })
     }
   }
   const load = loadavg()[0].toFixed(1)

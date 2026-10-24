@@ -282,7 +282,7 @@ function takeLock() {
     let pid
     try { pid = Number(readFileSync(join(lock, 'pid'), 'utf8')) } catch { /* Not written yet, or never. */ }
     const alive = () => { try { process.kill(pid, 0); return true } catch (error) { return error.code === 'EPERM' } }
-    if (pid ? alive() : Date.now() - statSync(lock).mtimeMs < 60_000) throw new Error(`another release is running (pid ${pid ?? 'unknown'}); its lock is ${lock}`)
+    if (pid ? alive() : Date.now() - statSync(lock).mtimeMs < 60_000) throw new Error(`another release is running (pid ${pid ?? 'unknown'}); its lock is ${lock}`, { cause: error })
     say(`taking over the lock of pid ${pid ?? 'unknown'}, which has gone`)
     rmSync(lock, { recursive: true, force: true })
     mkdirSync(lock)

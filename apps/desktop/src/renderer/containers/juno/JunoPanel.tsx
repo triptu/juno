@@ -97,6 +97,7 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
       column="panel"
       draftKey={`panel:${tabId}`}
       onOpenPage={(page) => showJunoPanelView(tabId, page)}
+      // oxlint-disable-next-line react/no-unstable-nested-components -- This is a render callback, not a component type.
       header={(banner) => (
         <JunoHeader
           column="panel"

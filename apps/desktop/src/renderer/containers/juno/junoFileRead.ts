@@ -4,8 +4,8 @@ import { cutText, fitImage, JUNO_IMAGE_LIMITS, JUNO_TEXT_LIMITS, JUNO_THUMB_CHAR
 const dataUrl = (blob: Blob) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(reader.error)
+    reader.addEventListener('load', () => resolve(String(reader.result)), { once: true })
+    reader.addEventListener('error', () => reject(reader.error), { once: true })
     reader.readAsDataURL(blob)
   })
 

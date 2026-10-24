@@ -166,6 +166,7 @@ function useNear(target: RefObject<HTMLDivElement | null>, onNear: (() => void) 
     }, { root, rootMargin: margin })
     observer.observe(element)
     return () => observer.disconnect()
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- A new page key must re-check proximity with the same sentinel.
   }, [target, enabled, margin, key])
 }
 

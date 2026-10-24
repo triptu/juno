@@ -78,6 +78,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
     placeNear(card, open.chip)
     open.chip.setAttribute('aria-describedby', id)
     return () => open.chip.removeAttribute('aria-describedby')
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- The lazy card can first be placed only after `ready`.
   }, [open, id, ready])
 
   const chipProps = (name: string) => ({
