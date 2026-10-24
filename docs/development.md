@@ -1217,6 +1217,9 @@ Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes.
 
 ## Releasing
 
+`bun run release` publishes a release from start to finish ("The release
+command" below); the rest of this section describes the steps it runs.
+
 The release target is macOS Apple Silicon. `bun run package` builds the app, rebuilds
 native dependencies for Electron, and writes the DMG, its block map and
 update metadata (`latest-mac.yml`) to `apps/desktop/release/`. It never
@@ -1446,56 +1449,70 @@ packaged app before publishing. It adds an `urgent` marker to the GitHub release
 notes metadata. No full run covers an urgent release yet, so run
 `bun run verify:main --ref <commit>` for it next; the command prints the commit. An urgent publish is still a normal visible release.
 It records the commit it built from as the release source, so merge that
-`Release x.y.z` commit into main afterwards; the next `release:scheduled` refuses
-any commit that does not descend from the last release source.
+`Release x.y.z` commit into main afterwards; the next `bun run release` refuses
+a tip that does not descend from the last release source.
 
 `bun run release:version`, `bun run package` and `bun run release:publish` print their
 step durations and append them to `.juno-status/release-timings.json` (local,
 gitignored): version bump, JS build, deploy, electron-builder, DMG, notarize
 or skip, and upload. The electron-builder total includes the DMG phase.
 
-### Scheduled releases
+### The release command
 
-`bun run release:scheduled` picks and publishes a release on the release Mac.
-Nothing runs it on a schedule. An agent runs it when Tushar asks for a release,
-following `.claude/skills/do-release/SKILL.md`, which also covers the update token. Use
-`bun run release:scheduled --dry-run` to inspect the current refs, records and
-GitHub release without fetching, building, committing or publishing.
+`bun run release` is the whole release in one command. Nothing runs it on a
+schedule: an agent runs it when Tushar asks, following
+`.claude/skills/do-release/SKILL.md`, which also covers the update token. The
+agent steps in only for judgement: the highlights, and fixes when the full run
+fails. `bun run release --dry-run` reads GitHub and the local records and
+changes nothing; it does not fetch.
 
-The command fetches `origin/main` and searches its full ancestry, newest descendants
-first, for a commit covered by an eligible full or repair run. A verified source remains
-eligible when it enters main through a merge's second parent. There is no minimum gap between releases. It does nothing if that source is
-already released or there are no user-facing changes. It refuses
-to release an ancestor of the last released source. GitHub release metadata
-records both the source and build commits; older releases use their
-`Release x.y.z` commit on main.
+1. It fetches `origin/main` and takes its tip. It does nothing if the tip is
+   already released or has no user-facing change since the last release, and
+   refuses a tip that does not descend from the last released source. GitHub
+   release metadata records both the source and build commits; older releases
+   use their `Release x.y.z` commit on main.
+2. It prints the product commits since the last release, the input for the
+   highlights, and the highlights file to write
+   (`.juno-status/release-<version>-notes.md`, or `--notes <file>`).
+3. If no green full run covers the tip (the release gate in "Publishing"), it
+   runs `bun run verify:main --ref <tip>` on the laptop. If the newest record
+   for an ancestor of the tip failed and main has changed since, it runs
+   `verify:main --ref <tip> --repair <record>` instead. If main has not changed
+   since a failed run, it refuses to run anything. A failed run stops the
+   command before any build, with each failed suite's failures, cause and log,
+   and the repair command. With `--nightly` the full run is nightly, and after a
+   green run the command pushes the refreshed coverage map to main.
+4. It waits for the highlights file, which the agent writes while the full run
+   goes. It reads the file once it has not changed for a second, and waits for
+   a corrected file if it is invalid, up to `--notes-timeout` minutes (60).
+5. It bumps the patch version in a detached worktree on the scratch volume
+   (`release-<version>`), commits `Release x.y.z`, runs `bun run package` and
+   `bun run test:package` there (both through the heavy lock, packaging with
+   release priority), and publishes with `release:publish`.
+6. It checks the GitHub release (not a draft, marked latest, with the DMG, its
+   block map and `latest-mac.yml`) and that main has the version, then removes
+   the worktree.
 
-Release step timings (prepare, package, packaged smoke, publish, upload and cleanup) persist in the main checkout's `.juno-status/release-timings.json`, including failed steps, after the release worktree is removed.
+`JUNO_UPDATE_TOKEN` must be in its environment; the command checks this before
+the full run. Supply it through the existing secure release setup, never in a
+command log. There is no minimum gap between releases. The version is a patch
+newer than both the source and the newest published version. The build's version
+commit stays in the release worktree; only its version field is replayed on the
+current main tip, preserving newer work, and this version-only change remains
+covered by the release gate. If the bump is already on main, no second bump is
+added.
 
-A release gets a patch version newer than both the source and published version,
-a worktree on the scratch volume, a version commit, packaging through the heavy
-lock, and the packaged smoke with `JUNO_E2E_AI_JOBS=1`. Packaging uses release
-priority when the installed heavy lock supports it. A publish needs
-`--notes <file>` with the version's highlights, written by the release agent;
-without it the command lists the product commits since the last release, the
-input for those highlights, and stops. The dry run shows the same list, or with
-`--notes` the highlights as they will be published. Neither bypasses the
-full-run gate or the check for user-facing changes, which still reads the
-commits. Keep product commit subjects plain, so the list reads easily.
+Rerun the same command after any failure. Before anything else it repairs
+main from the latest published stable version and exits without publishing,
+which needs the `gh` login but no build. A green record covering the tip is
+reused. A failed run keeps its worktree for inspection, and a rerun refuses to
+reuse it. The lock is `.juno-status/release.lock`; a lock whose process has
+gone is taken over.
 
-The command uses the existing `gh` login and requires `JUNO_UPDATE_TOKEN` in its
-environment. Supply it through the existing secure release setup, never in a
-command log. After publication it uses the main-version update described above.
-The build version commit stays in the release checkout; only its version field
-is replayed on the current main tip, preserving newer work. This version-only
-change remains covered by the release gate. If the release bump is already on
-main, no second bump is added. Before selecting another release, a rerun repairs
-main from the latest published stable version and exits without publishing.
-This recovery needs the `gh` login but no update token or build artifacts.
-A failed run keeps its checkout and notes for inspection. A successful run
-removes its checkout. After an interrupted
-run, check the PID in `.juno-status/release-scheduled.lock` and GitHub before
-removing a stale lock or resuming a draft.
+Step timings (full run, highlights wait, prepare, package, packaged smoke,
+publish, upload and cleanup) persist in the main checkout's
+`.juno-status/release-timings.json`, including failed steps, after the release
+worktree is removed.
 
 Do not build or publish on every green run. Build an extra preview DMG only on
 request. Milestone reviews remain at milestones; a pre-shipping review means a
