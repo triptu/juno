@@ -48,6 +48,17 @@ function startMeasure(): void {
   measureFrom = mark('juno.search-reader', undefined, { replace: true })
 }
 
+/**
+ * The open measure's start, once. A function, not inline in the effect: the React Compiler treats a module
+ * variable as constant, so a `const from = measureFrom` there was read again after the clear, as undefined, and
+ * the measure ran from the page's start.
+ */
+function takeMeasure(): number | undefined {
+  const from = measureFrom
+  measureFrom = undefined
+  return from
+}
+
 /** The reader's window around the target's match, which lands under the header band. */
 function aim(view: string, target: SearchSelection): void {
   registry.set(messageWindowSpecAtom(view), readerWindow(target.ts))
@@ -132,9 +143,8 @@ function ReaderTopic({ sessionId, selection, row, snapshot, narrow, readerRef, o
 
   const painted = !shown || local || gone
   useEffect(() => {
-    if (!painted || measureFrom === undefined) return
-    const from = measureFrom
-    measureFrom = undefined
+    const from = painted ? takeMeasure() : undefined
+    if (from === undefined) return
     afterPaint(() => measure('juno.search-reader', from, { detail: { reader: shown ? 'topic' : 'preview' } }))
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- A same-topic move starts a new measure even while `painted` stays true.
   }, [painted, ts])
