@@ -15,9 +15,9 @@ import type { Page } from '@playwright/test'
  * not those with tabs or pickers whose names are meant to shorten.
  */
 export async function findOverlaps(page: Page, check: { readonly route: string; readonly buttons: boolean }): Promise<ReadonlyArray<string>> {
-  // The functions below run in the page: their source goes in as one script, so they may use only each other.
-  await page.addScriptTag({ content: [clipOf, isPainted, isOpaque, textBoxes, separated, overlapsIn].map(String).join('\n') })
-  return page.evaluate((args) => (window as unknown as { overlapsIn: typeof overlapsIn }).overlapsIn(args.route, args.buttons), check)
+  // The functions below run in the page: their source goes in as one expression, so they may use only each other.
+  const source = [clipOf, isPainted, isOpaque, textBoxes, separated, overlapsIn].map(String).join('\n')
+  return page.evaluate<ReadonlyArray<string>>(`(() => {\n${source}\nreturn overlapsIn(${JSON.stringify(check.route)}, ${check.buttons})\n})()`)
 }
 
 type Box = { left: number; top: number; right: number; bottom: number }
