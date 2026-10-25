@@ -55,6 +55,8 @@ const IMPLICIT: ReadonlyArray<readonly [string, string]> = [
   ['separator', 'hr'],
   ['table', 'table'],
   ['row', 'tr'],
+  ['columnheader', 'th[scope="col"], thead th'],
+  ['rowheader', 'th[scope="row"]'],
   ['cell', 'td'],
   ['form', 'form[aria-label], form[aria-labelledby]'],
   ['progressbar', 'progress'],
@@ -69,7 +71,7 @@ export function roleOf(el: Element): string | undefined {
 }
 
 /** Roles whose name is not taken from what they contain. */
-const NAME_FROM_AUTHOR = new Set(['textbox', 'combobox', 'searchbox', 'list', 'listbox', 'group', 'radiogroup', 'region', 'dialog', 'alertdialog', 'navigation', 'complementary', 'main', 'tablist', 'menu', 'menubar', 'tree', 'grid', 'table', 'img', 'form', 'progressbar', 'slider', 'spinbutton', 'toolbar', 'status'])
+const NAME_FROM_AUTHOR = new Set(['listitem', 'article', 'alert', 'log', 'figure', 'banner', 'contentinfo', 'note', 'textbox', 'combobox', 'searchbox', 'list', 'listbox', 'group', 'radiogroup', 'region', 'dialog', 'alertdialog', 'navigation', 'complementary', 'main', 'tablist', 'menu', 'menubar', 'tree', 'grid', 'table', 'img', 'form', 'progressbar', 'slider', 'spinbutton', 'toolbar', 'status'])
 
 /**
  * Text as a screen reader reads it (`name`) or as `innerText` gives it
@@ -130,6 +132,8 @@ export interface RoleOptions {
   readonly pressed?: boolean
   readonly expanded?: boolean
   readonly disabled?: boolean
+  /** A heading's level: `h2`, or `aria-level`. */
+  readonly level?: number
   /** Hidden elements too, as Playwright's `includeHidden`. */
   readonly includeHidden?: boolean
 }
@@ -315,6 +319,21 @@ export class Query {
     return (await this.dom.until(this.description, () => this.el())).getAttribute(name)
   }
 
+  /** Selects characters `start` to `end` of the element's text with the pointer (`Dom.selectText`). */
+  async selectText(start: number, end: number): Promise<void> {
+    this.dom.selectText(await this.element(), start, end)
+  }
+
+  async innerHTML(): Promise<string> {
+    return (await this.dom.until(this.description, () => this.el())).innerHTML
+  }
+
+  /** Picks the option whose value or label is `value` in a `<select>`, as a person does. */
+  async selectOption(value: string): Promise<void> {
+    const el = (await this.element()) as unknown as HTMLSelectElement
+    this.dom.selectOption(el, value)
+  }
+
   async inputValue(): Promise<string> {
     return ((await this.element()) as HTMLInputElement).value
   }
@@ -341,6 +360,7 @@ function byRole(root: El, role: string, options: RoleOptions): El[] {
     if (options.pressed !== undefined && (el.getAttribute('aria-pressed') === 'true') !== options.pressed) return false
     if (options.expanded !== undefined && (el.getAttribute('aria-expanded') === 'true') !== options.expanded) return false
     if (options.disabled !== undefined && disabled(el) !== options.disabled) return false
+    if (options.level !== undefined && Number(el.getAttribute('aria-level') ?? /^H(\d)$/.exec(el.tagName)?.[1]) !== options.level) return false
     return true
   })
 }

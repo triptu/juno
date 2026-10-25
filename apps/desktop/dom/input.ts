@@ -38,8 +38,28 @@ export class Dom {
   }
 
   /** As Playwright's `page.keyboard`: keys go to the focused element. */
-  get keyboard(): { readonly press: (keys: string) => Promise<void>; readonly type: (text: string) => Promise<void> } {
-    return { press: (keys) => this.press(keys), type: (text) => this.type(text) }
+  get keyboard(): { readonly press: (keys: string) => Promise<void>; readonly type: (text: string) => Promise<void>; readonly down: (key: string) => Promise<void>; readonly up: (key: string) => Promise<void>; readonly insertText: (text: string) => Promise<void> } {
+    return { press: (keys) => this.press(keys), type: (text) => this.type(text), down: (key) => this.down(key), up: (key) => this.up(key), insertText: (text) => this.insertText(text) }
+  }
+
+  readonly #held = new Set<string>()
+
+  /** A key held down: keydown and its default action, with `repeat` from the second on, as a held key repeats. */
+  async down(key: string): Promise<void> {
+    const K = (this.window as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent
+    const el = this.active ?? this.document.body as El
+    this.#pointerFocus(false)
+    const repeat = this.#held.has(key)
+    this.#held.add(key)
+    if (el.dispatchEvent(new K('keydown', { key, code: codeOf(key), repeat, bubbles: true, cancelable: true, composed: true }))) this.#defaultAction(el, key, [])
+    await Promise.resolve()
+  }
+
+  async up(key: string): Promise<void> {
+    const K = (this.window as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent
+    this.#held.delete(key)
+    ;(this.active ?? this.document.body as El).dispatchEvent(new K('keyup', { key, code: codeOf(key), bubbles: true, cancelable: true, composed: true }))
+    await Promise.resolve()
   }
 
   /** The whole page, as a Query. */
@@ -65,6 +85,10 @@ export class Dom {
 
   getByTitle(text: TextMatch, options?: { readonly exact?: boolean }): Query {
     return this.page.getByTitle(text, options)
+  }
+
+  getByPlaceholder(text: TextMatch, options?: { readonly exact?: boolean }): Query {
+    return this.page.getByPlaceholder(text, options)
   }
 
   /** Polls `check` until it answers something other than undefined, null or false, or fails after `timeout`. */
@@ -162,6 +186,20 @@ export class Dom {
     this.#activate(el)
   }
 
+  /** Selects characters `start` to `end` of `el`'s first text node and lifts the pointer there, as a drag over words ends. */
+  selectText(el: El, start: number, end: number): void {
+    const text = el.firstChild
+    if (text === null) throw new Error('selectText: the element has no text')
+    const range = this.document.createRange()
+    range.setStart(text, start)
+    range.setEnd(text, end)
+    const selection = (this.window as unknown as globalThis.Window).getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    this.#mouse('pointerup', el)
+    this.#mouse('mouseup', el)
+  }
+
   /** A right press: down, up and `contextmenu`, as Chromium sends them on a Mac. */
   rightClick(el: El, modifiers?: ReadonlyArray<Modifier>): void {
     const init = { ...this.#modifiers(modifiers), button: 2 }
@@ -196,12 +234,35 @@ export class Dom {
     this.#setValue(el, text, text.length, 'insertReplacementText', text)
   }
 
+  /** Chooses an option by value or label, then `input` and `change`, which React's select listens to. */
+  selectOption(el: HTMLSelectElement, wanted: string): void {
+    const option = Array.from(el.options).find((option) => option.value === wanted || option.label === wanted)
+    if (option === undefined) throw new Error(`No option "${wanted}" in the select`)
+    if (this.active !== el) el.focus()
+    const W = this.window as unknown as { HTMLSelectElement: typeof HTMLSelectElement; Event: typeof Event }
+    Object.getOwnPropertyDescriptor(W.HTMLSelectElement.prototype, 'value')!.set!.call(el, option.value)
+    el.dispatchEvent(new W.Event('input', { bubbles: true }))
+    el.dispatchEvent(new W.Event('change', { bubbles: true }))
+  }
+
   #setValue(el: HTMLInputElement | HTMLTextAreaElement, value: string, caret: number, inputType: string, data: string | null): void {
     const W = this.window as unknown as { HTMLTextAreaElement: typeof HTMLTextAreaElement; HTMLInputElement: typeof HTMLInputElement; InputEvent: typeof InputEvent }
     const proto = el.tagName === 'TEXTAREA' ? W.HTMLTextAreaElement.prototype : W.HTMLInputElement.prototype
     Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(el, value)
     try { el.setSelectionRange(caret, caret) } catch { /* a field with no selection, as a number */ }
     el.dispatchEvent(new W.InputEvent('input', { bubbles: true, inputType, data }))
+  }
+
+  /** Inserts `text` at the focused field's selection in one input, as an IME or Playwright's `insertText` does: no key events. */
+  async insertText(text: string): Promise<void> {
+    const field = this.active as HTMLInputElement | HTMLTextAreaElement | null
+    if (field === null || !/^(INPUT|TEXTAREA)$/.test(field.tagName)) throw new Error('insertText: no field has focus')
+    const start = field.selectionStart ?? field.value.length
+    const end = field.selectionEnd ?? start
+    const I = (this.window as unknown as { InputEvent: typeof InputEvent }).InputEvent
+    if (!field.dispatchEvent(new I('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }))) return
+    this.#setValue(field, field.value.slice(0, start) + text + field.value.slice(end), start + text.length, 'insertText', text)
+    await Promise.resolve()
   }
 
   /** Types into the focused element, a key at a time. */
@@ -230,7 +291,8 @@ export class Dom {
     this.#pointerFocus(false)
     const init = { key, code: codeOf(key), bubbles: true, cancelable: true, composed: true, ...this.#modifiers(modifiers) }
     const kept = el.dispatchEvent(new K('keydown', init))
-    if (kept) this.#defaultAction(el, key, modifiers)
+    // As in a browser, the key's default action goes to what has focus once keydown's handlers ran.
+    if (kept) this.#defaultAction(this.active ?? el, key, modifiers)
     ;(this.active ?? el).dispatchEvent(new K('keyup', init))
     return kept
   }

@@ -93,6 +93,7 @@ interface PollAssertions<T> {
   toBe(expected: T): Promise<void>
   toEqual(expected: unknown): Promise<void>
   toContain(expected: unknown): Promise<void>
+  toContainEqual(expected: unknown): Promise<void>
   toMatch(expected: TextMatch): Promise<void>
   toBeGreaterThan(expected: number): Promise<void>
   toBeGreaterThanOrEqual(expected: number): Promise<void>
@@ -100,6 +101,7 @@ interface PollAssertions<T> {
   toBeTruthy(): Promise<void>
   toBeUndefined(): Promise<void>
   toBeDefined(): Promise<void>
+  toBeNull(): Promise<void>
   toHaveLength(length: number): Promise<void>
   readonly not: Omit<PollAssertions<T>, 'not'>
 }
@@ -122,7 +124,7 @@ function poll<T>(read: () => T | Promise<T>, options: Timeout & { readonly messa
       await new Promise((done) => setTimeout(done, 20))
     }
   }
-  const names = ['toBe', 'toEqual', 'toContain', 'toMatch', 'toBeGreaterThan', 'toBeGreaterThanOrEqual', 'toBeLessThan', 'toBeTruthy', 'toBeUndefined', 'toBeDefined', 'toHaveLength'] as const
+  const names = ['toBe', 'toEqual', 'toContain', 'toContainEqual', 'toMatch', 'toBeGreaterThan', 'toBeGreaterThanOrEqual', 'toBeLessThan', 'toBeTruthy', 'toBeUndefined', 'toBeDefined', 'toBeNull', 'toHaveLength'] as const
   const result = Object.fromEntries(names.map((name) => [name, matcher(name)])) as unknown as PollAssertions<T>
   if (!negate) Object.defineProperty(result, 'not', { get: () => poll(read, options, true) })
   return result
