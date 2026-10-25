@@ -253,7 +253,11 @@ export class Query {
   async click(options: ClickOptions = {}): Promise<void> {
     const el = await this.dom.until(`${this.description} to be enabled`, () => { const found = this.find().find(shown); return found !== undefined && !disabled(found) ? found : undefined }, options.timeout)
     if (options.button === 'right') this.dom.rightClick(el, options.modifiers)
-    else for (let n = 0; n < (options.clickCount ?? 1); n++) this.dom.click(el, options.modifiers, n + 1)
+    else for (let n = 0; n < (options.clickCount ?? 1); n++) {
+      // Each press is its own task in a browser, so React handles the first before the second arrives.
+      if (n > 0) await new Promise((done) => setTimeout(done, 0))
+      this.dom.click(el, options.modifiers, n + 1)
+    }
   }
 
   async dblclick(): Promise<void> {
