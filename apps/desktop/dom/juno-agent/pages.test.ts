@@ -1,11 +1,12 @@
-// Settings › Juno and the Juno menu's pages in the app, against the agent's served pages.
+// Settings › Juno and the Juno menu's pages, against the agent's served pages.
 // The menu's Settings and Connections open those sections of Settings. Settings › Juno's
 // model picker reads a catalogue with newer models, and Pause holds a message until Resume.
 import { chatCopy } from '@juno/agent-contract'
+import { answer, startScriptedModel, type CatalogueModel, type ScriptedModel } from '../../e2e/juno-agent/model'
+import { agentReady, JunoChatPane } from '../driver/agent'
 import type { Juno } from '../driver/juno'
-import { hooks } from '../fixtures'
-import { answer, expect, JunoChatPane, test as base } from './chat'
-import { startScriptedModel, type CatalogueModel, type ScriptedModel } from './model'
+import { expect } from '../expect'
+import { domTest } from '../test'
 
 const NEWER = 1_800_000_000
 
@@ -21,28 +22,18 @@ function withNewer(models: ReadonlyArray<CatalogueModel>): ReadonlyArray<Catalog
   ]
 }
 
-const test = base.extend<{ readonly model: ScriptedModel }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startScriptedModel({ answer, catalogue: withNewer })
-    await use(model)
-    await model.close()
-  },
-})
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 90_000 })
-
-const openChat = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+async function openChat(juno: Juno): Promise<void> {
+  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  await expect(juno.win.locator('main [data-juno-header="chat"]')).toBeVisible()
+}
 
 async function ready(juno: Juno): Promise<void> {
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await agentReady(juno)
   await openChat(juno)
 }
 
-const ruleFields = (juno: Juno) => juno.win.locator('main').getByLabel('Rule', { exact: true }).evaluateAll((fields) => fields.map((field) => (field as HTMLInputElement).value))
+const ruleFields = (juno: Juno) => juno.win.locator('main').getByLabel('Rule', { exact: true }).all().map((field) => (field as HTMLInputElement).value)
 
 async function openPage(juno: Juno, label: string): Promise<void> {
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
@@ -52,12 +43,12 @@ async function openPage(juno: Juno, label: string): Promise<void> {
 
 // One launch walks the pages: a chat message and its run first, then the rules on Connections,
 // then Settings, whose model picker and Pause come last.
-test('the Juno menu opens its pages: Activity, Connections rules, and Settings › Juno with its picker and Pause', async ({ juno, model }) => {
+domTest('the Juno menu opens its pages: Activity, Connections rules, and Settings › Juno with its picker and Pause', async ({ juno, model, step }) => {
   await ready(juno)
-  await test.step('Activity lists the run a message started, and the other pages open', () => walkPages(juno))
-  await test.step('Connections starts with when Juno asks first, and saves your rules', () => saveRules(juno))
-  await test.step('Settings › Juno shows the provider in use and the newest usable models, and Pause holds a message until Resume', () => settingsJuno(juno, model))
-})
+  await step('Activity lists the run a message started, and the other pages open', () => walkPages(juno))
+  await step('Connections starts with when Juno asks first, and saves your rules', () => saveRules(juno))
+  await step('Settings › Juno shows the provider in use and the newest usable models, and Pause holds a message until Resume', () => settingsJuno(juno, model))
+}, { model: () => startScriptedModel({ answer, catalogue: withNewer }), timeout: 90_000 })
 
 async function walkPages(juno: Juno): Promise<void> {
   const chat = JunoChatPane.tab(juno.win)
@@ -103,11 +94,7 @@ async function settingsJuno(juno: Juno, model: ScriptedModel): Promise<void> {
   await expect(page.locator('[data-provider-key]')).toHaveAttribute('data-provider-key', 'set')
 
   // The picker offers the newest usable model per family and hides batch, no-tools and small-window models.
-  const names = () =>
-    page
-      .getByLabel('Chat model')
-      .locator('option')
-      .evaluateAll((options) => options.map((option) => option.textContent!.split(' · ')[0]))
+  const names = () => page.getByLabel('Chat model').locator('option').all().map((option) => option.textContent!.split(' · ')[0])
   await expect.poll(names, { timeout: 15_000 }).toEqual(['Claude Sonnet 6', 'Claude Opus 5.5', 'Muse Wonder', 'GPT-6.1 Sol', 'Grok 4.7'])
   await expect(page.getByLabel('Chat model').locator('option').filter({ hasText: /Codex/ })).toHaveCount(0)
   // The page follows a change of chat model.

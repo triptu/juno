@@ -220,17 +220,6 @@ export class Dom {
     this.#setValue(el, text, text.length, 'insertReplacementText', text)
   }
 
-  /** Chooses an option by value or label, then `input` and `change`, which React's select listens to. */
-  selectOption(el: HTMLSelectElement, wanted: string): void {
-    const option = Array.from(el.options).find((option) => option.value === wanted || option.label === wanted)
-    if (option === undefined) throw new Error(`No option "${wanted}" in the select`)
-    if (this.active !== el) el.focus()
-    const W = this.window as unknown as { HTMLSelectElement: typeof HTMLSelectElement; Event: typeof Event }
-    Object.getOwnPropertyDescriptor(W.HTMLSelectElement.prototype, 'value')!.set!.call(el, option.value)
-    el.dispatchEvent(new W.Event('input', { bubbles: true }))
-    el.dispatchEvent(new W.Event('change', { bubbles: true }))
-  }
-
   #setValue(el: HTMLInputElement | HTMLTextAreaElement, value: string, caret: number, inputType: string, data: string | null): void {
     const W = this.window as unknown as { HTMLTextAreaElement: typeof HTMLTextAreaElement; HTMLInputElement: typeof HTMLInputElement; InputEvent: typeof InputEvent }
     const proto = el.tagName === 'TEXTAREA' ? W.HTMLTextAreaElement.prototype : W.HTMLInputElement.prototype
@@ -249,6 +238,17 @@ export class Dom {
     if (!field.dispatchEvent(new I('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }))) return
     this.#setValue(field, field.value.slice(0, start) + text + field.value.slice(end), start + text.length, 'insertText', text)
     await Promise.resolve()
+  }
+
+  /** Picks the option whose value or label is `value`, as a user's choice does: the native setter, then `input` and `change`. */
+  select(el: HTMLSelectElement, value: string): void {
+    const option = [...el.options].find((item) => item.value === value || item.label === value || item.textContent?.trim() === value)
+    if (option === undefined) throw new Error(`No option ${value} in ${[...el.options].map((item) => item.value).join(', ')}`)
+    const W = this.window as unknown as { HTMLSelectElement: typeof HTMLSelectElement; Event: typeof Event }
+    if (this.active !== el) el.focus()
+    Object.getOwnPropertyDescriptor(W.HTMLSelectElement.prototype, 'value')!.set!.call(el, option.value)
+    el.dispatchEvent(new W.Event('input', { bubbles: true }))
+    el.dispatchEvent(new W.Event('change', { bubbles: true }))
   }
 
   /** Types into the focused element, a key at a time. */

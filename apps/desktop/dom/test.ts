@@ -7,12 +7,13 @@
  * (test, fake, renderer) and of the hosts it forked (engine, agent).
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test } from 'bun:test'
 import type { FakeSlack, FakeSlackOptions } from '@juno/fake-slack'
 import { Slack } from '../e2e/driver/slack'
 import type { EngineOptions } from '../web/host/testHost'
-import { DomApp, domSnapshot, startDomApp } from './app'
+import { DomApp, domSnapshot, startDomApp, tempUserData } from './app'
 import { PageClock } from './clock'
 import { Juno } from './driver/juno'
 
@@ -46,6 +47,8 @@ export interface DomContext<M extends Model | undefined = undefined> {
   readonly model: M
   /** Quits and opens the app again on the same data folder; answers the new driver (`DomApp.relaunch`). */
   relaunch(options?: Parameters<DomApp['relaunch']>[0]): Promise<Juno>
+  /** A second app, as another Mac: its own data folder and host, signed out, against the same fake and model, with `engine` on top. Closed after the test. */
+  otherApp(engine?: EngineOptions): Promise<Juno>
   /** A named part of the test; a failure inside says which. */
   step<T>(name: string, body: () => Promise<T>): Promise<T>
 }
@@ -71,6 +74,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
     const ready = meter.lap()
     const started = await startDomApp({ snapshot, engine, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
     const warm = meter.lap()
+    const others: Array<{ app: DomApp | undefined; readonly userData: string }> = []
     try {
       const context: DomContext<M> = {
         juno: new Juno(started.app),
@@ -83,6 +87,13 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
           return clock
         },
         model: model as M,
+        otherApp: async (extra) => {
+          const userData = await tempUserData()
+          const other = { app: undefined as DomApp | undefined, userData }
+          others.push(other)
+          other.app = await DomApp.start(started.fake, userData, { engine: { ...engine, ...extra } })
+          return new Juno(other.app)
+        },
         relaunch: async (relaunch) => {
           await started.app.relaunch(relaunch)
           context.juno = new Juno(started.app)
@@ -104,6 +115,9 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
         throw error
       }
     } finally {
+      for (const other of others) {
+        try { await other.app?.close() } finally { await rm(other.userData, { recursive: true, force: true }) }
+      }
       await started.close()
       if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total() })}`)
     }
