@@ -791,7 +791,7 @@ Single runs of `bun run remote --cores 4 --env GALLERY_SHIFT_ALL=1 test:gallery 
 | Variant | Frame interval | Shift part durations | Script time | CPU busy, average | Peak container memory | Result |
 | --- | --- | --- | --- | --- | --- | --- |
 | Default | 16.7 ms | 579–582 s | 612 s | 65% | 5.81 GB | 51 passed |
-| `--disable-frame-rate-limit --disable-gpu-vsync` | 17.3 ms | about 575 s | 605 s | 78% | 6.28 GB | 51 passed |
+| `--disable-frame-rate-limit --disable-gpu-vsync` | 17.3 ms | 572–576 s | 605 s | 78% | 6.28 GB | 51 passed |
 | Three pages per shift part | 16.7 ms | 450 s | 480 s | 94% | 9.42 GB | 51 passed |
 
 The headless shell keeps its 60 Hz frame clock with those flags, so the guard's two-frame wait is unchanged and the flags are not used. Three pages per part were faster only because the CPU had room; with eight workers the gallery allocation is already 94% busy, so the pool was not kept.
