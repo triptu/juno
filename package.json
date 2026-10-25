@@ -66,7 +66,7 @@
     "test:agent": "bun scripts/heavy.mjs bun run --cwd packages/agent test",
     "test:notifications": "bun scripts/heavy.mjs bun run --cwd packages/engine test",
     "flake": "bun scripts/flake.mjs",
-    "test:package": "env JUNO_E2E_AI_JOBS=1 bun scripts/heavy.mjs --exclusive bun run --cwd apps/desktop test:package",
+    "test:package": "env JUNO_E2E_AI_JOBS=1 bun scripts/heavy.mjs --exclusive --priority release bun run --cwd apps/desktop test:package",
     "health:baseline": "bun scripts/health.mjs --update-baseline",
     "test:health": "bun test --timeout=30000 scripts/health.test.mjs",
     "test:repo-tools": "bun test --timeout=30000 scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release.test.mjs scripts/verify-main.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs",
