@@ -9,8 +9,6 @@ import { expect, syncedTest, test } from './fixtures'
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
-const PHOTOS_MAIN = '#photos'
-const DAY_MINUTES = 24 * 60
 
 /** The size of the picture at `src`, loaded as an image in the page. */
 function naturalSize(win: Page, src: string): Promise<{ width: number; height: number }> {
@@ -26,51 +24,16 @@ function naturalSize(win: Page, src: string): Promise<{ width: number; height: n
   )
 }
 
-test('an old card stored before Slack made the thumbnail becomes the picture through file info when its topic opens', async ({ juno, fake }) => {
-  fake.addChannel({ id: 'C0PHOTOS', name: 'photos', messages: [{ user: 'U0LEO', text: 'Photos from the offsite go here.', ago: DAY_MINUTES }] })
-  await juno.signIn()
-  await juno.waitForSync()
-  const { topic } = juno
+// When an old card becomes the picture, and the retry on reopen after the lookups ran out, are engine
+// behaviour (packages/engine/test/flows/topic-view.flow.test.ts). Here a wide picture is held to the
+// card's height.
+syncedTest('a 4:3 picture shows in a box held to the card height', async ({ juno, fake }) => {
   await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-
-  // Two days old and without thumbnails: written as it arrives, it is too old to be asked about then.
-  fake.holdThumbnails()
-  fake.resetCalls()
-  fake.injectMedia({ channel: 'C0PHOTOS', user: 'U0LEO', text: 'The venue floor plan', ago: 2 * DAY_MINUTES, media: [{ name: 'floor-plan.png', width: 800, height: 600 }] })
-  fake.releaseThumbnails({ event: 'none' })
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'The photo socket event has arrived' })
-  await topic.expectMessage('The photo socket event has arrived')
-  expect(fake.calls.filter((call) => call.method === 'files.info')).toHaveLength(0)
-
-  await juno.sidebar.row(PHOTOS_MAIN).open()
-  const row = topic.message('The venue floor plan')
-  await row.scrollIntoViewIfNeeded()
-  const image = row.getByRole('button', { name: 'Open floor-plan.png' })
-  await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 20_000 })
-  expect(fake.calls.filter((call) => call.method === 'files.info').length).toBeGreaterThan(0)
-  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file')).toHaveLength(0)
-  expect(fake.calls.filter((call) => call.method === 'files.info').every((call) => call.ok)).toBe(true)
+  await juno.topic.expectTitle('Main')
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0LEO', text: 'The venue floor plan', media: [{ name: 'floor-plan.png', width: 800, height: 600 }] })
+  const image = juno.topic.message('The venue floor plan').getByRole('button', { name: 'Open floor-plan.png' })
+  await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1)
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
-})
-
-syncedTest('reopening a topic retries an image after its background lookups ran out', async ({ juno, fake }) => {
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-
-  fake.holdThumbnails()
-  fake.resetCalls()
-  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Slow image processing', media: [{ name: 'late.png', width: 800, height: 600 }] })
-  await expect(topic.message('Slow image processing').locator('[data-file-card]')).toHaveCount(1)
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 60_000 }).toBe(4)
-  // No message update or file event arrives, and the next history page is newer than this message.
-  fake.releaseThumbnails({ event: 'none' })
-  await juno.sidebar.row('Proposal: cut offline mode').open()
-  await juno.sidebar.row(ENG_MAIN).open()
-  const image = topic.message('Slow image processing').getByRole('button', { name: 'Open late.png' })
-  await expect(image).toBeVisible({ timeout: 15_000 })
-  await expect.poll(() => image.locator('img').evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0)
 })
 
 syncedTest('images and videos in #eng show inline and open full screen, and a partial file becomes the picture', async ({ juno, win, fake }) => {

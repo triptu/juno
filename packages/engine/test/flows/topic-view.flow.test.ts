@@ -1,8 +1,10 @@
 // The topic view against the fake Slack (M4, architecture 5.5): opening a topic fetches only what the
 // store lacks, older history comes a page at a time and once, a window is covered only by a page that
 // confirms it, live changes reach exactly the rows they touch, links find their topic (SPEC 8, "Links"),
-// and names stand in for mentions and escapes. The older-history test cold-boots to seed history before
-// the first sync; every other test starts warm on the synced default workspace.
+// names stand in for mentions, user groups and escapes, Main's thread links preview their first reply, and
+// an image Slack filled in late becomes the picture when its topic opens (architecture 9, "Late thumbnails").
+// The older-history test cold-boots to seed history before the first sync; every other test starts warm on
+// the synced default workspace.
 import { Schema } from 'effect'
 import { afterEach, expect, it } from 'bun:test'
 import { MessageView, type ThreadSummary, type TopicDetail } from '@juno/contract'
@@ -242,6 +244,50 @@ it('a jump to a reply deep in a long thread is one bounded read, however far it 
     // The first jump's first page stored the steps up to 593.
     expect(await jump(639, 60)).toMatchObject({ outcome: 'fetched', calls: ['conversations.replies'], texts: replies.slice(579, 640).map((reply) => reply.text) })
     expect(await jump(520, 0)).toMatchObject({ outcome: 'cached', calls: [] })
+  })
+})
+
+it('an image Slack had no thumbnail for becomes the picture: retried on reopen after its lookups ran out, and an old card on open', async () => {
+  // The four lookups wait 1, 3, 10 and 30 times this.
+  const engine = await syncedEngine(engines, { timing: { fileRetryMillis: 5 } })
+  const { fake } = engine
+  const lookups = (method: string) => apiCalls(engine, method).filter((call) => call.args['_x_reason'] === 'file')
+  const image = (window: ListWindow<MessageView>, text: string) => rowsOf(window).find((row) => textOf(row) === text)?.files[0]
+
+  await step('a fresh image is looked up four times, an open asks four times more, and the reopen after Slack made it brings the picture', async () => {
+    const main = watchList(engine, messagesAtom('m:C0ENG'))
+    fake.holdThumbnails()
+    fake.resetCalls()
+    fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Slow image processing', media: [{ name: 'late.png', width: 800, height: 600 }] })
+    await main.until((window) => image(window, 'Slow image processing') !== undefined, 'the card')
+    await waitFor(() => (lookups('conversations.history').length === 4 ? true : undefined), WAIT_MS, 'four lookups')
+    // Opened while Slack still has no thumbnail: the open's page stores the message, and its lookups start again.
+    valueOf(await openTopic(engine.registry, 'm:C0ENG'))
+    await waitFor(() => (lookups('conversations.history').length === 8 ? true : undefined), WAIT_MS, 'four more lookups')
+    // No message update or file event comes, and the next open's page starts after the message.
+    fake.releaseThumbnails({ event: 'none' })
+    await quiet(engine)
+    expect(image(main.current(), 'Slow image processing')?.thumb).toBeUndefined()
+    valueOf(await openTopic(engine.registry, 'm:C0ENG'))
+    const window = await main.until((value) => image(value, 'Slow image processing')?.thumb !== undefined, 'the picture after the reopen')
+    expect(image(window, 'Slow image processing')).toMatchObject({ kind: 'image', width: 800, height: 600 })
+  })
+
+  await step('an old card stored before Slack made its thumbnail becomes the picture through file info when its topic opens', async () => {
+    // Two days old as it arrives, it is too old to be asked about then.
+    fake.holdThumbnails()
+    fake.resetCalls()
+    fake.injectMedia({ channel: 'C0PRODUCT', user: 'U0LEO', text: 'The venue floor plan', ago: 2 * 24 * 60, media: [{ name: 'floor-plan.png', width: 800, height: 600 }] })
+    fake.releaseThumbnails({ event: 'none' })
+    await quiet(engine)
+    expect(lookups('files.info')).toHaveLength(0)
+    const product = watchList(engine, messagesAtom('m:C0PRODUCT'))
+    valueOf(await openTopic(engine.registry, 'm:C0PRODUCT'))
+    const window = await product.until((value) => image(value, 'The venue floor plan')?.thumb !== undefined, 'the picture after the open')
+    expect(image(window, 'The venue floor plan')).toMatchObject({ kind: 'image', width: 800, height: 600 })
+    expect(lookups('files.info').length).toBeGreaterThan(0)
+    expect(lookups('files.info').every((call) => call.ok)).toBe(true)
+    expect(lookups('conversations.history')).toHaveLength(0)
   })
 })
 
