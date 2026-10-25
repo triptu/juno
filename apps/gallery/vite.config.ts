@@ -1,9 +1,8 @@
 import { resolve } from 'node:path'
 import stylex from '@stylexjs/unplugin'
 import { defineConfig, type Plugin } from 'vite'
-// The React Compiler pass the desktop renderer uses,
-// so the gallery renders the same compiled components the app does.
-import { reactWithCompiler } from '../desktop/react-compiler.vite'
+// React with the React Compiler, as the desktop renderer runs it.
+import { reactWithCompiler } from '../desktop/renderer.vite'
 
 // The monorepo root, so StyleX resolves the workspace token package the same
 // way the desktop renderer does (see apps/desktop/electron.vite.config.ts).
@@ -40,6 +39,6 @@ export default defineConfig({
       lightningcssOptions: { minify: true },
       unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
     }),
-    ...reactWithCompiler(repoRoot, true),
+    reactWithCompiler(true),
   ],
 })

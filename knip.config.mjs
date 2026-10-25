@@ -53,6 +53,8 @@ export default {
       project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'dom/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', 'web/**/*.ts', '*.config.ts', '*.vite.ts'],
       playwright: { config: ['playwright*.config.ts'] },
       vite: { config: ['electron.vite.config.ts', 'vite.web.config.ts', 'dom/vite.config.ts'] },
+      // @vitejs/plugin-react imports the React Compiler by name when `compiler` is set (renderer.vite.ts).
+      ignoreDependencies: ['oxc-transform-react'],
     },
     'apps/gallery': {
       entry: ['index.html'],

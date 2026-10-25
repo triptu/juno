@@ -43,7 +43,7 @@ const buildInputs = [...new Set([...files, ...envFiles])].filter((file) => {
   if (path.startsWith('dom/') && path !== 'dom/vite.config.ts') return false
   return !path.startsWith('e2e/') && !/^[^/]+\.spec\.ts$|^playwright(?:\.[^/]*)?\.config\.ts$/.test(path)
 })
-const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'JUNO_REACT_COMPILER', 'NODE_ENV'].includes(name)).toSorted(([a], [b]) => a.localeCompare(b))
+const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'NODE_ENV'].includes(name)).toSorted(([a], [b]) => a.localeCompare(b))
 const key = createHash('sha256').update(JSON.stringify({ version: 2, app: relative(root, app), outDir, command, node: process.version, platform: process.platform, arch: process.arch, environment, source: hashFiles(root, buildInputs) })).digest('hex')
 const fingerprint = (dir) => hashFiles(dir, walk(dir).filter((file) => relative(dir, file) !== marker))
 const valid = (dir) => {
