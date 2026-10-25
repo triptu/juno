@@ -1093,6 +1093,29 @@ export class Juno {
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: engine-live ${Math.round(performance.now() - started)} ms`)
   }
 
+  /**
+   * Nothing on screen moves at rest (performance.md section 1, "Idle CPU"): no
+   * looping animation runs and no frame loop asks for frames, over a second.
+   * Finite animations may still be ending when the check starts.
+   */
+  async expectAtRest(): Promise<void> {
+    const second = () => this.win.evaluate(() => new Promise<{ readonly looping: ReadonlyArray<string>; readonly frames: number }>((resolve) => {
+      const request = window.requestAnimationFrame
+      let frames = 0
+      window.requestAnimationFrame = (callback) => { frames++; return request.call(window, callback) }
+      setTimeout(() => {
+        window.requestAnimationFrame = request
+        const looping = document.getAnimations()
+          .filter((animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations === Infinity)
+          .map((animation) => (animation as CSSAnimation).animationName ?? 'script animation')
+        resolve({ looping, frames })
+      }, 1_000)
+    }))
+    // A loop asks for a frame every 16 ms; a one-off paint callback asks for one or two.
+    await expect.poll(async () => { const rest = await second(); return { looping: rest.looping, frameLoop: rest.frames > 5 } }, { timeout: 6_000, intervals: [0] })
+      .toEqual({ looping: [], frameLoop: false })
+  }
+
   /** Reads one of the app's performance measures (`@juno/state/perf`), in milliseconds. */
   async measure(name: string): Promise<number | undefined> {
     return this.win.evaluate((measureName) => {

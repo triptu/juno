@@ -124,7 +124,13 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 }
 
 // Signed in. The drag regions are counted first, before any surface has opened.
-syncedTest('the signed-in shell: drag regions, surfaces over the title bars, and the build line', { tag: '@electron' }, async ({ juno, fake }) => {
+syncedTest('the signed-in shell: its image policy, drag regions, surfaces over the title bars, and the build line', { tag: '@electron' }, async ({ juno, fake }) => {
+  await test.step('images load only from the app and Slack; unfurls go through main (src/main/publicImage.ts)', async () => {
+    const policy = await juno.win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
+    expect(policy).toContain("img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:")
+    expect(policy).not.toContain('slack-imgs.com')
+    expect(policy).not.toContain('twimg.com')
+  })
   await test.step('only the title bars drag the window, and every control on them opts out', () => dragRegions(juno))
   await test.step('every surface that can open over a title bar opts out of its drag region', () => surfacesOptOut(juno, fake))
   await test.step('answers app.getInfo over the typed IPC bridge', () => buildLine(juno))

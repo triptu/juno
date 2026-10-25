@@ -4,7 +4,7 @@ Reviewed on 2026-10-13 at commit `86ee2ee` on branch `m3-review`. Scope: the sig
 
 The owner's decisions are taken as given and not relitigated: grey unread counts, icon-only Resolve in a reserved slot on the meta line, the hover-only scrollbar, Figtree with Coral and the rounder shapes, no layout shift ever, mouse-down activation.
 
-Evidence lives next to this file: screenshots in `shots/`, machine-readable measurements in `harness/out/`, and the harness that produced them in `harness/` (section 4 says how to rerun it). Paths in the table are relative to the repo root.
+Evidence lives next to this file: screenshots in `shots/`, machine-readable measurements in `harness/out/`, and section 4 says how the harness that produced them ran. The harness was removed on 10-25; `git show 1e776b39c:docs/reviews/m3/harness/review.spec.ts` has it. Paths in the table are relative to the repo root.
 
 ## 1. Scope and coverage
 

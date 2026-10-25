@@ -4,15 +4,20 @@
 // the states the owner leaves the app in. On 10-18 a "Juno Helper" sat at
 // 100 % of a core on the owner's Mac: the engine's send workers ran their
 // pass again at once while a channel's first unsent row waited out a
-// backoff. The idle CPU regression lives in packages/engine/test/perf/edit-retry-idle.perf.ts.
+// backoff. Every run counts the engine's work passes at rest under a test
+// clock (packages/engine/test/flows/idle.flow.test.ts), and the Juno chat
+// flow checks nothing on screen moves after an answer (juno.expectAtRest).
+// The real-CPU check of that case is packages/engine/test/perf/edit-retry-idle.perf.ts.
 //
 // The first test keeps the 10-16 case: an unread message that mentions
 // someone the store knows, under a newer one that names nobody. Here #eng
 // is small, so that spin cost little; `idle.perf.ts` reads a large channel.
 //
-// The portable heavy journey checks CPU and memory on a small seed in under
-// two minutes. App diagnostics are the primary way to catch idle spins in
-// the field. The @mac run keeps minute windows and fine process budgets.
+// Everything here is tagged @mac, so it runs only on the Mac when asked and
+// before a release, never in the laptop lanes: it is nearly all waiting. The
+// portable journey checks CPU and memory on a small seed in under two
+// minutes; the other tests keep minute windows and fine process budgets. App
+// diagnostics are the primary way to catch idle spins in the field.
 import { rm } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
@@ -156,9 +161,9 @@ async function tabAndWindowStates(running: RunningApp, fake: FakeSlack): Promise
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show())
 }
 
-portableIdleJourney()
-
 test.describe('mac process budgets', { tag: '@mac' }, () => {
+  portableIdleJourney()
+
   test('the engine is idle after sync, with an older unread message that mentions a known person', async ({ juno, slack, running, fake }) => {
     test.setTimeout(120_000)
     await juno.signIn()

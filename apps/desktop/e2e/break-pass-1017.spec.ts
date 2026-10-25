@@ -240,39 +240,60 @@ syncedTest("a relaunch keeps many tabs, their topic drafts, and each Home tab's 
   await expect(restarted.write.composer).toHaveValue('Second, for product')
 })
 
-test('the topic switcher with many threads keeps the selected row in view and fits the window', async ({ juno, fake }) => {
+syncedTest('a narrow window keeps the tab strip and topic inside the window, and the destination list and topic switcher fit', async ({ juno, fake }) => {
+  // Sixty threads in #eng for the switcher.
   for (let i = 0; i < 60; i++) {
     const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: `Busy day thread number ${i} about things` })
     fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: `Reply ${i}`, threadTs: root.ts })
   }
-  await juno.signIn()
-  await juno.waitForSync()
-  await setWindowSize(juno, 1000, 600)
-  await juno.sidebar.row('#eng').open()
-  const switcher = await juno.topic.openSwitcherWithKeyboard()
-  const box = await switcher.root.boundingBox()
-  const height = await juno.win.evaluate(() => innerHeight)
-  expect(box!.y + box!.height).toBeLessThanOrEqual(height)
-  for (let i = 0; i < 40; i++) await juno.win.keyboard.press('ArrowDown')
-  const activeId = await switcher.search.getAttribute('aria-activedescendant')
-  expect(activeId).not.toBeNull()
-  const active = switcher.root.locator(`[id="${activeId}"]`)
-  await expect(active).toContainText('Busy day thread')
-  await expect(active).toBeInViewport({ ratio: 1 })
-  await juno.win.keyboard.press('Enter')
-  await expect(switcher.root).toBeHidden()
-})
+  await test.step('the tab strip and the topic stay inside a narrow window with many tabs', async () => {
+    await setWindowSize(juno, 720, 480)
+    await juno.sidebar.row(POSTGRES).open()
+    for (const title of [RINA, ROADMAP, '#eng']) await juno.sidebar.row(title).openInNewTab()
+    for (let i = 0; i < 6; i++) await juno.tabs.menu('new-tab')
+    await juno.sidebar.row(POSTGRES).open()
+    expect(await juno.win.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await expect(juno.tabs.newTabButton).toBeInViewport()
+    await expect(juno.topic.composer).toBeInViewport()
+    await expect(juno.topic.contextPill).toBeInViewport()
+  })
 
-syncedTest('a narrow window keeps the tab strip and topic inside the window', async ({ juno }) => {
-  await setWindowSize(juno, 720, 480)
-  await juno.sidebar.row(POSTGRES).open()
-  for (const title of [RINA, ROADMAP, '#eng']) await juno.sidebar.row(title).openInNewTab()
-  for (let i = 0; i < 6; i++) await juno.tabs.menu('new-tab')
-  await juno.sidebar.row(POSTGRES).open()
-  expect(await juno.win.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await expect(juno.tabs.newTabButton).toBeInViewport()
-  await expect(juno.topic.composer).toBeInViewport()
-  await expect(juno.topic.contextPill).toBeInViewport()
+  await test.step('in the smallest window the destination list from ⌘N fits above the chip, its search in view', async () => {
+    const { write, tabs, win } = juno
+    await expect.poll(() => win.evaluate(() => innerHeight)).toBeLessThan(500)
+    await tabs.menu('new-message')
+    await expect(write.search).toBeFocused()
+    await expect(write.option('Maya')).toBeVisible()
+    // In view and not under anything that clips it: the point at its middle is the search itself.
+    await expect(write.search).toBeInViewport({ ratio: 1 })
+    const hit = await write.search.evaluate((search) => {
+      const box = search.getBoundingClientRect()
+      const at = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return at === search
+    })
+    expect(hit, 'the search is the element at its own middle').toBe(true)
+    await win.keyboard.type('jon')
+    await win.keyboard.press('Enter')
+    await write.expectDestination('Jonas')
+  })
+
+  await test.step('the topic switcher with many threads keeps the selected row in view and fits the window', async () => {
+    await setWindowSize(juno, 1000, 600)
+    await juno.sidebar.row('#eng').open()
+    await juno.topic.expectMessage('Busy day thread number 59 about things')
+    const switcher = await juno.topic.openSwitcherWithKeyboard()
+    const box = await switcher.root.boundingBox()
+    const height = await juno.win.evaluate(() => innerHeight)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(height)
+    for (let i = 0; i < 40; i++) await juno.win.keyboard.press('ArrowDown')
+    const activeId = await switcher.search.getAttribute('aria-activedescendant')
+    expect(activeId).not.toBeNull()
+    const active = switcher.root.locator(`[id="${activeId}"]`)
+    await expect(active).toContainText('Busy day thread')
+    await expect(active).toBeInViewport({ ratio: 1 })
+    await juno.win.keyboard.press('Enter')
+    await expect(switcher.root).toBeHidden()
+  })
 })
 
 syncedTest('each tab gets its composer focus back after a keyboard tab switch', async ({ juno }) => {

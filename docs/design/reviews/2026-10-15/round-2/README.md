@@ -2,7 +2,7 @@
 
 The owner decided all six questions of the first round (`../README.md`) as recommended, and asked for the Unread toggle to become an icon. This round applies them on `design-review-1015-2`. SPEC, inventory, `tokens.md`, `primitives.md` and `performance.md` are updated to match.
 
-`compare/` stacks the shot from main (`2bfe29c0`, top) over the same shot on this branch (bottom), in light and dark. `after/` holds the Unread only hover and pressed shots, which main has no counterpart for. `gallery/` holds the new Sidebar gallery states and the icons tried for Unread only. The harness is `../harness/review.spec.ts` (`REVIEW_SET=round-2/before|after`); its measurements are in `../harness/out-round-2/`.
+`compare/` stacks the shot from main (`2bfe29c0`, top) over the same shot on this branch (bottom), in light and dark. `after/` holds the Unread only hover and pressed shots, which main has no counterpart for. `gallery/` holds the new Sidebar gallery states and the icons tried for Unread only. The harness was `../harness/review.spec.ts` (`REVIEW_SET=round-2/before|after`), removed on 10-25; its measurements are in `../harness/out-round-2/`.
 
 ## What changed
 

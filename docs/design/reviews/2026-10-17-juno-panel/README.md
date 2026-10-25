@@ -2,9 +2,9 @@
 
 Owner feedback from daily use of the DMG: remove the Catch me up button, show the channel context more nicely, open the chat at the bottom, and fix the panel colour in light and dark.
 
-Shots of the real app against the fake Slack and a fake model, 1440 by 900 at 2x, with eight exchanges in the chat. `before-*` is origin/main at 4e1d6f0e, `after-*` is this branch. Written by `apps/desktop/e2e/juno-agent/panel-shots.spec.ts`:
+Shots of the real app against the fake Slack and a fake model, 1440 by 900 at 2x, with eight exchanges in the chat. `before-*` is origin/main at 4e1d6f0e, `after-*` is this branch. Written by `apps/desktop/e2e/screens/panel-shots.spec.ts`:
 
-    JUNO_SCREENS=1 JUNO_SHOTS_PREFIX=after JUNO_SHOTS_ACCENTS=1 pnpm test:desktop e2e/juno-agent/panel-shots.spec.ts
+    JUNO_SCREENS=1 JUNO_SHOTS_PREFIX=after JUNO_SHOTS_ACCENTS=1 pnpm test:desktop e2e/screens/panel-shots.spec.ts
 
 | | Light | Dark |
 | --- | --- | --- |
