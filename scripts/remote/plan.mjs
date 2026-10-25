@@ -13,9 +13,12 @@ export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
   if (options.script !== 'test:plan' || setting('JUNO_RUNNER_PLAN') === 'single' || setting('JUNO_PLAN_SERIAL') === '1') return []
   const steps = parsePlan(options.args)
+  // An uncached gallery walk (a nightly, --no-cache) is about half of all the CPU: it gets a job of
+  // its own, and the other job takes every other step.
+  const fullWalk = steps.some((step) => step.script === 'test:gallery' && step.env.GALLERY_SHIFT_ALL === '1')
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
-    const kind = desktopJob.includes(step.script) ? 'desktop' : 'unit'
+    const kind = fullWalk ? step.script === 'test:gallery' ? 'gallery' : 'desktop' : desktopJob.includes(step.script) ? 'desktop' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
     groups.get(kind).push({ ...step, index })
   }
