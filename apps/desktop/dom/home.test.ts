@@ -3,16 +3,16 @@
 // topic; Mark done and Resolve all with Undo; Home with AI assist off; and
 // the caught-up state is in home-pictures.spec.ts;
 // and a DM's row drawn as the sidebar draws its Main: the photo, named once.
+// A row's height is the gallery's.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { expect, test } from './fixtures'
-
+import { readUserDb, threadId } from '../e2e/driver/userDb'
 import type { Juno } from './driver/juno'
-import { readUserDb, threadId } from './driver/userDb'
+import { expect } from './expect'
+import { domTest } from './test'
 
-test.describe.configure({ timeout: 150_000 })
 // Home's AI items and title rewrites come from the background AI jobs.
-test.use({ aiJobs: true, freshContext: true })
+const AI = { synced: false, engine: { aiJobs: true }, timeout: 150_000 } as const
 
 /** Show a topic, then Home again, so the next step starts from a fresh Home. */
 async function freshHome(juno: Juno, via: string): Promise<string[]> {
@@ -29,7 +29,8 @@ const OFFSITE = 'Can eng take the Wednesday afternoon'
 
 // One first sync with conversations.history held: the start ("0 of N"), then a page at a time
 // until Home has rows, then the end.
-test('during the first sync Home greets, counts as the sidebar does and shows rows before it ends', async ({ juno, slack, win }) => {
+domTest('during the first sync Home greets, counts as the sidebar does and shows rows before it ends', async ({ juno, slack, step }) => {
+  const { win } = juno
   const greets = 'During the first sync Home greets and says how far the sync got, as the sidebar does'
   const rowsEarly = 'Home shows rows before the first sync ends'
   const method = 'conversations.history'
@@ -40,7 +41,7 @@ test('during the first sync Home greets, counts as the sidebar does and shows ro
   await juno.home.navItem.click()
   const syncing = win.locator('[data-home][data-home-loading]')
   const progress = juno.sidebar.syncStatus
-  await test.step(greets, async () => {
+  await step(greets, async () => {
     await expect(syncing.getByRole('heading', { level: 2 })).toHaveText(/Tushar\.$/, { timeout: 30_000 })
     await expect(syncing.getByText('All caught up.')).toHaveCount(0)
     await expect(progress).toHaveText('Syncing with Slack')
@@ -51,7 +52,7 @@ test('during the first sync Home greets, counts as the sidebar does and shows ro
     await expect.poll(async () => `Syncing ${await juno.sidebar.syncProgress.getAttribute('aria-valuetext')}.`).toBe(await line.textContent())
   })
 
-  await test.step(rowsEarly, async () => {
+  await step(rowsEarly, async () => {
     const rows = win.locator('[data-home] [data-home-item]')
     // History lands a page at a time; Home shows what waits before the sync is done.
     await expect
@@ -78,7 +79,7 @@ test('during the first sync Home greets, counts as the sidebar does and shows ro
     await expect(rows.first().getByRole('link')).toBeVisible()
   })
 
-  await test.step(greets, async () => {
+  await step(greets, async () => {
     // Once the history lands the first sync finishes: Home shows what waits and the line goes.
     slack.fake.release()
     await juno.waitForSync()
@@ -86,10 +87,9 @@ test('during the first sync Home greets, counts as the sidebar does and shows ro
     await expect(juno.home.greeting).toHaveText(/Tushar\.$/)
     await expect(progress).toHaveCount(0)
   })
-})
+}, AI)
 
-test('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win, userData }) => {
-  await win.clock.install()
+domTest('Home shows what waits from the sidebar, each row opens its topic, and a DM row shows the person once', async ({ juno, slack, clock, userData }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar, topic, tabs } = juno
@@ -100,9 +100,11 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   // The thread's title, the root's words or its AI title once the job names it: Home shows it live.
   await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite.* · hiring · \d+m$/)
   await expect(home.navItem).toHaveAttribute('aria-current', 'page')
-  // The assistant rewrites the title line after paint; the row keeps its height.
+  // The assistant rewrites the title line after paint.
   await expect(home.title('waiting')).toHaveText('Elena asks: She has a competing offer with a Friday')
-  expect((await home.item('waiting').boundingBox())?.height).toBeCloseTo(52, 1)
+  // A thread's tile is its art, not a photo.
+  await expect(home.item('waiting').locator('[data-topic-art]')).toHaveCount(1)
+  await expect(home.item('waiting').locator('img')).toHaveCount(0)
 
   // Waiting on you opens its thread.
   await home.openItem('waiting')
@@ -131,7 +133,7 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   // is live again before the minute ends.
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
-  await win.clock.runFor('00:55')
+  await clock.runFor('00:55')
   await juno.expectEngineLive()
   await expect.poll(() => readUserDb(userData, slack.fake.teamId, (db) => db.prepare('SELECT topic_id FROM topic_visits ORDER BY seen_at DESC LIMIT 1').get()?.['topic_id']), { timeout: 15_000 }).toBe(threadId(slack, POSTGRES))
   await sidebar.row(OFFSITE).open()
@@ -142,20 +144,6 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await home.openItem('resume')
   await topic.expectTitle(POSTGRES)
   await tabs.expectCount(1)
-})
-
-// A DM set to Never leaves Home and comes back on Auto: the engine's home-view flow test.
-
-test("A Home row from a DM shows the person's photo and names them once; a channel's keeps its art", async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { home } = juno
-
-  // Elena's question in a #hiring thread: the tile is the thread's art, and the meta line has the thread and the channel.
-  await home.open()
-  await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite.* · hiring · \d+m$/)
-  await expect(home.item('waiting').locator('[data-topic-art]')).toHaveCount(1)
-  await expect(home.item('waiting').locator('img')).toHaveCount(0)
 
   // Maya asks in the DM: now the newest question. The tile is Maya's photo, as her DM's row in the sidebar, and she is named once.
   slack.as('Maya').dm('Can you look at the hiring plan today?')
@@ -168,11 +156,13 @@ test("A Home row from a DM shows the person's photo and names them once; a chann
   await expect(home.meta('waiting')).toHaveText(/^Maya · (now|\d+m)$/)
   await expect(home.item('waiting').locator('[data-topic-art]')).toHaveCount(0)
   await expect(home.item('waiting').locator('img')).toHaveAttribute('src', /U0MAYA/)
-})
+}, { ...AI, clock: true })
+
+// A DM set to Never leaves Home and comes back on Auto: the engine's home-view flow test.
 
 // Mark done and Resolve all on Home: home-live.spec.ts.
 
-test('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, userData, relaunch }) => {
+domTest('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, userData, relaunch }) => {
   await juno.signIn()
   await juno.waitForSync()
   const relaunched = await relaunch({
@@ -198,5 +188,4 @@ test('with AI assist off, Home shows the rules alone, with their plain titles an
   await expect(relaunched.win.locator('main [data-juno-no-provider]')).toHaveCount(0)
   await expect(relaunched.win.locator('main').getByText('What do you need?')).toHaveCount(0)
   await expect(relaunched.win.locator('main').getByRole('textbox', { name: /^Ask Juno/ })).toBeDisabled()
-
-})
+}, AI)
