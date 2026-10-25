@@ -83,6 +83,11 @@ export class Notifier {
     this.deps.send({ _tag: 'viewing', topicId })
   }
 
+  /** The topic last reported on screen, as the engine was told; for tests. */
+  get viewingTopic(): string | null {
+    return this.viewing
+  }
+
   /** After an engine restart: what it needs to know again. */
   engineReady(): void {
     this.deps.send({ _tag: 'viewing', topicId: this.viewing })

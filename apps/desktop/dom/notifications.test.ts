@@ -61,9 +61,12 @@ async function focusedTopic({ juno, slack, fake, userData }: Context): Promise<v
   await juno.expectToast('#alerts-prod: Always')
   await juno.sidebar.row(ALERTS_MAIN).open()
   await juno.focusWindow()
+  // The engine holds back a message only once the page has told it the topic is on screen; a message that
+  // arrives first notifies, as it would for someone who opened the topic just as it came.
+  await expect.poll(() => juno.system('viewing')).toBe('m:C0ALERTSPROD')
   slack.as('Leo').postIn('alerts-prod', 'Disk at 91% on db-2')
   await juno.topic.expectMessage('Disk at 91% on db-2')
-  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE preview LIKE ?').get('%Disk at 91% on db-2%')?.['suppressed_at'])).toEqual(expect.any(String))
+  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT outcome, decided_by, reason, delivered_at, suppressed_at FROM notification_log WHERE preview LIKE ?').get('%Disk at 91% on db-2%'))).toEqual(expect.objectContaining({ suppressed_at: expect.any(String) }))
   expect((await juno.osNotifications()).map((notification) => notification.body)).not.toContain('Disk at 91% on db-2')
 
   await juno.blurWindow()
