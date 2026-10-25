@@ -70,8 +70,7 @@ test('Set yourself away and active from the avatar menu, and the avatar shows wh
     await juno.accountMenu.expectPresence(/^Active/)
     await juno.accountMenu.close()
     await expect(juno.sidebar.accountButton).toHaveAccessibleDescription(/^Active(\. Notifications paused until .+)?$/)
-    await juno.setSystemIdle(0)
-    await expect.poll(() => slack.tickles(), { timeout: 15_000 }).toBeGreaterThan(0)
+    await expect.poll(async () => { await juno.setSystemIdle(0); return slack.tickles() }, { timeout: 15_000 }).toBeGreaterThan(0)
     await juno.sidebar.expectOwnPresence('active')
   })
 
