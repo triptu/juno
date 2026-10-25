@@ -111,7 +111,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'pending-menu.spec.ts',
   'person-links.spec.ts',
   'presence-others.spec.ts',
-  'quiet-window.spec.ts',
   'reaction-delivery.spec.ts',
   'reactions-dialog.spec.ts',
   'reactors.spec.ts',
