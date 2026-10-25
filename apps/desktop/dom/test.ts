@@ -31,7 +31,7 @@ export interface DomTestOptions<M extends Model | undefined = undefined> {
   readonly engine?: EngineOptions
   /** Install the test clock before the page loads, at this time or now; the engine's clock follows its jumps. */
   readonly clock?: boolean | number | Date
-  /** Starts the model the agent talks to; the agent runs with it. */
+  /** Starts the model the agent talks to; the agent runs with it, set up at launch unless `engine` gives `agent: false`. */
   readonly model?: () => Promise<M & Model>
   readonly timeout?: number
 }
@@ -68,7 +68,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
   const model = options.model === undefined ? undefined : await options.model()
   try {
     const clock = options.clock === undefined || options.clock === false ? undefined : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())
-    const engine: EngineOptions = { ...options.engine, ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }) }
+    const engine: EngineOptions = { ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }), ...options.engine }
     if (options.fake !== undefined && options.synced !== false) throw new Error('A fake of its own needs `synced: false`: the snapshot is of the default seed.')
     const snapshot = options.synced === false ? undefined : await domSnapshot(signIn)
     const ready = meter.lap()
