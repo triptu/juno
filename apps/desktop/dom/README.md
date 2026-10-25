@@ -4,7 +4,7 @@ User flows that check what the app shows and what it sends, with no layout, unde
 
 ## The rule
 
-Assert on what the user sees (text, attributes, counts, focus) and on what reaches the fake. Never assert on boxes, positions, scroll or computed styles: there is no layout, every box is zero, and StyleX's sheet is built without `@layer`, so the cascade differs from the app's. A test that needs a polyfill to pass is about a browser feature and belongs in Playwright.
+Assert on what the user sees (text, attributes, counts, focus) and on what reaches the fake. Never assert on boxes, positions, scroll or computed styles: there is no layout, every box is zero, and the window gets only the sheet's root rules (the tokens), so an element's computed style is mostly the default. A test that needs a polyfill to pass is about a browser feature and belongs in Playwright.
 
 Found while porting, and so left in the browser lane:
 
@@ -14,6 +14,10 @@ Found while porting, and so left in the browser lane:
 - **Focus that follows Chromium's events.** Esc in Home's destination search ends on the chip in Chromium and on the field here; a mouse press on a tab differs too.
 
 `window.ts` fills the gaps the app needs to run (animations finish at once, `checkVisibility` answers from `hidden` and inline `display`, `:focus-visible` follows the last input, `:hover` follows the element `Dom.hover` last moved onto, `document.hasFocus()` follows the window's `focus` and `blur`, a `MessageChannel` made of the window's own event targets). None of them is a thing to test here.
+
+happy-dom's element classes are shared by every window in a worker. `window.ts` patches them once, and puts them back as they were before each page runs and after the last one closes, since a page patches them as its own (`web/page/urls.ts` wraps `setAttribute`). Without that, each test wrapped the last one's patch and kept every closed window alive, about 35 MB a test, until a full lane ran out of memory. A new patch to a shared prototype goes in `patchPrototypes`, never in `fillGaps`, which runs per window.
+
+The window has only the root rules of the StyleX sheet (`:root`, `html`: the tokens, such as the durations `rootDuration` reads). happy-dom matches every rule against an element and its ancestors on each `getComputedStyle`, which the app calls in layout effects; with the whole sheet that was an eighth of the worker's CPU, for values that need layout to mean anything.
 
 A list drawn as it scrolls (the emoji picker's cells, All topics' table) draws nothing here, since every box is zero: a test of its rows stays in Playwright.
 
@@ -40,7 +44,7 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 `domTest` gives the body `juno` (the driver), `fake`, `slack` (`e2e/driver/slack.ts`), `app`, `userData`, `clock`, `model`, `relaunch`, `otherApp` (a second app on its own folder against the same fake and model, signed out, as another Mac) and `step`. Options: `synced`, `fake` (with `synced: false`), `engine` (the host's `EngineOptions`), `clock`, `model` (a function that starts the model the agent and the engine's AI talk to; the agent then runs, unless `engine: { agent: false }`) and `timeout` (default 60 s).
 
 - **Driver.** `driver/` has the Playwright driver's page objects with the same verbs (`e2e/driver/verbs.ts`; both drivers implement it, so a renamed verb fails the typecheck in both): `juno.sidebar` (with views and their sheet), `.tabs`, `.topic` (with thread links, the switcher and Follow), `.write` (Home's composer), `.home` (with a card's review sheet), `.welcome`, `.palette`, `.peek`, `.privacy` (whether `data-sensitive` text sits under `data-privacy`), `.settings`, `.notifications` (with the hours rows), `.accountMenu`, `.nav`, `.surface` (an `AppSurface`, as the web surface is), `searchPage(juno.win)` and the agent's `openChat`, `openPage`, `openSettings`, `openRuns`, `addServer`, `configure`, `card` and the chat's `menu`, `reply` (`driver/agent.ts`).
-- **Queries.** `Query` (`query.ts`) is shaped like Playwright's Locator: `locator`, `getByRole`, `getByText`, `getByLabel`, `getByTitle`, `filter`, `first`, `nth`, `parent`, `and`, `or`, and actions that wait for a shown element (`click`, `hover`, `fill`, `press`, `pressSequentially`, `check`). Roles and names follow Playwright's rules near enough: a string name matches a substring, ignoring case; `exact` asks for the whole name. `juno.win` is the page (`Dom`, `input.ts`), with `win.keyboard.press('Meta+Enter')`, and `win.keyboard.down('Alt')` and `up` for a held key (a row's `peek()`). A `<select>` takes `selectOption(value)`.
+- **Queries.** `Query` (`query.ts`) is shaped like Playwright's Locator: `locator`, `getByRole`, `getByText`, `getByLabel`, `getByTitle`, `filter`, `first`, `nth`, `parent`, `and`, `or`, and actions that wait for a shown element (`click`, `hover`, `fill`, `press`, `pressSequentially`, `check`). Roles, names and text are matched in `find.ts`, by walking happy-dom's own child arrays (the page changes between most polls, so happy-dom's selector cache misses and its engine costs several times as much). Roles and names follow Playwright's rules near enough: a string name matches a substring, ignoring case; `exact` asks for the whole name. `juno.win` is the page (`Dom`, `input.ts`), with `win.keyboard.press('Meta+Enter')`, and `win.keyboard.down('Alt')` and `up` for a held key (a row's `peek()`). A `<select>` takes `selectOption(value)`.
 - **expect.** `expect(query)` has Playwright's assertions (`toBeVisible`, `toHaveCount`, `toHaveText`, `toContainText`, `toHaveAttribute`, `toHaveValue`, `toBeFocused`, `toBeDisabled`, `toHaveAccessibleName`, with `.not`), each polled for 5 s unless given `{ timeout }`. Any other value goes to Bun's `expect`. `expect.poll(fn)` polls.
 - **Visible** means in the document and not under `hidden`, `inert`, `aria-hidden` or an inline `display: none` (React's Activity hides tabs that way). Style sheets do not hide anything here. A control the app keeps for the pointer only, out of the accessibility tree (See all on a reactions card, a presence dot), is checked with `toHaveCount` and pressed with `juno.win.click(query.all()[0]!)`.
 - **Nothing happened.** A check that something did not appear passes at once if it is made before the app could have shown it. Anchor it on something that did happen (`slack.expectNoMarks()` after the row shows the new message), or give it a short wait with a comment, as `peek.test.ts` does.
@@ -61,22 +65,24 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 
 ## Measured
 
-10-25, SSH laptop, 2 physical cores (4 threads), one run each, builds cached. The 14 tests ported first (`git log -- apps/desktop/dom`):
+10-25, SSH laptop, 2 physical cores (4 threads), one run each, builds cached. The whole lane after the four port batches (136 tests in 77 files, 4 workers), before and after the harness changes of `git log --grep 'DOM lane:' -- apps/desktop/dom/window.ts apps/desktop/dom/find.ts`, two interleaved runs each:
 
-| | Playwright browser lane, 4 workers | DOM lane, 4 workers | DOM lane, 1 worker |
-| --- | ---: | ---: | ---: |
-| Test step wall | 26.5 s | 15.8 s | 17.9 s |
-| CPU per test | 4.3 s | 3.9 s (2.6 s over 42 runs) | 2.4 s (about 2.0 once warm) |
-| Wall per test | 5.3 s | 4.2 s | 1.0–1.9 s |
+| | Before | After |
+| --- | ---: | ---: |
+| `bun test` wall | 128 s, 132 s (123 and 133 tests ran: workers died) | 103 s, 103 s |
+| CPU per test, median | 3.6 s, 3.3 s (Bun 2.3–2.4, host 0.9–1.0) | 2.6 s, 2.7 s (Bun 1.7–1.8, host 0.9) |
+| Worker peak RSS | 1.7 GB, 2.1 GB, growing every test | 0.5 GB, 0.7 GB |
+| Container peak | 6.0 GB (the cap) | 3.2 GB, 3.5 GB |
 
-The agent's flows (`juno-agent/`, 10-25, same laptop, one run each, 4 workers): 40 browser tests took 73 s of script time; after the move, 29 DOM tests take 37 s and the 12 browser tests left take 40 s.
+Earlier, against Playwright, on the 14 tests ported first: 4.3 CPU-s per test in the browser lane, 3.9 at 4 workers in this lane before the changes above. The agent's flows (`juno-agent/`): 40 browser tests took 73 s of script time; after the move, 29 DOM tests take 37 s and the 12 browser tests left take 40 s. The browser specs i–r: 56 browser tests took 73 s; after the port, 15 stay in the browser (about 30 s) and 33 DOM tests run in 34 s.
 
-A worker's first test pays for the host's fork and the renderer's compile (about 1.5 CPU-s), so a short run at many workers costs more per test than a long one. At four workers on four threads the job is CPU-bound (99% busy at the median).
+Where a test's CPU goes now (an inspector profile of the Bun side, `JUNO_DOM_PROFILE=1`): the app itself (React rendering and the renderer's Effect runtime) about 60%, the harness's queries and polls about 15%, the fake Slack about 13%. The host is a third of the total, nearly all engine boot, warm catch-up (about 25 calls to the fake) and the test's own engine work.
 
-The browser specs i–r, same machine and workers: 56 browser tests took 73 s (277 test-seconds). After the port, 15 stay in the browser (about 30 s) and 33 DOM tests in 20 files run in 34 s (117 test-seconds, 82 CPU-s in Bun and 35 in the hosts).
+A worker's first test pays for the host's fork and the renderer's compile (about 1.5 CPU-s); both start while the worker waits for the synced snapshot. At four workers on four threads the job is CPU-bound (99% busy at the median). Three workers finish 42 runs in the same wall time with less CPU per test (hyperthreads share cores), five take longer; keep one worker per thread.
 
 ## Commands
 
 - `bun run test:dom` (`scripts/dom-tests.mjs`): builds `dom/dist/` if its inputs changed, then every file. `--files <repo paths>` runs those; `--seed <n>` repeats an order. `JUNO_DOM_WORKERS` sets the workers (default `JUNO_TEST_WORKERS`, one per allocated thread on the runner). Locally it waits for the heavy-job slot; run it remotely: `bun run remote test:dom`.
-- `JUNO_E2E_TIMINGS=1` prints a `dom timing:` line per test: wall time and CPU milliseconds of the Bun worker (test, fake, renderer) and of the hosts it forked (engine, agent), for the snapshot wait, the start and the body.
+- `JUNO_E2E_TIMINGS=1` prints a `dom timing:` line per test: wall time and CPU milliseconds of the Bun worker (test, fake, renderer) and of the hosts it forked (engine, agent), for the snapshot wait, the start and the body, and megabytes resident: the worker's peak and now, the hosts' now.
+- `JUNO_DOM_PROFILE=1` runs in one process with no workers and writes CPU profiles of the Bun side (through the inspector, since `bun test` ignores `--cpu-prof`) and of each host to `test-results/dom-profile/`, which a remote run brings back.
 - `bun run affected` runs the DOM files a change reaches through the import graph, with the renderer and host entries counted as each file's imports; `verify:main` runs the whole lane as its own suite, in the unit job.
