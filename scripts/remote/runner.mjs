@@ -12,14 +12,16 @@ export const localHint = 'wait for the runner; --local runs the steps on this Ma
 /** Juno sizes work in physical cores; quota hosts use the same counts as CPUs. */
 export function runnerJobSize({ script, args, cores, specsCached = false }, capacity) {
   const steps = script === 'test:plan' ? parsePlan(args) : [{ script, args, env: {} }]
-  const unitOnly = steps.every((step) => step.script === 'test' || step.script.startsWith('test:agent') || step.script === 'specs:check')
+  const unitOnly = steps.every((step) => step.script === 'test' || step.script === 'test:dom' || step.script.startsWith('test:agent') || step.script === 'specs:check')
+  const files = (step) => step.args.filter((arg) => !arg.startsWith('-') && /\.[cm]?[jt]sx?$/.test(arg))
   const wide = steps.some((step) => {
     if (step.script === 'specs:check') return !specsCached || step.env.SPECS_CACHE === 'off' || step.env.SPECS_RUN_CACHE === 'off' || step.args.includes('--no-cache')
+    // A DOM test boots an engine host beside its renderer: more than a few want a second core.
+    if (step.script === 'test:dom') return files(step).length === 0 || files(step).length > 4
     if (step.script !== 'test') return false
-    const files = step.args.filter((arg) => !arg.startsWith('-') && /\.[cm]?[jt]sx?$/.test(arg))
-    return files.length === 0 || files.length > 20
+    return files(step).length === 0 || files(step).length > 20
   })
-  const requested = steps.some((step) => !['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'test:gallery', 'test', 'specs:check'].includes(step.script) && !step.script.startsWith('test:agent')) ? 4
+  const requested = steps.some((step) => !['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'test:gallery', 'test', 'test:dom', 'specs:check'].includes(step.script) && !step.script.startsWith('test:agent')) ? 4
     : unitOnly ? wide ? 2 : 1 : 2
   const reserved = cores ?? Math.min(requested, capacity)
   if (!Number.isSafeInteger(reserved) || reserved < 1 || reserved > capacity) throw new Error(`job needs ${reserved} cores; runner lends ${capacity}`)

@@ -39,6 +39,8 @@ const buildInputs = [...new Set([...files, ...envFiles])].filter((file) => {
   const path = relative(app, file)
   const sourcePath = relative(root, file)
   if (/^(?:packages|apps)\/[^/]+\/(?:test|tests)\//.test(sourcePath) || /^scripts\/.*\.test\.mjs$/.test(sourcePath)) return false
+  // The DOM lane's tests and driver are not in any build; its bundle's config is.
+  if (path.startsWith('dom/') && path !== 'dom/vite.config.ts') return false
   return !path.startsWith('e2e/') && !/^[^/]+\.spec\.ts$|^playwright(?:\.[^/]*)?\.config\.ts$/.test(path)
 })
 const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'NODE_ENV'].includes(name)).toSorted(([a], [b]) => a.localeCompare(b))
