@@ -35,6 +35,8 @@ test('formats a selection with ⌘B, keeps mentions and links, and aligns mixed-
 
 async function boldSelection({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { topic } = juno
+  await juno.sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
   await topic.composer.fill('ship it today')
   await topic.composer.evaluate((element: HTMLTextAreaElement) => {
     const at = element.value.indexOf('it')
