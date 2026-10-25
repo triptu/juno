@@ -1,7 +1,8 @@
 // Sending from a topic (spec section 8; architecture 5.7): the message shows
-// at once and settles in place, Main and threads, a refused send with Retry
-// and Delete draft, drafts kept across tabs and a restart, and the composer
-// growing to about eight lines.
+// at once and settles in place in a thread, drafts kept across tabs and a
+// restart, and the composer growing to about eight lines. Main's echo before
+// the answer and a refused send with Retry and Delete draft are in the DOM
+// lane (`dom/send.test.ts`).
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { measureLayoutShift } from '@juno/testing/layout-shift'
@@ -14,7 +15,6 @@ test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
-const ENG_MAIN = '#eng'
 
 interface SavedTab {
   readonly id: string
@@ -73,38 +73,6 @@ test('a reply in a thread shows at once and settles in place, posted once', asyn
   expect(posted[0]!.args['thread_ts']).toBeDefined()
   const copies = fake.messages(String(posted[0]!.args['channel'])).filter((m) => m.client_msg_id === posted[0]!.args['client_msg_id'])
   expect(copies).toHaveLength(1)
-})
-
-test('in Main, a message settles when the echo comes before the answer, and a refused send stays with Retry and Delete draft', async ({ juno, fake }) => {
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-
-  await test.step('a message settles when the echo comes before the answer', async () => {
-    fake.holdNext({ method: 'chat.postMessage' })
-    await topic.send('Lunch order goes in at noon')
-    await topic.expectSent('Lunch order goes in at noon')
-    fake.release()
-    // The same channel's next send waits for the first HTTP answer to finish.
-    await topic.send('Then book a table for six')
-    await topic.expectSent('Then book a table for six')
-    await topic.expectSent('Lunch order goes in at noon')
-    expect(fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['C0ENG', 'C0ENG'])
-  })
-
-  await test.step('a refused send stays in the row with Retry and Delete draft', async () => {
-    fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 2 })
-    await topic.send('Please try this one again')
-    await expect(topic.failed('Please try this one again').row).toContainText('Not sent.')
-    await topic.send('Please drop this one')
-    await expect(topic.failed('Please drop this one').row).toContainText('Not sent.')
-
-    await topic.failed('Please try this one again').retry()
-    await topic.expectSent('Please try this one again')
-    await topic.failed('Please drop this one').discard()
-    await expect(topic.message('Please drop this one')).toHaveCount(0)
-    expect(fake.messages('C0ENG').filter((m) => m.text === 'Please drop this one')).toHaveLength(0)
-  })
 })
 
 test('the composer grows to about eight lines, and a draft is kept per topic across tab switches and a restart', async ({ juno, relaunch, userData, fake }) => {
