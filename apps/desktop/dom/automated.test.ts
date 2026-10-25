@@ -3,12 +3,9 @@
 // could place, and says why; Move and Keep in All stick, with Undo; the view's
 // sheet marks what Juno added; and the question's menu ignores a noisy channel.
 import type { FakeSlack } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
-
-test.describe.configure({ timeout: 120_000 })
-// Juno's judgement of unclear channels is a background AI job.
-test.use({ aiJobs: true, sidebarTrace: true })
+import { expect } from './expect'
+import { domTest } from './test'
 
 const RELEASES_MAIN = '#releases'
 const POSTGRES = 'Draft plan is in the doc'
@@ -49,7 +46,7 @@ async function homeAsks(juno: Juno): Promise<void> {
 const afterAPass = (juno: Juno) => juno.workPass('automated')
 
 // The view's first fill, a channel taken out by hand and a deleted view are the engine's sidebar flow test.
-test('Home asks about an unclear channel; Move puts it in Automated with Undo, and Keep in All is remembered', async ({ juno, fake }) => {
+domTest('Home asks about an unclear channel; Move puts it in Automated with Undo, its menu ignores it, and Keep in All is remembered', async ({ juno, fake }) => {
   addReleases(fake)
   await juno.signIn()
   await juno.waitForSync()
@@ -85,6 +82,15 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
   await homeAsks(juno)
   await expect(home.meta('automated')).toHaveText('To Automated · 4 of 7 messages from apps')
 
+  // The question's menu ignores the channel; Undo brings it back, and Home asks again.
+  const labels = await home.chooseInItemMenu('automated', 'ignore-channel')
+  expect(labels).toContain('Ignore channel')
+  await juno.expectToast('Ignoring #releases')
+  await sidebar.row(RELEASES_MAIN).expectAbsent()
+  await juno.undo()
+  await sidebar.row(RELEASES_MAIN).expectVisible()
+  await homeAsks(juno)
+
   await home.button('automated', 'Keep in All').click()
   await juno.expectToast('Keeping #releases in All')
   // More from the bot moves nothing and asks nothing.
@@ -95,16 +101,4 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
   await sidebar.row(POSTGRES).open()
   await home.open()
   expect(await home.kinds()).not.toContain('automated')
-})
-
-test("the question's menu ignores a noisy channel", async ({ juno, fake }) => {
-  addReleases(fake)
-  await juno.signIn()
-  await juno.waitForSync()
-  await homeAsks(juno)
-
-  const labels = await juno.home.chooseInItemMenu('automated', 'ignore-channel')
-  expect(labels).toContain('Ignore channel')
-  await juno.expectToast('Ignoring #releases')
-  await juno.sidebar.row(RELEASES_MAIN).expectAbsent()
-})
+}, { synced: false, engine: { aiJobs: true }, timeout: 120_000 })
