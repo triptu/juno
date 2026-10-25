@@ -2,8 +2,10 @@
 // first frame, including while the scrollbar thumb is held at the end. A full message window drops its first
 // row without moving the viewport; an upward gesture lets go, and arrivals leave that scrolled position alone.
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { TOPIC300_MAIN_CHANNEL } from '@juno/fake-slack'
+import { TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
+import type { Page } from '@playwright/test'
 import { expect, test, type Fixtures } from './fixtures'
+import type { Juno } from './driver/juno'
 import { answer, JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
@@ -40,23 +42,18 @@ function expectWhole(frames: Frame[], { atEnd }: { readonly atEnd: boolean }): v
 
 const EDITING = '[data-message-row][data-editing]'
 
-// The thread and DM views are the same TopicView, so Main stands for them.
-test('Main: editing the last message without reactions stays above the composer', async ({ juno, win, slack, fake }) => {
-  const maya = slack.as('Maya').id
-  const channel = slack.channel('eng')
-  for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Edit history ${i}`, silent: true })
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng', { exact: true }).open()
+/**
+ * Editing the newest message of `place` keeps the edit box above the composer in every frame: one line or several,
+ * with its own name line or grouped under the message before, opened from the menu or with ↑ then E. `other` posts
+ * the message before when it is not the user's.
+ */
+async function editLastStaysAbove({ juno, win, fake }: Pick<Fixtures, 'juno' | 'win' | 'fake'>, place: string, channel: string, other: string, threadTs?: string): Promise<void> {
   const { topic } = juno
-  await topic.expectMessage('Edit history 29')
-  await topic.toLatest()
-  expect(await longerThanView(topic.scroller)).toBe(true)
-
+  const thread = threadTs === undefined ? {} : { threadTs }
   for (const multiline of [false, true]) {
     for (const grouped of [false, true]) {
       const name = `${multiline ? 'multiline' : 'one line'}, ${grouped ? 'grouped' : 'name line'}`
-      fake.injectMessage({ channel, user: grouped ? fake.workspace.selfId : maya, text: `Previous message for ${name}` })
+      fake.injectMessage({ channel, ...thread, user: grouped ? fake.workspace.selfId : other, text: `Previous message for ${name}` })
       await topic.expectMessage(`Previous message for ${name}`)
       const firstLine = `My last message: ${name}`
       await topic.send(multiline ? `${firstLine}\nA second line\nA third line\nA fourth line` : firstLine)
@@ -84,7 +81,7 @@ test('Main: editing the last message without reactions stays above the composer'
           await frames(win, 12)
           const samples = await watched()
           await test.info().attach(`${name}-${method}`, { body: JSON.stringify(samples), contentType: 'application/json' })
-          console.log(`Main, ${name}, ${method}: ${samples.length} frames, hidden below ${Math.max(...samples.map((sample) => sample.hiddenBelow))}px, above ${Math.max(...samples.map((sample) => sample.hiddenAbove))}px`)
+          console.log(`${place}, ${name}, ${method}: ${samples.length} frames, hidden below ${Math.max(...samples.map((sample) => sample.hiddenBelow))}px, above ${Math.max(...samples.map((sample) => sample.hiddenAbove))}px`)
           expect(samples.length).toBeGreaterThanOrEqual(10)
           expect(samples.filter((sample) => sample.hiddenAbove > 0 || sample.hiddenBelow > 0 || sample.buttons !== 2)).toEqual([])
           await win.keyboard.press('Escape')
@@ -93,6 +90,19 @@ test('Main: editing the last message without reactions stays above the composer'
       }
     }
   }
+}
+
+// A DM is the same TopicView as Main; the thread view is checked on its own (below), since a thread window once broke it alone.
+test('Main: editing the last message without reactions stays above the composer', async ({ juno, win, slack, fake }) => {
+  const channel = slack.channel('eng')
+  for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Edit history ${i}`, silent: true })
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('#eng', { exact: true }).open()
+  await juno.topic.expectMessage('Edit history 29')
+  await juno.topic.toLatest()
+  expect(await longerThanView(juno.topic.scroller)).toBe(true)
+  await editLastStaysAbove({ juno, win, fake }, 'Main', channel, slack.as('Maya').id)
 })
 
 test('keeps the last message of Main whole as it grows at the bottom, and still when scrolled up', async ({ juno, win, slack, fake }) => {
@@ -224,22 +234,12 @@ test('releases the bottom during an upward gesture and uses the resting threshol
   })
 })
 
-// The thread view is the same TopicView, so Main stands for it.
-longTest('Main: back at the end after scrolling up by hand, a full window follows new messages', async ({ juno, win, fake }) => {
-  const title = '#perf-main'
-  const post = (text: string) => void fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, user: 'U0PERFLEO', text })
-  await juno.signIn()
-  await juno.waitForSync()
-  // The first open reads the topic. Opened again, it shows its newest 150 rows, so each message that arrives drops
-  // the first row, and scroll anchoring lowers scrollTop by that row's height.
-  const row = juno.sidebar.row(title)
-  await row.open()
-  await row.expectRead()
-  await juno.tabs.menu('close-tab')
-  await row.open()
-  await juno.topic.expectAtBottom()
+/**
+ * After a scroll up by hand back to the end, a full window follows new messages: after the wheel, with the scrollbar
+ * thumb held at the end, and not while the thumb is dragged above it. `post` sends a message to the open topic.
+ */
+async function backAtEnd(juno: Juno, win: Page, post: (text: string) => void): Promise<void> {
   const { topic } = juno
-
   await test.step('the wheel up a few screens and back down to the end', async () => {
     await topic.scrollUp(1_500)
     expect(await distance(topic.scroller)).toBeGreaterThan(1_000)
@@ -283,6 +283,35 @@ longTest('Main: back at the end after scrolling up by hand, a full window follow
     await expect(topic.message('While the thumb is above the bottom')).not.toBeInViewport()
     await win.mouse.up()
   })
+}
+
+/** Opens `title` read to its end and then again, so it shows its newest 150 rows and each arrival drops the first. */
+async function openFullWindow(juno: Juno, title: string): Promise<void> {
+  await juno.signIn()
+  await juno.waitForSync()
+  // The first open reads the topic. Opened again, it shows its newest 150 rows, so each message that arrives drops
+  // the first row, and scroll anchoring lowers scrollTop by that row's height.
+  const row = juno.sidebar.row(title)
+  await row.open()
+  await row.expectRead()
+  await juno.tabs.menu('close-tab')
+  await row.open()
+  await juno.topic.expectAtBottom()
+}
+
+longTest('Main: back at the end after scrolling up by hand, a full window follows new messages', async ({ juno, win, fake }) => {
+  await openFullWindow(juno, '#perf-main')
+  await backAtEnd(juno, win, (text) => void fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, user: 'U0PERFLEO', text }))
+})
+
+longTest('thread: editing the last message stays above the composer, and back at the end after scrolling up by hand a full window follows new messages', async ({ juno, win, fake }) => {
+  const title = 'Review the rollout checklist 1'
+  await openFullWindow(juno, title)
+  const threadTs = fake.workspace.main(TOPIC300_THREAD_CHANNEL).find((message) => message.text?.startsWith(title))!.ts
+  const post = (text: string) => void fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text })
+  await editLastStaysAbove({ juno, win, fake }, 'thread', TOPIC300_THREAD_CHANNEL, 'U0PERFMAYA', threadTs)
+  await juno.topic.toLatest()
+  await backAtEnd(juno, win, post)
 })
 
 async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>): Promise<void> {
