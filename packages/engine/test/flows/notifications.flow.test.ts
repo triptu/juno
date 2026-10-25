@@ -1,24 +1,23 @@
 // Notifications (SPEC 14): the decision service on a real store with Effect's TestClock (the reading's 2 s
 // timeout, hours starts, settings changed mid-reading, presence), the engine's socket path into a recording
-// Notifier, which topics the dock badge counts, and Slack's own notification schedule and presence by the
-// hours rows against the fake. Main's Notifier (privacy mode, focused-topic suppression, showing the badge) is
-// apps/desktop/test/notifier.test.ts: engine tests do not import apps/desktop.
+// Notifier, and which topics the dock badge counts. Slack's schedule and presence by the hours rows are
+// notification-hours.flow.test.ts. Main's Notifier (privacy mode, focused-topic suppression, showing the
+// badge) is apps/desktop/test/notifier.test.ts: engine tests do not import apps/desktop.
 import { itEffect } from '@juno/testing/effect'
 import { afterEach, expect, it } from 'bun:test'
 import { AiProvider, makeFakeAiProvider } from '@juno/ai'
-import { channelsIgnore, homeView, notificationsDecisions, notificationsSettings, notificationsStatus, notificationsSetGroupHours, notificationsSetLevel, notificationsUseJunoHours, prefsSet, readsMarkRead, viewsSave, viewsSortChannel, type HomeItem, type HomeView, type Hours, type NotificationDecisions, type NotificationSettingsView, type NotificationStatus, type SlackScheduleView, type TodayRow } from '@juno/contract'
+import { channelsIgnore, homeView, notificationsDecisions, notificationsSetLevel, prefsSet, readsMarkRead, viewsSave, viewsSortChannel, type HomeItem, type HomeView, type Hours, type NotificationDecisions, type TodayRow } from '@juno/contract'
 import { ChannelId, UserId, defaultNotificationSettings, localTime, millisToTs, type NotificationSettings } from '@juno/domain'
 import { makeNotifications, type Candidate, type Notification, type Notifier } from '@juno/notifications'
 import { SlackApi } from '@juno/slack'
-import { liveQuery, notificationsPageAtom, runCommand, sendMessage } from '@juno/state'
+import { liveQuery, runCommand, sendMessage } from '@juno/state'
 import { prefs, StoreWriter, transaction } from '@juno/store'
 import { Effect, Fiber, Layer, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { clientLayer, fakeSlack } from '../../../slack/test/helpers'
 import { freshStore } from '../../../store/test/helpers'
-import { productionTiming } from '../../src/config'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
-import { readDb, restart, threadId, tsOf, valueOf } from '../scenario'
+import { readDb, threadId, tsOf, valueOf } from '../scenario'
 import { step } from '../step'
 import { syncedEngine, type SyncedOptions } from '../synced'
 
@@ -323,169 +322,5 @@ it('the dock badge: a DM kept out of All or in Automated counts only when it men
     engine.fake.emitFrame({ type: 'pref_change', name: 'muted_channels', value: 'C0ENG' })
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> Can you approve this now?' })
     await shows(true, 'the badge for the mention in the muted channel')
-  })
-})
-
-// Slack's own notification schedule from the notification hours, against the fake: what reaches Slack and when.
-/** What the owner set in Slack before Juno: every day, paused from 22:00 to 08:00. */
-const before = { dnd_enabled: true, dnd_days: 'every_day', dnd_start_hour: '22:00', dnd_end_hour: '8:00' }
-/** Juno's default notification hours, Monday to Friday 9 to 7, as Slack prefs. */
-const weekdays = { dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '19:00', dnd_end_hour: '09:00' }
-
-const apiSince = (engine: RunningEngine, method: string, since: number) =>
-  engine.fake.calls.slice(since).filter((call) => call.kind === 'api' && call.method === method)
-const writes = (engine: RunningEngine, since = 0) => apiSince(engine, 'users.prefs.set', since).map((call) => JSON.parse(call.args['prefs'] ?? '{}') as unknown)
-/** Reads of the schedule itself, not the boot's. */
-const scheduleReads = (engine: RunningEngine, since: number) => apiSince(engine, 'users.prefs.get', since).filter((call) => call.args['prefs']?.includes('dnd_days') === true)
-const dnd = (engine: RunningEngine) => Object.fromEntries(Object.entries(engine.fake.workspace.prefs).filter(([key]) => key.startsWith('dnd_')))
-
-/** The owner changes the schedule in Slack's own app: Slack stores it and sends `pref_change` for each pref. */
-async function changeInSlack(engine: RunningEngine, changes: Record<string, unknown>) {
-  engine.fake.workspace.prefs = { ...engine.fake.workspace.prefs, ...changes }
-  for (const [name, value] of Object.entries(changes)) engine.fake.workspace.emit({ type: 'pref_change', name, value })
-  await engine.socketIdle()
-}
-/** A real pass decides whether the current hours need a write. */
-const settled = (engine: RunningEngine) => engine.workPass('slackSchedule')
-type HoursGroup = 'weekdays' | 'saturday' | 'sunday'
-/** Sets one row of hours, as Settings does: only the edges that changed. */
-const setRow = async (engine: RunningEngine, which: 'notifications' | 'presence', group: HoursGroup, hours: { from?: number; to?: number } | 'off') =>
-  valueOf(await runCommand(engine.registry, notificationsSetGroupHours, { which, group, hours }))
-const setWeekdays = (engine: RunningEngine, which: 'notifications' | 'presence', hours: { from?: number; to?: number }) => setRow(engine, which, 'weekdays', hours)
-const useJunoHours = async (engine: RunningEngine) => valueOf(await runCommand(engine.registry, notificationsUseJunoHours, {}))
-
-function page(engine: RunningEngine, predicate: (view: SlackScheduleView) => boolean, label: string): Promise<SlackScheduleView> {
-  unmounts.push(engine.registry.mount(notificationsPageAtom))
-  return waitFor(() => {
-    const result = engine.registry.get(notificationsPageAtom)
-    return result._tag === 'Success' && predicate(result.value.slackSchedule) ? result.value.slackSchedule : undefined
-  }, WAIT_MS, label)
-}
-
-it('default hours never reach Slack; hours set on the page are written once after reading the schedule, presence hours never, and a relaunch writes nothing', async () => {
-  const engine = await synced()
-
-  await step('a schedule set in Slack is left alone while the hours are Juno defaults', async () => {
-    await changeInSlack(engine, before)
-    await settled(engine)
-    expect(writes(engine)).toEqual([])
-    expect(dnd(engine)).toMatchObject(before)
-    expect(await page(engine, (view) => view.waitingForHours, 'waiting for hours')).toEqual({ changedInSlack: false, waitingForHours: true })
-  })
-
-  await step('setting the hours, even to the defaults, reads Slack’s schedule and writes the hours once', async () => {
-    const since = engine.fake.calls.length
-    await setWeekdays(engine, 'notifications', { from: 9 * 60, to: 19 * 60 })
-    await waitFor(() => (writes(engine, since).length > 0 ? true : undefined), WAIT_MS, 'the write')
-    await settled(engine)
-    expect(writes(engine, since)).toEqual([weekdays])
-    expect(scheduleReads(engine, since).length).toBeGreaterThan(0)
-    expect(dnd(engine)).toMatchObject(weekdays)
-    expect(await page(engine, (view) => !view.waitingForHours, 'the hours applied')).toEqual({ changedInSlack: false, waitingForHours: false })
-  })
-
-  await step('presence hours are not Slack’s schedule', async () => {
-    const since = engine.fake.calls.length
-    await setWeekdays(engine, 'presence', { from: 600, to: 960 })
-    await settled(engine)
-    expect(writes(engine, since)).toEqual([])
-  })
-
-  await step('a relaunch writes nothing', async () => {
-    const next = await restart(engines, engine)
-    await settled(next)
-    expect(writes(next)).toEqual([])
-  })
-})
-
-it('Use Juno’s hours writes nothing when Slack holds them; a change made in Slack is left alone and shown until Use Juno’s hours; two quick changes write once [production 1 s debounce]', async () => {
-  // The app's own debounce, so the two quick changes fall inside it however slow the machine. Other steps run the pass directly.
-  const engine = await synced({ timing: { slackScheduleDebounceMillis: productionTiming.slackScheduleDebounceMillis } })
-
-  await step('Use Juno’s hours when Slack already holds them neither reads nor writes the schedule', async () => {
-    const since = engine.fake.calls.length
-    await useJunoHours(engine)
-    await settled(engine)
-    expect(writes(engine, since)).toEqual([])
-    expect(apiSince(engine, 'users.prefs.get', since).filter((call) => call.args['prefs'] !== undefined)).toEqual([])
-    await page(engine, (view) => !view.waitingForHours, 'the hours applied')
-  })
-
-  await step('a change made in Slack is left alone and shown', async () => {
-    const since = engine.fake.calls.length
-    await changeInSlack(engine, { dnd_end_hour: '10:00' })
-    await page(engine, (view) => view.changedInSlack, 'the change in Slack shown')
-    await settled(engine)
-    expect(writes(engine, since)).toEqual([])
-  })
-
-  await step('Use Juno’s hours writes them back once', async () => {
-    const since = engine.fake.calls.length
-    await useJunoHours(engine)
-    await settled(engine)
-    expect(writes(engine, since)).toEqual([weekdays])
-    await page(engine, (view) => !view.changedInSlack, 'the line gone')
-  })
-
-  await step('two quick changes to the hours write once, with the last values', async () => {
-    const since = engine.fake.calls.length
-    await setWeekdays(engine, 'notifications', { from: 8 * 60 })
-    await setWeekdays(engine, 'notifications', { to: 18 * 60 + 30 })
-    await waitFor(() => (writes(engine, since).length > 0 ? true : undefined), WAIT_MS, 'the write')
-    await settled(engine)
-    expect(writes(engine, since)).toEqual([{ dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '18:30', dnd_end_hour: '08:00' }])
-  })
-})
-
-it('hours saved by an older version load; Saturday reaches Slack as a custom day, Weekdays sets all five, and the Active in Slack rows set presence by the day', async () => {
-  const engine = await synced()
-  const rowOf = (day: number): HoursGroup => (day === 6 ? 'saturday' : day === 0 ? 'sunday' : 'weekdays')
-
-  await step('hours saved before the rows, Monday to Thursday with one from and to, load as they were', async () => {
-    const old = { notificationHours: { days: [1, 2, 3, 4], from: 600, to: 1020 }, presenceHours: { days: [1, 2, 3, 4, 5], from: 540, to: 1140 }, channels: {}, people: {} } as const
-    await setPref(engine, 'notifications', old)
-    const loaded = await liveUntil<NotificationSettingsView, NotificationSettingsView>(engine, liveQuery(notificationsSettings)(undefined), (value) => (value.notificationHours.from === 600 ? value : undefined), 'the saved hours')
-    expect(loaded.notificationHours).toEqual(old.notificationHours)
-    expect(loaded.presenceHours).toEqual(old.presenceHours)
-  })
-
-  await step('Saturday 11am to 2pm reaches Slack as a custom day; Friday stays off', async () => {
-    await setRow(engine, 'notifications', 'saturday', { from: 660, to: 840 })
-    await settled(engine)
-    expect(dnd(engine)).toMatchObject({
-      dnd_days: 'custom',
-      dnd_enabled_monday: 'partial', dnd_before_monday: '10:00', dnd_after_monday: '17:00',
-      dnd_enabled_friday: 'all_day',
-      dnd_enabled_saturday: 'partial', dnd_before_saturday: '11:00', dnd_after_saturday: '14:00',
-      dnd_enabled_sunday: 'all_day',
-    })
-  })
-
-  await step('changing the Weekdays row sets all five weekdays and leaves Saturday alone', async () => {
-    await setWeekdays(engine, 'notifications', { from: 540 })
-    await settled(engine)
-    expect(dnd(engine)).toMatchObject({
-      dnd_days: 'custom',
-      dnd_enabled_monday: 'partial', dnd_before_monday: '09:00', dnd_after_monday: '17:00',
-      dnd_enabled_friday: 'partial', dnd_before_friday: '09:00', dnd_after_friday: '17:00',
-      dnd_before_saturday: '11:00',
-    })
-  })
-
-  await step('the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async () => {
-    const status = (predicate: (value: NotificationStatus) => boolean, label: string) =>
-      liveUntil<NotificationStatus, NotificationStatus>(engine, liveQuery(notificationsStatus)(undefined), (value) => (predicate(value) ? value : undefined), label)
-    const now = new Date()
-    const today = now.getDay()
-    const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
-    await setRow(engine, 'presence', rowOf(today), { from: half, to: (half + 120) % 1440 })
-    expect((await status((value) => value.presence === 'active', 'active by today\'s row')).presenceLabel).toMatch(/^Active/)
-    // Every row off but the weekend day that is not today, 11am to 2pm.
-    const weekend: HoursGroup = today === 6 ? 'sunday' : 'saturday'
-    const since = engine.fake.calls.length
-    for (const group of ['weekdays', 'saturday', 'sunday'] as const) await setRow(engine, 'presence', group, group === weekend ? { from: 660, to: 840 } : 'off')
-    const away = await status((value) => value.presence === 'away', 'away by the rows')
-    expect(away.presenceLabel).toMatch(new RegExp(`^Away until (tomorrow|${weekend === 'saturday' ? 'Sat' : 'Sun'}) 11am`))
-    expect(apiSince(engine, 'presence.set', since).map((call) => call.args['presence'])).toEqual(['away'])
   })
 })

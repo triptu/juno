@@ -1,9 +1,10 @@
 /**
  * Both sets of hours from the owner's side (SPEC 14): the Weekdays,
  * Saturday and Sunday rows in Settings › Notifications, including hours
- * saved by an older version. What the engine does with the hours (Slack's
- * schedule, decisions, presence by the row, hours becoming active) is in
- * packages/engine/test/flows/notifications.flow.test.ts.
+ * saved by an older version. What the engine does with the hours is in
+ * packages/engine/test/flows: Slack's schedule and presence by the row in
+ * notification-hours.flow.test.ts, decisions and hours becoming active in
+ * notifications.flow.test.ts.
  */
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'

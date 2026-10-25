@@ -352,24 +352,20 @@ it('reads history over the quiet window the user chose, finishes when discovery 
 })
 
 // A first sync that keeps failing says why (SPEC 5, item 5)
-type Phase = EngineStatus['phase']
-/** Every phase the engine reports from now on. */
-function phases(engine: RunningEngine): Array<Phase> {
-  const seen: Array<Phase> = []
-  unmounts.push(engine.registry.subscribe(engineStatusAtom, (status) => { if (status._tag === 'Success') seen.push(status.value.phase) }, { immediate: true }))
-  return seen
-}
-/** Every sync notice the sidebar is given from now on. The sidebar's card reads the failure's reason too, which keeps it while a retry boots. */
-function notices(engine: RunningEngine): Array<string | undefined> {
-  const seen: Array<string | undefined> = []
-  unmounts.push(engine.registry.mount(syncFailureAtom), engine.registry.subscribe(syncNoticeAtom, (notice) => { seen.push(notice) }, { immediate: true }))
+/** Every phase the engine reports and every sync notice the sidebar is given from now on. The card reads the failure's reason too, which keeps it while a retry boots. */
+function watchSync(engine: RunningEngine) {
+  const seen = { phases: [] as Array<EngineStatus['phase']>, notices: [] as Array<string | undefined> }
+  unmounts.push(
+    engine.registry.subscribe(engineStatusAtom, (status) => { if (status._tag === 'Success') seen.phases.push(status.value.phase) }, { immediate: true }),
+    engine.registry.mount(syncFailureAtom),
+    engine.registry.subscribe(syncNoticeAtom, (notice) => { seen.notices.push(notice) }, { immediate: true }),
+  )
   return seen
 }
 
 it('a boot Slack answers with data Juno cannot read fails with that reason, and keeps it across the retries', async () => {
   const engine = await started({ timing: { bootRetryMillis: 50 }, initial: (fake) => (fake.forceMalformed({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
-  const seen = phases(engine)
-  const shown = notices(engine)
+  const { phases: seen, notices: shown } = watchSync(engine)
   const reason = { error: 'SlackDecodeError', method: 'client.userBoot' }
   expect(await engine.phase('failed')).toEqual({ _tag: 'failed', reason })
   await waitFor(() => (apiCalls(engine, 'client.userBoot').length >= 5 ? true : undefined), undefined, 'five boots')
@@ -384,13 +380,9 @@ it('a boot Slack answers with data Juno cannot read fails with that reason, and 
 it('a boot that never reaches Slack is offline, not failed, through the 30 s retry wait, and says so after the grace [controlled sleep]', async () => {
   const time = await controlledSleep(productionTiming.bootRetryMillis)
   try {
-    const engine = await started({
-      clock: time.clock,
-      timing: { bootRetryMillis: productionTiming.bootRetryMillis },
-      initial: (fake) => (fake.loseResponse({ method: 'client.userBoot', times: 1_000 }), fake.signIn()),
-    })
-    const seen = phases(engine)
-    const shown = notices(engine)
+    const timing = { bootRetryMillis: productionTiming.bootRetryMillis }
+    const engine = await started({ clock: time.clock, timing, initial: (fake) => (fake.loseResponse({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
+    const { phases: seen, notices: shown } = watchSync(engine)
     await engine.phase('offline')
     const boots = apiCalls(engine, 'client.userBoot').length
     // The phase holds through the retry wait, so the 5 s offline grace passes and the notice shows.
