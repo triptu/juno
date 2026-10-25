@@ -2,15 +2,11 @@
 // a thread goes to the channel too, as Slack's "Send reply to this channel"
 // does, with `chat.update` and `reply_broadcast`. It shows in Main at once and
 // is marked in the thread. Others' replies and the root have no such item. In
-// Main a broadcast reply's "in <topic title>" opens the thread at it.
-import type { Locator } from '@playwright/test'
-import { expect, test } from './fixtures'
-import { watchFlashes } from './driver/flashes'
+// Main a broadcast reply's "in <topic title>" opens the thread at it. That
+// the reply is in view and flashes is the browser lane's (notifications.spec.ts).
 import type { Juno } from './driver/juno'
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
+import { expect } from './expect'
+import { domTest } from './test'
 
 const ENG_MAIN = '#eng'
 const ROOT = 'Draft plan is in the doc'
@@ -24,19 +20,8 @@ async function openPostgresThread(juno: Juno): Promise<void> {
   await expect(juno.topic.message(MINE)).toBeVisible({ timeout: 15_000 })
 }
 
-/** Primary mouse down and up on `target`, as a person presses it. */
-async function press(juno: Juno, target: Locator): Promise<void> {
-  await target.scrollIntoViewIfNeeded()
-  const box = await target.boundingBox()
-  if (box === null) throw new Error('not on screen')
-  await juno.win.mouse.move(box.x + 8, box.y + box.height / 2)
-  await juno.win.mouse.down()
-  await juno.win.mouse.up()
-}
-
-test('Also send to #eng sends your own reply to the channel, and Main shows it at once', async ({ juno, fake }) => {
+domTest('Also send to #eng sends your own reply to the channel, and Main shows it at once', async ({ juno, fake }) => {
   await openPostgresThread(juno)
-  await juno.setTheme('Dark')
   await juno.sidebar.row(ROOT, { exact: true }).open()
   const { topic } = juno
   const stored = () => fake.messages('C0ENG').find((message) => message.text === MINE)
@@ -73,26 +58,24 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
   expect((await topic.chooseInMessageMenu(MINE, null)).labels).not.toContain('Also send to #eng')
 })
 
-test('the topic title in Main opens the topic at the reply, which flashes, and follows a rename', async ({ juno, fake }) => {
+domTest('the topic title in Main opens the topic at the reply, and follows a rename', async ({ juno, fake, step }) => {
   const { topic } = juno
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
-  await test.step('the title opens the topic at the reply, which flashes', async () => {
+  await step('the title opens the topic at the reply', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await topic.expectTitle('Main')
     fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Dry run passed on staging.', threadTs: root.ts, broadcast: true })
     const source = topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')
     await expect(source).toContainText(`in ${ROOT}`)
-    const flashed = await watchFlashes(juno.win)
-    await press(juno, source)
+    await source.click()
 
     await expect(topic.message(ROOT)).toBeVisible({ timeout: 15_000 })
-    await expect(topic.message('Dry run passed on staging.')).toBeInViewport()
+    await expect(topic.message('Dry run passed on staging.')).toBeVisible()
     // In its thread it is marked, with no link back.
     await expect(topic.message('Dry run passed on staging.')).toContainText('also sent to the channel')
     await expect(topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')).toHaveCount(0)
-    await expect.poll(async () => (await flashed()).some((row) => row.includes('Dry run passed on staging.')), { timeout: 10_000 }).toBe(true)
   })
-  await test.step('Main follows a renamed topic title', async () => {
+  await step('Main follows a renamed topic title', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await topic.expectTitle('Main')
     fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'The rollout is ready.', threadTs: root.ts, broadcast: true })
@@ -101,7 +84,7 @@ test('the topic title in Main opens the topic at the reply, which flashes, and f
     await juno.sidebar.row(ROOT, { exact: true }).chooseInMenu('rename')
     await juno.rename('Friday rollout')
     await expect(source).toHaveText('in Friday rollout')
-    await press(juno, source)
+    await source.click()
     await juno.topic.expectTitle('Friday rollout')
   })
 })
