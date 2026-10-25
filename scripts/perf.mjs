@@ -8,7 +8,7 @@
 //   --unit-files <a,b>                    only these package budget files (repo paths; empty for none)
 //   --no-desktop                          no desktop scenarios
 import { spawnSync } from 'node:child_process'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -40,22 +40,36 @@ function unitPerfFiles() {
   return [...listed('packages/agent/test'), ...listed('packages/engine/test/perf')]
 }
 
+const env = { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1' }
 let failed = 0
 if (unitsOnly || withUnit || (args.length === 0 && !noDesktop)) {
   const chosen = unitFiles === undefined ? unitPerfFiles() : unitFiles.split(',').filter(Boolean)
-  // One process per file, one after another, so each prints its own outcome for the nightly's input cache.
-  for (const file of chosen) {
-    const [, pkg, rest] = /^(packages\/[^/]+)\/(.+)$/.exec(file) ?? []
-    if (pkg === undefined) throw new Error(`Not a package budget file: ${file}`)
-    const result = spawnSync('bun', ['test', '--timeout', '600000', `./${rest}`], { cwd: `${root}${pkg}`, stdio: 'inherit', env: { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1' } })
+  // The large-seed budgets share one boot (packages/engine/test/perf/largeSeedEngine.ts), so they run in one process,
+  // in name order; every other file runs alone. Each file's outcome is printed for the nightly's input cache.
+  const shared = chosen.filter((file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').includes('largeSeedEngine'))
+  const groups = [...(shared.length > 0 ? [shared] : []), ...chosen.filter((file) => !shared.includes(file)).map((file) => [file])]
+  for (const files of groups) {
+    const pkg = /^(packages\/[^/]+)\//.exec(files[0])?.[1]
+    if (pkg === undefined || files.some((file) => !file.startsWith(`${pkg}/`))) throw new Error(`Not package budget files of one package: ${files.join(', ')}`)
+    const result = spawnSync('bun', ['test', '--no-isolate', '--timeout', '600000', ...files.map((file) => `./${file.slice(pkg.length + 1)}`)], { cwd: `${root}${pkg}`, env, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
     if (result.error) throw result.error
+    process.stdout.write(result.stdout)
+    process.stderr.write(result.stderr)
     if (result.signal) process.exit(1)
-    console.log(`juno-perf-unit: ${JSON.stringify({ file, passed: result.status === 0 })}`)
+    // bun test names each file on a line of its own before that file's results.
+    const failedFiles = new Set()
+    let current
+    for (const line of `${result.stdout}\n${result.stderr}`.split('\n')) {
+      const header = /^(\S+\.perf\.ts):$/.exec(line.trim())
+      if (header) current = files.find((file) => file.endsWith(header[1].replace(/^\.\//, '')))
+      else if (line.startsWith('(fail)')) failedFiles.add(current)
+    }
+    for (const file of files) console.log(`juno-perf-unit: ${JSON.stringify({ file, passed: result.status === 0 || (!failedFiles.has(file) && !failedFiles.has(undefined)) })}`)
     failed ||= result.status ?? 1
   }
 }
 if (!unitsOnly && !noDesktop) {
-  const result = spawnSync('bun', ['run', '--cwd', 'apps/desktop', 'perf', ...args], { cwd: root, stdio: 'inherit', env: { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1' } })
+  const result = spawnSync('bun', ['run', '--cwd', 'apps/desktop', 'perf', ...args], { cwd: root, stdio: 'inherit', env })
   if (result.error) throw result.error
   if (result.signal) process.exit(1)
   failed ||= result.status ?? 1
