@@ -9,7 +9,9 @@ Juno should feel as stable as a native macOS app: nothing moves unless the user 
 
 ## Run it
 
-1. `bun run test:feel` from the repository root. It builds the app, then queues behind the machine-wide lock (`scripts/heavy.mjs`), so it may wait for other agents' runs before it starts. Do not run it twice at once and do not start other heavy jobs alongside it.
+The scenarios run in every full run and in `bun run affected` plans on the laptop, in the browser lane (`test:desktop --project=feel`). There a passing scenario keeps only its checks, and a long frame only warns. A review needs every filmstrip and video, so it runs the suite in Electron on the Mac:
+
+1. `bun run test:feel` from the repository root, when Tushar asks for a review. It builds the app, then queues behind the machine-wide lock (`scripts/heavy.mjs`), so it may wait for other agents' runs before it starts. Do not run it twice at once and do not start other heavy jobs alongside it.
 2. It writes `apps/desktop/feel-report/`. A failed check fails the run, but every scenario still records.
 3. Note the load average printed per scenario. A long frame under heavy load is weak evidence; the geometry and pixel checks count frames, not time, so load does not change them.
 
