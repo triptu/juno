@@ -10,7 +10,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Window } from 'happy-dom'
-import { startFakeSlack, type FakeSlack } from '@juno/fake-slack'
+import { startFakeSlack, type FakeSlack, type FakeSlackOptions } from '@juno/fake-slack'
 import { HostPool, type TestHost } from '../e2e/browser/host'
 import { copySnapshot, matchingFake, sharedSnapshot, snapshotKey, snapshotState, type SnapshotMade, type WebSnapshot } from '../e2e/browser/snapshotCache'
 import type { EngineOptions } from '../web/host/testHost'
@@ -155,9 +155,9 @@ export interface Started {
  * match it (`synced`), or signed out on an empty folder. `warm` waits for the
  * warm boot and checks that the fake still matches what the snapshot saw.
  */
-export async function startDomApp(options: StartOptions & { readonly snapshot?: WebSnapshot; readonly warm?: (app: DomApp) => Promise<void> }): Promise<Started> {
+export async function startDomApp(options: StartOptions & { readonly snapshot?: WebSnapshot; readonly seed?: FakeSlackOptions['seed']; readonly warm?: (app: DomApp) => Promise<void> }): Promise<Started> {
   const { snapshot } = options
-  const fake = snapshot === undefined ? await startFakeSlack() : await matchingFake(snapshot)
+  const fake = snapshot === undefined ? await startFakeSlack(options.seed === undefined ? {} : { seed: options.seed }) : await matchingFake(snapshot)
   const userData = await tempUserData()
   let app: DomApp | undefined
   const close = async () => {

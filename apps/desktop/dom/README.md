@@ -6,6 +6,13 @@ User flows that check what the app shows and what it sends, with no layout, unde
 
 Assert on what the user sees (text, attributes, counts, focus) and on what reaches the fake. Never assert on boxes, positions, scroll or computed styles: there is no layout, every box is zero, and StyleX's sheet is built without `@layer`, so the cascade differs from the app's. A test that needs a polyfill to pass is about a browser feature and belongs in Playwright.
 
+Found while porting, and so left in the browser lane:
+
+- **`document.execCommand`.** happy-dom has no `insertText`, and the app edits through it so ⌘Z undoes: a topic composer's suggestion picks (emoji, mentions), ⌘B and ⌘I, keys typed on Home's chips, and keys held after ⌘T.
+- **Lists sized by the viewport.** A virtual list draws no rows when its box is zero: the All topics table and the emoji picker's grid.
+- **Images loading.** An image that shows once it has loaded, or falls back when it fails, never does either here.
+- **Focus that follows Chromium's events.** Esc in Home's destination search ends on the chip in Chromium and on the field here; a mouse press on a tab differs too.
+
 `window.ts` fills the gaps the app needs to run (animations finish at once, `checkVisibility` answers from `hidden` and inline `display`, `:focus-visible` follows the last input, a `MessageChannel` made of the window's own event targets). None of them is a thing to test here.
 
 ## What runs
@@ -28,7 +35,7 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 })
 ```
 
-`domTest` gives the body `juno` (the driver), `fake`, `slack` (`e2e/driver/slack.ts`), `app`, `userData`, `clock`, `model`, `relaunch` and `step`. Options: `synced`, `engine` (the host's `EngineOptions`), `clock`, `model` (a function that starts the model the agent talks to; the agent then runs) and `timeout` (default 60 s).
+`domTest` gives the body `juno` (the driver), `fake`, `slack` (`e2e/driver/slack.ts`), `app`, `userData`, `clock`, `model`, `relaunch` and `step`. Options: `synced`, `seed` (the fake's workspace, signed out), `engine` (the host's `EngineOptions`), `clock`, `model` (a function that starts the model the agent and the engine's AI talk to; the agent then runs, unless `engine: { agent: false }`) and `timeout` (default 60 s).
 
 - **Driver.** `driver/` has the Playwright driver's page objects with the same verbs (`e2e/driver/verbs.ts`; both drivers implement it, so a renamed verb fails the typecheck in both): `juno.sidebar`, `.tabs`, `.topic`, `.write` (Home's composer), `.home`, `.palette`, `.settings`, `.notifications`, `.accountMenu`, `.nav`, `.surface` (an `AppSurface`, as the web surface is), `searchPage(juno.win)` and the agent's `openChat`, `openSettings`, `card` (`driver/agent.ts`).
 - **Queries.** `Query` (`query.ts`) is shaped like Playwright's Locator: `locator`, `getByRole`, `getByText`, `getByLabel`, `getByTitle`, `filter`, `first`, `nth`, `parent`, `and`, `or`, and actions that wait for a shown element (`click`, `hover`, `fill`, `press`, `pressSequentially`, `check`). Roles and names follow Playwright's rules near enough: a string name matches a substring, ignoring case; `exact` asks for the whole name. `juno.win` is the page (`Dom`, `input.ts`), with `win.keyboard.press('Meta+Enter')`.

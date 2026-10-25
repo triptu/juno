@@ -16,9 +16,9 @@ import type { Query } from '../query'
 import { HomePane, HomeWritePane } from './home'
 import { domSurface, escapeRegExp, Menus } from './menus'
 import { PaletteDriver } from './palette'
-import { AccountMenu, NotificationsPage, SettingsPage } from './settings'
+import { AccountMenu, hoursRows, NotificationsPage, SettingsPage } from './settings'
 import { Sidebar } from './sidebar'
-import { TopicPane } from './topic'
+import { MessageMenuDriver, TopicPane } from './topic'
 
 /** The tab strip over the workspace. */
 export class TabStrip implements TabStripVerbs {
@@ -175,6 +175,11 @@ export class Juno implements JunoVerbs {
     this.palette = new PaletteDriver(this.dom, this.menus)
   }
 
+  /** A message's menu: `openOn` or `openOnRow`, then its rows and the emoji grid. */
+  get messageMenu(): MessageMenuDriver {
+    return new MessageMenuDriver(this.dom)
+  }
+
   /** The page, for a test's own queries, as `juno.win` is in the Playwright driver. */
   get win(): Dom {
     return this.dom
@@ -302,6 +307,33 @@ export class Juno implements JunoVerbs {
     await this.tabs.expectActive('Settings')
     await expect(this.settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
   }
+
+  /**
+   * Sets notification hours on every day to two hours around now, or with
+   * `outside`, to twelve hours starting six hours from now, so rules that
+   * depend on the hours hold whatever the runner's timezone or weekday.
+   * Reopens the page to wait for the engine to have saved them.
+   */
+  async notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+    await this.openNotifications()
+    const now = new (this.app.window as unknown as { Date: DateConstructor }).Date()
+    const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
+    const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
+    const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
+    for (const row of hoursRows) await this.notifications.setRow('Notifications', row, { from, to })
+    await this.tabs.close('Settings')
+    await this.openNotifications()
+    for (const row of hoursRows) await this.notifications.expectRow('Notifications', row, { from, to })
+  }
+
+  /** The OS notifications main showed (recorded by the host's shell), oldest first. `silent` only on one posted without a sound. */
+  osNotifications(): Promise<Array<{ readonly title: string; readonly body: string; readonly silent?: true }>> {
+    return this.surface.system('notifications')
+  }
+
+  clickOsNotification(index: number): Promise<void> { return this.surface.system('clickNotification', index) }
+  dockBounces(): Promise<number> { return this.surface.system('dockBounces') }
+  setFrontmost(frontmost: boolean): Promise<void> { return this.surface.system('frontmost', frontmost) }
 
   /** What the engine host's shell did (`SystemHooks`): notifications, the dock, the agent's state. */
   system<K extends keyof SystemHooks>(name: K, ...args: Parameters<SystemHooks[K]>): Promise<ReturnType<SystemHooks[K]>> {

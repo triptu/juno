@@ -13,10 +13,12 @@ export class MessageMenuDriver {
     this.root = dom.locator('[data-context-menu]')
   }
 
-  /** Right-clicks `target` and waits for the menu. */
+  /** Right-clicks `target` until the menu shows: a list just shown takes a moment to answer a press. */
   async openOn(target: Query): Promise<MessageMenuDriver> {
-    await target.click({ button: 'right' })
-    await expect(this.root).toBeVisible()
+    await expect.poll(async () => {
+      if (!this.root.isVisible()) await target.click({ button: 'right' })
+      return this.root.isVisible()
+    }, { message: 'the message menu' }).toBe(true)
     return this
   }
 
@@ -49,6 +51,13 @@ export class MessageMenuDriver {
       const label = [...node.childNodes].filter((child) => !(child.nodeType === 1 && (child as Element).getAttribute('aria-hidden') === 'true')).map((child) => child.textContent ?? '').join('')
       return node.getAttribute('role') === 'separator' ? '-' : node.getAttribute('aria-disabled') === 'true' ? `(${label})` : label
     })
+  }
+
+  /** Each row's key, by row id: `{ forward: 'F' }`. */
+  async shortcuts(): Promise<Record<string, string>> {
+    const root = this.root.el()
+    if (root === undefined) return {}
+    return Object.fromEntries([...root.querySelectorAll<HTMLElement>('[role="menuitem"][data-menu-shortcut]')].filter((node) => node.closest('[inert]') === null).map((node) => [node.dataset['menuItem'] ?? '', node.dataset['menuShortcut'] ?? '']))
   }
 
   async choose(id: string): Promise<void> {
@@ -116,6 +125,11 @@ export class TopicPane implements TopicVerbs {
 
   suggestion(name: string): Query {
     return this.suggestions.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
+  /** Linked words in the composer's drawn layer. */
+  get composerLinks(): Query {
+    return this.root.locator('[data-composer] [data-mark="link"]')
   }
 
   get composerChips(): Query {

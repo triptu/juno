@@ -59,12 +59,44 @@ export class SettingsPage implements SettingsVerbs {
   }
 }
 
+export type HoursSection = 'Notifications' | 'Active in Slack'
+export type HoursRowName = 'Weekdays' | 'Saturday' | 'Sunday'
+export const hoursRows: ReadonlyArray<HoursRowName> = ['Weekdays', 'Saturday', 'Sunday']
+
 /** Settings › Notifications. */
 export class NotificationsPage {
   readonly root: Query
 
   constructor(readonly dom: Dom) {
     this.root = dom.getByRole('main')
+  }
+
+  /** The Notification hours or Active in Slack rows. */
+  hours(which: HoursSection): Query {
+    return this.root.getByRole('group', { name: which === 'Notifications' ? 'Notification hours' : which, exact: true })
+  }
+
+  /** One row's from or to. Off is the first choice in from; an off row has no to. */
+  edge(which: HoursSection, row: HoursRowName, edge: 'from' | 'to'): Query {
+    return this.hours(which).getByRole('combobox', { name: `${row} ${edge}`, exact: true })
+  }
+
+  /** Sets a row's from and to, in minutes since midnight, or turns it off. */
+  async setRow(which: HoursSection, row: HoursRowName, hours: { readonly from: number; readonly to: number } | 'off'): Promise<void> {
+    if (hours === 'off') return void (await this.edge(which, row, 'from').selectOption('off'))
+    await this.edge(which, row, 'from').selectOption(String(hours.from))
+    await this.edge(which, row, 'to').selectOption(String(hours.to))
+  }
+
+  /** Checks a row as the engine saved it: from and to, or off with no to. */
+  async expectRow(which: HoursSection, row: HoursRowName, hours: { readonly from: number; readonly to: number } | 'off'): Promise<void> {
+    if (hours === 'off') {
+      await expect(this.edge(which, row, 'from')).toHaveValue('off')
+      await expect(this.edge(which, row, 'to')).toHaveCount(0)
+      return
+    }
+    await expect(this.edge(which, row, 'from')).toHaveValue(String(hours.from))
+    await expect(this.edge(which, row, 'to')).toHaveValue(String(hours.to))
   }
 
   get newInstruction(): Query {
