@@ -8,9 +8,6 @@ import type { EngineHooks, WorkPassName } from '../driver/surface'
 const repoRoot = resolve(__dirname, '../../../..')
 /** What `build:web` makes: the renderer the hosts serve (`vite.web.config.ts`) and the host bundled into one file. */
 export const WEB_BUILD = resolve(__dirname, '../../dist')
-export const WEB_ROOT = resolve(WEB_BUILD, 'renderer')
-// One bundled file loads in about a fifth of the CPU time Node takes to strip and resolve the source's modules.
-const entry = resolve(WEB_BUILD, 'host/testHost.mjs')
 
 /** Node, even when Playwright itself was started by another runtime. */
 const node = basename(process.execPath).startsWith('node') ? process.execPath : 'node'
@@ -39,8 +36,9 @@ async function terminate(child: ChildProcess): Promise<void> {
   }
 }
 
-function forkHost(): Child {
-  const child = fork(entry, [], {
+// One bundled file loads in about a fifth of the CPU time Node takes to strip and resolve the source's modules.
+function forkHost(build: string): Child {
+  const child = fork(resolve(build, 'host/testHost.mjs'), [], {
     execPath: node,
     // JUNO_E2E_HOST_PROFILE=<dir> writes each host's CPU profile there when it exits.
     execArgv: ['--disable-warning=ExperimentalWarning', ...(process.env.JUNO_E2E_HOST_PROFILE === undefined ? [] : ['--cpu-prof', `--cpu-prof-dir=${process.env.JUNO_E2E_HOST_PROFILE}`])],
@@ -142,6 +140,11 @@ export class TestHost implements EngineHooks {
     return this.#command({ type: 'aiCalls' })
   }
 
+  /** Moves the engine's test clock forward (`EngineOptions.clock`). */
+  jumpClock(millis: number): Promise<void> {
+    return this.#command({ type: 'jumpClock', millis })
+  }
+
   /** Ends this test's engine, agent and connections before returning the loaded process. */
   stop(): Promise<void> {
     return this.#stopping ??= this.#finish()
@@ -165,16 +168,20 @@ export class TestHost implements EngineHooks {
 /**
  * A worker's loaded processes. Each lease creates a new engine and shell on
  * a fresh data folder. Coverage keeps a process per test so offsets cannot
- * cross spec boundaries. A failed cleanup discards the process.
+ * cross spec boundaries. A failed cleanup discards the process. `build` is
+ * the folder with `host/` and `renderer/`: `dist/` for the browser lane,
+ * `dom/dist/` for the DOM lane.
  */
 export class HostPool {
   #idle: Child[] = []
   readonly #children = new Set<ChildProcess>()
 
+  constructor(readonly build = WEB_BUILD) {}
+
   #take(): Child {
     const ready = this.#idle.pop()
     if (ready !== undefined && ready.process.connected) return ready
-    const child = forkHost()
+    const child = forkHost(this.build)
     this.#children.add(child.process)
     child.process.once('exit', () => this.#children.delete(child.process))
     return child
@@ -185,7 +192,7 @@ export class HostPool {
     await child.loaded
     const host = new TestHost(child.process, fake, start.userData, start.coverage === undefined ? () => this.#idle.push(child) : undefined)
     try {
-      await host.start({ ...start, fakeUrl: fake.url, webRoot: WEB_ROOT })
+      await host.start({ ...start, fakeUrl: fake.url, webRoot: resolve(this.build, 'renderer') })
     } catch (error) {
       try { await host.stop() } finally { await terminate(child.process) }
       throw error
