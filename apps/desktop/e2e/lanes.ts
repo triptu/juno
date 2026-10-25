@@ -112,7 +112,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'sidebar-motion.spec.ts',
   'sidebar.spec.ts',
   'sidebar-first-sync.spec.ts',
-  'slack-links.spec.ts',
   'tables.spec.ts',
   'tabs.spec.ts',
   'thread-link-preview.spec.ts',
