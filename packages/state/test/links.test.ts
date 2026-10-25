@@ -16,8 +16,8 @@ describe('Slack links', () => {
   it('a message link reads back as the same message, a reply with its thread', () => {
     const reply = messageLink('https://acme.slack.com/', 'C024BE91L', '1712345690.000300', '1712345678.000200')
     expect(reply).toBe('https://acme.slack.com/archives/C024BE91L/p1712345690000300?thread_ts=1712345678.000200&cid=C024BE91L')
-    expect(parseSlackLink(reply, workspace)?.target).toEqual(message('1712345690.000300', '1712345678.000200'))
-    expect(parseSlackLink(messageLink('https://acme.slack.com/', 'C024BE91L', '1712345678.000200', '1712345678.000200'), workspace)?.target).toEqual(message('1712345678.000200'))
+    expect<unknown>(parseSlackLink(reply, workspace)).toEqual({ ours: true, target: message('1712345690.000300', '1712345678.000200') })
+    expect<unknown>(parseSlackLink(messageLink('https://acme.slack.com/', 'C024BE91L', '1712345678.000200', '1712345678.000200'), workspace)).toEqual({ ours: true, target: message('1712345678.000200') })
   })
 })
 
