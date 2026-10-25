@@ -910,7 +910,7 @@ Agents run selective checks before reporting. Full runs (`bun run verify:main`, 
 
 **Flakes.** Desktop Playwright projects have zero retries. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `bun run flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit, app and specs jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit (with the spec checks), desktop and gallery jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `bun run affected` picks desktop e2e specs by a coverage map that `bun run verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -1103,7 +1103,7 @@ this Mac through the heavy lock; use them only when Tushar asks, since heavy run
 unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
-`test:plan` splits unit, desktop and gallery, and specs steps into independent SSH jobs. Browser and Electron desktop steps run in order and share builds; conformance stays with specs. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
+`test:plan` splits unit, desktop and gallery steps into independent SSH jobs; the spec checks and conformance run in the unit job after the unit tests, so the three jobs (2, 3 and 3 cores) fit Juno's eight lent cores at once. A separate specs job used to wait about 80 s for the unit job to release cores. Browser and Electron desktop steps run in order and share builds. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order, whether set locally or passed with `--env`. An explicit `--env` value wins. `KEY=VALUE` before a step overrides its environment.
@@ -1236,9 +1236,9 @@ Juno requests physical cores from the laptop's shared `4-11` allocation:
 | Job | Cores | Memory cap |
 | --- | ---: | ---: |
 | Narrow unit, agent tests, cached spec check | 1 | 3 GiB |
-| Wide unit, uncached spec check, standalone gallery or app | 2 | 6 GiB |
+| Wide unit, uncached spec check, conformance, standalone gallery or app | 2 | 6 GiB |
 | Gallery or desktop inside a split plan | 3 | 9 GiB |
-| Conformance, trace generation, other scripts | 4 | 12 GiB |
+| Trace generation, other scripts | 4 | 12 GiB |
 
 Wide units have no named files or more than 20. `--cores` overrides the request;
 default sizes shrink to fit smaller hosts. Explicit oversized requests fail.
@@ -1258,7 +1258,7 @@ Explicit worker settings win within the Apalache memory cap.
 The host caps memory without swap and mounts `/tmp` and `/work` as tmpfs.
 Each tmpfs is 2 GiB, or 4 GiB for requests of four or more cores; tmpfs consumes
 the memory cap. Split plans release each job's cores independently.
-`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_GALLERY_CORES` override the two app jobs independently; `JUNO_RUNNER_UNIT_CORES` and `JUNO_RUNNER_SPECS_CORES` work the same way. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
+`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_GALLERY_CORES` override the two app jobs independently; `JUNO_RUNNER_UNIT_CORES` works the same way for the unit job, which also runs the spec checks. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
 Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue

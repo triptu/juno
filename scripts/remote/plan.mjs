@@ -10,7 +10,9 @@ export function runnerPlanJobs(options, env = process.env) {
   const steps = parsePlan(options.args)
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
-    const kind = step.script === 'test:gallery' ? 'gallery' : appSuites.includes(step.script) ? 'desktop' : step.script.startsWith('specs:') ? 'specs' : 'unit'
+    // Spec checks share the unit job: unit, desktop and gallery fill the eight lent cores, and a separate
+    // specs job had to wait for one of them to finish before it got cores.
+    const kind = step.script === 'test:gallery' ? 'gallery' : appSuites.includes(step.script) ? 'desktop' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
     groups.get(kind).push({ ...step, index })
   }
