@@ -5,7 +5,7 @@
 // conformance replay (test/conformance) and the 2026-10-17 correctness review say so. Every test starts warm
 // on the synced default workspace.
 import { expect, it } from 'bun:test'
-import type { FileView, MessageView } from '@juno/contract'
+import { STAGE_CHUNK_BYTES, type FileView, type MessageView } from '@juno/contract'
 import { samplePng } from '@juno/fake-slack'
 import { attachFiles, attachmentsAtom, clearAttachments, deleteMessage, openTopic, readyFiles, retryMessage, sendMessage, uploadProgressAtom } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
@@ -235,6 +235,20 @@ it('sends files with their message, uploads each file once across Retry, and kee
       expect(apiCalls(engine, 'files.share').map((call) => call.args['client_msg_id'])).toEqual([pending.clientMsgId])
       expect(engine.fake.messages('C0ENG').filter((m) => m.client_msg_id === pending.clientMsgId).map((m) => m.files?.map((f) => f.name))).toEqual([['chart.png', 'notes.txt']])
       expect(apiCalls(engine, 'chat.postMessage')).toEqual([])
+    })
+
+    await step('stages files larger than one chunk, and a file with no MIME type, and sends them whole', async () => {
+      await fresh(engine)
+      const diskImage = new File([new Uint8Array(3 * STAGE_CHUNK_BYTES).fill(7)], 'Juno.dmg', { type: '' })
+      const archive = new File([new Uint8Array(2 * STAGE_CHUNK_BYTES).fill(9)], 'archive.zip', { type: 'application/zip' })
+      const ids = await attach([diskImage, archive])
+      valueOf(await sendMessage(engine.registry, eng, 'Archives attached', MAIN, ids))
+      const stored = await rows((list) => list.some((row) => textOf(row) === 'Archives attached' && row.pending === undefined), 'the archives sent')
+      expect(stored.find((row) => textOf(row) === 'Archives attached')!.files.map((file) => file.name)).toEqual(['Juno.dmg', 'archive.zip'])
+      expect(engine.fake.messages('C0ENG').find((m) => m.text === 'Archives attached')?.files?.map((file) => ({ name: file.name, size: file.size }))).toEqual([
+        { name: 'Juno.dmg', size: 3 * STAGE_CHUNK_BYTES },
+        { name: 'archive.zip', size: 2 * STAGE_CHUNK_BYTES },
+      ])
     })
 
     await step('keeps a failed upload with its text for Retry, and uploads each file once', async () => {
