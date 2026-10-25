@@ -343,9 +343,9 @@ it('sends a reaction while an edit of another message waits out its production b
     await waitFor(() => (failures(engine).some((row) => row.attempts === 1) ? true : undefined), WAIT_MS, 'the edit waiting out its backoff')
     valueOf(await reactToMessage(engine.registry, refOf(target), 'eyes', true))
     await waitFor(() => (inSlack(engine, target.ts)?.reactions?.some((reaction) => reaction.name === 'eyes') ? true : undefined), WAIT_MS, 'the reaction in Slack')
-    // No time passed, so the edit is still waiting.
+    // The reaction's outbox row ends, with no issue to show; no time passed, so the edit is still waiting.
+    await waitFor(() => (actionRows(engine).map((row) => row.kind).join() === 'edit' ? true : undefined), WAIT_MS, 'only the edit left in the outbox')
     expect(apiCalls(engine, 'chat.update')).toHaveLength(1)
-    await rows((list) => chip(rowWith(list, 'Reaction delivery target'), 'eyes')?.me === true && rowWith(list, 'Reaction delivery target')?.reactionIssue === undefined, 'the reaction shown, with no issue')
   } finally {
     await stop(engine)
     await time.close()
