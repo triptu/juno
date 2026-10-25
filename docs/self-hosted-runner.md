@@ -60,7 +60,7 @@ On quota hosts these counts are CPUs: a narrow job gets one CPU, with no burst t
 Workers use tstack's actual `RUNNER_THREADS`, exposed in Juno's log as
 `remote: allocated threads=N`, rather than assuming two threads per core.
 At four allocated threads, units run four `bun test` processes, standalone desktop uses three workers (two in sequential app plans),
-and gallery uses four workers. Quint uses one simulation per two threads and
+and a job of only the gallery uses five (four per three threads). Quint uses one simulation per two threads and
 one Apalache checker per four, at least one each. Explicit worker settings win.
 
 `test:plan` groups unit, gallery, desktop and specs steps into separate jobs.

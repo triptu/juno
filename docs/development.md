@@ -734,7 +734,7 @@ The broad shift and focus-ring walks cache each successful state. A key includes
 
 Records are shared across worktrees in the system temp folder's `juno-cache/results/gallery-walk-v1`. With `JUNO_BUILD_CACHE_DIR` they live in its `gallery-walk-v1` child, beside build entries; the remote runner sets this to `/cache/builds`. Writes use temporary files and atomic rename. `GALLERY_SHIFT_ALL=1 bun run test:gallery` bypasses both walk caches and refreshes successful records. `verify:main --nightly` and `verify:main --no-cache` set it automatically. Ordinary verification reuses matching states. Playwright `--repeat-each` also bypasses the caches, so every repeat exercises the states.
 
-`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. `GALLERY_RING_ONLY=Sidebar` and `GALLERY_RING_PARTS` control the focus check. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
+`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. A remote job that runs only the gallery gets four workers per three allocated threads (eight on a full run's six), since the walk mostly waits for frames and motion; `scripts/remote/workers.sh` sets this. `GALLERY_RING_ONLY=Sidebar` and `GALLERY_RING_PARTS` control the focus check. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
 
 Each test owns one browser context. A walk opens a new document for each state, resetting fixture module state, selection, focus and scroll. It replaces its page after 20 states while keeping that context's HTTP cache. Fonts, visible images, lazy chunks and finite entrance motion must settle before measurement; a readiness deadline fails the state instead of silently treating it as ready. Scrolling an interaction target settles before the guard starts, so remembered off-screen row sizes are not charged to the following input. Motion stays enabled during the shift walk.
 
@@ -762,6 +762,18 @@ These are individual runs, not medians. The revised full runner run includes a 2
 The fully cached run restored its build in 0.01 s and reused all 1,810 shift and 774 focus states; targeted regressions still ran. Peak container memory was 2.13 GB. Its observed script time was 91.9% shorter than the original. A separate recovery run checked the 423 states left unfinished by a host reset and passed in 246 s; it is not the warm-cache timing.
 
 The first revised Mac full run reached the former fixed 20-minute part deadline; the workload-based budget replaces that fixed cutoff. Later comparison attempts were interrupted by load above eight or machine restarts and are excluded. Verification stayed on the remote runner after the 10:32 IST reset. No revised Mac speedup is claimed.
+
+### Gallery workers, 2026-10-25
+
+Single runs of `bun run remote --cores 3 --env GALLERY_SHIFT_ALL=1 --env GALLERY_WORKERS=<n> test:gallery` at `1e776b39c`, on the full run's gallery allocation (three physical cores, six threads, a 9 GB container limit). Each shift part ran its share of the full walk; the four focus-ring parts are fixed.
+
+| Workers and shift parts | Script time | CPU busy, average | Peak container memory | Shift part durations | Result |
+| --- | --- | --- | --- | --- | --- |
+| 4 (the old default) | 1,101 s | 62% | 4.85 GB | 950–954 s | 225 passed |
+| 6 | 776 s | 84% | 5.96 GB | 623–702 s | 227 passed |
+| 8 (the new default) | 705 s | 94% | 6.73 GB | 506–637 s | 229 passed |
+
+No run failed or retried a test. More workers slow each focus-ring part (79 s at 4 workers, 114 s at 6, 157 s at 8) because they share the CPU, but the shift walk sets the length of the job. With six threads 94% busy, more than eight workers would mostly queue for CPU and bring memory close to the limit, so it was not tried. The laptop's own memory use, with other jobs running beside these, peaked at 16.2–18.5 GB used, with 11.9–14.3 GB still available.
 
 ## Web shell
 
@@ -1251,7 +1263,7 @@ The shared host maps sibling CPUs and sets the actual thread quota. Workers
 use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
 threads from the request. At four threads units run four `bun test` processes.
 At six threads a split desktop job runs three workers and a split gallery job
-runs four. Quint uses one simulation group per two threads and one
+runs eight. Quint uses one simulation group per two threads and one
 Apalache checker per two threads, limited by the job’s cgroup memory ("Faster test runs").
 A two-core, 6 GiB job gets two simulation groups and two 1,536 MiB JVM heaps.
 Explicit worker settings win within the Apalache memory cap.
