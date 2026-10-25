@@ -1,0 +1,1 @@
+- 10-25 21:44 · A row's right-click menu reads the row, not the header's detail · The detail is its own live query and can trail the row after Undo, so the menu offered Reopen on a topic that was just unresolved. The menu now reads the sidebar or All topics row first and falls back to the detail; the header's own menu and buttons still read the detail.

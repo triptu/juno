@@ -26,9 +26,11 @@ domTest('resolves and reopens topics, with Undo and pinned rows', async ({ juno,
     await roadmap.expectVisible()
     await roadmap.expectUnread(3)
 
-    // Resolved again, then a reply from someone else brings it back, tagged. The row's menu reads the topic's own
-    // state, which can trail the row by a moment after Undo and still offer Reopen; open it until it offers Resolve.
-    await expect.poll(async () => (await roadmap.chooseInMenu('resolve')).labels.includes('Resolve')).toBe(true)
+    // Resolved again from the row's menu right after Undo: it must offer Resolve, not Reopen, with no waiting.
+    const menu = await roadmap.chooseInMenu('resolve')
+    expect(menu.labels).toContain('Resolve')
+    expect(menu.labels).not.toContain('Reopen')
+    // A reply from someone else then brings it back, tagged.
     await roadmap.expectAbsent()
     slack.as('Maya').replyIn(ROADMAP, 'One more thing on the proposal.')
     await roadmap.expectVisible()
