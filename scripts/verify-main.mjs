@@ -4,7 +4,8 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed with full sampling and every solver check, full gallery walks, coverage and Mac suites
+//   bun run verify:main --nightly         every check uncached, a fresh Quint seed, full gallery walks; laptop only
+//   bun run verify:main --coverage        record the e2e coverage map (a nightly does when it is a week old)
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
@@ -17,10 +18,11 @@
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
 // suite failed. perf and test:feel time the Mac, so they run only with
-// --with-mac, one after the other, each holding the whole machine; the feel
-// contact sheet is copied next to the logs.
+// --with-mac, after the @mac tests, each holding the whole machine; with the
+// plan on the laptop they start when it does. The feel contact sheet is
+// copied next to the logs.
 //
-// The nightly desktop suite records coverage (JUNO_COVERAGE=1) and writes the
+// With coverage, the desktop lanes record it (JUNO_COVERAGE=1) and write the
 // coverage map bun run affected selects specs by to
 // apps/desktop/e2e/coverage-map.json in this checkout; commit it after a
 // run on main (docs/development.md, "Affected tests").
@@ -35,7 +37,7 @@ import { hostname } from 'node:os'
 import { reportedRuntime, writeRecord } from './verify-records.mjs'
 import { assessRecord, isAncestor, readRecords, statusFolder } from './release-gate.mjs'
 import { failureCause, testResults } from './test-results-reporter.mjs'
-import { fullSuites, planOutcomes } from './verify-plan.mjs'
+import { COVERAGE_DAYS, fullSuites, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 import { formatMap, MAP_PATH, mergePartials } from './coverage-map.mjs'
 import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
@@ -48,12 +50,13 @@ import { stopFromLog } from './verify-failures.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
-const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
+const withMac = argv.includes('--with-mac')
 const nightly = argv.includes('--nightly')
 const smoke = argv.includes('--smoke')
-if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
+if (smoke && ['--repair', '--nightly', '--with-mac', '--coverage'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
 const noCache = argv.includes('--no-cache')
-const seed = process.env.SPECS_SEED ?? (nightly ? String(randomInt(1, 2 ** 32)) : undefined)
+// Every spec simulation that runs takes a fresh seed, kept in the record: `bun run specs:check --seed <n>` repeats it.
+const seed = process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
 // The unit tests' shuffled order, kept in the record: `bun run test --seed <n>` repeats it.
 const testSeed = process.env.JUNO_TEST_SEED || String(randomInt(1, 2 ** 32))
 
@@ -83,12 +86,16 @@ if (local && argv.includes('--require-remote')) throw new Error('This run requir
 const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
-const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }] : fullSuites(scripts, { nightly, noCache, seed, testSeed })
+// A nightly records coverage when the committed map is a week old; affected widens its picks by
+// what changed since the map's commit, so an older map stays correct. --coverage records it now.
+const mapAge = (() => { try { return Date.now() - Date.parse(JSON.parse(git('show', `${commit}:${MAP_PATH}`)).recordedAt) } catch { return Infinity } })()
+const coverage = argv.includes('--coverage') || (nightly && !(mapAge < COVERAGE_DAYS * 86_400_000))
+const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }] : fullSuites(scripts, { nightly, coverage, noCache, seed, testSeed })
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
 const baseline = repairArg === 'latest' ? records[0] : repairArg ? JSON.parse(readFileSync(resolve(repairArg), 'utf8')) : undefined
 if (repairArg && (!baseline || baseline.version !== 2 || !isAncestor(root, baseline.commit, commit)))
   throw new Error('--repair needs a version 2 record at an ancestor of the target commit')
-if (baseline && (nightly || noCache)) throw new Error('--repair cannot be combined with --nightly or --no-cache')
+if (baseline && (nightly || noCache || coverage)) throw new Error('--repair cannot be combined with --nightly, --coverage or --no-cache')
 // Reuse is provisional until this run's jobs confirm the recorded identity.
 const identity = local ? plannedIdentity : baseline?.identity ?? records.find((record) =>
   record.execution?.mode === execution.mode && record.execution.host === execution.host && record.suites.some(suitePassed))?.identity ?? plannedIdentity
@@ -96,7 +103,7 @@ const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
 let suites = required.filter((suite) => {
-  if (baseline || !protocolRoots[suite.name] || noCache || (seed !== undefined && suite.name === 'specs:check')) return true
+  if (baseline || !protocolRoots[suite.name] || noCache || nightly) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
     if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
@@ -220,7 +227,10 @@ if (withMac) {
       if (cancelled) return [{ suite: 'test:desktop @mac', code: 130, seconds: 0, log: '' }]
       const install = local ? { status: installed ? 0 : 1 } : spawnSync('bun', ['install', '--frozen-lockfile', '--silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
-      return [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
+      const mac = [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
+      // perf and feel time this Mac, so they follow its @mac tests; with the plan on the laptop they need not wait for it.
+      if (!local) for (const suite of ['perf', 'test:feel']) mac.push(await run(suite, 'bun', ['run', suite], checkout))
+      return mac
     })(),
   )
 }
@@ -233,12 +243,12 @@ const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }
 // does not stop the refresh; a spec with no partial is left out of the map and
 // then always runs.
 const coverageRoot = local ? join(checkout, 'apps/desktop/coverage/map') : join(checkout, '.remote')
-const partials = nightly && existsSync(coverageRoot)
+const partials = coverage && existsSync(coverageRoot)
   ? readdirSync(coverageRoot, { recursive: true })
       .map((name) => join(coverageRoot, String(name)))
       .filter((path) => /apps\/desktop\/coverage\/map\/partial-[^/]*\.json$/.test(path) && statSync(path).mtimeMs >= planStarted)
   : []
-let coverageNote = nightly ? 'no coverage partials came back; the coverage map was not refreshed' : 'coverage recording is nightly only'
+let coverageNote = coverage ? 'no coverage partials came back; the coverage map was not refreshed' : nightly ? `the coverage map is under ${COVERAGE_DAYS} days old; not recorded` : 'coverage is recorded by a nightly when the map is a week old, or with --coverage'
 if (partials.length > 0) {
   const map = mergePartials(partials.map((path) => JSON.parse(readFileSync(path, 'utf8'))), commit)
   map.identity = runtime.identity
@@ -247,8 +257,8 @@ if (partials.length > 0) {
 }
 console.log(`verify:main: ${coverageNote}`)
 if (withMac && !cancelled) {
-  // After the rest, so they do not time a machine the other suites are using.
-  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, local ? localVerifyEnv : {})]
+  // A local plan ran on this Mac too: they wait for it, so they do not time a machine the other suites are using.
+  if (local) for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, localVerifyEnv)]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }
@@ -300,7 +310,7 @@ const summary = {
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
-  coverage: coverageNote, nightly, seed, testSeed,
+  coverage: coverageNote, coverageRecorded: coverage, nightly, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
   allocation: Object.fromEntries(['DESKTOP', 'UNIT'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),

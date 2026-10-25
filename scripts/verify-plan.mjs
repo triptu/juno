@@ -8,7 +8,11 @@ export function planOutcomes(lines, suites, planned) {
   return planned.code !== 0 && results.every((result) => result.code === 0) ? [...results, { ...planned, suite: 'plan' }] : results
 }
 
-export function fullSuites(scripts, { nightly = false, noCache = false, seed, testSeed } = {}) {
+/** A nightly records coverage when the committed map is older than this. */
+export const COVERAGE_DAYS = 7
+
+/** nightly: every check uncached. coverage: the desktop lanes record coverage. */
+export function fullSuites(scripts, { nightly = false, coverage = false, noCache = false, seed, testSeed } = {}) {
   const apps = scripts['test:browser'] && scripts['test:electron'] ? ['test:browser', 'test:electron'] : ['test:desktop']
   return [
     { name: 'test', words: ['test', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] },
@@ -17,6 +21,6 @@ export function fullSuites(scripts, { nightly = false, noCache = false, seed, te
     { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : []), ...(nightly ? ['--nightly'] : [])] },
     { name: 'specs:conformance', words: ['specs:conformance'] },
     { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },
-    ...apps.map((name) => ({ name, words: [...(nightly ? ['JUNO_COVERAGE=1'] : []), name] })),
+    ...apps.map((name) => ({ name, words: [...(coverage ? ['JUNO_COVERAGE=1'] : []), name] })),
   ]
 }
