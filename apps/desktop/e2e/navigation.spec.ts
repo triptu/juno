@@ -1,6 +1,6 @@
-// Browser-like navigation (spec sections 4 and 6): each tab's Back and
-// Forward, the reopen stack, pinned tabs and the tab menu, the tab keys,
-// the unread dot, and the sidebar's resize and hide.
+// Navigation that needs main (spec sections 4 and 6): window swipes, the
+// sidebar's resize and hide, and full screen. Back and Forward, the reopen
+// stack, pinned tabs and the tab menu are in the DOM lane (dom/navigation.test.ts).
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, launchApp, syncedTest, test } from './fixtures'
@@ -8,64 +8,8 @@ import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
 
-const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
-const OFFSITE = 'Can eng take the Wednesday afternoon'
-
-syncedTest('Back and Forward move through the topics one tab showed', async ({ juno }) => {
-  const { sidebar, tabs, topic, nav } = juno
-
-  await nav.expectCanGo(false, false)
-  await sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await sidebar.row(RINA).open()
-  await topic.expectTitle(RINA)
-  await sidebar.row(ROADMAP).open()
-  await topic.expectTitle(ROADMAP)
-  await tabs.expectCount(1)
-  await nav.expectCanGo(true, false)
-
-  await nav.back()
-  await topic.expectTitle(RINA)
-  await tabs.expectActive(RINA)
-  await sidebar.row(RINA).expectSelected()
-  await nav.menu('back')
-  await topic.expectTitle(POSTGRES)
-  // The launch tab began at Home, so Back still has Home behind the first topic.
-  await nav.expectCanGo(true, true)
-
-  await nav.forward()
-  await topic.expectTitle(RINA)
-  await nav.mouseButton(4)
-  await topic.expectTitle(ROADMAP)
-  await nav.expectCanGo(true, false)
-  await nav.mouseButton(3)
-  await topic.expectTitle(RINA)
-  await nav.menu('forward')
-  await topic.expectTitle(ROADMAP)
-  await tabs.expectCount(1)
-
-  // Opening something after going back drops Forward.
-  await nav.back()
-  await sidebar.row(OFFSITE).open()
-  await topic.expectTitle(OFFSITE)
-  await nav.expectCanGo(true, false)
-  await nav.back()
-  await topic.expectTitle(RINA)
-
-  // A new tab has its own history, starting at Home; a topic opened in it goes after Home, so Back returns there.
-  await tabs.menu('new-tab')
-  await tabs.expectCount(2)
-  await tabs.expectActive('Home')
-  await nav.expectCanGo(false, false)
-  await sidebar.row(POSTGRES).open()
-  await tabs.expectCount(2)
-  await tabs.expectActive(POSTGRES)
-  await nav.expectCanGo(true, false)
-  await tabs.select(RINA)
-  await nav.expectCanGo(true, true)
-})
 
 syncedTest('window swipe events move back and forward', { tag: '@electron' }, async ({ juno }) => {
   await juno.sidebar.row(RINA).open()

@@ -91,7 +91,6 @@ test('browser, Playwright, OS, architecture, options and guard identity belong t
   for (const field of Object.keys(runtime)) {
     assert.equal(cache({ runtime: { ...runtime, [field]: 'changed' } }).passed(button), false, field)
   }
-  assert.equal(cache({ kind: 'ring' }).passed(button), false)
 })
 
 test('full runs bypass old passes; failed, incomplete and corrupt records never pass', t => {

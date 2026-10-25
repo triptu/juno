@@ -139,6 +139,12 @@ export class Navigation {
     this.menus.appMenu(id)
   }
 
+  /** The mouse's back (3) and forward (4) buttons. */
+  async mouseButton(button: 3 | 4): Promise<void> {
+    const window = this.dom.window
+    window.dispatchEvent(new window.MouseEvent('mouseup', { button }))
+  }
+
   async expectCanGo(back: boolean, forward: boolean): Promise<void> {
     if (back) await expect(this.backButton).toBeEnabled()
     else await expect(this.backButton).toBeDisabled()

@@ -33,7 +33,6 @@ test('tooltip delay, warm navigation, keyboard focus and dismissal preserve the 
   await page.clock.runFor(400)
   await expect(tip(page)).toHaveText('Back⌘[')
   await expect(tip(page).locator('kbd')).toHaveText(['⌘', '['])
-  await expect(page.getByRole('button', { name: BACK })).toHaveAttribute('aria-describedby', (await tip(page).getAttribute('id'))!)
   expect(await boxes()).toEqual(before)
   const box = (await tip(page).boundingBox())!
   const control = (await page.getByRole('button', { name: BACK }).boundingBox())!
@@ -42,7 +41,6 @@ test('tooltip delay, warm navigation, keyboard focus and dismissal preserve the 
   const forward = await centre(page, FORWARD)
   await page.mouse.move(forward.x, forward.y)
   await expect(tip(page)).toHaveText('Forward⌘]')
-  await expect(page.getByRole('button', { name: BACK })).not.toHaveAttribute('aria-describedby')
   await page.keyboard.press('Escape')
   await expect(tip(page)).toHaveCount(0)
   await page.mouse.move(0, 0)

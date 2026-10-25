@@ -1,5 +1,5 @@
 /** Atoms for the engine feature. */
-import { Option } from 'effect'
+import { Clock, Effect, Fiber, Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { enginePing, engineStatus, type SyncFailure } from '@juno/contract'
 import { command, liveQuery } from './atoms'
@@ -40,6 +40,9 @@ export type SyncNotice = 'offline' | 'failed' | 'rate-limited' | 'stopped'
 /** A lost connection that comes back within this long never shows: a short drop is not worth a line. */
 export const OFFLINE_GRACE_MILLIS = 5_000
 
+/** The clock the offline grace waits on: the live one, or a test's, set on its registry. */
+export const noticeClockAtom = Atom.make<Clock.Clock>(Effect.runSync(Clock.Clock)).pipe(Atom.keepAlive)
+
 const currentNotice = Atom.make((get): SyncNotice | undefined => {
   if (get(connectionStateAtom) === 'failed') return 'stopped'
   const status = get(engineStatusAtom)
@@ -78,7 +81,7 @@ export const syncNoticeAtom = Atom.make((get): SyncNotice | undefined => {
   if (notice === undefined && get(syncFailureAtom) !== undefined) return 'failed'
   if (notice !== 'offline') return notice
   if (Option.getOrUndefined(get.self<SyncNotice | undefined>()) === 'offline') return 'offline'
-  const timer = setTimeout(() => get.setSelf('offline'), OFFLINE_GRACE_MILLIS)
-  get.addFinalizer(() => clearTimeout(timer))
+  const grace = Effect.runFork(Effect.sleep(OFFLINE_GRACE_MILLIS).pipe(Effect.andThen(Effect.sync(() => get.setSelf('offline'))), Effect.provideService(Clock.Clock, get(noticeClockAtom))))
+  get.addFinalizer(() => void Effect.runFork(Fiber.interrupt(grace)))
   return undefined
 })

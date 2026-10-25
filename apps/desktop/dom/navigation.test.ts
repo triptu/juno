@@ -1,6 +1,6 @@
-// Tabs (spec sections 4 and 6): the reopen stack with each tab's history, the
-// unread dot on an inactive tab, and pinned tabs from the tab menu, kept over a
-// restart. Back and Forward are the browser lane's canary (navigation.spec.ts).
+// Tabs (spec sections 4 and 6): each tab's Back and Forward, the reopen stack
+// with each tab's history, the unread dot on an inactive tab, and pinned tabs
+// from the tab menu, kept over a restart.
 import { savedTabs, threadId } from '../e2e/driver/userDb'
 import { expect } from './expect'
 import { domTest } from './test'
@@ -9,6 +9,75 @@ const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
+
+domTest('Back and Forward move through the topics one tab showed', async ({ juno }) => {
+  const { sidebar, tabs, topic, nav } = juno
+
+  await nav.expectCanGo(false, false)
+  await sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
+  await sidebar.row(RINA).open()
+  await topic.expectTitle(RINA)
+  await sidebar.row(ROADMAP).open()
+  await topic.expectTitle(ROADMAP)
+  await tabs.expectCount(1)
+  await nav.expectCanGo(true, false)
+
+  await nav.back()
+  await topic.expectTitle(RINA)
+  await tabs.expectActive(RINA)
+  await sidebar.row(RINA).expectSelected()
+  await nav.menu('back')
+  await topic.expectTitle(POSTGRES)
+  // The launch tab began at Home, so Back still has Home behind the first topic.
+  await nav.expectCanGo(true, true)
+
+  await nav.forward()
+  await topic.expectTitle(RINA)
+  await nav.mouseButton(4)
+  await topic.expectTitle(ROADMAP)
+  await nav.expectCanGo(true, false)
+  await nav.mouseButton(3)
+  await topic.expectTitle(RINA)
+  await nav.menu('forward')
+  await topic.expectTitle(ROADMAP)
+  await tabs.expectCount(1)
+
+  // Opening something after going back drops Forward.
+  await nav.back()
+  await topic.expectTitle(RINA)
+  await sidebar.row(OFFSITE).open()
+  await topic.expectTitle(OFFSITE)
+  await nav.expectCanGo(true, false)
+  await nav.back()
+  await topic.expectTitle(RINA)
+
+  // A new tab has its own history, starting at Home; a topic opened in it goes after Home, so Back returns there.
+  await tabs.menu('new-tab')
+  await tabs.expectCount(2)
+  await tabs.expectActive('Home')
+  await nav.expectCanGo(false, false)
+  await sidebar.row(POSTGRES).open()
+  await tabs.expectCount(2)
+  await tabs.expectActive(POSTGRES)
+  await nav.expectCanGo(true, false)
+  await tabs.select(RINA)
+  await nav.expectCanGo(true, true)
+})
+
+domTest('a click on the topic on screen, while another open waits for its topic, keeps the topic on screen', async ({ juno }) => {
+  const { sidebar, tabs, topic } = juno
+  await sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
+  // Rina's open waits for her thread to paint; the second click, on the topic on screen, is the last ask.
+  await sidebar.row(RINA).open()
+  await sidebar.row(POSTGRES).open()
+  // Changes apply in the order asked, so once the new tab shows, Rina's open has applied or been dropped.
+  await tabs.menu('new-tab')
+  await tabs.expectActive('Home')
+  await tabs.select(POSTGRES)
+  await topic.expectTitle(POSTGRES)
+})
 
 domTest('⌘⇧T reopens closed tabs, the last closed first, each with its history; an inactive tab shows the unread dot until its topic is read', async ({ juno, slack }) => {
   const { sidebar, tabs, topic, nav } = juno

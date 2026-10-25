@@ -1,9 +1,9 @@
 import type { Route } from './support'
 
-export function sourceKeys(root: string, kind: 'shift' | 'ring'): (component: string) => string
+export function sourceKeys(root: string): (component: string) => string
 export function walkCache(options: {
   root: string
-  kind: 'shift' | 'ring'
+  kind: 'shift'
   runtime: object
   directory?: string
   all?: boolean

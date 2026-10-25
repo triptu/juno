@@ -38,15 +38,20 @@ export async function controlledSleep(millis: number) {
     armed.count++
     return time.clock.sleep(duration).pipe(Effect.ensuring(Effect.sync(() => { armed.count-- })))
   })
+  const whenArmed = async (timeoutMillis = 20_000) => {
+    const started = Date.now()
+    while (armed.count === 0) {
+      if (Date.now() - started > timeoutMillis) throw new Error(`timed out waiting for a ${millis} ms sleep`)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
+  }
   return {
     ...time,
+    /** Waits until a sleep of this duration is armed. */
+    armed: () => whenArmed(),
     /** Waits until a sleep of this duration is armed, then ends it by advancing exactly that long. */
     fire: async (timeoutMillis = 20_000) => {
-      const started = Date.now()
-      while (armed.count === 0) {
-        if (Date.now() - started > timeoutMillis) throw new Error(`timed out waiting for a ${millis} ms sleep`)
-        await new Promise((resolve) => setTimeout(resolve, 5))
-      }
+      await whenArmed(timeoutMillis)
       await time.advance(millis)
     },
     clock: {
