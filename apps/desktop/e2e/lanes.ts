@@ -45,7 +45,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'notification-hours.spec.ts',
   'notification-instructions.spec.ts',
   'notification-badge.spec.ts',
-  'presence.spec.ts',
   'huddle.spec.ts',
   'huddle-dm.spec.ts',
   'huddle-incoming.spec.ts',

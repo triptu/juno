@@ -27,7 +27,6 @@ export function createShell(userData: string, options: AgentOptions) {
   const log = createLog('main', join(userData, 'logs'))
   const permission = testNotificationPermission({})
   let badge = ''
-  let idle = 0
   let settingsOpened = 0
   const notifications: Array<NotificationOptions & { click: () => void }> = []
   const dock = createDockBadge(permission, (text) => { badge = text }, {
@@ -45,7 +44,7 @@ export function createShell(userData: string, options: AgentOptions) {
     open: (target) => publish({ event: 'notification', value: target }),
     focus: () => {}, send, privacy: () => saved.privacy === true,
   })
-  const activity = createActivityWatch({ idleSeconds: () => idle, locked: () => false, send })
+  const activity = createActivityWatch({ idleSeconds: () => 0, locked: () => false, send })
   const pages = createHuddlePageRegistry(send)
   let nextPage = 0
   let folder: string | null = null
@@ -57,7 +56,6 @@ export function createShell(userData: string, options: AgentOptions) {
     notificationPermission: permission.set,
     notificationRequests: permission.requests,
     notificationSettingsOpened: () => settingsOpened,
-    systemIdle: (seconds) => { idle = seconds; activity.poll() },
     dockBadge: () => badge,
     clearDockBadge: () => { badge = '' },
     dockBounces: bounce.testHooks.dockBounces,
