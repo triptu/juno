@@ -1,23 +1,19 @@
 // Juno sleeps when nothing happens (performance.md section 1, "Idle CPU").
-// Every process: main, the window's renderer, the engine, the agent, the
-// GPU process and the network service, each against its platform budget, in
-// the states the owner leaves the app in. On 10-18 a "Juno Helper" sat at
-// 100 % of a core on the owner's Mac: the engine's send workers ran their
-// pass again at once while a channel's first unsent row waited out a
-// backoff. Every run counts the engine's work passes at rest under a test
-// clock (packages/engine/test/flows/idle.flow.test.ts), and the Juno chat
-// flow checks nothing on screen moves after an answer (juno.expectAtRest).
-// The real-CPU check of that case is packages/engine/test/perf/edit-retry-idle.perf.ts.
+// On 10-18 a "Juno Helper" sat at 100 % of a core on the owner's Mac: the
+// engine's send workers ran their pass again at once while a channel's first
+// unsent row waited out a backoff. Every run counts the engine's work passes
+// at rest under a test clock (packages/engine/test/flows/idle.flow.test.ts),
+// and the Juno chat flow checks nothing on screen moves after an answer
+// (juno.expectAtRest). The real-CPU check of that case is
+// packages/engine/test/perf/edit-retry-idle.perf.ts.
 //
-// The first test keeps the 10-16 case: an unread message that mentions
-// someone the store knows, under a newer one that names nobody. Here #eng
-// is small, so that spin cost little; `idle.perf.ts` reads a large channel.
-//
-// Everything here is tagged @mac, so it runs only on the Mac when asked and
-// before a release, never in the laptop lanes: it is nearly all waiting. The
-// portable journey checks CPU and memory on a small seed in under two
-// minutes; the other tests keep minute windows and fine process budgets. App
-// diagnostics are the primary way to catch idle spins in the field.
+// The portable walk (idleJourney.ts) runs on the laptop in full runs: every
+// process of the real app in five states, including the 10-16 case of an
+// unread mention of a known person. The large-seed walk below keeps minute
+// windows and the fine Mac budgets; it is @mac and runs only by hand, before
+// a release that changes idle behaviour or when asked:
+// `bun run test:desktop e2e/idle-cpu.spec.ts --grep @mac`. App diagnostics are
+// the primary way to catch idle spins in the field.
 import { rm } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
@@ -93,16 +89,6 @@ async function expectIdle(running: RunningApp, state: string, fake?: FakeSlack):
   }
 }
 
-/** Maya in #eng, with a real mention of Leo (a rich_text `user` element), as Slack sends one. */
-const mentionLeo = (fake: FakeSlack, channel: string) =>
-  fake.workspace.post({
-    channel,
-    user: 'U0MAYA',
-    mrkdwn: true,
-    text: '<@U0LEO> can you look at the rollout plan?',
-    blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'user', user_id: 'U0LEO' }, { type: 'text', text: ' can you look at the rollout plan?' }] }] }],
-  } as Parameters<FakeSlack['workspace']['post']>[0])
-
 /** Picks `label` from the switcher of the Juno header inside `where`. */
 async function switchTo(win: Page, where: 'aside[data-juno-panel]' | 'main', label: string): Promise<void> {
   await win.locator(`${where} [data-juno-header] button[aria-haspopup="menu"]`).click()
@@ -161,30 +147,9 @@ async function tabAndWindowStates(running: RunningApp, fake: FakeSlack): Promise
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show())
 }
 
+portableIdleJourney()
+
 test.describe('mac process budgets', { tag: '@mac' }, () => {
-  portableIdleJourney()
-
-  test('the engine is idle after sync, with an older unread message that mentions a known person', async ({ juno, slack, running, fake }) => {
-    test.setTimeout(120_000)
-    await juno.signIn()
-    await juno.sidebar.expectRows()
-    await juno.expectEngineLive()
-    mentionLeo(fake, slack.channel('eng'))
-    slack.as('Maya').postIn('eng', 'thanks, no rush')
-    await expect(juno.sidebar.row('#eng').root).toContainText('thanks, no rush')
-    await expectIdle(running, 'after a mention')
-  })
-
-  test('every process is idle during the first sync while a history call waits', async ({ juno, slack, running }) => {
-    test.setTimeout(120_000)
-    // The first sync waits on one conversation, so the sidebar's syncing card stays.
-    slack.fake.holdNext({ method: 'conversations.history' })
-    await juno.signIn()
-    await expect(juno.sidebar.syncStatus).toHaveText('Syncing with Slack', { timeout: 30_000 })
-    await expectIdle(running, 'syncing card shown')
-    slack.fake.release()
-  })
-
   // The large seed with Juno on a fake model: each state is reached in turn
   // in one launch, as a person moves through the app.
   test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', { tag: ['@heavy', '@heavy-idle'] }, async () => {
