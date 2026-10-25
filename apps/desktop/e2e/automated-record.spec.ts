@@ -1,10 +1,9 @@
 // Automated's record (SPEC 5 "Automated", 12 "Automated's record") against
 // the fake Slack: a bot channel joined after the first sync moves by itself
 // and Home's card explains it with the counts that decided; Move back puts it
-// in All and Undo gives it back to Automated; a channel where people start
-// the conversations stays in All however much a bot replies in its threads;
-// and a channel people take over goes back out, which the card says, with
-// Dismiss to see it without opening the record.
+// in All and Undo gives it back to Automated, and Dismiss sees the card
+// without opening the record. Which channels move in and out, and the reasons
+// the record gives, are the engine's sidebar flow test.
 import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
@@ -14,8 +13,6 @@ test.use({ sidebarTrace: true })
 test.describe.configure({ timeout: 120_000 })
 
 const CI_BUILDS = '#ci-builds'
-const ALERTS = '#alerts-prod'
-const AGENTS = '#eng-agents'
 const POSTGRES = 'Draft plan is in the doc'
 
 /** Home is live; stay on it so a card shown once is not lost by opening another visit. */
@@ -23,9 +20,6 @@ async function homeShowsRecord(juno: Juno): Promise<void> {
   await juno.home.open()
   await expect.poll(() => juno.home.kinds(), { timeout: 30_000 }).toContain('automatedMoves')
 }
-
-/** The job has examined the changed rows, including a pass that keeps their placement. */
-const afterAPass = (juno: Juno) => juno.workPass('automated')
 
 syncedTest('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async ({ juno, fake }) => {
   const { home, sidebar } = juno
@@ -44,6 +38,10 @@ syncedTest('a bot channel joined later moves by itself, the card says why, and M
   // Home's card can come before the sidebar's list says the channel left, and opening a row to read Home afresh held
   // the list: wait until the sidebar shows the move, so the sheet's hold starts from it.
   await sidebar.row(CI_BUILDS).expectAbsent()
+
+  // Dismiss sees the moves without opening the record; the row stays while Home is on screen, without its button.
+  await home.button('automatedMoves', 'Dismiss').click()
+  await expect(home.button('automatedMoves', 'Dismiss')).toHaveCount(0)
 
   const sheet = await home.reviewOf('automatedMoves', 'automated')
   await expect(sheet.title).toHaveText('Juno moved 1 channel to Automated')
@@ -79,47 +77,4 @@ syncedTest('a bot channel joined later moves by itself, the card says why, and M
   await sidebar.row(POSTGRES).open()
   await home.open()
   expect(await home.kinds()).not.toContain('automatedMoves')
-})
-
-test('a channel where people start the conversations stays in All, however much a bot replies in its threads', async ({ juno, fake }) => {
-  // People ask the coding bot in top-level posts; it answers in each thread, many times.
-  fake.addChannel({
-    id: 'C0ENGAGENTS',
-    name: 'eng-agents',
-    messages: ['U0SAM', 'U0PRIYA', 'U0SAM', 'U0DEV', 'U0PRIYA', 'U0SAM'].map((user, n) => ({
-      user,
-      text: `<@U0DEPLOYBOT> please look at the flaky test in suite ${n + 1}`,
-      ago: 120 - n * 15,
-      replies: Array.from({ length: 5 }, (_, r) => ({ user: 'U0DEPLOYBOT', text: `Step ${r + 1}: reran suite ${n + 1}`, ago: 118 - n * 15 - r })),
-    })),
-  })
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-
-  await sidebar.row(AGENTS).expectVisible()
-  fake.injectMessage({ channel: 'C0ENGAGENTS', user: 'U0PRIYA', text: 'Thanks, the suite is green now' })
-  await sidebar.row(AGENTS).expectPreview(/the suite is green now$/)
-  await afterAPass(juno)
-  await sidebar.row(AGENTS).expectVisible()
-  await sidebar.selectView('Automated')
-  await sidebar.row(AGENTS).expectAbsent()
-})
-
-syncedTest('a channel people take over goes back to All, and the card says people start most conversations there', async ({ juno, fake }) => {
-  const { home, sidebar } = juno
-  await sidebar.row(ALERTS).expectAbsent()
-
-  // Its name says alerts, so people must start seven in ten of its latest 30 top-level messages.
-  for (let n = 0; n < 21; n++) fake.injectMessage({ channel: 'C0ALERTSPROD', user: n % 2 === 0 ? 'U0SAM' : 'U0PRIYA', text: `Looking into the p95 spike, note ${n + 1}` })
-  await sidebar.row(ALERTS).expectVisible()
-
-  await homeShowsRecord(juno)
-  await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel out of Automated')
-  // Dismiss sees the moves without opening the record; the row stays while Home is on screen, without its button.
-  await home.button('automatedMoves', 'Dismiss').click()
-  await expect(home.button('automatedMoves', 'Dismiss')).toHaveCount(0)
-  const sheet = await home.reviewOf('automatedMoves', 'automated')
-  await expect(sheet.reason(ALERTS)).toHaveText('Moved back: people start most conversations here')
-  await expect(sheet.row(ALERTS)).toContainText('People wrote 21 of the last 30 top-level messages')
 })
