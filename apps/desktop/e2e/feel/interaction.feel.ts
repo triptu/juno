@@ -41,7 +41,7 @@ const popover = (dialog: string, anchor: string, label: string) => ({
   ],
 })
 
-test('hover and press feedback', async ({ juno, win, feel }) => {
+test('hover and press feedback', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
 
   const row = await tag(juno.sidebar.row(POSTGRES).root, 'hover-row')
   await feel.run({ name: 'hover-row', title: 'Point at a sidebar row: its hover background shows in the next frame', probes: look(row), checks: feedback('pointerover', 'row hover') }, async (rec) => {
@@ -83,7 +83,7 @@ test('hover and press feedback', async ({ juno, win, feel }) => {
   })
 })
 
-test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
+test('popovers open from their anchor, whole', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
 
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
@@ -115,7 +115,7 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
   })
 })
 
-test('palette opens with frequent conversations and holds still', async ({ juno, win, feel }) => {
+test('palette opens with frequent conversations and holds still', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
   const dialog = '[role="dialog"][aria-label="Search and commands"]'
   // The app warms the palette's list in its first idle moment after launch (Palette.tsx); a warm start can be
   // here before that on a busy machine. Idle callbacks run in order, so this one runs after the warm-up's.

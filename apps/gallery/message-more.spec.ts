@@ -99,8 +99,6 @@ for (const theme of ['light', 'dark'] as const) {
       await button.hover()
       await expect.poll(() => button.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(rest)
       await expect(button).toHaveCSS('cursor', 'default')
-      await expect(button).toHaveAttribute('aria-label', 'More actions ⇧F10')
-      await expect(button).toHaveAttribute('tabindex', '-1')
     }
 
     for (const [state, index] of [

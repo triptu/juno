@@ -8,7 +8,7 @@ test.use({ synced: true })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-test('a reaction and a live reply arrive while reading at the bottom', async ({ juno, slack, feel }) => {
+test('a reaction and a live reply arrive while reading at the bottom', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, slack, feel }) => {
   await juno.sidebar.row(POSTGRES).open()
   // Enough replies that the list scrolls, in Compact density too: in a list that fits, staying at the bottom proves nothing.
   for (let i = 1; i <= 14; i++) slack.as('Leo').replyIn(POSTGRES, `Notes from the dry run, part ${i}.`)

@@ -45,7 +45,7 @@ async function openSettings(juno: Juno): Promise<void> {
 
 const lastBackupAt = async (juno: Juno) => Number((await juno.win.locator('main [data-last-backup]').getAttribute('data-last-backup')) || 0)
 
-test('backup to a shared folder, export the phrase, restore on a second Mac, and the first Mac turns read-only', async ({ juno, otherApp, shared }) => {
+test('backup to a shared folder, export the phrase, restore on a second Mac, and the first Mac turns read-only', { tag: ['@nightly', '@nightly-crash'] }, async ({ juno, otherApp, shared }) => {
   // The first Mac: the backup is on from the start, in its own folder.
   await ready(juno)
   await openSettings(juno)

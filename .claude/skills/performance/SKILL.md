@@ -66,7 +66,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 - A list or scroll change is tested in a topic past the window cap (more messages than the loaded window), with real gestures: trackpad momentum, fingers resting on the trackpad, a held scrollbar thumb. Reaching the bottom with a programmatic jump, or a fake topic that never fills the window, misses whole classes of bugs.
 - For a change to a measured interaction, `bun run affected` runs its feel scenario on the laptop (`test:desktop --project=feel`); a failed scenario's filmstrip is in `apps/desktop/test-results/feel-report/` of the run's results. `bun run test:feel -g "<name>"` records it in Electron on the Mac with full videos, when Tushar asks.
 - Query change: run the plan test and the engine benchmark.
-- Other UI changes are covered by the feel scenarios in every full run, and by perf in `bun run verify:main --with-mac` when Tushar asks. If unsure, say so in your report.
+- Other UI changes are covered by the feel scenarios in every nightly run, and by perf in `bun run verify:main --with-mac` when Tushar asks. If unsure, say so in your report.
 - By hand: `bun run dev`, DevTools Performance panel, repeat the interaction 5 times, read the Juno and React tracks and the long-animation-frame entries (`window.__juno.perf`).
 
 ## Delayed data

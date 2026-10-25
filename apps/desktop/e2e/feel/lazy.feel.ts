@@ -221,7 +221,7 @@ async function sendCheck(feel: Feel, app: Juno, userData: string, teamId: string
   )
 }
 
-syncedTest('each lazy part opens whole and on time the first time after a launch', async ({ juno, fake, relaunch, userData, studio }) => {
+syncedTest('each lazy part opens whole and on time the first time after a launch', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, relaunch, userData, studio }) => {
   // Your own message in #eng, for the edit field.
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.send('Shiping the fix today')
@@ -238,7 +238,7 @@ syncedTest('each lazy part opens whole and on time the first time after a launch
   await sendCheck(feel, app, userData, fake.teamId)
 })
 
-test('the sync card shows whole with the first sync and stays put', async ({ juno, fake, feel }) => {
+test('the sync card shows whole with the first sync and stays put', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, feel }) => {
   fake.holdNext({ method: 'client.userBoot', before: true })
   fake.holdNext({ method: 'conversations.history', before: true })
   await juno.signIn()

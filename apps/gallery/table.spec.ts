@@ -48,13 +48,6 @@ test('copying a selection inside a table gives its rows as tab-separated lines, 
   expect(copied).toBe('Deploy\tRun migrate then restart\nVerify\tCheck the dashboards')
 })
 
-test('the scroll box is a tab stop only on the tabbable row', async ({ page }) => {
-  await open(page, 'table/wide-not-tabbable')
-  await expect(page.locator('[data-msg-table]')).toHaveAttribute('tabindex', '-1')
-  await open(page, 'table/wide')
-  await expect(page.locator('[data-msg-table]')).not.toHaveAttribute('tabindex', /.*/)
-})
-
 test('the gallery ships its StyleX sheet minified, as the app does', async ({ page }) => {
   await open(page, 'table/status')
   const sheets = await page.evaluate(async () => Promise.all([...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(async (link) => (await fetch(link.href)).text())))

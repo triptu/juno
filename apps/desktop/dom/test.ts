@@ -35,6 +35,8 @@ export interface DomTestOptions<M extends Model | undefined = undefined> {
   /** Starts the model the agent talks to; the agent runs with it unless `engine.agent` is false, and the engine's AI uses it. */
   readonly model?: () => Promise<M & Model>
   readonly timeout?: number
+  /** Tags, as a Playwright test has them: a test with a tag JUNO_SKIP_TAGS names is skipped (`@nightly`, scripts/test-areas.mjs). */
+  readonly tag?: ReadonlyArray<string>
 }
 
 export interface DomContext<M extends Model | undefined = undefined> {
@@ -60,8 +62,11 @@ const signIn = async (app: DomApp) => {
   await juno.waitForSync()
 }
 
+const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
+
 export function domTest<M extends Model | undefined = undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M> = {}): void {
-  test(title, () => run(title, body, options), options.timeout ?? 60_000)
+  const define = options.tag?.some((tag) => skipTags.includes(tag)) ? test.skip : test
+  define(title, () => run(title, body, options), options.timeout ?? 60_000)
 }
 
 async function run<M extends Model | undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M>): Promise<void> {

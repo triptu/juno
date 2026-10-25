@@ -13,34 +13,9 @@ const badgeTest = test.extend({
   },
 })
 
-// What the dot does across an engine restart, a wake and a permanent engine failure is in the restart journey (juno-agent/crash.spec.ts).
-badgeTest('dock dot follows unread DMs, group DMs and mentions through reads', async ({ juno, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.notificationHoursNow()
-  const badge = (text: string) => expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe(text)
-  await badge('•')
-  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-never')
-  await badge('')
-  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-always')
-  await badge('•')
-  // More unread items keep the same dot, including a mention in the DM.
-  const dm = slack.as('Maya').dm('<@U0TUSHAR> Another DM')
-  await juno.sidebar.row('Maya', { exact: true }).expectPreview('@Tushar Another DM')
-  slack.as('Leo').postIn('eng', '<@U0TUSHAR> Can you review this now?')
-  await juno.sidebar.row('#eng', { exact: true }).expectPreview('Leo: @Tushar Can you review this now?')
-  await badge('•')
-  // A read from another Slack client leaves the channel mention as the only unread item.
-  fake.markRead({ channel: 'D0MAYA', ts: dm })
-  await juno.sidebar.row('Maya', { exact: true }).expectRead()
-  await juno.sidebar.row('#eng', { exact: true }).chooseInMenu('mark-read')
-  await juno.sidebar.row('#eng', { exact: true }).expectRead()
-  await badge('')
-  slack.as('Leo').groupDm('A group DM')
-  await badge('•')
-  await juno.sidebar.row('Maya, Leo', { exact: true }).chooseInMenu('mark-read')
-  await badge('')
-})
+// The dot's rules (unread DMs, group DMs and mentions through reads, Notify me, kept-out views, Automated) are in the
+// engine's notifications flow test; the host sends the dot in the DOM lane's notifications test, and what it does across
+// an engine restart is in the restart journey (juno-agent/crash.spec.ts).
 
 // No prompt during onboarding; the first Home view after it asks, before any banner has been shown.
 badgeTest('no permission prompt during onboarding, and the first Home view asks before any notification is shown', async ({ juno }) => {

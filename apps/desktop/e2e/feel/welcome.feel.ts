@@ -210,7 +210,7 @@ async function done(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promise
   )
 }
 
-test('the welcome card appears, ticks, says all set and goes without moving Home', async ({ juno, win, fake, feel }) => {
+test('the welcome card appears, ticks, says all set and goes without moving Home', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, fake, feel }) => {
   await appear(juno, win, fake, feel)
   await tick(juno, win, fake, feel)
   await returnHome(juno, win, fake, feel)

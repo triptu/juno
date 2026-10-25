@@ -21,7 +21,7 @@ import { largeSeed, startFakeSlack, type FakeSlack } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp } from './fixtures'
 import { answer, JunoChatPane } from './juno-agent/chat'
-import { portableIdleJourney } from './idleJourney'
+import { idleJourney } from './idleJourney'
 
 const IDLE_WINDOW_MS = Number(process.env.JUNO_IDLE_WINDOW_MS ?? 60_000)
 
@@ -147,12 +147,12 @@ async function tabAndWindowStates(running: RunningApp, fake: FakeSlack): Promise
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show())
 }
 
-portableIdleJourney()
+test('idle resources while the first sync waits, after sync with a mention, in a topic and the Juno panel, and hidden', { tag: ['@nightly', '@nightly-idle'] }, idleJourney)
 
 test.describe('mac process budgets', { tag: '@mac' }, () => {
   // The large seed with Juno on a fake model: each state is reached in turn
   // in one launch, as a person moves through the app.
-  test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', { tag: ['@heavy', '@heavy-idle'] }, async () => {
+  test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', async () => {
     test.setTimeout(20 * IDLE_WINDOW_MS + 600_000)
     const fake = await startFakeSlack({ seed: largeSeed() })
     const model = await startFakeOpenRouter({ answer })

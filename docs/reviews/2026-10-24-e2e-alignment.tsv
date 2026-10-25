@@ -154,7 +154,6 @@ apps/gallery/card-working.spec.ts	gallery	keep	A working card disables input fro
 apps/gallery/confirm-geometry.spec.ts	gallery	keep	Delete-confirm placement at band, under-band and tall-last edges; relations, not pins.
 apps/gallery/contrast.spec.ts	gallery	keep	Readability per accent and theme; each accent is a different colour set.
 apps/gallery/emoji-picker.spec.ts	gallery	folded	Six search and pick tests on one fixture are steps of one flow, each pick checked for a new value; the theme loop went (8→3 tests).
-apps/gallery/focus-ring.spec.ts	gallery	keep	Cached walk proving no focus ring is clipped; light only.
 apps/gallery/formatting.spec.ts	gallery	fixed	Glyph geometry and code/quote fills kept in both themes; removed a right-to-left loop that desktop formatting.spec.ts checks more strongly against the real caret.
 apps/gallery/geometry.spec.ts	gallery	keep	Filter row height, middle-cut backup path and count edge; the remaining pins never churned.
 apps/gallery/home-geometry.spec.ts	gallery	keep	The syncing line keeps its start as its text changes (fa418c130).
@@ -167,7 +166,6 @@ apps/gallery/message-more.spec.ts	gallery	fixed	The size-only hover test runs in
 apps/gallery/narrow-geometry.spec.ts	gallery	fixed	A rail count of 10 (edited when a section was added, 386066e05) and one tooltip copy pin became "every rail icon's tooltip is its accessible name".
 apps/gallery/peek-contrast.spec.ts	gallery	fixed	Opens with the accent through openState instead of a second navigation with its own waits; removed unasserted values.
 apps/gallery/popover-anchor-geometry.spec.ts	gallery	keep	A popover starts at its trigger's left edge and moves in at the window edge.
-apps/gallery/roving.spec.ts	gallery	keep	Radio groups are one Tab stop and the arrows choose (6a634d48e).
 apps/gallery/settings.spec.ts	gallery	keep	The saved-key chip matches between Set up Juno and Settings.
 apps/gallery/shift.spec.ts	gallery	fixed	Broad cached walk and injected-shift self-tests kept; a 200 ms sleep now waits for the status text, the 28 px Resolve, 68 px band and 8 px inset pins (Resolve rewritten three times) became relative checks or went, and two size-only tests run in light only (47→45 tests).
 apps/gallery/shots.spec.ts	manual	keep	Review screenshot tool outside the gate; its waits only time the capture.

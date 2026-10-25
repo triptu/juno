@@ -7,7 +7,7 @@ import { landsAndStays } from './checks'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test('launch shows Home with its composer', async ({ juno, relaunch, studio }) => {
+test('launch shows Home with its composer', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, relaunch, studio }) => {
   await expect(juno.write.composer).toBeVisible()
   const again = await relaunch()
   await new Feel(again.win, studio, 'launch').run({

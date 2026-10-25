@@ -118,7 +118,7 @@ if (!urgent) {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
   if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()) fail('commit or remove working-tree changes before publishing')
   const gate = releaseGate(root, commit)
-  if (!gate) fail('no eligible full-run record for this commit; inspect bun run verify:main results')
+  if (!gate) fail('no eligible full-run record and passing nightly tier for this commit; inspect bun run verify:main results')
   printGate(gate)
 }
 

@@ -4,6 +4,11 @@
 // - HEAVY_AREAS: the tests tagged @heavy, and the code each one checks. A
 //   full run (bun run verify:main) always runs them. An affected plan runs an area's heavy
 //   tests only when a changed file is in that area.
+// - NIGHTLY_AREAS: the tests tagged @nightly, and the code each one checks. A
+//   normal full run skips them; a nightly run (verify:main --nightly) runs them,
+//   and a release runs those its changes reach since they last passed
+//   (scripts/nightly-reach.mjs). An affected plan runs an area's nightly tests
+//   only when a changed file is in that area, as for heavy tests.
 // - PERF_INTERACTIONS: the interactions with a budget in docs/performance.md,
 //   and the files each one owns. When one of these changed, the plan runs its
 //   feel scenario in the browser and suggests perf on the Mac.
@@ -16,31 +21,112 @@
 // A path ending in / is a folder; any other string is one file; a RegExp
 // matches the repo path.
 
+/** The code the first sync runs, which the cold-sync checks cover. */
+const SYNC_PATHS = [
+  'packages/sync/',
+  'packages/engine/src/session/',
+  'packages/engine/src/startEngine.ts',
+  'packages/engine/src/syncLink.ts',
+  'packages/slack/src/client/',
+  'packages/fake-slack/src/seeds/',
+  'apps/desktop/e2e/layout-shift.spec.ts',
+]
+
 /** Each heavy test carries `@heavy` and its area's tag, as `{ tag: ['@heavy', '@heavy-sync'] }`. */
 export const HEAVY_AREAS = [
   {
     area: 'sync',
     suite: 'desktop',
     tag: '@heavy-sync',
-    tests: 'the first-sync cases in layout-shift.spec.ts',
+    tests: 'the sidebar first-sync case in layout-shift.spec.ts',
     // Spec files whose every test is heavy: the plan drops them when the area did not change.
     whole: [],
+    paths: SYNC_PATHS,
+  },
+  {
+    area: 'gallery',
+    suite: 'gallery',
+    tag: '@heavy-gallery',
+    tests: 'the shift guard over every component (shift.spec.ts without GALLERY_SHIFT_ONLY)',
+    whole: [],
+    // The gallery harness: the app and its shared helpers, the shift guard, @juno/testing.
+    paths: [/^apps\/gallery\/(?!.*\.spec\.ts$)/, 'apps/gallery/shift.spec.ts', 'packages/testing/'],
+  },
+]
+
+/**
+ * Each nightly test carries `@nightly` and its area's tag, as `{ tag: ['@nightly', '@nightly-crash'] }`, in the
+ * desktop e2e specs and the DOM lane (`domTest`'s `tag` option). A file with a nightly test names its area's tag.
+ */
+export const NIGHTLY_AREAS = [
+  {
+    area: 'crash',
+    tag: '@nightly-crash',
+    tests: 'the engine kill and inbox crash in juno-agent/crash.spec.ts, transfer.spec.ts, backup.spec.ts, engine.spec.ts and the relaunch tests in session.spec.ts; the uncertain write in crash.spec.ts stays on every run',
     paths: [
-      'packages/sync/',
+      'apps/desktop/src/main/agent.ts',
+      'apps/desktop/src/main/engine.ts',
+      'apps/desktop/src/main/processes.ts',
+      'apps/desktop/src/main/processWatch.ts',
+      'apps/desktop/src/main/backupSecrets.ts',
+      'apps/desktop/src/main/launch.ts',
+      'apps/desktop/src/main/session.ts',
+      'apps/desktop/src/main/slackSession.ts',
+      'apps/desktop/src/agent/',
+      'apps/desktop/src/engine/',
+      'packages/agent/src/backup/',
+      'packages/agent/src/inbox/',
+      'packages/agent/src/recovery/',
+      'packages/agent/src/ownership/',
+      'packages/agent/src/start.ts',
       'packages/engine/src/session/',
+      'packages/engine/src/sessionClient.ts',
       'packages/engine/src/startEngine.ts',
-      'packages/engine/src/syncLink.ts',
-      'packages/slack/src/client/',
-      'packages/fake-slack/src/seeds/',
+      'packages/engine/src/status/',
+      'apps/desktop/e2e/juno-agent/crash.spec.ts',
+      'apps/desktop/e2e/juno-agent/transfer.spec.ts',
+      'apps/desktop/e2e/juno-agent/backup.spec.ts',
+      'apps/desktop/e2e/engine.spec.ts',
+      'apps/desktop/e2e/session.spec.ts',
+    ],
+  },
+  {
+    area: 'huddle',
+    tag: '@nightly-huddle',
+    tests: 'huddle.spec.ts, huddle-share.spec.ts and the DOM huddle tests that start or join a call',
+    paths: [/^(apps|packages)\/.*huddle/i],
+  },
+  {
+    area: 'scroll',
+    tag: '@nightly-scroll',
+    tests: 'the extra variants in stick-bottom.spec.ts, layout-shift.spec.ts and tab-scroll.spec.ts; one test per rule stays on every run',
+    paths: [
+      'packages/ui/src/ScrollArea.tsx',
+      'packages/views/src/MessageList.tsx',
+      'packages/views/src/TopicView.tsx',
+      'packages/state/src/messages.ts',
+      'packages/state/src/tabs.ts',
+      'packages/engine/src/messages/',
+      'apps/desktop/src/renderer/containers/TopicView.tsx',
+      'apps/desktop/src/renderer/containers/topic/',
+      'apps/desktop/src/renderer/containers/messageRows.ts',
+      'apps/desktop/src/renderer/containers/scrollInput.ts',
+      'apps/desktop/src/renderer/containers/scrollRest.ts',
+      'apps/desktop/src/renderer/containers/juno/chatScroll.ts',
+      'apps/desktop/src/renderer/containers/juno/chatWindow.ts',
+      'apps/desktop/e2e/stick-bottom.spec.ts',
+      'apps/desktop/e2e/stickBottomLists.ts',
+      'apps/desktop/e2e/stickBottomProbe.ts',
+      'apps/desktop/e2e/scrollGrowthProbe.ts',
+      'apps/desktop/e2e/shiftProbe.ts',
       'apps/desktop/e2e/layout-shift.spec.ts',
+      'apps/desktop/e2e/tab-scroll.spec.ts',
     ],
   },
   {
     area: 'idle',
-    suite: 'desktop',
-    tag: '@heavy-idle',
-    tests: 'the portable CPU and memory walk in idle-cpu.spec.ts; its fine Mac walk is @mac and runs only by hand',
-    whole: [],
+    tag: '@nightly-idle',
+    tests: 'the CPU and memory walk of every process in idle-cpu.spec.ts; its fine Mac walk is @mac and runs only by hand',
     paths: [
       'apps/desktop/e2e/idle-cpu.spec.ts',
       'apps/desktop/e2e/idleJourney.ts',
@@ -56,13 +142,16 @@ export const HEAVY_AREAS = [
     ],
   },
   {
-    area: 'gallery',
-    suite: 'gallery',
-    tag: '@heavy-gallery',
-    tests: 'the shift guard over every component (shift.spec.ts without GALLERY_SHIFT_ONLY)',
-    whole: [],
-    // The gallery harness: the app and its shared helpers, the shift guard, @juno/testing.
-    paths: [/^apps\/gallery\/(?!.*\.spec\.ts$)/, 'apps/gallery/shift.spec.ts', 'packages/testing/'],
+    area: 'feel',
+    tag: '@nightly-feel',
+    tests: 'the feel scenarios (e2e/feel/*.feel.ts), filmed in the browser; affected plans also run a scenario whose interaction changed (PERF_INTERACTIONS)',
+    paths: ['apps/desktop/e2e/feel/'],
+  },
+  {
+    area: 'sync',
+    tag: '@nightly-sync',
+    tests: 'the cold-sync shift checks of All topics and Home in layout-shift.spec.ts; the sidebar one stays @heavy',
+    paths: [...SYNC_PATHS, 'apps/desktop/e2e/homeSyncProbe.ts'],
   },
 ]
 
@@ -150,6 +239,12 @@ export const inPaths = (paths, file) => paths.some((path) => (path instanceof Re
 
 /** The heavy areas a change reaches, by name. */
 export const heavyAreasChanged = (changed) => HEAVY_AREAS.filter((area) => changed.some((file) => inPaths(area.paths, file))).map((area) => area.area)
+
+/** The nightly areas a change reaches, by name. */
+export const nightlyAreasChanged = (changed) => NIGHTLY_AREAS.filter((area) => changed.some((file) => inPaths(area.paths, file))).map((area) => area.area)
+
+/** Whether a test file's text holds a nightly test: it names a nightly area's tag. */
+export const holdsNightly = (text) => NIGHTLY_AREAS.some((area) => text.includes(`'${area.tag}'`))
 
 /** The interactions a change reaches, each with the changed files it owns. */
 export const perfInteractionsChanged = (changed) =>

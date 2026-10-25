@@ -12,7 +12,7 @@
  */
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
-import { rendererPlugins } from './renderer.vite'
+import { rendererOutput, rendererPlugins } from './renderer.vite'
 
 const repoRoot = resolve(__dirname, '../..')
 
@@ -32,10 +32,10 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
-    minify: 'esbuild',
+    minify: 'oxc',
     sourcemap: process.env['JUNO_COVERAGE'] === '1' ? 'hidden' : false,
     reportCompressedSize: false,
-    rollupOptions: { input: resolve(__dirname, 'src/renderer/index.html') },
+    rolldownOptions: { input: resolve(__dirname, 'src/renderer/index.html'), output: rendererOutput },
   },
   logLevel: 'warn',
   plugins: [webEntry(), ...rendererPlugins({ repoRoot, minify: true, reportSkipped: false })],

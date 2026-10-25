@@ -92,7 +92,7 @@ syncedTest('a late reaction above the view moves no row in view, and one on the 
 // latest paints at once, at the foot of the list, and the 30 come in above it without moving its text. At the
 // "N new" divider the list waits for them, since the topic opens at the divider, which belongs among them.
 for (const divider of [false, true]) {
-  syncedTest(`a partial thread ${divider ? 'waits for history at its divider' : 'paints what it holds at the bottom and grows above it'}`, async ({ juno, win, slack, fake, userData }) => {
+  syncedTest(`a partial thread ${divider ? 'waits for history at its divider' : 'paints what it holds at the bottom and grows above it'}`, { tag: divider ? ['@nightly', '@nightly-scroll'] : [] }, async ({ juno, win, slack, fake, userData }) => {
     const channel = slack.channel('eng')
     const user = slack.as('Leo').id
     // The root is not posted live: a root heard on this connection proves its thread from the root (`liveRoots`),
@@ -126,7 +126,7 @@ for (const divider of [false, true]) {
 }
 
 // The time follows the name, so a name that resolves late moves the time along its line once; the message stays put.
-syncedTest('a sender name resolves without moving the message', async ({ juno, win, slack, fake }) => {
+syncedTest('a sender name resolves without moving the message', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
   const person = { ...fake.workspace.users.get(slack.as('Leo').id)!, id: 'U0LATE', name: 'late', profile: { display_name: 'Leonard Alexander Park', real_name: 'Leonard Alexander Park' } }
   fake.workspace.users.set(person.id, person)
   fake.holdNext({ method: 'edge:users/info' })
@@ -141,7 +141,7 @@ syncedTest('a sender name resolves without moving the message', async ({ juno, w
   })
 })
 
-syncedTest('a new Main message gains a thread link without a jump, and the header stays put', async ({ juno, win, slack, fake }) => {
+syncedTest('a new Main message gains a thread link without a jump, and the header stays put', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
   const channel = slack.channel('deploys')
   const user = slack.as('Leo').id
   const root = fake.injectMessage({ channel, user, text: 'A new Main message for the thread slot' })
@@ -198,7 +198,7 @@ test('sidebar rows stay fixed while sync fills the remaining topics', { tag: ['@
   })
 })
 
-test('cold sync fills All topics without moving painted rows', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
+test('cold sync fills All topics without moving painted rows', { tag: ['@nightly', '@nightly-sync'] }, async ({ juno, win, fake }) => {
   fake.holdNext({ method: 'subscriptions.thread.getView' })
   await juno.signIn()
   await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
@@ -215,7 +215,7 @@ test('cold sync fills All topics without moving painted rows', { tag: ['@heavy',
   }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
 })
 
-test('cold sync fills Home with retained rows, a fixed composer and no flicker', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
+test('cold sync fills Home with retained rows, a fixed composer and no flicker', { tag: ['@nightly', '@nightly-sync'] }, async ({ juno, win, fake }) => {
   const method = 'conversations.history'
   const subscriptions = 'subscriptions.thread.getView'
   fake.holdNext({ method: subscriptions })

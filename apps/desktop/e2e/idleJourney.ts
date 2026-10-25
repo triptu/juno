@@ -49,27 +49,25 @@ function expectMemory(samples: ReadonlyArray<ReadonlyArray<Reading>>): void {
   }
 }
 
-/** A small real-process check. App diagnostics remain the primary evidence for idle spins in the field. */
-export function portableIdleJourney(): void {
-  test('idle resources while the first sync waits, after sync with a mention, in a topic and the Juno panel, and hidden', { tag: ['@heavy', '@heavy-idle'] }, async () => {
-    test.setTimeout(90_000)
-    const fake = await startFakeSlack({ seed: largeSeed({ topics: 200, messages: 2_000, users: 80, channels: { public: 12, private: 4, dms: 8, mpims: 4 } }) })
-    const model = await startFakeOpenRouter({ answer })
-    const userData = await tempUserData()
-    const slackDir = await tempUserData()
-    let running: RunningApp | undefined
-    try {
-      const slackApp = await writeSlackApp(fake, slackDir)
-      running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, timing: 'production', fakeOpenRouterUrl: model.origin })
-      await walk(running, fake)
-    } finally {
-      await running?.close()
-      await fake.close()
-      await model.close()
-      await rm(userData, { recursive: true, force: true })
-      await rm(slackDir, { recursive: true, force: true })
-    }
-  })
+/** A small real-process walk, the body of the idle test in idle-cpu.spec.ts. App diagnostics remain the primary evidence for idle spins in the field. */
+export async function idleJourney(): Promise<void> {
+  test.setTimeout(90_000)
+  const fake = await startFakeSlack({ seed: largeSeed({ topics: 200, messages: 2_000, users: 80, channels: { public: 12, private: 4, dms: 8, mpims: 4 } }) })
+  const model = await startFakeOpenRouter({ answer })
+  const userData = await tempUserData()
+  const slackDir = await tempUserData()
+  let running: RunningApp | undefined
+  try {
+    const slackApp = await writeSlackApp(fake, slackDir)
+    running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, timing: 'production', fakeOpenRouterUrl: model.origin })
+    await walk(running, fake)
+  } finally {
+    await running?.close()
+    await fake.close()
+    await model.close()
+    await rm(userData, { recursive: true, force: true })
+    await rm(slackDir, { recursive: true, force: true })
+  }
 }
 
 // The large seed's first public channel and two of its people.

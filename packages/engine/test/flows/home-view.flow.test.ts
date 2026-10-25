@@ -4,7 +4,7 @@
 import { afterEach, expect, it } from 'bun:test'
 import { channelsIgnore, homeHuddleSeen, homeView, huddleIncoming, notificationsSetLevel, type HomeItem, type HomeView, type IncomingHuddle } from '@juno/contract'
 import { SELF_ID, TEAM, type Workspace } from '@juno/fake-slack'
-import { dismissHuddle, liveQuery, runCommand } from '@juno/state'
+import { dismissHuddle, liveQuery, runCommand, setTidyUpPrefs, tidyUpPrefsAtom } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { bootedEngine, readDb, restart, valueOf } from '../scenario'
 import { step } from '../step'
@@ -92,6 +92,19 @@ it('a DM set to Never leaves Home, and comes back when set to Auto', async () =>
   await setMaya('auto')
   const back = await homeUntil(engine, (view) => shows(view, 'm:D0MAYA'), 'Maya back on Home')
   expect(back.items.find((item) => shows({ ...back, items: [item] }, 'm:D0MAYA'))!.kind).toBe('waiting')
+})
+
+it('Settings › Tidy up keeps two quick changes to separate controls, made before either is saved', async () => {
+  const engine = await syncedEngine(engines)
+  unmounts.push(engine.registry.mount(tidyUpPrefsAtom))
+  expect(engine.registry.get(tidyUpPrefsAtom)).toMatchObject({ threads: true, dms: true })
+  setTidyUpPrefs(engine.registry, { threads: false })
+  setTidyUpPrefs(engine.registry, { dms: false })
+  await waitFor(() => (engine.registry.get(tidyUpPrefsAtom).dms ? undefined : true), WAIT_MS, 'the second change saved')
+  const window = engine.openWindow()
+  unmounts.push(window.mount(tidyUpPrefsAtom))
+  await waitFor(() => (window.get(tidyUpPrefsAtom).dms ? undefined : true), WAIT_MS, 'the saved settings read again')
+  expect(window.get(tidyUpPrefsAtom)).toMatchObject({ threads: false, dms: false })
 })
 
 it('a dismissed huddle shows as missed once it ends and opening it clears it; Never hides one, Always shows it even in an ignored channel, and a restart keeps them cleared', async () => {

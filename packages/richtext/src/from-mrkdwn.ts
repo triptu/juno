@@ -8,7 +8,8 @@
  */
 import type { ContentBlock as Block, Inline, InlineStyle, Lookups } from './model'
 import { codeBlock } from './code'
-import { channelInline, dateInline, emojiInline, normalize, usergroupInline, userInline } from './inline'
+import { channelInline, dateInline, normalize, usergroupInline, userInline } from './inline'
+import { emojiInline } from './emoji'
 
 export function unescapeMrkdwn(text: string): string {
   return text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')

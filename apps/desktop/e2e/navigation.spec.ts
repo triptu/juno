@@ -1,6 +1,7 @@
-// Browser-like navigation (spec sections 4 and 6): each tab's Back and
-// Forward, the reopen stack, pinned tabs and the tab menu, the tab keys,
-// the unread dot, and the sidebar's resize and hide.
+// Navigation that needs main (spec sections 4 and 6): the sidebar's resize
+// and hide. Window swipes share a launch in break-pass.spec.ts, and full
+// screen in app.spec.ts. Back and Forward, the reopen stack, pinned tabs and
+// the tab menu are in the DOM lane (dom/navigation.test.ts).
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, launchApp, syncedTest, test } from './fixtures'
@@ -8,75 +9,7 @@ import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
 
-const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite'
-const ROADMAP = 'Proposal: cut offline mode and public'
-const OFFSITE = 'Can eng take the Wednesday afternoon'
-
-syncedTest('Back and Forward move through the topics one tab showed', async ({ juno }) => {
-  const { sidebar, tabs, topic, nav } = juno
-
-  await nav.expectCanGo(false, false)
-  await sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await sidebar.row(RINA).open()
-  await topic.expectTitle(RINA)
-  await sidebar.row(ROADMAP).open()
-  await topic.expectTitle(ROADMAP)
-  await tabs.expectCount(1)
-  await nav.expectCanGo(true, false)
-
-  await nav.back()
-  await topic.expectTitle(RINA)
-  await tabs.expectActive(RINA)
-  await sidebar.row(RINA).expectSelected()
-  await nav.menu('back')
-  await topic.expectTitle(POSTGRES)
-  // The launch tab began at Home, so Back still has Home behind the first topic.
-  await nav.expectCanGo(true, true)
-
-  await nav.forward()
-  await topic.expectTitle(RINA)
-  await nav.mouseButton(4)
-  await topic.expectTitle(ROADMAP)
-  await nav.expectCanGo(true, false)
-  await nav.mouseButton(3)
-  await topic.expectTitle(RINA)
-  await nav.menu('forward')
-  await topic.expectTitle(ROADMAP)
-  await tabs.expectCount(1)
-
-  // Opening something after going back drops Forward.
-  await nav.back()
-  await sidebar.row(OFFSITE).open()
-  await topic.expectTitle(OFFSITE)
-  await nav.expectCanGo(true, false)
-  await nav.back()
-  await topic.expectTitle(RINA)
-
-  // A new tab has its own history, starting at Home; a topic opened in it goes after Home, so Back returns there.
-  await tabs.menu('new-tab')
-  await tabs.expectCount(2)
-  await tabs.expectActive('Home')
-  await nav.expectCanGo(false, false)
-  await sidebar.row(POSTGRES).open()
-  await tabs.expectCount(2)
-  await tabs.expectActive(POSTGRES)
-  await nav.expectCanGo(true, false)
-  await tabs.select(RINA)
-  await nav.expectCanGo(true, true)
-})
-
-syncedTest('window swipe events move back and forward', { tag: '@electron' }, async ({ juno }) => {
-  await juno.sidebar.row(RINA).open()
-  await juno.sidebar.row(ROADMAP).open()
-  await juno.nav.swipe('left')
-  await juno.topic.expectTitle(RINA)
-  await juno.nav.swipe('right')
-  await juno.topic.expectTitle(ROADMAP)
-})
-
-syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', { tag: '@electron' }, async ({ juno, running, userData, fake, slackApp }) => {
+syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', async ({ juno, running, userData, fake, slackApp }) => {
   const { frame, nav, sidebar } = juno
 
   await frame.expectWidth(384)
@@ -129,30 +62,4 @@ syncedTest('the sidebar resizes by its edge, resets on double-click, and hides',
   } finally {
     await again.close()
   }
-})
-
-test('in full screen the title bars drop the traffic lights’ room, and keep it again after', { tag: '@electron' }, async ({ juno, app }) => {
-  await juno.signIn()
-  const fullScreen = (on: boolean) => app.evaluate(({ BrowserWindow }, on) => BrowserWindow.getAllWindows()[0]!.setFullScreen(on), on)
-  // A button's left edge from the left of the pane it sits in.
-  const leftOf = (pane: string, name: RegExp) =>
-    juno.win.locator(pane).getByRole('button', { name }).evaluate((button, pane) => button.getBoundingClientRect().left - button.closest(pane)!.getBoundingClientRect().left, pane)
-  const hide = () => leftOf('aside[aria-label="Sidebar"]', /^Hide sidebar/)
-  const show = () => leftOf('[data-tab-strip]', /^Show sidebar/)
-
-  // The 78px after the lights, then the sidebar's 10px inset in full screen.
-  expect(await hide()).toBe(78)
-  await fullScreen(true)
-  await expect.poll(hide).toBe(10)
-  await fullScreen(false)
-  await expect.poll(hide).toBe(78)
-
-  // With the sidebar hidden, the tab strip does the same, from its own 10px padding.
-  await juno.frame.toggleWithButton()
-  await juno.frame.expectHidden()
-  expect(await show()).toBe(78)
-  await fullScreen(true)
-  await expect.poll(show).toBe(10)
-  await fullScreen(false)
-  await expect.poll(show).toBe(78)
 })

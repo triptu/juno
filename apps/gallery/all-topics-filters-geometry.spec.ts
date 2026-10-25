@@ -2,8 +2,8 @@
 // place picker and the sort sit on a line, or wrap onto more lines on a
 // narrow window, with one height and nothing overlapping or clipped.
 // Light only: a theme changes colours, never a size.
-import { expect, test } from '@playwright/test'
-import { openState } from './support'
+import { expect } from '@playwright/test'
+import { layoutTest as test, openState } from './support'
 
 /** The filter row's controls and status tabs, as the page lays them out. */
 function measure() {
@@ -34,30 +34,30 @@ function measure() {
 const STATES = ['default', 'place-picked', 'picker-open', 'picker-query', 'narrow'] as const
 
 test.describe('All topics filter row geometry', () => {
-  for (const state of STATES) {
-    test(`${state}: controls do not overlap or clip and fit the row`, async ({ page }) => {
+  test('controls do not overlap or clip and fit the row, in every filter state', async ({ page }) => {
+    for (const state of STATES) {
       const id = `filters/${state}`
       await openState(page, { component: 'AllTopics', id, route: `AllTopics/${id}`, group: '', groupId: '', state, frame: {} })
       const at = await page.evaluate(measure)
-      expect(at.extras).toBe(0)
-      expect(at.clipped).toBe(0)
+      expect(at.extras, state).toBe(0)
+      expect(at.clipped, state).toBe(0)
 
       // One height.
-      expect(new Set(at.controls.map((control) => control.height)).size).toBe(1)
+      expect(new Set(at.controls.map((control) => control.height)).size, state).toBe(1)
 
       // No two controls overlap, and each stays inside the row.
       for (const [i, a] of at.controls.entries()) {
-        expect(a.x).toBeGreaterThanOrEqual(at.row.x - 0.5)
-        expect(a.right).toBeLessThanOrEqual(at.row.right + 0.5)
+        expect(a.x, state).toBeGreaterThanOrEqual(at.row.x - 0.5)
+        expect(a.right, state).toBeLessThanOrEqual(at.row.right + 0.5)
         for (const b of at.controls.slice(i + 1)) {
           const apart = a.right <= b.x + 0.5 || b.right <= a.x + 0.5 || a.bottom <= b.y + 0.5 || b.bottom <= a.y + 0.5
-          expect(apart, `${JSON.stringify(a)} overlaps ${JSON.stringify(b)}`).toBe(true)
+          expect(apart, `${state}: ${JSON.stringify(a)} overlaps ${JSON.stringify(b)}`).toBe(true)
         }
       }
 
-      expect(at.segmentsClipped).toBe(0)
-    })
-  }
+      expect(at.segmentsClipped, state).toBe(0)
+    }
+  })
 })
 
 test.describe('All topics place picker', () => {

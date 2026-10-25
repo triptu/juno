@@ -3,7 +3,7 @@ import { expect } from '@playwright/test'
 import { landsAndStays, noFlicker, noLayoutShift } from './checks'
 import { test } from './feel'
 
-test('sign-in: a new accent and the dark theme recolour the page in place', async ({ juno, win, feel }) => {
+test('sign-in: a new accent and the dark theme recolour the page in place', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
   await juno.expectSignedOut()
   // The entrance plays once on mount; let it finish so only the change is recorded.
   await win.waitForTimeout(1200)

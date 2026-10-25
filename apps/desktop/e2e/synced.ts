@@ -18,7 +18,7 @@ export interface SyncedWorkspace {
   readonly fakeState: string
 }
 
-/** The build marker covers all source (including seed, schema, migrations and sync), toolchain and output bytes. */
+/** The build marker covers the bundled source (schema, migrations, engine and sync), toolchain and output bytes; the seed loads once per run in this process. */
 export async function syncedKey(options: object): Promise<string> {
   const build = await readFile(join(__dirname, '../out/.inputs-hash'), 'utf8')
   return createHash('sha256').update(build).update(JSON.stringify(options)).digest('hex')

@@ -5,7 +5,7 @@ import { test } from './feel'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test('the chip and the composer stay in place when a first @ chooses a person', async ({ juno, feel }) => {
+test('the chip and the composer stay in place when a first @ chooses a person', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
   await juno.write.composer.pressSequentially('@ma')
   await expect(juno.write.sendToOption('Maya')).toBeVisible()
   await feel.run({
@@ -21,7 +21,7 @@ test('the chip and the composer stay in place when a first @ chooses a person', 
   })
 })
 
-test('a send from Home leaves the field where it was', async ({ juno, fake, feel }) => {
+test('a send from Home leaves the field where it was', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, feel }) => {
   await juno.write.pickConversation('eng', 'eng')
   await juno.write.write('first')
   // The send button brightens over 150 ms once the field has text. Record from where it settled,
@@ -54,7 +54,7 @@ const heldWhole: Check = (evidence) => {
   return { name, status: 'fail', detail: `${mixed.length} frames showed the earlier rows without the Juno row`, shots: shots.slice(0, 12) }
 }
 
-test('the destination list keeps its rows while a search is typed', async ({ juno, feel }) => {
+test('the destination list keeps its rows while a search is typed', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
   await juno.write.chip.click()
   await expect(juno.write.option('eng')).toBeVisible()
   await feel.run({

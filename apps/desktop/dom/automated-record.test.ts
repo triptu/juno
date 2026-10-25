@@ -4,13 +4,9 @@
 // in All and Undo gives it back to Automated, and Dismiss sees the card
 // without opening the record. Which channels move in and out, and the reasons
 // the record gives, are the engine's sidebar flow test.
-import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
-
-// A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
-test.use({ sidebarTrace: true })
-
-test.describe.configure({ timeout: 120_000 })
+import { expect } from './expect'
+import { domTest } from './test'
 
 const CI_BUILDS = '#ci-builds'
 const POSTGRES = 'Draft plan is in the doc'
@@ -21,7 +17,7 @@ async function homeShowsRecord(juno: Juno): Promise<void> {
   await expect.poll(() => juno.home.kinds(), { timeout: 30_000 }).toContain('automatedMoves')
 }
 
-syncedTest('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async ({ juno, fake }) => {
+domTest('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async ({ juno, fake }) => {
   const { home, sidebar } = juno
 
   // The first sync's own sorting is setting up, not news.
@@ -70,9 +66,10 @@ syncedTest('a bot channel joined later moves by itself, the card says why, and M
   await sidebar.selectView('Automated')
   await sidebar.row(CI_BUILDS).expectVisible()
 
-  // Opened: Home does not list the move again.
+  // Opened: a later Home does not list the move again. This Home keeps it until it leaves, so wait for the topic.
   await sidebar.filter('All')
   await sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
   await home.open()
   expect(await home.kinds()).not.toContain('automatedMoves')
 })

@@ -85,7 +85,7 @@ for (const theme of themes) {
   const tag = theme.toLowerCase()
 
   // Three scenarios in one launch: a reply, a newly followed thread, then a burst.
-  test(`sidebar motion (${tag}): a reply moves a thread to the top, a newly followed thread comes in at the top, and three replies land within half a second`, async ({ juno, win, fake, feel }) => {
+  test(`sidebar motion (${tag}): a reply moves a thread to the top, a newly followed thread comes in at the top, and three replies land within half a second`, { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, fake, feel }) => {
     await ready(juno, win, theme)
     const ids = await recentIds(juno)
     // A thread in view, a few rows down.
