@@ -165,7 +165,8 @@ export function byRole(root: El, role: string, options: RoleOptions): El[] {
   const isVisible = (el: Element): boolean => {
     let answer = visible.get(el)
     if (answer === undefined) {
-      answer = !hidesSubtree(el) && isVisible(el.parentElement!)
+      const parent = el.parentElement
+      answer = !hidesSubtree(el) && (parent === null ? shown(el) : isVisible(parent))
       visible.set(el, answer)
     }
     return answer
