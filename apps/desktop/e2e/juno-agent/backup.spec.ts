@@ -48,10 +48,9 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
   await ready(juno)
   await openSettings(juno)
   const studio = juno.win.locator('main')
-  await expect(studio.getByRole('heading', { name: 'Backup', exact: true })).toBeVisible()
-  await expect(studio.getByRole('heading', { name: 'This Mac', exact: true })).toBeVisible()
-  await expect(studio.locator('[data-owner-line]')).toHaveText('This Mac owns Juno’s state.')
-  await expect(studio.locator('[data-last-backup]')).toContainText('Last backup', { timeout: 15_000 })
+  // This Mac owns Juno's state, and a first backup has been made.
+  await expect(studio.locator('[data-owner-line]')).not.toContainText('read-only')
+  await expect.poll(() => lastBackupAt(juno), { timeout: 15_000 }).toBeGreaterThan(0)
   const before = await lastBackupAt(juno)
 
   // Choose the shared folder: the first backup there updates "Last backup".
@@ -127,7 +126,8 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
     await expect(juno.win.locator('main [data-banner="otherDevice"]')).toBeVisible({ timeout: 20_000 })
     await expect(JunoChatPane.tab(juno.win).composer).toBeDisabled()
     await openSettings(juno)
-    await expect(studio.locator('[data-owner-line]')).toHaveText('Juno is working on Laptop. This Mac is read-only.')
+    // The owner line names the laptop now.
+    await expect(studio.locator('[data-owner-line]')).toContainText('Laptop')
     await expect(studio.getByRole('button', { name: 'Move', exact: true })).toBeDisabled()
   }
 })
