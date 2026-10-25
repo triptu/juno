@@ -20,11 +20,9 @@ import {
   type ContextMenuAt,
   type MenuCommand,
   type NotifyTargetView,
-  type TopicDetail,
   type TopicMenuAction,
 } from '@juno/contract'
 import {
-  allTopicsRowAtom,
   copyText,
   editUndo,
   flushSidebar,
@@ -34,11 +32,8 @@ import {
   releaseSidebarTopic,
   renamingAtom,
   runAction,
-  sidebarRowAtom,
   signedInAtom,
   slackLink,
-  threadRootTs,
-  topicAtom,
   undoLast,
   type RenameTarget,
   type ToastContent,
@@ -49,26 +44,7 @@ import { openNotificationsAt } from './notificationsAnchor'
 import { setNotifyLevel } from './notifyActions'
 import { showWhatJunoKnows } from './juno/actions'
 import { joinHuddleFromMenu } from './huddle/menuItem'
-
-/** What the actions read from a sidebar row or the header's detail. Copy Slack link and Open in Slack need the detail's root. */
-export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' | 'unreadCount' | 'pinned' | 'resolved' | 'subscribed'> & {
-  readonly rootTs?: string | undefined
-}
-
-const headerOf = (id: string): ActionTopic | undefined => {
-  const header = registry.get(topicAtom(id))
-  return header._tag === 'Success' && header.value !== null ? header.value : undefined
-}
-
-const rowOf = (id: string): ActionTopic | undefined => {
-  const row = registry.get(sidebarRowAtom(id)) ?? registry.get(allTopicsRowAtom(id))
-  return row === undefined ? undefined : { ...row, rootTs: threadRootTs(id) }
-}
-
-/** The header's detail when it is loaded, else the sidebar or All topics row, with its thread's root from the id. */
-export function topicOf(id: string): ActionTopic | undefined {
-  return headerOf(id) ?? rowOf(id)
-}
+import { headerOf, rowOf, topicOf, type ActionTopic } from './topicSource'
 
 /** How a toast names a topic: its title, or the channel label for Main ("#eng"). */
 export function labelOf(topic: ActionTopic): string {

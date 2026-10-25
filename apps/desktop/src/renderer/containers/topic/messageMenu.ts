@@ -13,7 +13,8 @@ import type { ComposerHandle } from '../messageActions'
 import { openMessageMenu } from '../messageMenu'
 import { isOwnEditable, landedTs, opensThread } from '../messageRows'
 import { showPersonMenu } from '../notifyActions'
-import { broadcastLabel, openTopicInSlack, type ActionTopic } from '../topicActions'
+import { broadcastLabel, openTopicInSlack } from '../topicActions'
+import type { ActionTopic } from '../topicSource'
 import { rowOf, textOf, type Latest } from './messageCommands'
 
 const SEPARATOR: MessageMenuEntry = { separator: true }
