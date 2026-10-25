@@ -58,7 +58,7 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 | CPU per test | 4.3 s | 3.9 s (2.6 s over 42 runs) | 2.4 s (about 2.0 once warm) |
 | Wall per test | 5.3 s | 4.2 s | 1.0–1.9 s |
 
-The agent's flows (`juno-agent/`, 10-25, same laptop, one run each, 4 workers): 40 browser tests took 73 s of script time; after the move, 31 DOM tests take 36 s and the 10 browser tests left take 34 s.
+The agent's flows (`juno-agent/`, 10-25, same laptop, one run each, 4 workers): 40 browser tests took 73 s of script time; after the move, 29 DOM tests take 37 s and the 12 browser tests left take 40 s.
 
 A worker's first test pays for the host's fork and the renderer's compile (about 1.5 CPU-s), so a short run at many workers costs more per test than a long one. At four workers on four threads the job is CPU-bound (99% busy at the median).
 
