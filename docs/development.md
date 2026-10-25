@@ -662,7 +662,7 @@ Counts exclude build setup cases and count a canary once in each lane:
 | Browser | 123 / 450 (449 executed, one skipped) | 124 / 419, all passed |
 | Electron | 39 / 122 (71 executed, 51 skipped) | 32 / 63, all passed |
 
-The agent-flow consolidation on main removed 35 cases. Remaining renderer flows moved from mixed native files, notification-hours checks joined the notification flows, and duplicate diagnostics, key-limit, session and engine-restart checks joined existing flows. Manual screenshot tools and Mac performance specs are outside ordinary Electron discovery. Every surviving non-agent BROWSER-class file in the audit is registered. Three canaries remain in both lanes; [Browser lane](../apps/desktop/e2e/README.md#browser-lane) lists them and the native responsibilities retained in Electron.
+The agent-flow consolidation on main removed 35 cases. Remaining renderer flows moved from mixed native files, notification-hours checks joined the notification flows, and duplicate diagnostics, key-limit, session and engine-restart checks joined existing flows. Manual screenshot tools and Mac performance specs are outside ordinary Electron discovery. Every surviving non-agent BROWSER-class file in the audit is registered. One canary remains in both lanes; [Browser lane](../apps/desktop/e2e/README.md#browser-lane) lists them and the native responsibilities retained in Electron.
 
 Across 387 matching measured browser flows, mean CPU cost per test was:
 
