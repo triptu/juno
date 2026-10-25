@@ -163,27 +163,11 @@ syncedTest('⌘W held down closes a tab per press, even when the tabs it lands o
   expect(await restarted.tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
 })
 
-syncedTest('tabs survive a restart', async ({ juno, relaunch, userData, fake, slack }) => {
+syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order and the active tab after a restart', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
-  await sidebar.row(ROADMAP).openInNewTab()
-  await sidebar.row(OFFSITE).openInNewTabFromMenu()
-  await tabs.expectActive(OFFSITE)
-  // The save has reached the engine.
-  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: [POSTGRES, RINA, ROADMAP, OFFSITE].map((title) => ({ place: threadId(slack, title), pinned: false })), active: 3 })
-  const restarted = await relaunch()
-  await restarted.tabs.expectCount(4)
-  await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Can eng/)])
-  await restarted.tabs.expectActive(OFFSITE)
-  await restarted.sidebar.row(OFFSITE).expectVisible()
-})
-
-syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, relaunch, userData, fake, slack }) => {
-  const { sidebar, tabs } = juno
-  await sidebar.row(POSTGRES).open()
-  await sidebar.row(RINA).openInNewTab()
-  await sidebar.row(ROADMAP).openInNewTab()
+  await sidebar.row(ROADMAP).openInNewTabFromMenu()
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
 
   // The third tab dragged to the first place.
@@ -215,11 +199,15 @@ syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and kee
   await juno.win.mouse.up()
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
 
-  // The order has reached the engine.
-  await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs.map((tab) => tab.place)).toEqual([ROADMAP, POSTGRES, RINA].map((title) => threadId(slack, title)))
+  // The order and the active last tab have reached the engine.
+  await tabs.tab(RINA).click()
+  await tabs.expectActive(RINA)
+  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: [ROADMAP, POSTGRES, RINA].map((title) => ({ place: threadId(slack, title), pinned: false })), active: 2 })
   const restarted = await relaunch()
   await restarted.tabs.expectCount(3)
   await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
+  await restarted.tabs.expectActive(RINA)
+  await restarted.sidebar.row(RINA).expectVisible()
 })
 
 syncedTest('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno }) => {
