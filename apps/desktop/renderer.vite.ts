@@ -73,7 +73,7 @@ function phosphorWeights(repoRoot: string): Plugin {
  * loaded 65 files (10-25). `$initial` is every module the entry reaches by
  * static imports, before tree shaking: a lazy-only module that a first-screen
  * module imports, even for code nobody calls at start, lands in this file
- * (performance.md 2.4).
+ * (performance.md, "Vite 8 first screen").
  */
 export const rendererOutput = { codeSplitting: { groups: [{ name: 'index', tags: ['$initial' as const] }] } }
 
