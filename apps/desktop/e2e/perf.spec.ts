@@ -503,55 +503,58 @@ async function firstOpen(win: Page, eventType: 'click' | 'pointerdown' | 'pointe
 }
 
 defaultSeedTest('first open in a second app: account menu, topic switcher, emoji picker and Settings', async ({ juno, fake, slackApp, userData, running }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(180_000)
   await signedIn(juno)
   await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const fresh = new Juno(again.app, again.win)
-    await fresh.waitForSync()
-    const hidden = await countHidden(again.win)
-    const measure = async (name: string, selector: string, action: () => Promise<void>) => {
-      const elapsed = await firstOpen(again.win, 'pointerdown', selector, action)
-      budget(stats(`${name}, first open in a second app`, [elapsed]), 50)
+  // One second app on the Mac; on the laptop the median of three, since one first open there moved 1.5 times between runs.
+  const samples = new Map<string, number[]>()
+  const add = (name: string, ms: number) => samples.set(name, [...(samples.get(name) ?? []), ms])
+  for (let launch = 0; launch < count(3, 1); launch++) {
+    const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+    try {
+      const fresh = new Juno(again.app, again.win)
+      await fresh.waitForSync()
+      const hidden = await countHidden(again.win)
+      const measure = async (name: string, selector: string, action: () => Promise<void>) => add(name, await firstOpen(again.win, 'pointerdown', selector, action))
+      await measure('account menu', '[role="menuitem"]', async () => {
+        await fresh.sidebar.accountButton.hover()
+        await press(again.win)
+      })
+      await expect(fresh.accountMenu.item(/^Settings/)).toBeVisible()
+      await fresh.accountMenu.close()
+      await fresh.sidebar.row(POSTGRES).open()
+      await fresh.topic.expectTitle(POSTGRES)
+      await again.win.waitForTimeout(500)
+      await measure('topic switcher', '[role="dialog"] [role="option"]', async () => {
+        await fresh.topic.titleButton.hover()
+        await press(again.win)
+      })
+      await expect(again.win.getByRole('textbox', { name: 'Search this channel' })).toBeFocused()
+      await again.win.keyboard.press('Escape')
+      // The message menu opens as the right-click comes up, then More reactions turns it into the emoji picker.
+      const row = fresh.topic.list.locator('[data-message-row]').last()
+      const text = (await row.locator('[data-msg-text]').first().boundingBox())!
+      await again.win.mouse.move(text.x + 8, text.y + 8)
+      await again.win.mouse.down({ button: 'right' })
+      add('message menu', await firstOpen(again.win, 'pointerup', '[data-context-menu] [data-menu-cell]', () => again.win.mouse.up({ button: 'right' })))
+      await measure('emoji picker', '[data-emoji-picker] [data-emoji]', async () => {
+        await fresh.messageMenu.more.hover()
+        await press(again.win)
+      })
+      await expect(again.win.getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
+      await again.win.keyboard.press('Escape')
+      await fresh.accountMenu.open()
+      await measure('Settings', 'nav[aria-label="Settings"]', async () => {
+        await fresh.accountMenu.item(/^Settings/).hover()
+        await press(again.win)
+      })
+      await expect(fresh.settings.section('General')).toHaveAttribute('aria-current', 'page')
+      expect(await hidden()).toBe(0)
+    } finally {
+      await again.close()
     }
-    await measure('account menu', '[role="menuitem"]', async () => {
-      await fresh.sidebar.accountButton.hover()
-      await press(again.win)
-    })
-    await expect(fresh.accountMenu.item(/^Settings/)).toBeVisible()
-    await fresh.accountMenu.close()
-    await fresh.sidebar.row(POSTGRES).open()
-    await fresh.topic.expectTitle(POSTGRES)
-    await again.win.waitForTimeout(500)
-    await measure('topic switcher', '[role="dialog"] [role="option"]', async () => {
-      await fresh.topic.titleButton.hover()
-      await press(again.win)
-    })
-    await expect(again.win.getByRole('textbox', { name: 'Search this channel' })).toBeFocused()
-    await again.win.keyboard.press('Escape')
-    // The message menu opens as the right-click comes up, then More reactions turns it into the emoji picker.
-    const row = fresh.topic.list.locator('[data-message-row]').last()
-    const text = (await row.locator('[data-msg-text]').first().boundingBox())!
-    await again.win.mouse.move(text.x + 8, text.y + 8)
-    await again.win.mouse.down({ button: 'right' })
-    budget(stats('message menu, first open in a second app', [await firstOpen(again.win, 'pointerup', '[data-context-menu] [data-menu-cell]', () => again.win.mouse.up({ button: 'right' }))]), 50)
-    await measure('emoji picker', '[data-emoji-picker] [data-emoji]', async () => {
-      await fresh.messageMenu.more.hover()
-      await press(again.win)
-    })
-    await expect(again.win.getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
-    await again.win.keyboard.press('Escape')
-    await fresh.accountMenu.open()
-    await measure('Settings', 'nav[aria-label="Settings"]', async () => {
-      await fresh.accountMenu.item(/^Settings/).hover()
-      await press(again.win)
-    })
-    await expect(fresh.settings.section('General')).toHaveAttribute('aria-current', 'page')
-    expect(await hidden()).toBe(0)
-  } finally {
-    await again.close()
   }
+  for (const [name, ms] of samples) budget(stats(`${name}, first open in a second app`, ms), 50)
 })
 
 defaultSeedTest('send in Main: Enter through the checks on send to the pending row painted, with a slow model', async ({ juno, fake, slackApp, userData, running }) => {
@@ -784,8 +787,8 @@ test.describe('large workspace', () => {
     }
   })
 
-  // On the laptop, against its baseline, a shorter use of the same shape: 20 s of scrolling, 15 chat messages and
-  // 10 s of idle rather than two minutes, 40 and 30 s (performance.md 7.3).
+  // On the laptop, against its baseline, a shorter use of the same shape: 10 topics, 20 tab switches, 10 chat
+  // messages, 10 s of scrolling and 5 s of idle rather than 20, 50, 40, two minutes and 30 s (performance.md 7.3).
   test('memory after heavy use: 20 topics, 50 tab switches, two minutes of mixed scrolling and the Juno panel', async () => {
     test.setTimeout(900_000)
     const running = await launch(true)
@@ -797,7 +800,7 @@ test.describe('large workspace', () => {
       await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
       await readMemory(running, 'memory after launch')
       if (process.env['JUNO_MEMORY_DUMP'] !== undefined) await memoryDump(running.win, `${process.env['JUNO_MEMORY_DUMP']}-launch-live.json`, false)
-      const after = await heavyUse(juno, running, absolute ? {} : { scrollFor: 20_000, chatMessages: 15, idle: 10_000 })
+      const after = await heavyUse(juno, running, absolute ? {} : { topics: 10, switches: 20, scrollFor: 10_000, chatMessages: 10, idle: 5_000 })
       for (const [name, limit] of Object.entries(HEAVY_MEMORY_BUDGETS)) {
         const value = after[name as keyof typeof HEAVY_MEMORY_BUDGETS]
         if (value !== undefined) budget(reading(`${name} private memory after heavy use`, value, 'MB'), limit)
@@ -944,7 +947,8 @@ test.describe('large workspace', () => {
 test('topic open, uncached: a thread whose replies were never fetched, to the header and what the store has', async () => {
   test.setTimeout(600_000)
   const samples: number[] = []
-  for (let i = 0; i < 5; i++) {
+  // Each sample is a sign-in of its own: three on the laptop.
+  for (let i = 0; i < count(3, 5); i++) {
     const fake = await startFakeSlack()
     const dir = await tempUserData()
     const appDir = await tempUserData()

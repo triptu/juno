@@ -81,9 +81,9 @@ function heavyContext(juno: Juno, running: RunningApp) {
 type HeavyContext = ReturnType<typeof heavyContext>
 
 /** Twenty topics, each in a new tab, as the owner opens them through a day; then fifty switches back and forth, so tabs leave the mounted set and come back. */
-async function openAndSwitch(at: HeavyContext, start: number, phase: (name: string) => Promise<void>): Promise<void> {
+async function openAndSwitch(at: HeavyContext, start: number, topics: number, switches: number, phase: (name: string) => Promise<void>): Promise<void> {
   const { juno, win, scrollTopic } = at
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < topics; i++) {
     await juno.tabs.menu('new-tab')
     await juno.tabs.expectCount(start + i + 1)
     const row = juno.sidebar.rows.nth(i)
@@ -91,19 +91,19 @@ async function openAndSwitch(at: HeavyContext, start: number, phase: (name: stri
     await row.click()
     await expect(scrollTopic).toBeVisible({ timeout: 15_000 })
   }
-  await phase('20 topics')
-  for (let i = 0; i < 50; i++) {
+  await phase(`${topics} topics`)
+  for (let i = 0; i < switches; i++) {
     await juno.tabs.menu(i % 10 < 7 ? 'next-tab' : 'previous-tab')
     await win.waitForTimeout(60)
   }
-  await phase('50 tab switches')
+  await phase(`${switches} tab switches`)
 }
 
 /** The Juno chat in a tab of its own, given `messages` messages so it has history to scroll. */
 async function fillChat(at: HeavyContext, start: number, messages: number): Promise<void> {
   const { juno, win } = at
   await juno.tabs.menu('new-tab')
-  await juno.tabs.expectCount(start + 21)
+  await juno.tabs.expectCount(start + 1)
   await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const composer = win.locator('main [data-juno-chat] textarea:visible')
   await composer.waitFor()
@@ -153,7 +153,7 @@ async function scrollRounds(at: HeavyContext, scrollFor: number): Promise<number
  * sidebar, a topic's messages and the Juno chat, and the Juno panel opened
  * and closed beside a topic. Answers with the memory read after 30 s idle.
  */
-export async function heavyUse(juno: Juno, running: RunningApp, { scrollFor = 120_000, chatMessages = 40, idle = 30_000 } = {}): Promise<MemoryReading> {
+export async function heavyUse(juno: Juno, running: RunningApp, { topics = 20, switches = 50, scrollFor = 120_000, chatMessages = 40, idle = 30_000 } = {}): Promise<MemoryReading> {
   const at = heavyContext(juno, running)
   const { win } = running
   const start = await juno.tabs.root.getByRole('tab').count()
@@ -166,8 +166,8 @@ export async function heavyUse(juno: Juno, running: RunningApp, { scrollFor = 12
     await memoryDump(win, `${dump}-${name.replaceAll(' ', '-')}-live.json`, false)
     await memoryDump(win, `${dump}-${name.replaceAll(' ', '-')}.json`, true)
   }
-  await openAndSwitch(at, start, phase)
-  await fillChat(at, start, chatMessages)
+  await openAndSwitch(at, start, topics, switches, phase)
+  await fillChat(at, start + topics, chatMessages)
   await phase('the Juno chat')
   let panelOpens = await scrollRounds(at, scrollFor)
   await phase('scrolling')
