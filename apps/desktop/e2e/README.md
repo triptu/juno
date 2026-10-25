@@ -2,6 +2,19 @@
 
 The app's end-to-end tests, against the fake Slack server. Fixtures and the options a file can `test.use` are in `fixtures.ts`, `launchApp` is in `launch.ts`, and the page objects are in `driver/`. Setup, commands and the remote runner are in `docs/development.md`.
 
+## Which lane
+
+| A test that checks | Goes in | Runner |
+| --- | --- | --- |
+| A protocol, merge, parser or state machine rule | a unit test in its package | `bun run test` |
+| Engine or agent behaviour with no UI (sync, read state, the outbox, Home's rules) | `packages/engine/test/flows/`, `packages/agent/test/` | `bun run test` |
+| What the app shows and sends after a user's steps: send, edit, fail and retry, unread and read state, filters, tabs, search, the palette, menus through the seam, Settings forms, the agent's chat and cards, Home | the DOM lane, `apps/desktop/dom/` ([README](../dom/README.md)) | `bun run test:dom` |
+| Layout, scroll, virtual lists past their overscan, shift, focus rings, drag, pointer coordinates, paint, the CSS cascade, images | the browser lane (below) | `bun run test:browser` |
+| Main, windows, native menus, protocols, keychain, packaging | the Electron lane | `bun run test:electron` |
+| One component's look and states | the gallery | `bun run test:gallery` |
+
+A DOM test costs about a third of a browser test's CPU. When a browser test's flow moves to the DOM lane, delete the browser test in the same change; a check in it that needs layout moves to the gallery or to the browser test it belongs with.
+
 ## Browser lane
 
 Most specs run in the `browser` Playwright project: the real renderer in Chromium's headless shell, against the engine and agent in a Node host, with no Electron. The `electron` project runs what needs main or the OS. `e2e/lanes.ts` lists the files that run in the browser; every other file runs in Electron.
