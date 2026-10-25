@@ -62,6 +62,8 @@ export default defineConfig<object, { lane: Lane }>({
       outputDir: join(results, 'electron'),
       testIgnore: ['web/web-shell.spec.ts', 'setup/**', 'perf.spec.ts', '*.perf.spec.ts', ...(process.env.JUNO_SCREENS === '1' ? [] : ['screens.spec.ts', '**/screens/**'])],
       dependencies: ['build-electron'],
+      // Each test is its own group, so one file's tests spread over the workers; the slowest start first (e2e/order.ts).
+      fullyParallel: true,
       workers: electronWorkers,
       grep: electronGrep,
       ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
@@ -88,6 +90,7 @@ export default defineConfig<object, { lane: Lane }>({
     [process.env.CI ? 'github' : 'list'],
     ['../../scripts/test-results-reporter.mjs'],
     ['json', { outputFile: join(results, 'results.json') }],
+    ['./e2e/order.ts'],
     // Per-test timing lines for `bun scripts/e2e-timings.mjs`.
     ...(process.env.JUNO_E2E_TIMINGS === '1' ? [['./e2e/timings.ts'] as const] : []),
   ],
