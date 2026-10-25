@@ -23,6 +23,12 @@ let pool: HostPool | undefined
 /** One pool per Bun worker, kept across files; a host exits when the worker that forked it goes away. */
 const hostPool = () => (pool ??= new HostPool(DOM_BUILD))
 
+/** Ends the worker's hosts, so each writes its CPU profile (`profile.ts`). */
+export async function closeHostPool(): Promise<void> {
+  await pool?.close()
+  pool = undefined
+}
+
 export async function tempUserData(): Promise<string> {
   return mkdtemp(join(process.env.JUNO_TEST_SCRATCH ?? tmpdir(), 'juno-dom-'))
 }
