@@ -1,11 +1,14 @@
-// Reuses only builds whose source, toolchain, environment and output bytes match.
+// Reuses only builds whose inputs (scripts/build-inputs.mjs), toolchain, environment and output bytes match.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { buildInputs } from './build-inputs.mjs'
 
-const [outDir, ...command] = process.argv.slice(2)
-if (!outDir || command.length === 0) throw new Error('usage: build-cached.mjs <output dir> <command> [args...]')
+// `--key` prints the build key and builds nothing.
+const printKey = process.argv[2] === '--key'
+const [outDir, ...command] = process.argv.slice(printKey ? 3 : 2)
+if (!outDir || command.length === 0) throw new Error('usage: build-cached.mjs [--key] <output dir> <command> [args...]')
 const app = process.cwd()
 const root = resolve(app, '../..')
 const output = join(app, outDir)
@@ -24,27 +27,32 @@ const hashFiles = (base, files) => {
   return hash.digest('hex')
 }
 const rootFiles = readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name)
-const inputs = [relative(root, app), 'packages', 'scripts', ...rootFiles]
-const git = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...inputs], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+const sources = ['apps', 'packages', 'scripts', ...rootFiles]
+const git = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...sources], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
 // Remote archives have no Git directory. Walk the same source roots, excluding generated files.
-const files = git.status === 0 && git.stdout.length > 0
-  ? [...new Set(git.stdout.split('\0').filter(Boolean))].map((file) => join(root, file))
-  : inputs.flatMap((name) => {
-    const path = join(root, name)
-    return rootFiles.includes(name) ? [path] : walk(path, (part) => !ignored.has(part))
-  })
+// A deleted file that is still in the index is not an input; one the graph needs widens its key.
+const files = new Set(git.status === 0 && git.stdout.length > 0
+  ? git.stdout.split('\0').filter((file) => file && existsSync(join(root, file)))
+  : sources.flatMap((name) => rootFiles.includes(name) ? [name] : walk(join(root, name), (part) => !ignored.has(part)).map((file) => relative(root, file))))
 // Vite reads ignored .env files too; their contents affect local builds.
-const envFiles = [root, app].flatMap((dir) => readdirSync(dir).filter((name) => /^\.env(?:\.|$)/.test(name)).map((name) => join(dir, name)))
-const buildInputs = [...new Set([...files, ...envFiles])].filter((file) => {
-  const path = relative(app, file)
-  const sourcePath = relative(root, file)
-  if (/^(?:packages|apps)\/[^/]+\/(?:test|tests)\//.test(sourcePath) || /^scripts\/.*\.test\.mjs$/.test(sourcePath)) return false
+const envFiles = [root, app].flatMap((dir) => readdirSync(dir).filter((name) => /^\.env(?:\.|$)/.test(name)).map((name) => relative(root, join(dir, name))))
+// A known output keys on what its entry points and configs reach (scripts/build-inputs.mjs).
+// Anything else, or a graph it cannot follow, keys on every source file but tests.
+const inputs = buildInputs(root, files, relative(root, app), outDir)
+if (inputs.widened) console.log(`build-cached: keying ${outDir}/ on all source: ${inputs.widened.slice(0, 3).join('; ')}`)
+const buildFiles = [...new Set([...(inputs.files ?? [...files].filter((file) => {
+  const path = relative(app, join(root, file))
+  if (/^(?:packages|apps)\/[^/]+\/(?:test|tests)\//.test(file) || /^scripts\/.*\.test\.mjs$/.test(file)) return false
   // The DOM lane's tests and driver are not in any build; its bundle's config is.
   if (path.startsWith('dom/') && path !== 'dom/vite.config.ts') return false
   return !path.startsWith('e2e/') && !/^[^/]+\.spec\.ts$|^playwright(?:\.[^/]*)?\.config\.ts$/.test(path)
-})
+})), ...envFiles])].map((file) => join(root, file))
 const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'NODE_ENV'].includes(name)).toSorted(([a], [b]) => a.localeCompare(b))
-const key = createHash('sha256').update(JSON.stringify({ version: 2, app: relative(root, app), outDir, command, node: process.version, platform: process.platform, arch: process.arch, environment, source: hashFiles(root, buildInputs) })).digest('hex')
+const key = createHash('sha256').update(JSON.stringify({ version: 3, app: relative(root, app), outDir, command, node: process.version, bun: process.versions.bun ?? null, platform: process.platform, arch: process.arch, environment, extra: inputs.extra ?? null, source: hashFiles(root, buildFiles) })).digest('hex')
+if (printKey) {
+  console.log(key)
+  process.exit(0)
+}
 const fingerprint = (dir) => hashFiles(dir, walk(dir).filter((file) => relative(dir, file) !== marker))
 const valid = (dir) => {
   try { return readFileSync(join(dir, marker), 'utf8') === `${key} ${fingerprint(dir)}` } catch { return false }

@@ -70,7 +70,7 @@
     "test:package": "env JUNO_E2E_AI_JOBS=1 bun scripts/heavy.mjs --exclusive --priority release bun run --cwd apps/desktop test:package",
     "health:baseline": "bun scripts/health.mjs --update-baseline",
     "test:health": "bun test --timeout=30000 scripts/health.test.mjs",
-    "test:repo-tools": "bun test --timeout=30000 scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release.test.mjs scripts/verify-main.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs",
+    "test:repo-tools": "bun test --timeout=30000 scripts/build-cached.test.mjs scripts/build-inputs.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release.test.mjs scripts/verify-main.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs",
     "test:runner": "bun test --timeout=30000 scripts/remote/runner.test.mjs scripts/remote/workspace.test.mjs scripts/remote/runner-health.test.mjs scripts/plan.test.mjs",
     "pictures:build": "bun scripts/pictures/build.mjs",
     "pictures:upload": "bun scripts/pictures/upload.mjs"
