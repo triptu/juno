@@ -27,7 +27,7 @@ export interface Route {
 export type Theme = 'light' | 'dark'
 
 /** The address of a state, for example `/#/Button?__state=variant/primary&theme=dark`. */
-export function stateUrl(route: Pick<Route, 'component' | 'id'>, theme: Theme = 'light', accent?: string): string {
+function stateUrl(route: Pick<Route, 'component' | 'id'>, theme: Theme = 'light', accent?: string): string {
   return `/#/${encodeURIComponent(route.component)}?__state=${route.id}${theme === 'light' ? '' : `&theme=${theme}`}${accent === undefined ? '' : `&accent=${accent}`}`
 }
 

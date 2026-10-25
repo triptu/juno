@@ -5,7 +5,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 import type { Route } from './open-state'
 import { walkCache } from './walk-cache.mjs'
 
-export { openState, stateUrl, type Route, type Theme } from './open-state'
+export { openState, type Route, type Theme } from './open-state'
 
 /** Opens the index once and reads every state from the page. */
 export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
