@@ -5,6 +5,7 @@ import { join, relative, resolve } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import type { TestHost } from './browser/host'
+import { cpuAll, printCpuSince } from './cpu'
 import { startSendTrace, startSidebarTrace } from './traces'
 
 /**
@@ -112,6 +113,7 @@ export function launchTiming(options: LaunchOptions): 'fast' | 'production' {
  */
 export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
   const started = performance.now()
+  const startedCpu = cpuAll()
   const env: Record<string, string> = {}
   // A package manager or test runner may give the scripts it runs NODE_PATH
   // or NODE_OPTIONS. The app is bundled and the packaged app gets neither, so
@@ -174,6 +176,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     await win.evaluate(startSendTrace)
   }
   if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: launch ${Math.round(performance.now() - started)} ms`)
+  printCpuSince('launch', startedCpu)
   return {
     app,
     win,
@@ -181,8 +184,10 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
       // Main and the renderers write what ran since their last write; the engine and the agent write as they end.
       if (coverage !== undefined) await app.evaluate(() => (globalThis as unknown as { junoTest: { flushCoverage: () => Promise<void> } }).junoTest.flushCoverage()).catch(() => undefined)
       const closing = performance.now()
+      const closingCpu = cpuAll()
       await app.close()
       if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: close ${Math.round(performance.now() - closing)} ms`)
+      printCpuSince('close', closingCpu)
       await ownOpenRouter?.close()
     },
   }
