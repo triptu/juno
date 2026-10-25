@@ -1,4 +1,4 @@
-// First-sync timing ceilings, weekly in the laptop perf run (docs/performance.md 7.3); correctness is in
+// First-sync timing ceilings, in the laptop perf run (docs/performance.md 7.3); correctness is in
 // packages/engine/test/flows/first-sync.flow.test.ts and quick-start.flow.test.ts. The quick start's own budget, sign-in to rows on the
 // large seed, is `quick start` in perf.spec.ts.
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -43,7 +43,7 @@ const signInOn = (seed: Parameters<typeof largeSeed>[0], options: { readonly lat
 const MEDIUM = { topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }
 const medium = signInOn(MEDIUM)
 
-medium('the busiest channels show a preview seconds after sign-in, before their history is read', { tag: ['@heavy', '@heavy-sync', '@perf-weekly'] }, async ({ juno, fake }) => {
+medium('the busiest channels show a preview seconds after sign-in, before their history is read', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake }) => {
   test.setTimeout(120_000)
   // History waits: any channel preview now comes from the preview search after the quick start.
   fake.holdNext({ method: 'conversations.history', times: 1_000, before: true, reason: 'history' })

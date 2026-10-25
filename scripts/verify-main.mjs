@@ -17,8 +17,7 @@
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
 // suite failed. --nightly adds `perf` on the laptop as its own SSH job beside
-// the plan: the scenarios a change reaches since each last passed there, all
-// of them once a week (scripts/perf-select.mjs), checked against the laptop's
+// the plan: every scenario and package budget, checked against the laptop's
 // baseline. The Mac suites run only with --with-mac, one after the other,
 // each holding the whole machine; the feel contact sheet is copied next to
 // the logs.
@@ -47,7 +46,6 @@ import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { keepReports } from './verify-reports.mjs'
 import { stopFromLog } from './verify-failures.mjs'
-import { perfRuns, selectPerf, selectUnits, unitOutcomes } from './perf-select.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -112,24 +110,11 @@ let suites = required.filter((suite) => {
   return true
 })
 let words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
-// The laptop perf job: nightly, beside the plan, on cores of its own, so the plan's two jobs give up one core each.
-// The scenarios and package budgets a change reaches since each last passed (scripts/perf-select.mjs), read with
-// the import graph of `graphRoot`, the checkout once it exists.
+// The laptop perf job: nightly, every scenario and package budget, beside the plan on cores of its own, so the
+// plan's two jobs give up one core each.
 const perfCores = process.env.JUNO_RUNNER_PERF_CORES ?? '2'
-function planPerf(graphRoot) {
-  if (!nightly || local || baseline) return undefined
-  const changedSince = (from) => isAncestor(root, from, commit) ? git('diff', '--name-only', from, commit).split('\n').filter(Boolean) : undefined
-  const runs = perfRuns(records, execution.host)
-  const scenarios = selectPerf({ runs, now: Date.now(), changedSince })
-  const files = tracked.filter((file) => /^packages\/(agent\/test|engine\/test\/perf)\/.*\.perf\.ts$/.test(file))
-  const graph = new ImportGraph(graphRoot, new Set(tracked.filter((file) => /^(apps|packages)\//.test(file))))
-  const units = selectUnits({ runs, files, closure: (file) => new Set([file, ...graph.closure(file)]), changedSince, full: scenarios.full })
-  const desktop = scenarios.grep === null ? ['--no-desktop'] : [...(scenarios.full ? [] : ['--grep-invert', '@perf-weekly']), ...(scenarios.grep === undefined ? [] : ['--grep', scenarios.grep])]
-  const words = scenarios.grep === null && units.length === 0 ? undefined : ['perf', '--with-unit', '--unit-files', units.join(','), ...desktop]
-  return { ...scenarios, units, skippedUnits: files.filter((file) => !units.includes(file)), words }
-}
-let perfPlan = planPerf(root)
-const perfEnv = () => perfPlan?.words === undefined ? {} : { JUNO_RUNNER_DESKTOP_CORES: process.env.JUNO_RUNNER_DESKTOP_CORES ?? '3', JUNO_RUNNER_UNIT_CORES: process.env.JUNO_RUNNER_UNIT_CORES ?? '3' }
+const perfWords = nightly && !local && !baseline ? ['perf'] : undefined
+const planEnv = perfWords === undefined ? {} : { JUNO_RUNNER_DESKTOP_CORES: process.env.JUNO_RUNNER_DESKTOP_CORES ?? '3', JUNO_RUNNER_UNIT_CORES: process.env.JUNO_RUNNER_UNIT_CORES ?? '3' }
 if (argv.includes('--dry-run')) {
   console.log(`verify:main: ${commit} on ${execution.host} (${execution.mode}); no checkout, tests or record written`)
   if (local) console.log('bun install --frozen-lockfile; exclusive heavy lock; serial plan; desktop skips @mac')
@@ -137,9 +122,7 @@ if (argv.includes('--dry-run')) {
   console.log(`test:plan ${words.join(' ')}`)
   for (const suite of reused) console.log(`Reuse ${suite.suite}: unchanged inputs and runtime (${suite.reusedFrom.commit})`)
   if (baseline) console.log(`Repair ${baseline.commit}: failed/unfinished files plus uncapped import-graph selection (resolved in the target checkout)` )
-  if (perfPlan) console.log(perfPlan.words ? `On the laptop beside the plan (${perfCores} cores): ${perfPlan.words.join(' ')}` : 'perf: nothing it measures changed since each scenario last passed')
-  for (const skipped of perfPlan?.skipped ?? []) console.log(`perf: skip ${skipped.interaction}, unchanged since ${skipped.commit.slice(0, 10)}`)
-  for (const file of perfPlan?.skippedUnits ?? []) console.log(`perf: skip ${file}, nothing it imports changed since it passed`)
+  if (perfWords) console.log(`On the laptop beside the plan (${perfCores} cores): ${perfWords.join(' ')}`)
   if (withMac) console.log('On this Mac: test:desktop --grep @mac, then perf @mac, then test:feel (exclusive heavy lock)')
   process.exit(0)
 }
@@ -219,8 +202,6 @@ if (baseline && !installed) throw new Error(`Repair dependencies did not install
 
 const checkoutFiles = tracked.filter((file) => /^(apps|packages)\//.test(file))
 const graph = new ImportGraph(checkout, new Set(checkoutFiles))
-perfPlan = planPerf(checkout)
-const planEnv = perfEnv()
 const protocols = protocolInputs(tracked, (file) => graph.closure(file))
 let affected
 if (baseline) {
@@ -238,10 +219,8 @@ const runs = [cancelled || !installed ? Promise.resolve(suites.map(({ name }) =>
   : suites.length === 0 ? Promise.resolve([]) : run('plan', process.execPath, local
     ? [heavy, '--exclusive', process.execPath, join(checkout, 'scripts/plan.mjs'), ...words]
     : [join(checkout, 'scripts/remote.mjs'), '--env', 'JUNO_VERIFY_POLICY=1', 'test:plan', ...words], checkout, local ? { ...localVerifyEnv, JUNO_SKIP_TAGS: '@mac', JUNO_VERIFY_POLICY: '1' } : planEnv).then((planned) => splitPlan(planned))]
-if (perfPlan?.words && !cancelled && installed) {
-  const { words: perfWords, ...plan } = perfPlan
-  runs.push(run('perf', process.execPath, [join(checkout, 'scripts/remote.mjs'), '--cores', perfCores, '--wait', '3600', '--env', 'JUNO_VERIFY_POLICY=1', ...perfWords], checkout)
-    .then((result) => [{ ...result, perf: plan, perfUnits: unitOutcomes(result.log && existsSync(result.log) ? readFileSync(result.log, 'utf8') : '') }]))
+if (perfWords && !cancelled && installed) {
+  runs.push(run('perf', process.execPath, [join(checkout, 'scripts/remote.mjs'), '--cores', perfCores, '--wait', '3600', '--env', 'JUNO_VERIFY_POLICY=1', ...perfWords], checkout).then((result) => [result]))
 }
 if (withMac) {
   // The @mac tests need the installed workspace and a build here; they take a heavy-job slot.
@@ -335,7 +314,7 @@ const summary = {
   coverage: coverageNote, nightly, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
-  allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'PERF'].map((kind) => [kind.toLowerCase(), planEnv[`JUNO_RUNNER_${kind}_CORES`] ?? (kind === 'PERF' && perfPlan?.words ? perfCores : undefined) ?? process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
+  allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'PERF'].map((kind) => [kind.toLowerCase(), planEnv[`JUNO_RUNNER_${kind}_CORES`] ?? (kind === 'PERF' && perfWords ? perfCores : undefined) ?? process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
   reports: keepReports(checkout, logDir, planStarted).map((file) => join('.juno-status', relative(statusDir, file))),
 }
 writeRecord(statusDir, runId, summary)

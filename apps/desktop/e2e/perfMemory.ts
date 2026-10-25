@@ -99,8 +99,8 @@ async function openAndSwitch(at: HeavyContext, start: number, phase: (name: stri
   await phase('50 tab switches')
 }
 
-/** The Juno chat in a tab of its own, given forty messages so it has history to scroll. */
-async function fillChat(at: HeavyContext, start: number): Promise<void> {
+/** The Juno chat in a tab of its own, given `messages` messages so it has history to scroll. */
+async function fillChat(at: HeavyContext, start: number, messages: number): Promise<void> {
   const { juno, win } = at
   await juno.tabs.menu('new-tab')
   await juno.tabs.expectCount(start + 21)
@@ -108,7 +108,7 @@ async function fillChat(at: HeavyContext, start: number): Promise<void> {
   const composer = win.locator('main [data-juno-chat] textarea:visible')
   await composer.waitFor()
   const answers = win.locator('main [data-juno-chat]:visible [data-chat-juno]')
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < messages; i++) {
     const before = await answers.count()
     await composer.fill(`memory run ${i}: what changed in the sidebar?`)
     await composer.press('Enter')
@@ -153,7 +153,7 @@ async function scrollRounds(at: HeavyContext, scrollFor: number): Promise<number
  * sidebar, a topic's messages and the Juno chat, and the Juno panel opened
  * and closed beside a topic. Answers with the memory read after 30 s idle.
  */
-export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_000): Promise<MemoryReading> {
+export async function heavyUse(juno: Juno, running: RunningApp, { scrollFor = 120_000, chatMessages = 40, idle = 30_000 } = {}): Promise<MemoryReading> {
   const at = heavyContext(juno, running)
   const { win } = running
   const start = await juno.tabs.root.getByRole('tab').count()
@@ -167,7 +167,7 @@ export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_
     await memoryDump(win, `${dump}-${name.replaceAll(' ', '-')}.json`, true)
   }
   await openAndSwitch(at, start, phase)
-  await fillChat(at, start)
+  await fillChat(at, start, chatMessages)
   await phase('the Juno chat')
   let panelOpens = await scrollRounds(at, scrollFor)
   await phase('scrolling')
@@ -177,7 +177,7 @@ export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_
   await readMemory(running, 'memory right after heavy use')
   // Then idle, as the owner stops to read: Chromium collects what rendering left behind once the page is quiet.
   await win.mouse.move(0, 0)
-  await win.waitForTimeout(30_000)
+  await win.waitForTimeout(idle)
   if (dump !== undefined) await memoryDump(win, `${dump}-end-live.json`, false)
   return readMemory(running, 'memory after heavy use and 30 s idle')
 }

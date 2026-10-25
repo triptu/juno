@@ -784,8 +784,9 @@ test.describe('large workspace', () => {
     }
   })
 
-  // Weekly on the laptop: two minutes of scrolling and 30 s of idle for one reading (performance.md 7.3).
-  test('memory after heavy use: 20 topics, 50 tab switches, two minutes of mixed scrolling and the Juno panel', { tag: '@perf-weekly' }, async () => {
+  // On the laptop, against its baseline, a shorter use of the same shape: 20 s of scrolling, 15 chat messages and
+  // 10 s of idle rather than two minutes, 40 and 30 s (performance.md 7.3).
+  test('memory after heavy use: 20 topics, 50 tab switches, two minutes of mixed scrolling and the Juno panel', async () => {
     test.setTimeout(900_000)
     const running = await launch(true)
     try {
@@ -796,7 +797,7 @@ test.describe('large workspace', () => {
       await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
       await readMemory(running, 'memory after launch')
       if (process.env['JUNO_MEMORY_DUMP'] !== undefined) await memoryDump(running.win, `${process.env['JUNO_MEMORY_DUMP']}-launch-live.json`, false)
-      const after = await heavyUse(juno, running)
+      const after = await heavyUse(juno, running, absolute ? {} : { scrollFor: 20_000, chatMessages: 15, idle: 10_000 })
       for (const [name, limit] of Object.entries(HEAVY_MEMORY_BUDGETS)) {
         const value = after[name as keyof typeof HEAVY_MEMORY_BUDGETS]
         if (value !== undefined) budget(reading(`${name} private memory after heavy use`, value, 'MB'), limit)
@@ -1736,7 +1737,7 @@ test('emoji picker with 20,000 workspace emoji, cold subscription and loaded ima
 
 // Trace the idle preload without ever opening a picker: scripts/perf-trace.mjs
 // sums main-thread work, including module evaluation, inside juno.emoji-preload.
-test('20,000 workspace emoji preload after first paint', { tag: '@perf-weekly' }, async ({ juno, fake, running, userData, slackApp }) => {
+test('20,000 workspace emoji preload after first paint', async ({ juno, fake, running, userData, slackApp }) => {
   test.setTimeout(120_000)
   for (let i = 0; i < 20_000; i++) fake.addEmoji({ name: `preload_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
   await juno.signIn()
