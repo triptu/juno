@@ -16,7 +16,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'ai-activity.spec.ts',
   'juno-agent/chat.spec.ts',
   'juno-agent/panel.spec.ts',
-  'juno-agent/cards.spec.ts',
   'juno-agent/chat-reactions.spec.ts',
   'juno-agent/selection.spec.ts',
   'juno-agent/source-link.spec.ts',
