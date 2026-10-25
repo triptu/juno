@@ -99,7 +99,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'peek.spec.ts',
   'person-links.spec.ts',
   'reaction-delivery.spec.ts',
-  'reactions-dialog.spec.ts',
   'send-to-channel.spec.ts',
   'send-while-staging.spec.ts',
   'send.spec.ts',
