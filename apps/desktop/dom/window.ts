@@ -17,8 +17,36 @@ export const DOM_BUILD = resolve(__dirname, 'dist')
 let compiled: { readonly script: Script; readonly css: string } | undefined
 /** Compiled once per Bun worker; each window runs it in its own context. */
 function renderer() {
-  compiled ??= { script: new Script(readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8'), { filename: 'renderer.js' }), css: readFileSync(join(DOM_BUILD, 'style.css'), 'utf8') }
+  compiled ??= { script: new Script(readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8'), { filename: 'renderer.js' }), css: rootRules(readFileSync(join(DOM_BUILD, 'style.css'), 'utf8')) }
   return compiled
+}
+
+/**
+ * The sheet's rules for the root (`:root`, `html`): the tokens, such as the
+ * durations `rootDuration` reads. happy-dom matches every rule of every
+ * sheet against an element and its ancestors on each `getComputedStyle`,
+ * which the app calls in layout effects, and the class rules only give
+ * values that need layout to mean anything (README, "The rule").
+ */
+function rootRules(css: string): string {
+  const parser = new Window()
+  try {
+    const sheet = new parser.CSSStyleSheet()
+    sheet.replaceSync(css)
+    // A rule whose subject, the compound after the last combinator, is the root.
+    const forRoot = (selector: string) => selector.split(',').some((part) => { const subject = part.trim().split(/[\s>+~]+/).at(-1) ?? ''; return /:root\b/.test(subject) || /^html\b/.test(subject) })
+    const keep = (rules: CSSRuleList): string => [...rules].map((rule) => {
+      if ('selectorText' in rule) return forRoot(String(rule.selectorText)) ? rule.cssText : ''
+      if ('conditionText' in rule && 'cssRules' in rule) {
+        const inner = keep(rule.cssRules as CSSRuleList)
+        return inner === '' ? '' : `@${rule.constructor.name === 'CSSSupportsRule' ? 'supports' : 'media'} ${String(rule.conditionText)} {${inner}}`
+      }
+      return ''
+    }).join('')
+    return keep(sheet.cssRules as unknown as CSSRuleList)
+  } finally {
+    void parser.happyDOM.close()
+  }
 }
 
 const quiet = Object.fromEntries(['log', 'info', 'debug', 'trace', 'group', 'groupCollapsed', 'groupEnd', 'table', 'dir', 'time', 'timeEnd', 'timeLog', 'count', 'assert'].map((name) => [name, () => {}]))

@@ -83,23 +83,45 @@ export class Dom {
     }
   }
 
+  readonly #waiting = new Set<() => void>()
+  #observer: MutationObserver | undefined
+  #releasing = false
+
   /**
    * Resolves at the page's next change (a node, an attribute or text), or
    * after `millis`: a wait checks again when there is something new to see,
    * not on a fast timer. Focus and the fake's state change no node, so the
-   * timer still runs. Bun's timer, which a test clock does not hold.
+   * timer still runs. Bun's timer, which a test clock does not hold. One
+   * observer serves every wait in a row: observing the whole page visits
+   * every node, so it is not done again on each check.
    */
   changed(millis = 50): Promise<void> {
     return new Promise((done) => {
-      const Observer = (this.window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
       const finish = () => {
         clearTimeout(timer)
-        observer.disconnect()
+        this.#waiting.delete(finish)
         done()
+        this.#release()
       }
-      const observer = new Observer(finish)
-      observer.observe(this.document, { subtree: true, childList: true, attributes: true, characterData: true })
       const timer = setTimeout(finish, millis)
+      this.#waiting.add(finish)
+      if (this.#observer === undefined) {
+        const Observer = (this.window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
+        this.#observer = new Observer(() => { for (const waiting of [...this.#waiting]) waiting() })
+        this.#observer.observe(this.document, { subtree: true, childList: true, attributes: true, characterData: true })
+      }
+    })
+  }
+
+  /** Stops observing when no wait has started again by the next task, as a check that fails waits again at once. */
+  #release(): void {
+    if (this.#releasing) return
+    this.#releasing = true
+    setImmediate(() => {
+      this.#releasing = false
+      if (this.#waiting.size > 0) return
+      this.#observer?.disconnect()
+      this.#observer = undefined
     })
   }
 

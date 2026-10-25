@@ -32,39 +32,37 @@ export function shown(el: Element | null | undefined): el is El {
   return true
 }
 
-const IMPLICIT: ReadonlyArray<readonly [string, string]> = [
-  ['button', 'button, input[type="button"], input[type="submit"], input[type="reset"], summary'],
-  ['link', 'a[href]'],
-  ['checkbox', 'input[type="checkbox"]'],
-  ['radio', 'input[type="radio"]'],
-  ['textbox', 'textarea, input:not([type]):not([list]), input[type="text"]:not([list]), input[type="search"]:not([list]), input[type="email"]:not([list]), input[type="url"]:not([list]), input[type="tel"]:not([list])'],
-  ['combobox', 'select, input[list]'],
-  ['spinbutton', 'input[type="number"]'],
-  ['slider', 'input[type="range"]'],
-  ['heading', 'h1, h2, h3, h4, h5, h6'],
-  ['img', 'img:not([alt=""])'],
-  ['list', 'ul, ol'],
-  ['listitem', 'li'],
-  ['navigation', 'nav'],
-  ['complementary', 'aside'],
-  ['main', 'main'],
-  ['dialog', 'dialog'],
-  ['option', 'option'],
-  ['group', 'fieldset, details, optgroup'],
-  ['region', 'section[aria-label], section[aria-labelledby]'],
-  ['separator', 'hr'],
-  ['table', 'table'],
-  ['row', 'tr'],
-  ['cell', 'td'],
-  ['form', 'form[aria-label], form[aria-labelledby]'],
-  ['progressbar', 'progress'],
-  ['status', 'output'],
-]
+/** The tags that can imply each role, for finding candidates (`byRole`). */
+const IMPLICIT_TAGS: Readonly<Record<string, string>> = {
+  button: 'button, input, summary', link: 'a[href]', checkbox: 'input', radio: 'input', textbox: 'textarea, input', combobox: 'select, input', spinbutton: 'input', slider: 'input',
+  heading: 'h1, h2, h3, h4, h5, h6', img: 'img', list: 'ul, ol', listitem: 'li', navigation: 'nav', complementary: 'aside', main: 'main', dialog: 'dialog', option: 'option',
+  group: 'fieldset, details, optgroup', region: 'section', separator: 'hr', table: 'table', row: 'tr', cell: 'td', form: 'form', progressbar: 'progress', status: 'output',
+}
 
+const BY_TAG: Readonly<Record<string, string>> = {
+  BUTTON: 'button', SUMMARY: 'button', TEXTAREA: 'textbox', SELECT: 'combobox', H1: 'heading', H2: 'heading', H3: 'heading', H4: 'heading', H5: 'heading', H6: 'heading',
+  UL: 'list', OL: 'list', LI: 'listitem', NAV: 'navigation', ASIDE: 'complementary', MAIN: 'main', DIALOG: 'dialog', OPTION: 'option', FIELDSET: 'group', DETAILS: 'group',
+  OPTGROUP: 'group', HR: 'separator', TABLE: 'table', TR: 'row', TD: 'cell', PROGRESS: 'progressbar', OUTPUT: 'status',
+}
+
+const INPUT_ROLES: Readonly<Record<string, string>> = { button: 'button', submit: 'button', reset: 'button', checkbox: 'checkbox', radio: 'radio', number: 'spinbutton', range: 'slider' }
+const TEXT_INPUTS = new Set(['text', 'search', 'email', 'url', 'tel'])
+
+/** The explicit role, or the one the element's tag and attributes imply (HTML-AAM, the part these tests meet). */
 export function roleOf(el: Element): string | undefined {
   const explicit = el.getAttribute('role')?.trim().split(/\s+/)[0]
   if (explicit) return explicit
-  for (const [role, selector] of IMPLICIT) if (el.matches(selector)) return role
+  const tag = el.tagName
+  const byTag = BY_TAG[tag]
+  if (byTag !== undefined) return byTag
+  if (tag === 'INPUT') {
+    const type = el.getAttribute('type')
+    if (type === null || TEXT_INPUTS.has(type)) return el.hasAttribute('list') ? 'combobox' : 'textbox'
+    return INPUT_ROLES[type]
+  }
+  if (tag === 'A') return el.hasAttribute('href') ? 'link' : undefined
+  if (tag === 'IMG') return el.getAttribute('alt') === '' ? undefined : 'img'
+  if (tag === 'SECTION' || tag === 'FORM') return el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby') ? (tag === 'SECTION' ? 'region' : 'form') : undefined
   return undefined
 }
 
@@ -327,11 +325,9 @@ export class Query {
 export const disabled = (el: El) => (el as HTMLButtonElement).disabled === true || el.getAttribute('aria-disabled') === 'true'
 export const checked = (el: El) => (el as HTMLInputElement).checked === true || el.getAttribute('aria-checked') === 'true'
 
-const IMPLICIT_SELECTOR = new Map(IMPLICIT.map(([role, selector]) => [role, selector]))
-
 function byRole(root: El, role: string, options: RoleOptions): El[] {
   // Only elements that can have the role: an explicit role, or the tags that imply it.
-  const implicit = IMPLICIT_SELECTOR.get(role)
+  const implicit = IMPLICIT_TAGS[role]
   return [...root.querySelectorAll<El>(`[role]${implicit === undefined ? '' : `, ${implicit}`}`)].filter((el) => {
     if (roleOf(el) !== role) return false
     if (options.includeHidden !== true && !shown(el)) return false
