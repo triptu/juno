@@ -270,7 +270,8 @@ async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | '
 async function threadArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>, rootTs: string): Promise<void> {
   const channel = slack.channel('eng')
   await juno.topic.list.locator(`[data-thread-link="t:${channel}:${rootTs}"]`).click()
-  await juno.topic.expectMessage('Reply 29')
+  // The thread paints at once with the newest reply Juno holds; the others land above it with the open's fetch.
+  await juno.topic.expectMessage('Reply 0')
   await juno.topic.toLatest()
   expect(await longerThanView(juno.topic.scroller)).toBe(true)
   await wheelDownAtEnd(win, juno.topic.scroller)
