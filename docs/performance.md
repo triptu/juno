@@ -1258,7 +1258,11 @@ to 17 of 18.
   field alone for a frame, then grew to 459 px when the Frequent rows'
   first answer came (`palette-open` #4 to #5). Nothing kept that query
   warm. `Palette.tsx` now subscribes to it on idle, with the chunk, for
-  the life of the window: one query per change to the conversations.
+  the life of the window: one query per change to the conversations. The
+  Recent rows (`searchAtom('')`, six topics) were still cold: the open
+  palette draws its list once both have answered, so on the laptop's
+  feel run (10-26) it opened empty in 7 of 7 tries. They are now
+  subscribed on idle beside the Frequent rows.
 - **Not reproduced.** Sidebar scroll's long frames (50 to 409 ms with no
   script and no blocking time) passed on the rerun, as in 8.6.
 

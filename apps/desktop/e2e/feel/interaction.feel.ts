@@ -117,7 +117,7 @@ test('popovers open from their anchor, whole', { tag: ['@nightly', '@nightly-fee
 
 test('palette opens with frequent conversations and holds still', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
   const dialog = '[role="dialog"][aria-label="Search and commands"]'
-  // The app warms the palette's list in its first idle moment after launch (Palette.tsx); a warm start can be
+  // The app warms the palette's lists in its first idle moment after launch (Palette.tsx); a warm start can be
   // here before that on a busy machine. Idle callbacks run in order, so this one runs after the warm-up's.
   await win.evaluate(() => new Promise<void>((resolve) => requestIdleCallback(() => resolve(), { timeout: 5_000 })))
   await win.waitForTimeout(300)

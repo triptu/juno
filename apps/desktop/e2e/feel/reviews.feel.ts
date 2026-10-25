@@ -202,9 +202,15 @@ test('threads you never open and channels you never read: each sheet opens whole
   await reviewSheet(feel, juno, { name: 'review-ignore', kind: 'ignore', sheet: 'ignore', row: '#build-chatter' })
 })
 
-test("old drafts and Automated's record: each sheet opens whole, and Delete and Move back move no row", { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, userData, relaunch, studio }) => {
+test("Automated's record and old drafts: each sheet opens whole, and Move back and Delete move no row", { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, userData, relaunch, studio, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
+  fake.workspace.addConversation({ id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: fake.now(), topic: '', purpose: '', isOpen: true, archived: false })
+  fake.joinChannel({ channel: 'C0CIBUILDS' })
+  for (let n = 1; n <= 6; n++) fake.injectMessage({ channel: 'C0CIBUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
+  await expect.poll(() => freshHome(juno), { timeout: 30_000 }).toContain('automatedMoves')
+  await reviewSheet(feel, juno, { name: 'review-automated', kind: 'automatedMoves', sheet: 'automated', row: '#ci-builds' })
+
   // Two old drafts, written while the app is closed, as a launch weeks later finds them.
   const root = fake.workspace.main('C0ENG').find((message) => message.text?.startsWith(POSTGRES) === true)!
   const old = String(Date.now() - 15 * DAY)
@@ -217,14 +223,7 @@ test("old drafts and Automated's record: each sheet opens whole, and Delete and 
       db.close()
     },
   })
-  const feel = new Feel(app.win, studio, 'review sheets')
   await expect(app.home.navItem).toBeVisible({ timeout: 30_000 })
   await expect.poll(() => freshHome(app), { timeout: 30_000 }).toContain('oldDrafts')
-  await reviewSheet(feel, app, { name: 'review-old-drafts', kind: 'oldDrafts', sheet: 'oldDrafts', row: '#eng' })
-
-  fake.workspace.addConversation({ id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: fake.now(), topic: '', purpose: '', isOpen: true, archived: false })
-  fake.joinChannel({ channel: 'C0CIBUILDS' })
-  for (let n = 1; n <= 6; n++) fake.injectMessage({ channel: 'C0CIBUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
-  await expect.poll(() => freshHome(app), { timeout: 30_000 }).toContain('automatedMoves')
-  await reviewSheet(feel, app, { name: 'review-automated', kind: 'automatedMoves', sheet: 'automated', row: '#ci-builds' })
+  await reviewSheet(new Feel(app.win, studio, 'old drafts'), app, { name: 'review-old-drafts', kind: 'oldDrafts', sheet: 'oldDrafts', row: '#eng' })
 })

@@ -74,7 +74,8 @@ export default defineConfig<object, { lane: Lane }>({
       dependencies: ['build-web'],
       fullyParallel: true,
       retries: 0,
-      workers: browserWorkers,
+      // Each scenario films and analyses every frame; half the browser workers keep the frames coming on time.
+      workers: Math.max(1, Math.ceil(browserWorkers / 2)),
       timeout: 120_000,
       expect: { timeout: 15_000 },
       ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
