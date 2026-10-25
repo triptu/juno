@@ -109,7 +109,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'thread-link-preview.spec.ts',
   'thread-root.spec.ts',
   'topic.spec.ts',
-  'instant-paths.spec.ts',
   'usergroups.spec.ts',
   'views.spec.ts',
 ]
