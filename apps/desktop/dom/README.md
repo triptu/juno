@@ -48,6 +48,18 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 5. Show it can fail: break the code it guards (return early, flip a condition) and see it fail, then put the code back.
 6. Delete the Playwright test once the port passes and asserts the same behaviour, and the spec file when it is empty (remove it from `e2e/lanes.ts` too).
 
+## Measured
+
+10-25, SSH laptop, 2 physical cores (4 threads), one run each, builds cached. The 14 tests ported first (`git log -- apps/desktop/dom`):
+
+| | Playwright browser lane, 4 workers | DOM lane, 4 workers | DOM lane, 1 worker |
+| --- | ---: | ---: | ---: |
+| Test step wall | 26.5 s | 15.8 s | 17.9 s |
+| CPU per test | 4.3 s | 3.9 s (2.6 s over 42 runs) | 2.4 s (about 2.0 once warm) |
+| Wall per test | 5.3 s | 4.2 s | 1.0–1.9 s |
+
+A worker's first test pays for the host's fork and the renderer's compile (about 1.5 CPU-s), so a short run at many workers costs more per test than a long one. At four workers on four threads the job is CPU-bound (99% busy at the median).
+
 ## Commands
 
 - `bun run test:dom` (`scripts/dom-tests.mjs`): builds `dom/dist/` if its inputs changed, then every file. `--files <repo paths>` runs those; `--seed <n>` repeats an order. `JUNO_DOM_WORKERS` sets the workers (default `JUNO_TEST_WORKERS`, one per allocated thread on the runner). Locally it waits for the heavy-job slot; run it remotely: `bun run remote test:dom`.
