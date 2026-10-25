@@ -962,7 +962,7 @@ Agents run selective checks before reporting. Full runs (`bun run verify:main`, 
 
 **Flakes.** Desktop Playwright projects have zero retries. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `bun run flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit (with the spec checks), desktop and gallery jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `bun run affected` and `bun run verify:main` use two jobs on the SSH runner: a desktop job (browser and Electron lanes, spec checks and conformance) and a unit job (unit tests, DOM lane and gallery). The desktop job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `bun run affected` picks desktop e2e specs by a coverage map that `bun run verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -1156,7 +1156,7 @@ this Mac through the heavy lock; use them only when Tushar asks, since heavy run
 unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
-`test:plan` splits unit, desktop and gallery steps into independent SSH jobs; the DOM lane (`test:dom`), the spec checks and conformance run in the unit job after the unit tests, in that order, so the three jobs (2, 3 and 3 cores) fit Juno's eight lent cores at once. A separate specs job used to wait about 80 s for the unit job to release cores. Browser and Electron desktop steps run in order and share builds. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
+`test:plan` splits its steps into two independent SSH jobs of four cores each, which fit Juno's eight lent cores at once: a desktop job (`test:browser`, `test:electron`, `test:desktop`, `test:e2e`, `specs:check`, `specs:conformance`) and a unit job (`test`, `test:dom`, `test:gallery` and the rest). Each job runs its steps in order with all its threads. In a full run the two jobs carry about the same measured CPU ("Full runs"); smaller jobs each left one long suite on too few cores. A unit job without the DOM lane or the gallery keeps the size its steps ask for ("Machine shapes"). Browser and Electron desktop steps share builds. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order, whether set locally or passed with `--env`. An explicit `--env` value wins. `KEY=VALUE` before a step overrides its environment.
@@ -1290,7 +1290,7 @@ Juno requests physical cores from the laptop's shared `4-11` allocation:
 | --- | ---: | ---: |
 | Narrow unit, agent tests, cached spec check | 1 | 3 GiB |
 | Wide unit, uncached spec check, conformance, standalone gallery or app | 2 | 6 GiB |
-| Gallery or desktop inside a split plan | 3 | 9 GiB |
+| Desktop job of a split plan; unit job with the DOM lane or the gallery | 4 | 12 GiB |
 | Trace generation, other scripts | 4 | 12 GiB |
 
 Wide units have no named files or more than 20. `--cores` overrides the request;
@@ -1302,8 +1302,8 @@ CPU, with no burst to two.
 The shared host maps sibling CPUs and sets the actual thread quota. Workers
 use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
 threads from the request. At four threads units run four `bun test` processes.
-At six threads a split desktop job runs three workers and a split gallery job
-runs eight. Quint uses one simulation group per two threads and one
+At eight threads a split job runs eight unit, DOM, browser and Electron
+workers and six gallery walkers. Quint uses one simulation group per two threads and one
 Apalache checker per two threads, limited by the job’s cgroup memory ("Faster test runs").
 A two-core, 6 GiB job gets two simulation groups and two 1,536 MiB JVM heaps.
 Explicit worker settings win within the Apalache memory cap.
@@ -1311,7 +1311,7 @@ Explicit worker settings win within the Apalache memory cap.
 The host caps memory without swap and mounts `/tmp` and `/work` as tmpfs.
 Each tmpfs is 2 GiB, or 4 GiB for requests of four or more cores; tmpfs consumes
 the memory cap. Split plans release each job's cores independently.
-`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_GALLERY_CORES` override the two app jobs independently; `JUNO_RUNNER_UNIT_CORES` works the same way for the unit job, which also runs the spec checks. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
+`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_UNIT_CORES` override the two jobs independently. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
 Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue
@@ -1746,16 +1746,23 @@ Results live in the main checkout's shared `.juno-status`: latest `verify-main.j
 
 After fixing and committing the cause, run `bun run verify:main --ref origin/main --repair <record.json>` (or `--repair latest`). The baseline must be an ancestor with a version 2 record and the same runtime/platform. The repair runs failed and unfinished spec files, plus every test the fix reaches through `affected --wide --graph --no-cache`. It leaves out affected's typecheck and lint, which run on this Mac and are not part of a full run, and runs affected's `test:desktop` selection in both the browser and Electron lanes. There is no count or time cap and no heavy-test exclusion. A suite without a complete structured inventory reruns in full. Passed, untouched suites keep their provenance; repaired suites retain previous passing test outcomes. The release gate accepts the repair only with the recorded baseline chain and complete successful required suites. A Mac timing/nightly baseline needs a fresh `--with-mac` full run.
 
-### Compare desktop and gallery allocation
+### Job sizes
 
-After the browser lane lands on main, run `bun scripts/verify-benchmark.mjs --dry-run` to inspect the plan, then `bun scripts/verify-benchmark.mjs --ref origin/main`. It pins one commit and runs five laptop full runs sequentially at desktop/gallery core splits 2/2, 3/3, 4/4, 5/3 and 4/4. It stops on a failure for triage. It refuses local fallback and waits for both browser and Electron scripts before starting. Records live in shared `.juno-status/verify-benchmarks/` and include wall time, suite records and allocations; the retained logs contain allocator waits, peak container memory and CPU pressure. Compare the whole run, failure rate and shared-host pressure, not desktop time alone. A failed configuration is not eligible even when its raw wall time is lower.
+A full run is two four-core jobs. Each serial step prints `plan: step <n> <script> used <s> CPU-s, peak memory <g> GB`, read from the job's cgroup, so a re-plan can use measured CPU rather than guesses. Single runs on 2026-10-25, protocol suites reused from an unchanged earlier run:
 
-The 2026-10-24 warm-cache run at `baea08148` produced these single-run results:
+| Plan | Commit | Wall | Job | Cores | Steps (wall s) | Script wall | CPU busy | Peak memory |
+| --- | --- | ---: | --- | ---: | --- | ---: | ---: | ---: |
+| Before: unit 2, desktop 3, gallery 3 | `1e9e01c87` | 206.6 s | unit | 2 | test 70, test:dom 111, conformance 17 | 198 s | 92% | 3.6 GB |
+| | | | desktop | 3 | browser 120, Electron 61 | 181 s | 89% | 5.4 GB |
+| | | | gallery | 3 | gallery 82 | 81 s | 79% | 4.7 GB |
+| After: desktop 4, unit 4 | `e1e82b049` | 183.3 s | unit | 4 | test 36, test:dom 80, gallery 58 | 174 s | 75% | 5.4 GB |
+| | | | desktop | 4 | browser 111, Electron 67 | 178 s | 82% | 6.4 GB |
 
-| Desktop/gallery cores | Result | Wall | Unit | Gallery | Browser | Electron | Allocator wait | Desktop peak | Desktop median CPU |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2/2 | Passed | 567.1 s | 95 s | 75 s | 435 s | 121 s | 86 s | 4.10 GiB | 97% |
-| 3/3 | Passed | 387.4 s | 95 s | 61 s | 297 s | 81 s | 0 s | 5.39 GiB | 98% |
-| 4/4 | Failed | 353.6 s | 90 s | 45 s | 224 s | 73 s | 46 s | 6.81 GiB | 99% |
+Measured CPU per step at eight threads: test 259 CPU-s, test:dom 497, test:gallery 296, test:browser 747, test:electron 431 (2,230 in all; conformance about 60 when it runs). Two equal halves are the best split of that work: any smaller job left one long suite on two or three cores, and 16 threads at about 80% busy put the floor near 175 s. Below that the work itself has to shrink. Where the time goes:
 
-The 4/4 run failed a browser media-tab flow, so the harness stopped before 5/3 and the repeated 4/4 run. These are observations, not replicated medians. The browser lane was the long pole in both successful runs. The split-plan default is 3/3 because it was the fastest successful sample and the only sample without an allocator wait; 4/4 is ineligible despite its lower raw wall time.
+- The browser lane is a third of all CPU. Its 118 tests sum to 719 s of test time; 8 workers take 111 s wall, after a 13 s renderer build.
+- Builds run on the critical path in both jobs: DOM 14 s, web renderer 13 s, gallery 9 s. The build key (`scripts/build-cached.mjs`) hashes every file under `packages`, `scripts` and the app, so almost every commit builds them again.
+- The Electron lane is limited by its longest tests: the agent crash and transfer specs take 25 s each, and 8 workers finish its 366 s of test time in 66 s.
+- The DOM lane spends 3.6 CPU-s per test (137 tests).
+
+`bun scripts/verify-benchmark.mjs --ref origin/main` runs full runs one after another at desktop/unit core splits 4/4, 5/3, 3/5 and 4/4 (`--dry-run` prints the plan). It stops on a failure for triage and refuses local fallback. Records live in shared `.juno-status/verify-benchmarks/`. Compare the whole run, failure rate and shared-host pressure, not one job's time. A failed configuration is not eligible even when its raw wall time is lower.
