@@ -95,7 +95,7 @@ const withReleases = test.extend<{ releases: FakeReleases }>({
   },
 })
 
-withReleases('an unsigned build offers the new version as a DMG and shows what is new', async ({ juno, app, releases }) => {
+withReleases('with a releases repository, Check for updates says what it found, What’s new lists recent versions, and opting in offers an unsigned build’s DMG', async ({ juno, app, releases }) => {
   const current = await app.evaluate(({ app: electronApp }) => electronApp.getVersion())
   expect(current).toBe(currentVersion)
   releases.changelog = [
@@ -113,16 +113,41 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   await expect(updates).toBeEnabled()
   await expect(updates).not.toBeChecked()
 
+  await test.step('with updates off, Check for updates checks at once and says what it found', async () => {
+    const check = about.getByRole('button', { name: 'Check for updates' })
+
+    releases.latest = currentVersion
+    await check.click()
+    await expect(about.getByText('Juno is up to date.')).toBeVisible()
+
+    releases.latest = nextVersion
+    await check.click()
+    await expect(about.getByText(`Juno ${nextVersion} is available.`)).toBeVisible()
+    await expect(about.getByRole('button', { name: 'Download the new version' })).toBeVisible()
+    await expect(about.getByText('Juno is up to date.')).toHaveCount(0)
+
+    releases.latest = 'fail'
+    await check.click()
+    await expect(about.getByText('Could not check for updates.')).toBeVisible()
+    await about.getByRole('button', { name: 'Copy details' }).click()
+    const details = await app.evaluate(({ clipboard }) => clipboard.readText())
+    expect(details).toContain(`Juno ${currentVersion} could not check for updates: HTTP 502`)
+    expect(details).not.toContain(TOKEN.slice('Bearer '.length))
+    expect(releases.api.filter((request) => request.path.endsWith('/releases/latest'))).toHaveLength(3)
+    releases.latest = nextVersion
+  })
+
   // What's new lists recent versions, fetched only when asked.
-  await about.getByRole('button', { name: "What's new" }).click()
+  const asked = releases.api.length
+  await about.getByRole('button', { name: "What's new" }).first().click()
   await expect(about.getByText('Updates from the releases repository.')).toBeVisible()
   await expect(about.getByText('Faster search.')).toBeVisible()
   await expect(about.getByText('Added topic filters.')).toBeVisible()
   await expect(about.getByText(`Juno ${nextVersion}, 2026-12-01`)).toBeVisible()
   await expect(about.getByText('Installed', { exact: true })).toBeVisible()
   await expect(about.getByText('Available', { exact: true })).toBeVisible()
-  expect(releases.api.map((request) => request.path)).toEqual([`${REPO}/contents/CHANGELOG.md`])
-  await about.getByRole('button', { name: "What's new" }).click()
+  expect(releases.api.slice(asked).map((request) => request.path)).toEqual([`${REPO}/contents/CHANGELOG.md`])
+  await about.getByRole('button', { name: "What's new" }).first().click()
   await expect(about.getByText('Updates from the releases repository.')).toHaveCount(0)
 
   // Opting in checks at once; an unsigned build offers the DMG.
@@ -147,32 +172,4 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   expect(releases.api.some((request) => request.path.endsWith('/releases/assets/3'))).toBe(false)
   expect(releases.files).toHaveLength(1)
   expect(releases.files[0]!.authorization).toBeUndefined()
-})
-
-withReleases('Check for updates checks at once with updates off and says what it found', async ({ juno, app, releases }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.openSettings('About')
-  const about = juno.settings.root
-  const check = about.getByRole('button', { name: 'Check for updates' })
-  await expect(about.getByRole('checkbox', { name: 'Download updates automatically' })).not.toBeChecked()
-
-  releases.latest = currentVersion
-  await check.click()
-  await expect(about.getByText('Juno is up to date.')).toBeVisible()
-
-  releases.latest = nextVersion
-  await check.click()
-  await expect(about.getByText(`Juno ${nextVersion} is available.`)).toBeVisible()
-  await expect(about.getByRole('button', { name: 'Download the new version' })).toBeVisible()
-  await expect(about.getByText('Juno is up to date.')).toHaveCount(0)
-
-  releases.latest = 'fail'
-  await check.click()
-  await expect(about.getByText('Could not check for updates.')).toBeVisible()
-  await about.getByRole('button', { name: 'Copy details' }).click()
-  const details = await app.evaluate(({ clipboard }) => clipboard.readText())
-  expect(details).toContain(`Juno ${currentVersion} could not check for updates: HTTP 502`)
-  expect(details).not.toContain(TOKEN.slice('Bearer '.length))
-  expect(releases.api.filter((request) => request.path.endsWith('/releases/latest'))).toHaveLength(3)
 })

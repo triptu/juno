@@ -36,7 +36,7 @@ function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray
   }
 }
 
-test('a reply in a thread shows at once and settles in place, posted once', { tag: '@canary' }, async ({ juno, fake }) => {
+test('a reply in a thread shows at once and settles in place, posted once', async ({ juno, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)

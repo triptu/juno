@@ -25,7 +25,7 @@ test.describe.configure({ timeout: 90_000 })
 
 const junoNav = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ })
 
-test('after Skip for now the tab and the panel say Juno needs a model, and Add a provider sets one up', { tag: '@canary' }, async ({ juno, model }) => {
+test('after Skip for now the tab and the panel say Juno needs a model, and Add a provider sets one up', async ({ juno, model }) => {
   await juno.signIn({ skipSetUp: false })
   await expect(juno.setUp.getByRole('heading', { name: 'Set up Juno' })).toBeVisible({ timeout: 15_000 })
   await juno.setUp.getByRole('button', { name: 'Skip for now' }).click()
