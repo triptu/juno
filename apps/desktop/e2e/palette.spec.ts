@@ -149,8 +149,26 @@ test('commands: ">theme" switches the theme, and an open topic\'s commands resol
   })
 })
 
-test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab', async ({ juno }) => {
+test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab; Messages never asks Slack', async ({ juno, fake }) => {
   const { palette, topic, tabs } = juno
+
+  await test.step('Messages finds what this Mac stores, with apps hidden, and never asks Slack', async () => {
+    await palette.open()
+    await palette.type('replica')
+    await palette.press('Meta+3')
+    await palette.expectTab('Messages')
+    await palette.expectResults()
+    // Every match in the Postgres thread is one row, under its title.
+    await expect(palette.row(POSTGRES)).toHaveCount(1)
+    // Grafana's alerts on db-replica-2 are from an app.
+    await expect(palette.row('db-replica-2')).toHaveCount(0)
+    // Slack's search used to be asked 400 ms after the last key: wait past that.
+    await juno.win.waitForTimeout(1_000)
+    // Sync's own discovery searches Slack too, never with typed text.
+    expect(fake.calls.filter((call) => call.method.startsWith('search.') && String(call.args['query']).includes('replica'))).toEqual([])
+    await palette.press('Escape')
+    await palette.expectClosed()
+  })
 
   await palette.openMessages()
   await palette.expectResults()
@@ -281,27 +299,6 @@ test('channels from the keyboard and from their menu', async ({ juno, fake }) =>
 
   // ⌘K never waits on the network (performance 5.3). Sync's own discovery searches Slack too, never with typed text.
   expect(fake.calls.filter((call) => call.method.startsWith('search.') && /platfo|nothing like/.test(String(call.args['query'])))).toEqual([])
-})
-
-test('Messages finds what this Mac stores, with apps hidden, and never asks Slack', async ({ juno, fake }) => {
-  const { palette, topic } = juno
-
-  await palette.open()
-  await palette.type('replica')
-  await palette.press('Meta+3')
-  await palette.expectTab('Messages')
-  await palette.expectResults()
-  // Every match in the Postgres thread is one row, under its title.
-  await expect(palette.row(POSTGRES)).toHaveCount(1)
-  // Grafana's alerts on db-replica-2 are from an app.
-  await expect(palette.row('db-replica-2')).toHaveCount(0)
-  // Slack's search used to be asked 400 ms after the last key: wait past that.
-  await juno.win.waitForTimeout(1_000)
-  // Sync's own discovery searches Slack too, never with typed text.
-  expect(fake.calls.filter((call) => call.method.startsWith('search.') && String(call.args['query']).includes('replica'))).toEqual([])
-  await palette.choose(POSTGRES)
-  await palette.expectClosed()
-  await topic.expectMessage('4 minutes is fine for us')
 })
 
 test('a better local match arriving later does not change what Enter opens', async ({ juno, slack }) => {

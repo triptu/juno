@@ -1,13 +1,13 @@
 // The first sync, from sign-in to live (SPEC 5, architecture 5.8): the list is usable before any
 // history, every row is named when it first shows, history is read in the order the user needs it,
-// conversations the user is not in cost nothing, and a boot that fails part way picks up where it
-// stopped. Each test is a cold boot on a fresh fake; that is what it tests.
+// conversations the user is not in cost nothing, a boot that fails part way picks up where it
+// stopped, and one that keeps failing says why. Each test is a cold boot on a fresh fake; that is what it tests.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
-import { viewsDelete, type TopicRow } from '@juno/contract'
+import { viewsDelete, type EngineStatus, type TopicRow } from '@juno/contract'
 import { CONVERSATIONS, largeSeed, SELF_ID } from '@juno/fake-slack'
-import { runCommand, topicCountsAtom } from '@juno/state'
+import { engineStatusAtom, runCommand, syncFailureAtom, syncNoticeAtom, topicCountsAtom } from '@juno/state'
 import { productionTiming } from '../../src/config'
 import { controlledSleep } from '../controlledClock'
 import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from '../harness'
@@ -15,7 +15,9 @@ import { apiCalls, bootedEngine, DAY, quiet, readDb, seedThread, threadId, tsOf,
 import { step } from '../step'
 
 const engines: Array<RunningEngine> = []
+const unmounts: Array<() => void> = []
 afterEach(async () => {
+  for (const unmount of unmounts.splice(0)) unmount()
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 
@@ -244,8 +246,8 @@ it('names every row when it first shows, keeps a mention that arrives meanwhile 
 })
 
 it('reads DMs (unread first), then mentions, then unread followed threads, then other unread channels, before the bulk', async () => {
-  // Live in 2 to 5 s on a quiet machine, 7 to 23 s at four busy processes per core and 14 to 75 s at ten.
-  const engine = await booted({ fakeOptions: { seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) } }, 90_000)
+  // 120 conversations, so every group below has some; the order of history reads is checked, not throughput.
+  const engine = await booted({ fakeOptions: { seed: largeSeed({ topics: 300, messages: 3_000, users: 80, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) } }, 90_000)
   const ws = engine.fake.workspace
   const threads = ws.threadCounts()
   const members = [...ws.conversations.values()].filter((c) => c.members.has(SELF_ID))
@@ -269,10 +271,10 @@ it('reads DMs (unread first), then mentions, then unread followed threads, then 
 }, 150_000)
 
 it("with the app's pacing, reads thread previews and emoji beside history, not after it", async () => {
-  // Pacing ten times faster than the app's, every method alike, so the methods keep their real ratios; live calls took
+  // Pacing thirty times faster than the app's, every method alike, so the methods keep their real ratios; live calls took
   // about 450 ms (performance.md, "First sync timeline"), scaled the same way. Ten active conversations and 40 threads.
   const seed = largeSeed({ topics: 40, messages: 600, users: 80, days: 7, channels: { public: 6, private: 1, dms: 2, mpims: 1 } })
-  const engine = await booted({ paced: 10, fakeOptions: { seed, latencyMillis: 45 } }, 30_000)
+  const engine = await booted({ paced: 30, fakeOptions: { seed, latencyMillis: 15 } }, 30_000)
   const history = apiCalls(engine, 'conversations.history').filter((call) => call.args['_x_reason'] === 'history')
   const previews = apiCalls(engine, 'conversations.replies').filter((call) => call.args['_x_reason'] === 'thread-preview')
   const emoji = engine.fake.calls.filter((call) => call.method === 'emojis/list')
@@ -347,4 +349,50 @@ it('reads history over the quiet window the user chose, finishes when discovery 
     const query = String(searches()[0]!.args['query'])
     expect(/after:(\d{4}-\d{2}-\d{2})/.exec(query)![1]).toBe(/after:(\d{4}-\d{2}-\d{2})/.exec(failedQuery)![1])
   })
+})
+
+// A first sync that keeps failing says why (SPEC 5, item 5)
+/** Every phase the engine reports and every sync notice the sidebar is given from now on. The card reads the failure's reason too, which keeps it while a retry boots. */
+function watchSync(engine: RunningEngine) {
+  const seen = { phases: [] as Array<EngineStatus['phase']>, notices: [] as Array<string | undefined> }
+  unmounts.push(
+    engine.registry.subscribe(engineStatusAtom, (status) => { if (status._tag === 'Success') seen.phases.push(status.value.phase) }, { immediate: true }),
+    engine.registry.mount(syncFailureAtom),
+    engine.registry.subscribe(syncNoticeAtom, (notice) => { seen.notices.push(notice) }, { immediate: true }),
+  )
+  return seen
+}
+
+it('a boot Slack answers with data Juno cannot read fails with that reason, and keeps it across the retries', async () => {
+  const engine = await started({ timing: { bootRetryMillis: 50 }, initial: (fake) => (fake.forceMalformed({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
+  const { phases: seen, notices: shown } = watchSync(engine)
+  const reason = { error: 'SlackDecodeError', method: 'client.userBoot' }
+  expect(await engine.phase('failed')).toEqual({ _tag: 'failed', reason })
+  await waitFor(() => (apiCalls(engine, 'client.userBoot').length >= 5 ? true : undefined), undefined, 'five boots')
+  const settled = seen.slice(seen.findIndex((phase) => phase._tag === 'failed')).filter((phase) => phase._tag !== 'booting')
+  expect(settled).toEqual(settled.map(() => ({ _tag: 'failed', reason })))
+  // The reason stays while it boots again, so a retry never clears the notice.
+  const fromFirst = shown.slice(shown.indexOf('failed'))
+  expect(fromFirst).toEqual(fromFirst.map(() => 'failed'))
+  expect(engine.registry.get(syncFailureAtom)).toEqual(reason)
+})
+
+it('a boot that never reaches Slack is offline, not failed, through the 30 s retry wait, and says so after the grace [controlled sleep]', async () => {
+  const time = await controlledSleep(productionTiming.bootRetryMillis)
+  try {
+    const timing = { bootRetryMillis: productionTiming.bootRetryMillis }
+    const engine = await started({ clock: time.clock, timing, initial: (fake) => (fake.loseResponse({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
+    const { phases: seen, notices: shown } = watchSync(engine)
+    await engine.phase('offline')
+    // The phase holds through the retry wait, so the 5 s offline grace passes and the notice shows.
+    await waitFor(() => (shown.at(-1) === 'offline' ? true : undefined), undefined, 'the offline notice')
+    // The client's own quick retries of the lost call are over by then; the next boot waits for the retry time.
+    const boots = apiCalls(engine, 'client.userBoot').length
+    await time.advance(productionTiming.bootRetryMillis)
+    await waitFor(() => (apiCalls(engine, 'client.userBoot').length > boots && seen.at(-1)?._tag === 'offline' ? true : undefined), undefined, 'the next boot offline again')
+    expect(seen.some((phase) => phase._tag === 'failed')).toBe(false)
+    expect(engine.registry.get(syncFailureAtom)).toBeUndefined()
+  } finally {
+    await time.close()
+  }
 })

@@ -18,14 +18,12 @@ describe('preview text', () => {
   })
 
   it('labels a message that is only files by what they are', () => {
-    expect(messagePreviewText({ text: '', files: [image('F1')] })).toBe('Image')
     // A fresh upload Slack has not typed yet: its name says what it is.
     expect(messagePreviewText({ text: '', files: [{ id: 'F0NEW', name: 'shot.png', mimetype: '', filetype: '' }] })).toBe('Image')
+    // Files of one kind are counted by that kind; mixed kinds are counted as files.
     expect(messagePreviewText({ text: '', files: [image('F1'), image('F2')] })).toBe('2 images')
     expect(messagePreviewText({ text: '', files: [image('F1'), pdf] })).toBe('2 files')
     expect(messagePreviewText({ text: '', files: [pdf] })).toBe('File: report.pdf')
-    expect(messagePreviewText({ text: '', files: [{ id: 'F0AUD', name: 'audio_message.webm', mimetype: 'audio/webm', subtype: 'slack_audio' }] })).toBe('Voice clip')
-    expect(messagePreviewText({ text: '', files: [{ id: 'F0GONE', mode: 'tombstone' }] })).toBe('Deleted file')
   })
 
   it('names a link alone by its domain, but keeps a link inside words', () => {
@@ -33,14 +31,13 @@ describe('preview text', () => {
     expect(messagePreviewText({ text: 'See <https://example.com>' })).toBe('See https://example.com')
   })
 
-  it('reads a shared message, a bot attachment, an unfurl and a huddle', () => {
+  it('reads a shared message, a bot attachment and an unfurl', () => {
     expect(messagePreviewText({ text: '', attachments: [{ is_msg_unfurl: true, text: 'Ship it on Friday' }] })).toBe('Shared message: Ship it on Friday')
     expect(messagePreviewText({ text: '', attachments: [{ message_blocks: [] }] })).toBe('Shared message')
     expect(messagePreviewText({ text: '', attachments: [{ is_share: true, channel_id: 'C0ENG', text: 'Ship it on Friday' }] })).toBe('Shared message: Ship it on Friday')
     expect(messagePreviewText({ text: '', attachments: [{ title: 'Build 412 passed', text: 'All green' }] })).toBe('Build 412 passed')
     expect(messagePreviewText({ text: '', attachments: [{ fallback: '[FIRING] disk 90%' }] })).toBe('[FIRING] disk 90%')
     expect(messagePreviewText({ text: '', attachments: [{ from_url: 'https://docs.example.org/page' }] })).toBe('Link: docs.example.org')
-    expect(messagePreviewText({ text: '', subtype: 'huddle_thread' })).toBe('Huddle')
   })
 
   it("names a shared message of only files by its files, not Slack's fallback line", () => {

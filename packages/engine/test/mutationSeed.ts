@@ -1,8 +1,9 @@
 import { largeSeed } from '@juno/fake-slack'
 
 /**
- * Repair needs 150 recently active conversations and threads outside the ten-topic recheck,
- * not a throughput workload. Keep all 300 conversations and enough paginated follows and
- * three-reply threads, with one week's activity. The performance tests retain 100,000 messages.
+ * Repair needs threads outside the ten-topic recheck with three recent replies, and all 300
+ * conversations so a call per conversation would break the catch-up call budget. It is not a
+ * throughput workload: 1,500 messages and 150 threads over two days. The performance tests
+ * keep 100,000 messages.
  */
-export const mutationSeed = () => largeSeed({ users: 400, topics: 1_000, messages: 20_000, days: 7 })
+export const mutationSeed = () => largeSeed({ users: 60, topics: 150, messages: 1_500, days: 2 })

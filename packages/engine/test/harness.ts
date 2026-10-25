@@ -197,6 +197,8 @@ export interface EngineOptions {
   readonly paced?: number
   /** Run the background AI jobs (titles, art, Home's AI items, Juno's Automated check). Off by default, so a test sees no AI result it did not ask for. */
   readonly aiJobs?: boolean
+  /** Open the cache with one more migration (`cacheMigrationsWithProbe`), as a build that adds one does. */
+  readonly cacheMigrationProbe?: boolean
 }
 
 /** All scheduling ratios stay at 1:20; explicit sync passes replace periodic work in ordinary tests. */
@@ -204,6 +206,8 @@ export const fastTiming: EngineTimingConfig = {
   ...Record.map(productionTiming, (millis) => millis / 20),
   sweepIntervalMillis: 0,
   followPassMillis: 0,
+  // Retry-After stays real, so the wait it is compared with does too.
+  slackInteractiveMaxWaitMillis: productionTiming.slackInteractiveMaxWaitMillis,
 }
 
 /** Starts a fake (unless reused) and the engine on it, with the atoms a test reads. */
@@ -241,7 +245,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     if (state === undefined) { state = { started: 0, finished: 0 }; work.set(name, state) }
     return state
   }
-  const handle = await timed('engine construction', () => startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }) }, {
+  const handle = await timed('engine construction', () => startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.cacheMigrationProbe === true ? { cacheMigrationProbe: true } : {}), ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }) }, {
     timing: { ...fastTiming, ...options.timing },
     ...(options.clock === undefined ? {} : { clock: options.clock }),
     work: {

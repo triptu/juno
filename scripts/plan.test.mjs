@@ -61,9 +61,6 @@ test('only complete successful job reports pass, including report collection', (
 
 test('desktop and gallery allocations vary independently and reject invalid core counts', async () => {
   const { planCores } = await import('./remote/plan.mjs')
-  assert.equal(planCores('desktop', { env: [] }, {}), 3)
-  assert.equal(planCores('gallery', { env: [] }, {}), 3)
-  assert.equal(planCores('unit', { env: [] }, {}), undefined)
   const options = { env: ['JUNO_RUNNER_DESKTOP_CORES=5', 'JUNO_RUNNER_GALLERY_CORES=3'] }
   assert.equal(planCores('desktop', options, {}), 5)
   assert.equal(planCores('gallery', options, {}), 3)

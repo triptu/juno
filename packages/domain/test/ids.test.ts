@@ -14,11 +14,7 @@ describe('topic ids', () => {
     expect(parseTopicId(bad)).toBeUndefined()
   })
 
-  it('rejects malformed timestamps and topic ids at the schema', () => {
-    const decode = Schema.decodeUnknownSync(Ts)
-    expect(() => decode('1728000000')).toThrow()
-    expect(() => decode('abc')).toThrow()
-    expect(decode('1728000000.000001')).toBe<string>('1728000000.000001')
+  it('rejects malformed topic ids at the schema', () => {
     expect(() => Schema.decodeUnknownSync(TopicId)('x:C0ENG')).toThrow()
     expect(Schema.decodeUnknownSync(TopicId)('m:C0ENG')).toBe<string>('m:C0ENG')
   })

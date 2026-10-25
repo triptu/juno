@@ -74,22 +74,7 @@ test('a malformed launch.json still opens a usable window', { tag: '@electron' }
   }
 })
 
-test('a deleted sender and a live rename keep their messages readable', async ({ juno, fake }) => {
-  const old = fake.workspace.users.get('U0MAYA')!
-  fake.workspace.users.set(old.id, { ...old, deleted: true })
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
-  fake.injectMessage({ channel: 'C0ENG', user: old.id, text: 'A former teammate wrote this' })
-  const row = juno.topic.message('A former teammate wrote this')
-  await expect(row).toBeVisible()
-  const renamed = { ...old, deleted: true, real_name: 'Former teammate', profile: { ...old.profile, display_name: 'Former teammate', real_name: 'Former teammate' } }
-  fake.workspace.users.set(old.id, renamed)
-  fake.emitFrame({ type: 'user_change', user: renamed })
-  await expect(row).toContainText('Former teammate')
-  await juno.topic.send('Reply to the old message')
-  await juno.topic.expectSent('Reply to the old message')
-})
+// A deactivated sender and a live rename of them: the engine's live-events flow test.
 
 syncedTest('repeated window minimize and restore keeps the draft', { tag: '@electron' }, async ({ juno, app }) => {
   await juno.sidebar.row('#eng').open()

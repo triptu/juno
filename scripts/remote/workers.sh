@@ -16,8 +16,9 @@ if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
   # Four threads on the usual two physical cores overlap the frame waits.
   if [ "$cores" -eq 4 ]; then gallery_workers=4; fi
 fi
-# The standalone gallery spends part of each touch waiting for animation frames.
-if [ "$cores" -eq 3 ] && [ "$1" = test:gallery ]; then gallery_workers=4; fi
+# A job that runs only the gallery mostly waits for frames and motion to settle:
+# four walkers per three threads kept 6 threads 94% busy and cut a full walk by 36%.
+case " $* " in *" + "*) ;; *" test:gallery "*) gallery_workers=$(at_least $(( cores * 4 / 3 )) 1) ;; esac
 export JUNO_TEST_WORKERS=${JUNO_TEST_WORKERS:-$test_workers}
 # An Electron test runs the app, its engine and a fake Slack: half a core's worth
 # of workers kept tests on time on 4 cores, one per core did not (8 cores take

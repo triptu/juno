@@ -1,7 +1,9 @@
 // The conversation observation fence (specs/metadata.qnt): events against held workspace and counts
 // snapshots. Tests start warm on the synced default workspace, except the one about the first snapshot.
+import type { TopicRow } from '@juno/contract'
 import { sendMessage } from '@juno/state'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { controlledSweeps } from './controlledClock'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { readDb, valueOf } from './scenario'
 import { syncedEngine } from './synced'
@@ -30,6 +32,8 @@ describe('conversation observation fence', () => {
   it('repairs a missed rename, leave and archive after a gap with one workspace and one full counts call', async () => {
     const engine = await syncedEngine(engines)
     const { fake } = engine
+    const shown = (rows: ReadonlyArray<TopicRow>) => rows.filter((row) => row.id === 'm:C0PRODUCT' || row.id === 'm:C0PLATFORM').map((row) => row.id).toSorted()
+    expect(shown(await engine.rows())).toEqual(['m:C0PLATFORM', 'm:C0PRODUCT'])
     fake.goOffline()
     await engine.phase('offline')
     fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
@@ -46,6 +50,9 @@ describe('conversation observation fence', () => {
     const counts = fake.calls.filter((c) => c.method === 'client.counts')
     expect(counts).toHaveLength(1)
     expect(counts[0]!.args['counts_last_fetched']).toBeUndefined()
+    // The sidebar follows: the new name, and no Main for the channel left or the one archived.
+    const rows = await engine.rowsUntil((list) => list.find((row) => row.id === 'm:C0ENG')?.title === '#engineering', 'the renamed row')
+    expect(shown(rows)).toEqual([])
   })
 
   it('keeps a rename observed before the first workspace snapshot creates its row', async () => {
@@ -128,7 +135,8 @@ it('leaves omitted topic and purpose to the snapshot while a partial event chang
 })
 
 it('merges a partial incremental counts row without clearing unread state or latest', async () => {
-  const engine = await syncedEngine(engines, { timing: { sweepIntervalMillis: 500 } })
+  const sweeps = await controlledSweeps()
+  const engine = await syncedEngine(engines, { clock: sweeps.clock, timing: { sweepIntervalMillis: sweeps.sweepIntervalMillis } })
   const reads = () => readDb(engine, 'cache.db', (db) => db.prepare(
     "SELECT slack_last_read, latest, has_unreads, mention_count, counts_updated FROM channel_reads WHERE channel = 'C0ENG'",
   ).get())
@@ -138,13 +146,19 @@ it('merges a partial incremental counts row without clearing unread state or lat
   engine.fake.workspace.changedAt.clear()
   const pointer = engine.fake.workspace.main('C0ENG').at(-1)!.ts
   engine.fake.workspace.reads.set('C0ENG', pointer)
-  await waitFor(() => {
-    const row = reads()
-    return row?.counts_updated !== before?.counts_updated ? row : undefined
-  }, 20_000, 'partial counts merged')
-  expect(reads()).toMatchObject({
-    slack_last_read: pointer, latest: before?.latest,
-    has_unreads: before?.has_unreads, mention_count: before?.mention_count,
-  })
-  expect(engine.fake.calls.some((call) => call.method === 'client.counts' && call.args['counts_last_fetched'] !== undefined)).toBe(true)
+  try {
+    await sweeps.sweep(engine)
+    await waitFor(() => {
+      const row = reads()
+      return row?.counts_updated !== before?.counts_updated ? row : undefined
+    }, 20_000, 'partial counts merged')
+    expect(reads()).toMatchObject({
+      slack_last_read: pointer, latest: before?.latest,
+      has_unreads: before?.has_unreads, mention_count: before?.mention_count,
+    })
+    expect(engine.fake.calls.some((call) => call.method === 'client.counts' && call.args['counts_last_fetched'] !== undefined)).toBe(true)
+  } finally {
+    await engines.splice(engines.indexOf(engine), 1)[0]!.stop()
+    await sweeps.close()
+  }
 })

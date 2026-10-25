@@ -1,18 +1,21 @@
 // Edits and deletes through the outbox (M6b; architecture 5.7, specs/outbox.qnt): the change shows at once,
 // Slack's answer and the socket event reconcile it in either order, a message still being sent is waited for
 // (`depends_on`), a refusal puts back what Slack has, and a failure ends once and is shown for Retry or
-// Dismiss. Every test starts warm on the synced default workspace. Reactions are in `outbox-reactions`.
+// Dismiss. Every test starts warm on the synced default workspace. Reactions are in `outbox-reactions`, apart
+// from how they pass an edit's backoff and a lost answer, which are here; broadcasts in `outbox-broadcast`.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 import { SELF_ID } from '@juno/fake-slack'
 import { deleteMessage, editMessage, reactToMessage, resolveMessageAction, sendMessage } from '@juno/state'
+import { productionTiming } from '../../src/config'
+import { controlledClock } from '../controlledClock'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { actionRows, actionsEnded, chip, eng, fresh, inSlack, MAIN, outboxScenario, refOf, rowWith, sending, sent } from '../outboxScenario'
 import { apiCalls, quiet, readDb, valueOf } from '../scenario'
 import { step } from '../step'
 
-const { booted, watch, opened, restarted } = outboxScenario()
+const { booted, watch, opened, restarted, stop } = outboxScenario()
 
 /** Outbox actions that ended as failures, with their attempts: what the message's action issue is built from. */
 const failures = (engine: RunningEngine) => readDb(engine, 'user.db', (db) =>
@@ -190,7 +193,7 @@ it('waits for a post still being sent before editing, deleting or reacting to it
     const pending = rowWith(await rows((list) => rowWith(list, 'Queued draft')?.pending === 'sending', 'sending'), 'Queued draft')!
     valueOf(await editMessage(engine.registry, refOf(pending), 'Edit while sending'))
     await waitFor(() => (actionRows(engine).length === 1 ? true : undefined), WAIT_MS, 'the edit waiting on the post')
-    engine.fake.decide(call.id, { error: 'ratelimited', status: 429, retryAfter: 2 })
+    engine.fake.decide(call.id, { error: 'ratelimited', status: 429, retryAfter: 0.5 })
     engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === call.id && c.stage === 'answer'), WAIT_MS, 'the 429')).id, 'answer')
     // The outbox's own state is the only sign the post went back to the queue; the row still says sending.
     const state = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT state FROM pending_messages WHERE client_msg_id = ?').get(pending.clientMsgId!) as { state: string } | undefined)?.state)
@@ -322,4 +325,57 @@ it('stops a failing edit after five tries for an explicit Retry, and settles one
       engine.fake.releaseFrames()
     })
   }
+})
+
+it('sends a reaction while an edit of another message waits out its production backoff [TestClock]', async () => {
+  const time = await controlledClock()
+  const engine = await booted({ clock: time.clock, timing: { retryBaseMillis: productionTiming.retryBaseMillis, retryCapMillis: productionTiming.retryCapMillis } })
+  try {
+    const rows = await opened(engine)
+    const mine = await sent(engine, 'Edit before reacting', rows)
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Reaction delivery target' })
+    const target = rowWith(await rows((list) => rowWith(list, 'Reaction delivery target') !== undefined, 'the target'), 'Reaction delivery target')!
+    await quiet(engine)
+    await time.freeze()
+    engine.fake.forceError({ method: 'chat.update', error: 'internal_error', times: 5 })
+    valueOf(await editMessage(engine.registry, refOf(mine), 'Edited before reacting'))
+    // The refused edit is put off by the outbox's own schedule; nothing else shows it.
+    await waitFor(() => (failures(engine).some((row) => row.attempts === 1) ? true : undefined), WAIT_MS, 'the edit waiting out its backoff')
+    valueOf(await reactToMessage(engine.registry, refOf(target), 'eyes', true))
+    await waitFor(() => (inSlack(engine, target.ts)?.reactions?.some((reaction) => reaction.name === 'eyes') ? true : undefined), WAIT_MS, 'the reaction in Slack')
+    // The reaction's outbox row ends, with no issue to show; no time passed, so the edit is still waiting.
+    await waitFor(() => (actionRows(engine).map((row) => row.kind).join() === 'edit' ? true : undefined), WAIT_MS, 'only the edit left in the outbox')
+    expect(apiCalls(engine, 'chat.update')).toHaveLength(1)
+  } finally {
+    await stop(engine)
+    await time.close()
+  }
+})
+
+it('a reaction whose answer the network lost and sent again is added once and taken away once', async () => {
+  const engine = await booted()
+  // Chromium sends a request again when its connection closes with no answer (ADR 0014), so Slack runs it twice.
+  engine.main.network.resend = true
+  const rows = await opened(engine)
+  engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'React over a lost answer' })
+  const target = rowWith(await rows((list) => rowWith(list, 'React over a lost answer') !== undefined, 'the target'), 'React over a lost answer')!
+  const reactions = () => inSlack(engine, target.ts)?.reactions ?? []
+
+  await step('the add Slack ran twice ends as made, with one reaction in Slack', async () => {
+    engine.fake.loseResponse({ method: 'reactions.add' })
+    valueOf(await reactToMessage(engine.registry, refOf(target), '+1', true))
+    await actionsEnded(engine, 'the add ended')
+    expect(apiCalls(engine, 'reactions.add').map((call) => call.error)).toEqual(['lost', 'already_reacted'])
+    expect(reactions()).toMatchObject([{ name: '+1', count: 1 }])
+    await rows((list) => chip(rowWith(list, 'React over a lost answer'), '+1')?.count === 1 && rowWith(list, 'React over a lost answer')?.reactionIssue === undefined, 'one chip, yours')
+  })
+
+  await step('the remove Slack ran twice ends as made, with no reaction left', async () => {
+    engine.fake.loseResponse({ method: 'reactions.remove' })
+    valueOf(await reactToMessage(engine.registry, refOf(target), '+1', false))
+    await actionsEnded(engine, 'the remove ended')
+    expect(apiCalls(engine, 'reactions.remove').map((call) => call.error)).toEqual(['lost', 'no_reaction'])
+    expect(reactions()).toEqual([])
+    await rows((list) => chip(rowWith(list, 'React over a lost answer'), '+1') === undefined && rowWith(list, 'React over a lost answer')?.reactionIssue === undefined, 'no chip')
+  })
 })

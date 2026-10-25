@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'bun:test'
-import { parseSearchQuery, printSearchQuery, SEARCH_WINDOW, searchMore, searchQuery, viewsSortChannel, topicsRename, type SearchSnapshot, type SearchQuery } from '@juno/contract'
+import { parseSearchQuery, printSearchQuery, SEARCH_WINDOW, searchCalendar, searchMore, searchQuery, viewsSortChannel, topicsRename, type SearchSnapshot, type SearchQuery } from '@juno/contract'
 import { liveQuery, runCommand, searchSnapshots } from '@juno/state'
 import { syncedEngine } from '../synced'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
@@ -257,3 +257,15 @@ it('retains local rows on Slack failure; pins wait for Slack; offline and palett
   expect(ids(offline)).toEqual([])
   expect(fake.callCount('search.modules.messages')).toBe(0)
 }, 90_000)
+
+it("the Date presets' calendar is the Slack profile's time zone, and follows a change to it", async () => {
+  const engine = await syncedEngine(engines)
+  const self = engine.fake.workspace.users.get(engine.fake.workspace.selfId)!
+  for (const tz of ['America/Los_Angeles', 'Asia/Kolkata']) {
+    const user = { ...self, tz }
+    engine.fake.workspace.users.set(user.id, user)
+    engine.fake.emitFrame({ type: 'user_change', user })
+    await engine.socketIdle()
+    expect(valueOf(await runCommand(engine.registry, searchCalendar, undefined))).toBe(tz)
+  }
+})

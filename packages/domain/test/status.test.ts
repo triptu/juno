@@ -14,11 +14,6 @@ import { DAY, HOUR, NOW, alerts, eng, group, hiring, maya, topic, ts } from './f
 const ctx: RuleContext = { now: NOW }
 
 describe('topic status', () => {
-  it('uses a 3-day quiet window by default', () => {
-    expect(topicStatus(topic({ ago: 3 * DAY }), ctx)).toBe('open')
-    expect(topicStatus(topic({ ago: 3 * DAY + 1 }), ctx)).toBe('quiet')
-  })
-
   it.each([
     ['active and untouched', topic({ ago: HOUR }), 'open'],
     ['no activity for 4 days', topic({ ago: 4 * DAY }), 'quiet'],

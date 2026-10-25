@@ -112,7 +112,7 @@ Unit:
 - `specs:check` with no cache is the longest step of the side lane (287 to 435 s: 266 simulations two at a time, 19 Apalache checks one at a time). It is kept as it is. Two options for the owner, not taken: run it in its own lane, or let `verify:main` reuse cached Apalache results, which are deterministic for the same inputs, and rerun only the random simulations.
 - The engine's `quiet()` (a 300 ms window with no new fake calls) is called about 100 times; a count of calls in flight could replace it, but every engine test depends on it.
 - `realtime.spec`'s offline tests take 8 to 10 s each, waiting for the socket to come back; finding the backoff was not worth the few seconds.
-- The crash and recovery unit tests start the agent from source two to four times per test. A shared Node compile cache cut their CPU by about 30%; wall time did not change, since the runs are one after another.
+- The crash and recovery unit tests start the agent two to four times per test. Each test process bundles a fixture once and starts the bundle (`runAgent`), so a start no longer loads the module graph from source.
 - The agent's AI and Juno e2e specs, `idle-cpu`, `quick-start` and the named regression tests: kept as they are.
 
 ## 5. Results

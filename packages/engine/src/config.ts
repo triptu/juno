@@ -103,6 +103,8 @@ export interface EngineTimingConfig {
   readonly slackRetryBaseMillis: number
   /** Longest HTTP transient retry backoff. */
   readonly slackRetryCapMillis: number
+  /** Longest Retry-After pause an interactive call waits out; a longer one shows Juno as rate-limited. */
+  readonly slackInteractiveMaxWaitMillis: number
   /** First retry of a failed live query. */
   readonly liveRetryBaseMillis: number
   /** Longest retry of a failed live query. */
@@ -154,6 +156,7 @@ export const productionTiming: EngineTimingConfig = {
   socketTickleMillis: 19_000,
   slackRetryBaseMillis: 1_000,
   slackRetryCapMillis: 15_000,
+  slackInteractiveMaxWaitMillis: 5_000,
   liveRetryBaseMillis: 500,
   liveRetryCapMillis: 30_000,
   huddleStatusRenewMillis: 240_000,
