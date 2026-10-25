@@ -7,7 +7,8 @@ import { forwardSignals } from './children.mjs'
 // Two four-core jobs that carry about the same measured CPU in a full run (docs/development.md,
 // "Full runs"): the browser and Electron lanes, which share builds, with the spec checks; and the
 // unit tests, the DOM lane and the gallery. Smaller jobs each left one long suite on too few cores.
-const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'specs:check', 'specs:conformance']
+// A release's nightly tests (test:nightly) join the desktop job, which has the builds.
+const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:nightly', 'test:e2e', 'specs:check', 'specs:conformance']
 
 export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]

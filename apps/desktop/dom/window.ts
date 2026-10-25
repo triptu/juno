@@ -1,29 +1,36 @@
 /**
- * A happy-dom window that runs the renderer bundle (`vite.config.ts`). Each
- * window is its own VM context, so the renderer's module state is new for
- * every test and every relaunch. What happy-dom leaves out and the app calls
- * is filled in here, each answering as an unhidden, laid-out page would:
- * a test whose assertion depends on one of these belongs in Playwright
- * (README, "The rule").
+ * A happy-dom window that runs the renderer bundle (`vite.config.ts`). The
+ * bundle runs in one VM context per Bun worker (`realm.ts`), so the code JSC
+ * has compiled and optimised carries from test to test; each window gets
+ * the bundle's module state new, and its globals are that window's. What
+ * happy-dom leaves out and the app calls is filled in here, each answering
+ * as an unhidden, laid-out page would: a test whose assertion depends on
+ * one of these belongs in Playwright (README, "The rule").
  */
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { Script } from 'node:vm'
 import { Window } from 'happy-dom'
 import type { PageClock } from './clock'
+import { checkRealm, LANGUAGE, prepareRealm, startRenderer } from './realm'
 
 export const DOM_BUILD = resolve(__dirname, 'dist')
 
-let compiled: { readonly script: Script; readonly css: string } | undefined
-/** Compiled once per Bun worker; each window runs it in its own context. */
-function renderer() {
-  compiled ??= { script: new Script(readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8'), { filename: 'renderer.js' }), css: rootRules(readFileSync(join(DOM_BUILD, 'style.css'), 'utf8')) }
-  return compiled
+let css: string | undefined
+
+/** The sheet's root rules, read once per worker. */
+function rootSheet(): string {
+  return css ??= rootRules(readFileSync(join(DOM_BUILD, 'style.css'), 'utf8'))
 }
 
-/** Compiles the renderer and its sheet ahead of the first window. */
+/** Compiles the renderer in its realm and reads its sheet ahead of the first window, from a window that runs nothing. */
 export function warmRenderer(): void {
-  renderer()
+  rootSheet()
+  prepareRealm(() => {
+    const probe = new Window()
+    fillGaps(probe)
+    ;(probe as unknown as Record<string, unknown>)['__junoSidebarTrace'] = undefined
+    return probe
+  }, () => readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8'))
 }
 
 /**
@@ -74,6 +81,8 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
       navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36' },
     },
   })
+  // JavaScript's globals as the window made them, before the gaps and the clock replace any.
+  const language = Object.fromEntries(LANGUAGE.map((name) => [name, (window as unknown as Record<string, unknown>)[name]]))
   patchPrototypes(window)
   if (open.size === 0) restorePrototypes(window)
   open.add(window)
@@ -82,9 +91,9 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
   ;(window as unknown as Record<string, unknown>)['__junoSidebarTrace'] = { hold: [], list: { values: 0, errors: 0 } }
   clock?.install(window, engineClock)
   for (const [key, value] of storage) window.localStorage.setItem(key, value)
-  const { script, css } = renderer()
-  window.document.write(`<!doctype html><html><head><style>${css}</style></head><body><div id="root"></div></body></html>`)
-  script.runInContext(window as never)
+  window.document.write(`<!doctype html><html><head><style>${rootSheet()}</style></head><body><div id="root"></div></body></html>`)
+  warmRenderer()
+  startRenderer(window, language)
   return window
 }
 
@@ -338,6 +347,7 @@ export async function closeWindow(window: Window): Promise<void> {
     open.delete(window)
     if (open.size === 0) restorePrototypes(window)
   }
+  checkRealm()
 }
 
 function fillGaps(window: Window): void {

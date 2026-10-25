@@ -90,7 +90,7 @@ test('local runs archive eligible records, refresh coverage, and preserve failed
       const map = JSON.parse(readFileSync(join(root, 'apps/desktop/e2e/coverage-map.json'), 'utf8'))
       assert.equal(map.commit, commit)
       assert.deepEqual(map.files, { 'apps/desktop/src/main.ts': [0] })
-      // A nightly reuses nothing, even with unchanged inputs.
+      // A nightly run reuses no suite from the run before it.
       assert.ok(!summary.suites.find((s) => s.suite === 'specs:conformance').reusedFrom)
       assert.ok(calls.some((c) => c.suite === 'specs:conformance'))
     }
