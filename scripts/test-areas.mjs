@@ -5,8 +5,8 @@
 //   full run (bun run verify:main) always runs them. An affected plan runs an area's heavy
 //   tests only when a changed file is in that area.
 // - PERF_INTERACTIONS: the interactions with a budget in docs/performance.md,
-//   and the files each one owns. The plan suggests perf and feel on the Mac only
-//   when one of these changed.
+//   and the files each one owns. When one of these changed, the plan runs its
+//   feel scenario in the browser and suggests perf on the Mac.
 // - GUARD_SPECS: desktop specs that guard the most frequent paths. A plan
 //   always runs one when a changed file is in its area, whatever the coverage
 //   map ranks or the time budget leaves. None now: the instant paths check is
@@ -39,7 +39,7 @@ export const HEAVY_AREAS = [
     area: 'idle',
     suite: 'desktop',
     tag: '@heavy-idle',
-    tests: 'CPU and memory checks in idle-cpu.spec.ts, all @mac, so only Mac runs reach them',
+    tests: 'the portable CPU and memory walk in idle-cpu.spec.ts; its fine Mac walk is @mac and runs only by hand',
     whole: [],
     paths: [
       'apps/desktop/e2e/idle-cpu.spec.ts',
@@ -77,7 +77,7 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'topic open, scroll and live updates',
     perf: 'topic open|scroll|live update',
-    feel: 'topic.feel.ts',
+    feel: 'after-idle.feel.ts',
     paths: ['apps/desktop/src/renderer/containers/TopicView.tsx', 'apps/desktop/src/renderer/containers/topic/', 'apps/desktop/src/renderer/containers/messageRows.ts', 'packages/views/src/TopicView.tsx', 'packages/views/src/MessageList.tsx', 'packages/views/src/Message.tsx', 'packages/views/src/MessageBody.tsx', 'packages/state/src/messages.ts', 'packages/state/src/topics.ts', 'packages/engine/src/messages/', 'packages/engine/src/protocol/'],
   },
   {
@@ -89,7 +89,7 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'Home open and a new tab with Home',
     perf: 'home open|a new tab with Home',
-    feel: 'home.feel.ts',
+    feel: 'after-idle.feel.ts',
     paths: ['apps/desktop/src/renderer/containers/Home.tsx', 'apps/desktop/src/renderer/containers/HomeComposer.tsx', /^packages\/views\/src\/Home[A-Za-z]*\.tsx$/, /^packages\/state\/src\/home[A-Za-z]*\.ts$/, 'packages/engine/src/home/'],
   },
   {

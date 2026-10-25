@@ -53,6 +53,7 @@ async function teardown(): Promise<void> {
     const result = await readResult(join(REPORT_DIR, entry.name))
     if (result !== undefined) results.push(result)
   }
+  if (results.length === 0) return
   results.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
   const started = Number(await readFile(join(REPORT_DIR, 'started'), 'utf8').catch(() => '0'))
   const minutes = started > 0 ? ((Date.now() - started) / 60_000).toFixed(1) : '?'

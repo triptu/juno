@@ -2,9 +2,10 @@ import { expect } from '../fixtures'
 import { landsAndStays, neverZero, noFlicker, shotOfFrame, type Check } from './checks'
 import { test } from './feel'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test('the chip and the composer stay in place when a first @ chooses a person', async ({ juno, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.write.composer.pressSequentially('@ma')
   await expect(juno.write.sendToOption('Maya')).toBeVisible()
   await feel.run({
@@ -21,8 +22,6 @@ test('the chip and the composer stay in place when a first @ chooses a person', 
 })
 
 test('a send from Home leaves the field where it was', async ({ juno, fake, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.write.pickConversation('eng', 'eng')
   await juno.write.write('first')
   // The send button brightens over 150 ms once the field has text. Record from where it settled,
@@ -56,8 +55,6 @@ const heldWhole: Check = (evidence) => {
 }
 
 test('the destination list keeps its rows while a search is typed', async ({ juno, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.write.chip.click()
   await expect(juno.write.option('eng')).toBeVisible()
   await feel.run({

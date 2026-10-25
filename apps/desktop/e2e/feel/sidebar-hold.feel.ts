@@ -7,6 +7,9 @@ import { happened, landsAndStays, noFlicker, noLayoutShift, shotOfFrame, type Ch
 import { test } from './feel'
 import type { ProbeFrame } from './recorder'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 const RECENT_ROWS = 'aside[aria-label="Sidebar"] [role="group"][aria-label="Topics"] [data-topic-row]'
 
 const order = (values: ProbeFrame['values']): string => {
@@ -31,8 +34,6 @@ const reordersOnce: Check = (evidence) => {
 }
 
 test('the sidebar holds its order under the pointer while replies land, and reorders once when the pointer leaves', async ({ juno, win, fake, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const recent = juno.sidebar.section('Recent').locator('[data-topic-row]')
   const ids = await recent.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-topic-id') ?? ''))
   // The two oldest threads in Recent, below the row pointed at: replies in them would move them to the top.

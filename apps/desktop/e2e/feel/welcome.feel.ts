@@ -5,7 +5,7 @@
 // plays it in again.
 import type { Page } from '@playwright/test'
 import type { FakeSlack } from '@juno/fake-slack'
-import { expect, launchApp } from '../fixtures'
+import { expect } from '../fixtures'
 import type { Juno } from '../driver/juno'
 import { firstFrameRight, happened, landsAndStays, noFlicker, noLayoutShift, opensWhole, shotOfFrame, staysDrawn, switchesOnce, type Check } from './checks'
 import { type Feel, test as feelTest } from './feel'
@@ -19,13 +19,7 @@ const CARD = `${HOME} section[data-welcome]:not([aria-hidden])`
 const ROOM = `${HOME} section[data-welcome]`
 
 /** The app shows the card by itself, as outside tests. */
-const test = feelTest.extend({
-  running: async ({ fake, slackApp, userData }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true })
-    await use(running)
-    await running.close()
-  },
-})
+const test = feelTest.extend({ tour: true })
 
 const card: ReadonlyArray<Probe> = [
   { kind: 'rect', name: 'card', selector: CARD },

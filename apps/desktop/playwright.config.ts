@@ -31,6 +31,15 @@ const electronGrep = new RegExp(`${tagPattern(['@electron', '@canary'])}|^(?!\\s
 // own folder, so one step does not empty another's traces and results.
 const results = join(__dirname, 'test-results', process.env.JUNO_PLAN_STEP === undefined ? '' : `step-${process.env.JUNO_PLAN_STEP}`)
 
+// The feel scenarios (e2e/feel) run in the browser beside the other specs, on
+// a machine other jobs share: their contact sheet goes with the test results,
+// only failed scenarios keep frames, filmstrip and video, and a long animation
+// frame only warns (`bun run perf` owns timing). `bun run test:feel` keeps the
+// full record in Electron on the Mac.
+process.env.JUNO_FEEL_REPORT ??= join(results, 'feel-report')
+process.env.JUNO_FEEL_MEDIA ??= 'failed'
+process.env.JUNO_FEEL_LONG_FRAMES ??= 'warn'
+
 export default defineConfig<object, { lane: Lane }>({
   testDir: 'e2e',
   // The build steps' folder; a project's own replaces it.
@@ -58,6 +67,26 @@ export default defineConfig<object, { lane: Lane }>({
       },
     },
     {
+      name: 'feel',
+      testDir: 'e2e/feel',
+      testMatch: '*.feel.ts',
+      outputDir: join(results, 'feel'),
+      dependencies: ['build-web'],
+      fullyParallel: true,
+      retries: 0,
+      workers: browserWorkers,
+      timeout: 120_000,
+      expect: { timeout: 15_000 },
+      ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
+      use: {
+        lane: 'web' satisfies Lane,
+        browserName: 'chromium',
+        launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] },
+        viewport: { width: 1200, height: 800 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+    {
       name: 'electron',
       outputDir: join(results, 'electron'),
       testIgnore: ['web/web-shell.spec.ts', 'setup/**', 'perf.spec.ts', '*.perf.spec.ts', ...(process.env.JUNO_SCREENS === '1' ? [] : ['screens.spec.ts', '**/screens/**'])],
@@ -78,7 +107,7 @@ export default defineConfig<object, { lane: Lane }>({
     },
   ],
   // e2e/coverage.ts records which source files each spec runs, under JUNO_COVERAGE=1.
-  globalSetup: ['./e2e/coverage.ts'],
+  globalSetup: ['./e2e/coverage.ts', './e2e/feel/sheet.ts'],
   timeout: 30_000,
   expect: { timeout: 5_000 },
   workers: Math.max(electronWorkers, browserWorkers),

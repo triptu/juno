@@ -10,6 +10,9 @@ import { happened, noFlicker, noLongFrames, shotOfFrame, type Check } from './ch
 import { expect, test } from './feel'
 import type { ProbeFrame } from './recorder'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 const ROWS = 'aside[aria-label="Sidebar"] [role="group"][aria-label="Topics"] [data-topic-row]'
 
 interface Box {
@@ -65,10 +68,8 @@ function reply(fake: FakeSlack, id: string, text: string): void {
   fake.injectMessage({ channel: channel!, threadTs: threadTs!, user: 'U0LEO', text })
 }
 
-/** Signs in, picks the theme, and parks the pointer away from the list at its top. */
+/** Picks the theme, and parks the pointer away from the list at its top. */
 async function ready(juno: Juno, win: Page, theme: 'Light' | 'Dark'): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
   if (theme === 'Dark') await juno.setTheme('Dark')
   await win.mouse.move(900, 400)
   await win.waitForTimeout(400)
@@ -83,7 +84,8 @@ const themes = (process.env['FEEL_THEMES'] ?? 'Light').split(',') as Array<'Ligh
 for (const theme of themes) {
   const tag = theme.toLowerCase()
 
-  test(`sidebar motion (${tag}): a reply moves a thread from lower in the list to the top`, async ({ juno, win, fake, feel }) => {
+  // Three scenarios in one launch: a reply, a newly followed thread, then a burst.
+  test(`sidebar motion (${tag}): a reply moves a thread to the top, a newly followed thread comes in at the top, and three replies land within half a second`, async ({ juno, win, fake, feel }) => {
     await ready(juno, win, theme)
     const ids = await recentIds(juno)
     // A thread in view, a few rows down.
@@ -107,10 +109,8 @@ for (const theme of themes) {
         await expect.poll(async () => (await recentIds(juno))[0]).toBe(mover)
       },
     )
-  })
+    await win.waitForTimeout(400)
 
-  test(`sidebar motion (${tag}): a newly followed thread comes in at the top`, async ({ juno, win, fake, feel }) => {
-    await ready(juno, win, theme)
     // A new thread in #platform, outside the sidebar until it is followed.
     const root = fake.injectMessage({ channel: 'C0PLATFORM', user: 'U0SAM', text: 'Should we move the build cache to the new runners?' })
     await win.waitForTimeout(1_200)
@@ -131,12 +131,9 @@ for (const theme of themes) {
         await expect.poll(async () => (await recentIds(juno)).includes(id), { timeout: 15_000 }).toBe(true)
       },
     )
-  })
+    await win.waitForTimeout(400)
 
-  test(`sidebar motion (${tag}): three replies within half a second`, async ({ juno, win, fake, feel }) => {
-    await ready(juno, win, theme)
-    const ids = await recentIds(juno)
-    const movers = ids.slice(2).filter((id) => id.startsWith('t:')).slice(0, 3)
+    const movers = (await recentIds(juno)).slice(2).filter((id) => id.startsWith('t:')).slice(0, 3)
     expect(movers).toHaveLength(3)
     await feel.run(
       {

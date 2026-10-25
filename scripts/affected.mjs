@@ -361,8 +361,14 @@ for (const { script, reached } of bunTestScripts(root, changed))
   if (everythingChanged.length > 0 || toolChanged.length > 0 || reached.length > 0)
     plan.push({ script, args: [], local: false, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
 
-// perf and feel are suggested only for an interaction with a budget whose own files changed.
+// perf is suggested only for an interaction with a budget whose own files changed.
 const interactions = batch ? [] : perfInteractionsChanged(changed)
+// The feel scenarios run in the browser (the e2e config's feel project): a changed scenario, and the scenario of a changed interaction.
+const feelFiles = batch ? [] : [...new Set([
+  ...changed.filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file) && existsSync(join(root, file))).map((file) => file.replace('apps/desktop/', '')),
+  ...interactions.flatMap((entry) => (entry.feel ? [`e2e/feel/${entry.feel}`] : [])),
+])]
+if (feelFiles.length > 0) plan.push({ script: 'test:desktop', args: ['--project=feel', ...feelFiles], local: false, items: [], why: `${feelFiles.length} feel scenario file(s): changed, or the scenario of a changed interaction` })
 
 // --plan --json prints the plan for tools (a replay of past merges, for one).
 if (flag('--json')) {
@@ -383,7 +389,7 @@ for (const note of desktopNotes) console.log(`  (${note})`)
 if (!batch && skipTags.length > 0 && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. A full run (bun run verify:main) and --wide run them)`)
 if (plan.length === 0) console.log('  nothing to run')
 for (const entry of interactions)
-  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, bun run perf -g "${entry.perf}"${entry.feel ? ` and bun run test:feel ${entry.feel}` : ''})`)
+  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, bun run perf -g "${entry.perf}" when Tushar asks)`)
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
 const results = await runPlan(plan, { root, local: flag('--local') })

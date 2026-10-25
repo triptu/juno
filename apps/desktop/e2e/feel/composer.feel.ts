@@ -7,6 +7,9 @@ import { test } from './feel'
 import { tag } from './pane'
 import type { Probe, Rect } from './recorder'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 const POSTGRES = 'Draft plan is in the doc'
 const LIST = '[data-topic-view] [data-mention-suggestions]'
 
@@ -32,8 +35,6 @@ const narrowsInPlace: Check = (evidence) => {
 }
 
 test('typing a mention', async ({ juno, win, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   await juno.topic.composer.focus()
