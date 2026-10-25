@@ -747,7 +747,7 @@ A fast sweep checks the same touches in every state without real input: `bun run
 
 The broad shift walk caches each successful state. A key holds only what can move that state's boxes:
 
-- the state and its fixture's transitive workspace imports, and the gallery shell (the registry, frame and theme code, not `compositions.tsx` or `testFixtures.tsx`), its styles, assets and bundled fonts;
+- the state and its fixture's transitive workspace imports, and the gallery shell (the registry, frame and theme code, not `compositions.tsx` or `testFixtures.tsx`), its styles, assets and bundled fonts. The gallery's own compositions and test fixtures key on their file and what it imports;
 - the values of the design tokens those files read, in every theme, and of the tokens those values read. Tokens whose every value is a colour or a box shadow are left out: such a value is valid only where it paints, so it cannot move a box. A file that indexes a token group with a variable (`text[role]`) reads the whole group. The rest of the two token files (imports, constants, the theme lists) counts for every state; comments do not;
 - stylesheets without comments and paint-only declarations (`color`, `background-*`, `box-shadow`, `opacity` and the like);
 - the walk itself: `apps/gallery/shift-walk.ts` and what it imports, which includes `open-state.ts` (how a state is opened and when it is ready) and the guard in `packages/testing`. The rest of `shift.spec.ts` (delayed loads, the guard's self-tests), the queue and page recycling in `support.ts`, the Playwright config and other specs do not count for the shift walk;
@@ -758,9 +758,11 @@ The broad shift walk caches each successful state. A key holds only what can mov
 
 Records are shared across worktrees in the system temp folder's `juno-cache/results/gallery-walk-v1`. With `JUNO_BUILD_CACHE_DIR` they live in its `gallery-walk-v1` child, beside build entries; the remote runner sets this to `/cache/builds`. Writes use temporary files and atomic rename. `GALLERY_SHIFT_ALL=1 bun run test:gallery` bypasses both walk caches and refreshes successful records. `verify:main --nightly` and `verify:main --no-cache` set it automatically. Ordinary verification reuses matching states. Playwright `--repeat-each` also bypasses the caches, so every repeat exercises the states.
 
+Gallery tests that only read what states draw (geometry, overlap, contrast, wrapping, static attributes) are cached the same way, a whole test at a time: `layoutTest` and `paintTest` in `apps/gallery/support.ts`. A test's record keys on its title, its spec and what that imports, the runtime, and the walk key of every component it opened, which the fixture reads from the page's navigations (the state list counts as `#index`: the registries and fixture code). `paintTest` also counts the colour and shadow tokens those components read and paint-only CSS, so contrast reruns when a colour it resolves changes and not otherwise. `GALLERY_SHIFT_ALL=1` (so nightly and no-cache full runs) runs every one; repeats and retries do too. Interaction timing, motion, delayed loads, keyboard flows and the guard's self-tests are plain tests and run every time. See [the gallery README](../apps/gallery/README.md#cached-rendering-tests).
+
 `GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. A remote job that runs only the gallery gets four workers per three allocated threads (eight on a full run's six), since the walk mostly waits for frames and motion; `scripts/remote/workers.sh` sets this. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
 
-Each test owns one browser context. A walk opens a new document for each state, resetting fixture module state, selection, focus and scroll. It replaces its page after 20 states while keeping that context's HTTP cache. Fonts, visible images, lazy chunks and finite entrance motion must settle before measurement; a readiness deadline fails the state instead of silently treating it as ready. Scrolling an interaction target settles before the guard starts, so remembered off-screen row sizes are not charged to the following input. Motion stays enabled during the shift walk.
+Each test owns one browser context. Opening the gallery in a new document costs about 0.45 CPU-s (it loads the 2.4 MB bundle); a new context adds 0.06, and a page in a context that already loaded the bundle saves only 0.06 of the 0.45, so contexts are not shared between tests. A state opened by its hash in an open document costs about 0.03 CPU-s, so a test that checks several states opens them in one document (single probe runs on the runner, 10-25). A walk opens a new document for each state, resetting fixture module state, selection, focus and scroll. It replaces its page after 20 states while keeping that context's HTTP cache. Fonts, visible images, lazy chunks and finite entrance motion must settle before measurement; a readiness deadline fails the state instead of silently treating it as ready. Scrolling an interaction target settles before the guard starts, so remembered off-screen row sizes are not charged to the following input. Motion stays enabled during the shift walk.
 
 The shift walk budgets three seconds per selected state, divided by the active worker count, with a 20-minute minimum for a full walk (15 minutes for a component selection). The fixed 20-minute limit cut off an otherwise progressing uncached Mac walk. Each state, including its document reset, still has a 30-second limit. Playwright tears down each test's context after success or failure.
 
@@ -810,6 +812,18 @@ Single runs of `bun run remote --cores 4 --env GALLERY_SHIFT_ALL=1 test:gallery 
 | Three pages per shift part | 16.7 ms | 450 s | 480 s | 94% | 9.42 GB | 51 passed |
 
 The headless shell keeps its 60 Hz frame clock with those flags, so the guard's two-frame wait is unchanged and the flags are not used. Three pages per part were faster only because the CPU had room; with eight workers the gallery allocation is already 94% busy, so the pool was not kept.
+
+### Gallery CPU per spec, 2026-10-26
+
+Single runs of `bun run remote --cores 4 --env GALLERY_WORKERS=6 --env GALLERY_CPU=1 test:gallery`, the unit job's gallery step of a full run (eight threads, six workers), each after a run that left the walk records current. CPU is the Playwright phase from the job's cgroup; the build and the cache unit tests are outside it.
+
+| Run | Commit | Tests run | Playwright phase CPU | Playwright phase wall | Script time | CPU busy |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Before | `40103bc18` | 248 | 301 CPU-s | 53.2 s | 66 s (build 10 s) | 62% |
+| After, nothing changed | this change | 113 run, 58 cached | 123 CPU-s | 18.4 s | 21 s (build reused) | 78% |
+| After, eight workers | this change | 115 run, 60 cached | 150 CPU-s | 20.1 s | 23 s | 86% |
+
+Before, most tests cost about 0.5 CPU-s each: one new document of the 2.4 MB bundle. The largest were the shift spec (55 CPU-s: six cached walk parts reading the state list and keys, 14 composition states walked again on every source change, and its targeted tests), `behaviour` (23), `narrow-geometry` (17, 25 tests), `contrast` (12, 18 tests) and `message-geometry` (6). Uncached, as in a full run, the merged specs cost less too: `narrow-geometry` 6.7 CPU-s, `contrast` 4.6, `message-geometry` 3.1, `peek-contrast` 2.8. Removing the accessibility-only tests (merged from main before the after runs) accounts for about 5 CPU-s of the difference. The full walk with every record replaced took 610 s and passed. Eight workers were not faster than six: each walk part pays for the state list and keys, so the six of `scripts/remote/workers.sh` stay.
 
 ## Web shell
 
