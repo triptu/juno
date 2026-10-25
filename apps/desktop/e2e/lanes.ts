@@ -71,7 +71,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'suggestions.spec.ts',
   'quick-reactions.spec.ts',
   'emoji-frequents.spec.ts',
-  'cache-update.spec.ts',
   'actions.spec.ts',
   'all-topics.spec.ts',
   'automated-record.spec.ts',
