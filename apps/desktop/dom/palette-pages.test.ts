@@ -1,18 +1,13 @@
-// ⌘K's pages and Settings sections (spec section 10): ">" lists the pages,
-// a page opens from its row, and text that names a whole group, as
-// "settings" does, shows every row of it.
-import { expect, test } from './fixtures'
-
-// Starts signed in and synced (README, "Synced start").
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
+// ⌘K's pages and Settings sections (spec section 10): ">" lists the pages, a page opens from
+// its row, and text that names a whole group, as "settings" does, shows every row of it.
+import { expect } from './expect'
+import { domTest } from './test'
 
 // The pages in the order a first look needs: Memory of this chat is absent until the Juno page has opened.
-test('pages and Settings sections open from ⌘K', async ({ juno }) => {
+domTest('pages and Settings sections open from ⌘K', async ({ juno, step }) => {
   const { palette, settings, tabs } = juno
 
-  await test.step('">" lists the pages; "Juno" opens the Juno tab, and then Memory of this chat is one of them', async () => {
+  await step('">" lists the pages; "Juno" opens the Juno tab, and then Memory of this chat is one of them', async () => {
     const pages = palette.section('Pages')
 
     await palette.open()
@@ -35,12 +30,12 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
     await palette.expectClosed()
   })
 
-  await test.step('"settings" on Commands lists every Settings section, and Enter on one opens Settings there', async () => {
+  await step('"settings" on Commands lists every Settings section, and Enter on one opens Settings there', async () => {
     await palette.openCommands()
     await palette.type('settings')
     const sections = palette.section('Settings')
     await expect(sections.getByRole('option', { name: /Settings: Notifications/ })).toBeVisible()
-    const listed = await sections.getByRole('option').allTextContents()
+    const listed = sections.getByRole('option').allTextContents()
     await palette.row('Settings: Notifications').hover()
     await palette.expectActive(/Settings: Notifications/)
     await palette.press('Enter')
@@ -48,13 +43,13 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
     await tabs.expectActive('Settings')
     await expect(settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
     // Every section in Settings' own list has its row, and no other row is in the group.
-    const names = await settings.nav.getByRole('button').evaluateAll((items) => items.map((item) => item.getAttribute('aria-label') ?? item.textContent?.trim() ?? ''))
+    const names = settings.nav.getByRole('button').all().map((item) => item.getAttribute('aria-label') ?? item.textContent?.trim() ?? '')
     expect(names.length).toBeGreaterThan(1)
     expect(listed).toHaveLength(names.length)
     for (const name of names) expect(listed.some((row) => row.includes(`Settings: ${name}`)), name).toBe(true)
   })
 
-  await test.step('"topics" and "tabs" find Settings: Tidy up', async () => {
+  await step('"topics" and "tabs" find Settings: Tidy up', async () => {
     for (const term of ['settings topics', 'settings tabs']) {
       await palette.openCommands()
       await palette.type(term)
@@ -65,7 +60,7 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
     }
   })
 
-  await test.step('"scheduled" then Enter opens the Scheduled page', async () => {
+  await step('"scheduled" then Enter opens the Scheduled page', async () => {
     await palette.openCommands()
     await palette.type('scheduled')
     await palette.expectActive(/ Scheduled$/)
