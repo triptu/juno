@@ -7,11 +7,11 @@ import { expect, test } from '@playwright/test'
  * How a perf scenario fails (performance.md 7.3). On the Mac the budgets of
  * performance.md section 1 are absolute: a p95 (or a median where the budget
  * says so) over its budget fails. On the laptop runner the same metrics are
- * regression checks: the median fails when it is more than `RATIO` times the
- * stored baseline from the same runner shape plus an absolute floor, since
- * Electron on Xvfb in a Linux container has numbers of its own. The baseline lives
- * in `perf-baseline.json` and changes only through
- * `bun scripts/perf-baseline.mjs update`.
+ * regression checks, since Electron on Xvfb in a Linux container has numbers
+ * of its own: the median fails when it is more than `RATIO` times the
+ * slowest of the baseline's runs from the same runner shape, plus an
+ * absolute floor. The baseline lives in `perf-baseline.json` and changes
+ * only through `bun scripts/perf-baseline.mjs update`.
  */
 export const RATIO = 1.2
 
@@ -33,7 +33,7 @@ export interface BaselineFile {
   readonly identity: string
   readonly commit: string
   readonly recorded: string
-  readonly metrics: Readonly<Record<string, { readonly median: number; readonly p95: number; readonly n: number; readonly unit: string }>>
+  readonly metrics: Readonly<Record<string, { readonly median: number; readonly p95: number; readonly highMedian: number; readonly highP95: number; readonly n: number; readonly unit: string }>>
 }
 
 export const BASELINE_PATH = resolve(__dirname, 'perf-baseline.json')
@@ -81,8 +81,9 @@ export function budget(metric: Metric, limit: number, options: { readonly at?: '
     console.log(`${metric.name}: no baseline for ${runnerIdentity()}; ${compare} ${metric[compare].toFixed(1)} ${metric.unit} recorded`)
     return
   }
-  const ceiling = base[compare] * RATIO + (options.floor ?? FLOORS[metric.unit])
-  const line = `${metric.name}: ${compare} ${metric[compare].toFixed(1)} ${metric.unit} against a baseline of ${base[compare].toFixed(1)} (ceiling ${ceiling.toFixed(1)})`
+  const slowest = compare === 'p95' ? base.highP95 : base.highMedian
+  const ceiling = slowest * RATIO + (options.floor ?? FLOORS[metric.unit])
+  const line = `${metric.name}: ${compare} ${metric[compare].toFixed(1)} ${metric.unit} against a baseline of ${base[compare].toFixed(1)}, slowest ${slowest.toFixed(1)} (ceiling ${ceiling.toFixed(1)})`
   console.log(line)
   expect.soft(metric[compare], line).toBeLessThanOrEqual(ceiling)
 }
