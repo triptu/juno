@@ -181,10 +181,19 @@ export class HostPool {
   #take(): Child {
     const ready = this.#idle.pop()
     if (ready !== undefined && ready.process.connected) return ready
+    return this.#fork()
+  }
+
+  #fork(): Child {
     const child = forkHost(this.build)
     this.#children.add(child.process)
     child.process.once('exit', () => this.#children.delete(child.process))
     return child
+  }
+
+  /** Forks the first process before the first lease asks, so its load overlaps other work. */
+  warm(): void {
+    if (this.#children.size === 0) this.#idle.push(this.#fork())
   }
 
   async start(fake: FakeSlack, start: Omit<HostStart, 'fakeUrl' | 'webRoot'>): Promise<TestHost> {

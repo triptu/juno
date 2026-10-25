@@ -1,246 +1,21 @@
-// Break pass of 10-17: the features that landed on 10-16 and 10-17 used
-// together, the way a busy day uses them. Findings are in
-// docs/reviews/2026-10-17-break-pass.md.
-import { DatabaseSync } from 'node:sqlite'
-import { join } from 'node:path'
+// Break pass of 10-17: what needs a browser's layout. A narrow window, the
+// destination list and switcher in it, Home's field through a send, dark
+// mode's surfaces and a mouse press on a tab. The flows
+// of the break pass are in the DOM lane (`dom/break-pass-1017*.test.ts`).
+// Findings are in docs/reviews/2026-10-17-break-pass.md.
 import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
-import type { AppMenuItem } from './driver/surface'
+import { recordBoxes } from './shiftProbe'
 
 test.describe.configure({ timeout: 120_000 })
-// A failing test attaches the send's path through the app and the fake's post calls (README, "Send trace").
-test.use({ sendTrace: true })
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 
-interface SavedTab {
-  readonly id: string
-  readonly place?: { readonly kind: string; readonly topicId?: string }
-  readonly homeDraft?: { readonly draft?: string; readonly conversation?: unknown }
-}
-
-/** The tabs and topic drafts user.db holds (drafts by text), read while the app runs: what a relaunch reads back. */
-function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray<SavedTab>; readonly active: SavedTab | undefined; readonly drafts: ReadonlyMap<string, string> } {
-  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
-  try {
-    const row = db.prepare("SELECT value_json FROM prefs WHERE key = 'tabs'").get() as { value_json: string } | undefined
-    const value = row === undefined ? undefined : (JSON.parse(row.value_json) as { readonly tabs: ReadonlyArray<SavedTab>; readonly active: string | null })
-    const drafts = new Map(db.prepare('SELECT topic_id, text FROM drafts').all().map((draft) => [String(draft['text']), String(draft['topic_id'])]))
-    const tabs = value?.tabs ?? []
-    return { tabs, active: tabs.find((tab) => tab.id === value?.active), drafts }
-  } finally {
-    db.close()
-  }
-}
-
-const menu = (juno: Juno, id: AppMenuItem) => juno.surface.appMenu(id)
 const setWindowSize = (juno: Juno, width: number, height?: number) => juno.setWindowSize(width, height)
 
-// The sends share a launch; each step opens the tabs it needs. The offline send goes last.
-syncedTest('sends across tabs: a draft two tabs share, a send from Home that leaves the tabs where they were, and a send while offline', async ({ juno, fake }) => {
-  await test.step('two tabs on one topic share its draft, and a send from one clears it in both', async () => {
-    await juno.sidebar.row(POSTGRES).open()
-    await juno.sidebar.row(POSTGRES).openInNewTab()
-    await expect(juno.tabs.tab(POSTGRES)).toHaveCount(2)
-    await juno.topic.composer.fill('Shared draft')
-    await juno.tabs.selectAt(POSTGRES, 0)
-    await juno.tabs.expectActiveAt(POSTGRES, 0)
-    await expect(juno.topic.composer).toHaveValue('Shared draft')
-    await juno.topic.composer.press('Enter')
-    await juno.topic.expectSent('Shared draft')
-    await juno.tabs.selectAt(POSTGRES, 1)
-    await juno.tabs.expectActiveAt(POSTGRES, 1)
-    await juno.topic.expectMessage('Shared draft')
-    await expect(juno.topic.composer).toHaveValue('')
-    expect(fake.messages('C0ENG').filter((m) => m.text === 'Shared draft')).toHaveLength(1)
-  })
-
-  await test.step('a send from Home to a channel, a thread’s channel or a DM another tab shows leaves every tab where it was', async () => {
-    await juno.sidebar.row('#eng').open()
-    await juno.sidebar.row('Maya', { exact: true }).openInNewTab()
-    await juno.tabs.menu('new-tab')
-    await juno.write.pickConversation('eng', 'eng')
-    await juno.write.write('Sent from Home')
-    await juno.write.send()
-    await juno.tabs.expectActive('Home')
-    await expect(juno.tabs.tab('eng')).toHaveCount(1)
-    await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Sent from Home').length).toBe(1)
-
-    await juno.write.pickConversation('maya', 'Maya')
-    await juno.write.write('DM from Home')
-    await juno.write.send()
-    await juno.tabs.expectActive('Home')
-    await expect(juno.tabs.tab('Maya')).toHaveCount(1)
-    await juno.tabs.select('Maya')
-    await juno.topic.expectMessage('DM from Home')
-  })
-
-  await test.step('a send while the socket and network drop goes once when they are back', async () => {
-    await juno.sidebar.row('#eng').open()
-    fake.goOffline()
-    fake.dropSocket()
-    await juno.topic.composer.fill('Sent offline')
-    await juno.topic.composer.press('Enter')
-    await juno.topic.expectMessage('Sent offline')
-    // Juno has seen the drop before the network comes back.
-    await juno.sidebar.expectSyncStatus("You're offline")
-    fake.goOnline()
-    await juno.topic.expectSent('Sent offline')
-    await juno.waitForSync()
-    expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent offline')).toHaveLength(1)
-    await expect(juno.topic.message('Sent offline')).toHaveCount(1)
-  })
-})
-
-syncedTest('closing the last tab while its message sends posts it once and opens a new tab', async ({ juno, fake }) => {
-  await juno.sidebar.row('#eng').open()
-  await juno.tabs.expectCount(1)
-  fake.holdNext({ method: 'chat.postMessage', before: true })
-  await juno.topic.composer.fill('Sent as the tab closed')
-  await juno.topic.composer.press('Enter')
-  await expect.poll(() => fake.heldCount({ method: 'chat.postMessage' })).toBe(1)
-  await juno.tabs.menu('close-tab')
-  await juno.tabs.expectCount(1)
-  await juno.tabs.expectActive('Home')
-  await expect(juno.write.composer).toBeFocused()
-  fake.release()
-  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Sent as the tab closed').length).toBe(1)
-  await juno.tabs.menu('reopen-tab')
-  await juno.topic.expectSent('Sent as the tab closed')
-  await expect(juno.topic.composer).toHaveValue('')
-  expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent as the tab closed')).toHaveLength(1)
-})
-
-test('⌘T during the first sync opens a usable Home', async ({ juno, fake }) => {
-  fake.holdNext({ method: 'conversations.history' })
-  await juno.signIn()
-  await expect(juno.write.composer).toBeVisible()
-  await juno.tabs.expectCount(1)
-  await expect(juno.sidebar.root.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing/, { timeout: 30_000 })
-  // ⌘T opens a Home beside the launch tab's, every time, each with its own draft.
-  await juno.tabs.menu('new-tab')
-  await juno.tabs.expectCount(2)
-  await expect(juno.write.composer).toBeFocused()
-  await juno.write.write('Written during sync')
-  await juno.tabs.menu('new-tab')
-  await juno.tabs.expectCount(3)
-  await expect(juno.write.composer).toBeFocused()
-  await expect(juno.write.composer).toHaveValue('')
-  fake.release()
-  await juno.waitForSync()
-  await juno.tabs.selectAt('Home', 1)
-  await expect(juno.write.composer).toHaveValue('Written during sync')
-  await juno.write.pickConversation('eng', 'eng')
-  await juno.write.send()
-  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Written during sync').length).toBe(1)
-})
-
-syncedTest('Settings opened from ⌘, , the avatar menu and Notifications stays one tab at the asked section', async ({ juno }) => {
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.sidebar.row(RINA).openInNewTab()
-  // Everything opens in the current tab: Settings takes Rina's.
-  if (process.platform === 'darwin') await menu(juno, 'settings')
-  else await juno.accountMenu.choose(/^Settings/)
-  await juno.tabs.expectActive('Settings')
-  await expect(juno.settings.section('General')).toHaveAttribute('aria-current', 'page')
-  await juno.settings.show('Appearance')
-  // From another tab, each entry focuses that one Settings tab at its section.
-  await juno.tabs.select(POSTGRES)
-  await juno.openNotifications()
-  await juno.tabs.expectCount(2)
-  await juno.tabs.select(POSTGRES)
-  await juno.accountMenu.choose(/^Settings/)
-  await juno.tabs.expectActive('Settings')
-  await expect(juno.settings.section('General')).toHaveAttribute('aria-current', 'page')
-  await juno.tabs.expectCount(2)
-  await juno.tabs.expectActive('Settings')
-  expect(await juno.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), 'Settings'])
-
-  await test.step('a choice in Settings holds when Settings opens afresh', async () => {
-    // Off is stored as an empty classifier in the aiModels preference.
-    const classifier = juno.settings.root.getByRole('checkbox', { name: 'Use fast classifier' })
-    await expect(classifier).toBeChecked()
-    await classifier.click()
-    await expect(classifier).not.toBeChecked()
-    // A topic takes the Settings tab, so the next open mounts Settings again.
-    await juno.sidebar.row(RINA).open()
-    await juno.tabs.expectActive('Rina')
-    await juno.openSettings()
-    await expect(classifier).not.toBeChecked()
-  })
-})
-
-syncedTest("a relaunch keeps many tabs, their topic drafts, and each Home tab's own draft and destination", async ({ juno, relaunch, userData, fake }) => {
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.composer.fill('Draft one')
-  await juno.sidebar.row(RINA).openInNewTab()
-  await juno.topic.composer.fill('Draft two')
-  await juno.sidebar.row(ROADMAP).openInNewTab()
-  await juno.sidebar.row('#eng').openInNewTab()
-  await juno.topic.composer.fill('Draft in Main')
-  await juno.sidebar.row(POSTGRES).openInNewTab()
-  // Two Home tabs, from ⌘-click on Home and from ⌘T, each with its own draft and destination.
-  await juno.home.navItem.click({ modifiers: ['Meta'] })
-  await expect(juno.tabs.tab('Home')).toHaveCount(1)
-  await juno.tabs.selectAt('Home', 0)
-  await juno.tabs.expectActiveAt('Home', 0)
-  await juno.write.write('First note for Juno')
-  await juno.tabs.menu('new-tab')
-  await expect(juno.tabs.tab('Home')).toHaveCount(2)
-  await juno.tabs.expectActiveAt('Home', 1)
-  await expect(juno.write.composer).toHaveValue('')
-  await juno.write.pickConversation('product', 'product')
-  await juno.write.write('Second, for product')
-  // A picked destination and its draft survive a switch to a topic tab and back.
-  await juno.tabs.select('Rina')
-  await juno.topic.expectTitle(RINA)
-  await juno.tabs.selectAt('Home', 1)
-  await juno.write.expectDestination('#product')
-  await expect(juno.write.composer).toHaveValue('Second, for product')
-  await juno.tabs.selectAt('Home', 0)
-  await expect(juno.write.composer).toHaveValue('First note for Juno')
-  await juno.write.expectDestination('Juno')
-  await juno.tabs.expectCount(7)
-  const before = await juno.tabs.titles()
-  await juno.tabs.select('Rina')
-  // The seven tabs, with Rina's active, the three topic drafts and both Home drafts are in user.db before the quit.
-  await expect
-    .poll(() => {
-      const state = saved(userData, fake.teamId)
-      const rina = state.drafts.get('Draft two')
-      const first = state.tabs.find((tab) => tab.homeDraft?.draft === 'First note for Juno')
-      const second = state.tabs.find((tab) => tab.homeDraft?.draft === 'Second, for product')
-      return state.tabs.length === 7 && rina !== undefined && state.active?.place?.topicId === rina && state.drafts.has('Draft one') && state.drafts.has('Draft in Main')
-        && first !== undefined && second?.homeDraft?.conversation !== undefined
-    })
-    .toBe(true)
-  const restarted = await relaunch()
-  await restarted.tabs.expectCount(7)
-  await expect.poll(() => restarted.tabs.titles()).toEqual(before)
-  await restarted.tabs.expectActive('Rina')
-  await expect(restarted.topic.composer).toHaveValue('Draft two', { timeout: 15_000 })
-  await restarted.tabs.selectAt(POSTGRES, 0)
-  await restarted.tabs.expectActiveAt(POSTGRES, 0)
-  await expect(restarted.topic.composer).toHaveValue('Draft one', { timeout: 15_000 })
-  await restarted.tabs.select('eng')
-  await restarted.tabs.expectActive('eng')
-  await expect(restarted.topic.composer).toHaveValue('Draft in Main', { timeout: 15_000 })
-  await restarted.tabs.selectAt(POSTGRES, 1)
-  await restarted.tabs.expectActiveAt(POSTGRES, 1)
-  await expect(restarted.topic.composer).toHaveValue('Draft one', { timeout: 15_000 })
-  await restarted.tabs.selectAt('Home', 0)
-  await restarted.tabs.expectActiveAt('Home', 0)
-  await expect(restarted.write.composer).toHaveValue('First note for Juno')
-  await restarted.write.expectDestination('Juno')
-  await restarted.tabs.selectAt('Home', 1)
-  await restarted.tabs.expectActiveAt('Home', 1)
-  await restarted.write.expectDestination('#product')
-  await expect(restarted.write.composer).toHaveValue('Second, for product')
-})
-
-syncedTest('a narrow window keeps the tab strip and topic inside the window, and the destination list and topic switcher fit', async ({ juno, fake }) => {
+syncedTest('a narrow window keeps the tab strip and topic inside the window, the destination list and topic switcher fit, and dark mode leaves no light surface', async ({ juno, fake }) => {
   // Sixty threads in #eng for the switcher.
   for (let i = 0; i < 60; i++) {
     const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: `Busy day thread number ${i} about things` })
@@ -263,6 +38,11 @@ syncedTest('a narrow window keeps the tab strip and topic inside the window, and
     await expect.poll(() => win.evaluate(() => innerHeight)).toBeLessThan(500)
     await tabs.menu('new-message')
     await expect(write.search).toBeFocused()
+    // Esc gives focus back to the chip, and Enter there opens the list again.
+    await write.search.press('Escape')
+    await expect(write.chip).toBeFocused()
+    await win.keyboard.press('Enter')
+    await expect(write.search).toBeFocused()
     await expect(write.option('Maya')).toBeVisible()
     // In view and not under anything that clips it: the point at its middle is the search itself.
     await expect(write.search).toBeInViewport({ ratio: 1 })
@@ -275,6 +55,18 @@ syncedTest('a narrow window keeps the tab strip and topic inside the window, and
     await win.keyboard.type('jon')
     await win.keyboard.press('Enter')
     await write.expectDestination('Jonas')
+
+    // A send from Home: every frame through it shows one field, in the same place.
+    await write.write('Lunch order goes out at noon')
+    const before = await write.field.boundingBox()
+    const fields = await recordBoxes(win, '[data-composer-field]')
+    await write.send()
+    await juno.expectToast('Sent to Jonas')
+    await expect(write.composer).toHaveValue('')
+    expect(await write.field.boundingBox()).toEqual(before)
+    const frames = await fields()
+    expect(frames.length, 'the field must be sampled in many frames').toBeGreaterThan(1)
+    expect(frames.filter((boxes) => boxes.length !== 1 || JSON.stringify(boxes[0]) !== JSON.stringify(before)), `one field at ${JSON.stringify(before)} in every frame`).toEqual([])
   })
 
   await test.step('the topic switcher with many threads keeps the selected row in view and fits the window', async () => {
@@ -294,23 +86,41 @@ syncedTest('a narrow window keeps the tab strip and topic inside the window, and
     await juno.win.keyboard.press('Enter')
     await expect(switcher.root).toBeHidden()
   })
+
+  await test.step('dark mode leaves no light surface on Home, the switcher and Settings', async () => {
+    await juno.setTheme('Dark')
+    const lightSurfaces = () =>
+      juno.win.evaluate(() => {
+        const light: string[] = []
+        for (const element of document.querySelectorAll<HTMLElement>('body *')) {
+          // Rows off screen skip style (content-visibility), and hidden actions are at opacity 0.
+          if (!element.checkVisibility({ opacityProperty: true, contentVisibilityAuto: true })) continue
+          // A toast is paper on ink in dark by design (tokens, "--toast-success"); an earlier step's send left one.
+          if (element.closest('[role="status"]')) continue
+          const match = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(element).backgroundColor)
+          if (match === null || (match[4] !== undefined && Number(match[4]) < 0.5)) continue
+          const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])]
+          if (0.2126 * r + 0.7152 * g + 0.0722 * b > 200) light.push(`${element.tagName.toLowerCase()} "${element.getAttribute('aria-label') ?? element.textContent?.slice(0, 30)}" ${match[0]} in ${element.parentElement?.closest('[aria-label]')?.getAttribute('aria-label')}`)
+        }
+        return light
+      })
+    await juno.home.open()
+    await expect(juno.write.chip).toBeVisible()
+    expect(await lightSurfaces()).toEqual([])
+    await juno.write.chip.click()
+    await expect(juno.write.list).toBeVisible()
+    expect(await lightSurfaces()).toEqual([])
+    await juno.win.keyboard.press('Escape')
+    await juno.sidebar.row('#eng').open()
+    await juno.topic.openSwitcher()
+    expect(await lightSurfaces()).toEqual([])
+    await juno.win.keyboard.press('Escape')
+    await juno.openSettings('General')
+    expect(await lightSurfaces()).toEqual([])
+  })
 })
 
-syncedTest('each tab gets its composer focus back after a keyboard tab switch', async ({ juno }) => {
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.composer.click()
-  await juno.topic.composer.pressSequentially('Typing in the topic')
-  await juno.tabs.menu('new-tab')
-  await expect(juno.write.composer).toBeFocused()
-  await juno.write.composer.pressSequentially('Typing on Home')
-  await juno.tabs.menu('previous-tab')
-  await juno.tabs.expectActive(POSTGRES)
-  await expect(juno.topic.composer).toBeFocused()
-  await juno.tabs.menu('next-tab')
-  await juno.tabs.expectActive('Home')
-  await expect(juno.write.composer).toBeFocused()
-})
-
+// A press's focus follows Chromium's pointer and mouse events, which the DOM lane does not reproduce.
 syncedTest('a mouse press on a tab gives its page focus; the keyboard keeps focus in the strip', async ({ juno }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.sidebar.row(RINA).openInNewTab()
@@ -329,4 +139,3 @@ syncedTest('a mouse press on a tab gives its page focus; the keyboard keeps focu
   await juno.tabs.expectActive('Rina')
   await juno.tabs.expectFocused('Rina')
 })
-

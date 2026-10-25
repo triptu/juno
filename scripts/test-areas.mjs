@@ -9,7 +9,9 @@
 //   when one of these changed.
 // - GUARD_SPECS: desktop specs that guard the most frequent paths. A plan
 //   always runs one when a changed file is in its area, whatever the coverage
-//   map ranks or the time budget leaves.
+//   map ranks or the time budget leaves. None now: the instant paths check is
+//   a DOM lane file (dom/instant-paths.test.ts), and every change to the
+//   renderer, the host or what they import reaches every DOM file.
 //
 // A path ending in / is a folder; any other string is one file; a RegExp
 // matches the repo path.
@@ -141,37 +143,7 @@ export const PERF_INTERACTIONS = [
 ]
 
 /** Specs a plan requires when a change is in their area. */
-export const GUARD_SPECS = [
-  {
-    spec: 'apps/desktop/e2e/instant-paths.spec.ts',
-    guards: 'the most frequent paths paint from what Juno holds, with Slack holding every answer',
-    // Topic, sync, store, search and palette code.
-    paths: [
-      'apps/desktop/src/renderer/containers/TopicView.tsx',
-      'apps/desktop/src/renderer/containers/topic/',
-      'apps/desktop/src/renderer/containers/Peek.tsx',
-      'apps/desktop/src/renderer/containers/PeekTopic.tsx',
-      'apps/desktop/src/renderer/containers/navigation.ts',
-      'apps/desktop/src/renderer/containers/slackLinks.ts',
-      'apps/desktop/src/renderer/containers/Palette.tsx',
-      'apps/desktop/src/renderer/containers/PaletteContent.tsx',
-      'apps/desktop/src/renderer/containers/paletteCommands.ts',
-      'apps/desktop/src/renderer/containers/search/',
-      'packages/views/src/MessageList.tsx',
-      'packages/views/src/PeekView.tsx',
-      'packages/views/src/CommandPalette.tsx',
-      'packages/views/src/search/',
-      'packages/state/src/',
-      'packages/engine/src/messages/',
-      'packages/engine/src/topics/',
-      'packages/engine/src/protocol/',
-      'packages/engine/src/search/',
-      /^packages\/engine\/src\/search[A-Za-z]*\.ts$/,
-      'packages/sync/src/',
-      'packages/store/src/',
-    ],
-  },
-]
+export const GUARD_SPECS = []
 
 /** Whether a repo path is in one of the paths above. */
 export const inPaths = (paths, file) => paths.some((path) => (path instanceof RegExp ? path.test(file) : path.endsWith('/') ? file.startsWith(path) : file === path))

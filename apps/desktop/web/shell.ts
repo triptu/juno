@@ -6,6 +6,8 @@ export type ShellEvent = { readonly event: 'notification'; readonly value: Notif
 export interface SystemHooks {
   pickFolder: (folder: string | null) => void
   agentState: () => string
+  /** The topic the shell last told the engine is on screen in a focused window, or null. */
+  viewing: () => string | null
   notifications: () => Array<{ readonly title: string; readonly body: string; readonly silent?: true }>
   clickNotification: (index: number) => void
   notificationPermission: (permission: NotificationPermission) => void

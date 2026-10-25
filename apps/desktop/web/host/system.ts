@@ -51,6 +51,7 @@ export function createShell(userData: string, options: AgentOptions) {
   const hooks: SystemHooks = {
     pickFolder: (path) => { folder = path },
     agentState: () => agent.state,
+    viewing: () => notifier.viewingTopic,
     notifications: () => notifications.map(({ title, body, silent }) => ({ title, body, ...(silent === true ? { silent: true as const } : {}) })),
     clickNotification: (index) => notifications[index]?.click(),
     notificationPermission: permission.set,

@@ -5,7 +5,9 @@
  * at no coordinate.
  */
 import type { Window } from 'happy-dom'
-import { disabled, Query, roleOf, shown, type El, type RoleOptions, type TextMatch } from './query'
+import { disabled, roleOf, shown, type El, type RoleOptions, type TextMatch } from './find'
+import { Query } from './query'
+import { HOVER_ATTRIBUTE } from './window'
 
 const DEFAULT_TIMEOUT = 5_000
 
@@ -14,7 +16,7 @@ const normalize = (text: string) => text.replace(/\s+/g, ' ').trim()
 const MODIFIERS = { Meta: 'metaKey', Shift: 'shiftKey', Alt: 'altKey', Control: 'ctrlKey' } as const
 type Modifier = keyof typeof MODIFIERS
 
-const CODES: Record<string, string> = { ' ': 'Space', Enter: 'Enter', Escape: 'Escape', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown' }
+const CODES: Record<string, string> = { ' ': 'Space', Alt: 'AltLeft', Meta: 'MetaLeft', Shift: 'ShiftLeft', Control: 'ControlLeft', Enter: 'Enter', Escape: 'Escape', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown' }
 const codeOf = (key: string) => CODES[key] ?? (/^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : /^\d$/.test(key) ? `Digit${key}` : key)
 
 const TABBABLE = 'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable="true"]'
@@ -26,6 +28,8 @@ const TABBABLE = 'a[href], button, input, select, textarea, summary, [tabindex],
  */
 export class Dom {
   #hovered: El | null = null
+  /** Keys held down with `down`, until `up`. */
+  readonly #held = new Set<string>()
 
   constructor(readonly window: Window) {}
 
@@ -38,8 +42,8 @@ export class Dom {
   }
 
   /** As Playwright's `page.keyboard`: keys go to the focused element. */
-  get keyboard(): { readonly press: (keys: string) => Promise<void>; readonly type: (text: string) => Promise<void> } {
-    return { press: (keys) => this.press(keys), type: (text) => this.type(text) }
+  get keyboard(): { readonly press: (keys: string) => Promise<void>; readonly type: (text: string) => Promise<void>; readonly down: (key: string) => Promise<void>; readonly up: (key: string) => Promise<void>; readonly insertText: (text: string) => Promise<void> } {
+    return { press: (keys) => this.press(keys), type: (text) => this.type(text), down: async (key) => this.down(key), up: async (key) => this.up(key), insertText: (text) => this.insertText(text) }
   }
 
   /** The whole page, as a Query. */
@@ -67,6 +71,10 @@ export class Dom {
     return this.page.getByTitle(text, options)
   }
 
+  getByPlaceholder(text: TextMatch, options?: { readonly exact?: boolean }): Query {
+    return this.page.getByPlaceholder(text, options)
+  }
+
   /** Polls `check` until it answers something other than undefined, null or false, or fails after `timeout`. */
   async until<T>(what: string, check: () => T | undefined | null | false, timeout = DEFAULT_TIMEOUT): Promise<T> {
     const deadline = performance.now() + timeout
@@ -83,23 +91,45 @@ export class Dom {
     }
   }
 
+  readonly #waiting = new Set<() => void>()
+  #observer: MutationObserver | undefined
+  #releasing = false
+
   /**
    * Resolves at the page's next change (a node, an attribute or text), or
    * after `millis`: a wait checks again when there is something new to see,
    * not on a fast timer. Focus and the fake's state change no node, so the
-   * timer still runs. Bun's timer, which a test clock does not hold.
+   * timer still runs. Bun's timer, which a test clock does not hold. One
+   * observer serves every wait in a row: observing the whole page visits
+   * every node, so it is not done again on each check.
    */
   changed(millis = 50): Promise<void> {
     return new Promise((done) => {
-      const Observer = (this.window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
       const finish = () => {
         clearTimeout(timer)
-        observer.disconnect()
+        this.#waiting.delete(finish)
         done()
+        this.#release()
       }
-      const observer = new Observer(finish)
-      observer.observe(this.document, { subtree: true, childList: true, attributes: true, characterData: true })
       const timer = setTimeout(finish, millis)
+      this.#waiting.add(finish)
+      if (this.#observer === undefined) {
+        const Observer = (this.window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
+        this.#observer = new Observer(() => { for (const waiting of this.#waiting) waiting() })
+        this.#observer.observe(this.document, { subtree: true, childList: true, attributes: true, characterData: true })
+      }
+    })
+  }
+
+  /** Stops observing when no wait has started again by the next task, as a check that fails waits again at once. */
+  #release(): void {
+    if (this.#releasing) return
+    this.#releasing = true
+    setImmediate(() => {
+      this.#releasing = false
+      if (this.#waiting.size > 0) return
+      this.#observer?.disconnect()
+      this.#observer = undefined
     })
   }
 
@@ -129,6 +159,8 @@ export class Dom {
       if (from !== null) for (const type of ['pointerout', 'mouseout']) this.#mouse(type, from, { relatedTarget: el })
       for (const node of left.filter((node) => !entered.includes(node))) for (const type of ['pointerleave', 'mouseleave']) this.#mouse(type, node, { relatedTarget: el })
       for (const type of ['pointerover', 'mouseover']) this.#mouse(type, el, { relatedTarget: from })
+      for (const node of left.filter((node) => !entered.includes(node))) node.removeAttribute(HOVER_ATTRIBUTE)
+      for (const node of entered) node.setAttribute(HOVER_ATTRIBUTE, '')
       for (const node of entered.filter((node) => !left.includes(node)).toReversed()) for (const type of ['pointerenter', 'mouseenter']) this.#mouse(type, node, { relatedTarget: from })
       this.#hovered = el
     }
@@ -140,6 +172,7 @@ export class Dom {
     const from = this.#hovered
     if (from === null || !from.isConnected) { this.#hovered = null; return }
     for (const type of ['pointerout', 'mouseout']) this.#mouse(type, from, { relatedTarget: null })
+    for (let node: El | null = from; node !== null; node = node.parentElement) node.removeAttribute(HOVER_ATTRIBUTE)
     for (let node: El | null = from; node !== null; node = node.parentElement) for (const type of ['pointerleave', 'mouseleave']) this.#mouse(type, node, { relatedTarget: null })
     this.#hovered = null
   }
@@ -160,6 +193,20 @@ export class Dom {
     this.#mouse('click', el, init)
     if (detail === 2) this.#mouse('dblclick', el, { ...init, detail: 2 })
     this.#activate(el)
+  }
+
+  /** Selects characters `start` to `end` of `el`'s first text node and lifts the pointer there, as a drag over words ends. */
+  selectText(el: El, start: number, end: number): void {
+    const text = el.firstChild
+    if (text === null) throw new Error('selectText: the element has no text')
+    const range = this.document.createRange()
+    range.setStart(text, start)
+    range.setEnd(text, end)
+    const selection = (this.window as unknown as globalThis.Window).getSelection()!
+    selection.removeAllRanges()
+    selection.addRange(range)
+    this.#mouse('pointerup', el)
+    this.#mouse('mouseup', el)
   }
 
   /** A right press: down, up and `contextmenu`, as Chromium sends them on a Mac. */
@@ -204,6 +251,29 @@ export class Dom {
     el.dispatchEvent(new W.InputEvent('input', { bubbles: true, inputType, data }))
   }
 
+  /** Inserts `text` at the focused field's selection in one input, as an IME or Playwright's `insertText` does: no key events. */
+  async insertText(text: string): Promise<void> {
+    const field = this.active as HTMLInputElement | HTMLTextAreaElement | null
+    if (field === null || !/^(INPUT|TEXTAREA)$/.test(field.tagName)) throw new Error('insertText: no field has focus')
+    const start = field.selectionStart ?? field.value.length
+    const end = field.selectionEnd ?? start
+    const I = (this.window as unknown as { InputEvent: typeof InputEvent }).InputEvent
+    if (!field.dispatchEvent(new I('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }))) return
+    this.#setValue(field, field.value.slice(0, start) + text + field.value.slice(end), start + text.length, 'insertText', text)
+    await Promise.resolve()
+  }
+
+  /** Picks the option whose value or label is `value`, as a user's choice does: the native setter, then `input` and `change`. */
+  select(el: HTMLSelectElement, value: string): void {
+    const option = [...el.options].find((item) => item.value === value || item.label === value || item.textContent?.trim() === value)
+    if (option === undefined) throw new Error(`No option ${value} in ${[...el.options].map((item) => item.value).join(', ')}`)
+    const W = this.window as unknown as { HTMLSelectElement: typeof HTMLSelectElement; Event: typeof Event }
+    if (this.active !== el) el.focus()
+    Object.getOwnPropertyDescriptor(W.HTMLSelectElement.prototype, 'value')!.set!.call(el, option.value)
+    el.dispatchEvent(new W.Event('input', { bubbles: true }))
+    el.dispatchEvent(new W.Event('change', { bubbles: true }))
+  }
+
   /** Types into the focused element, a key at a time. */
   async type(text: string): Promise<void> {
     for (const char of text) {
@@ -226,13 +296,44 @@ export class Dom {
    * then keyup. Answers whether the keydown was let through.
    */
   key(el: El, key: string, modifiers: ReadonlyArray<Modifier> = []): boolean {
+    const kept = this.#keydown(el, key, modifiers)
+    this.#keyup(this.active ?? el, key, modifiers)
+    return kept
+  }
+
+  /** Presses `key` (`Alt`, `Space`) on the focused element and keeps it down until `up`; a held modifier joins later keys' events. */
+  down(key: string): void {
+    const name = key === 'Space' ? ' ' : key
+    const modifiers = [...this.#held].filter((held): held is Modifier => held in MODIFIERS)
+    if (name in MODIFIERS) modifiers.push(name as Modifier)
+    // A key already down repeats, as a held key does.
+    const repeat = this.#held.has(name)
+    this.#held.add(name)
+    this.#keydown(this.active ?? this.document.body as El, name, modifiers, repeat)
+  }
+
+  up(key: string): void {
+    const name = key === 'Space' ? ' ' : key
+    this.#held.delete(name)
+    this.#keyup(this.active ?? this.document.body as El, name, [...this.#held].filter((held): held is Modifier => held in MODIFIERS))
+  }
+
+  #keyInit(key: string, modifiers: ReadonlyArray<Modifier>, repeat = false) {
+    return { key, code: codeOf(key), repeat, bubbles: true, cancelable: true, composed: true, ...this.#modifiers(modifiers) }
+  }
+
+  #keydown(el: El, key: string, modifiers: ReadonlyArray<Modifier>, repeat = false): boolean {
     const K = (this.window as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent
     this.#pointerFocus(false)
-    const init = { key, code: codeOf(key), bubbles: true, cancelable: true, composed: true, ...this.#modifiers(modifiers) }
-    const kept = el.dispatchEvent(new K('keydown', init))
-    if (kept) this.#defaultAction(el, key, modifiers)
-    ;(this.active ?? el).dispatchEvent(new K('keyup', init))
+    const kept = el.dispatchEvent(new K('keydown', this.#keyInit(key, modifiers, repeat)))
+    // As in a browser, the key's default action goes to what has focus once keydown's handlers ran.
+    if (kept) this.#defaultAction(this.active ?? el, key, modifiers)
     return kept
+  }
+
+  #keyup(el: El, key: string, modifiers: ReadonlyArray<Modifier>): void {
+    const K = (this.window as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent
+    el.dispatchEvent(new K('keyup', this.#keyInit(key, modifiers)))
   }
 
   #defaultAction(el: El, key: string, modifiers: ReadonlyArray<Modifier>): void {

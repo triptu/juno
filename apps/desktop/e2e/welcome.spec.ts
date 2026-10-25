@@ -4,7 +4,9 @@
 // on its next launch. Each hint ticks when it is done, anywhere in the app,
 // and the ticks survive a relaunch. With all three done it says "You're all
 // set"; Done or Hide puts it away for good, and ⌘K, Help and Settings › About
-// bring it back. Nothing around it moves when it appears, ticks or goes.
+// bring it back. Nothing around it moves when it appears, ticks or goes. The
+// install from before it, Hide and the three ways back are in the DOM lane
+// (`dom/welcome.test.ts`).
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import type { Locator } from '@playwright/test'
 import type { Juno } from './driver/juno'
@@ -83,53 +85,6 @@ showsItself('shows on Home after the first sign-in once the sidebar has rows, ti
 
   // Never again by itself.
   await expectNoCardAfterLaunch(await relaunch({ tour: true }))
-})
-
-test('an install from before the welcome card shows it once, on its next launch; Hide puts it away without moving Home, and ⌘K, Help and Settings › About bring it back', async ({ juno, relaunch }) => {
-  // This app does not show the card by itself: the workspace never sees it, as on a build from before it.
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.welcome.expectGone()
-
-  const after = await relaunch({ tour: true })
-  await after.sidebar.expectRows()
-  await after.welcome.expectShown()
-  await after.welcome.close.click()
-  await after.welcome.expectGone()
-
-  // Put away for good, the card comes back only when asked for. Nothing was done, so nothing is ticked.
-  const last = await relaunch({ tour: true })
-  await expectNoCardAfterLaunch(last)
-  const { welcome, palette, home } = last
-
-  // ⌘K: "Show the tour" brings the card back on Home, nothing ticked.
-  await last.sidebar.row(POSTGRES).open()
-  await palette.open()
-  await palette.type('tour')
-  await palette.choose('Show the tour')
-  await palette.expectClosed()
-  await home.expectShown()
-  await welcome.expectShown()
-  await welcome.expectTicked()
-  await welcome.expectWholeAboveField()
-
-  // Hide: the card goes; its room stays for this visit, so the rows and the field stay put.
-  await expectNoLayoutShift(last.win, async () => {
-    await welcome.close.click()
-    await welcome.expectGone()
-  })
-
-  // Help › Show the Tour.
-  await welcome.openFromHelp()
-  await home.expectShown()
-  await welcome.close.click()
-  await welcome.expectGone()
-
-  // Settings › About.
-  await last.openSettings('About')
-  await last.settings.root.getByRole('button', { name: 'Show the tour' }).click()
-  await home.expectShown()
-  await welcome.expectShown()
 })
 
 /** Launches the app on a workspace that has seen the card: signed in, synced, and no card on Home. */

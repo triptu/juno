@@ -18,6 +18,7 @@
 // result; the exit code is 1 if any step failed.
 
 import { spawn } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { availableParallelism, loadavg } from 'node:os'
 import { createInterface } from 'node:readline'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -42,6 +43,11 @@ export function parsePlan(argv) {
   for (const step of steps) if (step.script === 'test:plan') throw new Error('a plan cannot contain test:plan')
   return steps
 }
+
+// The job's cgroup (remote containers): CPU time used and memory now, or undefined elsewhere.
+const cgroupRead = (file, pick) => { try { return pick(readFileSync(`/sys/fs/cgroup/${file}`, 'utf8')) } catch { return undefined } }
+const cpuMicros = () => cgroupRead('cpu.stat', (text) => Number(/^usage_usec (\d+)$/m.exec(text)?.[1]))
+const memoryBytes = () => cgroupRead('memory.current', Number)
 
 export const appSuites = ['test:desktop', 'test:browser', 'test:electron', 'test:gallery', 'test:e2e']
 /** The steps in lanes that run at the same time; each lane runs its steps in order. */
@@ -102,6 +108,11 @@ if (import.meta.main) {
   const run = (step, low) =>
     new Promise((resolvePromise) => {
       const started = Date.now()
+      // Per-step CPU and memory, for sizing jobs (docs/development.md, "Full runs"). Steps in one lane
+      // run alone, so the job's cgroup counts only this step.
+      const cpuStart = planned.length === 1 ? cpuMicros() : undefined
+      let peak = memoryBytes() ?? 0
+      const sampler = cpuStart === undefined ? undefined : setInterval(() => { peak = Math.max(peak, memoryBytes() ?? 0) }, 1000)
       const monitor = failureMonitor()
       let stopped
       const command = low ? ['nice', ['-n', '10', 'bun', 'run', step.script, ...step.args]] : ['bun', ['run', step.script, ...step.args]]
@@ -125,6 +136,8 @@ if (import.meta.main) {
       child.on('error', () => {})
       child.on('close', (code) => {
         children.delete(child)
+        clearInterval(sampler)
+        if (cpuStart !== undefined) console.log(`plan: step ${steps.indexOf(step)} ${step.script} used ${Math.round((cpuMicros() - cpuStart) / 1e6)} CPU-s, peak memory ${(peak / 2 ** 30).toFixed(1)} GB (includes file cache)`)
         if (guarded && code !== 0 && !stopped && monitor.completed === 0 && /^test(?::|$)/.test(step.script)) stop({ scope: 'run', rule: 'setup', signature: `${step.script} exited before any tests completed`, completed: 0, failed: 0 })
         const result = stopped ? 1 : code ?? 1
         console.log(`plan: step ${steps.indexOf(step)} ${step.script} exited with ${result} after ${Math.round((Date.now() - started) / 1000)} s`)

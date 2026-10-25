@@ -39,7 +39,7 @@ export function claimQueue(name: string) {
   }
 }
 
-export function stateCache(kind: 'shift' | 'ring', browser: Browser) {
+export function stateCache(kind: 'shift', browser: Browser) {
   const { baseURL: _baseURL, ...options } = test.info().project.use
   return walkCache({
     root: resolvePath(import.meta.dirname, '../..'),

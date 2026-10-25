@@ -367,6 +367,7 @@ if (e2e) {
       agentHost: () => agent.host?.host,
       agentPid: () => agent.pid,
       ...processes.testHooks,
+      viewing: () => notifier.viewingTopic,
       notifications: () => notificationsForTests.map(({ title, body, silent }) => ({ title, body, ...(silent === true ? { silent } : {}) })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,

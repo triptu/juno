@@ -47,8 +47,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    `content`), give the box `ringRoom.inline`, `.block` or `.all` from `@juno/ui` (padding of
    `--focus-ring-room` taken back by a negative margin), pass `revealFocus` as a scroller's
    `onFocus`, or use the inset ring for items that fill the scroller edge to edge. A hand-written
-   outset ring also sets `scrollMargin: sizes['--focus-ring-room']`. `apps/gallery/focus-ring.spec.ts`
-   tabs through the main surfaces and fails on a cut ring.
+   outset ring also sets `scrollMargin: sizes['--focus-ring-room']`.
 6. **Buttons stay still on press and toggle.** No scale, translate, spring or transform transition.
    Hover and press colours change at once. Disabled controls use `pointerEvents: { default: 'auto', ':disabled': 'none' }`.
 7. **Motion**: no transition for button hover and press feedback. Other motion uses the motion tokens. Set

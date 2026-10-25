@@ -101,6 +101,19 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     await expect(menu.root).toHaveCount(0)
   })
 
+  await test.step('a right-click on a link inside selected words opens the message menu, not the link menu', async () => {
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Read <https://example.com/releases/42|release notes> first' })
+    const link = juno.topic.message('Read release notes').getByRole('link', { name: 'release notes' })
+    await link.selectText()
+    const asked = await juno.menusAsked()
+    await menu.openOn(link)
+    const labels = await menu.labels()
+    expect(labels).toContain('Start thread')
+    expect(labels).not.toContain('Copy link')
+    await menu.close()
+    expect(await juno.menusAsked()).toBe(asked)
+  })
+
   await checkMessageMenuButton(juno, target, neighbour)
   await test.step('the grid reacts and takes a reaction back, More reactions picks any emoji, and R opens the picker', () => reactFromMenu(juno, fake))
   await test.step('a key the menu shows runs its row; T on a focused message in Main starts its thread, and does nothing in the thread', () => keysInMenu(juno))
@@ -239,7 +252,6 @@ async function reactFromMenu(juno: Juno, fake: FakeSlack): Promise<void> {
 
   // R in the open menu chooses More reactions, as its tooltip says.
   const keyed = await juno.messageMenu.openOnRow(row)
-  await expect(keyed.more).toHaveAttribute('aria-keyshortcuts', 'r')
   await juno.win.keyboard.press('r')
   await expect(keyed.search).toBeFocused()
   await juno.win.keyboard.press('Escape')

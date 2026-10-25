@@ -1,7 +1,8 @@
-// Formatting in the composer (spec section 8): Slack's markup typed in the
-// field goes to Slack as rich_text styles and a code block, the message
-// shows them, the edit field shows them back as markup, and ⌘B wraps a
-// selection in one edit that ⌘Z takes back.
+// Formatting in the composer (spec section 8), what needs a browser: ⌘B wraps
+// a selection in one edit that ⌘Z takes back (the field's own undo), the
+// caret in mixed-direction lines, and the cold formatting chunk. Markup sent
+// as rich_text, and ⌘B and ⌘I around picked mentions and linked words, are in
+// the DOM lane (`dom/formatting.test.ts`).
 import { expect, test, type Fixtures } from './fixtures'
 import { readUserDb } from './driver/userDb'
 
@@ -25,79 +26,16 @@ function lastPost(calls: ReadonlyArray<{ method: string; args: Json }>): { reado
   return { elements: (blocks as ReadonlyArray<{ elements: unknown }> | undefined)?.[0]?.elements, text: String(posted?.args['text']).replace(/\r\n/g, '\n') }
 }
 
-test('sends Slack markup as rich text styles, formats a selection with ⌘B, keeps mentions and links, and aligns mixed-direction lines', async ({ juno, fake }) => {
-  const context = { juno, fake }
-  await test.step('markup typed in the composer goes as Slack styles and a code block, shows styled, and edits as markup', () => sendMarkup(context))
+test('formats a selection with ⌘B that ⌘Z takes back, and aligns mixed-direction lines', async ({ juno }) => {
+  const context = { juno }
   await test.step('⌘B wraps the selection in one edit, and ⌘Z takes it back', () => boldSelection(context))
-  await test.step('formatting keeps picked mentions and linked words', () => formatMentionsAndLinks(context))
-  await test.step('inline edit formatting expands partial mentions and links', () => formatInEdit(context))
   await test.step('Hebrew and mixed lines align the mirror with the native caret', () => alignMixedLines(context))
 })
 
-async function sendMarkup({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+async function boldSelection({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
-
-  await topic.composer.pressSequentially('*bold* _it_ `code`')
-  await topic.composer.press('Shift+Enter')
-  await juno.win.keyboard.insertText('```\nmake test\n```')
-  await expect(topic.composer).toHaveValue('*bold* _it_ `code`\n```\nmake test\n```')
-  await expect(juno.win.getByTestId('textarea-bold')).toContainText(['bold'])
-  await expect(juno.win.getByTestId('textarea-code-block')).toHaveCount(3)
-  await topic.composer.press('Enter')
-  await topic.expectSent('bold')
-
-  expect(lastPost(fake.calls)).toEqual({
-    elements: [
-      {
-        type: 'rich_text_section',
-        elements: [
-          { type: 'text', text: 'bold', style: { bold: true } },
-          { type: 'text', text: ' ' },
-          { type: 'text', text: 'it', style: { italic: true } },
-          { type: 'text', text: ' ' },
-          { type: 'text', text: 'code', style: { code: true } },
-        ],
-      },
-      { type: 'rich_text_preformatted', elements: [{ type: 'text', text: 'make test' }], border: 0 },
-    ],
-    text: '*bold* _it_ `code`\n```make test```',
-  })
-
-  // The message draws the styles, without the markers.
-  const row = topic.message('bold')
-  const body = row.locator('[data-msg-text]')
-  await expect(body.locator('strong')).toHaveText('bold')
-  await expect(body.locator('em')).toHaveText('it')
-  await expect(body.locator('code').filter({ hasText: /^code$/ })).toHaveCount(1)
-  await expect(row.getByText('make test')).toBeVisible()
-  await expect(body).not.toContainText('*')
-
-  // Edit the message for real; the untouched styles must survive the update.
-  await topic.composer.press('ArrowUp')
-  await expect(row).toBeFocused()
-  await row.press('e')
-  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
-  await expect(field).toHaveValue('*bold* _it_ `code`\n```\nmake test\n```')
-  await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 0))
-  await field.pressSequentially('Updated: ')
-  await field.press('Enter')
-  await expect(field).toHaveCount(0)
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBe(1)
-  const update = fake.calls.filter((call) => call.method === 'chat.update').at(-1)!
-  const sent = lastPost([{ method: 'chat.postMessage', args: update.args }])
-  expect(sent.elements).toEqual([
-    { type: 'rich_text_section', elements: [{ type: 'text', text: 'Updated: ' },
-      { type: 'text', text: 'bold', style: { bold: true } }, { type: 'text', text: ' ' },
-      { type: 'text', text: 'it', style: { italic: true } }, { type: 'text', text: ' ' },
-      { type: 'text', text: 'code', style: { code: true } }] },
-    { type: 'rich_text_preformatted', border: 0, elements: [{ type: 'text', text: 'make test' }] },
-  ])
-}
-
-async function boldSelection({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
-  const { topic } = juno
   await topic.composer.fill('ship it today')
   await topic.composer.evaluate((element: HTMLTextAreaElement) => {
     const at = element.value.indexOf('it')
@@ -114,72 +52,6 @@ async function boldSelection({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
 }
 
 const posts = (fake: Fixtures['fake']) => fake.calls.filter((call) => call.method === 'chat.postMessage').length
-const updates = (fake: Fixtures['fake']) => fake.calls.filter((call) => call.method === 'chat.update')
-
-async function formatMentionsAndLinks({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
-  const { topic } = juno
-  await topic.composer.fill('')
-  const before = posts(fake)
-  await topic.composer.pressSequentially('@ma')
-  await expect(topic.suggestion('Maya')).toBeVisible()
-  await topic.composer.press('Enter')
-  await topic.composer.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(2, 4))
-  await topic.composer.press('ControlOrMeta+i')
-  await expect(topic.composer).toHaveValue('_@Maya_ ')
-  await expect(topic.composerChips).toHaveText(['@Maya'])
-  await topic.composer.press('Enter')
-  await topic.expectSent('Maya')
-  expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'user', user_id: 'U0MAYA', style: { italic: true } }] }])
-
-  await topic.composer.fill('plan')
-  await topic.composer.evaluate((el: HTMLTextAreaElement) => el.select())
-  await topic.composer.evaluate((el) => {
-    const data = new DataTransfer()
-    data.setData('text/plain', 'https://example.com/plan')
-    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
-  })
-  await topic.composer.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 4))
-  await topic.composer.press('ControlOrMeta+b')
-  await expect(topic.composerLinks).toHaveText('plan')
-  await topic.composer.press('Enter')
-  await expect.poll(() => posts(fake)).toBe(before + 2)
-  expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } }] }])
-}
-
-async function formatInEdit({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
-  const composer = juno.topic.composer
-  const before = { posts: posts(fake), updates: updates(fake).length }
-  await composer.pressSequentially('@ma')
-  await expect(juno.topic.suggestion('Maya')).toBeVisible()
-  await composer.press('Enter')
-  await composer.pressSequentially('plan')
-  await composer.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(6, 10))
-  await composer.evaluate((el) => {
-    const data = new DataTransfer()
-    data.setData('text/plain', 'https://example.com/plan')
-    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
-  })
-  await composer.press('Enter')
-  await expect.poll(() => posts(fake)).toBe(before.posts + 1)
-  await juno.topic.expectSent('Maya plan')
-  await composer.press('ArrowUp')
-  await juno.topic.message('Maya plan').press('e')
-  const field = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
-  await expect(field).toHaveValue('@Maya plan')
-  await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(2, 4))
-  await field.press('ControlOrMeta+i')
-  await expect(field).toHaveValue('_@Maya_ plan')
-  await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(9, 10))
-  await field.press('ControlOrMeta+b')
-  await expect(field).toHaveValue('_@Maya_ *plan*')
-  await field.press('Enter')
-  await expect.poll(() => updates(fake).length).toBe(before.updates + 1)
-  const update = updates(fake).at(-1)!
-  expect(lastPost([{ method: 'chat.postMessage', args: update.args }]).elements).toEqual([{ type: 'rich_text_section', elements: [
-    { type: 'user', user_id: 'U0MAYA', style: { italic: true } }, { type: 'text', text: ' ' },
-    { type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } },
-  ] }])
-}
 
 async function alignMixedLines({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   for (const text of ['שלום', 'שלום hello עולם', 'hello שלום world', 'hello\nשלום', 'שלום\nhello']) {

@@ -22,7 +22,7 @@ describe('incoming huddles', () => {
     expect(lookAt(state, running, SELF, NOW).fresh).toEqual([])
   })
 
-  // huddle-incoming.spec covers a huddle the user started on another device.
+  // apps/desktop/dom/huddle-incoming.test.ts covers a huddle the user started on another device.
   it('offers none the user started or is already in, or that has run a while', () => {
     expect(offered({ C1: huddle({ createdBy: null, participants: [SELF, 'U0MAYA'] }) }).list).toEqual([])
     expect(offered({ C1: huddle({ participants: ['U0MAYA', SELF] }) }).list).toEqual([])
@@ -40,7 +40,7 @@ describe('incoming huddles', () => {
     expect(settle(state, { C1: huddle(), C2: huddle({ callId: 'R9' }) }, inCall('C2'), SELF).list[0]?.ringUntil).toBeNull()
   })
 
-  // huddle-incoming.spec covers dropping the card on Join, Dismiss and the huddle's end.
+  // apps/desktop/dom/huddle-incoming.test.ts covers dropping the card on Join, Dismiss and the huddle's end.
   it('lists the newest first, and drops one when the user is in it or a new call starts there', () => {
     const first = offered({ C1: huddle() })
     const running = { C1: huddle(), C2: huddle({ callId: 'R2' }) }

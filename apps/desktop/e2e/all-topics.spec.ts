@@ -57,7 +57,7 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
 })
 
 // What each filter keeps, the chip counts and a row's status after an action are the engine's
-// all-topics flow test; the row menu is actions.spec.ts. This checks the controls reach the list.
+// all-topics flow test; the row menu is `dom/actions.test.ts`. This checks the controls reach the list.
 test('the filters reach the list, and the place picker searches conversations by word', async ({ juno }) => {
   await test.step('a status chip, the text filter and the empty list\'s Clear filters each change the list', () => useFilters(juno))
   await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace({ juno }))

@@ -10,18 +10,30 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Window } from 'happy-dom'
-import { startFakeSlack, type FakeSlack } from '@juno/fake-slack'
+import { startFakeSlack, type FakeSlack, type FakeSlackOptions } from '@juno/fake-slack'
 import { HostPool, type TestHost } from '../e2e/browser/host'
 import { copySnapshot, matchingFake, sharedSnapshot, snapshotKey, snapshotState, type SnapshotMade, type WebSnapshot } from '../e2e/browser/snapshotCache'
 import type { EngineOptions } from '../web/host/testHost'
 import type { WebTestSeam } from '../web/page/testSeam'
 import { PageClock } from './clock'
 import { Dom } from './input'
-import { DOM_BUILD, openWindow } from './window'
+import { closeWindow, DOM_BUILD, openWindow, warmRenderer } from './window'
 
 let pool: HostPool | undefined
 /** One pool per Bun worker, kept across files; a host exits when the worker that forked it goes away. */
 const hostPool = () => (pool ??= new HostPool(DOM_BUILD))
+
+/** Loads the worker's first host and compiles the renderer, while it waits for the synced snapshot. */
+export function warmWorker(): void {
+  hostPool().warm()
+  warmRenderer()
+}
+
+/** Ends the worker's hosts, so each writes its CPU profile (`profile.ts`). */
+export async function closeHostPool(): Promise<void> {
+  await pool?.close()
+  pool = undefined
+}
 
 export async function tempUserData(): Promise<string> {
   return mkdtemp(join(process.env.JUNO_TEST_SCRATCH ?? tmpdir(), 'juno-dom-'))
@@ -50,6 +62,8 @@ export class DomApp {
   window: Window
   dom: Dom
   #closing: Promise<void> | undefined
+  /** The welcome card shows by itself (`tour=auto`), as outside tests; off unless a relaunch asks. */
+  #tour = false
 
   private constructor(
     readonly host: TestHost,
@@ -74,13 +88,14 @@ export class DomApp {
   }
 
   /** As the host's page route does: a verified session goes in the address, so the first frame is the shell. */
-  #open(): Window {
+  #open(storage: ReadonlyArray<readonly [string, string]> = []): Window {
     const sessionFile = join(this.userData, 'web-session.json')
     const ready = existsSync(sessionFile) ? (JSON.parse(readFileSync(sessionFile, 'utf8')) as { ready?: unknown }).ready : undefined
     const url = new URL(this.host.url)
     url.searchParams.set('e2e', '1')
+    if (this.#tour) url.searchParams.set('tour', 'auto')
     if (ready !== undefined) url.searchParams.set('session', JSON.stringify(ready))
-    return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) })
+    return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) }, storage)
   }
 
   /** The page's test seam (`web/page/testSeam.ts`): menus, links and app-menu commands. */
@@ -91,18 +106,19 @@ export class DomApp {
   /**
    * Quits and opens the app again on the same data folder: the page goes, the
    * engine and agent stop, `whileClosed` runs, they start again and a new
-   * window loads. localStorage goes with the window, as the browser lane's
-   * launch preferences do not: a test of what main keeps stays in Electron.
+   * window loads with the old one's localStorage, as the browser lane's
+   * launch preferences stay: a test of what main keeps stays in Electron.
+   * With `tour`, the new page shows the welcome card by itself, as outside tests.
    */
-  async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly engine?: EngineOptions } = {}): Promise<void> {
+  async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly engine?: EngineOptions; readonly tour?: boolean } = {}): Promise<void> {
     const local = this.window.localStorage
     const storage = Array.from({ length: local.length }, (_, at) => local.key(at)!).map((key) => [key, local.getItem(key)!] as const)
-    await within(this.window.happyDOM.close(), 3_000, 'closing the page')
+    await within(closeWindow(this.window), 3_000, 'closing the page')
     await this.host.quitEngine()
     await options.whileClosed?.()
     await this.host.startEngine(options.engine)
-    this.window = this.#open()
-    for (const [key, value] of storage) this.window.localStorage.setItem(key, value)
+    this.#tour = options.tour === true
+    this.window = this.#open(storage)
     this.dom = new Dom(this.window)
   }
 
@@ -111,7 +127,7 @@ export class DomApp {
     return this.#closing ??= (async () => {
       try {
         this.clock?.close()
-        await within(this.window.happyDOM.close(), 3_000, 'closing the page')
+        await within(closeWindow(this.window), 3_000, 'closing the page')
       } finally {
         await within(this.host.stop(), 8_000, 'stopping the host')
       }
@@ -155,9 +171,9 @@ export interface Started {
  * match it (`synced`), or signed out on an empty folder. `warm` waits for the
  * warm boot and checks that the fake still matches what the snapshot saw.
  */
-export async function startDomApp(options: StartOptions & { readonly snapshot?: WebSnapshot; readonly warm?: (app: DomApp) => Promise<void> }): Promise<Started> {
+export async function startDomApp(options: StartOptions & { readonly snapshot?: WebSnapshot; readonly fake?: FakeSlackOptions; readonly warm?: (app: DomApp) => Promise<void> }): Promise<Started> {
   const { snapshot } = options
-  const fake = snapshot === undefined ? await startFakeSlack() : await matchingFake(snapshot)
+  const fake = snapshot === undefined ? await startFakeSlack(options.fake) : await matchingFake(snapshot)
   const userData = await tempUserData()
   let app: DomApp | undefined
   const close = async () => {
