@@ -1,26 +1,12 @@
 // The Juno chat as a user drives it, for the Juno tab and the Juno panel,
 // and a test fixture that runs the agent against a fake OpenRouter.
-import { startFakeOpenRouter, type FakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
+import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test as base } from '../fixtures'
 import { MessageMenuDriver } from '../driver/juno'
+import { answer } from './model'
 
-/**
- * The model the e2e agent talks to. It answers each message by echoing its
- * words, reacts with 🎉 when asked to "react", answers "formatting" with
- * markdown and HTML bold, and says nothing to a reaction. `requests` is what the agent sent.
- */
-export function answer(request: OpenRouterRequest): string {
-  const input = request.input
-  if (input.startsWith('<reaction')) return ''
-  const id = /<message id="(n\d+)">/.exec(input)?.[1]
-  const words = input.replace(/<about[^>]*\/>|<about[\s\S]*?<\/about>|<quote[\s\S]*?<\/quote>|<[^>]*>/g, '').trim()
-  if (/\breact\b/.test(words) && id !== undefined) return `<react to="${id}">🎉</react><say>Reacted to ${words}</say>`
-  if (/\bquote me\b/.test(words) && id !== undefined) return `<say reply-to="${id}">Answering ${words}</say>`
-  if (/\blong one\b/.test(words)) return '<say>Here is the long one: the deploy moved to Thursday, Maya owns the migration, and Leo reviews it before the freeze.</say>'
-  if (/\bformatting\b/.test(words)) return '<say>**Staging** is green, and <b>deploys</b> run at 14:00.</say>'
-  return `<say>You said: ${words}</say>`
-}
+export { answer } from './model'
 
 export const test = base.extend<{ readonly model: FakeOpenRouter }>({
   // oxlint-disable-next-line no-empty-pattern

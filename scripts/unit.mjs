@@ -55,7 +55,7 @@ export function unitCommand(given, root, { workers = defaultWorkers() } = {}) {
 }
 
 /** `--seed <n>` or `--seed=<n>` taken out of the arguments, else JUNO_TEST_SEED, else a new random seed. */
-function takeSeed(args) {
+export function takeSeed(args) {
   const rest = []
   let given = process.env.JUNO_TEST_SEED || undefined
   for (let index = 0; index < args.length; index++) {

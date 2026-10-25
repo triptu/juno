@@ -33,6 +33,7 @@ import { driverSpecs, galleryComponents, graphCandidates, mapProblem, COVERAGE_B
 import { guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { bunTestScripts, unitTestItems } from './affected-tests.mjs'
+import { isDomTest } from './dom-tests.mjs'
 import { inputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
 import { readRecords, statusFolder } from './release-gate.mjs'
 import { specDurations } from './verify-records.mjs'
@@ -70,7 +71,7 @@ const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standar
 /** What every suite installs and compiles with: a change reaches every unit test, and a sample of every e2e suite. */
 const dependencies = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
-const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
+const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/dom-tests.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
 const deletedSources = wide ? changed.filter((file) => /^(apps|packages)\//.test(file) && !file.endsWith('.md') && !files.has(file)) : []
 const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : []), ...deletedSources]
@@ -125,6 +126,14 @@ const unit = pending(unitItems)
 // One shuffled order, kept in the step's arguments: `bun run test --seed <n>` repeats it.
 const testSeed = process.env.JUNO_TEST_SEED || String(randomInt(1, 2 ** 32))
 if (unit.length > 0) plan.push({ script: 'test', args: [`--seed=${testSeed}`, ...(unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)])], items: unit, why: `${unit.length} unit test file(s)` })
+
+// The DOM lane (apps/desktop/dom): each test file reaches its own imports and everything the renderer
+// bundle and the engine host it runs reach, so the import graph decides; a change to most app code runs every file.
+const domEntries = ['apps/desktop/web/page/main.ts', 'apps/desktop/web/host/testHost.ts', 'apps/desktop/dom/vite.config.ts', 'apps/desktop/renderer.vite.ts', 'apps/desktop/web/build-host.mjs']
+const domApp = new Set([...domEntries.filter((file) => files.has(file)).flatMap((file) => [...closure(file)]), 'apps/desktop/package.json', 'scripts/dom-tests.mjs', 'scripts/build-cached.mjs'])
+const domItems = [...files].filter(isDomTest).map((file) => ({ suite: 'dom', id: file, inputs: new Set([...closure(file), ...domApp]) }))
+const domFiles = batch ? [] : pending(domItems)
+if (domFiles.length > 0) plan.push({ script: 'test:dom', args: [`--seed=${testSeed}`, ...(domFiles.length === domItems.length ? [] : ['--files', ...domFiles.map((item) => item.id)])], items: domFiles, why: `${domFiles.length} DOM lane test file(s)` })
 
 // Protocol checks follow their inputs, independently of the breadth of e2e selection.
 const protocols = protocolInputs(git('ls-files', '--cached', '--others', '--exclude-standard'), closure)

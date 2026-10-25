@@ -1,16 +1,14 @@
-// The developer log: a hidden page that lists what the engine does, opened
-// from ⌘K only when the text names it ("developer", "dev log"). Its rows are
-// the Slack calls the fake saw, and a row opens to show the call's params.
-import { expect, test } from './fixtures'
+// The developer log: a hidden page that lists what the engine does, opened from ⌘K only
+// when the text names it ("developer", "dev log"). Its rows are the Slack calls the fake
+// saw, and a row opens to show the call's params.
+import { expect } from './expect'
+import { domTest } from './test'
 
-// Starts signed in and synced (README, "Synced start").
-test.use({ synced: true })
-
-test('⌘K opens the developer log only by name, and a Slack call shows its method and params', async ({ juno, fake }) => {
+domTest('⌘K opens the developer log only by name, and a Slack call shows its method and params', async ({ juno, fake, step }) => {
   const { palette, tabs, win } = juno
   const command = palette.root.getByRole('option', { name: /Open developer log/ })
 
-  await test.step('the command is in neither the ">" listing nor a near match', async () => {
+  await step('the command is in neither the ">" listing nor a near match', async () => {
     await palette.open()
     await palette.type('>')
     await expect(palette.root.getByRole('option').first()).toBeVisible()
@@ -23,7 +21,7 @@ test('⌘K opens the developer log only by name, and a Slack call shows its meth
     await palette.expectClosed()
   })
 
-  await test.step('"dev log" lists it, and Enter opens the log in a tab of its own', async () => {
+  await step('"dev log" lists it, and Enter opens the log in a tab of its own', async () => {
     await palette.openCommands()
     await palette.type('dev log')
     await expect(command).toBeVisible()
@@ -40,7 +38,7 @@ test('⌘K opens the developer log only by name, and a Slack call shows its meth
   expect(call).toBeDefined()
   const method = call!.method
 
-  await test.step('the call is a row with its method; filtered to it, a click shows its params', async () => {
+  await step('the call is a row with its method; filtered to it, a click shows its params', async () => {
     await page.getByRole('radio', { name: 'Slack calls' }).click()
     await page.getByRole('textbox', { name: 'Filter' }).fill(method)
     const row = page.locator(`[data-dev-log-row="slack"][data-dev-log-name="${method}"]`).first()

@@ -12,6 +12,8 @@ export function fullSuites(scripts, { nightly = false, noCache = false, seed, te
   const apps = scripts['test:browser'] && scripts['test:electron'] ? ['test:browser', 'test:electron'] : ['test:desktop']
   return [
     { name: 'test', words: ['test', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] },
+    // The DOM lane (apps/desktop/dom), in the unit job; a commit from before it has no test:dom.
+    ...(scripts['test:dom'] ? [{ name: 'test:dom', words: ['test:dom', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] }] : []),
     { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
     { name: 'specs:conformance', words: ['specs:conformance'] },
     { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },

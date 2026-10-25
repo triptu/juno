@@ -1,11 +1,11 @@
 // Cards the owner clicks (plan v3 §16, flows 3, 5 and 11): Dismiss on a Send card, a multi-send
 // card where one post fails, a hostile Slack message that turns a task into a card with a
-// Because line, the Budget card at the daily cap (one test per button: the agent makes one Budget
-// card per day and raise), and a card that expires.
+// Because line, and a card that expires. The Budget card at the daily cap is in the DOM lane
+// (`dom/juno-agent/cards.test.ts`).
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import { agentReady, card, openChat, openPage, openRuns, openSettings, readySynced as ready } from './agent'
+import { agentReady, card, openChat, openPage, openRuns, readySynced as ready } from './agent'
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -119,47 +119,6 @@ test(
     await expect(run.locator('[data-activity-tainted]')).toBeVisible()
   },
 )
-
-test('at the daily cap the Budget card appears, and Allow $1 more lets the answer through', async ({ juno }) => {
-  await ready(juno)
-  const settings = await openSettings(juno, 'AI activity')
-  const cap = settings.getByLabel('Daily limit in dollars')
-  await cap.fill('0')
-  await cap.press('Enter')
-  await expect(cap).toHaveValue('0')
-
-  const chat = await openChat(juno)
-  await chat.send('what is on today?')
-  const budget = card(chat, 'budget')
-  await expect(budget).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
-  await expect(budget.getByText("Juno has used today's budget.", { exact: true })).toBeVisible()
-  await expect(chat.junoBubble('You said: what is on today?')).toHaveCount(0)
-
-  await budget.getByRole('button', { name: 'Allow $1 more today' }).click()
-  await expect(budget.getByText('Allowed until midnight', { exact: true })).toBeVisible()
-  // The next owner request has the increased allowance.
-  await chat.send('and tomorrow?')
-  await chat.expectJuno('and tomorrow?')
-  await expect(card(chat, 'budget')).toHaveCount(1)
-})
-
-test('at the daily cap, Wait until tomorrow closes the Budget card and Juno stays quiet', async ({ juno, model }) => {
-  await ready(juno)
-  const settings = await openSettings(juno, 'AI activity')
-  const cap = settings.getByLabel('Daily limit in dollars')
-  await cap.fill('0')
-  await cap.press('Enter')
-  await expect(cap).toHaveValue('0')
-
-  const chat = await openChat(juno)
-  await chat.send('what is on today?')
-  const budget = card(chat, 'budget')
-  await expect(budget).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
-  await budget.getByRole('button', { name: 'Wait until tomorrow' }).click()
-  await expect(budget).toHaveAttribute('data-card-status', 'dismissed')
-  await expect(budget.getByText('Dismissed', { exact: true })).toBeVisible()
-  expect(model.inputs().filter((input) => input.includes('what is on today?'))).toEqual([])
-})
 
 test('an old unapproved card expires, and Ask again creates a fresh card without sending', async ({ juno, relaunch, userData, fake, slack }) => {
   await ready(juno)

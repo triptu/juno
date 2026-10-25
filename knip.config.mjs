@@ -43,10 +43,12 @@ export default {
         // The web shell (`bun run web`): its host and the page entry it serves.
         'web/host/cli.ts',
         'web/page/main.ts',
+        // The DOM lane's bun test files (scripts/dom-tests.mjs).
+        'dom/**/*.test.ts',
       ],
-      project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', 'web/**/*.ts', '*.config.ts', '*.vite.ts'],
+      project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'dom/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', 'web/**/*.ts', '*.config.ts', '*.vite.ts'],
       playwright: { config: ['playwright*.config.ts'] },
-      vite: { config: ['electron.vite.config.ts'] },
+      vite: { config: ['electron.vite.config.ts', 'vite.web.config.ts', 'dom/vite.config.ts'] },
     },
     'apps/gallery': {
       entry: ['index.html'],

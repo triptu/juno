@@ -33,7 +33,7 @@ Read the parts relevant to your task, and the package's README, before changing 
 
 - Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, performance, and others as they are added).
 - Tests (`docs/development.md`, "Rules for tests"). Tushar: "few meaningful tests >>>>> tons of one line slop tests. we do need good overall tests for realistic practice behaviours though." So:
-  - Write realistic behaviour tests: user and system flows through the real code, against fakes at the boundaries (the fake Slack server, the fake model, a test clock), in the browser lane unless the flow needs Electron.
+  - Write realistic behaviour tests: user and system flows through the real code, against fakes at the boundaries (the fake Slack server, the fake model, a test clock): in the DOM lane (`apps/desktop/dom/`, `bun test` and happy-dom) when they check what the app shows and sends, in the browser lane when they need layout, and in Electron when they need main or the OS.
   - Unit tests only for something actually tricky (a protocol or merge rule, a parser edge case, a state machine), never 2–3 line checks of a mapping, a label or a constant.
   - No mocks: use fakes for boundaries.
   - "If any change in code requires change in test, the test isn't useful." Delete tests that never failed, change with every code change, and give no plausible signal.

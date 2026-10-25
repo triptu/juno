@@ -2,7 +2,24 @@
 // matches until the test releases it, so a test can act while Juno is busy and wait on state
 // instead of time. `catalogue` rewrites the model list the agent reads.
 import { createServer, request as httpRequest, type IncomingMessage } from 'node:http'
-import { startFakeOpenRouter, type FakeOpenRouter, type FakeOpenRouterOptions } from '@juno/agent-testing/openrouter'
+import { startFakeOpenRouter, type FakeOpenRouter, type FakeOpenRouterOptions, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
+
+/**
+ * The model the e2e agent talks to. It answers each message by echoing its
+ * words, reacts with 🎉 when asked to "react", answers "formatting" with
+ * markdown and HTML bold, and says nothing to a reaction. `requests` is what the agent sent.
+ */
+export function answer(request: OpenRouterRequest): string {
+  const input = request.input
+  if (input.startsWith('<reaction')) return ''
+  const id = /<message id="(n\d+)">/.exec(input)?.[1]
+  const words = input.replace(/<about[^>]*\/>|<about[\s\S]*?<\/about>|<quote[\s\S]*?<\/quote>|<[^>]*>/g, '').trim()
+  if (/\breact\b/.test(words) && id !== undefined) return `<react to="${id}">🎉</react><say>Reacted to ${words}</say>`
+  if (/\bquote me\b/.test(words) && id !== undefined) return `<say reply-to="${id}">Answering ${words}</say>`
+  if (/\blong one\b/.test(words)) return '<say>Here is the long one: the deploy moved to Thursday, Maya owns the migration, and Leo reviews it before the freeze.</say>'
+  if (/\bformatting\b/.test(words)) return '<say>**Staging** is green, and <b>deploys</b> run at 14:00.</say>'
+  return `<say>You said: ${words}</say>`
+}
 
 export interface CatalogueModel {
   readonly id: string
