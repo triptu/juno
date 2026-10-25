@@ -4,7 +4,7 @@ import { expectStableAnchor } from './shiftProbe'
 const ROOT = 'checkout.spec failed again on main.'
 const FIRST_REPLY = 'Sam: Quarantining it. Ticket filed.'
 
-// Which reply previews and which repliers show is engine data (topic-view.flow.test.ts); this checks the link draws them.
+// Which reply previews and which repliers show is engine data (message-content.flow.test.ts); this checks the link draws them.
 syncedTest('Main draws the thread link with its first reply and repliers once the thread is opened', async ({ juno }) => {
   await juno.sidebar.row('#eng').open()
   await juno.topic.threadLinkUnder(ROOT).open()

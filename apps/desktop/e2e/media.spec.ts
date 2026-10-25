@@ -25,7 +25,7 @@ function naturalSize(win: Page, src: string): Promise<{ width: number; height: n
 }
 
 // When an old card becomes the picture, and the retry on reopen after the lookups ran out, are engine
-// behaviour (packages/engine/test/flows/topic-view.flow.test.ts). Here a wide picture is held to the
+// behaviour (packages/engine/test/flows/message-content.flow.test.ts). Here a wide picture is held to the
 // card's height.
 syncedTest('a 4:3 picture shows in a box held to the card height', async ({ juno, fake }) => {
   await juno.sidebar.row(ENG_MAIN).open()

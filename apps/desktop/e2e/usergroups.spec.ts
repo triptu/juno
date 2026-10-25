@@ -1,6 +1,6 @@
 // User group mentions: Slack sends a bare `<!subteam^S…>`, and Juno shows it as a chip with the group's
 // "@handle" and its name as the title. Which handle, in Main, a thread, the sidebar, for a deleted group and
-// after a rename, is engine data (topic-view.flow.test.ts); this checks the chip draws it.
+// after a rename, is engine data (message-content.flow.test.ts); this checks the chip draws it.
 import { expect, test } from './fixtures'
 
 test.use({ synced: true })
