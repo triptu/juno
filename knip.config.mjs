@@ -16,7 +16,7 @@ export default {
   },
   workspaces: {
     '.': {
-      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
+      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/verify-agent.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
       project: ['scripts/**/*.{mjs,ts}', 'specs/**/*.mjs'],
     },
     // Knip reads every package.json exports map; bun test's *.test.ts files are entries
