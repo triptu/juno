@@ -11,6 +11,10 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 
 Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency. Every test owns one context; long walks reset the document between states and recycle pages every 20 states. Screenshots remain review artifacts, not pixel baselines in the behavior gate.
 
+## Shift tiers
+
+`computed-shift.spec.ts` checks every state on every run: forced hover, focus and press styles, synthetic events and a box comparison in one call per state, plus the cursor rule and whole-pixel message rows. `shift.spec.ts` is the real-input walk: on an ordinary run only states whose own component changed (at most 60), every state with `GALLERY_SHIFT_ALL=1`. See [the layout-shift guard](../../docs/development.md#the-layout-shift-guard).
+
 ## Cached walks
 
 `walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports. Shared gallery code, configuration, styles, assets, fonts, tokens, test helpers and the lockfile also count. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
@@ -29,7 +33,7 @@ Reviewed every spec and its non-merge history. Commit counts alone do not prove 
 | --- | --- |
 | `shift`, `focus-ring` | Keep and cache broad walks. Shift history includes real regressions, the disabled-control hang and fallback-font failures; retain injected-shift self-tests and delayed loads. Size checks run in light only, and the header band and Resolve button are checked against each other, not against pinned pixels. |
 | `activation` | Merge eight small cases into three pointer, nested-control and keyboard flows. |
-| `behaviour` | Keep cursor, scroll chaining, whole-pixel row, truncation, late palette and gallery routing checks. These have specific regression history. |
+| `behaviour` | Keep scroll chaining, truncation, late palette and gallery routing checks. These have specific regression history. The cursor and whole-pixel row checks moved into `computed-shift` on 10-25. |
 | `tooltip` | Merge six checks into a timing/dismissal flow and an edge-containment check. Drive time explicitly instead of racing wall-clock sleeps. |
 | `memory-edit` | Merge five cases into one edit/save/cancel flow, including the empty draft and both save keys. |
 | `geometry` | Keep stable filter height, long-path truncation and count alignment. Remove fixed insets, chip dimensions, column widths and decorative alignment; 17 of its 23 commits accompanied UI changes. |

@@ -21,6 +21,12 @@ Options: `root` (default the gallery's `[data-fixture-frame]`, else `body`), `se
 
 Chromium only (the `layout-shift` entry type); the box comparison runs anywhere.
 
+## `checkForcedInteractions(page, options)`
+
+The cheap tier of the same guard, for checking every state of a gallery on every run. In one `page.evaluate` it rewrites `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` in the loaded sheets into attribute selectors of the same specificity, turns transitions off and, for each element matching `targets` (at most `max`, default 8: the first ones and the last three), hovers, focuses from the keyboard, blurs, presses, releases and leaves. It sets the attributes where the browser would match the pseudo-classes, dispatches the pointer, mouse, key and focus events React listens to, waits two tasks, waits for `pending` code to load and finishes animations the touch started. After each step it compares every box under the root with the same comparison as `expectNoLayoutShift` (`tolerance`, `grows`). `skipWithin` leaves alone what is inside its matches. When a touch removes or hides elements still to touch it returns `next`: open the state again and call with `from: next`. `formatForcedShift` renders a shift in the guard's report format.
+
+It cannot see a shift that exists only while a transition runs, one that waits for an animation frame or a ResizeObserver, or browser defaults of real input other than focus on press. Run `expectNoLayoutShift` with real input for those.
+
 ## `waitForLayoutReady(page)`
 
 After the expected UI and data are visible, wait for `document.fonts.ready` and two animation frames before starting a layout-shift measurement. This lets the font layout and earlier UI changes paint outside the interaction being measured. It does not wait for application data or stop animations.
