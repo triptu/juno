@@ -7,7 +7,6 @@
 export const BROWSER_SPECS: ReadonlyArray<string> = [
   'app.spec.ts',
   'file-viewer.spec.ts',
-  'image-menu.spec.ts',
   'privacy.spec.ts',
   'session.spec.ts',
   'browser-isolation.spec.ts',
