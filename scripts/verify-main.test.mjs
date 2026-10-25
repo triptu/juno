@@ -64,10 +64,10 @@ console.error('Connection refused'); process.exit(255);
 
 test('local runs archive eligible records, refresh coverage, and preserve failed suites; an unreachable runner runs nothing', { timeout: 120_000 }, (t) => {
   const { root, commit, env, invoke } = verificationFixture(t)
-  const dry = invoke(['--local', '--dry-run', '--nightly'])
+  const dry = invoke(['--local', '--dry-run', '--nightly', '--with-mac'])
   assert.equal(dry.status, 0, dry.stderr)
   assert.match(dry.stdout, /SPECS_SEED=\d+ specs:check/)
-  assert.match(dry.stdout, /test:desktop --grep @mac, then perf, then test:feel/)
+  assert.match(dry.stdout, /test:desktop --grep @mac, then perf @mac, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)
   assert.equal(existsSync(env.TEST_CALLS), false)
   for (const [args, failing] of [[['--local'], false], [['--local', '--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {

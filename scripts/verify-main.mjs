@@ -4,11 +4,11 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed, full gallery walks, coverage and Mac suites
+//   bun run verify:main --nightly         varied Quint seed, full gallery walks, coverage and the laptop perf job
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
-//                                    then `perf` and `test:feel`
+//                                    then `perf` (absolute budgets) and `test:feel`
 //
 // It checks main out into a temporary detached worktree, so nothing local is
 // sent, and runs `test`, `specs:check` (reused while its inputs match),
@@ -16,9 +16,12 @@
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
-// suite failed. perf and test:feel time the Mac, so they run only with
-// --with-mac, one after the other, each holding the whole machine; the feel
-// contact sheet is copied next to the logs.
+// suite failed. --nightly adds `perf` on the laptop as its own SSH job beside
+// the plan: the scenarios a change reaches since each last passed there, all
+// of them once a week (scripts/perf-select.mjs), checked against the laptop's
+// baseline. The Mac suites run only with --with-mac, one after the other,
+// each holding the whole machine; the feel contact sheet is copied next to
+// the logs.
 //
 // The nightly desktop suite records coverage (JUNO_COVERAGE=1) and writes the
 // coverage map bun run affected selects specs by to
@@ -44,11 +47,12 @@ import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { keepReports } from './verify-reports.mjs'
 import { stopFromLog } from './verify-failures.mjs'
+import { perfRuns, selectPerf } from './perf-select.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
-const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
+const withMac = argv.includes('--with-mac')
 const nightly = argv.includes('--nightly')
 const smoke = argv.includes('--smoke')
 if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
@@ -108,6 +112,13 @@ let suites = required.filter((suite) => {
   return true
 })
 let words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
+// The laptop perf job: nightly, beside the plan, on cores of its own, so the plan's two jobs give up one core each.
+const perfPlan = nightly && !local && !baseline ? selectPerf({ runs: perfRuns(records, execution.host), now: Date.now(),
+  changedSince: (from) => isAncestor(root, from, commit) ? git('diff', '--name-only', from, commit).split('\n').filter(Boolean) : undefined }) : undefined
+const perfCores = process.env.JUNO_RUNNER_PERF_CORES ?? '2'
+const planEnv = perfPlan?.grep === null || perfPlan === undefined ? {} : { JUNO_RUNNER_DESKTOP_CORES: process.env.JUNO_RUNNER_DESKTOP_CORES ?? '3', JUNO_RUNNER_UNIT_CORES: process.env.JUNO_RUNNER_UNIT_CORES ?? '3' }
+const perfWords = perfPlan === undefined || perfPlan.grep === null ? undefined
+  : ['perf', '--with-unit', ...(perfPlan.full ? [] : ['--grep-invert', '@perf-weekly']), ...(perfPlan.grep === undefined ? [] : ['--grep', perfPlan.grep])]
 if (argv.includes('--dry-run')) {
   console.log(`verify:main: ${commit} on ${execution.host} (${execution.mode}); no checkout, tests or record written`)
   if (local) console.log('bun install --frozen-lockfile; exclusive heavy lock; serial plan; desktop skips @mac')
@@ -115,7 +126,9 @@ if (argv.includes('--dry-run')) {
   console.log(`test:plan ${words.join(' ')}`)
   for (const suite of reused) console.log(`Reuse ${suite.suite}: unchanged inputs and runtime (${suite.reusedFrom.commit})`)
   if (baseline) console.log(`Repair ${baseline.commit}: failed/unfinished files plus uncapped import-graph selection (resolved in the target checkout)` )
-  if (withMac) console.log('On this Mac: test:desktop --grep @mac, then perf, then test:feel (exclusive heavy lock)')
+  if (perfPlan) console.log(perfWords ? `On the laptop beside the plan (${perfCores} cores): ${perfWords.join(' ')}` : 'perf: nothing it measures changed since each scenario last passed')
+  for (const skipped of perfPlan?.skipped ?? []) console.log(`perf: skip ${skipped.interaction}, unchanged since ${skipped.commit.slice(0, 10)}`)
+  if (withMac) console.log('On this Mac: test:desktop --grep @mac, then perf @mac, then test:feel (exclusive heavy lock)')
   process.exit(0)
 }
 mkdirSync(logDir, { recursive: true })
@@ -210,7 +223,11 @@ if (baseline) {
 const runs = [cancelled || !installed ? Promise.resolve(suites.map(({ name }) => ({ suite: name, code: cancelled ? 130 : 1, seconds: 0, log: join(logDir, 'install.log') })))
   : suites.length === 0 ? Promise.resolve([]) : run('plan', process.execPath, local
     ? [heavy, '--exclusive', process.execPath, join(checkout, 'scripts/plan.mjs'), ...words]
-    : [join(checkout, 'scripts/remote.mjs'), '--env', 'JUNO_VERIFY_POLICY=1', 'test:plan', ...words], checkout, local ? { ...localVerifyEnv, JUNO_SKIP_TAGS: '@mac', JUNO_VERIFY_POLICY: '1' } : {}).then((planned) => splitPlan(planned))]
+    : [join(checkout, 'scripts/remote.mjs'), '--env', 'JUNO_VERIFY_POLICY=1', 'test:plan', ...words], checkout, local ? { ...localVerifyEnv, JUNO_SKIP_TAGS: '@mac', JUNO_VERIFY_POLICY: '1' } : planEnv).then((planned) => splitPlan(planned))]
+if (perfWords && !cancelled && installed) {
+  runs.push(run('perf', process.execPath, [join(checkout, 'scripts/remote.mjs'), '--cores', perfCores, '--wait', '3600', '--env', 'JUNO_VERIFY_POLICY=1', ...perfWords], checkout)
+    .then((result) => [{ ...result, perf: perfPlan }]))
+}
 if (withMac) {
   // The @mac tests need the installed workspace and a build here; they take a heavy-job slot.
   runs.push(
@@ -248,7 +265,7 @@ if (partials.length > 0) {
 console.log(`verify:main: ${coverageNote}`)
 if (withMac && !cancelled) {
   // After the rest, so they do not time a machine the other suites are using.
-  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, local ? localVerifyEnv : {})]
+  for (const [suite, script] of [['perf @mac', 'perf'], ['test:feel', 'test:feel']]) results = [...results, await run(suite, 'bun', ['run', script], checkout, local ? localVerifyEnv : {})]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }
@@ -286,7 +303,7 @@ const measured = results.map((result) => {
   const inputs = protocols[result.suite]
   const override = argv.filter((word, index) => argv[index - 1] === '--cause').map((word) => word.split('=')).find(([suite]) => suite === result.suite)?.[1]
   return { ...result, code, stop, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs && actual ? committedInputKey(root, commit, inputs, actual) : undefined,
-    host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? execution.host : hostname(),
+    host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' || result.suite === 'perf' ? execution.host : hostname(),
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
     failures: code === 0 ? [] : stop ? [`${stop.rule}: ${stop.signature ?? `${stop.failed}/${stop.completed} tests failed`}`] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused'] : failures(result.log), tests,
     cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch || stop ? 'infrastructure' : undefined), note: stop ? JSON.stringify(stop) : mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
@@ -303,7 +320,7 @@ const summary = {
   coverage: coverageNote, nightly, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
-  allocation: Object.fromEntries(['DESKTOP', 'UNIT'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
+  allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'PERF'].map((kind) => [kind.toLowerCase(), planEnv[`JUNO_RUNNER_${kind}_CORES`] ?? (kind === 'PERF' && perfWords ? perfCores : undefined) ?? process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
   reports: keepReports(checkout, logDir, planStarted).map((file) => join('.juno-status', relative(statusDir, file))),
 }
 writeRecord(statusDir, runId, summary)
