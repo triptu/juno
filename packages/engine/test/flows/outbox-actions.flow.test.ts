@@ -1,18 +1,21 @@
-// Edits and deletes through the outbox (M6b; architecture 5.7, specs/outbox.qnt): the change shows at once,
-// Slack's answer and the socket event reconcile it in either order, a message still being sent is waited for
-// (`depends_on`), a refusal puts back what Slack has, and a failure ends once and is shown for Retry or
-// Dismiss. Every test starts warm on the synced default workspace. Reactions are in `outbox-reactions`.
+// Edits, deletes and broadcasts through the outbox (M6b; architecture 5.7, specs/outbox.qnt): the change shows
+// at once, Slack's answer and the socket event reconcile it in either order, a message still being sent is waited
+// for (`depends_on`), a refusal puts back what Slack has, and a failure ends once and is shown for Retry or
+// Dismiss. Every test starts warm on the synced default workspace. Reactions are in `outbox-reactions`, apart
+// from how they pass an edit's backoff and a lost answer, which are here.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 import { SELF_ID } from '@juno/fake-slack'
-import { deleteMessage, editMessage, reactToMessage, resolveMessageAction, sendMessage } from '@juno/state'
+import { broadcastMessage, deleteMessage, editMessage, openTopic, reactToMessage, resolveMessageAction, sendMessage } from '@juno/state'
+import { productionTiming } from '../../src/config'
+import { controlledClock } from '../controlledClock'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
-import { actionRows, actionsEnded, chip, eng, fresh, inSlack, MAIN, outboxScenario, refOf, rowWith, sending, sent } from '../outboxScenario'
+import { actionRows, actionsEnded, chip, eng, fresh, inSlack, MAIN, outboxScenario, refOf, rowWith, sending, sent, type Watch } from '../outboxScenario'
 import { apiCalls, quiet, readDb, valueOf } from '../scenario'
 import { step } from '../step'
 
-const { booted, watch, opened, restarted } = outboxScenario()
+const { booted, watch, opened, restarted, stop } = outboxScenario()
 
 /** Outbox actions that ended as failures, with their attempts: what the message's action issue is built from. */
 const failures = (engine: RunningEngine) => readDb(engine, 'user.db', (db) =>
@@ -322,4 +325,127 @@ it('stops a failing edit after five tries for an explicit Retry, and settles one
       engine.fake.releaseFrames()
     })
   }
+})
+
+it('sends a reaction while an edit of another message waits out its production backoff [TestClock]', async () => {
+  const time = await controlledClock()
+  const engine = await booted({ clock: time.clock, timing: { retryBaseMillis: productionTiming.retryBaseMillis, retryCapMillis: productionTiming.retryCapMillis } })
+  try {
+    const rows = await opened(engine)
+    const mine = await sent(engine, 'Edit before reacting', rows)
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Reaction delivery target' })
+    const target = rowWith(await rows((list) => rowWith(list, 'Reaction delivery target') !== undefined, 'the target'), 'Reaction delivery target')!
+    await quiet(engine)
+    await time.freeze()
+    engine.fake.forceError({ method: 'chat.update', error: 'internal_error', times: 5 })
+    valueOf(await editMessage(engine.registry, refOf(mine), 'Edited before reacting'))
+    // The refused edit is put off by the outbox's own schedule; nothing else shows it.
+    await waitFor(() => (failures(engine).some((row) => row.attempts === 1) ? true : undefined), WAIT_MS, 'the edit waiting out its backoff')
+    valueOf(await reactToMessage(engine.registry, refOf(target), 'eyes', true))
+    await waitFor(() => (inSlack(engine, target.ts)?.reactions?.some((reaction) => reaction.name === 'eyes') ? true : undefined), WAIT_MS, 'the reaction in Slack')
+    // No time passed, so the edit is still waiting.
+    expect(apiCalls(engine, 'chat.update')).toHaveLength(1)
+    await rows((list) => chip(rowWith(list, 'Reaction delivery target'), 'eyes')?.me === true && rowWith(list, 'Reaction delivery target')?.reactionIssue === undefined, 'the reaction shown, with no issue')
+  } finally {
+    await stop(engine)
+    await time.close()
+  }
+})
+
+it('a reaction whose answer the network lost and sent again is added once and taken away once', async () => {
+  const engine = await booted()
+  // Chromium sends a request again when its connection closes with no answer (ADR 0014), so Slack runs it twice.
+  engine.main.network.resend = true
+  const rows = await opened(engine)
+  engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'React over a lost answer' })
+  const target = rowWith(await rows((list) => rowWith(list, 'React over a lost answer') !== undefined, 'the target'), 'React over a lost answer')!
+  const reactions = () => inSlack(engine, target.ts)?.reactions ?? []
+
+  await step('the add Slack ran twice ends as made, with one reaction in Slack', async () => {
+    engine.fake.loseResponse({ method: 'reactions.add' })
+    valueOf(await reactToMessage(engine.registry, refOf(target), '+1', true))
+    await actionsEnded(engine, 'the add ended')
+    expect(apiCalls(engine, 'reactions.add').map((call) => call.error)).toEqual(['lost', 'already_reacted'])
+    expect(reactions()).toMatchObject([{ name: '+1', count: 1 }])
+    await rows((list) => chip(rowWith(list, 'React over a lost answer'), '+1')?.count === 1 && rowWith(list, 'React over a lost answer')?.reactionIssue === undefined, 'one chip, yours')
+  })
+
+  await step('the remove Slack ran twice ends as made, with no reaction left', async () => {
+    engine.fake.loseResponse({ method: 'reactions.remove' })
+    valueOf(await reactToMessage(engine.registry, refOf(target), '+1', false))
+    await actionsEnded(engine, 'the remove ended')
+    expect(apiCalls(engine, 'reactions.remove').map((call) => call.error)).toEqual(['lost', 'no_reaction'])
+    expect(reactions()).toEqual([])
+    await rows((list) => chip(rowWith(list, 'React over a lost answer'), '+1') === undefined && rowWith(list, 'React over a lost answer')?.reactionIssue === undefined, 'no chip')
+  })
+})
+
+// Also send to the channel (SPEC 7): `chat.update` with `reply_broadcast` and no text sends an own reply to Main.
+const POSTGRES = 'Draft plan is in the doc'
+const broadcastRows = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => db.prepare(`SELECT count(*) AS n FROM outbox WHERE kind = 'broadcast'`).get() as { n: number }).n
+const broadcastsEnded = (engine: RunningEngine, label: string) => waitFor(() => (broadcastRows(engine) === 0 ? true : undefined), WAIT_MS, label)
+
+/** Posts `text` as an own reply in the Postgres thread and answers its stored row. */
+async function ownReply(engine: RunningEngine, thread: Watch, root: string, text: string) {
+  valueOf(await sendMessage(engine.registry, { ...eng, threadTs: root }, text, `t:C0ENG:${root}`))
+  return rowWith(await thread((list) => rowWith(list, text) !== undefined && rowWith(list, text)!.pending === undefined, `"${text}" stored`), text)!
+}
+
+it('sends an own reply to the channel too, and reconciles a refusal, an edit before it and a lost answer', async () => {
+  const first = await booted()
+  const root = first.fake.messages('C0ENG').find((m) => m.text?.startsWith(POSTGRES))!.ts
+  const topic = `t:C0ENG:${root}`
+  valueOf(await openTopic(first.registry, topic))
+  const thread = await opened(first, topic)
+  const main = await opened(first)
+
+  await step('a refused broadcast takes the copy out of Main and the mark off the reply', async () => {
+    const reply = await ownReply(first, thread, root, 'Refused broadcast')
+    await fresh(first)
+    first.fake.forceError({ method: 'chat.update', error: 'cant_broadcast_message' })
+    first.fake.holdNext({ method: 'chat.update', before: true })
+    valueOf(await broadcastMessage(first.registry, refOf(reply)))
+    await thread((list) => rowWith(list, 'Refused broadcast')?.broadcast === true, 'marked at once')
+    await main((list) => rowWith(list, 'Refused broadcast') !== undefined, 'in Main at once')
+    first.fake.release()
+    await broadcastsEnded(first, 'the refusal ended')
+    await main((list) => rowWith(list, 'Refused broadcast') === undefined, 'out of Main')
+    await thread((list) => rowWith(list, 'Refused broadcast')?.broadcast === false, 'the mark gone')
+  })
+
+  await step('an edit and then a broadcast of one reply go in order, as separate calls', async () => {
+    const reply = await ownReply(first, thread, root, 'Keep the old primary warm')
+    await fresh(first)
+    first.fake.holdNext({ method: 'chat.update', before: true })
+    valueOf(await editMessage(first.registry, refOf(reply), 'Keep the old primary warm until Friday.'))
+    await waitFor(() => (first.fake.heldCount({ method: 'chat.update' }) === 1 ? true : undefined), WAIT_MS, 'the held edit')
+    valueOf(await broadcastMessage(first.registry, refOf(reply)))
+    await thread((list) => rowWith(list, 'Keep the old primary warm until Friday.')?.broadcast === true, 'edited and marked')
+    first.fake.release()
+    await waitFor(() => (inSlack(first, reply.ts)?.subtype === 'thread_broadcast' ? true : undefined), WAIT_MS, 'the broadcast in Slack')
+    await broadcastsEnded(first, 'the broadcast ended')
+    expect(inSlack(first, reply.ts)?.text).toBe('Keep the old primary warm until Friday.')
+    expect(apiCalls(first, 'chat.update').map((call) => [call.args['text'], call.args['reply_broadcast']])).toEqual([
+      ['Keep the old primary warm until Friday.', undefined],
+      [undefined, 'true'],
+    ])
+    await main((list) => rowWith(list, 'Keep the old primary warm until Friday.')?.broadcastFrom?.title.startsWith(POSTGRES) === true, 'in Main, from its thread')
+  })
+
+  await step('a broadcast whose answer and socket event are lost is found in Main before its row ends, and stays after a restart', async () => {
+    const reply = await ownReply(first, thread, root, 'Lost broadcast answer')
+    await fresh(first)
+    first.fake.holdFrames({ types: ['message'] })
+    first.fake.loseResponse({ method: 'chat.update' })
+    valueOf(await broadcastMessage(first.registry, refOf(reply)))
+    await broadcastsEnded(first, 'the broadcast ended')
+    // Sent again, Slack refuses it as already sent; one read of that ts in Main proves it.
+    expect(apiCalls(first, 'chat.update').map((call) => call.error)).toEqual(['lost', 'cant_broadcast_message'])
+    expect(apiCalls(first, 'conversations.history').some((call) => call.args['oldest'] === reply.ts && call.args['latest'] === reply.ts)).toBe(true)
+    first.fake.releaseFrames({ drop: true })
+    await thread((list) => rowWith(list, 'Lost broadcast answer')?.broadcast === true, 'marked in the thread')
+    await main((list) => rowWith(list, 'Lost broadcast answer')?.broadcastFrom?.title.startsWith(POSTGRES) === true, 'in Main, from its thread')
+    const engine = await restarted(first)
+    await watch(engine, MAIN)((list) => rowWith(list, 'Lost broadcast answer')?.broadcastFrom?.title.startsWith(POSTGRES) === true, 'in Main after the restart')
+  })
 })
