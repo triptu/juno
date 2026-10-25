@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { parseSlackLink, slackLink } from '../src/links'
+import { messageLink, parseSlackLink, slackLink } from '../src/links'
 
 const channel = { id: 'C024BE91L' } as never
 const workspace = { url: 'https://acme.slack.com/', teamId: 'T0ACME' }
@@ -11,6 +11,13 @@ describe('Slack links', () => {
   it('a thread links to its root message, Main to its channel', () => {
     expect(slackLink('https://acme.slack.com/', { channel, rootTs: '1712345678.000200' })).toBe('https://acme.slack.com/archives/C024BE91L/p1712345678000200')
     expect(slackLink('https://acme.slack.com', { channel })).toBe('https://acme.slack.com/archives/C024BE91L')
+  })
+
+  it('a message link reads back as the same message, a reply with its thread', () => {
+    const reply = messageLink('https://acme.slack.com/', 'C024BE91L', '1712345690.000300', '1712345678.000200')
+    expect(reply).toBe('https://acme.slack.com/archives/C024BE91L/p1712345690000300?thread_ts=1712345678.000200&cid=C024BE91L')
+    expect(parseSlackLink(reply, workspace)?.target).toEqual(message('1712345690.000300', '1712345678.000200'))
+    expect(parseSlackLink(messageLink('https://acme.slack.com/', 'C024BE91L', '1712345678.000200', '1712345678.000200'), workspace)?.target).toEqual(message('1712345678.000200'))
   })
 })
 
