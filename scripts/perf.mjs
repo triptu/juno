@@ -45,7 +45,7 @@ let failed = 0
 if (unitsOnly || withUnit || (args.length === 0 && !noDesktop)) {
   const chosen = unitFiles === undefined ? unitPerfFiles() : unitFiles.split(',').filter(Boolean)
   // The large-seed budgets share one boot (packages/engine/test/perf/largeSeedEngine.ts), so they run in one process,
-  // in name order; every other file runs alone. Each file's outcome is printed for the nightly's input cache.
+  // in bun's shuffled order; every other file runs alone. Each file's outcome is printed for the nightly's input cache.
   const shared = chosen.filter((file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').includes('largeSeedEngine'))
   const groups = [...(shared.length > 0 ? [shared] : []), ...chosen.filter((file) => !shared.includes(file)).map((file) => [file])]
   for (const files of groups) {

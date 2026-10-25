@@ -181,9 +181,8 @@ describe('topics.list on the large seed', () => {
 describe('allTopics.list on the large seed', () => {
   it('runs a window, the counts and a text filter over every topic within budget', async () => {
     const { engine } = await largeSeedEngine()
-    // Freeze the store before opening a separate one for isolated timings. This stops the shared engine, so this
-    // budget is the last of the large-seed ones (scripts/perf.mjs runs them in this order).
-    await engine.handle.stop()
+    // The shared engine is idle after the boot (no periodic sweeps), so a separate store reads it for isolated timings.
+    await engine.syncIdle()
     const paths = workspacePathsFromDir(join(engine.userData, 'workspaces', engine.fake.teamId))
     const report = await Effect.runPromise(
       Effect.gen(function* () {

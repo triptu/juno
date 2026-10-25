@@ -598,6 +598,8 @@ defaultSeedTest('send in Main: Enter through the checks on send to the pending r
 // With one worker they still run in order on one setup; after a failure the
 // next worker runs the setup again and goes on.
 test.describe('large workspace', () => {
+  // One worker runs the group on its synced workspace, while the laptop's other workers take other scenarios.
+  test.describe.configure({ mode: 'default' })
   let fake: FakeSlack
   let userData: string
   let slackDir: string
@@ -995,6 +997,7 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
 // (codeBlocksSeed: 50 distinct code blocks of 40 to 100 lines). One synced
 // user-data directory; every scenario launches the app warm on it.
 test.describe('topic view', () => {
+  test.describe.configure({ mode: 'default' })
   let fake: FakeSlack
   let userData: string
   let slackDir: string
@@ -1397,6 +1400,7 @@ test.describe('topic view', () => {
 })
 
 test.describe('Juno chat', () => {
+  test.describe.configure({ mode: 'default' })
   let fake: FakeSlack
   let model: FakeOpenRouter
   let userData: string
