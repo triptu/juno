@@ -10,7 +10,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Window } from 'happy-dom'
-import { startFakeSlack, type FakeSlack } from '@juno/fake-slack'
+import { startFakeSlack, type FakeSlack, type FakeSlackOptions } from '@juno/fake-slack'
 import { HostPool, type TestHost } from '../e2e/browser/host'
 import { copySnapshot, matchingFake, sharedSnapshot, snapshotKey, snapshotState, type SnapshotMade, type WebSnapshot } from '../e2e/browser/snapshotCache'
 import type { EngineOptions } from '../web/host/testHost'
@@ -74,13 +74,13 @@ export class DomApp {
   }
 
   /** As the host's page route does: a verified session goes in the address, so the first frame is the shell. */
-  #open(): Window {
+  #open(storage: ReadonlyArray<readonly [string, string]> = []): Window {
     const sessionFile = join(this.userData, 'web-session.json')
     const ready = existsSync(sessionFile) ? (JSON.parse(readFileSync(sessionFile, 'utf8')) as { ready?: unknown }).ready : undefined
     const url = new URL(this.host.url)
     url.searchParams.set('e2e', '1')
     if (ready !== undefined) url.searchParams.set('session', JSON.stringify(ready))
-    return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) })
+    return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) }, storage)
   }
 
   /** The page's test seam (`web/page/testSeam.ts`): menus, links and app-menu commands. */
@@ -91,8 +91,8 @@ export class DomApp {
   /**
    * Quits and opens the app again on the same data folder: the page goes, the
    * engine and agent stop, `whileClosed` runs, they start again and a new
-   * window loads. localStorage goes with the window, as the browser lane's
-   * launch preferences do not: a test of what main keeps stays in Electron.
+   * window loads with the old one's localStorage, as the browser lane's
+   * launch preferences stay: a test of what main keeps stays in Electron.
    */
   async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly engine?: EngineOptions } = {}): Promise<void> {
     const local = this.window.localStorage
@@ -101,8 +101,7 @@ export class DomApp {
     await this.host.quitEngine()
     await options.whileClosed?.()
     await this.host.startEngine(options.engine)
-    this.window = this.#open()
-    for (const [key, value] of storage) this.window.localStorage.setItem(key, value)
+    this.window = this.#open(storage)
     this.dom = new Dom(this.window)
   }
 
@@ -155,9 +154,9 @@ export interface Started {
  * match it (`synced`), or signed out on an empty folder. `warm` waits for the
  * warm boot and checks that the fake still matches what the snapshot saw.
  */
-export async function startDomApp(options: StartOptions & { readonly snapshot?: WebSnapshot; readonly warm?: (app: DomApp) => Promise<void> }): Promise<Started> {
+export async function startDomApp(options: StartOptions & { readonly snapshot?: WebSnapshot; readonly fake?: FakeSlackOptions; readonly warm?: (app: DomApp) => Promise<void> }): Promise<Started> {
   const { snapshot } = options
-  const fake = snapshot === undefined ? await startFakeSlack() : await matchingFake(snapshot)
+  const fake = snapshot === undefined ? await startFakeSlack(options.fake) : await matchingFake(snapshot)
   const userData = await tempUserData()
   let app: DomApp | undefined
   const close = async () => {
