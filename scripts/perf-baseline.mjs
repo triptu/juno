@@ -7,7 +7,8 @@
 //   bun scripts/perf-baseline.mjs update [<results dir>...]
 //       Writes apps/desktop/e2e/perf-baseline.json from the perf-metrics.json
 //       files the runs left (default: the three newest .remote/<run> with
-//       any). Metrics the runs did not measure keep their old values. Only on
+//       any). Name runs at different host loads: the load moves the numbers
+//       most. Metrics the runs did not measure keep their old values. Only on
 //       request, or after a change that moves a number on purpose: a baseline
 //       refreshed every night would let a slow creep through.
 //   bun scripts/perf-baseline.mjs show [<results dir>...]
