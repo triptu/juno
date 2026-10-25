@@ -59,7 +59,7 @@ domTest('with AI assist on, Mark done and Resolve all take their row away at onc
 domTest('a new item shows while Home is on screen, and waits while the pointer is over the rows', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { home, sidebar } = juno
+  const { home } = juno
   await home.open()
   await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite/)
 
@@ -68,10 +68,16 @@ domTest('a new item shows while Home is on screen, and waits while the pointer i
   slack.as('Maya').dm('Can you look at the hiring plan today?')
   await expect(home.meta('waiting')).toHaveText(/^Maya · /, { timeout: 30_000 })
 
-  // The pointer over the rows holds them: Sam's newer question waits.
+  // Moved a lot: nine replies since the user last read the thread.
+  for (let n = 1; n <= 9; n++) slack.as('Leo').replyIn(STAGING, `Cost update ${n}.`)
+  await expect(home.meta('moved')).toContainText('9 new', { timeout: 30_000 })
+
+  // The pointer over the rows holds them: Sam's newer question waits. A row the hold keeps still changes in place,
+  // and Leo's reply after Sam's question changes it, so the view that moves it to 10 new already has Sam's question.
   await home.item('waiting').hover()
   slack.as('Sam').dm('Can you send me the offsite agenda?')
-  await sidebar.row('Sam', { exact: true }).expectPreview(/offsite agenda/)
+  slack.as('Leo').replyIn(STAGING, 'Cost update 10.')
+  await expect(home.meta('moved')).toContainText('10 new')
   await expect(home.meta('waiting')).toHaveText(/^Maya · /)
 
   // The pointer leaves: it shows in one step.
