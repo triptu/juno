@@ -14,7 +14,7 @@ import type { DomApp } from '../app'
 import { expect } from '../expect'
 import type { Dom } from '../input'
 import type { Query } from '../query'
-import { HomePane, HomeWritePane } from './home'
+import { HomePane, HomeWritePane, WelcomeCard } from './home'
 import { domSurface, escapeRegExp, Menus } from './menus'
 import { PaletteDriver } from './palette'
 import { AccountMenu, hoursRows, NotificationsPage, PrivacyMode, SettingsPage } from './settings'
@@ -79,6 +79,12 @@ export class TabStrip implements TabStripVerbs {
     const tab = this.nth(title, index)
     await tab.hover()
     await tab.parent().getByRole('button', { name: 'Close tab' }).click()
+  }
+
+  /** Delete on the focused tab. */
+  async closeWithKeyboard(title: string): Promise<void> {
+    await this.tab(title).focus()
+    await this.dom.press('Delete')
   }
 
   async selectAt(title: string, index: number): Promise<void> {
@@ -173,6 +179,7 @@ export class Juno implements JunoVerbs {
   readonly palette: PaletteDriver
   readonly privacy: PrivacyMode
   readonly peek: PeekPopover
+  readonly welcome: WelcomeCard
 
   constructor(readonly app: DomApp) {
     this.dom = app.dom
@@ -190,11 +197,26 @@ export class Juno implements JunoVerbs {
     this.palette = new PaletteDriver(this.dom, this.menus)
     this.privacy = new PrivacyMode(this.dom, this.surface)
     this.peek = new PeekPopover(this.dom)
+    this.welcome = new WelcomeCard(this.dom, this.menus)
   }
 
   /** The page, for a test's own queries, as `juno.win` is in the Playwright driver. */
   get win(): Dom {
     return this.dom
+  }
+
+  /**
+   * When one of the app's marks (`@juno/state/perf`) was last recorded, or
+   * undefined. The Bun worker's `performance` is shared by every window it
+   * opens, so compare with the value before the step.
+   */
+  lastMark(name: string): number | undefined {
+    return this.dom.window.performance.getEntriesByName(name, 'mark').at(-1)?.startTime
+  }
+
+  /** When one of the app's measures last started, or undefined; see `lastMark`. */
+  lastMeasure(name: string): number | undefined {
+    return this.dom.window.performance.getEntriesByName(name, 'measure').at(-1)?.startTime
   }
 
   async chooseNextMenuItem(id: string | null, options: { readonly hold?: boolean } = {}): Promise<void> {
