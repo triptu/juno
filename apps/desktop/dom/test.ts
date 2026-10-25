@@ -12,7 +12,7 @@ import { test } from 'bun:test'
 import type { FakeSlack } from '@juno/fake-slack'
 import { Slack } from '../e2e/driver/slack'
 import type { EngineOptions } from '../web/host/testHost'
-import { DomApp, domSnapshot, startDomApp } from './app'
+import { DomApp, domSnapshot, startDomApp, warmWorker } from './app'
 import { PageClock } from './clock'
 import { Juno } from './driver/juno'
 
@@ -64,6 +64,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
   try {
     const clock = options.clock === undefined || options.clock === false ? undefined : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())
     const engine: EngineOptions = { ...options.engine, ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }) }
+    warmWorker()
     const snapshot = options.synced === false ? undefined : await domSnapshot(signIn)
     const ready = meter.lap()
     const started = await startDomApp({ snapshot, engine, ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })

@@ -17,11 +17,17 @@ import type { EngineOptions } from '../web/host/testHost'
 import type { WebTestSeam } from '../web/page/testSeam'
 import { PageClock } from './clock'
 import { Dom } from './input'
-import { closeWindow, DOM_BUILD, openWindow } from './window'
+import { closeWindow, DOM_BUILD, openWindow, warmRenderer } from './window'
 
 let pool: HostPool | undefined
 /** One pool per Bun worker, kept across files; a host exits when the worker that forked it goes away. */
 const hostPool = () => (pool ??= new HostPool(DOM_BUILD))
+
+/** Loads the worker's first host and compiles the renderer, while it waits for the synced snapshot. */
+export function warmWorker(): void {
+  hostPool().warm()
+  warmRenderer()
+}
 
 /** Ends the worker's hosts, so each writes its CPU profile (`profile.ts`). */
 export async function closeHostPool(): Promise<void> {

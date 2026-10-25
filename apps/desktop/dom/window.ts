@@ -21,6 +21,11 @@ function renderer() {
   return compiled
 }
 
+/** Compiles the renderer and its sheet ahead of the first window. */
+export function warmRenderer(): void {
+  renderer()
+}
+
 /**
  * The sheet's rules for the root (`:root`, `html`): the tokens, such as the
  * durations `rootDuration` reads. happy-dom matches every rule of every
