@@ -21,8 +21,9 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 const RINA = 'Rina finished the onsite'
 const LONG_THREAD = 'Review the rollout checklist 1.'
 
-// The defaults are read first, before any step changes a setting.
-syncedTest('Settings: Notifications and Appearance save, the test notification and permission line, Ignored, and Tidy up', { tag: '@canary' }, async ({ juno }) => {
+// The defaults are read first, before any step changes a setting. Electron only: the permission line and the test
+// notification are main's. What the engine keeps (Tidy up's quick changes, Ignore with Undo, the hours) is in its flow tests.
+syncedTest('Settings: Notifications and Appearance save, the test notification and permission line, Ignored, and Tidy up', { tag: '@electron' }, async ({ juno }) => {
   await test.step('Settings › Notifications saves hours, and Appearance changes the density', () => notificationsAndAppearance(juno))
   await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
   await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', () => ignoredChannels(juno))

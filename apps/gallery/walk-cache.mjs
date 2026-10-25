@@ -23,7 +23,7 @@ class LayoutGraph extends ImportGraph {
 }
 
 /** Source keys work in remote archives too: no Git metadata or worktree paths. */
-export function sourceKeys(root, kind) {
+export function sourceKeys(root) {
   const files = new Set([...filesUnder(root, 'packages'), ...filesUnder(root, 'apps/gallery')])
   const graph = new LayoutGraph(root, files)
   const registries = ['ui', 'views', 'huddle-views'].map(name => `packages/${name}/src/fixtures.ts`).filter(file => files.has(file))
@@ -31,7 +31,7 @@ export function sourceKeys(root, kind) {
 
   // What a walk does to a state. The spec's other tests (delayed loads, the guard's
   // self-tests) are not part of it; the guard is, through the walk's imports.
-  const walk = kind === 'shift' ? 'apps/gallery/shift-walk.ts' : 'apps/gallery/focus-ring.spec.ts'
+  const walk = 'apps/gallery/shift-walk.ts'
   const shared = new Set([
     'bunfig.toml', 'tsconfig.base.json',
     'scripts/import-graph.mjs', 'scripts/locked-packages.mjs', 'scripts/build-cached.mjs', 'scripts/build-inputs.mjs',
@@ -148,7 +148,7 @@ const manifest = (root, file) => existsSync(join(root, file)) ? JSON.parse(readF
 
 /** Immutable successful state records beside the shared build/results caches. */
 export function walkCache({ root, kind, runtime, directory, all = false }) {
-  const componentKey = sourceKeys(root, kind)
+  const componentKey = sourceKeys(root)
   const cache = directory ?? join(process.env.JUNO_BUILD_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'results'), 'gallery-walk-v1')
   const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['NODE_ENV', 'JUNO_UNMINIFIED'].includes(name)).toSorted()
   const key = route => digest(JSON.stringify({ kind, route, runtime, environment, source: componentKey(route.component) }))

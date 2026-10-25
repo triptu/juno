@@ -1,7 +1,5 @@
-// Second break pass of 10-17: Home's composer used fast from the keyboard.
-// Keys typed on the chip and keys held after ⌘T reach the field through
-// `execCommand`, so they stay in the browser lane
-// (`e2e/break-pass-1017b.spec.ts`). Findings are in
+// Second break pass of 10-17: Home's composer used fast from the keyboard,
+// keys typed on its chips and keys held after ⌘T. Findings are in
 // docs/reviews/2026-10-17-break-pass-b.md.
 import { brief, paste } from './attach'
 import { expect } from './expect'
@@ -120,3 +118,66 @@ domTest("Home's drafts: typing during a send, a draft shown again, and a file Ju
   })
 })
 
+domTest("Home's field takes keys typed on its chips and a paste after ⌘T", async ({ juno, step }) => {
+  await step('keys typed on the destination chip go into the field; arrows and Space still drive the chip', async () => {
+    const { write, tabs, win } = juno
+
+    // Esc from the list gives focus back to the chip in Chromium, and to the field here (README): the browser lane checks that.
+    await tabs.menu('new-message')
+    await expect(write.search).toBeFocused()
+    await write.search.press('Escape')
+    await write.chip.focus()
+    await win.keyboard.type('What changed today?')
+    await expect(write.composer).toBeFocused()
+    await expect(write.composer).toHaveValue('What changed today?')
+    await write.expectDestination('Juno')
+
+    await win.keyboard.press('Shift+Tab')
+    await expect(write.chip).toBeFocused()
+    await win.keyboard.press('ArrowDown')
+    await expect(write.search).toBeFocused()
+    await write.search.press('Escape')
+    await write.chip.focus()
+    await win.keyboard.press('Space')
+    await expect(write.search).toBeFocused()
+    await write.search.press('Escape')
+    await expect(write.composer).toHaveValue('What changed today?')
+  })
+
+  await step('a key typed on the topic chip goes into the field', async () => {
+    const { write } = juno
+
+    await write.composer.fill('')
+    await write.pickConversation('eng', 'eng')
+    await write.expectTopic('Main')
+    await write.composer.press('Shift+Tab')
+    await write.topicChip.press('ArrowDown')
+    await expect(write.topicSearch).toBeFocused()
+    await write.topicSearch.press('Escape')
+    await write.topicChip.focus()
+    await write.topicChip.press('D')
+    await expect(write.composer).toBeFocused()
+    await expect(write.composer).toHaveValue('D')
+  })
+
+  await step('text pasted right after ⌘T goes into the new Home, in order with the keys typed around it', async () => {
+    const { write, topic, sidebar, tabs, win } = juno
+
+    await sidebar.row(POSTGRES).open()
+    await topic.expectTitle(POSTGRES)
+    await topic.composer.focus()
+    // ⌘T reaches the page before the menu runs it; keys and a ⌘V in that time are held for the new tab.
+    const page = win.window as unknown as typeof globalThis
+    page.document.activeElement?.dispatchEvent(new page.KeyboardEvent('keydown', { key: 't', code: 'KeyT', metaKey: true, bubbles: true, cancelable: true }))
+    await win.keyboard.type('Re: ')
+    const data = new page.DataTransfer()
+    data.setData('text/plain', 'the launch brief')
+    ;(page.document.activeElement ?? page.document.body).dispatchEvent(new page.ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    await win.keyboard.type('?')
+    await tabs.menu('new-tab')
+    await tabs.expectActiveAt('Home', 0)
+    await expect(write.composer).toHaveValue('Re: the launch brief?')
+    await tabs.select(POSTGRES)
+    await expect(topic.composer).toHaveValue('')
+  })
+})
