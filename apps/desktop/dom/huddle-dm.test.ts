@@ -5,12 +5,12 @@
  * say the huddle has nobody in it. The call must still show who is in it,
  * count up from its start and keep its row's headphones.
  */
-import { expect, syncedTest as test } from './fixtures'
-import { addRemote, connection } from './huddleFake'
+import { expect } from './expect'
+import { addRemote, connection } from './huddle'
+import { domTest } from './test'
 
-test.describe.configure({ timeout: 90_000 })
-
-test('a DM huddle shows both people and counts up while huddles/info lags the room frames', async ({ juno, fake, win }) => {
+domTest('a DM huddle shows both people and counts up while huddles/info lags the room frames', async ({ juno, fake }) => {
+  const { win } = juno
   fake.control('setHuddleInfoLag', { ms: 1_500 })
   const row = juno.sidebar.row('Maya', { exact: true })
   await row.open()
@@ -40,16 +40,12 @@ test('a DM huddle shows both people and counts up while huddles/info lags the ro
   await expect(bar).not.toContainText('0:00')
   await expect(row.root.locator('[data-huddle-indicator]')).toBeVisible()
   // Sampled every 20 ms until the clock has ticked once, at most 2 s.
-  const durations = await win.evaluate(async () => {
-    const samples: Array<ReadonlyArray<string | null>> = []
-    for (let i = 0; i < 100; i++) {
-      samples.push(['[data-huddle-bar]', '[data-huddle-page]'].map((selector) =>
-        document.querySelector(selector)?.textContent?.match(/\d+:\d{2}/)?.[0] ?? null))
-      if (new Set(samples.map(([time]) => time)).size > 1) break
-      await new Promise((resolve) => setTimeout(resolve, 20))
-    }
-    return samples
-  })
+  const durations: Array<ReadonlyArray<string | null>> = []
+  for (let i = 0; i < 100; i++) {
+    durations.push(['[data-huddle-bar]', '[data-huddle-page]'].map((selector) => win.document.querySelector(selector)?.textContent?.match(/\d+:\d{2}/)?.[0] ?? null))
+    if (new Set(durations.map(([time]) => time)).size > 1) break
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
   expect(durations.filter(([barTime, tabTime]) => barTime === null || barTime !== tabTime)).toEqual([])
   expect(new Set(durations.map(([time]) => time)).size).toBeGreaterThan(1)
-})
+}, { timeout: 90_000 })
