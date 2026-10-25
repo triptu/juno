@@ -90,10 +90,13 @@ const mention = (fake: FakeSlack) =>
 async function walk(running: RunningApp, fake: FakeSlack): Promise<void> {
   const { app, win } = running
   const juno = new Juno(app, win)
-  // The first sync waits on one conversation, so the sidebar's syncing card stays while it is sampled.
-  fake.holdNext({ method: 'conversations.history' })
+  // The first sync waits on Slack for every conversation's history and replies, so it has nothing to do
+  // while the sidebar's syncing card is sampled.
+  fake.holdNext({ method: 'conversations.history', times: 10_000 })
+  fake.holdNext({ method: 'conversations.replies', times: 10_000 })
   await juno.signIn()
   await expect(juno.sidebar.syncStatus).toHaveText('Syncing with Slack', { timeout: 30_000 })
+  await expect.poll(() => fake.heldCount({ method: 'conversations.history' }), { timeout: 30_000 }).toBeGreaterThan(0)
   await test.step('while the first sync waits on Slack', async () => { await sample(running, 'syncing card shown') })
   fake.release()
   await juno.waitForSync()
