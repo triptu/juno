@@ -5,7 +5,6 @@
 // and a DM's row drawn as the sidebar draws its Main: the photo, named once.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
 import type { Juno } from './driver/juno'
@@ -26,7 +25,6 @@ async function freshHome(juno: Juno, via: string): Promise<string[]> {
 const RINA = 'Rina finished the onsite'
 const POSTGRES = 'Draft plan is in the doc'
 const STAGING = 'Unrelated: has anyone looked at the'
-const KEYS = 'The staging deploy keys need rotating'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
 // One first sync with conversations.history held: the start ("0 of N"), then a page at a time
@@ -146,21 +144,7 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await tabs.expectCount(1)
 })
 
-test('a DM set to Never leaves Home and returns when set to Auto', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  slack.as('Maya').dm('Can you look at the hiring plan today?')
-
-  const maya = juno.sidebar.row('Maya', { exact: true })
-  await expect(maya.root).toBeVisible({ timeout: 30_000 })
-  await maya.chooseInMenu('notify-never')
-  await juno.home.open()
-  await expect(juno.home.root.locator('a[href*="m%3AD0MAYA"]')).toHaveCount(0)
-
-  await maya.chooseInMenu('notify-auto')
-  await expect.poll(() => freshHome(juno, OFFSITE), { timeout: 30_000 }).toContain('waiting')
-  await expect(juno.home.root.locator('a[href*="m%3AD0MAYA"]')).toBeVisible()
-})
+// A DM set to Never leaves Home and comes back on Auto: the engine's home-view flow test.
 
 test("A Home row from a DM shows the person's photo and names them once; a channel's keeps its art", async ({ juno, slack }) => {
   await juno.signIn()
@@ -186,38 +170,7 @@ test("A Home row from a DM shows the person's photo and names them once; a chann
   await expect(home.item('waiting').locator('img')).toHaveAttribute('src', /U0MAYA/)
 })
 
-test('Mark done clears a follow-up, and Resolve all resolves the settled topics with Undo', async ({ juno, fake, win }) => {
-  // A second settled thread: the user answered Dev, and Dev thanked them two hours ago.
-  const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
-  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
-  fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
-  await juno.signIn()
-  await juno.waitForSync()
-  const { home, sidebar } = juno
-  // Tidy up waits four hours of quiet by default; the incident thread went quiet 70 minutes ago.
-  await juno.openSettings('Tidy up')
-  await win.getByRole('radio', { name: '1 hour' }).click()
-
-  await expect.poll(() => freshHome(juno, OFFSITE), { timeout: 30_000 }).toEqual(['waiting', 'followUp', 'tidyUp'])
-  await expect(home.title('tidyUp')).toHaveText('2 topics look settled')
-  await expect(home.meta('tidyUp')).toHaveText('incidents')
-
-  await home.button('followUp', 'Mark done').click()
-  await juno.expectToast('Follow-up done')
-  // The row goes at once, even under the pointer: the user did it (home-live.spec.ts).
-  await expect.poll(() => home.kinds()).toEqual(['waiting', 'tidyUp'])
-
-  // Tidy up is live too: the follow-up just marked done can make its topic look settled, so read the count off the row.
-  const settled = (await home.title('tidyUp').textContent())!.match(/^(\d+) topics look settled$/)![1]
-  await home.button('tidyUp', 'Resolve all').click()
-  await juno.expectToast(`Resolved ${settled} topics`)
-  await sidebar.row(KEYS).expectAbsent()
-  await juno.undoFromToast()
-  await sidebar.row(KEYS).expectVisible()
-
-  // Home again: the follow-up is still gone.
-  expect(await freshHome(juno, POSTGRES)).not.toContain('followUp')
-})
+// Mark done and Resolve all on Home: home-live.spec.ts.
 
 test('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, userData, relaunch }) => {
   await juno.signIn()

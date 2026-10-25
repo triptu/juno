@@ -35,15 +35,17 @@ test('a DM huddle shows both people and counts up while huddles/info lags the ro
   const page = win.locator('[data-huddle-page]')
   await expect(page).not.toContainText("You're the only one here")
   await expect(win.locator('[data-huddle-bar] button [role="img"]')).toHaveAccessibleName('Maya')
-  // The huddle has run for more than five seconds, and the line counts on.
-  await expect(bar).toContainText(/0:(0[5-9]|[1-5]\d)/, { timeout: 10_000 })
+  // The huddle has run past twice the edge's lag, and the line counts on.
+  await expect(bar).toContainText(/0:(0[3-9]|[1-5]\d)/, { timeout: 10_000 })
   await expect(bar).not.toContainText('0:00')
   await expect(row.root.locator('[data-huddle-indicator]')).toBeVisible()
+  // Sampled every 20 ms until the clock has ticked once, at most 2 s.
   const durations = await win.evaluate(async () => {
     const samples: Array<ReadonlyArray<string | null>> = []
     for (let i = 0; i < 100; i++) {
       samples.push(['[data-huddle-bar]', '[data-huddle-page]'].map((selector) =>
         document.querySelector(selector)?.textContent?.match(/\d+:\d{2}/)?.[0] ?? null))
+      if (new Set(samples.map(([time]) => time)).size > 1) break
       await new Promise((resolve) => setTimeout(resolve, 20))
     }
     return samples
