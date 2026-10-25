@@ -12,6 +12,7 @@ test.describe.configure({ timeout: 150_000 })
 const DAY = 24 * 60 * 60 * 1000
 const STAGING = 'Unrelated: has anyone looked at the'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
+const KEYS = 'The staging deploy keys need rotating'
 
 /** A resting place for the pointer on Home, off its rows: right of the column, above the composer. */
 async function pointAway(juno: Juno): Promise<void> {
@@ -48,10 +49,16 @@ test.describe('with AI assist on', () => {
     await juno.expectToast('Follow-up done')
     await expect.poll(() => home.kinds(), { timeout: 2_000 }).toEqual(['waiting', 'moved', 'tidyUp'])
 
+    // Tidy up is live too: the follow-up just marked done can make its topic look settled, so read the count off the row.
+    await expect(home.meta('tidyUp')).toHaveText('incidents')
+    const settled = (await home.title('tidyUp').textContent())!.match(/^(\d+) topics look settled$/)![1]
     await home.button('tidyUp', 'Resolve all').click()
     await expect.poll(() => home.kinds(), { timeout: 2_000 }).toEqual(['waiting', 'moved'])
+    await juno.expectToast(`Resolved ${settled} topics`)
+    await juno.sidebar.row(KEYS).expectAbsent()
     await juno.undoFromToast()
     await expect.poll(() => home.kinds(), { timeout: 5_000 }).toEqual(['waiting', 'moved', 'tidyUp'])
+    await juno.sidebar.row(KEYS).expectVisible()
   })
 })
 
@@ -123,29 +130,4 @@ asked('answering the last row shows the caught-up picture at once, with the DM s
   await expect.poll(() => home.picture.locator('img').evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
 })
 
-/** Leo's unread DM says something that asks nothing of the user: no row. */
-function unreadNothingAsked(workspace: Workspace): void {
-  oneQuestion(workspace)
-  workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'Release notes are out.', at: workspace.clock.now() - 10 * 60_000 })
-  workspace.reads.set('D0LEO', workspace.post({ channel: 'D0LEO', user: SELF_ID, text: 'Done, checked them.', at: workspace.clock.now() - 20 * 60_000 }).ts)
-}
-
-const unreadOnly = test.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: unreadNothingAsked })
-    await use(fake)
-    await fake.close()
-  },
-})
-
-unreadOnly('with no rows, the first Home is caught up even while a DM is unread', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { home, sidebar } = juno
-  await sidebar.row('Leo Park', { exact: true }).expectPreview(/Release notes are out\./)
-  await home.open()
-  expect(await home.kinds()).toEqual([])
-  // The caught-up scene, or the picture once one is on disk; never the time of day's scene and greeting.
-  await expect(home.root.locator('[data-home-scene="caughtUp"]').or(home.picture)).toBeVisible()
-})
+// With no rows, the first Home is caught up even while a DM is unread: the engine's home-view flow test.
