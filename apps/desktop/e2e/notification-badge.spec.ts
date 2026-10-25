@@ -67,26 +67,19 @@ badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wa
   await badge('')
 })
 
-// The first post-setup content view asks before any banner has been shown.
-badgeTest('the first Home view asks for authorization before any notification is shown', async ({ juno }) => {
-  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-  expect(await juno.osNotifications()).toEqual([])
-  await juno.openNotifications()
-  await expect(juno.notifications.root.getByRole('status', { name: 'Notification permission' })).toHaveCount(0)
-})
-
-badgeTest('badge regression: no permission prompt during onboarding', async ({ juno }) => {
+// No prompt during onboarding; the first Home view after it asks, before any banner has been shown.
+badgeTest('no permission prompt during onboarding, and the first Home view asks before any notification is shown', async ({ juno }) => {
   await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
   await juno.signIn({ skipSetUp: false })
   await expect(juno.setUp).toBeVisible()
   await expect.poll(() => juno.dockBadge()).toBe('•')
   expect(await juno.surface.system('notificationRequests')).toBe(0)
   await juno.skipSetUp()
+  await juno.waitForSync()
   await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
+  expect(await juno.osNotifications()).toEqual([])
+  await juno.openNotifications()
+  await expect(juno.notifications.root.getByRole('status', { name: 'Notification permission' })).toHaveCount(0)
 })
 
 badgeTest('a denied request is remembered across a full app restart', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
