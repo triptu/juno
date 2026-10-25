@@ -4,7 +4,8 @@
  * hands the body the driver, the fake Slack and the people in it, and
  * closes everything after, pass or fail. With JUNO_E2E_TIMINGS=1 each test
  * prints a `dom timing:` line: wall time, and the CPU of this Bun worker
- * (test, fake, renderer) and of the hosts it forked (engine, agent).
+ * (test, fake, renderer) and of the hosts it forked (engine, agent), and
+ * the memory of both: the worker's peak and now, the hosts' now.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
@@ -120,7 +121,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
         try { await other.app?.close() } finally { await rm(other.userData, { recursive: true, force: true }) }
       }
       await started.close()
-      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total() })}`)
+      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total(), memory: memoryMB() })}`)
     }
   } finally {
     await model?.close()
@@ -143,10 +144,20 @@ function savePage(title: string, app: DomApp, userData: string): void {
   } catch { /* the window is gone */ }
 }
 
+/** Megabytes resident: this worker at its peak and now, and the hosts it forked now (Linux; 0 elsewhere). */
+function memoryMB(): { readonly bunPeak: number; readonly bun: number; readonly host: number } {
+  return { bunPeak: Math.round(process.resourceUsage().maxRSS / 1024), bun: Math.round(process.memoryUsage().rss / 1e6), host: Math.round(hostStats().rssPages * 4096 / 1e6) }
+}
+
 /** CPU milliseconds of the host processes this worker forked (Linux; 0 elsewhere). */
 function hostCpuMillis(): number {
-  if (process.platform !== 'linux') return 0
+  return hostStats().cpuMillis
+}
+
+function hostStats(): { readonly cpuMillis: number; readonly rssPages: number } {
+  if (process.platform !== 'linux') return { cpuMillis: 0, rssPages: 0 }
   let total = 0
+  let rss = 0
   for (const name of readdirSync('/proc')) {
     if (!/^\d+$/.test(name)) continue
     try {
@@ -154,9 +165,10 @@ function hostCpuMillis(): number {
       const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
       if (Number(fields[1]) !== process.pid) continue
       total += (Number(fields[11]) + Number(fields[12])) * 10
+      rss += Number(fields[21])
     } catch { /* gone */ }
   }
-  return total
+  return { cpuMillis: total, rssPages: rss }
 }
 
 /** Wall and CPU since the last lap. */
