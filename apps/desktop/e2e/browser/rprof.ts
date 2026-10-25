@@ -55,7 +55,7 @@ export async function startRendererProfile(page: Page): Promise<{ readonly mark:
       try {
         marks['end'] = await metrics()
         await collect(session, phases['end'] = {}, fns)
-        const top = [...fns].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([name, ms]) => [name, Math.round(ms)])
+        const top = [...fns].toSorted((a, b) => b[1] - a[1]).slice(0, 12).map(([name, ms]) => [name, Math.round(ms)])
         console.log(`e2e rprof: ${JSON.stringify({ title, marks, phases: Object.fromEntries(Object.entries(phases).map(([key, groups]) => [key, rounded(groups)])), top })}`)
       } finally { await session.detach().catch(() => undefined) }
     },
