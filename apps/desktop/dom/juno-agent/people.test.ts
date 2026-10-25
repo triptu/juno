@@ -1,14 +1,14 @@
-// Person files (SPEC 13.8), in the app against the fake Slack and a fake OpenRouter: the learning
-// pass builds files for the people the owner exchanges most with, a run in the panel beside a DM
+// Person files (SPEC 13.8): the learning pass builds files for the people the owner exchanges most with, a run in the panel beside a DM
 // gets that person's file after the recent messages, a draft follows How you talk with them, the
 // owner corrects the relationship from the DM's ⋯ menu, and privacy mode blurs the files.
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import type { Locator } from '@playwright/test'
+import type { Slack } from '../../e2e/driver/slack'
+import { answer, startScriptedModel, type ScriptedModel } from '../../e2e/juno-agent/model'
+import { JunoChatPane, openChat, openPage, readySynced as ready } from '../driver/agent'
 import type { Juno } from '../driver/juno'
-import type { Slack } from '../driver/slack'
-import { openChat, openPage, readySynced as ready } from './agent'
-import { answer, expect, JunoChatPane, test as base } from './chat'
-import { startScriptedModel, type ScriptedModel } from './model'
+import { expect } from '../expect'
+import type { Query } from '../query'
+import { domTest } from '../test'
 
 /** The pass's first message (`task` in `memory-docs/learn.ts`). */
 const PASS = 'Learn how the owner works'
@@ -48,21 +48,17 @@ function scripted(): (request: OpenRouterRequest) => string | ToolCallAnswer {
   }
 }
 
-const test = base.extend<{ readonly model: ScriptedModel }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startScriptedModel({ answer: scripted() })
-    await use(model)
-    await model.close()
-  },
-})
+/** Privacy mode blurs what is marked sensitive (tokens/global.css): the page's flag, and the mark on or around `target`. */
+async function expectBlurred(juno: Juno, target: Query, blurred = true): Promise<void> {
+  const el = await target.element()
+  expect(juno.dom.document.documentElement.hasAttribute('data-privacy') && el.closest('[data-sensitive]') !== null).toBe(blurred)
+}
 
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 180_000 })
-
-async function setWindowWidth(juno: Juno, width: number): Promise<void> {
-  await juno.setWindowSize(width)
+/** ⌃⌘H through View, and waits until the page has the change. */
+async function togglePrivacy(juno: Juno): Promise<void> {
+  const before = juno.dom.document.documentElement.hasAttribute('data-privacy')
+  await juno.surface.appMenu('toggle-privacy')
+  await expect.poll(() => juno.dom.document.documentElement.hasAttribute('data-privacy')).toBe(!before)
 }
 
 /** Opens Maya's DM in the current tab and the Juno panel beside it, when it is not open yet. */
@@ -70,7 +66,7 @@ async function mayaPanel(juno: Juno): Promise<JunoChatPane> {
   await juno.sidebar.row('Maya', { exact: true }).open()
   await juno.tabs.expectActive('Maya')
   const panel = JunoChatPane.panel(juno.win)
-  if (!(await panel.composer.isVisible())) await juno.tabs.menu('juno')
+  if (!panel.composer.isVisible()) await juno.tabs.menu('juno')
   await expect(panel.composer).toBeVisible()
   return panel
 }
@@ -107,7 +103,7 @@ async function learnFromHome(juno: Juno, model: ScriptedModel): Promise<Readonly
 }
 
 /** People is a row per file; Maya's opens her file in place of the page, and Back returns. */
-async function expectFiles(page: Locator, other: { readonly name: string; readonly id: string } | undefined): Promise<void> {
+async function expectFiles(page: Query, other: { readonly name: string; readonly id: string } | undefined): Promise<void> {
   const maya = page.locator('[data-memory-person="U0MAYA"]')
   await expect(maya.locator('[data-memory-person-name]')).toHaveText('Maya Chen')
   await expect(maya.locator('[data-memory-relationship]')).toHaveText('Peer')
@@ -138,7 +134,7 @@ async function draftToMaya(juno: Juno, model: ScriptedModel): Promise<void> {
 }
 
 /** The DM's ⋯ menu opens what Juno knows about Maya, where the owner sets the relationship. Answers the page. */
-async function correctRelationship(juno: Juno): Promise<Locator> {
+async function correctRelationship(juno: Juno): Promise<Query> {
   const menu = await juno.topic.chooseInMenu('juno-knows')
   expect(menu.labels.slice(-2)).toEqual(['-', 'What Juno knows about Maya'])
   await juno.tabs.expectActive('What Juno remembers')
@@ -154,21 +150,20 @@ async function correctRelationship(juno: Juno): Promise<Locator> {
 }
 
 /** Privacy mode blurs every note in the open file and each row's line of work; names and chips stay readable. */
-async function expectBlurred(juno: Juno, page: Locator): Promise<void> {
+async function blurFiles(juno: Juno, page: Query): Promise<void> {
   const maya = page.locator('[data-memory-person="U0MAYA"]')
-  await juno.privacy.toggleWithMenu()
-  await juno.privacy.expectBlurred(page.locator('[data-memory-section="talk"] [data-memory-entry] [data-sensitive]'))
+  await togglePrivacy(juno)
+  await expectBlurred(juno, page.locator('[data-memory-section="talk"] [data-memory-entry] [data-sensitive]'))
   await page.locator('[data-memory-back]').click()
   await expect(maya.locator('[data-memory-relationship]')).toHaveText('Manager')
-  await juno.privacy.expectBlurred(maya.locator('[data-memory-work]'))
-  await juno.privacy.expectBlurred(maya.locator('[data-memory-person-name]'), false)
-  await juno.privacy.toggleWithMenu()
-  await juno.privacy.expectBlurred(maya.locator('[data-memory-work]'), false)
+  await expectBlurred(juno, maya.locator('[data-memory-work]'))
+  await expectBlurred(juno, maya.locator('[data-memory-person-name]'), false)
+  await togglePrivacy(juno)
+  await expectBlurred(juno, maya.locator('[data-memory-work]'), false)
 }
 
-test('the pass builds files for the top DM partners, a DM run gets the file and drafts the way the owner talks with them, the relationship is corrected, and privacy blurs the files', async ({ juno, slack, model }) => {
+domTest('the pass builds files for the top DM partners, a DM run gets the file and drafts the way the owner talks with them, the relationship is corrected, and privacy blurs the files', async ({ juno, slack, model }) => {
   await ready(juno)
-  await setWindowWidth(juno, 1400)
   await exchangeWithMaya(juno, slack)
 
   // The pass's task lists the people the owner exchanges most with, Maya among them; it wrote the first two files.
@@ -177,11 +172,11 @@ test('the pass builds files for the top DM partners, a DM run gets the file and 
   await expectFiles(await openPage(juno, 'What Juno remembers'), people.find((person) => person.id !== 'U0MAYA'))
 
   await draftToMaya(juno, model)
-  await expectBlurred(juno, await correctRelationship(juno))
+  await blurFiles(juno, await correctRelationship(juno))
 
   // The next run beside the DM sees the owner's choice.
   const panel = await mayaPanel(juno)
   await panel.send('what does Maya need from me this week?')
   await panel.expectJuno('You said: what does Maya need from me this week?')
   expect(askedWith(model, 'what does Maya need from me').memory).toContain('Relationship: Manager (set by the owner)')
-})
+}, { model: () => startScriptedModel({ answer: scripted() }), timeout: 180_000 })

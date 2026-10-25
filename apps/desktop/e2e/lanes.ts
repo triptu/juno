@@ -19,7 +19,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'juno-agent/chat-reactions.spec.ts',
   'juno-agent/selection.spec.ts',
   'juno-agent/source-link.spec.ts',
-  'juno-agent/people.spec.ts',
   'juno-agent/images.spec.ts',
   'juno-agent/learn.spec.ts',
   'juno-agent/providers-ui.spec.ts',
