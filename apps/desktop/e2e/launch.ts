@@ -106,14 +106,8 @@ export function launchTiming(options: LaunchOptions): 'fast' | 'production' {
   return options.timing ?? (production ? 'production' : 'fast')
 }
 
-/**
- * Launches the built app (prepared by Playwright setup) on the given user-data
- * directory and waits for its first window. Launch the same directory twice
- * to test what survives a relaunch.
- */
-export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
-  const started = performance.now()
-  const startedCpu = cpuAll()
+/** The app's environment for a launch: this process's, without what a packaged app never gets, and the e2e seams `options` asks for. */
+function launchEnv(userData: string, options: LaunchOptions): Record<string, string> {
   const env: Record<string, string> = {}
   // A package manager or test runner may give the scripts it runs NODE_PATH
   // or NODE_OPTIONS. The app is bundled and the packaged app gets neither, so
@@ -136,10 +130,6 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.slackAppDir !== undefined) env.JUNO_SLACK_APP_DIR = options.slackAppDir
   if (options.keychainPassword !== undefined) env.JUNO_SLACK_SAFE_STORAGE_PASSWORD = options.keychainPassword
   if (options.fakeAiDelayMillis !== undefined) env.JUNO_FAKE_AI_DELAY_MS = String(options.fakeAiDelayMillis)
-  const ownOpenRouter = options.agent === true && options.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
-  if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
-  const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
-  if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
   if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
   if (options.codemode === true) env.JUNO_AGENT_CODEMODE = '1'
   if (options.screenShared === true) env.JUNO_E2E_SCREEN_SHARED = '1'
@@ -151,6 +141,22 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.aiJobs === true) env.JUNO_E2E_AI_JOBS = '1'
   else delete env.JUNO_E2E_AI_JOBS
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
+  return env
+}
+
+/**
+ * Launches the built app (prepared by Playwright setup) on the given user-data
+ * directory and waits for its first window. Launch the same directory twice
+ * to test what survives a relaunch.
+ */
+export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
+  const started = performance.now()
+  const startedCpu = cpuAll()
+  const env = launchEnv(userData, options)
+  const ownOpenRouter = options.agent === true && options.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
+  if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
+  const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
+  if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
   const coverage = coverageDir()
   if (coverage !== undefined) env.JUNO_E2E_COVERAGE = coverage
 
