@@ -317,7 +317,6 @@ test('an edit made while the message is still sending is kept, and reaches Slack
     await field.press('Enter')
     await expect(topic.message('Wrong word here')).toBeVisible()
     expect(updates()).toBe(before)
-
     fake.release()
     await topic.expectSent('Wrong word here')
     await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Wrong word here').length).toBe(1)

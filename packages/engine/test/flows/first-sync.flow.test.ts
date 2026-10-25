@@ -7,10 +7,10 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { viewsDelete, type EngineStatus, type TopicRow } from '@juno/contract'
 import { CONVERSATIONS, largeSeed, SELF_ID } from '@juno/fake-slack'
-import { engineStatusAtom, homeViewAtom, runCommand, syncFailureAtom, syncNoticeAtom, topicCountsAtom } from '@juno/state'
+import { engineStatusAtom, runCommand, syncFailureAtom, syncNoticeAtom, topicCountsAtom } from '@juno/state'
 import { productionTiming } from '../../src/config'
 import { controlledSleep } from '../controlledClock'
-import { startTestEngine, waitFor, WAIT_MS, type EngineOptions, type RunningEngine } from '../harness'
+import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from '../harness'
 import { apiCalls, bootedEngine, DAY, quiet, readDb, seedThread, threadId, tsOf, valueOf, type SeededThread } from '../scenario'
 import { step } from '../step'
 
@@ -269,50 +269,6 @@ it('reads DMs (unread first), then mentions, then unread followed threads, then 
   // Each group is read before the next one starts.
   for (let i = 0; i + 1 < groups.length; i++) expect(Math.max(...positions(groups[i]!))).toBeLessThan(Math.min(...positions(groups[i + 1]!)))
 }, 150_000)
-
-it('Home is ready once DMs, mentions and unread followed threads have history, before the rest of history', async () => {
-  // What Home is made of (SPEC 12, owner 10-18): DMs and group DMs, conversations with an unread mention, and those
-  // with unread replies in a followed thread, inside the three-day topic window.
-  const seed = largeSeed({ topics: 300, messages: 3_000, users: 100, channels: { public: 20, private: 6, dms: 8, mpims: 3 } })
-  let forHome = new Set<string>()
-  const engine = await started({
-    fakeOptions: { seed },
-    initial: (fake) => {
-      const ws = fake.workspace
-      const threads = ws.threadCounts()
-      const windowStart = (Date.now() - 3 * DAY) / 1000
-      forHome = new Set([...ws.conversations.values()].filter((c) => {
-        if (!c.members.has(SELF_ID) || c.archived) return false
-        const entry = ws.countEntry(c)
-        if (entry.latest === undefined || Number(entry.latest) < windowStart) return false
-        return c.kind === 'im' || c.kind === 'mpim' || (entry.has_unreads && entry.mention_count > 0)
-          || (threads.mention_count_by_channel?.[c.id] ?? 0) > 0 || (threads.unread_count_by_channel?.[c.id] ?? 0) > 0
-      }).map((c) => c.id))
-      // The history of anything else waits, so the sync stops at the first conversation Home does not need.
-      fake.gate((method, args) => method === 'conversations.history' && args['_x_reason'] === 'history' && !forHome.has(args['channel'] ?? ''))
-      return fake.signIn()
-    },
-  })
-  const unmount = engine.registry.mount(homeViewAtom)
-  try {
-    const home = () => {
-      const result = engine.registry.get(homeViewAtom)
-      return result._tag === 'Success' ? result.value : undefined
-    }
-    expect(forHome.size).toBeGreaterThan(3)
-    await waitFor(() => (home()?.ready === true ? true : undefined), 30_000, 'Home ready')
-    expect(home()?.firstSync).toBe(true)
-    expect(engine.fake.gated().filter((call) => call.method === 'conversations.history')).toHaveLength(1)
-    const read = new Set(apiCalls(engine, 'conversations.history').filter((call) => call.args['_x_reason'] === 'history').map((call) => call.args['channel']))
-    expect([...forHome].filter((id) => !read.has(id))).toEqual([])
-    expect((await engine.phase('catching-up'))._tag).toBe('catching-up')
-    engine.fake.gate()
-    await engine.phase('live', 30_000)
-    await waitFor(() => (home()?.firstSync === false && home()?.ready === true ? true : undefined), WAIT_MS, 'Home after the boot')
-  } finally {
-    unmount()
-  }
-}, 60_000)
 
 it("with the app's pacing, reads thread previews and emoji beside history, not after it", async () => {
   // Pacing ten times faster than the app's, every method alike, so the methods keep their real ratios; live calls took

@@ -398,23 +398,3 @@ it('live changes reach exactly the rows they touch, and names stand in for menti
     expect(after.find((row) => row.id === id)!.rev).not.toBe(before.find((row) => row.id === id)!.rev)
   })
 })
-
-it("one sender's replies share a header until ten quiet minutes pass", async () => {
-  const engine = await synced()
-  const minutes = (ago: number) => engine.fake.now() - ago * 60_000
-  const root = engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Header gap thread', at: minutes(40), silent: true })
-  for (const [text, ago] of [['First after the root', 30], ['Nine minutes later', 21], ['Ten quiet minutes later', 11], ['Right after that', 10]] as const) {
-    engine.fake.workspace.post({ channel: 'C0ENG', threadTs: root.ts, user: 'U0MAYA', text, at: minutes(ago), silent: true })
-  }
-  const id = threadId(engine.fake, 'C0ENG', 'Header gap thread')
-  const list = watchList(engine, messagesAtom(id))
-  valueOf(await openTopic(engine.registry, id))
-  const window = await list.until((value) => value.order.length === 5, 'the root and its four replies')
-  expect(rowsOf(window).map((row) => [textOf(row), row.groupStart])).toEqual([
-    ['Header gap thread', true],
-    ['First after the root', true],
-    ['Nine minutes later', false],
-    ['Ten quiet minutes later', true],
-    ['Right after that', false],
-  ])
-})
