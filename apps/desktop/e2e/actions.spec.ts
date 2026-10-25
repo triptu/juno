@@ -1,8 +1,9 @@
 // The topic actions against the fake Slack (SPEC 5 "Row actions", inventory
-// 15 and 16): resolve and reopen, pin, rename, ignore, mark read and
-// unread, Copy Slack link and Open in Slack, each with its toast, and each
-// undone with the toast's Undo or ⌘Z (Edit › Undo).
-import { expect, test, type Fixtures } from './fixtures'
+// 15 and 16): rename, ignore, mark read and unread, Copy Slack link and Open
+// in Slack, each with its toast, and each undone with the toast's Undo or ⌘Z
+// (Edit › Undo). Resolve, reopen and pin are in the DOM lane
+// (`dom/actions.test.ts`).
+import { expect, test } from './fixtures'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -12,76 +13,7 @@ test.describe.configure({ timeout: 90_000 })
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
-const ROADMAP = 'Proposal: cut offline mode and public'
 const ALERTS_MAIN = '#alerts-prod'
-
-const MARKS = ['conversations.mark', 'subscriptions.thread.mark']
-
-test('resolves and reopens topics, with Undo and pinned rows', async ({ juno, slack }) => {
-  const context = { juno, slack }
-  await test.step('Resolve hides the row and marks it read, Undo brings it back unread, and a new reply reopens it', () => resolveTopic(context))
-  await test.step('a pinned topic stays in Pinned when resolved, and the header reopens it', () => resolvePinnedTopic(context))
-})
-
-async function resolveTopic({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
-  const roadmap = juno.sidebar.row(ROADMAP)
-  await roadmap.expectUnread(3)
-  slack.resetCalls()
-
-  // From the row's menu.
-  await roadmap.chooseInMenu('resolve')
-  await roadmap.expectAbsent()
-  await juno.expectToast(`Resolved · ${ROADMAP}`)
-  // Resolve marks read in Slack too; it never unfollows.
-  await expect.poll(() => slack.fake.calls.some((call) => MARKS.includes(call.method)), { timeout: 10_000 }).toBe(true)
-  expect(slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove')).toBe(false)
-
-  await juno.undoFromToast()
-  await roadmap.expectVisible()
-  await roadmap.expectUnread(3)
-
-  // Resolved again, then a reply from someone else brings it back, tagged.
-  await roadmap.chooseInMenu('resolve')
-  await roadmap.expectAbsent()
-  slack.as('Maya').replyIn(ROADMAP, 'One more thing on the proposal.')
-  await roadmap.expectVisible()
-  await roadmap.expectTag('Reopened')
-}
-
-async function resolvePinnedTopic({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
-  const { sidebar } = juno
-  const postgres = sidebar.row(POSTGRES)
-
-  await postgres.chooseInMenu('pin')
-  await juno.expectToast(`Pinned · ${POSTGRES}`)
-  await expect(sidebar.section('Pinned').locator('[data-topic-row]')).toHaveCount(1)
-  await postgres.open()
-
-  const header = juno.topic.header
-  await header.getByRole('button', { name: 'Resolve' }).click()
-  await juno.expectToast(`Resolved · ${POSTGRES}`)
-  await postgres.expectResolvedCheck()
-  expect(await sidebar.titles('Pinned')).toEqual([expect.stringMatching(/^Draft plan/)])
-
-  // Reopen is the same button now; ⌘Z undoes it.
-  await header.getByRole('button', { name: 'Reopen' }).click()
-  await juno.expectToast(`Reopened · ${POSTGRES}`)
-  await postgres.expectResolvedCheck(false)
-  await juno.undo()
-  await postgres.expectResolvedCheck()
-  await expect(header.getByRole('button', { name: 'Reopen' })).toBeVisible()
-
-  // Unpin, then undo it.
-  await postgres.chooseInMenu('unpin')
-  await juno.expectToast(`Unpinned · ${POSTGRES}`)
-  await sidebar.expectNoSection('Pinned')
-  await juno.undo()
-  await expect(sidebar.section('Pinned').locator('[data-topic-row]')).toHaveCount(1)
-  // And the pin itself: undoing it empties Pinned. The resolve undo goes first.
-  await juno.undo()
-  await juno.undo()
-  await sidebar.expectNoSection('Pinned')
-}
 
 // Each step undoes what it did. Marks go first, while Rina's thread still has its 2 unread.
 test('Mark as read and unread, Ignore, the Slack links and Rename, each from the menu', async ({ juno }) => {
