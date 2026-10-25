@@ -109,6 +109,11 @@
         "semver": "7.7.4"
       }
     },
+    "electron-vite": {
+      "peerDependencies": {
+        "electron": "*"
+      }
+    },
     "@phosphor-icons/react": {
       "peerDependencies": {
         "@types/react": "*"
