@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { openState, type Route, type Theme } from './support'
+import { expect, type Page } from '@playwright/test'
+import { layoutTest as test, openState, type Route, type Theme } from './support'
 
 /**
  * The message menu (SPEC 7, "Message menu"; primitives.md, ContextMenu):
@@ -23,7 +23,7 @@ const boxOf = async (page: Page) => {
   return { left: box.x - frame.x, top: box.y - frame.y, right: box.x - frame.x + box.width, bottom: box.y - frame.y + box.height, width: box.width, height: box.height }
 }
 
-test('the menu opens downward from the pointer, to its left near the right edge, and up only as far as it must near the bottom', async ({ page }) => {
+test('the menu opens downward from the pointer, to its left near the right edge, up only as far as it must near the bottom, and More reactions grows from the corner that stays put', async ({ page }) => {
   await open(page, 'placement/top-left')
   expect(await boxOf(page)).toMatchObject({ left: 41, top: 41 })
   await open(page, 'placement/top-right')
@@ -33,26 +33,24 @@ test('the menu opens downward from the pointer, to its left near the right edge,
   expect(bottom).toMatchObject({ left: 41, bottom: FRAME.height - EDGE })
   await open(page, 'placement/bottom-right')
   expect(await boxOf(page)).toMatchObject({ right: FRAME.width - 40, bottom: FRAME.height - EDGE })
-})
 
-for (const corner of ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const) {
-  test(`More reactions near the ${corner} grows the picker from the menu's ${corner} corner, which stays put`, async ({ page }) => {
+  // Near each corner the picker grows from the menu's corner there, which stays put.
+  for (const corner of ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const) {
     await open(page, `placement/${corner}`)
     const before = await boxOf(page)
     await open(page, `more-reactions/${corner}`)
     const after = await boxOf(page)
-    expect(after.height).toBeGreaterThan(before.height)
+    expect(after.height, corner).toBeGreaterThan(before.height)
     const [y, x] = corner.split('-') as ['top' | 'bottom', 'left' | 'right']
-    expect(after[x]).toBe(before[x])
-    expect(after[y]).toBe(before[y])
-    expect(after.left).toBeGreaterThanOrEqual(EDGE)
-    expect(after.top).toBeGreaterThanOrEqual(EDGE)
-    expect(after.right).toBeLessThanOrEqual(FRAME.width - EDGE)
-    expect(after.bottom).toBeLessThanOrEqual(FRAME.height - EDGE)
-  })
-}
+    expect(after[x], corner).toBe(before[x])
+    expect(after[y], corner).toBe(before[y])
+    expect(after.left, corner).toBeGreaterThanOrEqual(EDGE)
+    expect(after.top, corner).toBeGreaterThanOrEqual(EDGE)
+    expect(after.right, corner).toBeLessThanOrEqual(FRAME.width - EDGE)
+    expect(after.bottom, corner).toBeLessThanOrEqual(FRAME.height - EDGE)
+  }
 
-test('in a window too short for the picker above or below the menu, the picker is held inside it', async ({ page }) => {
+  // In a window too short for the picker above or below the menu, the picker is held inside it.
   await open(page, 'more-reactions/short-window')
   const box = await boxOf(page)
   expect(box.top).toBe(EDGE)

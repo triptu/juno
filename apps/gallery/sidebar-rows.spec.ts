@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
-import { openState, type Route } from './support'
+import { layoutTest, openState, paintTest, type Route } from './support'
 
 /**
  * Sidebar rows and the topic list as views: what a row says and shows, the
@@ -24,7 +24,7 @@ async function expectOnPhotoEdge(photo: Locator, dot: Locator): Promise<void> {
 
 const row = (page: Page, title: string) => page.getByRole('listitem', { name: new RegExp(`^${title}`) })
 
-test('a DM’s Main previews the message alone, your own message keeps “You:”, and a group DM’s tile is two members', async ({ page }) => {
+layoutTest('a DM’s Main previews the message alone, your own message keeps “You:”, and a group DM’s tile is two members', async ({ page }) => {
   await open(page, 'TopicRow', 'sidebar/mixed-rows')
   const maya = page.locator('[data-topic-id="m:D0MAYA"]')
   await expect(maya.locator('[data-row-part="preview"]')).toHaveText('Sent you the deck. Tell me if the pricing slide reads.')
@@ -33,14 +33,14 @@ test('a DM’s Main previews the message alone, your own message keeps “You:�
   await expect(page.locator('[data-topic-id="G0MAYALEO:main"] [data-group-avatar] [data-kind="person"]')).toHaveCount(2)
 })
 
-test('a row says its unread count and a mention in words, not only in tooltips', async ({ page }) => {
+layoutTest('a row says its unread count and a mention in words, not only in tooltips', async ({ page }) => {
   await open(page, 'TopicRow', 'state/mention')
   await expect(row(page, 'Rina Sato')).toHaveAccessibleDescription(/^2 unread, mentions you\. \S/)
   await open(page, 'TopicRow', 'state/read')
   await expect(row(page, 'Postgres 16')).toHaveAccessibleDescription('Dev: Booked 2–4pm. Will post results here.')
 })
 
-test('an active DM partner gets the presence dot centred on the round photo’s bottom right edge, ringed in the row’s fill, plain and selected', async ({ page }) => {
+paintTest('an active DM partner gets the presence dot centred on the round photo’s bottom right edge, ringed in the row’s fill, plain and selected', async ({ page }) => {
   /** The dot's ring and the fill behind it: the nearest ancestor background that is not transparent. */
   const colours = (dot: ReturnType<Page['locator']>) => dot.evaluate((node) => {
     let fill = 'rgba(0, 0, 0, 0)'
@@ -69,7 +69,7 @@ test('an active DM partner gets the presence dot centred on the round photo’s 
   await expectOnPhotoEdge(page.locator('button [data-kind="person"], button img').first(), page.locator('[data-presence="active"]'))
 })
 
-test('an open DM’s header pill shows its person’s presence in the icon’s place, and a group DM’s shows none', async ({ page }) => {
+layoutTest('an open DM’s header pill shows its person’s presence in the icon’s place, and a group DM’s shows none', async ({ page }) => {
   const pill = page.locator('[data-topic-header] [data-island="left"] button').first()
   await open(page, 'TopicHeader', 'presence/dm-main-unknown')
   await expect(pill.locator('[data-pill-presence]')).toHaveCount(0)
@@ -90,7 +90,7 @@ test('an open DM’s header pill shows its person’s presence in the icon’s p
   await expect(pill.locator('[data-pill-presence]')).toHaveCount(0)
 })
 
-test('a title cut off by the row shows in full on hover, and one that fits shows no tooltip', async ({ page }) => {
+layoutTest('a title cut off by the row shows in full on hover, and one that fits shows no tooltip', async ({ page }) => {
   await open(page, 'TopicRow', 'content/long-title')
   const long = page.locator('[data-row-part="title"]')
   expect(await long.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true)
@@ -103,7 +103,7 @@ test('a title cut off by the row shows in full on hover, and one that fits shows
   await expect(short).not.toHaveAttribute('title')
 })
 
-test('the place line sits at one height on every row: renaming, and a resolved row', async ({ page }) => {
+layoutTest('the place line sits at one height on every row: renaming, and a resolved row', async ({ page }) => {
   const placeTop = (id: string) =>
     page.evaluate((topicId) => {
       const row = document.querySelector(`[data-topic-id="${topicId}"]`)!
@@ -145,7 +145,7 @@ test('the list scrollbar shows only while the pointer is over the list, and noth
   await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(top)
 })
 
-test('in privacy mode an AI title stays sharp while its preview blurs', async ({ page }) => {
+paintTest('in privacy mode an AI title stays sharp while its preview blurs', async ({ page }) => {
   await open(page, 'Sidebar', 'privacy/on')
   // Rina Sato · Staff backend is an AI title. An old one looks the same: nothing marks or blurs it.
   const hiring = page.locator('[data-topic-id="C0HIRING:1760000000.000300"]')
