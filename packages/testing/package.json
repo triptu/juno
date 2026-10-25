@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./layout-shift": "./src/layoutShift.ts",
+    "./forced-shift": "./src/forcedShift.ts",
     "./eventually": "./src/eventually.ts",
     "./effect": "./src/effect.ts"
   },

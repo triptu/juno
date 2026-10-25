@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev": "bun ../../scripts/without-run-as-node.mjs electron-vite dev",
-    "build": "electron-vite build && bun ../../scripts/check-bundle-size.mjs",
+    "build": "bun ../../scripts/build-desktop.mjs && bun ../../scripts/check-bundle-size.mjs",
     "build:web": "rm -rf dist && vite build -c vite.web.config.ts && bun web/build-host.mjs",
     "build:dom": "vite build -c dom/vite.config.ts && bun web/build-host.mjs dom/dist",
     "start": "bun ../../scripts/without-run-as-node.mjs electron-vite preview",
@@ -30,6 +30,7 @@
     "koffi": "3.3.3"
   },
   "devDependencies": {
+    "@babel/core": "7.29.7",
     "@electron/fuses": "1.8.0",
     "@juno/agent": "workspace:*",
     "@juno/agent-contract": "workspace:*",
@@ -48,6 +49,7 @@
     "@juno/views": "workspace:*",
     "@playwright/test": "1.64.0",
     "@stylexjs/unplugin": "0.19.1",
+    "@types/babel__core": "7.20.5",
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

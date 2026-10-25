@@ -4,5 +4,5 @@
     "lib": ["ES2023"],
     "types": ["node", "bun-types/test"]
   },
-  "include": ["src/main", "src/preload", "src/engine", "src/agent", "src/coverage.ts", "electron.vite.config.ts", "renderer.vite.ts", "vite.web.config.ts", "web/host", "web/paths.ts", "test"]
+  "include": ["src/main", "src/preload", "src/engine", "src/agent", "src/coverage.ts", "electron.vite.config.ts", "renderer.vite.ts", "react-compiler.vite.ts", "vite.web.config.ts", "web/host", "web/paths.ts", "test"]
 }
