@@ -13,7 +13,7 @@ import { openState, type Route } from './open-state'
 export const walkUse = { reducedMotion: 'no-preference' } as const
 
 /** What a person can point at or tab to, plus scroll areas. Disabled controls cannot be pointed at. */
-const interactive = [
+export const interactive = [
   'button:not(:disabled)',
   'a[href]',
   'input:not(:disabled)',
@@ -143,7 +143,7 @@ const cursorOffenders = (page: Page, route: Route) =>
     return bad
   }, route.route)
 
-async function checkStateWithin(route: Route, check: () => Promise<void>): Promise<void> {
+export async function checkStateWithin(route: Route, check: () => Promise<void>): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
