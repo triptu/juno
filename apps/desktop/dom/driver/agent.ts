@@ -58,13 +58,6 @@ export class JunoChatPane {
     return new MessageMenuDriver(this.dom).openOn(row.locator('[data-chat-run], p').first())
   }
 
-  /** A quick reaction (👍 ✅ 👀 by default), from the menu's grid. */
-  async react(bubble: string, emoji: string): Promise<void> {
-    const menu = await this.menu(bubble)
-    await menu.root.getByRole('button', { name: `React ${emoji}` }).click()
-    await expect(menu.root).toHaveCount(0)
-  }
-
   async reply(bubble: string): Promise<void> {
     await (await this.menu(bubble)).choose('reply')
   }
