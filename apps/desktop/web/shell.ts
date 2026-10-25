@@ -11,7 +11,6 @@ export interface SystemHooks {
   notificationPermission: (permission: NotificationPermission) => void
   notificationRequests: () => number
   notificationSettingsOpened: () => number
-  systemIdle: (seconds: number) => void
   dockBadge: () => string
   clearDockBadge: () => void
   dockBounces: () => number

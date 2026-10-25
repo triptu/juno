@@ -92,3 +92,68 @@ export const longTest = test.extend({
     await fake.close()
   },
 })
+
+/**
+ * After a scroll up by hand back to the end, a full window follows new messages: after the wheel, with the scrollbar
+ * thumb held at the end, and not while the thumb is dragged above it. `post` sends a message to the open topic.
+ */
+export async function backAtEnd(juno: Juno, win: Page, post: (text: string) => void): Promise<void> {
+  const { topic } = juno
+  await test.step('the wheel up a few screens and back down to the end', async () => {
+    await topic.scrollUp(1_500)
+    expect(await distance(topic.scroller)).toBeGreaterThan(1_000)
+    await wheelToEnd(win, topic.scroller)
+    for (let i = 1; i <= 3; i++) {
+      post(`After the wheel ${i}`)
+      await topic.expectMessage(`After the wheel ${i}`)
+    }
+    await frames(win, 5)
+    await expectLastWhole(juno, 'After the wheel 3')
+  })
+
+  // The scroll has reached the end but has not ended: the thumb is still held, as fingers resting on the trackpad
+  // keep a gesture going. A message that arrives then is followed, and so is every one after the scroll ends.
+  await test.step('the scrollbar thumb held at the end while a message arrives', async () => {
+    await topic.scrollUp(1_500)
+    expect(await distance(topic.scroller)).toBeGreaterThan(1_000)
+    await holdThumbAtEnd(win, topic.scroller)
+    post('While the thumb is held')
+    await topic.expectMessage('While the thumb is held')
+    await frames(win, 5)
+    await expectLastWhole(juno, 'While the thumb is held')
+    await win.mouse.up()
+    await frames(win, 10)
+    for (let i = 1; i <= 3; i++) {
+      post(`After the thumb ${i}`)
+      await topic.expectMessage(`After the thumb ${i}`)
+    }
+    await frames(win, 5)
+    await expectLastWhole(juno, 'After the thumb 3')
+  })
+
+  await test.step('dragging the thumb upward leaves the bottom while messages arrive', async () => {
+    await holdThumbAtEnd(win, topic.scroller)
+    const box = (await topic.scroller.boundingBox())!
+    await win.mouse.move(box.x + box.width - 5, box.y + box.height / 2, { steps: 8 })
+    await expect.poll(() => distance(topic.scroller)).toBeGreaterThan(1_000)
+    post('While the thumb is above the bottom')
+    await expect.poll(() => topic.message('While the thumb is above the bottom').count()).toBe(1)
+    expect(await distance(topic.scroller)).toBeGreaterThan(1_000)
+    await expect(topic.message('While the thumb is above the bottom')).not.toBeInViewport()
+    await win.mouse.up()
+  })
+}
+
+/** Opens `title` read to its end and then again, so it shows its newest 150 rows and each arrival drops the first. */
+export async function openFullWindow(juno: Juno, title: string): Promise<void> {
+  await juno.signIn()
+  await juno.waitForSync()
+  // The first open reads the topic. Opened again, it shows its newest 150 rows, so each message that arrives drops
+  // the first row, and scroll anchoring lowers scrollTop by that row's height.
+  const row = juno.sidebar.row(title)
+  await row.open()
+  await row.expectRead()
+  await juno.tabs.menu('close-tab')
+  await row.open()
+  await juno.topic.expectAtBottom()
+}
