@@ -190,7 +190,7 @@ it('waits for a post still being sent before editing, deleting or reacting to it
     const pending = rowWith(await rows((list) => rowWith(list, 'Queued draft')?.pending === 'sending', 'sending'), 'Queued draft')!
     valueOf(await editMessage(engine.registry, refOf(pending), 'Edit while sending'))
     await waitFor(() => (actionRows(engine).length === 1 ? true : undefined), WAIT_MS, 'the edit waiting on the post')
-    engine.fake.decide(call.id, { error: 'ratelimited', status: 429, retryAfter: 2 })
+    engine.fake.decide(call.id, { error: 'ratelimited', status: 429, retryAfter: 0.5 })
     engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === call.id && c.stage === 'answer'), WAIT_MS, 'the 429')).id, 'answer')
     // The outbox's own state is the only sign the post went back to the queue; the row still says sending.
     const state = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT state FROM pending_messages WHERE client_msg_id = ?').get(pending.clientMsgId!) as { state: string } | undefined)?.state)
