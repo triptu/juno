@@ -1,46 +1,38 @@
-// The chat's states in the app (plan v3 §16 flows 2, 12, 13 and 15, SPEC 13.2, 13.5 and 13.7):
-// a run while it works and when it fails, steering it, and every other state a user can reach
-// against the fakes. Pause and the model picker are on the pages walk (pages.spec.ts). The gallery
-// shows each state from fixtures (`packages/views/src/juno-chat/*.fixtures.tsx`).
+// The chat's states (plan v3 §16 flows 2, 12, 13 and 15, SPEC 13.2, 13.5 and 13.7): a run while it
+// works and when it fails, steering it, and every other state a user can reach against the fakes.
+// Pause and the model picker are on the pages walk (pages.test.ts). The gallery shows each state
+// from fixtures (`packages/views/src/juno-chat/*.fixtures.tsx`).
 import { readdirSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { chatCopy } from '@juno/agent-contract'
-import { agentReady, openChat, openPage, readySynced as ready } from './agent'
-import { answer, expect, JunoChatPane, test as base } from './chat'
-import { startScriptedModel, type ScriptedModel } from './model'
+import { answer, startScriptedModel } from '../../e2e/juno-agent/model'
+import { agentReady, JunoChatPane, openChat, openPage, readySynced as ready } from '../driver/agent'
+import { expect } from '../expect'
+import { domTest } from '../test'
 
 /** The echo model, except that the first message saying "fail once" gets a server error. */
-const test = base.extend<{ readonly model: ScriptedModel }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    let failed = false
-    const model = await startScriptedModel({
-      answer: (request) => {
-        if (!failed && request.input.includes('fail once')) {
-          failed = true
-          throw new Error('the model is down')
-        }
-        return answer(request)
-      },
-    })
-    await use(model)
-    await model.close()
-  },
-})
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 180_000 })
+const model = () => {
+  let failed = false
+  return startScriptedModel({
+    answer: (request) => {
+      if (!failed && request.input.includes('fail once')) {
+        failed = true
+        throw new Error('the model is down')
+      }
+      return answer(request)
+    },
+  })
+}
 
 // One launch walks the states that need no relaunch. The run that fails comes first, so Activity counts
 // only its runs, and the message too large for its request comes last, so no later run carries it.
-test('the chat while Juno works, when a run fails, when storage fails, offline, and for messages over the limit', async ({ juno, fake, model, userData }) => {
+domTest('the chat while Juno works, when a run fails, when storage fails, offline, and for messages over the limit', async ({ juno, fake, model, userData, step }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await expect(chat.root.getByText(chatCopy.empty.title)).toBeVisible()
 
-  await test.step('"stop" sent while Juno works joins the same run, and a run the model fails says so with Try again', async () => {
+  await step('"stop" sent while Juno works joins the same run, and a run the model fails says so with Try again', async () => {
     // A message sent during a run joins it at its next step, and "stop" is a message like any other: no Stop anywhere.
     const busy = model.hold('what is on today?')
     await chat.send('what is on today?')
@@ -76,7 +68,7 @@ test('the chat while Juno works, when a run fails, when storage fails, offline, 
     await expect(activity.locator('[data-activity-trigger="message"]').filter({ hasText: /^stop$/ })).toHaveCount(0)
   })
 
-  await test.step('a storage failure keeps the message as Not delivered, and Try again stores it once', async () => {
+  await step('a storage failure keeps the message as Not delivered, and Try again stores it once', async () => {
     await openChat(juno)
     const before = model.inputs().length
     const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
@@ -102,7 +94,7 @@ test('the chat while Juno works, when a run fails, when storage fails, offline, 
     }
   })
 
-  await test.step('offline, the chat shows the chip, a message waits for the network, and both clear once back with one model request', async () => {
+  await step('offline, the chat shows the chip, a message waits for the network, and both clear once back with one model request', async () => {
     const before = model.inputs().length
     fake.goOffline()
     const chip = chat.root.locator('[data-banner="offline"]')
@@ -119,7 +111,7 @@ test('the chat while Juno works, when a run fails, when storage fails, offline, 
     expect(model.inputs()).toHaveLength(before + 1)
   })
 
-  await test.step('a message over the size limit is marked too long, one at the limit is kept when request framing makes it too large, and neither reaches the model', async () => {
+  await step('a message over the size limit is marked too long, one at the limit is kept when request framing makes it too large, and neither reaches the model', async () => {
     const before = model.inputs().length
     // Earlier steps left failed messages and endings of their own: count from here, and read the newest.
     const failed = chat.root.locator('[data-delivery="failed"]')
@@ -136,10 +128,10 @@ test('the chat while Juno works, when a run fails, when storage fails, offline, 
     await expect(failed).toHaveCount(failedBefore + 1)
     expect(model.inputs()).toHaveLength(before)
   })
-})
+}, { model, timeout: 180_000 })
 
 // Two relaunches in one test: an interrupted reply first, then records from a newer build, which leave the chat disabled.
-test('an interrupted reply keeps the owner message and Try again answers it once, and records newer than this build show Update needed', async ({ juno, model, relaunch, userData }) => {
+domTest('an interrupted reply keeps the owner message and Try again answers it once, and records newer than this build show Update needed', async ({ juno, model, relaunch, userData, step }) => {
   await ready(juno)
   const chat = await openChat(juno)
   const gate = model.hold('keep these words')
@@ -153,8 +145,8 @@ test('an interrupted reply keeps the owner message and Try again answers it once
     }
   } })
   await again.waitForSync()
-  await agentReady(again.surface)
-  await test.step('an interrupted reply keeps the owner message and Try again answers it once', async () => {
+  await agentReady(again)
+  await step('an interrupted reply keeps the owner message and Try again answers it once', async () => {
     const pane = await openChat(again)
     await expect(pane.ownerBubble('keep these words')).toHaveCount(1)
     const ending = pane.root.locator('[data-chat-ending]')
@@ -171,9 +163,9 @@ test('an interrupted reply keeps the owner message and Try again answers it once
     try { db.prepare('UPDATE durable_schema SET version = version + 1000 WHERE singleton = 1').run() } finally { db.close() }
   } })
   await later.waitForSync()
-  await test.step('records newer than this build show Update needed and disable the composer', async () => {
+  await step('records newer than this build show Update needed and disable the composer', async () => {
     const chip = (await openChat(later)).root.locator('[data-banner="updateNeeded"]')
     await expect(chip).toHaveText(chatCopy.banner.updateNeeded.chip, { timeout: 30_000 })
     await expect(JunoChatPane.tab(later.win).composer).toBeDisabled()
   })
-})
+}, { model, timeout: 180_000 })
