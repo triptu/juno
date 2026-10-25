@@ -1,6 +1,7 @@
 // Socket drops and restarts (architecture 5.8): what changes in Slack while Juno is offline or closed reaches
 // the rows and the store, the catch-up reads only what moved, and a page or counts answer in flight never
 // undoes a newer event. Every test starts warm on the synced default workspace.
+import { writeFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
@@ -238,6 +239,15 @@ it('brings edits, deletes and reactions made while the app was closed', async ()
   const seeded = await seedRecent(first)
   const engine = await restart(engines, first, () => changeWhileAway(first, seeded))
   await expectChanges(engine, seeded)
+})
+
+it('a damaged cache found at the next start is synced again, still signed in', async () => {
+  const first = await synced()
+  const engine = await restart(engines, first, () => {
+    writeFileSync(join(first.userData, 'workspaces', first.fake.teamId, 'cache.db'), 'not a database '.repeat(400))
+  })
+  expect((await engine.status('ready'))._tag).toBe('ready')
+  await engine.rowsUntil((rows) => rows.some((row) => row.title.startsWith('Draft plan is in the doc')), 'the rows synced again')
 })
 
 it('reads only what moved while closed: a new Main message, and a reply whose root is older than the search reaches', async () => {

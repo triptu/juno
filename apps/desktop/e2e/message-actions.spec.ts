@@ -317,11 +317,24 @@ test('an edit made while the message is still sending is kept, and reaches Slack
     await field.press('Enter')
     await expect(topic.message('Wrong word here')).toBeVisible()
     expect(updates()).toBe(before)
-
     fake.release()
     await topic.expectSent('Wrong word here')
     await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Wrong word here').length).toBe(1)
     expect(fake.messages('C0ENG').some((m) => m.text === 'Wrnog word here')).toBe(false)
+  })
+
+  await test.step('Edit from a menu opened while the message was sending follows it once it is sent', async () => {
+    fake.holdNext({ method: 'chat.postMessage', before: true })
+    await topic.send('Menu during send')
+    await expect(topic.message('Menu during send')).toHaveAttribute('data-pending', 'sending')
+    const menu = await topic.messageMenu('Menu during send')
+    fake.release()
+    await topic.expectSent('Menu during send')
+    await menu.choose('edit')
+    await expect(field).toHaveValue('Menu during send')
+    await field.fill('Edited after send')
+    await field.press('Enter')
+    await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Edited after send').length).toBe(1)
   })
 })
 

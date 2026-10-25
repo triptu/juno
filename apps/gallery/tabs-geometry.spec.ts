@@ -106,3 +106,34 @@ test('with the middle of three tabs active, both dividers next to it hide; twelv
   // Tabs touch: each starts where the one before it ends.
   for (let index = 1; index < twelve.length; index++) expect(twelve[index]!.rect[0]).toBeCloseTo(twelve[index - 1]!.rect[0]! + twelve[index - 1]!.rect[2]!, 1)
 })
+
+test('"+" sits one tab gap after the last tab, level with it, and stays at the end of the strip when the tabs scroll', async ({ page }) => {
+  const place = () => page.evaluate(() => {
+    const box = (element: Element | null | undefined) => {
+      const rect = element!.getBoundingClientRect()
+      return { left: rect.left, right: rect.right, middle: rect.top + rect.height / 2 }
+    }
+    const strip = document.querySelector('[role="tablist"]')!
+    return {
+      last: box([...strip.querySelectorAll('[role="tab"]')].at(-1)),
+      plus: box([...document.querySelectorAll('button')].find((button) => button.getAttribute('aria-label')?.startsWith('New tab'))),
+      strip: box(strip),
+      frame: box(document.querySelector('[data-fixture-frame]')),
+      scrolls: strip.scrollWidth > strip.clientWidth,
+    }
+  })
+
+  await open(page, 'Tabs', 'strip/two-tabs')
+  const two = await place()
+  // The 2px tab gap, then the button's even inset in its tab-high square: (35 - 28) / 2.
+  expect(Math.round((two.plus.left - two.last.right) * 2) / 2).toBe(5.5)
+  expect(Math.abs(two.plus.middle - two.last.middle)).toBeLessThanOrEqual(0.5)
+
+  // The tabs overflow and scroll; "+" follows the scroller and ends inside the frame.
+  await open(page, 'Tabs', 'strip/thirty-seven-narrow')
+  const many = await place()
+  expect(many.scrolls).toBe(true)
+  expect(many.plus.left).toBeGreaterThanOrEqual(many.strip.right)
+  expect(many.plus.left - many.strip.right).toBeLessThanOrEqual(5.5)
+  expect(many.plus.right).toBeLessThanOrEqual(many.frame.right)
+})

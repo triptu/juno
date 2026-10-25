@@ -30,7 +30,24 @@ async function focusTextField(win: Page) {
   return field
 }
 
-test('holding ⌥ over a row peeks at the topic without marking it, opening it or moving focus', async ({ juno, slack }) => {
+test('holding ⌥ over a row peeks at the topic without marking it, opening it or moving focus; moving off the rows closes it, and a text field keeps its focus', async ({ juno, slack }) => {
+  await test.step('moving off the rows closes the peek', async () => {
+    await juno.sidebar.row(RINA).peek()
+    await juno.peek.expectShowing(RINA)
+    await juno.win.mouse.move(900, 400, { steps: 4 })
+    await juno.peek.expectClosed()
+    await juno.peek.release()
+    await juno.expectNothingOpen()
+  })
+  await test.step('⌥ peeks while a text field has focus, and the field keeps it', async () => {
+    const field = await focusTextField(juno.win)
+    await juno.sidebar.row(RINA).peek()
+    await juno.peek.expectShowing(RINA)
+    await expect(field).toBeFocused()
+    await juno.peek.release()
+    await juno.peek.expectClosed()
+  })
+
   const { sidebar, peek, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await tabs.expectActive(POSTGRES)
@@ -64,25 +81,6 @@ test('holding ⌥ over a row peeks at the topic without marking it, opening it o
   await slack.expectNoMarks()
 })
 
-test('a peek closes when the pointer leaves the rows, and ⌥ peeks while a text field keeps focus', async ({ juno }) => {
-  await test.step('moving off the rows closes the peek', async () => {
-    await juno.sidebar.row(RINA).peek()
-    await juno.peek.expectShowing(RINA)
-    await juno.win.mouse.move(900, 400, { steps: 4 })
-    await juno.peek.expectClosed()
-    await juno.peek.release()
-    await juno.expectNothingOpen()
-  })
-  await test.step('⌥ peeks while a text field has focus, and the field keeps it', async () => {
-    const field = await focusTextField(juno.win)
-    await juno.sidebar.row(RINA).peek()
-    await juno.peek.expectShowing(RINA)
-    await expect(field).toBeFocused()
-    await juno.peek.release()
-    await juno.peek.expectClosed()
-  })
-})
-
 test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text field types a space', async ({ juno, slack }) => {
   await juno.setPeekKey('space')
   // Closing Preferences left Home, whose composer has focus; Space peeks only outside a text field.
@@ -112,7 +110,7 @@ test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text
   await slack.expectNoMarks()
 })
 
-test('holding ⌥ over a thread in a Main peeks at its replies without opening it', async ({ juno, slack }) => {
+test('holding ⌥ over a thread in a Main peeks at its replies without opening it, and a person in it opens their DM', async ({ juno, slack }) => {
   const { peek, tabs, topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -165,4 +163,16 @@ test('holding ⌥ over a thread in a Main peeks at its replies without opening i
   await tabs.expectCount(1)
   // The thread was not marked read.
   expect(slack.fake.calls.filter((call) => call.method === 'subscriptions.thread.mark')).toEqual([])
+
+  await test.step('a person in the peek opens their DM', async () => {
+    slack.as('Maya').replyIn(POSTGRES, 'Maya here: the dry run slot is booked.')
+    await topic.threadLinkUnder(POSTGRES).peek()
+    await peek.expectShowing(POSTGRES)
+    const maya = peek.root.locator('[data-message-header] [data-opens-person]', { hasText: 'Maya' })
+    await maya.hover()
+    await maya.click()
+    await peek.release()
+    await tabs.expectActive('Maya')
+    await tabs.expectCount(2)
+  })
 })

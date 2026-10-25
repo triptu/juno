@@ -36,9 +36,11 @@ describe('rate limits', () => {
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Sent while the limits were tight.' })
     engine.fake.resetCalls()
     // History's next call gets a 0.5 s Retry-After, over the 250 ms interactive wait, so it shows as rate-limited.
-    // Each of the next two calls of counts gets 0.1 s, which does not show.
+    // Each of the next two calls of counts gets 0.1 s, and the thread view and search one each, which do not show.
     engine.fake.force429({ method: 'conversations.history', retryAfter: 0.5, times: 1 })
     engine.fake.force429({ method: 'client.counts', retryAfter: 0.1, times: 2 })
+    engine.fake.force429({ method: 'subscriptions.thread.getView', retryAfter: 0.1, times: 1 })
+    engine.fake.force429({ method: 'search.modules.messages', retryAfter: 0.1, times: 1 })
     engine.fake.goOnline()
 
     expect(await engine.phase('rate-limited', 30_000)).toMatchObject({ _tag: 'rate-limited' })
@@ -46,6 +48,8 @@ describe('rate limits', () => {
     await engine.rowsUntil((rows) => rows.some((r) => r.preview.text === 'Sent while the limits were tight.'), 'the message from the gap')
     expectWaitedOut(engine, 'conversations.history', 0.5, 1)
     expectWaitedOut(engine, 'client.counts', 0.1, 2)
+    expectWaitedOut(engine, 'subscriptions.thread.getView', 0.1, 1)
+    expectWaitedOut(engine, 'search.modules.messages', 0.1, 1)
   }, 60_000)
 
   it("a 429 on history during a paced first sync waits out its Retry-After, while previews go on, and the boot completes", async () => {

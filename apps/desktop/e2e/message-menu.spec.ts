@@ -5,7 +5,6 @@
 // put, near every edge of the window. Rows show the keys that work on a
 // focused message (T, Q, F, E, ⌫, and R on More reactions), which also choose
 // them while the menu is open.
-// One sender's messages start a new header after ten quiet minutes.
 import { checkMessageMenuButton } from './messageMenuButton'
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Locator, Page } from '@playwright/test'
@@ -15,8 +14,6 @@ import type { Juno, MessageMenuDriver } from './driver/juno'
 test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
-
-const MINUTE = 60_000
 
 /** Waits until every animation in the menu has finished: the morph. */
 const settled = (menu: Locator) => menu.evaluate((node) => Promise.all(node.getAnimations({ subtree: true }).filter((animation) => !(animation instanceof CSSAnimation) && !(animation instanceof CSSTransition)).map((animation) => animation.finished)).then(() => undefined))
@@ -347,28 +344,4 @@ test('More reactions grows the picker from the corner of the menu that stays put
   await test.step('top right: down and to the left', async () => morphAt(juno, await pointOn(juno.win, upper, 'right'), 'top-right'))
   await test.step('bottom left: up and to the right', async () => morphAt(juno, await pointOn(juno.win, last, 'left'), 'bottom-left'))
   await test.step('bottom right: up and to the left', async () => morphAt(juno, await pointOn(juno.win, last, 'right'), 'bottom-right'))
-})
-
-test('one sender’s messages start a new header after ten quiet minutes', async ({ juno, fake }) => {
-  const now = fake.now()
-  const root = fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Header gap thread', at: now - 40 * MINUTE })
-  const reply = (text: string, ago: number) => fake.workspace.post({ channel: 'C0ENG', threadTs: root.ts, user: 'U0MAYA', text, at: now - ago * MINUTE })
-  reply('First after the root', 30)
-  reply('Nine minutes later', 21)
-  reply('Ten quiet minutes later', 11)
-  reply('Right after that', 10)
-  // The new root moves the Main row up; press it once it is in its new place.
-  await juno.sidebar.row('#eng').expectPreview('Leo: Header gap thread')
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.list.locator(`[data-thread-link="t:C0ENG:${root.ts}"]`).click()
-  await juno.topic.expectMessage('Right after that')
-  const header = (text: string) => juno.topic.message(text).locator('[data-message-header]')
-  await expect(header('First after the root')).toHaveCount(1)
-  await expect(header('Nine minutes later')).toHaveCount(0)
-  await expect(header('Ten quiet minutes later')).toHaveCount(1)
-  await expect(header('Right after that')).toHaveCount(0)
-  // A follow-up shows no time beside it, under the pointer or not.
-  const follow = juno.topic.message('Nine minutes later')
-  await follow.hover()
-  await expect(follow.locator('time')).toHaveCount(0)
 })

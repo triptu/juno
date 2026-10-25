@@ -75,7 +75,7 @@ async function stopFrames(win: Page): Promise<ReadonlyArray<Frame>> {
   })
 }
 
-test('a reply from elsewhere slides its row to the top, and a press during the slide opens it', async ({ juno, win, fake }) => {
+test('a reply from elsewhere slides its row to the top, and a press during the slide opens it; your own Resolve, a reply while scrolled down and reduced motion do not animate', async ({ juno, win, fake }) => {
   await atTheTop(juno, win)
   const mover = await threadInView(juno)
   const row = juno.sidebar.list.locator(`[data-topic-id="${mover}"]`)
@@ -109,10 +109,8 @@ test('a reply from elsewhere slides its row to the top, and a press during the s
   await expect.poll(() => win.evaluate((selector) => [...document.querySelectorAll(selector)].filter((el) => el.getAnimations().length > 0).length, ROW)).toBe(0)
   const first = await juno.sidebar.list.locator('[data-topic-row]').first().boundingBox()
   expect(await row.boundingBox()).toEqual(first)
-})
 
-// The steps that record no motion share one launch. Reduced motion goes last: it stays on for the page.
-test('your own Resolve, a reply while scrolled down and reduced motion move rows with no animation', async ({ juno, win, fake }) => {
+  // The steps below record no motion. Reduced motion goes last: it stays on for the page.
   await test.step('your own Resolve takes its row out in one frame, with no motion', async () => {
     await atTheTop(juno, win)
     const ids = await recentIds(juno)
@@ -161,22 +159,24 @@ test('your own Resolve, a reply while scrolled down and reduced motion move rows
   })
 })
 
-test('a burst retargets the rows, including a row removed during its slide, and releases every animation', async ({ juno, win, fake }) => {
+test('a burst retargets the rows, including a row removed during its slide, and releases every animation; hiding the page cancels slides', async ({ juno, win, fake }) => {
   await atTheTop(juno, win)
   const movers = (await recentIds(juno)).filter((id) => id.startsWith('t:')).slice(2, 4)
   expect(movers).toHaveLength(2)
+  // Row animations, slowed by `__motionRate`, are kept in `__motionAnimations`.
   await win.evaluate(() => {
-    const animations: Animation[] = []
+    const store = globalThis as unknown as { __motionAnimations: Animation[]; __motionRate: number }
+    store.__motionAnimations = []
+    store.__motionRate = 0.2
     const original = Element.prototype.animate
     Element.prototype.animate = function (frames, options) {
       const animation = original.call(this, frames, options)
       if (this.hasAttribute('data-topic-row')) {
-        animation.playbackRate = 0.2
-        animations.push(animation)
+        animation.playbackRate = store.__motionRate
+        store.__motionAnimations.push(animation)
       }
       return animation
     }
-    Object.assign(globalThis, { __motionAnimations: animations })
   })
   replyIn(fake, movers[0]!, 'The first reply in a burst')
   await win.waitForFunction((id) => (document.querySelector(`[data-topic-id="${id}"]`)?.getAnimations().length ?? 0) > 0, movers[0])
@@ -191,42 +191,35 @@ test('a burst retargets the rows, including a row removed during its slide, and 
   })).toBe(true)
   const tops = await juno.sidebar.rows.evaluateAll((rows) => rows.slice(0, 10).map((row) => row.getBoundingClientRect().top))
   expect(tops).toEqual([...tops].toSorted((a, b) => a - b))
-})
 
-test('page visibility cancels active slides and hidden updates start none', async ({ juno, win, fake }) => {
-  await atTheTop(juno, win)
-  const movers = (await recentIds(juno)).slice(3).filter((id) => id.startsWith('t:')).slice(0, 2)
-  expect(movers).toHaveLength(2)
-  await win.evaluate(() => {
-    const animations: Animation[] = []
-    const original = Element.prototype.animate
-    Element.prototype.animate = function (frames, options) {
-      const animation = original.call(this, frames, options)
-      if (this.hasAttribute('data-topic-row')) {
-        animation.playbackRate = 0.1
-        animations.push(animation)
-      }
-      return animation
-    }
-    Object.assign(globalThis, { __motionAnimations: animations })
+  await test.step('page visibility cancels active slides and hidden updates start none', async () => {
+    await atTheTop(juno, win)
+    const used = new Set(movers)
+    const next = (await recentIds(juno)).slice(3).filter((id) => id.startsWith('t:') && !used.has(id)).slice(0, 2)
+    expect(next).toHaveLength(2)
+    await win.evaluate(() => {
+      const store = globalThis as unknown as { __motionAnimations: Animation[]; __motionRate: number }
+      store.__motionAnimations = []
+      store.__motionRate = 0.1
+    })
+    replyIn(fake, next[0]!, 'An outside reply before hiding')
+    await win.waitForFunction((id) => (document.querySelector(`[data-topic-id="${id}"]`)?.getAnimations().length ?? 0) > 0, next[0])
+    // Playwright forces visible/focused pages on its own CDP session. Supply the
+    // Page Visibility boundary here; a second session cannot undo that override.
+    const starts = await win.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+      const { __motionAnimations: animations } = globalThis as unknown as { __motionAnimations: Animation[] }
+      if (!animations.every((animation) => animation.playState === 'idle')) throw new Error('Hiding left a row animation running')
+      return animations.length
+    })
+    replyIn(fake, next[1]!, 'An outside reply while hidden')
+    await expect.poll(async () => (await recentIds(juno))[0]).toBe(next[1])
+    expect(await win.evaluate(() => (globalThis as unknown as { __motionAnimations: Animation[] }).__motionAnimations.length)).toBe(starts)
+    await win.evaluate(() => {
+      Reflect.deleteProperty(document, 'hidden')
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(await win.evaluate((selector) => [...document.querySelectorAll(selector)].flatMap((row) => row.getAnimations()).length, ROW)).toBe(0)
   })
-  replyIn(fake, movers[0]!, 'An outside reply before hiding')
-  await win.waitForFunction((id) => (document.querySelector(`[data-topic-id="${id}"]`)?.getAnimations().length ?? 0) > 0, movers[0])
-  // Playwright forces visible/focused pages on its own CDP session. Supply the
-  // Page Visibility boundary here; a second session cannot undo that override.
-  const starts = await win.evaluate(() => {
-    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
-    document.dispatchEvent(new Event('visibilitychange'))
-    const { __motionAnimations: animations } = globalThis as unknown as { __motionAnimations: Animation[] }
-    if (!animations.every((animation) => animation.playState === 'idle')) throw new Error('Hiding left a row animation running')
-    return animations.length
-  })
-  replyIn(fake, movers[1]!, 'An outside reply while hidden')
-  await expect.poll(async () => (await recentIds(juno))[0]).toBe(movers[1])
-  expect(await win.evaluate(() => (globalThis as unknown as { __motionAnimations: Animation[] }).__motionAnimations.length)).toBe(starts)
-  await win.evaluate(() => {
-    Reflect.deleteProperty(document, 'hidden')
-    document.dispatchEvent(new Event('visibilitychange'))
-  })
-  expect(await win.evaluate((selector) => [...document.querySelectorAll(selector)].flatMap((row) => row.getAnimations()).length, ROW)).toBe(0)
 })

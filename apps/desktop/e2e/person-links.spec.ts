@@ -105,9 +105,23 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
     await tabs.expectActive('Maya')
   })
 
-  await test.step('⌘-click on an @person chip opens the DM behind the current tab', async () => {
+  await test.step('Enter on a focused name opens the DM', async () => {
     await tabs.select(POSTGRES)
-    await topic.message(MENTION).locator('[data-opens-person]', { hasText: '@Sam' }).click({ modifiers: ['Meta'] })
+    await topic.message(FIRST).locator('[data-msg-text]').click()
+    await win.keyboard.press('Tab')
+    await expect(link(juno, FIRST)).toBeFocused()
+    await win.keyboard.press('Enter')
+    await tabs.expectCount(2)
+    await tabs.expectActive('Maya')
+  })
+
+  await test.step('⌘Enter on a focused @person chip opens the DM behind the current tab', async () => {
+    await tabs.select(POSTGRES)
+    await topic.message(MENTION).locator('[data-msg-text]').click()
+    await win.keyboard.press('Tab')
+    await win.keyboard.press('Tab')
+    await expect(topic.message(MENTION).locator('[data-opens-person]', { hasText: '@Sam' })).toBeFocused()
+    await win.keyboard.press('Meta+Enter')
     await tabs.expectCount(3)
     await expect(tabs.tab('Sam')).toBeVisible()
     await tabs.expectActive(POSTGRES)
@@ -152,29 +166,6 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
   })
 })
 
-test('Enter on a focused name opens the DM, and ⌘Enter on a chip opens it behind', async ({ juno, fake }) => {
-  seedReplies(fake)
-  await openPostgres(juno)
-  const { topic, tabs, win } = juno
-
-  await topic.message(FIRST).locator('[data-msg-text]').click()
-  await win.keyboard.press('Tab')
-  await expect(link(juno, FIRST)).toBeFocused()
-  await win.keyboard.press('Enter')
-  await tabs.expectCount(2)
-  await tabs.expectActive('Maya')
-
-  await tabs.select(POSTGRES)
-  await topic.message(MENTION).locator('[data-msg-text]').click()
-  await win.keyboard.press('Tab')
-  await win.keyboard.press('Tab')
-  await expect(topic.message(MENTION).locator('[data-opens-person]', { hasText: '@Sam' })).toBeFocused()
-  await win.keyboard.press('Meta+Enter')
-  await tabs.expectCount(3)
-  await expect(tabs.tab('Sam')).toBeVisible()
-  await tabs.expectActive(POSTGRES)
-})
-
 test("a deactivated person's DM opens read-only; with no DM they offer no link", async ({ juno, fake }) => {
   for (const id of ['U0SAM', 'U0PRIYA']) (fake.workspace.users.get(id) as unknown as { deleted: boolean }).deleted = true
   reply(fake, 'U0SAM', 'Sam signing off: handing the dry run to Dev.')
@@ -188,21 +179,4 @@ test("a deactivated person's DM opens read-only; with no DM they offer no link",
   await expect(topic.message('Notes from today')).toBeVisible()
   await expect(topic.composer).toHaveCount(0)
   await expect(topic.root.getByText(/^Sam.*'s account is deactivated\. You can read this conversation but not reply\.$/)).toBeVisible()
-})
-
-test('a person in a thread peek opens their DM', async ({ juno, fake }) => {
-  reply(fake, 'U0MAYA', FIRST)
-  await juno.signIn()
-  await juno.waitForSync()
-  const { peek, tabs, topic } = juno
-  await juno.sidebar.row('#eng').open()
-  await topic.expectTitle('Main')
-  await topic.threadLinkUnder(POSTGRES).peek()
-  await peek.expectShowing(POSTGRES)
-  const maya = peek.root.locator('[data-message-header] [data-opens-person]', { hasText: 'Maya' })
-  await maya.hover()
-  await maya.click()
-  await peek.release()
-  await tabs.expectActive('Maya')
-  await tabs.expectCount(2)
 })

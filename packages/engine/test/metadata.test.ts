@@ -1,5 +1,6 @@
 // The conversation observation fence (specs/metadata.qnt): events against held workspace and counts
 // snapshots. Tests start warm on the synced default workspace, except the one about the first snapshot.
+import type { TopicRow } from '@juno/contract'
 import { sendMessage } from '@juno/state'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { controlledSweeps } from './controlledClock'
@@ -31,6 +32,8 @@ describe('conversation observation fence', () => {
   it('repairs a missed rename, leave and archive after a gap with one workspace and one full counts call', async () => {
     const engine = await syncedEngine(engines)
     const { fake } = engine
+    const shown = (rows: ReadonlyArray<TopicRow>) => rows.filter((row) => row.id === 'm:C0PRODUCT' || row.id === 'm:C0PLATFORM').map((row) => row.id).toSorted()
+    expect(shown(await engine.rows())).toEqual(['m:C0PLATFORM', 'm:C0PRODUCT'])
     fake.goOffline()
     await engine.phase('offline')
     fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
@@ -47,6 +50,9 @@ describe('conversation observation fence', () => {
     const counts = fake.calls.filter((c) => c.method === 'client.counts')
     expect(counts).toHaveLength(1)
     expect(counts[0]!.args['counts_last_fetched']).toBeUndefined()
+    // The sidebar follows: the new name, and no Main for the channel left or the one archived.
+    const rows = await engine.rowsUntil((list) => list.find((row) => row.id === 'm:C0ENG')?.title === '#engineering', 'the renamed row')
+    expect(shown(rows)).toEqual([])
   })
 
   it('keeps a rename observed before the first workspace snapshot creates its row', async () => {
