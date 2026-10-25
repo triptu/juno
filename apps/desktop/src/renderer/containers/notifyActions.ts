@@ -26,8 +26,9 @@ import { openNotificationsAt } from './notificationsAnchor'
 export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, label: string): void {
   // Following or unfollowing a thread adds or removes its row at once, even while the sidebar holds its order (SPEC 5).
   if (target.kind === 'thread') releaseSidebarTopic(registry, target.id)
-  // The toast waits until the settings the menus read hold the new level. A thread's follow flag arrives with its row.
-  const stored = () => loadNotificationSettings(registry, (settings) => storedChoice(settings, target, choice !== 'never') === choice)
+  // The toast waits until the settings hold the new level, read as for a followed thread: an unfollowed one is Never
+  // whatever the settings say, which would end the wait before they arrive. A thread's follow flag arrives with its row.
+  const stored = () => loadNotificationSettings(registry, (settings) => storedChoice(settings, target, true) === choice)
   // Menus opened before the settings and the follow flag arrive read the choice just made.
   void holdLevel(registry, target, choice, () => runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` }, stored))
 }
