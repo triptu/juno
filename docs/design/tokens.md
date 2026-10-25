@@ -650,6 +650,7 @@ The `menu` group (`tokens.stylex.ts`, dark in `themes.stylex.ts` as `darkMenu`) 
 | `--menu-cell`, `--menu-cell-gap`, `--menu-cell-row-gap`, `--menu-cell-radius` | 24px, 5px, 6px, 6px | same | The emoji grid's cells, six a row, spread across the menu at least 5px apart, the first and last emoji in line with the rows' icons |
 | `--menu-emoji-size`, `--menu-emoji` | 14px, black | 14px, white | The grid's emoji, opaque: Chromium draws a colour emoji with its text colour's alpha |
 | `--menu-cell-hover`, `--menu-cell-selected` | black at 7%, the accent at 22% | white at 10%, the accent at 34% | A highlighted cell, and an emoji you already reacted with |
+| `--menu-trailing-size`, `--menu-trailing-radius`, `--menu-trailing-hover` | 18px, 4px, white at 24% | same | A row's trailing button (Copy Slack link on Open in Slack): its 14px icon with 2px around it, its end as far from the highlight's edge as the icon is from the other, and its fill over the row's highlight when it has focus |
 
 ## 7. Z-index layers
 
