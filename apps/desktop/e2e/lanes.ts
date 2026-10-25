@@ -78,7 +78,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'break-pass-1017-input.spec.ts',
   'code-highlight.spec.ts',
   'composer-up.spec.ts',
-  'conversation-search.spec.ts',
   'dev-log.spec.ts',
   'formatting.spec.ts',
   'forward.spec.ts',

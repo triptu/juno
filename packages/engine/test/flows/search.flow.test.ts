@@ -4,12 +4,13 @@
 // what the store lacks, reads palette commands only with AI assist on, and
 // New chat finds people, channels and group DMs by member.
 import { afterEach, expect, it } from 'bun:test'
-import { channelsIgnore, newChatConversations, prefsSet, searchCommand, searchQuery, searchSlack, type PickConversations, type SearchResult } from '@juno/contract'
-import type { FakeSlack } from '@juno/fake-slack'
-import { liveQuery, runCommand } from '@juno/state'
+import { channelsIgnore, newChatConversations, prefsSet, searchCommand, searchQuery, searchSlack, type PickConversation, type PickConversations, type SearchResult } from '@juno/contract'
+import { SELF_ID, TEAM, type FakeSlack } from '@juno/fake-slack'
+import { liveQuery, paletteConversationsAtom, runCommand } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { valueOf } from '../scenario'
 import { step } from '../step'
+import { bootedEngine } from '../scenario'
 import { syncedEngine } from '../synced'
 
 const engines: Array<RunningEngine> = []
@@ -158,4 +159,25 @@ it('finds what the store holds, leaves out ignored and left channels, asks Slack
     valueOf(await runCommand(registry, prefsSet, { key: 'aiAssist', value: false }))
     expect(await command('tell maya the slot works')).toBeNull()
   })
+})
+
+// The palette's Conversations by words (spec section 10): the words can match the label's names in any order,
+// across its comma, each as a prefix.
+it('"dmitriy wi" ranks the group DM with Dmitriy and wience first, with both words marked in its label', async () => {
+  const DAY = 86_400_000
+  const engine = await bootedEngine(engines, {
+    initial: (fake) => {
+      for (const [id, name, display, real] of [['U0DMITRIY', 'dvasilyuk', 'Dmitriy', 'Dmitriy Vasilyuk'], ['U0WIENCE', 'wience', 'wience', 'Wience Ortega']] as const) {
+        fake.workspace.addUser({ id, team_id: TEAM.id, name, real_name: real, profile: { display_name: display, real_name: real } })
+      }
+      fake.workspace.addConversation({ id: 'G0DMITRIY', name: 'mpdm-tushar--dvasilyuk--wience-1', kind: 'mpim', members: new Set([SELF_ID, 'U0DMITRIY', 'U0WIENCE']), created: fake.now() - 10 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
+      const last = fake.workspace.post({ channel: 'G0DMITRIY', user: 'U0WIENCE', text: 'Shipping the build tonight', at: fake.now() - DAY, silent: true })
+      fake.workspace.reads.set('G0DMITRIY', last.ts)
+      return fake.signIn()
+    },
+  })
+  const rows = await liveUntil<ReadonlyArray<PickConversation>>(engine, paletteConversationsAtom('dmitriy wi'), (list) => list.length > 0, 'the palette rows')
+  const [first] = rows
+  expect(first).toMatchObject({ key: 'G0DMITRIY', channelId: 'G0DMITRIY', name: 'Dmitriy, wience' })
+  expect(first!.highlight!.map(([start, end]) => first!.name.slice(start, end))).toEqual(['Dmitriy', 'wi'])
 })
