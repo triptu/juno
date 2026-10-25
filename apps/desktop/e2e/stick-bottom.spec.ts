@@ -229,7 +229,7 @@ test('releases the bottom during an upward gesture and uses the resting threshol
   })
 
   await test.step('an upward gesture escapes concurrent column growth from the first scroll frame', async () => {
-    await topic.toLatest()
+    await wheelToEnd(win, topic.scroller)
     await expectScrollEscapesGrowth(win, topic.scroller, topic.list.locator('[data-message-row]').last())
   })
 })
@@ -310,7 +310,6 @@ longTest('thread: editing the last message stays above the composer, and back at
   const threadTs = fake.workspace.main(TOPIC300_THREAD_CHANNEL).find((message) => message.text?.startsWith(title))!.ts
   const post = (text: string) => void fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text })
   await editLastStaysAbove({ juno, win, fake }, 'thread', TOPIC300_THREAD_CHANNEL, 'U0PERFMAYA', threadTs)
-  await juno.topic.toLatest()
   await backAtEnd(juno, win, post)
 })
 
