@@ -57,6 +57,8 @@ async function levels({ juno }: Context): Promise<void> {
 async function focusedTopic({ juno, slack, fake, userData }: Context): Promise<void> {
   await juno.sidebar.selectView('Automated')
   await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('notify-always')
+  // The menus show Always at once; the toast waits until the engine holds it, which the next message is decided by.
+  await juno.expectToast('#alerts-prod: Always')
   await juno.sidebar.row(ALERTS_MAIN).open()
   await juno.focusWindow()
   slack.as('Leo').postIn('alerts-prod', 'Disk at 91% on db-2')
