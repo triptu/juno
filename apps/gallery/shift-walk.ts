@@ -164,6 +164,27 @@ export interface StateResult {
   readonly resets: number
 }
 
+/** States one document opens before it is loaded again, so what fixtures leave behind stays small. */
+export const statesPerDocument = 150
+
+/** The walk opens its states in place in the test's page; the document is loaded again every `statesPerDocument` states. */
+export function walkPages(page: Page) {
+  let opened = 0
+  return {
+    page: () => page,
+    next: async (): Promise<Page> => {
+      if (opened === statesPerDocument) {
+        await page.evaluate(() => { location.hash = '#/~' })
+        await page.reload()
+        opened = 0
+      }
+      opened++
+      await page.mouse.move(0, 0)
+      return page
+    },
+  }
+}
+
 /** Opens one state, checks the cursor rule, and touches each target every way a person can. */
 export async function walkState(pages: { readonly next: () => Promise<Page> }, route: Route): Promise<StateResult> {
   const failures: string[] = []

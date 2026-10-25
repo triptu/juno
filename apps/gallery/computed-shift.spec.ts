@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { checkForcedInteractions, formatForcedShift, type ForcedInteractionReport } from '@juno/testing/forced-shift'
-import { checkStateWithin, interactive } from './shift-walk'
-import { claimQueue, openState, readRoutes, statesPerDocument, test, type Route } from './support'
+import { checkStateWithin, interactive, statesPerDocument } from './shift-walk'
+import { claimQueue, openState, readRoutes, test, type Route } from './support'
 
 /**
  * A fast sweep of the shift guard over every state, on request:

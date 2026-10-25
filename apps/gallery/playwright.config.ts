@@ -25,8 +25,8 @@ const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
 export default defineConfig({
   testDir: '.',
   timeout: 120_000,
-  // Tests are independent pages against a static server. The shift guard
-  // splits itself into parts to use the workers.
+  // Each worker loads the gallery once and its tests share that page, reset
+  // between them (support.ts). The shift guard splits itself into parts to use the workers.
   // GALLERY_WORKERS lets a machine of its own (bun run remote) run more.
   workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,

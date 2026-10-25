@@ -255,24 +255,3 @@ export const paintTest = renderingTest('paint')
 
 /** For a test that needs a context and page of its own (see `test`). */
 export const ownPageTest = test.extend({ ownPage: true })
-
-/** States one document opens before it is loaded again, so what fixtures leave behind stays small. */
-export const statesPerDocument = 150
-
-/** The walk opens its states in place in the test's page; the document is loaded again every `statesPerDocument` states. */
-export function walkPages(page: Page) {
-  let opened = 0
-  return {
-    page: () => page,
-    next: async (): Promise<Page> => {
-      if (opened === statesPerDocument) {
-        await page.evaluate(() => { location.hash = '#/~' })
-        await page.reload()
-        opened = 0
-      }
-      opened++
-      await page.mouse.move(0, 0)
-      return page
-    },
-  }
-}

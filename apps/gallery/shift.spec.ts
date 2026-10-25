@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
 import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
-import { claimQueue, openState, ownPageTest, readRoutes, stateCache, test, walkPages, type Route } from './support'
-import { touch, walkState, walkUse } from './shift-walk'
+import { claimQueue, openState, ownPageTest, readRoutes, stateCache, test, type Route } from './support'
+import { touch, walkPages, walkState, walkUse } from './shift-walk'
 
 /**
  * Nothing in the product may move when the pointer or the keyboard touches
