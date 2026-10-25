@@ -31,7 +31,7 @@ export function assessRecord(record) {
 
 export function docsOrTests(file) {
   return /^(docs\/|\.claude\/skills\/)/.test(file) || /(^|\/)(README|CLAUDE|AGENTS|CHANGELOG)\.md$/.test(file)
-    || /^(packages\/[^/]+\/test\/|apps\/desktop\/e2e\/)/.test(file)
+    || /^(packages\/[^/]+\/test\/|apps\/desktop\/e2e\/|apps\/desktop\/dom\/)/.test(file)
     || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)
 }
 

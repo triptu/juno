@@ -31,6 +31,7 @@ import { fakeMain, type SessionStore, type StoredSession } from './fakeMain'
 import { serveFile } from './files'
 import { createShell } from './system'
 import { recordHostCoverage } from './coverage'
+import { jumpClock } from './clock'
 import type { AgentOptions } from './agent'
 import { AGENT_SOCKET_PATH, SHELL_SOCKET_PATH, type SystemCall } from '../shell'
 
@@ -42,6 +43,8 @@ export interface EngineOptions extends AgentOptions {
   readonly fakeAiRequiresKey?: boolean
   readonly cacheMigration?: boolean
   readonly paced?: boolean
+  /** The engine's time jumps with the DOM lane's test clock (`clock.ts`). */
+  readonly clock?: boolean
 }
 
 export interface HostStart {
@@ -61,6 +64,7 @@ export type HostCommand =
   | { readonly type: 'startEngine'; readonly engine?: EngineOptions }
   | { readonly type: 'workPass'; readonly name: 'title' | 'art' | 'home' | 'automated' }
   | { readonly type: 'aiCalls' }
+  | { readonly type: 'jumpClock'; readonly millis: number }
   | { readonly type: 'system'; readonly call: SystemCall }
   | { readonly type: 'stop' }
 
@@ -131,6 +135,8 @@ interface Running {
   readonly url: string
   /** Between `quitEngine` and `startEngine`. */
   stopped: boolean
+  /** With `EngineOptions.clock`, kept across a restart of the engine. */
+  readonly clock: ReturnType<typeof jumpClock> | undefined
 }
 
 let running: Running | undefined
@@ -138,7 +144,7 @@ let httpServer: ReturnType<typeof createServer> | undefined
 const workReplies = new Map<number, (error: string | undefined) => void>()
 let nextWork = 0
 
-async function startEngineOn(start: HostStart, options: EngineOptions, transport: ReturnType<typeof socketTransport>, calls: Record<string, number>, shell: ReturnType<typeof createShell>) {
+async function startEngineOn(start: HostStart, options: EngineOptions, transport: ReturnType<typeof socketTransport>, calls: Record<string, number>, shell: ReturnType<typeof createShell>, clock: ReturnType<typeof jumpClock> | undefined) {
   const log = createLog('engine', join(start.userData, 'logs'))
   const host = memoryHost()
   shell.connect(host)
@@ -170,6 +176,7 @@ async function startEngineOn(start: HostStart, options: EngineOptions, transport
       agentTransport: shell.agent.transport,
       logger: log.effectLogger,
       ...(fast ? { work: work.control, timing: fastTestTiming } : {}),
+      ...(clock === undefined ? {} : { clock: clock.clock }),
     },
   )
   await shell.agent.start()
@@ -212,7 +219,8 @@ async function begin(start: HostStart): Promise<{ url: string }> {
   const port = typeof address === 'object' && address !== null ? address.port : 0
   const transport = socketTransport({ host: '127.0.0.1', port })
   const shell = createShell(start.userData, start.engine)
-  const started = await startEngineOn(start, start.engine, transport, calls, shell)
+  const clock = start.engine.clock === true ? jumpClock() : undefined
+  const started = await startEngineOn(start, start.engine, transport, calls, shell, clock)
   server.on('request', (request, response) => {
     const files = { origin: new URL(start.fakeUrl).origin, aliases: start.aliases, cookie: () => running?.cookie() ?? '', userData: start.userData }
     serveFile(request, response, files)
@@ -244,6 +252,7 @@ async function begin(start: HostStart): Promise<{ url: string }> {
     transport,
     url,
     stopped: false,
+    clock,
     close: async () => {
       for (const client of sockets.clients) client.terminate()
       await new Promise<void>((resolve) => sockets.close(() => resolve()))
@@ -272,7 +281,7 @@ async function startEngineAgain(engine: EngineOptions | undefined): Promise<void
   if (current === undefined) throw new Error('The host has not started')
   if (!current.stopped) throw new Error('The engine is still running; quit it first')
   current.engineOptions = { ...current.engineOptions, ...engine }
-  const started = await startEngineOn(current.start, current.engineOptions, current.transport, current.calls, current.shell)
+  const started = await startEngineOn(current.start, current.engineOptions, current.transport, current.calls, current.shell, current.clock)
   current.stopped = false
   current.engine = started.engine
   current.log = started.log
@@ -329,6 +338,9 @@ async function run(command: HostCommand): Promise<unknown> {
       return workPass(command.name)
     case 'aiCalls':
       return { ...running?.calls }
+    case 'jumpClock':
+      if (running?.clock === undefined) throw new Error('The engine has no test clock; start it with clock: true')
+      return running.clock.jump(command.millis)
     case 'system': {
       if (running === undefined) throw new Error('The host has not started')
       return Reflect.apply(running.shell.hooks[command.call.name], undefined, command.call.args)

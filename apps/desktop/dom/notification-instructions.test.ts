@@ -1,6 +1,9 @@
-import { expect, syncedTest } from './fixtures'
+// Settings › Notifications, Your instructions: an example fills the add row, an
+// instruction is added with its direction, kept across closing Settings, and removed.
+import { expect } from './expect'
+import { domTest } from './test'
 
-syncedTest('Your instructions: add one with a direction, see it in the list, remove it', async ({ juno }) => {
+domTest('Your instructions: add one with a direction, see it in the list, remove it', async ({ juno }) => {
   await juno.openNotifications()
   const page = juno.notifications
   const words = 'Social plans, lunch and dinner'

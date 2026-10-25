@@ -106,7 +106,7 @@ Unchanged on purpose: no labels, no counts, no times, no greeting while items wa
   - `mentions.spec.ts` "suggestions in New chat…"
   - `attachments.spec.ts` "a New chat keeps its files…"
   - `emoji-colon.spec.ts` "New chat supports Tab…"
-- `palette.spec.ts` (the never-messaged person) and `palette-pages.spec.ts` (its page list includes "New chat").
+- `palette.spec.ts` (the never-messaged person) and `dom/palette-pages.test.ts` (its page list includes "New chat").
 - `screens.spec.ts`, `perf.spec.ts` "New chat open to first paint", `feel/newchat.feel.ts`, `feel/launch.feel.ts` and `feel/tabs.feel.ts`: Home in its place.
 - `app.spec.ts`, `navigation.spec.ts`, `layout-shift.spec.ts`, `peek.spec.ts`, `break-pass-1017*.spec.ts` and `juno-agent/chat.spec.ts` start from the launch tab, a New chat today; they wait for Home instead.
 - Driver: `NewChatPane` and `expectNothingOpen('New chat')` in `e2e/driver/juno.ts` fold into the Home pane. The "+" label "New chat ⌘T" becomes "New tab ⌘T".

@@ -2,11 +2,20 @@
  * What other people do in Slack, in the driver's words:
  * `slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')`. Wraps the fake's
  * control API, finding people by first name and threads by their root's text.
+ * It loads no test runner, so the browser, Electron and DOM lanes share it.
  */
-import { expect } from '@playwright/test'
 import type { FakeSlack } from '@juno/fake-slack'
 
 const MARK_METHODS = ['conversations.mark', 'subscriptions.thread.mark']
+
+/** Polls `check` until it is true, or fails with `what` after `timeout`. */
+async function within(what: string, check: () => boolean, timeout = 10_000): Promise<void> {
+  const deadline = performance.now() + timeout
+  while (!check()) {
+    if (performance.now() > deadline) throw new Error(`Slack: timed out after ${timeout} ms waiting until ${what}`)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
 
 export class Slack {
   constructor(readonly fake: FakeSlack) {}
@@ -54,20 +63,21 @@ export class Slack {
   /** Juno's socket is subscribed to this person's presence, or with `false` no longer is, within 10 s. */
   async expectPresenceSubscribed(name: string, subscribed = true): Promise<void> {
     const { id } = this.as(name)
-    await expect.poll(() => this.fake.presenceSubscriptions().includes(id), { timeout: 10_000 }).toBe(subscribed)
+    await within(`${name}'s presence is ${subscribed ? '' : 'not '}subscribed`, () => this.fake.presenceSubscriptions().includes(id) === subscribed)
   }
 
   /** Juno sent no read mark to Slack since the last `resetCalls`. */
   async expectNoMarks(): Promise<void> {
     // Marks leave the engine in the background; give one a moment to show up.
     await new Promise((resolve) => setTimeout(resolve, 1_000))
-    expect(this.fake.calls.filter((call) => MARK_METHODS.includes(call.method)).map((call) => call.method)).toEqual([])
+    const marks = this.fake.calls.filter((call) => MARK_METHODS.includes(call.method)).map((call) => call.method)
+    if (marks.length > 0) throw new Error(`Slack: expected no read marks, got ${marks.join(', ')}`)
   }
 
   /** Juno marked the conversation read in Slack. */
   async expectMarked(channelName: string): Promise<void> {
     const id = this.channel(channelName)
-    await expect.poll(() => this.fake.calls.some((call) => call.method === 'conversations.mark' && call.args['channel'] === id), { timeout: 10_000 }).toBe(true)
+    await within(`#${channelName} is marked read`, () => this.fake.calls.some((call) => call.method === 'conversations.mark' && call.args['channel'] === id))
   }
 }
 

@@ -74,11 +74,12 @@ function phosphorWeights(repoRoot: string): Plugin {
  * the first stylesheet was line breaks and indents (10-21). `reportSkipped`
  * (default true) prints each function the React Compiler left as written.
  */
-export function rendererPlugins(options: { readonly repoRoot: string; readonly minify: boolean; readonly reportSkipped?: boolean }): PluginOption[] {
+export function rendererPlugins(options: { readonly repoRoot: string; readonly minify: boolean; readonly reportSkipped?: boolean; readonly cssLayers?: boolean }): PluginOption[] {
   return [
     phosphorWeights(options.repoRoot),
     stylex.vite({
-      useCSSLayers: true,
+      // The DOM lane's bundle (dom/vite.config.ts) turns them off: happy-dom's cascade skips rules inside @layer.
+      useCSSLayers: options.cssLayers !== false,
       lightningcssOptions: { minify: options.minify },
       unstable_moduleResolution: { type: 'commonJS', rootDir: options.repoRoot },
     }),
