@@ -1,12 +1,13 @@
-// What Juno keeps of the chat, in the app against the fake Slack and a fake OpenRouter:
-// a pin from the owner's words, edited and then lost with its source, the chat's memory
+// What Juno keeps of the chat: a pin from the owner's words, edited and then lost with its source, the chat's memory
 // line masked by the removal and rebuilt (plan v3 §16 flow 10), and the owner's own
 // Remember, Undo and Remove from the chat.
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
+import { answer, startScriptedModel } from '../../e2e/juno-agent/model'
+import { card, openChat, openPage, readySynced as ready, type JunoChatPane } from '../driver/agent'
 import type { Juno } from '../driver/juno'
-import { card, openChat, openPage, readySynced as ready } from './agent'
-import { answer, expect, type JunoChatPane, test as base } from './chat'
-import { startScriptedModel, type ScriptedModel } from './model'
+import { MessageMenuDriver } from '../driver/topic'
+import { expect } from '../expect'
+import { domTest } from '../test'
 
 const FACT = 'the launch moves to Thursday'
 const EDITED = 'the launch moves to Friday'
@@ -29,31 +30,20 @@ function memoryAnswer(request: OpenRouterRequest): string | ToolCallAnswer {
   return answer(request)
 }
 
-const test = base.extend<{ readonly model: ScriptedModel }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startScriptedModel({ answer: memoryAnswer })
-    await use(model)
-    await model.close()
-  },
-})
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 180_000 })
+const model = () => startScriptedModel({ answer: memoryAnswer })
 
 /** Whether the "Removed" note comes before the owner's bubble that holds `text`. */
-const noteBefore = (chat: JunoChatPane, text: string) =>
-  chat.root.evaluate((root, words) => {
-    const note = root.querySelector('[data-chat-note="removed"]')
-    const bubble = [...root.querySelectorAll('[data-chat-owner]')].find((el) => el.textContent?.includes(words))
-    return note !== null && bubble !== undefined && (note.compareDocumentPosition(bubble) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-  }, text)
+const noteBefore = (chat: JunoChatPane, words: string) => {
+  const root = chat.root.el()
+  const note = root?.querySelector('[data-chat-note="removed"]')
+  const bubble = [...(root?.querySelectorAll('[data-chat-owner]') ?? [])].find((el) => el.textContent?.includes(words))
+  return note != null && bubble !== undefined && (note.compareDocumentPosition(bubble) & 4) !== 0
+}
 
 const pins = (juno: Juno) => juno.win.locator('main [data-pin]')
 const memoryLines = (juno: Juno) => juno.win.locator('main [data-memory-line]')
 
-test('a pin from the owner\'s words is edited, then goes with its source, whose memory line is masked and rebuilt', async ({ juno, model }) => {
+domTest('a pin from the owner\'s words is edited, then goes with its source, whose memory line is masked and rebuilt', async ({ juno, model }) => {
   await ready(juno)
   let chat = await openChat(juno)
   await chat.send(ASKED)
@@ -83,9 +73,9 @@ test('a pin from the owner\'s words is edited, then goes with its source, whose 
   const forget = memoryLines(juno).filter({ hasText: 'These are my notes' })
   await expect(asked).toHaveCount(1, { timeout: 20_000 })
   await expect(forget).toContainText(/Summary of messages \d+–\d+: /, { timeout: 20_000 })
-  const index = (filter: string) => memoryLines(juno).evaluateAll((rows, text) => rows.findIndex((row) => row.textContent?.includes(text)), filter)
-  const askedLine = memoryLines(juno).nth(await index(ASKED))
-  const forgetLine = memoryLines(juno).nth(await index('These are my notes'))
+  const index = (text: string) => memoryLines(juno).all().findIndex((row) => row.textContent?.includes(text))
+  const askedLine = memoryLines(juno).nth(index(ASKED))
+  const forgetLine = memoryLines(juno).nth(index('These are my notes'))
   const span = /Summary of messages (\d+)–/.exec((await forget.textContent()) ?? '')![1]
   // The long message read the removed one as context, so its line is rebuilt by the model too.
   // Holding that rebuild keeps the line masked until the test lets it through.
@@ -97,7 +87,7 @@ test('a pin from the owner\'s words is edited, then goes with its source, whose 
   await expect(remove).toContainText('Removed 1 message')
   // Where the message was: before the message that asked for its removal, and it does not come back at the bottom.
   await expect(chat.root.locator('[data-chat-note="removed"]')).toHaveText('Removed')
-  expect(await noteBefore(chat, 'forget that')).toBe(true)
+  expect(noteBefore(chat, 'forget that')).toBe(true)
   await expect(chat.ownerBubble(ASKED)).toHaveCount(0)
 
   page = await openPage(juno, 'What Juno remembers')
@@ -116,9 +106,9 @@ test('a pin from the owner\'s words is edited, then goes with its source, whose 
   await expect(askedLine).toHaveAttribute('data-memory-line', 'line')
   await expect(page.locator('[data-memory-line="masked"]')).toHaveCount(0)
   await expect(page).not.toContainText(ASKED)
-})
+}, { model, timeout: 180_000 })
 
-test('Remember shows "Remembered · Undo", and words selected in a message are remembered from its menu and removed with their pin', async ({ juno }) => {
+domTest('Remember shows "Remembered · Undo", and words selected in a message are remembered from its menu and removed with their pin', async ({ juno }) => {
   await ready(juno)
   let chat = await openChat(juno)
   await chat.send(ASKED)
@@ -137,21 +127,23 @@ test('Remember shows "Remembered · Undo", and words selected in a message are r
   await chat.send(message)
   await chat.expectJuno(`You said: ${message}`)
   const remember = async () => {
-    await chat.ownerBubble(message).locator('p').evaluate((node, text) => {
-      const content = node.firstChild
-      if (content === null) throw new Error('No message text')
-      const start = (content.textContent ?? '').indexOf(text)
-      if (start < 0) throw new Error('No selected words')
-      const range = document.createRange()
-      range.setStart(content, start)
-      range.setEnd(content, start + text.length)
-      const selection = document.getSelection()
-      selection?.removeAllRanges()
-      selection?.addRange(range)
-    }, FACT)
+    const node = await chat.ownerBubble(message).locator('p').element()
+    const content = node.firstChild
+    if (content === null) throw new Error('No message text')
+    const start = (content.textContent ?? '').indexOf(FACT)
+    if (start < 0) throw new Error('No selected words')
+    const { document } = juno.dom
+    const range = document.createRange()
+    range.setStart(content, start)
+    range.setEnd(content, start + FACT.length)
+    document.getSelection()?.removeAllRanges()
+    document.getSelection()?.addRange(range)
     // The context-menu key: the menu opens at once, and Remember this takes the selected words.
-    await chat.ownerBubble(message).locator('p').dispatchEvent('contextmenu')
-    await juno.messageMenu.choose('remember')
+    const W = juno.dom.window as unknown as { MouseEvent: typeof MouseEvent }
+    node.dispatchEvent(new W.MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+    const menu = new MessageMenuDriver(juno.dom)
+    await expect(menu.root).toBeVisible()
+    await menu.choose('remember')
     await expect(note).toContainText('Remembered')
   }
   await remember()
@@ -173,4 +165,4 @@ test('Remember shows "Remembered · Undo", and words selected in a message are r
   await expect(note).toHaveCount(0)
   page = await openPage(juno, 'What Juno remembers')
   await expect(page.getByText('Nothing pinned yet')).toBeVisible()
-})
+}, { model, timeout: 180_000 })
