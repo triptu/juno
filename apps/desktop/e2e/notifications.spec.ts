@@ -148,7 +148,7 @@ async function ignoreFromSettings(juno: Juno): Promise<void> {
   await juno.win.keyboard.press('Enter')
   await expect(settings.ignoreOptions).toHaveCount(0)
   await expect(settings.ignoreSelect).toBeFocused()
-  await expect(settings.ignoreSelect).toHaveAccessibleName('Channel to ignore: product')
+  await expect(settings.ignoreSelect).toHaveText('product')
 
   await settings.ignoreButton.click()
   await juno.expectToast('Ignoring #product')

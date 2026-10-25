@@ -79,9 +79,9 @@ async function editLastStaysAbove({ juno, win, fake }: Pick<Fixtures, 'juno' | '
           } else {
             await (await juno.messageMenu.openOnRow(row, { scroll: false })).choose('edit')
           }
-          await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
-          await expect(topic.list.locator(EDITING).getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
-          await expect(topic.list.locator(EDITING).getByRole('button', { name: /^Save/ })).toBeVisible()
+          await expect(topic.list.locator('textarea[aria-label="Edit message"]')).toBeFocused()
+          await expect(topic.list.locator(EDITING).locator('button', { hasText: /^Cancel$/ })).toBeVisible()
+          await expect(topic.list.locator(EDITING).locator('button', { hasText: /^Save/ })).toBeVisible()
           await frames(win, 12)
           const samples = await watched()
           await test.info().attach(`${name}-${method}`, { body: JSON.stringify(samples), contentType: 'application/json' })

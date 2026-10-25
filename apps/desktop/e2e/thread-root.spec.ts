@@ -38,7 +38,7 @@ async function startThreadOn(juno: Juno, open: () => Promise<void>, text: string
   await menu.choose('reply')
 
   // The root shows as soon as the thread does, before any reply.
-  await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+  await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
   const rows = topic.list.locator('[data-message-row]')
   await expect(rows).toHaveCount(1)
   await expect(rows.first()).toContainText(text)

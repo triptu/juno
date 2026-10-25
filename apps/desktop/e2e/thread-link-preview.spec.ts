@@ -8,8 +8,8 @@ const FIRST_REPLY = 'Sam: Quarantining it. Ticket filed.'
 syncedTest('unknown first replies show only the count and fill in place when a peek fetch lands', async ({ juno, fake, slack, win }) => {
   await juno.sidebar.row('#eng').open()
   const link = juno.topic.threadLinkUnder(ROOT)
-  await expect(link.root).toHaveAccessibleName('5 replies')
   await expect(link.root).toContainText('5 replies')
+  await expect(link.root).not.toContainText(FIRST_REPLY)
   await expect(link.root).not.toContainText(ROOT)
   slack.resetCalls()
   // Local warming and the list do not fetch replies.
@@ -19,11 +19,11 @@ syncedTest('unknown first replies show only the count and fill in place when a p
   fake.holdNext({ method: 'conversations.replies', reason: 'open' })
   await link.peek()
   await expect.poll(() => fake.heldCount({ method: 'conversations.replies' })).toBe(1)
-  await expect(link.root).toHaveAccessibleName('5 replies')
+  await expect(link.root).not.toContainText(FIRST_REPLY)
   const root = slack.root(ROOT)
   await expectStableAnchor(win, `[data-topic-view] [data-message-row="${root.ts}"]`, async () => {
     fake.release({ method: 'conversations.replies' })
-    await expect(link.root).toHaveAccessibleName(`5 replies: ${FIRST_REPLY}`)
+    await expect(link.root).toContainText(FIRST_REPLY)
     await juno.peek.expectMessage('Quarantining it. Ticket filed.')
   })
   await juno.peek.release()

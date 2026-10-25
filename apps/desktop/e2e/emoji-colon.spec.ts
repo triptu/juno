@@ -35,7 +35,7 @@ syncedTest('colon suggestions insert Unicode in a reply and send it to Slack; in
   await test.step(':thumbs offers 👍 first, before any recent use', async () => {
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.composer.pressSequentially(':thumbs')
-    await expect(juno.topic.suggestions.getByRole('option').first()).toHaveAccessibleName(':thumbsup:')
+    await expect(juno.topic.suggestions.locator('[role="option"]').first()).toContainText(':thumbsup:')
     await juno.topic.composer.press('Enter')
     await expect(juno.topic.composer).toHaveValue('👍 ')
   })

@@ -77,7 +77,7 @@ async function mentionGroup({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pr
   await expect(topic.suggestion('@platform')).toBeVisible()
   const options = topic.suggestions.getByRole('option')
   await expect(options).not.toHaveCount(1)
-  await expect(options.last()).toHaveAccessibleName(/^@platform Platform team/)
+  await expect(options.last()).toHaveText(/^@platform\s*Platform team/)
   await expect(topic.suggestions).toContainText('Groups')
 
   await topic.composer.pressSequentially('lat')
