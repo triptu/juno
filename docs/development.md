@@ -1149,7 +1149,7 @@ Nearly every file reaches the whole desktop app through the import graph, so a c
 
 **Gallery budget.** Gallery shift components are ranked within `--budget-seconds` (default 300 estimated test seconds, `rankComponents`). A component whose own source or fixture changed is required. Other components score by how few components reach each changed file, and each costs the last matching full shift duration divided by the component count, or 30 seconds without measurements. A gallery harness change and `--wide` run every component. The gallery's content cache can skip unchanged states. Behaviour specs are narrowed by the component names they open (`galleryComponents`); a spec that reads every route without filtering them runs for any component.
 
-**Measured** (10-26): MEASURED_PLACEHOLDER
+**Measured** (10-26, one uncached `bun run affected --no-cache --files packages/views/src/TopicRow.tsx` on the shared laptop): every desktop spec, both lanes, with heavy and nightly tests skipped, ran 125 tests in 122 s (859 CPU-s, 6.3 GB peak); beside it in the unit job, the DOM lane took 54 s and four gallery components with 14 behaviour specs 86 s. Both jobs first waited about 35 minutes for cores other projects held.
 
 ## Remote runs
 
