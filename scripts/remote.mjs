@@ -18,8 +18,8 @@ import { runPlan } from './affected-run.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const self = fileURLToPath(import.meta.url)
 const started = Date.now()
-const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:browser', 'test:dom', 'test:electron', 'test:e2e', 'test:plan', 'test:runner', 'test:repo-tools', 'test:health']
-const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
+const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'perf', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:browser', 'test:dom', 'test:electron', 'test:e2e', 'test:plan', 'test:runner', 'test:repo-tools', 'test:health']
+const localOnly = { 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
 function parse(argv) {
   const options = { env: [], wait: Number(process.env.JUNO_RUNNER_WAIT ?? 60) }
