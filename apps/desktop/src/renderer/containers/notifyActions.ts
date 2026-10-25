@@ -18,7 +18,7 @@ import {
   type NotifyChoice,
   type NotifyTargetView,
 } from '@juno/contract'
-import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, releaseSidebarTopic, runAction } from '@juno/state'
+import { currentNotificationSettings, holdLevel, junoAvailableAtom, loadNotificationSettings, pendingLevel, popupContextMenu, registry, releaseSidebarTopic, runAction } from '@juno/state'
 import { askJunoAbout, showWhatJunoKnows } from './juno/actions'
 import { openNotificationsAt } from './notificationsAnchor'
 
@@ -27,12 +27,18 @@ export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, l
   // Following or unfollowing a thread adds or removes its row at once, even while the sidebar holds its order (SPEC 5).
   if (target.kind === 'thread') releaseSidebarTopic(registry, target.id)
   // The toast waits until the settings the menus read hold the new level. A thread's follow flag arrives with its row.
-  const stored = () => loadNotificationSettings(registry, (settings) => choiceFor(settings, target, choice !== 'never') === choice)
-  void runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` }, stored)
+  const stored = () => loadNotificationSettings(registry, (settings) => storedChoice(settings, target, choice !== 'never') === choice)
+  // Menus opened before the settings and the follow flag arrive read the choice just made.
+  void holdLevel(registry, target, choice, () => runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` }, stored))
 }
 
-/** The current choice for a target, from the settings and, for a thread, Slack's follow flag. */
+/** The current choice for a target: the one just made while the stored state catches up, else the stored one. */
 export function choiceFor(settings: NotificationSettingsView | undefined, target: NotifyTargetView, subscribed = false): NotifyChoice {
+  return pendingLevel(registry, target) ?? storedChoice(settings, target, subscribed)
+}
+
+/** A target's choice as stored: the settings and, for a thread, Slack's follow flag. */
+function storedChoice(settings: NotificationSettingsView | undefined, target: NotifyTargetView, subscribed: boolean): NotifyChoice {
   switch (target.kind) {
     case 'thread':
       return threadNotifyChoice(subscribed, settings?.threads[target.id])
