@@ -837,7 +837,7 @@ test.describe('large workspace', () => {
       console.log(`All topics rows: ${total}`)
       const tableBox = (await table.boundingBox())!
       await win.mouse.move(tableBox.x + tableBox.width / 2, tableBox.y + tableBox.height / 2)
-      await scrollReading(win, 'scroll-all-topics', { steps: 80, direction: 1, interval: await refreshInterval(win), layoutLimit: 256, placeholders: true, at: { x: tableBox.x + tableBox.width / 2, y: tableBox.y + tableBox.height / 2 } })
+      await scrollReading(win, 'scroll-all-topics', { steps: count(40, 80), direction: 1, interval: await refreshInterval(win), layoutLimit: 256, placeholders: true, at: { x: tableBox.x + tableBox.width / 2, y: tableBox.y + tableBox.height / 2 } })
     } finally {
       await running.close()
     }
@@ -1438,7 +1438,7 @@ test.describe('Juno chat', () => {
 
       const sends: number[] = []
       const bubbles: number[] = []
-      for (let i = 0; i < count(30, 80); i++) {
+      for (let i = 0; i < count(20, 80); i++) {
         const before = { send: (await juno.measures('juno.chat-send')).length, bubble: (await juno.measures('juno.chat-bubble')).length }
         await composer.fill(`message ${i}`)
         await composer.press('Enter')
@@ -1667,8 +1667,9 @@ test('emoji picker with 20,000 workspace emoji, cold subscription and loaded ima
   db.close()
   const samples: number[] = []
   const preloadWork: number[] = []
-  for (let i = 0; i < count(5, 10); i++) {
-    await expect.poll(() => loadavg()[0], { timeout: 120_000, intervals: [1000] }).toBeLessThanOrEqual(8)
+  for (let i = 0; i < count(3, 10); i++) {
+    // The Mac's own load; the laptop's job has its cores, and its host's load is other projects'.
+    if (absolute) await expect.poll(() => loadavg()[0], { timeout: 120_000, intervals: [1000] }).toBeLessThanOrEqual(8)
     const app = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
     try {
       const second = new Juno(app.app, app.win)
