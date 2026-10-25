@@ -13,11 +13,14 @@ domTest('a reply that arrives while the topic is open at the bottom shows and ke
   await juno.topic.expectTitle(POSTGRES)
 
   await step('a reply that arrives while the topic is open shows and keeps the row read', async () => {
+    slack.resetCalls()
     slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
     await juno.topic.expectMessage('Cutover is a go')
     await expect(juno.topic.root.getByRole('button', { name: /new message|Jump to latest/ })).toHaveCount(0)
     await postgres.expectPreview('Leo: Cutover is a go')
     await postgres.expectRead()
+    // The row reads as read before its mark leaves for Slack; the next step counts marks from here.
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.mark'), { timeout: 10_000 }).toBe(true)
   })
 
   await step('a reply that arrives while the window is in the background stays unread until the window is back', async () => {
