@@ -30,3 +30,14 @@ test('thread-link photos replace initials without moving the link', async ({ pag
   expect(await link.boundingBox()).toEqual(before)
   for (const image of await images.all()) await expect(image).toHaveCSS('transition-duration', '0s')
 })
+
+test('a link with no known repliers keeps its speech bubble', async ({ page }) => {
+  const routes = await readRoutes(page)
+  for (const name of ['ThreadLink/repliers/empty', 'ThreadLink/label/not-loaded']) {
+    await openState(page, routes.find(route => route.route === name)!)
+    const link = page.locator('[data-thread-link]')
+    await expect(link).toHaveAccessibleName('5 replies')
+    await expect(link.locator('[data-kind="person"]')).toHaveCount(0)
+    await expect(link.locator('svg')).toHaveCount(2)
+  }
+})

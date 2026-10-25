@@ -155,13 +155,12 @@ const notifier = new Notifier({
 supervisor.onReady(() => notifier.engineReady())
 
 /**
- * Whether the owner is at the Mac, so Slack shows them active (activity.ts). Under JUNO_E2E a test
- * sets the idle time (`junoTest.systemIdle`); it starts at 0, a user at the Mac.
+ * Whether the owner is at the Mac, so Slack shows them active (activity.ts). Under JUNO_E2E the idle
+ * time is 0, a user at the Mac; apps/desktop/test/activity.test.ts drives the watch with other times.
  */
-let idleForTests = 0
 let screenLocked = false
 const activity = createActivityWatch({
-  idleSeconds: () => (e2e ? idleForTests : powerMonitor.getSystemIdleTime()),
+  idleSeconds: () => (e2e ? 0 : powerMonitor.getSystemIdleTime()),
   locked: () => screenLocked,
   send: (message) => supervisor.send(message),
 })
@@ -379,11 +378,6 @@ if (e2e) {
       ...huddleSettingsForTests,
       slackKeychainReads,
       wake: () => { notifier.wake(); refreshDockBadge() },
-      // The activity watch's seam: the Mac's idle time in seconds, read at once.
-      systemIdle: (seconds: number) => {
-        idleForTests = seconds
-        activity.poll()
-      },
       // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
       screenShared: (shared: boolean) => {
         sharedForTests = shared

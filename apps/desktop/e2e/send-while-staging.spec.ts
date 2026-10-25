@@ -34,7 +34,7 @@ function holdFileRead(win: Page, { fail = false }: { readonly fail?: boolean } =
 
 const releaseFileRead = (win: Page) => win.evaluate(() => window.dispatchEvent(new Event('release-file-read')))
 
-test('Enter while a file is still being read sends at once: the message goes when the file is ready, or shows as not sent when it cannot be read', async ({ juno, win, fake }) => {
+test('Enter while a file is still being read sends at once: the message goes when the file is ready, or shows as not sent when it cannot be read', async ({ juno, win, fake, userData }) => {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -75,35 +75,33 @@ test('Enter while a file is still being read sends at once: the message goes whe
     await failed.discard()
     await expect(topic.message('Brief that will not load')).toHaveCount(0)
   })
-})
 
-test('a choice on the send check bar sends while a newly attached file is still being read', async ({ juno, win, fake, userData }) => {
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-  // Wrong place is the one check before sending: wait for the typing pause's answer.
-  const since = Date.now()
-  await topic.composer.fill(BILL_REPLY)
-  await expect.poll(() => {
-    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
-    try {
-      return (db.prepare(`SELECT max(CAST(created_at AS INTEGER)) AS at FROM ai_cache WHERE task = 'routeCheck' AND model != ''`).get() as { at: number | null }).at ?? 0
-    } finally {
-      db.close()
-    }
-  }, { timeout: 15_000 }).toBeGreaterThanOrEqual(since)
-  await topic.composer.press('Enter')
-  const post = topic.root.getByRole('button', { name: /Post in thread/ })
-  await expect(post).toBeVisible()
+  await test.step('a choice on the send check bar sends while a newly attached file is still being read', async () => {
+    fake.resetCalls()
+    // Wrong place is the one check before sending: wait for the typing pause's answer.
+    const since = Date.now()
+    await topic.composer.fill(BILL_REPLY)
+    await expect.poll(() => {
+      const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+      try {
+        return (db.prepare(`SELECT max(CAST(created_at AS INTEGER)) AS at FROM ai_cache WHERE task = 'routeCheck' AND model != ''`).get() as { at: number | null }).at ?? 0
+      } finally {
+        db.close()
+      }
+    }, { timeout: 15_000 }).toBeGreaterThanOrEqual(since)
+    await topic.composer.press('Enter')
+    const post = topic.root.getByRole('button', { name: /Post in thread/ })
+    await expect(post).toBeVisible()
 
-  await holdFileRead(win)
-  await paste(topic.composer, [chart()])
-  await expect(chip(topic, 'chart.png')).toBeVisible()
-  await post.click()
-  await expect(topic.composer).toHaveValue('')
-  expect(fake.calls.filter((call) => call.method === 'chat.postMessage' || call.method === 'files.share')).toHaveLength(0)
+    await holdFileRead(win)
+    await paste(topic.composer, [chart()])
+    await expect(chip(topic, 'chart.png')).toBeVisible()
+    await post.click()
+    await expect(topic.composer).toHaveValue('')
+    expect(fake.calls.filter((call) => call.method === 'chat.postMessage' || call.method === 'files.share')).toHaveLength(0)
 
-  await releaseFileRead(win)
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').length, { timeout: 15_000 }).toBe(1)
-  expect(fake.calls.find((call) => call.method === 'files.share')!.args['thread_ts']).toBeDefined()
+    await releaseFileRead(win)
+    await expect.poll(() => fake.calls.filter((call) => call.method === 'files.share').length, { timeout: 15_000 }).toBe(1)
+    expect(fake.calls.find((call) => call.method === 'files.share')!.args['thread_ts']).toBeDefined()
+  })
 })

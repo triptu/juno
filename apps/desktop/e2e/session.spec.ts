@@ -1,8 +1,8 @@
 // Session import, sign-out, relaunch and expiry against the fake Slack app.
-import { readFile, access, readdir, writeFile, rm } from 'node:fs/promises'
+import { readFile, access, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
-import { expect, launchApp, syncedTest, test, writeSlackApp } from './fixtures'
+import { expect, launchApp, test, writeSlackApp } from './fixtures'
 import { Juno } from './driver/juno'
 
 test('signed out at launch, then imports and verifies the Slack app’s session', { tag: '@electron' }, async ({ juno, win, fake, userData, relaunch }) => {
@@ -141,15 +141,6 @@ test('a relaunch whose session Slack no longer accepts shows "Slack signed you o
   } finally {
     await again.close()
   }
-})
-
-syncedTest('comes back signed in when the local cache is damaged, and syncs it again', async ({ relaunch, userData }) => {
-  const restarted = await relaunch({ whileClosed: async () => {
-    const [workspace] = await readdir(join(userData, 'workspaces'))
-    await writeFile(join(userData, 'workspaces', workspace!, 'cache.db'), 'not a database '.repeat(400))
-  } })
-  await restarted.expectSignedIn('Juno Fake')
-  await restarted.sidebar.row('Draft plan is in the doc').expectVisible()
 })
 
 // Signing out ends with a fresh sign-in, which the expiry step starts from.

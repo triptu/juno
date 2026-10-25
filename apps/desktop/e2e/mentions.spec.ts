@@ -22,6 +22,7 @@ test('picks people, groups and channels, navigates suggestions and keeps a menti
   await test.step('link a channel with #, picked with Tab', () => linkChannel(context))
   await test.step('arrows move through the list, and Esc closes it and keeps the text', () => navigateMentions(context))
   await test.step('a draft keeps its mentions across tab switches', () => keepMentionDraft(context))
+  await test.step('Home suggests people and channels inside a question for Juno and once a person or channel is chosen', () => homeSuggestions(context))
 })
 
 async function mentionPerson({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
@@ -163,8 +164,9 @@ async function keepMentionDraft({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>)
   expect(postedText(fake).at(-1)).toBe('Ask <@U0PRIYA> about the copy.')
 }
 
-test('Home suggests people and channels inside a question for Juno and once a person or channel is chosen', async ({ juno, fake }) => {
+async function homeSuggestions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { write } = juno
+  await juno.home.open()
 
   // Before a destination, a first @ is the "Send to" list's, and an @ inside the question suggests people.
   await write.composer.pressSequentially('@le')
@@ -201,4 +203,4 @@ test('Home suggests people and channels inside a question for Juno and once a pe
 
   await write.send()
   await expect.poll(() => postedText(fake).at(-1)).toBe('Pairing with <@U0LEO> in <#C0PLATFORM|platform> 😄')
-})
+}
