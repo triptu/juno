@@ -4,14 +4,12 @@
 // T3 Code is agent-testing's fake on loopback, connected through the T3 Code row on Connections.
 // The policy cases (hostile instructions to a running job, a Stop T3 Code cannot carry out) are
 // in packages/agent/test/t3.test.ts and policy.test.ts.
-import { startFakeOpenRouter, type OpenRouterRequest, type ToolCallAnswer } from '@juno/agent-testing/openrouter'
-// The T3 fake alone; it is not on `@juno/agent-testing/mcp`.
-import { startFakeT3, type FakeT3 } from '../../../../packages/agent-testing/src/mcp/t3'
-import { answer as echo } from '../../e2e/juno-agent/model'
-import { card, configure, openChat, openPage, readySynced as ready } from '../driver/agent'
+import type { FakeT3 } from '../../../../packages/agent-testing/src/mcp/t3'
+import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
+import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
-import { expect } from '../expect'
-import { domTest } from '../test'
+import { card, configure, openChat, openPage, readySynced as ready } from './agent'
+import { answer as echo, expect, test as chat } from './chat'
 
 // The shape of `FAKE_SECRET` in agent-testing's hostile fixtures: an invented OpenRouter key.
 const SECRET = `sk-or-v1-${'0f'.repeat(32)}`
@@ -32,16 +30,32 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   return echo(request)
 }
 
+const test = chat.extend<{ readonly t3: FakeT3; readonly model: FakeOpenRouter }>({
+  // oxlint-disable-next-line no-empty-pattern
+  model: async ({}, use) => {
+    const model = await startFakeOpenRouter({ answer })
+    await use(model)
+    await model.close()
+  },
+  // oxlint-disable-next-line no-empty-pattern
+  t3: async ({}, use) => {
+    // pi-mcp has only an ESM entry and Playwright loads specs as CommonJS. The package root would
+    // load the model fakes again as ESM beside the CommonJS copy `./chat` holds, and fail, so this
+    // loads the T3 fake alone; it is not on `@juno/agent-testing/mcp`.
+    const { startFakeT3 } = await import('../../../../packages/agent-testing/src/mcp/t3')
+    const server = await startFakeT3()
+    await use(server)
+    await server.close()
+  },
+})
+
 // The watcher sees a run end through t3_thread_wait and an answer as soon as Juno sends it; any other
 // change shows within its slowest read, 10 s. POLL leaves room for a busy machine.
 const POLL = 25_000
 
-const model = () => startFakeOpenRouter({ answer })
+test.use({ synced: true })
 
-async function withT3(body: (t3: FakeT3) => Promise<void>): Promise<void> {
-  const t3 = await startFakeT3()
-  try { await body(t3) } finally { await t3.close() }
-}
+test.describe.configure({ timeout: 150_000 })
 
 /** Points T3 Code at `url` in its Configure sheet and connects it. */
 async function connectT3(juno: Juno, url: string): Promise<void> {
@@ -82,7 +96,7 @@ async function startTask(juno: Juno, t3: FakeT3) {
   return { pane, task, threadId: thread.threadId }
 }
 
-domTest('T3 Code on loopback is used before the LAN address; a one-tap Start card starts a session whose question is answered on a card, and its Task card follows it to Done with a pull request', async ({ juno }) => withT3(async (t3) => {
+test('T3 Code on loopback is used before the LAN address; a one-tap Start card starts a session whose question is answered on a card, and its Task card follows it to Done with a pull request', async ({ juno, t3 }) => {
   await ready(juno)
   const page = await openPage(juno, 'Connections')
   const row = page.locator('[data-connection-id="t3"]')
@@ -119,9 +133,9 @@ domTest('T3 Code on loopback is used before the LAN address; a one-tap Start car
   await expect(task.getByRole('button', { name: 'Stop' })).toHaveCount(0)
   // Start launched once; watching never launches again.
   expect(t3.calls.filter((call) => call.name === 't3_thread_launch')).toHaveLength(1)
-}), { model, timeout: 150_000 })
+})
 
-domTest('Stop on the Task card interrupts the session, and a key in a later brief is blocked before any card', async ({ juno, model }) => withT3(async (t3) => {
+test('Stop on the Task card interrupts the session, and a key in a later brief is blocked before any card', async ({ juno, t3, model }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const { pane, task } = await startTask(juno, t3)
@@ -140,4 +154,4 @@ domTest('Stop on the Task card interrupts the session, and a key in a later brie
   expect(t3.threads()).toHaveLength(1)
   expect(t3.calls.filter((call) => call.name === 't3_thread_launch')).toHaveLength(1)
   await expect(pane.root.getByText('Juno stopped a tool call that held a key or a token. Nothing was sent.')).toBeVisible({ timeout: 15_000 })
-}), { model, timeout: 150_000 })
+})
