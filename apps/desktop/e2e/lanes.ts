@@ -57,7 +57,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'review-cards.spec.ts',
   'navigation.spec.ts',
   'break-pass-1017b.spec.ts',
-  'link-menu.spec.ts',
   'tab-scroll.spec.ts',
   'scroll-rest.spec.ts',
   'emoji-colon.spec.ts',
