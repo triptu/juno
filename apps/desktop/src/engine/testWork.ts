@@ -45,7 +45,8 @@ export const fastTestTiming: NonNullable<EngineHostOptions['timing']> = {
   ...Record.map(productionTiming, (millis) => millis / 20),
   // As in the unit harness, explicit catch-ups replace periodic discovery.
   sweepIntervalMillis: 0,
-  followPassMillis: 0,
+  // The follow pass stays scaled (3 minutes), so as in production a boot's own pass is the only one in a
+  // test; at 0 every boot and reconnect read every followed thread a second time.
   // Polling pending dependencies faster does not make their network calls finish sooner.
   dependencyPollMillis: productionTiming.dependencyPollMillis,
   // Heartbeats exercise liveness without waking every half second in short UI flows.
