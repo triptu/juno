@@ -1,12 +1,11 @@
 // Home's other suggestions (SPEC 12, docs/design/settled-suggestions/, "More
 // self-management"): Unfollow threads you never open and Ignore channels you
 // never read, each a card opening a review with the reason, the action, Undo
-// and the no; and a direct mention of you breaking through an ignored
-// channel (SPEC 5 and 14), while @here does not.
+// and the no. A mention breaking through an ignored channel is in
+// packages/engine/test/flows/notifications.flow.test.ts.
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
-import { loggedDecision } from './driver/notificationLog'
 
 test.describe.configure({ timeout: 150_000 })
 
@@ -136,36 +135,4 @@ test('Ignore channels you never read: the reason, nothing in Slack, Ignore, Undo
   await juno.win.keyboard.press('Escape')
   expect(await freshHome(juno)).not.toContain('ignore')
   await juno.sidebar.row(BUILDS).expectVisible()
-})
-
-test('a mention of you, or of your group, breaks through an ignored channel; @here does not', async ({ juno, fake, userData }) => {
-  fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
-  await juno.signIn()
-  await juno.waitForSync()
-
-  // Inside the hours, mentions notify by the Mentions switch; then ignore #incidents.
-  await juno.notificationHoursNow()
-  await juno.sidebar.row('#incidents').chooseInMenu('ignore-channel')
-  await juno.expectToast('Ignoring #incidents')
-  await juno.sidebar.row('#incidents').expectAbsent()
-
-  await juno.blurWindow()
-  const bodies = async () => (await juno.osNotifications()).map((notification) => notification.body)
-  fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0LEO', text: '<!here> the deploy freeze starts at 3' })
-  fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0MAYA', text: '<@U0TUSHAR> can you approve the rollback?' })
-  await expect.poll(async () => (await bodies()).some((body) => body.includes('can you approve the rollback?')), { timeout: 15_000 }).toBe(true)
-  // The group mention gets through too; within 10 seconds of that banner the burst rule keeps it quiet, later it notifies.
-  fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0LEO', text: '<!subteam^S0PLATFORM> please check the dashboards' })
-  await expect.poll(() => loggedDecision(userData, fake.teamId, 'please check the dashboards')?.decidedBy, { timeout: 15_000 }).toMatch(/^(burst|directMention)$/)
-  expect(loggedDecision(userData, fake.teamId, 'the deploy freeze starts at 3')).toEqual({ outcome: 'stay', decidedBy: 'ignored' })
-  expect((await bodies()).some((body) => body.includes('deploy freeze'))).toBe(false)
-  await juno.focusWindow()
-
-  // Home names who mentioned you; the channel stays out of the sidebar, and the row opens the topic.
-  await expect.poll(() => freshHome(juno), { timeout: 30_000 }).toContain('mentioned')
-  await expect(juno.home.title('mentioned')).toHaveText('Leo mentioned you in #incidents')
-  await juno.sidebar.row('#incidents').expectAbsent()
-  await juno.home.openItem('mentioned')
-  await juno.topic.expectTitle('incidents')
-  await juno.topic.expectMessage('can you approve the rollback?')
 })

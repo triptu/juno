@@ -1,15 +1,16 @@
 // Notifications (SPEC 14): the decision service on a real store with Effect's TestClock (the reading's 2 s
 // timeout, hours starts, settings changed mid-reading, presence), the engine's socket path into a recording
-// Notifier, and Slack's own notification schedule against the fake. Main's Notifier (privacy mode, focused-topic
-// suppression, the dock badge) is apps/desktop/test/notifier.test.ts: engine tests do not import apps/desktop.
+// Notifier, which topics the dock badge counts, and Slack's own notification schedule and presence by the
+// hours rows against the fake. Main's Notifier (privacy mode, focused-topic suppression, showing the badge) is
+// apps/desktop/test/notifier.test.ts: engine tests do not import apps/desktop.
 import { itEffect } from '@juno/testing/effect'
 import { afterEach, expect, it } from 'bun:test'
 import { AiProvider, makeFakeAiProvider } from '@juno/ai'
-import { notificationsDecisions, notificationsSetGroupHours, notificationsUseJunoHours, prefsSet, type Hours, type NotificationDecisions, type SlackScheduleView, type TodayRow } from '@juno/contract'
+import { channelsIgnore, homeView, notificationsDecisions, notificationsSettings, notificationsStatus, notificationsSetGroupHours, notificationsSetLevel, notificationsUseJunoHours, prefsSet, readsMarkRead, viewsSave, viewsSortChannel, type HomeItem, type HomeView, type Hours, type NotificationDecisions, type NotificationSettingsView, type NotificationStatus, type SlackScheduleView, type TodayRow } from '@juno/contract'
 import { ChannelId, UserId, defaultNotificationSettings, localTime, millisToTs, type NotificationSettings } from '@juno/domain'
 import { makeNotifications, type Candidate, type Notification, type Notifier } from '@juno/notifications'
 import { SlackApi } from '@juno/slack'
-import { liveQuery, notificationsPageAtom, runCommand } from '@juno/state'
+import { liveQuery, notificationsPageAtom, runCommand, sendMessage } from '@juno/state'
 import { prefs, StoreWriter, transaction } from '@juno/store'
 import { Effect, Fiber, Layer, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
@@ -17,7 +18,7 @@ import { clientLayer, fakeSlack } from '../../../slack/test/helpers'
 import { freshStore } from '../../../store/test/helpers'
 import { productionTiming } from '../../src/config'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
-import { restart, threadId, tsOf, valueOf } from '../scenario'
+import { readDb, restart, threadId, tsOf, valueOf } from '../scenario'
 import { step } from '../step'
 import { syncedEngine, type SyncedOptions } from '../synced'
 
@@ -166,6 +167,15 @@ function hoursAroundNow(shift = 0): Hours {
 const setPref = async (engine: RunningEngine, key: 'notifications' | 'aiAssist', value: unknown) =>
   valueOf(await runCommand(engine.registry, prefsSet, { key, value: Schema.decodeUnknownSync(Schema.Json)(value) }))
 
+/** A live query's value once `pick` finds something in it. */
+function liveUntil<A, B>(engine: RunningEngine, atom: Parameters<RunningEngine['registry']['mount']>[0], pick: (value: A) => B | undefined, label: string): Promise<B> {
+  unmounts.push(engine.registry.mount(atom))
+  return waitFor(() => {
+    const value = (engine.registry.get(atom) as { value?: A }).value
+    return value === undefined ? undefined : pick(value)
+  }, WAIT_MS, label)
+}
+
 /** Today's decisions as Details shows them; `decided` waits for the one whose text includes `text`. */
 function decisions(engine: RunningEngine) {
   const atom = liveQuery(notificationsDecisions)(undefined)
@@ -202,6 +212,18 @@ it('decides socket messages within the hours: Always once per message, a reading
     expect(log.about('Can you approve this?')).toHaveLength(1)
   })
 
+  await step('a cold greeting stays by the reading, and a reply while you talk in the DM notifies', async () => {
+    engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'hi Tushar 👋' })
+    expect(await log.decided('hi Tushar')).toMatchObject({ outcome: 'stay', decidedBy: 'reading' })
+    valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'D0MAYA' }, 'Hey Maya, what is up?', 'm:D0MAYA'))
+    // The fact comes from Slack's copy of the reply.
+    await waitFor(() => readDb(engine, 'cache.db', (db) => db.prepare('SELECT 1 FROM messages WHERE text = ? AND deleted = 0').get('Hey Maya, what is up?')) === undefined ? undefined : true, WAIT_MS, 'the reply synced')
+    engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'The doc is in the shared folder now' })
+    expect(await log.decided('The doc is in the shared folder now')).toMatchObject({ outcome: 'notify', decidedBy: 'live' })
+    await shownWith('The doc is in the shared folder now')
+    expect(record.shown.some((item) => item.body.includes('hi Tushar'))).toBe(false)
+  })
+
   await step('a presence change made in Slack is observed, and Set yourself active overrides it', async () => {
     await engine.handle.setPresence('active')
     engine.fake.emitFrame({ type: 'manual_presence_change', presence: 'away', user: 'U0TUSHAR' })
@@ -225,6 +247,23 @@ it('decides socket messages within the hours: Always once per message, a reading
     expect(record.shown.some((item) => item.body.includes('Review the mocks.'))).toBe(false)
   })
 
+  await step('a mention of you, or of your group, breaks through an ignored channel and reaches Home; @here does not', async () => {
+    valueOf(await runCommand(engine.registry, channelsIgnore, { channel: 'C0INCIDENTS' }))
+    engine.fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0LEO', text: '<!here> the deploy freeze starts at 3' })
+    engine.fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0MAYA', text: '<@U0TUSHAR> can you approve the rollback?' })
+    expect(await log.decided('can you approve the rollback?')).toMatchObject({ outcome: 'notify', decidedBy: 'directMention' })
+    await shownWith('can you approve the rollback?')
+    // Within 10 seconds of that banner the burst rule keeps the group mention quiet; later it notifies.
+    engine.fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0LEO', text: '<!subteam^S0PLATFORM> please check the dashboards' })
+    expect((await log.decided('please check the dashboards')).decidedBy).toMatch(/^(burst|directMention)$/)
+    expect(log.about('the deploy freeze starts at 3')).toEqual([expect.objectContaining({ outcome: 'stay', decidedBy: 'ignored' })])
+    expect(record.shown.some((item) => item.body.includes('deploy freeze'))).toBe(false)
+    // Home names the newest mention; the channel stays out of the sidebar.
+    const home = await liveUntil<HomeView, HomeItem>(engine, liveQuery(homeView)(undefined), (view) => view.items.find((item) => item.kind === 'mentioned'), 'the mention on Home')
+    expect(home).toMatchObject({ title: 'Leo mentioned you in #incidents', topics: [{ id: 'm:C0INCIDENTS' }] })
+    expect((await engine.rows()).some((row) => row.channel.id === 'C0INCIDENTS')).toBe(false)
+  })
+
   await step('a plain reply in a followed channel thread is decided from its message frame alone', async () => {
     const thread = threadId(engine.fake, 'C0ENG', 'Draft plan is in the doc')
     // Only the message frame: no desktop_notification comes with it.
@@ -239,6 +278,51 @@ it('decides socket messages within the hours: Always once per message, a reading
     engine.fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0SAM', text: 'Paging is quiet tonight' })
     expect(await log.decided('Paging is quiet tonight')).toMatchObject({ outcome: 'stay', decidedBy: 'hours' })
     expect(record.shown).toHaveLength(shown)
+  })
+})
+
+it('the dock badge: a DM kept out of All or in Automated counts only when it mentions you, a Never sender’s @here does not count, and a channel muted in Slack does', async () => {
+  const badge: Array<boolean> = []
+  const engine = await synced({ notifications: { notifier: recorder().notifier, badge: (unread) => Effect.sync(() => { badge.push(unread) }) } })
+  const shows = (unread: boolean, label: string) => waitFor(() => (badge.at(-1) === unread ? true : undefined), WAIT_MS, label)
+  const readAll = async () => {
+    for (const { id } of await engine.rows({ kind: 'all', unreadOnly: true })) valueOf(await runCommand(engine.registry, readsMarkRead, { id }))
+    await shows(false, 'no badge once everything is read')
+  }
+  await setPref(engine, 'notifications', { ...defaultNotificationSettings, notificationHours: hoursAroundNow() })
+  await readAll()
+
+  await step('a DM in a view kept out of All is quiet, but a mention in it counts', async () => {
+    engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'A DM before the view' })
+    await shows(true, 'the badge for an unread DM')
+    valueOf(await runCommand(engine.registry, viewsSave, { name: 'Apps', keepOutOfAll: true, channels: ['D0MAYA'] }))
+    await shows(false, 'no badge for the kept-out DM')
+    engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: '<@U0TUSHAR> Please approve' })
+    await shows(true, 'the badge for the mention')
+    valueOf(await runCommand(engine.registry, readsMarkRead, { id: 'm:D0MAYA' }))
+    await shows(false, 'no badge once the DM is read')
+  })
+
+  await step('a DM in Automated is quiet until it mentions you', async () => {
+    engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'Pull request opened' })
+    await shows(true, 'the badge for an unread DM')
+    valueOf(await runCommand(engine.registry, viewsSortChannel, { channel: 'D0SAM', to: 'automated' }))
+    await shows(false, 'no badge for the DM in Automated')
+    engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: '<@U0TUSHAR> Review the pull request' })
+    await shows(true, 'the badge for the mention')
+    valueOf(await runCommand(engine.registry, readsMarkRead, { id: 'm:D0SAM' }))
+    await shows(false, 'no badge once the DM is read')
+  })
+
+  await step('an @here from a sender set to Never does not count; a mention in a channel muted in Slack does', async () => {
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<!here> A muted sender' })
+    await shows(true, 'the badge for the @here')
+    valueOf(await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'person', id: 'U0MAYA' }, choice: 'never' }))
+    await shows(false, 'no badge once Maya is set to Never')
+    // Juno does not follow Slack's mute.
+    engine.fake.emitFrame({ type: 'pref_change', name: 'muted_channels', value: 'C0ENG' })
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> Can you approve this now?' })
+    await shows(true, 'the badge for the mention in the muted channel')
   })
 })
 
@@ -263,9 +347,11 @@ async function changeInSlack(engine: RunningEngine, changes: Record<string, unkn
 }
 /** A real pass decides whether the current hours need a write. */
 const settled = (engine: RunningEngine) => engine.workPass('slackSchedule')
-/** Sets the weekdays row, as Settings does: only the edges that changed. */
-const setWeekdays = async (engine: RunningEngine, which: 'notifications' | 'presence', hours: { from?: number; to?: number }) =>
-  valueOf(await runCommand(engine.registry, notificationsSetGroupHours, { which, group: 'weekdays', hours }))
+type HoursGroup = 'weekdays' | 'saturday' | 'sunday'
+/** Sets one row of hours, as Settings does: only the edges that changed. */
+const setRow = async (engine: RunningEngine, which: 'notifications' | 'presence', group: HoursGroup, hours: { from?: number; to?: number } | 'off') =>
+  valueOf(await runCommand(engine.registry, notificationsSetGroupHours, { which, group, hours }))
+const setWeekdays = (engine: RunningEngine, which: 'notifications' | 'presence', hours: { from?: number; to?: number }) => setRow(engine, which, 'weekdays', hours)
 const useJunoHours = async (engine: RunningEngine) => valueOf(await runCommand(engine.registry, notificationsUseJunoHours, {}))
 
 function page(engine: RunningEngine, predicate: (view: SlackScheduleView) => boolean, label: string): Promise<SlackScheduleView> {
@@ -348,5 +434,58 @@ it('Use Juno’s hours writes nothing when Slack holds them; a change made in Sl
     await waitFor(() => (writes(engine, since).length > 0 ? true : undefined), WAIT_MS, 'the write')
     await settled(engine)
     expect(writes(engine, since)).toEqual([{ dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '18:30', dnd_end_hour: '08:00' }])
+  })
+})
+
+it('hours saved by an older version load; Saturday reaches Slack as a custom day, Weekdays sets all five, and the Active in Slack rows set presence by the day', async () => {
+  const engine = await synced()
+  const rowOf = (day: number): HoursGroup => (day === 6 ? 'saturday' : day === 0 ? 'sunday' : 'weekdays')
+
+  await step('hours saved before the rows, Monday to Thursday with one from and to, load as they were', async () => {
+    const old = { notificationHours: { days: [1, 2, 3, 4], from: 600, to: 1020 }, presenceHours: { days: [1, 2, 3, 4, 5], from: 540, to: 1140 }, channels: {}, people: {} } as const
+    await setPref(engine, 'notifications', old)
+    const loaded = await liveUntil<NotificationSettingsView, NotificationSettingsView>(engine, liveQuery(notificationsSettings)(undefined), (value) => (value.notificationHours.from === 600 ? value : undefined), 'the saved hours')
+    expect(loaded.notificationHours).toEqual(old.notificationHours)
+    expect(loaded.presenceHours).toEqual(old.presenceHours)
+  })
+
+  await step('Saturday 11am to 2pm reaches Slack as a custom day; Friday stays off', async () => {
+    await setRow(engine, 'notifications', 'saturday', { from: 660, to: 840 })
+    await settled(engine)
+    expect(dnd(engine)).toMatchObject({
+      dnd_days: 'custom',
+      dnd_enabled_monday: 'partial', dnd_before_monday: '10:00', dnd_after_monday: '17:00',
+      dnd_enabled_friday: 'all_day',
+      dnd_enabled_saturday: 'partial', dnd_before_saturday: '11:00', dnd_after_saturday: '14:00',
+      dnd_enabled_sunday: 'all_day',
+    })
+  })
+
+  await step('changing the Weekdays row sets all five weekdays and leaves Saturday alone', async () => {
+    await setWeekdays(engine, 'notifications', { from: 540 })
+    await settled(engine)
+    expect(dnd(engine)).toMatchObject({
+      dnd_days: 'custom',
+      dnd_enabled_monday: 'partial', dnd_before_monday: '09:00', dnd_after_monday: '17:00',
+      dnd_enabled_friday: 'partial', dnd_before_friday: '09:00', dnd_after_friday: '17:00',
+      dnd_before_saturday: '11:00',
+    })
+  })
+
+  await step('the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async () => {
+    const status = (predicate: (value: NotificationStatus) => boolean, label: string) =>
+      liveUntil<NotificationStatus, NotificationStatus>(engine, liveQuery(notificationsStatus)(undefined), (value) => (predicate(value) ? value : undefined), label)
+    const now = new Date()
+    const today = now.getDay()
+    const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
+    await setRow(engine, 'presence', rowOf(today), { from: half, to: (half + 120) % 1440 })
+    expect((await status((value) => value.presence === 'active', 'active by today\'s row')).presenceLabel).toMatch(/^Active/)
+    // Every row off but the weekend day that is not today, 11am to 2pm.
+    const weekend: HoursGroup = today === 6 ? 'sunday' : 'saturday'
+    const since = engine.fake.calls.length
+    for (const group of ['weekdays', 'saturday', 'sunday'] as const) await setRow(engine, 'presence', group, group === weekend ? { from: 660, to: 840 } : 'off')
+    const away = await status((value) => value.presence === 'away', 'away by the rows')
+    expect(away.presenceLabel).toMatch(new RegExp(`^Away until (tomorrow|${weekend === 'saturday' ? 'Sat' : 'Sun'}) 11am`))
+    expect(apiSince(engine, 'presence.set', since).map((call) => call.args['presence'])).toEqual(['away'])
   })
 })
