@@ -3,9 +3,9 @@
 // nightly test has seen. For each file that holds a nightly test
 // (scripts/nightly-tests.mjs), the newest passing run of its nightly tests at
 // an ancestor is its evidence; the file runs again when the change since that
-// commit reaches it, as `bun run affected --wide` decides (the coverage map,
-// else the import graph), leaving out the repository's scripts. A file with no
-// evidence runs.
+// commit reaches it, as `bun run affected --wide` decides by the import graph
+// (a change that reaches the desktop app reaches every desktop spec), leaving
+// out the repository's scripts. A file with no evidence runs.
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'

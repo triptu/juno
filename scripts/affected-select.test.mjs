@@ -1,103 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { decodeMappings, formatMap, mergePartials, sourceAt } from './coverage-map.mjs'
-import { changedMembers, driverSpecs, galleryComponents, mapProblem, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
-
-
-const TOPIC = 'apps/desktop/e2e/topic.spec.ts'
-const SIDEBAR = 'apps/desktop/e2e/sidebar.spec.ts'
-const AGENT = 'apps/desktop/e2e/juno-agent/hello.spec.ts'
-
-const map = {
-  version: 1,
-  commit: 'abc',
-  recordedAt: '2026-10-16T10:00:00.000Z',
-  specs: [SIDEBAR, TOPIC],
-  files: {
-    'packages/views/src/Topic.tsx': [1],
-    'packages/views/src/Sidebar.tsx': [0],
-    'packages/engine/src/sync.ts': [0, 1],
-    'apps/desktop/src/renderer/containers/topic.tsx': [1],
-  },
-  moduleOnly: ['packages/contract/src/schema.ts'],
-}
-
-/** A world with the files above in the app, and what a test changes on top. */
-function select({ changed, imports = {}, added = [], drift = [], specs = [SIDEBAR, TOPIC] }) {
-  const app = new Set([...Object.keys(map.files), ...map.moduleOnly, 'packages/views/src/types.ts', 'packages/ui/src/fonts.css', ...added, ...Object.keys(imports)])
-  const importerMap = new Map()
-  for (const [from, targets] of Object.entries(imports)) for (const target of targets) importerMap.set(target, [...(importerMap.get(target) ?? []), from])
-  return selectSpecs({
-    specs,
-    changed,
-    map,
-    support: new Set(['apps/desktop/e2e/fixtures.ts', 'packages/fake-slack/src/server.ts']),
-    own: (spec) => new Set(spec === AGENT ? [AGENT, 'apps/desktop/e2e/juno-agent/agent.ts'] : [spec]),
-    app,
-    isNew: (file) => added.includes(file),
-    drift: new Set([...changed, ...drift]),
-    importers: (file) => importerMap.get(file) ?? [],
-  })
-}
-
-
-test('coverage selection follows changed, new and unrecorded consumers without keeping deleted specs', () => {
-  const cases = [
-    [{ changed: ['packages/views/src/Topic.tsx'] }, [TOPIC]],
-    [{ changed: ['packages/engine/src/sync.ts'] }, [SIDEBAR, TOPIC]],
-    [{ changed: [TOPIC] }, [TOPIC]],
-    [{ changed: ['apps/desktop/e2e/juno-agent/agent.ts'], specs: [SIDEBAR, TOPIC, AGENT] }, [AGENT]],
-    [{ changed: ['packages/views/src/Topic.tsx'], specs: [SIDEBAR, TOPIC, AGENT] }, [AGENT, TOPIC]],
-    [{ changed: ['packages/engine/src/sync.ts'], specs: [TOPIC] }, [TOPIC]],
-    [{ changed: ['packages/views/src/types.ts'], specs: [SIDEBAR, TOPIC, AGENT] }, [AGENT]],
-    [{ changed: ['docs/development.md'] }, []],
-    [{ changed: ['packages/contract/src/schema.ts'], imports: { 'packages/views/src/Topic.tsx': ['packages/contract/src/schema.ts'] } }, [TOPIC]],
-    [{ changed: ['packages/views/src/Badge.tsx'], added: ['packages/views/src/Badge.tsx', 'packages/views/src/BadgeRow.tsx'], imports: { 'packages/views/src/BadgeRow.tsx': ['packages/views/src/Badge.tsx'], 'packages/views/src/Sidebar.tsx': ['packages/views/src/BadgeRow.tsx'] } }, [SIDEBAR]],
-  ]
-  for (const [input, expected] of cases) assert.deepEqual([...select(input).specs.keys()].toSorted(), expected.toSorted(), JSON.stringify(input))
-  const input = { changed: ['packages/views/src/Topic.tsx'], imports: { 'packages/views/src/Sidebar.tsx': ['packages/views/src/Topic.tsx'] } }
-  assert.equal(select(input).specs.has(SIDEBAR), false)
-  assert.equal(select({ ...input, drift: ['packages/views/src/Sidebar.tsx'] }).specs.has(SIDEBAR), true)
-  for (const input of [
-    { changed: ['packages/fake-slack/src/server.ts'] },
-    { changed: ['packages/ui/src/fonts.css'] },
-    { changed: ['packages/contract/src/schema.ts'] },
-    { changed: ['packages/views/src/Orphan.tsx'], added: ['packages/views/src/Orphan.tsx'] },
-  ]) assert.ok(select(input).all, JSON.stringify(input))
-})
-
-test('the map is not used when missing, of another version, from an unknown commit or too old', () => {
-  const now = Date.parse(map.recordedAt)
-  assert.equal(mapProblem(map, { now, commitKnown: true }), undefined)
-  assert.match(mapProblem(undefined, { now, commitKnown: false }), /no coverage map/)
-  assert.match(mapProblem({ ...map, version: 2 }, { now, commitKnown: true }), /version 2/)
-  assert.match(mapProblem(map, { now, commitKnown: false }), /not in this repository/)
-  assert.match(mapProblem(map, { now: now + 4 * 86_400_000, commitKnown: true }), /4 days old/)
-})
-
-test('source map segments decode to the file at a generated position', () => {
-  // Line 0: column 0 from source 0, column 10 from source 1. Line 1: column 4 from source 1, column 8 unmapped.
-  const lines = decodeMappings('AAAA,UCAA;IAAA,I')
-  assert.equal(sourceAt(lines, 0, 3), 0)
-  assert.equal(sourceAt(lines, 0, 10), 1)
-  assert.equal(sourceAt(lines, 1, 2), -1)
-  assert.equal(sourceAt(lines, 1, 5), 1)
-  assert.equal(sourceAt(lines, 1, 9), -1)
-  assert.equal(sourceAt(lines, 5, 0), -1)
-})
-
-test('partials join into one map: specs by index, files any spec ran, and bundled files none ran', () => {
-  const merged = mergePartials(
-    [
-      { specs: { [TOPIC]: ['b.ts', 'a.ts'] }, bundled: ['a.ts', 'b.ts', 'c.ts'] },
-      { specs: { [SIDEBAR]: ['a.ts'] }, bundled: ['a.ts', 'b.ts', 'c.ts', 'd.ts'] },
-    ],
-    'abc',
-    '2026-10-16T10:00:00.000Z',
-  )
-  assert.deepEqual(merged, { version: 1, commit: 'abc', recordedAt: '2026-10-16T10:00:00.000Z', specs: [SIDEBAR, TOPIC], files: { 'a.ts': [0, 1], 'b.ts': [1] }, moduleOnly: ['c.ts', 'd.ts'] })
-  assert.deepEqual(JSON.parse(formatMap(merged)), merged)
-})
+import { changedMembers, galleryComponents, rankSpecs, reachSpecs } from './affected-select.mjs'
 
 const gallery = new Set(['Sidebar', 'TopicRow', 'AttachmentCard', 'Composer'])
 
@@ -159,88 +62,21 @@ test('a changed driver member reaches the specs that use it on its class, and th
     ['pick.spec.ts', 'await juno.palette.pick("Home")'],
     ['other.spec.ts', 'await juno.topic.send("hi")'],
   ])
-  const reached = (lines) => driverSpecs({ changed: [{ text: DRIVER_TEXT, lines }], driverTexts: [DRIVER_TEXT], specTexts })
+  const reached = (lines) => reachSpecs({ changed: [{ text: DRIVER_TEXT, lines }], corpus: [DRIVER_TEXT], specTexts })
   assert.deepEqual([...reached([lineOf('getByRole')]).keys()], ['palette.spec.ts'])
   // press is used by Palette.pick, which pick.spec.ts calls.
   assert.deepEqual([...reached([lineOf('mouse.down')]).keys()], ['pick.spec.ts'])
-  assert.equal(reached([lineOf('export class Palette')]), undefined)
 })
 
-// Narrow selection (the default plan since 10-18; --wide keeps the rules above).
-
-const COMMON = 'apps/desktop/e2e/common.spec.ts'
-const wideMap = {
-  ...map,
-  specs: [SIDEBAR, TOPIC, COMMON],
-  files: { ...map.files, 'packages/engine/src/boot.ts': [0, 1, 2], 'packages/views/src/Topic.tsx': [1] },
-}
-const narrowSelect = ({ changed, reach, imports = {}, specs = [SIDEBAR, TOPIC, COMMON] }) => {
-  const importerMap = new Map()
-  for (const [from, targets] of Object.entries(imports)) for (const target of targets) importerMap.set(target, [...(importerMap.get(target) ?? []), from])
-  return selectSpecs({
-    specs,
-    changed,
-    map: wideMap,
-    support: new Set(['apps/desktop/e2e/fixtures.ts', 'packages/fake-slack/src/server.ts']),
-    own: (spec) => new Set(spec === AGENT ? [AGENT, 'apps/desktop/e2e/juno-agent/agent.ts'] : [spec]),
-    app: new Set([...Object.keys(wideMap.files), ...map.moduleOnly, 'packages/ui/src/fonts.css']),
-    isNew: () => false,
-    drift: new Set(changed),
-    importers: (file) => importerMap.get(file) ?? [],
-    narrow: true,
-    reach,
-  })
-}
-
-test('a file few specs ran counts more than one every spec runs', () => {
-  const result = narrowSelect({ changed: ['packages/engine/src/boot.ts', 'packages/views/src/Topic.tsx'] })
-  assert.equal(result.scores.get(TOPIC) > result.scores.get(SIDEBAR), true)
-  assert.equal(result.scores.get(SIDEBAR), 0)
-  // The strongest reason comes first, with how many specs ran the file.
-  assert.equal(result.specs.get(TOPIC)[0], 'ran packages/views/src/Topic.tsx (run by 1 of 3 specs)')
-})
-
-test('a narrow selection never runs everything for support, a style sheet or an unplaced file', () => {
-  const reached = narrowSelect({ changed: ['packages/fake-slack/src/server.ts'], reach: () => new Map([[TOPIC, { reason: 'it uses FakeSlack.react, which changed or uses what changed', depth: 0 }], [SIDEBAR, { reason: 'it uses test, which changed or uses what changed', depth: 3 }]]) })
-  assert.equal(reached.all, undefined)
-  assert.equal(reached.scores.get(TOPIC) > reached.scores.get(SIDEBAR), true)
-  const unplaced = narrowSelect({ changed: ['apps/desktop/e2e/fixtures.ts'], reach: () => undefined })
-  assert.deepEqual([...unplaced.specs.keys()], [SIDEBAR, TOPIC, COMMON])
-  assert.match(unplaced.notes[0], /no spec can be told apart/)
-  const css = narrowSelect({ changed: ['packages/ui/src/fonts.css'] })
-  assert.equal(css.specs.size, 0)
-  assert.match(css.notes[0], /outside the JavaScript bundles/)
-  const orphan = narrowSelect({ changed: ['packages/contract/src/schema.ts'] })
-  assert.equal(orphan.specs.size, 0)
-  assert.match(orphan.notes[0], /nothing that imports it ran/)
-})
-
-test('a changed spec is required; specs importing a changed helper are ranked, not required', () => {
-  const result = narrowSelect({ changed: [TOPIC, 'apps/desktop/e2e/juno-agent/agent.ts'], specs: [SIDEBAR, TOPIC, AGENT] })
-  assert.deepEqual([...result.required], [TOPIC])
-  assert.equal(result.scores.get(AGENT) > 1, true)
-})
-
-test('the ranked plan keeps required specs, then others within the time budget by score, then the smaller spec', () => {
+test('the ranked plan keeps required items, then others within the time budget by score, then the smaller one', () => {
   const specs = new Map([['a', ['x']], ['b', ['x']], ['c', ['x']], ['d', ['x']]])
   const scores = new Map([['a', 0], ['b', 2], ['c', 0], ['d', 1]])
   const sizes = { a: 50, c: 10 }
   const ranked = rankSpecs({ specs, scores, required: new Set(['a']), budget: 120, size: (spec) => sizes[spec] ?? 0 })
   assert.deepEqual([...ranked.specs.keys()], ['a', 'b', 'd'])
   assert.deepEqual(ranked.dropped, ['c'])
-  // A tie goes to the spec that ran fewer files.
+  // A tie goes to the smaller item.
   assert.deepEqual([...rankSpecs({ specs, scores: new Map(), required: new Set(), budget: 60, size: (spec) => sizes[spec] ?? 99 }).specs.keys()], ['c'])
-})
-
-test('a cheap browser lane runs every reachable spec; an expensive optional spec cannot consume the required set', () => {
-  const specs = new Map(Array.from({ length: 30 }, (_, index) => [`spec-${index}`, ['reached']]))
-  const required = new Set(['spec-0'])
-  const options = { specs, required, scores: new Map(), budget: 60 }
-  assert.equal(rankSpecs({ ...options, seconds: () => 1 }).specs.size, 30)
-  const bounded = rankSpecs({ ...options, seconds: (spec) => spec === 'spec-1' ? 90 : 10 })
-  assert.ok(bounded.specs.has('spec-0'))
-  assert.ok(!bounded.specs.has('spec-1'))
-  assert.equal(bounded.specs.size, 7)
 })
 
 const FAKE_SERVER = `export class FakeServer {
@@ -293,5 +129,4 @@ test('a support change outside every part counts as a change to what the file ex
   const text = 'export class Seeds extends Base {\n  grow() {}\n}\nexport function seed() {}\n'
   const reached = reachSpecs({ changed: [{ text, lines: [1] }], corpus: [text], specTexts: new Map([['seeded.spec.ts', 'seed()'], ['other.spec.ts', 'run()']]) })
   assert.deepEqual([...reached.keys()], ['seeded.spec.ts'])
-  assert.equal(driverSpecs({ changed: [{ text, lines: [1] }], driverTexts: [text], specTexts: new Map() }), undefined)
 })

@@ -4,7 +4,7 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed with full sampling and every solver check, full gallery walks, coverage and Mac suites
+//   bun run verify:main --nightly         varied Quint seed with full sampling and every solver check, full gallery walks and Mac suites
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
@@ -27,14 +27,9 @@
 // suite failed. perf and test:feel time the Mac, so they run only with
 // --with-mac, one after the other, each holding the whole machine; the feel
 // contact sheet is copied next to the logs.
-//
-// The nightly desktop suite records coverage (JUNO_COVERAGE=1) and writes the
-// coverage map bun run affected selects specs by to
-// apps/desktop/e2e/coverage-map.json in this checkout; commit it after a
-// run on main (docs/development.md, "Affected tests").
 
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomInt } from 'node:crypto'
@@ -45,7 +40,6 @@ import { assessRecord, isAncestor, readRecords, statusFolder } from './release-g
 import { failureCause, testResults } from './test-results-reporter.mjs'
 import { fullSuites, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
-import { formatMap, MAP_PATH, mergePartials } from './coverage-map.mjs'
 import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
 import { committedInputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
 import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
@@ -227,8 +221,8 @@ if (reach) {
 
 let affected
 if (baseline) {
-  // The graph is deliberately broader than coverage: a repair has no sampling or heavy exclusions.
-  const selected = spawnSync(process.execPath, [join(checkout, 'scripts/affected.mjs'), '--plan', '--json', '--wide', '--graph', '--no-cache', '--range', `${baseline.commit}..${commit}`, ...(local ? ['--local'] : [])], { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, JUNO_TEST_SEED: testSeed } })
+  // A repair plans wide: no sampling or heavy exclusions.
+  const selected = spawnSync(process.execPath, [join(checkout, 'scripts/affected.mjs'), '--plan', '--json', '--wide', '--no-cache', '--range', `${baseline.commit}..${commit}`, ...(local ? ['--local'] : [])], { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, JUNO_TEST_SEED: testSeed } })
   if (selected.status !== 0) throw new Error(`Could not plan repair: ${selected.stderr}`)
   affected = JSON.parse(selected.stdout)
   const repair = repairPlan({ baseline, identity, suites: required, affected: affected.steps })
@@ -258,24 +252,6 @@ let results = (await Promise.all(runs)).flat()
 const readLog = (result) => result.log && existsSync(result.log) ? readFileSync(result.log, 'utf8') : ''
 const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local || suites.length === 0 ? identity : undefined, reused.map((suite) => suite.identity), baseline?.identity)
 
-// The coverage map, from the partials this run's desktop machines brought back
-// (scripts/coverage-map.mjs). A failed test still ran its code, so a failure
-// does not stop the refresh; a spec with no partial is left out of the map and
-// then always runs.
-const coverageRoot = local ? join(checkout, 'apps/desktop/coverage/map') : join(checkout, '.remote')
-const partials = nightly && existsSync(coverageRoot)
-  ? readdirSync(coverageRoot, { recursive: true })
-      .map((name) => join(coverageRoot, String(name)))
-      .filter((path) => /apps\/desktop\/coverage\/map\/partial-[^/]*\.json$/.test(path) && statSync(path).mtimeMs >= planStarted)
-  : []
-let coverageNote = nightly ? 'no coverage partials came back; the coverage map was not refreshed' : 'coverage recording is nightly only'
-if (partials.length > 0) {
-  const map = mergePartials(partials.map((path) => JSON.parse(readFileSync(path, 'utf8'))), commit)
-  map.identity = runtime.identity
-  writeFileSync(join(root, MAP_PATH), formatMap(map))
-  coverageNote = `coverage map refreshed from ${partials.length} partial(s): ${map.specs.length} spec file(s), ${Object.keys(map.files).length} source file(s); commit ${MAP_PATH}`
-}
-console.log(`verify:main: ${coverageNote}`)
 if (withMac && !cancelled) {
   // After the rest, so they do not time a machine the other suites are using.
   for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, local ? localVerifyEnv : {})]
@@ -334,7 +310,7 @@ const summary = {
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
-  coverage: coverageNote, nightly, nightlyReach, seed, testSeed,
+  nightly, nightlyReach, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
   allocation: Object.fromEntries(['DESKTOP', 'UNIT'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
@@ -347,8 +323,6 @@ const markdown = [
   `${commit.slice(0, 10)} ${subject} (${ref}), finished ${summary.finishedAt}.`,
   '',
   `Full plan ran on ${execution.host} (${execution.mode}).`,
-  '',
-  `${coverageNote[0].toUpperCase()}${coverageNote.slice(1)}.`,
   '',
   `Unit test order seed ${testSeed}; \`bun run test --seed ${testSeed}\` repeats it.`,
   '',

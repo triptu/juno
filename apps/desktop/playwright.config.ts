@@ -79,8 +79,6 @@ export default defineConfig<object, { lane: Lane }>({
       },
     },
   ],
-  // e2e/coverage.ts records which source files each spec runs, under JUNO_COVERAGE=1.
-  globalSetup: ['./e2e/coverage.ts'],
   timeout: 30_000,
   expect: { timeout: 5_000 },
   workers: Math.max(electronWorkers, browserWorkers),

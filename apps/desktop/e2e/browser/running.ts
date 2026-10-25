@@ -3,8 +3,7 @@ import type { FakeSlack } from '@juno/fake-slack'
 import type { EngineOptions } from '../../web/host/testHost'
 import { Juno } from '../driver/juno'
 import { webSurface } from '../driver/surface'
-import { coverageDir, type RunningApp } from '../launch'
-import { recordPageCoverage } from './coverage'
+import { type RunningApp } from '../launch'
 import { startSendTrace, startSidebarTrace } from '../traces'
 import type { HostPool } from './host'
 import { snapshotState, type WebSnapshot } from './snapshot'
@@ -28,9 +27,7 @@ export async function startWebApp(
     if (timings) console.log(`e2e timing: ${name} ${Math.round(performance.now() - at)} ms`)
     at = performance.now()
   }
-  const coverage = coverageDir()
-  const finishCoverage = await recordPageCoverage(page, coverage)
-  const host = await pool.start(fake, { userData, ...(coverage === undefined ? {} : { coverage }), aliases: snapshot === undefined ? [] : [snapshot.origin], engine: options.engine })
+  const host = await pool.start(fake, { userData, aliases: snapshot === undefined ? [] : [snapshot.origin], engine: options.engine })
   lap('host')
   try {
     if (options.sidebarTrace) await page.addInitScript(startSidebarTrace)
@@ -52,6 +49,6 @@ export async function startWebApp(
     },
     win: page,
     host,
-    close: async () => { try { await finishCoverage() } finally { await host.stop() } },
+    close: () => host.stop(),
   }
 }

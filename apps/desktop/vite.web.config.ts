@@ -33,7 +33,6 @@ export default defineConfig({
     outDir: resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
     minify: 'oxc',
-    sourcemap: process.env['JUNO_COVERAGE'] === '1' ? 'hidden' : false,
     reportCompressedSize: false,
     rolldownOptions: { input: resolve(__dirname, 'src/renderer/index.html'), output: rendererOutput },
   },

@@ -24,6 +24,6 @@ export function fullSuites(scripts, { nightly = false, noCache = false, seed, te
     { name: 'specs:check', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : []), ...(nightly ? ['--nightly'] : [])] },
     { name: 'specs:conformance', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
     { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },
-    ...apps.map((name) => ({ name, words: [...(nightly ? ['JUNO_COVERAGE=1'] : []), ...skip, name] })),
+    ...apps.map((name) => ({ name, words: [...skip, name] })),
   ]
 }

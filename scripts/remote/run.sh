@@ -68,7 +68,7 @@ if [ -s /out/load.txt ]; then
 fi
 
 reports=()
-for path in specs/traces apps/desktop/coverage/map apps/desktop/test-results apps/desktop/playwright-report apps/desktop/blob-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
+for path in specs/traces apps/desktop/test-results apps/desktop/playwright-report apps/desktop/blob-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
   [ -e "$path" ] && reports+=("$path")
 done
 # The spec cache `bun run remote` brought along, with what this run added to it.

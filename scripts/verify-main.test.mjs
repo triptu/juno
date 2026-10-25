@@ -33,13 +33,9 @@ const fs = require('node:fs');
 const argv = process.argv.slice(2);
 if (argv[0] === '--version' || argv[0] === '--revision') { console.log('1.4.4'); process.exit(0); }
 const [suite, ...args] = argv[0] === 'run' ? argv.slice(1) : argv;
-fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:process.env.JUNO_HEAVY_HELD,skip:process.env.JUNO_SKIP_TAGS,coverage:process.env.JUNO_COVERAGE,workers:process.env.JUNO_E2E_WORKERS})+'\\n');
+fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:process.env.JUNO_HEAVY_HELD,skip:process.env.JUNO_SKIP_TAGS,workers:process.env.JUNO_E2E_WORKERS})+'\\n');
 if (suite === 'install') { fs.writeFileSync('installed', 'yes'); if (!fs.existsSync('node_modules')) fs.symlinkSync(${JSON.stringify(resolve(import.meta.dirname, '../node_modules'))}, 'node_modules', 'dir'); process.exit(0); }
 if (!fs.existsSync('installed')) process.exit(9);
-if (suite === 'test:desktop' && process.env.JUNO_COVERAGE === '1') {
-  fs.mkdirSync('apps/desktop/coverage/map', {recursive:true});
-  fs.writeFileSync('apps/desktop/coverage/map/partial-local.json', JSON.stringify({specs:{'apps/desktop/e2e/app.spec.ts':['apps/desktop/src/main.ts']},bundled:['apps/desktop/src/main.ts']}));
-}
 console.log('fixture '+suite);
 if (process.env.JUNO_VERIFY_POLICY === '1') console.log('juno-test: ' + JSON.stringify({failure: suite === process.env.TEST_FAIL_SUITE}));
 process.exit(suite === process.env.TEST_FAIL_SUITE ? 7 : 0);
@@ -62,7 +58,7 @@ console.error('Connection refused'); process.exit(255);
   return { root, commit, env, invoke, git: fixtureGit }
 }
 
-test('local runs archive eligible records, refresh coverage, and preserve failed suites; an unreachable runner runs nothing', { timeout: 120_000 }, (t) => {
+test('local runs archive eligible records and preserve failed suites; an unreachable runner runs nothing', { timeout: 120_000 }, (t) => {
   const { root, commit, env, invoke } = verificationFixture(t)
   const dry = invoke(['--local', '--dry-run', '--nightly'])
   assert.equal(dry.status, 0, dry.stderr)
@@ -82,13 +78,9 @@ test('local runs archive eligible records, refresh coverage, and preserve failed
     assert.ok(summary.suites.every((s) => s.host === hostname()))
     const calls = readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse)
     const desktop = calls.find((c) => c.suite === 'test:desktop')
-    assert.equal(desktop.coverage, args.includes('--nightly') ? '1' : undefined)
     assert.equal(desktop.skip, '@mac')
     assert.equal(desktop.workers, '1')
     if (args.includes('--nightly')) {
-      const map = JSON.parse(readFileSync(join(root, 'apps/desktop/e2e/coverage-map.json'), 'utf8'))
-      assert.equal(map.commit, commit)
-      assert.deepEqual(map.files, { 'apps/desktop/src/main.ts': [0] })
       // A nightly run reuses no suite from the run before it.
       assert.ok(!summary.suites.find((s) => s.suite === 'specs:conformance').reusedFrom)
       assert.ok(calls.some((c) => c.suite === 'specs:conformance'))
