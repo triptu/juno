@@ -24,9 +24,10 @@ export const DOM_BUILD = resolve(__dirname, 'dist')
  * value (`document`, `setTimeout`, `globalThis`), so a closed page's late
  * callbacks still reach only its own window, and two windows (`otherApp`)
  * run side by side. JavaScript's own globals (`Array`, `Promise`, `Map`)
- * are the realm's, except one a test replaced on the window (the clock's
- * `Date`). A global read by bare name is bound when the page starts: one
- * set on the window later is read as `window.name`.
+ * are the realm's, on the window too, except one a test replaced on the
+ * window (the clock's `Date`). A global the page replaces on the window
+ * later (`window.fetch`) follows (`follow`); one it adds that the window
+ * did not have is read as `window.name`.
  *
  * What the realm itself holds is checked after every page (`checkRealm`).
  */
@@ -63,19 +64,22 @@ function makeRealm(window: Window): Realm {
   const fromWindow = windowGlobals(window)
   const source = readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8')
   const bind = [...fromWindow.map((name, at) => `${name} = $w[${at}]`), ...LANGUAGE_BOUND.map((name, at) => `${name} = $l[${at}]`)].join(', ')
+  const setters = fromWindow.map((name) => `(v) => { ${name} = v }`).join(', ')
   // One line before the bundle, so its stack lines keep the bundle's numbers (`callers`).
-  const script = new Script(`(function ($w, $l) { var ${bind};\n${source}\n})`, { filename: 'renderer.js', lineOffset: -1 })
+  const script = new Script(`(function ($w, $l, $set) { var ${bind}; $set([${setters}]);\n${source}\n})`, { filename: 'renderer.js', lineOffset: -1 })
   const context = createContext({})
-  const run = script.runInContext(context) as (fromWindow: unknown[], language: unknown[]) => void
+  const run = script.runInContext(context) as (fromWindow: unknown[], language: unknown[], set: (setters: ReadonlyArray<(value: unknown) => void>) => void) => void
   const global = runInContext('globalThis', context) as Record<string, unknown>
   const own = Object.fromEntries(LANGUAGE.map((name) => [name, global[name]]))
   const labels = new Map<object, string>([[global, 'globalThis']])
+  // The realm's objects are not `instanceof` this realm's `Object`.
+  const isObject = (value: unknown): value is object => (typeof value === 'object' && value !== null) || typeof value === 'function'
   for (const name of LANGUAGE) {
     const value = own[name]
-    if (!(value instanceof Object) && typeof value !== 'function') continue
-    if (!labels.has(value as object)) labels.set(value as object, name)
+    if (!isObject(value)) continue
+    if (!labels.has(value)) labels.set(value, name)
     const proto = (value as { prototype?: unknown }).prototype
-    if (proto instanceof Object && !labels.has(proto)) labels.set(proto, `${name}.prototype`)
+    if (isObject(proto) && !labels.has(proto)) labels.set(proto, `${name}.prototype`)
   }
   for (const [object, label] of [...labels]) {
     // Prototypes with no global of their own: functions', iterators', generators'.
@@ -85,12 +89,44 @@ function makeRealm(window: Window): Realm {
   return {
     start: (page, language) => {
       const globals = page as unknown as Record<string, unknown>
-      run(fromWindow.map((name) => (name === 'globalThis' ? page : globals[name])), LANGUAGE_BOUND.map((name) => (globals[name] !== language[name] ? globals[name] : own[name])))
+      // `window.Uint8Array` is the bundle's `Uint8Array`, as in a browser (Effect's Schema checks `globalThis.Uint8Array`).
+      for (const name of LANGUAGE) {
+        if (globals[name] !== language[name]) continue
+        const descriptor = Object.getOwnPropertyDescriptor(page, name)
+        Object.defineProperty(page, name, { ...(descriptor ?? { writable: true, configurable: true, enumerable: false }), value: own[name] })
+      }
+      run(fromWindow.map((name) => (name === 'globalThis' ? page : globals[name])), LANGUAGE_BOUND.map((name) => (globals[name] !== language[name] ? globals[name] : own[name])), (setters) => follow(page, fromWindow, setters))
     },
     global,
     pristine: new Map([...labels.keys()].map((object) => [object, Object.getOwnPropertyDescriptors(object)])),
     labels,
   }
+}
+
+/**
+ * Keeps the bundle's variables in step with the window: a global the page
+ * sets on the window after it starts (`urls.ts` replaces `window.fetch`) is
+ * what its bare name reads from then on. Each writable value becomes an
+ * accessor on the window that sets the variable too.
+ */
+function follow(page: Window, names: ReadonlyArray<string>, setters: ReadonlyArray<(value: unknown) => void>): void {
+  names.forEach((name, at) => {
+    if (name === 'globalThis') return
+    let owner: object | null = page
+    while (owner !== null && !Object.hasOwn(owner, name)) owner = Object.getPrototypeOf(owner) as object | null
+    const descriptor = owner === null ? undefined : Object.getOwnPropertyDescriptor(owner, name)
+    if (descriptor === undefined || !('value' in descriptor) || descriptor.writable !== true || (owner === page && descriptor.configurable !== true)) return
+    let value: unknown = descriptor.value
+    Object.defineProperty(page, name, {
+      configurable: true,
+      enumerable: descriptor.enumerable ?? false,
+      get: () => value,
+      set: (next: unknown) => {
+        value = next
+        setters[at]!(next)
+      },
+    })
+  })
 }
 
 /**
