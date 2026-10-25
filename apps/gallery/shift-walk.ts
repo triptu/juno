@@ -1,11 +1,12 @@
 import type { Locator, Page } from '@playwright/test'
 import { expectNoLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
-import { openState, type Route, type walkPages } from './support'
+import { openState, type Route } from './open-state'
 
 /**
  * What the broad shift walk does to one state. A walk record (walk-cache.mjs)
- * keys on this file and what it imports, so a change here walks every state
- * again; the spec's other tests do not.
+ * keys on this file and what it imports (open-state.ts and the guard), so a
+ * change here walks every state again; the spec's other tests and support.ts
+ * do not.
  */
 
 /** Motion is left on: reduced motion collapses transitions, which would hide a shift that only a real transition produces. */
@@ -164,7 +165,7 @@ export interface StateResult {
 }
 
 /** Opens one state, checks the cursor rule, and touches each target every way a person can. */
-export async function walkState(pages: Awaited<ReturnType<typeof walkPages>>, route: Route): Promise<StateResult> {
+export async function walkState(pages: { readonly next: () => Promise<Page> }, route: Route): Promise<StateResult> {
   const failures: string[] = []
   const cursors: string[] = []
   let elements = 0, resets = 0

@@ -151,6 +151,7 @@ test('spec-only tests, scripts and packages outside the gallery do not invalidat
   for (const [file, text] of [
     ['apps/gallery/shift.spec.ts', "test('the guard itself', () => {})"],
     ['apps/gallery/playwright.config.ts', 'export default { workers: 8 }'],
+    ['apps/gallery/src/compositions.tsx', 'export const compositions = {}'],
     ['package.json', JSON.stringify({ name: 'juno', scripts: { test: 'bun test --randomize' } })],
     ['bun.lock', lock({ vite: '7.0.0', electron: '31.0.0' })],
   ]) {

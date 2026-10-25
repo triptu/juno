@@ -39,7 +39,8 @@ export function sourceKeys(root, kind) {
     ...registries,
   ])
   for (const file of files) {
-    if (/^apps\/gallery\/(src|public)\//.test(file) || /^packages\/tokens\/src\/.*\.(css|woff2?|ttf|otf)$/.test(file)
+    // Compositions and test fixtures register states of their own, which key on all source.
+    if (/^apps\/gallery\/(src|public)\/(?!(compositions|testFixtures)\.)/.test(file) || /^packages\/tokens\/src\/.*\.(css|woff2?|ttf|otf)$/.test(file)
       || /^packages\/(ui|views|huddle-views)\/.*\.(css|woff2?|ttf|otf|svg|png|jpg|webp)$/.test(file)) shared.add(file)
   }
   for (const file of ['apps/gallery/vite.config.ts', walk]) {

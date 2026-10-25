@@ -731,10 +731,10 @@ Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShi
 
 The broad shift and focus-ring walks cache each successful state. A key holds only what can move that state's boxes:
 
-- the state and its fixture's transitive workspace imports, and the gallery shell, its styles, assets and bundled fonts;
+- the state and its fixture's transitive workspace imports, and the gallery shell (the registry, frame and theme code, not `compositions.tsx` or `testFixtures.tsx`), its styles, assets and bundled fonts;
 - the values of the design tokens those files read, in every theme, and of the tokens those values read. Tokens whose every value is a colour or a box shadow are left out: such a value is valid only where it paints, so it cannot move a box. A file that indexes a token group with a variable (`text[role]`) reads the whole group. The rest of the two token files (imports, constants, the theme lists) counts for every state; comments do not;
 - stylesheets without comments and paint-only declarations (`color`, `background-*`, `box-shadow`, `opacity` and the like);
-- the walk itself: `apps/gallery/shift-walk.ts` or `focus-ring.spec.ts` and what they import, which includes `support.ts` and the guard in `packages/testing`. The rest of `shift.spec.ts` (delayed loads, the guard's self-tests), the Playwright config and other specs do not count;
+- the walk itself: `apps/gallery/shift-walk.ts` or `focus-ring.spec.ts` and what they import, which includes `open-state.ts` (how a state is opened and when it is ready) and the guard in `packages/testing`. The rest of `shift.spec.ts` (delayed loads, the guard's self-tests), the queue and page recycling in `support.ts`, the Playwright config and other specs do not count for the shift walk;
 - the locked versions of the packages those files import and the gallery builds with, and what those depend on, and the manifest fields that decide how imports resolve. Scripts, other workspaces' dependencies and an unrelated lockfile change do not count;
 - the actual Playwright/Chromium version, OS release, architecture and browser options.
 
