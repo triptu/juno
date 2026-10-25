@@ -4,7 +4,7 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed, full gallery walks, coverage and Mac suites
+//   bun run verify:main --nightly         varied Quint seed with full sampling and every solver check, full gallery walks, coverage and Mac suites
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
