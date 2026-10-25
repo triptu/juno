@@ -1,7 +1,7 @@
 /**
  * The React Compiler pass (performance.md 5.4), as a Vite plugin with a
- * per-file cache. It runs the same Babel transform that `@vitejs/plugin-react`
- * 5 runs in a production build, so the output is the same, and it stores each
+ * per-file cache. It runs the Babel transform that `@vitejs/plugin-react` 5
+ * ran in a production build (version 6 runs no Babel), and it stores each
  * result under a hash of the file's path and source, the compiler's options,
  * the build mode and `bun.lock`, which pins Babel and the compiler. The compiler looks at one file at a time,
  * so a file whose source did not change gets the stored result. The pass was
@@ -89,7 +89,7 @@ export function reactCompiler(repoRoot: string, reportSkipped: boolean): Plugin 
         const parserPlugins: Array<'jsx' | 'typescript'> = []
         if (!file.endsWith('.ts')) parserPlugins.push('jsx')
         if (/\.tsx?$/.test(file)) parserPlugins.push('typescript')
-        // The options @vitejs/plugin-react 5 passes in a production build.
+        // The options @vitejs/plugin-react 5 passed in a production build.
         const result = await transformAsync(code, {
           babelrc: false,
           configFile: false,

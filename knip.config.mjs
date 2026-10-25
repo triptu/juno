@@ -38,6 +38,9 @@ export default {
         'e2e/timings.ts', // Loaded only when JUNO_E2E_TIMINGS enables the reporter.
         'src/main/index.ts',
         'src/engine/index.ts',
+        // Knip's Vite plugin reads rollupOptions.input, which Vite 8 calls rolldownOptions.
+        'src/agent/index.ts',
+        'src/agent/codemode-worker.ts',
         'src/preload/index.ts',
         'src/renderer/index.html',
         // The web shell (`bun run web`): its host and the page entry it serves.

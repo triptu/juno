@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import type { PluginOption, Plugin } from 'vite'
+import { parseSync, Visitor, type ESTree, type PluginOption, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import stylex from '@stylexjs/unplugin'
 import { reactCompiler } from './react-compiler.vite'
@@ -67,6 +67,94 @@ function phosphorWeights(repoRoot: string): Plugin {
 }
 
 /**
+ * The renderer's output chunks: everything the first screen imports in one
+ * file, as Rollup made it. On its own, Rolldown puts each module the first
+ * screen shares with a lazy chunk in a chunk of its own, and the first screen
+ * loaded 65 files (10-25). `$initial` is every module the entry reaches by
+ * static imports, before tree shaking: a lazy-only module that a first-screen
+ * module imports, even for code nobody calls at start, lands in this file
+ * (performance.md 2.4).
+ */
+export const rendererOutput = { codeSplitting: { groups: [{ name: 'index', tags: ['$initial' as const] }] } }
+
+const tokensModule = /\/packages\/tokens\/src\/tokens\.stylex\.ts$/
+
+/** The names a pattern (a declaration, a parameter) binds. */
+function boundNames(pattern: ESTree.Node | null | undefined, into: Set<string>): void {
+  if (pattern == null) return
+  if (pattern.type === 'Identifier') into.add(pattern.name)
+  else if (pattern.type === 'ObjectPattern') for (const property of pattern.properties) boundNames(property.type === 'RestElement' ? property.argument : property.value, into)
+  else if (pattern.type === 'ArrayPattern') for (const element of pattern.elements) boundNames(element, into)
+  else if (pattern.type === 'RestElement') boundNames(pattern.argument, into)
+  else if (pattern.type === 'AssignmentPattern') boundNames(pattern.left, into)
+}
+
+/**
+ * Replaces each read of one token, `colors['--background-subtle']`, with the
+ * value StyleX compiles it to, `'var(--background-subtle)'`, after StyleX has
+ * run. Rollup dropped the keys of a token group nobody read; Rolldown keeps
+ * every group a chunk imports whole, 21 KB of the first screen (10-25). The
+ * tokens module itself is checked, so a token whose value is not
+ * `var(<its key>)` fails the build. A file that declares a name of its own
+ * equal to an imported token group is left as it is.
+ */
+function inlineTokenReads(): Plugin {
+  return {
+    name: 'juno:inline-token-reads',
+    apply: 'build',
+    enforce: 'post',
+    transform(code, id) {
+      const [file = id] = id.split('?')
+      if (tokensModule.test(file)) {
+        for (const match of code.matchAll(/["'](--[\w-]+)["']\s*:\s*["'`]([^"'`]*)["'`]/g)) {
+          if (match[2] !== `var(${match[1]})`) this.error(`juno:inline-token-reads: ${match[1]} compiles to ${match[2]}, not var(${match[1]})`)
+        }
+        return undefined
+      }
+      if (!/\.[cm]?[jt]sx?$/.test(file) || file.includes('/node_modules/') || !code.includes('tokens.stylex')) return undefined
+      const { program } = parseSync(file, code)
+      const groups = new Set<string>()
+      for (const node of program.body) {
+        if (node.type !== 'ImportDeclaration' || !/(?:^|\/)tokens\.stylex(?:\.ts)?$/.test(node.source.value)) continue
+        for (const specifier of node.specifiers) if (specifier.type === 'ImportSpecifier') groups.add(specifier.local.name)
+      }
+      if (groups.size === 0) return undefined
+      const reads: Array<{ readonly group: string; readonly start: number; readonly end: number; readonly value: string }> = []
+      const declared = new Set<string>()
+      const functionLike = (node: { readonly id?: ESTree.Node | null; readonly params: ReadonlyArray<ESTree.Node> }) => {
+        boundNames(node.id, declared)
+        for (const param of node.params) boundNames(param, declared)
+      }
+      new Visitor({
+        VariableDeclarator: (node) => boundNames(node.id, declared),
+        FunctionDeclaration: functionLike,
+        FunctionExpression: functionLike,
+        ArrowFunctionExpression: functionLike,
+        ClassDeclaration: (node) => boundNames(node.id, declared),
+        ClassExpression: (node) => boundNames(node.id, declared),
+        CatchClause: (node) => boundNames(node.param, declared),
+        MemberExpression: (node) => {
+          if (!node.computed || node.object.type !== 'Identifier' || !groups.has(node.object.name)) return
+          const key = node.property
+          if (key.type !== 'Literal' || typeof key.value !== 'string' || !key.value.startsWith('--')) return
+          reads.push({ group: node.object.name, start: node.start, end: node.end, value: JSON.stringify(`var(${key.value})`) })
+        },
+      }).visit(program)
+      const kept = reads.filter((read) => !declared.has(read.group))
+      if (kept.length === 0) return undefined
+      let out = ''
+      let at = 0
+      // The visitor walks in source order, so the reads are in order.
+      for (const read of kept) {
+        out += code.slice(at, read.start) + read.value
+        at = read.end
+      }
+      return { code: out + code.slice(at), map: null }
+    },
+  }
+}
+
+/**
  * `repoRoot` is the monorepo root: StyleX hashes class names relative to it
  * and needs it to resolve the workspace token package, no matter which
  * directory the build is started from. `minify` minifies the StyleX sheet,
@@ -77,6 +165,7 @@ function phosphorWeights(repoRoot: string): Plugin {
 export function rendererPlugins(options: { readonly repoRoot: string; readonly minify: boolean; readonly reportSkipped?: boolean; readonly cssLayers?: boolean }): PluginOption[] {
   return [
     phosphorWeights(options.repoRoot),
+    inlineTokenReads(),
     stylex.vite({
       // The DOM lane's bundle (dom/vite.config.ts) turns them off: happy-dom's cascade skips rules inside @layer.
       useCSSLayers: options.cssLayers !== false,
