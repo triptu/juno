@@ -12,10 +12,6 @@ import { DatabaseSync } from 'node:sqlite'
 import { expect, syncedTest, test } from './fixtures'
 import { hoursRows, type HoursRowName, type Juno } from './driver/juno'
 import { readUserDb } from './driver/userDb'
-import { test as agentTest } from './juno-agent/chat'
-import { agentReady } from './juno-agent/agent'
-
-const standingByTest = agentTest.extend({ synced: true })
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -33,20 +29,6 @@ const rowOf = (day: number): HoursRowName => (day === 6 ? 'Saturday' : day === 0
 /** How Juno decided a message, from its log. */
 const outcomeOf = (userData: string, teamId: string, preview: string) =>
   readUserDb(userData, teamId, (db) => db.prepare('SELECT outcome, reason FROM notification_log WHERE preview = ?').get(preview))
-
-standingByTest('outside notification hours a DM is held with its reason and shows no notification', async ({ juno, slack, model, userData, fake }) => {
-  await agentReady(juno.surface)
-  await juno.notificationHoursNow({ outside: true })
-  // The two sets of hours are separate: Active in Slack keeps its weekends off.
-  await juno.notifications.expectRow('Active in Slack', 'Saturday', 'off')
-  await juno.notifications.expectRow('Active in Slack', 'Sunday', 'off')
-  await juno.blurWindow()
-  const held = 'Can you approve the release now?'
-  slack.as('Maya').dm(held)
-  await expect.poll(() => outcomeOf(userData, fake.teamId, held)).toMatchObject({ outcome: 'stay', reason: expect.stringContaining('Outside your notification hours.') })
-  expect(await juno.osNotifications()).toHaveLength(0)
-  expect(model.inputs()).toHaveLength(0)
-})
 
 syncedTest('hours saved by an older version still load; Saturday reaches Slack as a custom day, Weekdays sets all five, today\'s row decides, and the Active in Slack rows set presence', async ({ fake, slack, userData, relaunch }) => {
   // As an older version saved them: Monday to Thursday, one from and to.

@@ -86,13 +86,18 @@ itEffect('a reading that takes 2 s times out: a mention and a DM notify, the res
   expect(yield* sql`SELECT outcome FROM notification_log WHERE ts = '4.000001'`).toEqual([{ outcome: 'stay' }])
 }).pipe(Effect.provide(Layer.merge(freshStore, Layer.succeed(AiProvider, { ...fakeProvider, decide: () => Effect.never })))))
 
-itEffect('messages held outside the hours stay held at the hours start and after a start missed while closed', () => Effect.gen(function* () {
+itEffect('messages held outside the hours are not read, and stay held at the hours start and after a start missed while closed', () => Effect.gen(function* () {
   yield* TestClock.setTime(monday(8))
   yield* setSettings()
+  let readings = 0
+  const counting = { ...fakeProvider, decide: (...args: Parameters<typeof fakeProvider.decide>) => Effect.suspend(() => (readings++, fakeProvider.decide(...args))) }
   const record = recorder()
-  const service = yield* makeNotifications(record.notifier, () => Effect.succeed(true))
+  const service = yield* makeNotifications(record.notifier, () => Effect.succeed(true)).pipe(Effect.provideService(AiProvider, counting))
   yield* service.receive(candidate('1.000001'))
   yield* service.receive(candidate('2.000001'))
+  const sql = yield* StoreWriter
+  expect(yield* sql`SELECT outcome, decided_by FROM notification_log ORDER BY ts`).toEqual([{ outcome: 'stay', decided_by: 'hours' }, { outcome: 'stay', decided_by: 'hours' }])
+  expect(readings).toBe(0)
   yield* service.tick
   yield* TestClock.setTime(monday(9))
   yield* service.tick
