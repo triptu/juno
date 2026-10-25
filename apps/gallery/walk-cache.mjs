@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ImportGraph } from '../../scripts/import-graph.mjs'
+import { lockedPackages } from '../../scripts/locked-packages.mjs'
 import { layoutCss, layoutTokens, tokenFiles } from './layout-tokens.mjs'
 
 const ignored = new Set(['node_modules', '.git', 'dist', 'out', 'test-results', 'playwright-report', 'shots', 'coverage'])
@@ -33,7 +34,7 @@ export function sourceKeys(root, kind) {
   const walk = kind === 'shift' ? 'apps/gallery/shift-walk.ts' : 'apps/gallery/focus-ring.spec.ts'
   const shared = new Set([
     'bunfig.toml', 'tsconfig.base.json',
-    'scripts/import-graph.mjs', 'scripts/build-cached.mjs',
+    'scripts/import-graph.mjs', 'scripts/locked-packages.mjs', 'scripts/build-cached.mjs', 'scripts/build-inputs.mjs',
     'apps/gallery/index.html', 'apps/gallery/vite.config.ts',
     'apps/gallery/walk-cache.mjs', 'apps/gallery/layout-tokens.mjs',
     ...registries,
@@ -144,33 +145,6 @@ const packageFields = ['name', 'type', 'exports', 'imports', 'main', 'module', '
 const rootFields = ['workspaces', 'packageManager', 'packageExtensions', 'overrides', 'resolutions', 'patchedDependencies', 'trustedDependencies']
 const pick = (entry, fields) => Object.fromEntries(fields.filter(field => field in entry).map(field => [field, entry[field]]))
 const manifest = (root, file) => existsSync(join(root, file)) ? JSON.parse(readFileSync(join(root, file), 'utf8')) : null
-
-/**
- * The locked versions of the packages the reached files import and the
- * gallery builds with, and of what those depend on: `[importer, name]` pairs.
- * Other workspaces' packages and tools do not count. An unreadable lockfile
- * counts whole.
- */
-function lockedPackages(root, roots) {
-  const text = existsSync(join(root, 'bun.lock')) ? readFileSync(join(root, 'bun.lock'), 'utf8') : ''
-  let lock
-  try { lock = JSON.parse(text.replace(/,(\s*[}\]])/g, '$1')) } catch { return digest(text) }
-  const { packages = {}, workspaces: _workspaces, ...settings } = lock
-  const picked = new Map()
-  const names = key => key.split('/').reduce((list, part) => list.at(-1)?.startsWith('@') && !list.at(-1).includes('/') ? [...list.slice(0, -1), `${list.at(-1)}/${part}`] : [...list, part], [])
-  const visit = (parent, name) => {
-    // Bun keys a nested copy under its dependent: `parent/name`, then each ancestor.
-    const chain = names(parent)
-    const key = Array.from({ length: chain.length + 1 }, (_, index) => [...chain.slice(0, chain.length - index), name].join('/')).find(candidate => packages[candidate])
-    if (key === undefined || picked.has(key)) return
-    picked.set(key, packages[key])
-    const info = packages[key][2]
-    if (typeof info !== 'object' || info === null) return
-    for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) for (const next of Object.keys(info[field] ?? {})) visit(key, next)
-  }
-  for (const [importer, name] of roots) visit(importer, name)
-  return digest(JSON.stringify([settings, [...picked].toSorted(([a], [b]) => a < b ? -1 : 1)]))
-}
 
 /** Immutable successful state records beside the shared build/results caches. */
 export function walkCache({ root, kind, runtime, directory, all = false }) {
