@@ -12,9 +12,8 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { parseSync, Visitor, type ESTree, type PluginOption, type Plugin } from 'vite'
-import react from '@vitejs/plugin-react'
 import stylex from '@stylexjs/unplugin'
-import { reactCompiler } from './react-compiler.vite'
+import { reactWithCompiler } from './react-compiler.vite'
 
 // The icon weights Juno draws: `IconWeight` in packages/ui/src/Icon.tsx. Keep the two lists the same.
 const ICON_WEIGHTS = new Set(['regular', 'bold', 'fill'])
@@ -174,7 +173,6 @@ export function rendererPlugins(options: { readonly repoRoot: string; readonly m
     }),
     // The React Compiler memoizes components and hooks at build time (react-compiler.vite.ts), on the
     // workspace packages' source too. A component it cannot compile is left as written; the build prints which one and why.
-    reactCompiler(options.repoRoot, options.reportSkipped !== false),
-    react(),
+    ...reactWithCompiler(options.repoRoot, options.reportSkipped !== false),
   ]
 }

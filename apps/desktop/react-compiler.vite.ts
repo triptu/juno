@@ -19,7 +19,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { transformAsync } from '@babel/core'
 import reactCompilerPlugin from 'babel-plugin-react-compiler'
-import type { Plugin, Rollup } from 'vite'
+import react from '@vitejs/plugin-react'
+import type { Plugin, PluginOption, Rollup } from 'vite'
 
 const include = /\.[tj]sx?$/
 const exclude = /\/node_modules\//
@@ -128,6 +129,39 @@ export function reactCompiler(repoRoot: string, reportSkipped: boolean): Plugin 
       }
       if (reportSkipped) for (const reason of entry.skipped) console.warn(`react-compiler: skipped a function in ${id}: ${reason}`)
       return { code: entry.code, map: entry.map as Rollup.SourceMapInput }
+    },
+  }
+}
+
+/**
+ * React with the React Compiler. By default `@vitejs/plugin-react` runs Oxc's Rust port of the
+ * compiler (`oxc-transform-react`), which also turns JSX into calls, with no Babel.
+ * `JUNO_REACT_COMPILER=babel` runs the cached Babel pass above instead, for comparison.
+ * `JUNO_REACT_COMPILER_PROBE=<file>` writes each module's memo cache sizes (`_c(n)`) there.
+ */
+export function reactWithCompiler(repoRoot: string, reportSkipped: boolean): PluginOption[] {
+  const plugins: PluginOption[] =
+    process.env['JUNO_REACT_COMPILER'] === 'babel'
+      ? [reactCompiler(repoRoot, reportSkipped), react()]
+      : [react({ compiler: { ...options, logDiagnostics: reportSkipped } })]
+  const probe = process.env['JUNO_REACT_COMPILER_PROBE']
+  if (probe !== undefined) plugins.push(compilerProbe(probe))
+  return plugins
+}
+
+function compilerProbe(path: string): Plugin {
+  const sites = new Map<string, number[]>()
+  return {
+    name: 'juno:react-compiler-probe',
+    enforce: 'pre',
+    transform(code, id) {
+      if (exclude.test(id) || !include.test(id.split('?')[0] ?? id)) return undefined
+      const found = Array.from(code.matchAll(/\b_c\d*\((\d+)\)/g), (match) => Number(match[1]))
+      if (found.length > 0) sites.set(id, found)
+      return undefined
+    },
+    buildEnd() {
+      writeFileSync(path, JSON.stringify(Object.fromEntries([...sites].sort(([a], [b]) => a.localeCompare(b))), null, 1))
     },
   }
 }
