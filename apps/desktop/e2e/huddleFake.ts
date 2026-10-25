@@ -36,7 +36,6 @@ export const connection = (win: Page) => win.evaluate(() => (window as unknown a
 export const localMuted = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.muted)
 export const attendee = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.attendeeId ?? null)
 export const addRemote = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.addRemote({ userId: id }), userId)
-export const played = (win: Page) => win.evaluate(() => [...(window as unknown as MediaWindow).__junoHuddleMedia.played])
 export const microphoneAccess = (win: Page, access: string) => win.evaluate((given) => (window as unknown as MediaWindow).__junoHuddleMedia.setMicrophoneAccess(given), access)
 export const startShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.startShare(id), userId)
 export const stopShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.stopShare(id), userId)
@@ -50,7 +49,6 @@ export const playing = (video: Locator) =>
     await new Promise((resolve) => setTimeout(resolve, 300))
     return frames() > before
   })
-export const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
 export async function openEngMain(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
