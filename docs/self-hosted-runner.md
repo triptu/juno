@@ -63,7 +63,7 @@ At four allocated threads, units run four `bun test` processes, standalone deskt
 and a job of only the gallery uses five (four per three threads). Quint uses one simulation per two threads and
 one Apalache checker per four, at least one each. Explicit worker settings win.
 
-`test:plan` groups unit, gallery, desktop and specs steps into separate jobs.
+`test:plan` groups unit (with the spec checks), gallery and desktop steps into separate jobs.
 Conformance belongs to specs. Gallery and desktop overlap within the existing
 lent allocation and restore their own verified persistent builds. Each job has
 its own workspace, install, results and independently released core set.

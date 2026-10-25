@@ -11,13 +11,15 @@ import { prefsSet, readsCatchUp, readsMarkRead, readsMarkUnread, type TopicRow, 
 import { mirrorReadsAtom, readCatchUpAtom, runCommand, type TopicListFilter } from '@juno/state'
 import { waitFor, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine as boot, quiet, readDb, restart, threadId, tsOf, valueOf } from './scenario'
+import { syncedEngine } from './synced'
 
 const engines: Array<RunningEngine> = []
 afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 
-const bootedEngine = () => boot(engines)
+/** Tests start warm on the synced default workspace; only the one about a boot itself starts cold. */
+const bootedEngine = () => syncedEngine(engines)
 
 const ALERTS = 'C0ALERTSPROD'
 const ALERTS_MAIN = `m:${ALERTS}`
@@ -135,7 +137,7 @@ describe('the outbox', () => {
   it('five marks coalesce over the production 400 ms window [TestClock]', async () => {
     const time = await controlledClock()
     const windowMillis = productionTiming.markDelayMillis
-    const engine = await boot(engines, { clock: time.clock, timing: { markDelayMillis: windowMillis } })
+    const engine = await syncedEngine(engines, { clock: time.clock, timing: { markDelayMillis: windowMillis } })
     try {
       await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9, 'nine unread')
       engine.fake.resetCalls()
@@ -275,7 +277,7 @@ describe('the mirror setting', () => {
 
 describe('nothing marks by itself', () => {
   it('a boot, live messages and a reconnect send no mark', async () => {
-    const engine = await bootedEngine()
+    const engine = await boot(engines)
     engine.fake.injectMessage({ channel: ALERTS, user: 'U0GRAFANA', text: '[FIRING] cpu 90% on api-1' })
     await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 10, 'ten unread')
     const reconnected = engine.nextSync()

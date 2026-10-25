@@ -18,7 +18,8 @@ import { agentWritesApprove, messagesRetry, prefsSet, parseSearchQuery, type Sea
 import { runCommand, topicAtom, searchSnapshots } from '@juno/state'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
-import { bootedEngine, slackWrites } from './scenario'
+import { slackWrites } from './scenario'
+import { syncedEngine } from './synced'
 
 const CHANNEL = 'C0ENG'
 const engines: Array<RunningEngine> = []
@@ -96,7 +97,7 @@ async function startRealAgent(transport: ReturnType<typeof memoryTransport>, age
 
 async function hostWithAgent(writes: 'enabled' | 'disabled') {
   const transport = memoryTransport()
-  const engine = await bootedEngine(engines, { agent: { transport, writes } })
+  const engine = await syncedEngine(engines, { agent: { transport, writes } })
   const agent = await connectAgent(transport)
   const account = (await presence(agent.client))!.accountId!
   return { engine, transport, agent, account }

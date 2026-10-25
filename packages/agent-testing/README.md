@@ -101,7 +101,7 @@ The host's action RPCs as the agent's `ActionHost` takes them (`openTurns({ acti
 
 The contract with the agent: at each point, the agent checks `JUNO_AGENT_CRASH_AT` (`point` or `point:n` for the nth hit) and, if it names this point, kills itself with SIGKILL. The points and `crashPoint(point)` belong to the agent (`@juno/agent/crash`, in `packages/agent/src/runtime/crash.ts`); this package re-exports them for test programs.
 
-- `runAgent({ args, env?, crashAt? })` runs a program and returns its exit, signal and output. `crashAt(point, options)` also requires the SIGKILL, and otherwise fails with the spec transition the point stands for.
+- `runAgent({ args, env?, crashAt? })` runs a program and returns its exit, signal and output. `crashAt(point, options)` also requires the SIGKILL, and otherwise fails with the spec transition the point stands for. Under Bun, a `.ts` program is bundled once per test process (into `juno-cache/agent-programs` in the system temp folder) and each run starts the bundle, which cuts a start from about 0.5–0.9 s to about a third.
 - `snapshotFiles(dir)` copies the agent directory. Taken right after a crash at a point, it is the state at that commit boundary. `restore(only?)` puts it back over a later state and deletes matching files written since: power loss, or with `journalFiles` a journal restored behind the archive (spec `rollback`). `agentDatabaseFiles` selects `agent.sqlite` and its siblings.
 
 ## Must not
