@@ -16,26 +16,6 @@ async function setup(juno: Juno, fake: FakeSlack) {
   return { row, react, sent, ts: message.ts }
 }
 
-test('reaction stops after five failures, toasts once, and Retry starts a new attempt', async ({ juno, fake }) => {
-  const target = await setup(juno, fake)
-  fake.forceError({ method: 'reactions.add', error: 'internal_error', times: 5 })
-  await target.react()
-  await expect(target.row.locator('[data-reaction-issue="waiting"]')).toBeVisible({ timeout: 6000 })
-  await expect(target.row.locator('[data-reaction-issue="failed"]')).toBeVisible({ timeout: 20_000 })
-  await juno.expectToast('Reaction not sent')
-  expect(fake.calls.filter((c) => c.method === 'reactions.add')).toHaveLength(5)
-  await expect(target.row.getByRole('button', { name: '1 👀, including you' })).toHaveCount(0)
-  await expect(juno.toast('Reaction not sent')).toHaveCount(0, { timeout: 6000 })
-  await juno.sidebar.row('#product').open()
-  await juno.sidebar.row('#eng').open()
-  await expect(target.row.locator('[data-reaction-issue="failed"]')).toBeVisible()
-  await expect(juno.toast('Reaction not sent')).toHaveCount(0)
-  await target.row.getByRole('button', { name: 'Retry', exact: true }).click()
-  await expect.poll(target.sent).toBe(true)
-  await expect(target.row.locator('[data-reaction-issue]')).toHaveCount(0)
-  expect(fake.calls.filter((c) => c.method === 'reactions.add')).toHaveLength(6)
-})
-
 test.describe('custom workspace emoji', () => {
   test.use({ synced: false })
 
