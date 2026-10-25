@@ -122,8 +122,14 @@ const minify = process.env['JUNO_UNMINIFIED'] === '1' ? false : ('esbuild' as co
 // source files (docs/development.md, "Affected tests").
 const sourcemap = process.env['JUNO_COVERAGE'] === '1' ? ('hidden' as const) : false
 
+// scripts/build-desktop.mjs builds main and preload in one process and the
+// renderer in another, at the same time; JUNO_ELECTRON_TARGETS names the
+// targets this process builds. Unset, it builds all three.
+const targets = process.env['JUNO_ELECTRON_TARGETS']?.split(',')
+const only = <T>(name: string, config: T): T | undefined => (targets === undefined || targets.includes(name) ? config : undefined)
+
 export default defineConfig({
-  main: {
+  main: only('main', {
     plugins: [externalize, runtimeImports(), codemodeFiles()],
     // `ws` loads the optional native `bufferutil` in a try. Bundled, that require
     // becomes an empty stub, so masking a frame of 48 bytes or more threw
@@ -143,16 +149,16 @@ export default defineConfig({
         },
       },
     },
-  },
-  preload: {
+  }),
+  preload: only('preload', {
     plugins: [externalize, runtimeImports()],
     build: {
       minify,
       sourcemap,
       rollupOptions: { input: resolve(__dirname, 'src/preload/index.ts') },
     },
-  },
-  renderer: {
+  }),
+  renderer: only('renderer', {
     root: resolve(__dirname, 'src/renderer'),
     build: {
       minify,
@@ -164,5 +170,5 @@ export default defineConfig({
       preloadFonts([/figtree-latin-wght-normal-[^/]*\.woff2$/, /instrument-serif-latin-400-normal-[^/]*\.woff2$/]),
       ...rendererPlugins({ repoRoot, minify: minify !== false }),
     ],
-  },
+  }),
 })

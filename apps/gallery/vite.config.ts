@@ -2,6 +2,9 @@ import { resolve } from 'node:path'
 import stylex from '@stylexjs/unplugin'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
+// The React Compiler pass the desktop renderer uses, with its per-file cache,
+// so the gallery renders the same compiled components the app does.
+import { reactCompiler } from '../desktop/react-compiler.vite'
 
 // The monorepo root, so StyleX resolves the workspace token package the same
 // way the desktop renderer does (see apps/desktop/electron.vite.config.ts).
@@ -19,20 +22,6 @@ function pendingImage(): Plugin {
   }
   return { name: 'gallery-pending-image', configureServer: hold, configurePreviewServer: hold }
 }
-
-// The React Compiler, as in the desktop renderer (apps/desktop/electron.vite.config.ts),
-// so the gallery renders the same compiled components the app does.
-const reactCompiler = [
-  'babel-plugin-react-compiler',
-  {
-    target: '19',
-    logger: {
-      logEvent(filename: string | null, event: { kind: string; detail?: { reason?: string } }) {
-        if (event.kind === 'CompileError' || event.kind === 'PipelineError') console.warn(`react-compiler: skipped a function in ${filename}: ${event.detail?.reason ?? event.kind}`)
-      },
-    },
-  },
-] as const
 
 export default defineConfig({
   root: __dirname,
@@ -52,6 +41,7 @@ export default defineConfig({
       lightningcssOptions: { minify: true },
       unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
     }),
-    react({ babel: { plugins: [reactCompiler] } }),
+    reactCompiler(repoRoot, true),
+    react(),
   ],
 })
