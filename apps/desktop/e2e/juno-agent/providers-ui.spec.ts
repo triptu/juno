@@ -1,9 +1,7 @@
-// Setting up a model provider as a first-time user does (SPEC 13.10): "Set up Juno" right
-// after the first Slack sign-in, or Skip for now and later "Juno needs a model", the provider
-// section of Settings › Juno, then the chat. These stay in the browser: the page offers Set up
-// Juno from the provider state it has when the import is clicked, and the DOM driver clicks
-// before that state arrives. An endpoint with a typed model id is in the DOM lane
-// (`dom/juno-agent/providers-ui.test.ts`).
+// Setting up a model provider as a first-time user does (SPEC 13.10): Skip for now on "Set up
+// Juno" after the first Slack sign-in, later "Juno needs a model", the provider section of
+// Settings › Juno, then the chat. Set up Juno itself and an endpoint with a typed model id are in
+// the DOM lane (`dom/juno-agent/providers-ui.test.ts`).
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
 import { expect, hooks, test as base } from '../fixtures'
@@ -74,28 +72,4 @@ test('after Skip for now the tab and the panel say Juno needs a model, and Add a
   await chat.expectJuno('You said: what is on today?')
   expect(model.requests.at(-1)?.key).toBe(KEY)
   expect(model.requests.filter((request) => !request.model.includes('haiku')).at(-1)?.model).toBe('anthropic/claude-opus-5.5')
-})
-
-test('after sign-in, Set up Juno takes an OpenRouter key and the default model, and the first chat is answered', async ({ juno, model }) => {
-  await juno.signIn({ skipSetUp: false })
-  const { setUp } = juno
-  await expect(setUp.getByRole('heading', { name: 'Set up Juno' })).toBeVisible({ timeout: 15_000 })
-  // Codex is not installed under tests, so two choices.
-  await expect(setUp.getByRole('radio')).toHaveText(['OpenRouter', 'OpenAI-compatible'])
-  await expect(setUp.getByRole('button', { name: 'Continue' })).toBeDisabled()
-  await setUp.getByLabel('API key').fill(KEY)
-  await setUp.getByLabel('API key').press('Enter')
-  // Saved: the agent starts, and the model row offers its models with Sonnet chosen.
-  const select = setUp.locator('[data-set-up-model]').getByRole('combobox', { name: 'Model' })
-  await expect(select).toBeVisible({ timeout: 20_000 })
-  await expect(select.locator('option:checked')).toHaveText(/^Claude Sonnet/)
-  await setUp.getByRole('button', { name: 'Continue' }).click()
-
-  // The app, with Juno ready on the key just saved.
-  await juno.waitForSync()
-  await junoNav(juno).click()
-  const chat = JunoChatPane.tab(juno.win)
-  await chat.send('what is on today?')
-  await chat.expectJuno('You said: what is on today?')
-  expect(model.requests.at(-1)?.key).toBe(KEY)
 })
