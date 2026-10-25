@@ -45,6 +45,7 @@ export default {
         'web/page/main.ts',
         // The DOM lane's bun test files (scripts/dom-tests.mjs).
         'dom/**/*.test.ts',
+        'dom/profile.ts', // Preloaded only with JUNO_DOM_PROFILE=1.
       ],
       project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'dom/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', 'web/**/*.ts', '*.config.ts', '*.vite.ts'],
       playwright: { config: ['playwright*.config.ts'] },
