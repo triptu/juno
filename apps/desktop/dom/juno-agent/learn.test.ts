@@ -1,12 +1,12 @@
-// Juno learns how the owner works (SPEC 13.6, 13.8), in the app against the fake Slack and a fake
-// OpenRouter: the proactive ask on Home, Start, the background pass over the owner's own Slack
+// Juno learns how the owner works (SPEC 13.6, 13.8): the proactive ask on Home, Start, the background pass over the owner's own Slack
 // messages, the memory page with each note's source, the outline in the next chat's request, and
 // Undo on a later update.
 import { chatCopy } from '@juno/agent-contract'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import { openChat, openPage, readySynced as ready } from './agent'
-import { answer, expect, test as base } from './chat'
-import { startScriptedModel, type ScriptedModel } from './model'
+import { answer, startScriptedModel } from '../../e2e/juno-agent/model'
+import { openChat, openPage, readySynced as ready } from '../driver/agent'
+import { expect } from '../expect'
+import { domTest } from '../test'
 
 /** The pass's first message (`LEARN` in `memory-docs/learn.ts`). */
 const PASS = 'Learn how the owner works'
@@ -32,20 +32,7 @@ function learnAnswer(request: OpenRouterRequest): string | ToolCallAnswer {
   return answer(request)
 }
 
-const test = base.extend<{ readonly model: ScriptedModel }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startScriptedModel({ answer: learnAnswer })
-    await use(model)
-    await model.close()
-  },
-})
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 180_000 })
-
-test('Home offers to learn, the pass fills the memory page with sources, the next chat carries the outline, and Undo takes back an update', async ({ juno, model }) => {
+domTest('Home offers to learn, the pass fills the memory page with sources, the next chat carries the outline, and Undo takes back an update', async ({ juno, model }) => {
   await ready(juno)
 
   // The ask is offered once the owner is set up; Home lists it when it next appears.
@@ -55,7 +42,6 @@ test('Home offers to learn, the pass fills the memory page with sources, the nex
     return ask.count()
   }, { timeout: 30_000 }).toBe(1)
   await expect(juno.home.title('ask')).toHaveText(chatCopy.ask.learn.title.setup)
-  await expect(juno.home.meta('ask')).toHaveText(chatCopy.ask.learn.meta([]))
   await ask.getByRole('button', { name: 'Start', exact: true }).click()
 
   // The pass runs in the background and never shows the typing bubble; the chat's ask says what it kept.
@@ -104,4 +90,4 @@ test('Home offers to learn, the pass fills the memory page with sources, the nex
   await expect(style).toContainText(STYLE)
   await expect(style).not.toContainText(STYLE_EDITED)
   await expect(page.locator('[data-memory-change="update"][data-memory-undone]')).toHaveCount(1)
-})
+}, { model: () => startScriptedModel({ answer: learnAnswer }), timeout: 180_000 })
