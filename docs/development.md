@@ -730,7 +730,16 @@ Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShi
 
 `apps/gallery/shift.spec.ts` hovers, leaves, presses, releases, focuses from the keyboard and blurs up to eight interactive elements per state, sampled from both ends of a longer list, with motion on. It also checks that an Avatar photo arriving late or failing moves nothing (the `photo/pending` state points at `/__fixture/pending.png`, which the gallery server never answers; the test answers it). The desktop e2e can import the same helper for sidebar hover, tab switches, live messages and image loads.
 
-The broad shift and focus-ring walks cache each successful state. A key includes the state and its fixture's transitive workspace imports, shared gallery code and configuration, tokens, styles, assets, bundled fonts, the lockfile, and the actual Playwright/Chromium version, OS release, architecture and browser options. Named imports through barrels keep unrelated components independent; unknown fixture registrations conservatively include all source. A failed or incomplete state gets no record. Matching DOM alone never skips interactions: two fixtures can draw the same DOM with different callbacks.
+The broad shift and focus-ring walks cache each successful state. A key holds only what can move that state's boxes:
+
+- the state and its fixture's transitive workspace imports, and the gallery shell (the registry, frame and theme code, not `compositions.tsx` or `testFixtures.tsx`), its styles, assets and bundled fonts;
+- the values of the design tokens those files read, in every theme, and of the tokens those values read. Tokens whose every value is a colour or a box shadow are left out: such a value is valid only where it paints, so it cannot move a box. A file that indexes a token group with a variable (`text[role]`) reads the whole group. The rest of the two token files (imports, constants, the theme lists) counts for every state; comments do not;
+- stylesheets without comments and paint-only declarations (`color`, `background-*`, `box-shadow`, `opacity` and the like);
+- the walk itself: `apps/gallery/shift-walk.ts` or `focus-ring.spec.ts` and what they import, which includes `open-state.ts` (how a state is opened and when it is ready) and the guard in `packages/testing`. The rest of `shift.spec.ts` (delayed loads, the guard's self-tests), the queue and page recycling in `support.ts`, the Playwright config and other specs do not count for the shift walk;
+- the locked versions of the packages those files import and the gallery builds with, and what those depend on, and the manifest fields that decide how imports resolve. Scripts, other workspaces' dependencies and an unrelated lockfile change do not count;
+- the actual Playwright/Chromium version, OS release, architecture and browser options.
+
+`apps/gallery/layout-tokens.mjs` decides which tokens and declarations paint. Named imports through barrels keep unrelated components independent; unknown fixture registrations conservatively include all source. A failed or incomplete state gets no record. Matching DOM alone never skips interactions: two fixtures can draw the same DOM with different callbacks.
 
 Records are shared across worktrees in the system temp folder's `juno-cache/results/gallery-walk-v1`. With `JUNO_BUILD_CACHE_DIR` they live in its `gallery-walk-v1` child, beside build entries; the remote runner sets this to `/cache/builds`. Writes use temporary files and atomic rename. `GALLERY_SHIFT_ALL=1 bun run test:gallery` bypasses both walk caches and refreshes successful records. `verify:main --nightly` and `verify:main --no-cache` set it automatically. Ordinary verification reuses matching states. Playwright `--repeat-each` also bypasses the caches, so every repeat exercises the states.
 
@@ -774,6 +783,18 @@ Single runs of `bun run remote --cores 3 --env GALLERY_SHIFT_ALL=1 --env GALLERY
 | 8 (the new default) | 705 s | 94% | 6.73 GB | 506–637 s | 229 passed |
 
 No run failed or retried a test. More workers slow each focus-ring part (79 s at 4 workers, 114 s at 6, 157 s at 8) because they share the CPU, but the shift walk sets the length of the job. With six threads 94% busy, more than eight workers would mostly queue for CPU and bring memory close to the limit, so it was not tried. The laptop's own memory use, with other jobs running beside these, peaked at 16.2–18.5 GB used, with 11.9–14.3 GB still available.
+
+### Frame clock and page pool, 2026-10-25
+
+Single runs of `bun run remote --cores 4 --env GALLERY_SHIFT_ALL=1 test:gallery shift.spec.ts` at `8febc617c` (before the eight-worker default), each on four physical cores (eight threads, six shift parts, a 12 GB container). About 1,830 states each.
+
+| Variant | Frame interval | Shift part durations | Script time | CPU busy, average | Peak container memory | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| Default | 16.7 ms | 579–582 s | 612 s | 65% | 5.81 GB | 51 passed |
+| `--disable-frame-rate-limit --disable-gpu-vsync` | 17.3 ms | 572–576 s | 605 s | 78% | 6.28 GB | 51 passed |
+| Three pages per shift part | 16.7 ms | 450 s | 480 s | 94% | 9.42 GB | 51 passed |
+
+The headless shell keeps its 60 Hz frame clock with those flags, so the guard's two-frame wait is unchanged and the flags are not used. Three pages per part were faster only because the CPU had room; with eight workers the gallery allocation is already 94% busy, so the pool was not kept.
 
 ## Web shell
 
