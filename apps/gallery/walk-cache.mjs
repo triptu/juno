@@ -21,16 +21,30 @@ class LayoutGraph extends ImportGraph {
   }
 }
 
-/** Source keys work in remote archives too: no Git metadata or worktree paths. */
+/**
+ * Source keys work in remote archives too: no Git metadata or worktree paths.
+ * `shift` and `ring` key on a broad walk and what can move a box; `layout` and
+ * `paint` key the cached rendering tests (support.ts), whose own code counts
+ * through `specKey`. `paint` also counts colour and shadow tokens and CSS
+ * declarations that only paint.
+ */
 export function sourceKeys(root, kind) {
   const files = new Set([...filesUnder(root, 'packages'), ...filesUnder(root, 'apps/gallery')])
   const graph = new LayoutGraph(root, files)
   const registries = ['ui', 'views', 'huddle-views'].map(name => `packages/${name}/src/fixtures.ts`).filter(file => files.has(file))
   const components = fixtureSources(root, graph, registries)
+  // The gallery's own compositions and test fixtures key on their file and what it imports.
+  const galleryOwn = new Map()
+  for (const [file, name] of [['apps/gallery/src/compositions.tsx', 'compositions'], ['apps/gallery/src/testFixtures.tsx', 'testFixtures']]) {
+    if (!files.has(file)) continue
+    const text = readFileSync(join(root, file), 'utf8')
+    for (const match of text.slice(text.indexOf(`export const ${name}`)).matchAll(/^ {2}(\w+): defineFixtures\(/gm)) galleryOwn.set(match[1], file)
+  }
 
   // What a walk does to a state. The spec's other tests (delayed loads, the guard's
   // self-tests) are not part of it; the guard is, through the walk's imports.
-  const walk = kind === 'shift' ? 'apps/gallery/shift-walk.ts' : 'apps/gallery/focus-ring.spec.ts'
+  const walk = { shift: 'apps/gallery/shift-walk.ts', ring: 'apps/gallery/focus-ring.spec.ts' }[kind]
+  const paint = kind === 'paint'
   const shared = new Set([
     'bunfig.toml', 'tsconfig.base.json',
     'scripts/import-graph.mjs', 'scripts/build-cached.mjs',
@@ -43,7 +57,7 @@ export function sourceKeys(root, kind) {
     if (/^apps\/gallery\/(src|public)\/(?!(compositions|testFixtures)\.)/.test(file) || /^packages\/tokens\/src\/.*\.(css|woff2?|ttf|otf)$/.test(file)
       || /^packages\/(ui|views|huddle-views)\/.*\.(css|woff2?|ttf|otf|svg|png|jpg|webp)$/.test(file)) shared.add(file)
   }
-  for (const file of ['apps/gallery/vite.config.ts', walk]) {
+  for (const file of ['apps/gallery/vite.config.ts', walk].filter(Boolean)) {
     if (files.has(file)) for (const reached of graph.closure(file)) shared.add(reached)
   }
   // Frame, theme and highlighting imports affect every state. Registries and
@@ -71,25 +85,37 @@ export function sourceKeys(root, kind) {
   const hash = file => {
     if (!hashes.has(file)) {
       const path = join(root, file)
-      hashes.set(file, !existsSync(path) ? null : file.endsWith('.css') ? digest(layoutCss(readFileSync(path, 'utf8'))) : digest(readFileSync(path)))
+      hashes.set(file, !existsSync(path) ? null : file.endsWith('.css') && !paint ? digest(layoutCss(readFileSync(path, 'utf8'))) : digest(readFileSync(path)))
     }
     return hashes.get(file)
   }
   const hashFiles = inputs => digest(JSON.stringify(source(inputs).toSorted().map(file => [file, hash(file)])))
-  const sharedTokens = tokens.key(shared)
+  const tokenKey = inputs => tokens.key(inputs, { paint })
+  const sharedTokens = tokenKey(shared)
   const keys = new Map()
-  const inputsOf = component => components.has(component) ? graph.closure(components.get(component)) : files
-  const reached = new Set([...shared, ...[...components.keys()].flatMap(component => [...inputsOf(component)])])
+  // `#index`, the gallery's list of states, changes with the registries and the fixture modules and helpers that declare
+  // them. A state list built from a constant outside fixture code is missed until a full run.
+  const fixtureCode = file => /(^|\/)fixtures(\/|\.)|\.fixtures\./.test(file)
+  let index
+  const indexInputs = () => index ??= new Set([...registries, 'apps/gallery/src/compositions.tsx', 'apps/gallery/src/testFixtures.tsx',
+    ...[...new Set(components.values())].flatMap(source => [...graph.closure(source)].filter(fixtureCode))])
+  const inputsOf = component => component === '#index' ? indexInputs()
+    : components.has(component) ? graph.closure(components.get(component))
+    : galleryOwn.has(component) ? graph.closure(galleryOwn.get(component)) : files
+  const reached = new Set([...shared, ...[...components.keys(), ...galleryOwn.keys()].flatMap(component => [...inputsOf(component)])])
   const base = digest(JSON.stringify([hashFiles(shared), tokens.structure, sharedTokens, packagesKey(root, files, reached)]))
-  return component => {
+  const componentKey = component => {
     if (!keys.has(component)) {
       // Unknown registrations (including compositions) conservatively depend on
       // all source. A new registration must never acquire an incomplete key.
       const inputs = inputsOf(component)
-      keys.set(component, digest(JSON.stringify([base, hashFiles(inputs), tokens.key(inputs)])))
+      keys.set(component, digest(JSON.stringify([base, hashFiles(inputs), tokenKey(inputs)])))
     }
     return keys.get(component)
   }
+  /** A test file and what it imports. */
+  componentKey.specKey = file => digest(JSON.stringify([hashFiles(graph.closure(file)), packagesKey(root, files, graph.closure(file))]))
+  return componentKey
 }
 
 /** Which fixture module each registered component name comes from. */
@@ -172,28 +198,68 @@ function lockedPackages(root, roots) {
   return digest(JSON.stringify([settings, [...picked].toSorted(([a], [b]) => a < b ? -1 : 1)]))
 }
 
+const cacheDirectory = directory => directory ?? join(process.env.JUNO_BUILD_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'results'), 'gallery-walk-v1')
+const environment = () => Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['NODE_ENV', 'JUNO_UNMINIFIED'].includes(name)).toSorted()
+const read = path => { try { return readFileSync(path, 'utf8') } catch { return undefined } }
+function write(cache, name, text) {
+  mkdirSync(cache, { recursive: true })
+  const target = join(cache, name)
+  const temporary = `${target}.${randomUUID()}.tmp`
+  try {
+    writeFileSync(temporary, text)
+    renameSync(temporary, target)
+  } finally { rmSync(temporary, { force: true }) }
+}
+
 /** Immutable successful state records beside the shared build/results caches. */
 export function walkCache({ root, kind, runtime, directory, all = false }) {
   const componentKey = sourceKeys(root, kind)
-  const cache = directory ?? join(process.env.JUNO_BUILD_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'results'), 'gallery-walk-v1')
-  const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['NODE_ENV', 'JUNO_UNMINIFIED'].includes(name)).toSorted()
-  const key = route => digest(JSON.stringify({ kind, route, runtime, environment, source: componentKey(route.component) }))
+  const cache = cacheDirectory(directory)
+  const env = environment()
+  const key = route => digest(JSON.stringify({ kind, route, runtime, environment: env, source: componentKey(route.component) }))
   const record = route => `${kind} ${route.route}\n`
   return {
     key,
-    passed(route) {
-      if (all) return false
-      try { return readFileSync(join(cache, key(route)), 'utf8') === record(route) } catch { return false }
-    },
+    passed: route => !all && read(join(cache, key(route))) === record(route),
     forget(route) { rmSync(join(cache, key(route)), { force: true }) },
-    pass(route) {
-      mkdirSync(cache, { recursive: true })
-      const target = join(cache, key(route))
-      const temporary = `${target}.${randomUUID()}.tmp`
-      try {
-        writeFileSync(temporary, record(route))
-        renameSync(temporary, target)
-      } finally { rmSync(temporary, { force: true }) }
+    pass(route) { write(cache, key(route), record(route)) },
+  }
+}
+
+/**
+ * Records for whole tests that are a pure function of what they render. A
+ * test's identity is its title, its spec and what that imports, and the
+ * runtime; its record also keys on every component it opened, which the last
+ * pass wrote down beside the identity. A test never seen, or whose spec,
+ * runtime or opened components changed, runs.
+ */
+export function testCache({ root, kind, runtime, directory, all = false }) {
+  const componentKey = sourceKeys(root, kind)
+  const cache = cacheDirectory(directory)
+  const env = environment()
+  const identity = (file, title) => digest(JSON.stringify({ kind, test: [file, title], runtime, environment: env, spec: componentKey.specKey(file) }))
+  const key = (id, components) => digest(JSON.stringify([id, components.toSorted().map(component => [component, componentKey(component)])]))
+  const opened = id => {
+    const text = read(join(cache, `${id}.opened`))
+    try { return text === undefined ? undefined : JSON.parse(text) } catch { return undefined }
+  }
+  return {
+    passed(file, title) {
+      if (all) return false
+      const id = identity(file, title)
+      const components = opened(id)
+      return Array.isArray(components) && read(join(cache, key(id, components))) === `${kind} test ${title}\n`
+    },
+    forget(file, title) {
+      const id = identity(file, title)
+      const components = opened(id)
+      rmSync(join(cache, `${id}.opened`), { force: true })
+      if (Array.isArray(components)) rmSync(join(cache, key(id, components)), { force: true })
+    },
+    pass(file, title, components) {
+      const id = identity(file, title)
+      write(cache, key(id, [...components]), `${kind} test ${title}\n`)
+      write(cache, `${id}.opened`, JSON.stringify([...components].toSorted()))
     },
   }
 }
