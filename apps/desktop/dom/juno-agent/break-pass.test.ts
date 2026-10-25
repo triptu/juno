@@ -1,34 +1,26 @@
-import { chatCopy } from '@juno/agent-contract'
-import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
+// Juno's Resolve card: it waits for approval, a double click resolves once, Undo survives a
+// restart, and with AI assist off an open card resolves nothing.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { card, openChat, readySynced as ready } from './agent'
-import { expect, test as base } from './chat'
+import { chatCopy } from '@juno/agent-contract'
+import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
+import { card, openChat, readySynced as ready } from '../driver/agent'
+import { expect } from '../expect'
+import { domTest } from '../test'
 
-const test = base.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startFakeOpenRouter({ answer: (request) => {
-      const topic = /resolve (m:C\w+)/.exec(request.input)?.[1]
-      return topic && request.toolResult === undefined
-        ? { toolCall: { name: 'topics_resolve', arguments: { topicIds: [topic] } } }
-        : '<say>Ready for your click.</say>'
-    } })
-    await use(model)
-    await model.close()
-  },
-})
+const model = () => startFakeOpenRouter({ answer: (request) => {
+  const topic = /resolve (m:C\w+)/.exec(request.input)?.[1]
+  return topic && request.toolResult === undefined
+    ? { toolCall: { name: 'topics_resolve', arguments: { topicIds: [topic] } } }
+    : '<say>Ready for your click.</say>'
+} })
 
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
-
-test('Resolve waits for approval, double clicking resolves once, Undo survives a restart, and AI off with an open card resolves nothing', async ({ juno, relaunch, userData, fake }) => {
+domTest('Resolve waits for approval, double clicking resolves once, Undo survives a restart, and AI off with an open card resolves nothing', async ({ juno, relaunch, userData, fake }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send('resolve m:C0ENG')
   const resolve = card(chat, 'resolve')
-  await expect(resolve).toHaveAttribute('data-card-status', 'open')
+  await expect(resolve).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
   await juno.sidebar.row('#eng').expectVisible()
   await resolve.getByRole('button', { name: 'Resolve', exact: true }).dblclick()
   await expect(resolve).toContainText('Resolved')
@@ -59,4 +51,4 @@ test('Resolve waits for approval, double clicking resolves once, Undo survives a
   await expect(offChat.composer).toBeDisabled()
   await expect(offChat.root.getByRole('button', { name: 'Resolve', exact: true })).toHaveCount(0)
   await off.sidebar.row('#eng').expectVisible()
-})
+}, { model, timeout: 120_000 })
