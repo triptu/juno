@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { FULL_EVERY_MS, perfRuns, selectPerf } from './perf-select.mjs'
+import { FULL_EVERY_MS, perfRuns, selectPerf, selectUnits, unitOutcomes } from './perf-select.mjs'
 
 const DAY = 24 * 60 * 60 * 1000
 const now = Date.parse('2026-10-26T00:00:00Z')
@@ -42,4 +42,21 @@ test('a nightly runs what changed since each scenario last passed, everything a 
   assert.equal(selectPerf({ runs: perfRuns([record('c', 1, ['expected', 'expected', 'expected', 'expected'])], 'runner'), now, changedSince: () => [] }).full, true)
   // Another host's results (the Mac's) do not count.
   assert.deepEqual(perfRuns([record('c', 1, ['expected', 'expected', 'expected', 'expected'])], 'mac'), [])
+})
+
+test('a package budget runs when a file it imports changed since it passed, or it failed last', () => {
+  const unitRecord = (commit, daysAgo, units) => ({ ...record(commit, daysAgo, ['expected', 'expected', 'expected', 'expected']), suites: [{ ...record(commit, daysAgo, ['expected', 'expected', 'expected', 'expected']).suites[0], perfUnits: units }] })
+  const runs = perfRuns([
+    unitRecord('b', 1, [{ file: 'packages/engine/test/perf/idle.perf.ts', passed: false }]),
+    unitRecord('a', 2, [{ file: 'packages/engine/test/perf/idle.perf.ts', passed: true }, { file: 'packages/engine/test/perf/topics-large.perf.ts', passed: true }, { file: 'packages/agent/test/activity.perf.ts', passed: true }]),
+  ], 'runner')
+  const files = ['packages/agent/test/activity.perf.ts', 'packages/engine/test/perf/idle.perf.ts', 'packages/engine/test/perf/topics-large.perf.ts', 'packages/engine/test/perf/messages-large.perf.ts']
+  const closure = (file) => new Set([file, ...(file.includes('/engine/') ? ['packages/engine/src/store.ts'] : ['packages/agent/src/run.ts'])])
+  const select = (changed) => selectUnits({ runs, files, closure, changedSince: () => changed, full: false })
+  // A renderer change: only the one that failed last and the one never run.
+  assert.deepEqual(select(['apps/desktop/src/renderer/App.tsx']), ['packages/engine/test/perf/idle.perf.ts', 'packages/engine/test/perf/messages-large.perf.ts'])
+  assert.deepEqual(select(['packages/engine/src/store.ts']), files.slice(1))
+  assert.deepEqual(select(['bun.lock']), files)
+  assert.deepEqual(selectUnits({ runs, files, closure, changedSince: () => [], full: true }), files)
+  assert.deepEqual(unitOutcomes('x\n[runner:a] juno-perf-unit: {"file":"f","passed":true}\n'), [{ file: 'f', passed: true }])
 })

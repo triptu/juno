@@ -6,6 +6,10 @@
 // names its scenarios with a grep. A changed file in no interaction's paths
 // that the app or the harness runs (shared code, a dependency, the fake's
 // seeds) reaches every scenario. Docs and other lanes' tests reach none.
+//
+// The package budgets (the engine's and the agent's `*.perf.ts`) are chosen
+// per file, by the files each one imports: an engine benchmark does not run
+// for a change to the renderer.
 
 import { docsOrTests } from './release-gate.mjs'
 import { inPaths, PERF_INTERACTIONS } from './test-areas.mjs'
@@ -79,8 +83,34 @@ export function perfRuns(records, host) {
     const suite = record.suites.find((item) => item.suite === 'perf' && item.host === host && Array.isArray(item.tests?.cases))
     if (suite === undefined) return []
     const cases = suite.tests.cases.filter((test) => test.project !== 'build-electron')
-    return [{ commit: record.commit, at: Date.parse(record.finishedAt), full: suite.perf?.full === true,
+    return [{ commit: record.commit, at: Date.parse(record.finishedAt), full: suite.perf?.full === true, units: suite.perfUnits ?? [],
       passed: cases.filter((test) => test.outcome === 'expected').map((test) => test.title),
       failed: cases.filter((test) => test.outcome !== 'expected' && test.outcome !== 'skipped').map((test) => test.title) }]
   })
+}
+
+/** A dependency change reaches every package budget. */
+const EVERYTHING = ['bun.lock', 'package.json', 'scripts/perf.mjs']
+
+/**
+ * The package budget files a nightly runs: all of them in a full run, else
+ * each file whose newest run failed, or that has none, or whose imports
+ * (`closure(file)`, a Set of repo paths with the file itself) changed since
+ * it passed.
+ */
+export function selectUnits({ runs, files, closure, changedSince, full }) {
+  if (full) return files
+  return files.filter((file) => {
+    const last = runs.find((run) => run.units.some((unit) => unit.file === file))
+    if (last === undefined || !last.units.find((unit) => unit.file === file).passed) return true
+    const changed = changedSince(last.commit)
+    if (changed === undefined) return true
+    const reached = closure(file)
+    return changed.some((path) => reached.has(path) || EVERYTHING.includes(path))
+  })
+}
+
+/** The package budget outcomes perf.mjs printed in `log`. */
+export function unitOutcomes(log) {
+  return log.split('\n').map((line) => /juno-perf-unit: (\{.*\})\s*$/.exec(line)?.[1]).filter(Boolean).map((json) => JSON.parse(json))
 }
