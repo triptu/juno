@@ -453,6 +453,8 @@ export interface ForcedInteractionReport {
   readonly next?: number
   /** Pseudo-class rules in this document that could not be rewritten, for the log. */
   readonly unforced: number
+  /** Milliseconds spent dispatching, waiting and reading boxes, for the log. */
+  readonly timing: { readonly act: number; readonly settle: number; readonly boxes: number }
 }
 
 /**
@@ -603,6 +605,7 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
       // The first ones and the last three, as the real-input walk picks them.
       const tail = Math.min(3, arg.max)
       const picked = sample.length <= arg.max ? sample : [...sample.slice(0, arg.max - tail), ...sample.slice(-tail)]
+      const timing = { act: 0, settle: 0, boxes: 0 }
       const drawn = new Set(picked.filter((el) => el.getClientRects().length > 0))
       const shifts: Array<{ element: number; target: string; step: string; moved: unknown[] }> = []
       let touched = 0
@@ -626,9 +629,15 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
         const hovered = chain(hit)
         const target = helpers.describeNode(element)
         const step = async (name: string, action: () => void) => {
+          const t0 = performance.now()
           action()
+          const t1 = performance.now()
           await settle()
+          const t2 = performance.now()
           const now = helpers.layoutBoxes(rootEl)
+          timing.act += t1 - t0
+          timing.settle += t2 - t1
+          timing.boxes += performance.now() - t2
           const moved = helpers.changedBoxes(boxes, now, arg.tolerance, arg.grows, helpers.describeNode)
           if (moved.length > 0) shifts.push({ element: index, target, step: name, moved })
           boxes = now
@@ -678,9 +687,9 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
         })
         // A touch that took away or hid elements still to touch (Undo puts back other buttons) needs a fresh state for the rest.
         // Other changes stay: what follows is still something a person can do, and each step is measured on its own.
-        if (picked.slice(index + 1).some((next) => drawn.has(next) && (!next.isConnected || next.getClientRects().length === 0))) return { shifts, touched, next: index + 1, unforced: counts.__junoUnforced }
+        if (picked.slice(index + 1).some((next) => drawn.has(next) && (!next.isConnected || next.getClientRects().length === 0))) return { shifts, touched, next: index + 1, unforced: counts.__junoUnforced, timing }
       }
-      return { shifts, touched, unforced: counts.__junoUnforced }
+      return { shifts, touched, unforced: counts.__junoUnforced, timing }
     },
     {
       root: options.root ?? defaults.root,

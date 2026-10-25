@@ -88,18 +88,24 @@ for (let part = 0; part < parts; part++) {
     const cursors: string[] = []
     const rows: string[] = []
     let states = 0, elements = 0, resets = 0, unforced = 0
+    const spent = { act: 0, settle: 0, boxes: 0, rules: 0 }
     const started = Date.now()
     try {
       for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
         await checkStateWithin(route, async () => {
           await open(route)
           states++
+          const before = Date.now()
           const drawn = await drawnRules(page, route)
+          spent.rules += Date.now() - before
           for (const hit of drawn.cursors) cursors.push(`${route.route}: ${hit}`)
           for (const row of drawn.rows) rows.push(`${route.route} ${row}`)
           // A touch that changed what the state draws asks for a fresh document for the elements after it.
           for (let report: ForcedInteractionReport = await forced(page); ; report = await forced(page, report.next)) {
             elements += report.touched
+            spent.act += report.timing.act
+            spent.settle += report.timing.settle
+            spent.boxes += report.timing.boxes
             unforced = Math.max(unforced, report.unforced)
             for (const shift of report.shifts) shifts.push(`${route.route} (element ${shift.element + 1}, ${shift.target}) ${formatForcedShift(shift)}`)
             if (report.next === undefined) break
@@ -110,8 +116,9 @@ for (let part = 0; part < parts; part++) {
       }
     } finally {
       const ms = states > 0 ? Math.round((Date.now() - started) / states) : 0
+      const per = (ms: number) => `${states > 0 ? Math.round(ms / states) : 0} ms`
       const open = states > 0 ? Math.round(opening / states) : 0
-      console.log(`computed shift: ${states} states, ${elements} elements, ${resets} resets, ${ms} ms a state (${open} ms opening), ${unforced} pseudo-class rules left unforced`)
+      console.log(`computed shift: ${states} states, ${elements} elements, ${resets} resets, ${ms} ms a state (${open} ms opening, ${per(spent.rules)} rules, ${per(spent.act)} touching, ${per(spent.settle)} waiting, ${per(spent.boxes)} boxes), ${unforced} pseudo-class rules left unforced`)
     }
     expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect.soft(rows, 'every message row is a whole number of pixels tall').toEqual([])
