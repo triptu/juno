@@ -204,6 +204,17 @@ export class Dom {
     el.dispatchEvent(new W.InputEvent('input', { bubbles: true, inputType, data }))
   }
 
+  /** Picks the option whose value or label is `value`, as a user's choice does: the native setter, then `input` and `change`. */
+  select(el: HTMLSelectElement, value: string): void {
+    const option = [...el.options].find((item) => item.value === value || item.label === value || item.textContent?.trim() === value)
+    if (option === undefined) throw new Error(`No option ${value} in ${[...el.options].map((item) => item.value).join(', ')}`)
+    const W = this.window as unknown as { HTMLSelectElement: typeof HTMLSelectElement; Event: typeof Event }
+    if (this.active !== el) el.focus()
+    Object.getOwnPropertyDescriptor(W.HTMLSelectElement.prototype, 'value')!.set!.call(el, option.value)
+    el.dispatchEvent(new W.Event('input', { bubbles: true }))
+    el.dispatchEvent(new W.Event('change', { bubbles: true }))
+  }
+
   /** Types into the focused element, a key at a time. */
   async type(text: string): Promise<void> {
     for (const char of text) {

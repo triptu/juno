@@ -281,6 +281,11 @@ export class Query {
     this.dom.fill(el as HTMLInputElement, text)
   }
 
+  /** Picks an option of a `<select>` by its value or label, as Playwright's `selectOption`. */
+  async selectOption(value: string): Promise<void> {
+    this.dom.select((await this.element()) as unknown as HTMLSelectElement, value)
+  }
+
   /** Focuses the element, then the keys (`Enter`, `Meta+Enter`, `Shift+Tab`, `a`). */
   async press(keys: string): Promise<void> {
     const el = await this.element()
