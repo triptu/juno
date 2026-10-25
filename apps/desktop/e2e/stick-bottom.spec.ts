@@ -21,15 +21,21 @@ function expectHeldAtEnd(frames: Frame[]): void {
 const TOPIC_SCROLLER = '[data-topic-view] [data-scroll]'
 const PANEL_SCROLLER = 'aside[data-juno-panel] [data-scroll]'
 
-test('keeps Main and a thread at the bottom through arrivals and composer growth, and holds its position when scrolled up', async ({ juno, win, slack, fake }) => {
-  const root = fake.workspace.post({ channel: slack.channel('eng'), user: slack.as('Leo').id, text: 'Stick to the bottom thread check', silent: true })
+test('a thread at the bottom keeps a new reply fully in view', async ({ juno, win, slack, fake }) => {
+  const root = fake.injectMessage({ channel: slack.channel('eng'), user: slack.as('Leo').id, text: 'Stick to the bottom thread check' })
   for (let i = 0; i < 30; i++) fake.workspace.post({ channel: slack.channel('eng'), user: slack.as(i % 2 === 0 ? 'Leo' : 'Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true })
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('#eng').open()
+  await threadArrival({ juno, win, slack, fake }, root.ts)
+})
+
+test('keeps Main at the bottom through arrivals and composer growth, and holds its position when scrolled up', async ({ juno, win, slack, fake }) => {
   await openLongMain(juno, fake, slack)
   const context = { juno, win, slack, fake }
   await test.step('Main at the bottom keeps a new message fully in view after a click on a message', () => mainArrival(context))
   await test.step('Main at the bottom keeps its last message in view while the composer grows', () => composerGrowth(context))
   await test.step('scrolled up in Main, a new message moves nothing and shows the pill', () => scrolledUpArrival(context))
-  await test.step('a thread at the bottom keeps a new reply fully in view', () => threadArrival(context, root.ts))
 })
 
 /** Every frame from the first that draws the element shows it whole, at the list's end or anywhere in view. */
