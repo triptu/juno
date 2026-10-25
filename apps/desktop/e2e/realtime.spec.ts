@@ -1,8 +1,7 @@
-// Realtime hardening (M7, architecture 5.1, 5.8 and 2.5): what changes in
-// Slack while the socket is down reaches the open topic and the sidebar once
-// it is back, a message written offline waits and goes once, and an engine
-// restart keeps what is on screen. Slack's rate limits are checked in
-// packages/engine/test/flows/rate-limits.flow.test.ts.
+// Realtime hardening (M7, architecture 5.1, 5.8 and 2.5), the parts only the
+// app shows: a rename reaches the open topic's header and tab, and an engine
+// restart keeps what is on screen. The socket gap, offline writes and Slack's
+// rate limits are checked in the engine's flow tests.
 import { expect, hooks, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
