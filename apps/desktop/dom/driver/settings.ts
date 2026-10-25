@@ -1,3 +1,4 @@
+import type { AppSurface } from '../../e2e/driver/surface'
 import type { AccountMenuVerbs, SettingsSectionName, SettingsVerbs, TextMatch } from '../../e2e/driver/verbs'
 import { expect } from '../expect'
 import type { Dom } from '../input'
@@ -54,10 +55,18 @@ export class SettingsPage implements SettingsVerbs {
     await expect(this.section(name)).toHaveAttribute('aria-current', 'page')
   }
 
+  get sidebarPresence(): Query {
+    return this.root.getByRole('switch', { name: 'Show who is active in the sidebar' })
+  }
+
   themeRadio(name: 'System' | 'Light' | 'Dark'): Query {
     return this.root.getByRole('radio', { name })
   }
 }
+
+export type HoursSection = 'Notifications' | 'Active in Slack'
+export type HoursRowName = 'Weekdays' | 'Saturday' | 'Sunday'
+export const hoursRows: ReadonlyArray<HoursRowName> = ['Weekdays', 'Saturday', 'Sunday']
 
 /** Settings › Notifications. */
 export class NotificationsPage {
@@ -65,6 +74,43 @@ export class NotificationsPage {
 
   constructor(readonly dom: Dom) {
     this.root = dom.getByRole('main')
+  }
+
+  /** The Notification hours or Active in Slack rows. */
+  hours(which: HoursSection): Query {
+    return this.root.getByRole('group', { name: which === 'Notifications' ? 'Notification hours' : which, exact: true })
+  }
+
+  /** One row's from or to. Off is the first choice in from; an off row has no to. */
+  edge(which: HoursSection, row: HoursRowName, edge: 'from' | 'to'): Query {
+    return this.hours(which).getByRole('combobox', { name: `${row} ${edge}`, exact: true })
+  }
+
+  /** Sets a row's from and to, in minutes since midnight, or turns it off. */
+  async setRow(which: HoursSection, row: HoursRowName, hours: { readonly from: number; readonly to: number } | 'off'): Promise<void> {
+    if (hours === 'off') return this.edge(which, row, 'from').selectOption('off')
+    await this.edge(which, row, 'from').selectOption(String(hours.from))
+    await this.edge(which, row, 'to').selectOption(String(hours.to))
+  }
+
+  /** Checks a row as the engine saved it: from and to, or off with no to. */
+  async expectRow(which: HoursSection, row: HoursRowName, hours: { readonly from: number; readonly to: number } | 'off'): Promise<void> {
+    if (hours === 'off') {
+      await expect(this.edge(which, row, 'from')).toHaveValue('off')
+      await expect(this.edge(which, row, 'to')).toHaveCount(0)
+      return
+    }
+    await expect(this.edge(which, row, 'from')).toHaveValue(String(hours.from))
+    await expect(this.edge(which, row, 'to')).toHaveValue(String(hours.to))
+  }
+
+  /** The Always or Never list of conversations and people. */
+  level(name: 'Always' | 'Never'): Query {
+    return this.root.getByRole('group', { name, exact: true })
+  }
+
+  async removeTag(name: string): Promise<void> {
+    await this.root.getByRole('button', { name: `Remove ${name}` }).click()
   }
 
   get newInstruction(): Query {
@@ -99,3 +145,39 @@ export class NotificationsPage {
   }
 }
 
+
+/**
+ * Privacy mode (SPEC 13): text marked `data-sensitive` is blurred while the
+ * page carries `data-privacy` (`tokens/global.css`). Here that is the
+ * attribute pair; the blur itself is the browser lane's.
+ */
+export class PrivacyMode {
+  constructor(readonly dom: Dom, readonly surface: AppSurface) {}
+
+  /** The sidebar footer that says the mode is on. */
+  get footer(): Query {
+    return this.dom.getByRole('complementary', { name: 'Sidebar' }).getByRole('status').filter({ hasText: 'Message text hidden' })
+  }
+
+  get showButton(): Query {
+    return this.footer.getByRole('button', { name: 'Show message text' })
+  }
+
+  async expectBlurred(target: Query, blurred = true): Promise<void> {
+    await expect.poll(async () => {
+      const el = await target.element()
+      return el.closest('[data-sensitive]') !== null && el.closest('[data-privacy]') !== null
+    }).toBe(blurred)
+  }
+
+  /** ⌃⌘H through View, and waits until the change took (the menu names the other action). */
+  async toggleWithMenu(): Promise<void> {
+    const before = await this.menuLabel()
+    await this.surface.appMenu('toggle-privacy')
+    await expect.poll(() => this.menuLabel()).not.toBe(before)
+  }
+
+  menuLabel(): Promise<string | undefined> {
+    return this.surface.menuLabel('toggle-privacy')
+  }
+}

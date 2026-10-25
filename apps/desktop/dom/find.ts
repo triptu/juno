@@ -77,8 +77,8 @@ export function roleOf(el: Element): string | undefined {
   return undefined
 }
 
-/** Roles whose name is not taken from what they contain. */
-const NAME_FROM_AUTHOR = new Set(['textbox', 'combobox', 'searchbox', 'list', 'listbox', 'group', 'radiogroup', 'region', 'dialog', 'alertdialog', 'navigation', 'complementary', 'main', 'tablist', 'menu', 'menubar', 'tree', 'grid', 'table', 'img', 'form', 'progressbar', 'slider', 'spinbutton', 'toolbar', 'status'])
+/** Roles whose name is taken from what they contain, as Playwright and Chromium have it; a list item or a region has none of its own. */
+const NAME_FROM_CONTENT = new Set(['button', 'cell', 'checkbox', 'columnheader', 'gridcell', 'heading', 'link', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'radio', 'row', 'rowheader', 'switch', 'tab', 'tooltip', 'treeitem'])
 
 /**
  * Text as a screen reader reads it (`name`) or as `innerText` gives it
@@ -124,7 +124,7 @@ export function nameOf(el: Element): string {
     return normalize(el.getAttribute('title') ?? el.getAttribute('placeholder') ?? '')
   }
   const role = roleOf(el)
-  if (role === undefined || !NAME_FROM_AUTHOR.has(role)) {
+  if (role === undefined || NAME_FROM_CONTENT.has(role)) {
     const text = normalize(readText(el, 'name'))
     if (text !== '') return text
   }

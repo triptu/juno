@@ -24,6 +24,8 @@ import {
   type InstructionDirection,
   type InstructionRule,
   type NotificationSettingsView,
+  type NotifyChoice,
+  type NotifyTargetView,
   type PresenceValue,
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
@@ -56,6 +58,35 @@ export const notificationStatusAtom = liveQuery(notificationsStatus)(undefined)
 export function currentNotificationSettings(registry: Registry): NotificationSettingsView | undefined {
   const result = registry.get(notificationSettingsAtom)
   return result._tag === 'Success' ? result.value : undefined
+}
+
+const pendingLevelsAtom = Atom.make<ReadonlyMap<string, NotifyChoice>>(new Map()).pipe(Atom.keepAlive)
+
+const levelKey = (target: NotifyTargetView): string => `${target.kind}:${target.id}`
+
+/**
+ * A Notify me choice just made, until the menus' own sources hold it. The settings and a thread's follow flag are
+ * separate live queries that arrive a moment after the command, so a menu opened in that moment reads this first.
+ */
+export function pendingLevel(registry: Registry, target: NotifyTargetView): NotifyChoice | undefined {
+  return registry.get(pendingLevelsAtom).get(levelKey(target))
+}
+
+/** Holds `choice` for `target` until `run` is done, which waits for the sources to show it; a newer choice for the target keeps its own hold. */
+export async function holdLevel(registry: Registry, target: NotifyTargetView, choice: NotifyChoice, run: () => Promise<unknown>): Promise<void> {
+  const key = levelKey(target)
+  const set = (next: NotifyChoice | undefined) => {
+    const levels = new Map(registry.get(pendingLevelsAtom))
+    if (next === undefined) levels.delete(key)
+    else levels.set(key, next)
+    registry.set(pendingLevelsAtom, levels)
+  }
+  set(choice)
+  try {
+    await run()
+  } finally {
+    if (pendingLevel(registry, target) === choice) set(undefined)
+  }
 }
 
 /**

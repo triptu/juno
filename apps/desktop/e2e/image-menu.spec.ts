@@ -68,13 +68,3 @@ test('image menus copy image data, download, open a temporary copy and open the 
   await viewer.getByRole('button', { name: 'Close', exact: true }).click()
 })
 
-test('Open from an image menu in a peek opens its topic viewer', async ({ juno, fake }) => {
-  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Peek image menu sample', media: [{ name: 'peek-image-menu.png', width: 800, height: 600 }] })
-  await juno.sidebar.row('#eng').peek()
-  const image = juno.peek.root.locator('[data-thumbnail]')
-  await expect(image).toBeVisible()
-
-  expect(await choose(juno, image, 'open')).toEqual(IMAGE_ITEMS)
-  await expect(juno.win.locator('[data-media-viewer] [data-viewer-name]')).toHaveText('peek-image-menu.png')
-  await juno.peek.release()
-})

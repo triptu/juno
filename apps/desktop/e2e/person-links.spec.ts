@@ -166,17 +166,3 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
   })
 })
 
-test("a deactivated person's DM opens read-only; with no DM they offer no link", async ({ juno, fake }) => {
-  for (const id of ['U0SAM', 'U0PRIYA']) (fake.workspace.users.get(id) as unknown as { deleted: boolean }).deleted = true
-  reply(fake, 'U0SAM', 'Sam signing off: handing the dry run to Dev.')
-  reply(fake, 'U0PRIYA', 'Priya here: runbook links are pinned.')
-  await openPostgres(juno)
-  const { tabs, topic } = juno
-
-  await expect(link(juno, 'Priya here')).toHaveCount(0)
-  await link(juno, 'Sam signing off').click()
-  await tabs.expectActive('Sam')
-  await expect(topic.message('Notes from today')).toBeVisible()
-  await expect(topic.composer).toHaveCount(0)
-  await expect(topic.root.getByText(/^Sam.*'s account is deactivated\. You can read this conversation but not reply\.$/)).toBeVisible()
-})

@@ -56,8 +56,12 @@ function rootRules(css: string): string {
 
 const quiet = Object.fromEntries(['log', 'info', 'debug', 'trace', 'group', 'groupCollapsed', 'groupEnd', 'table', 'dir', 'time', 'timeEnd', 'timeLog', 'count', 'assert'].map((name) => [name, () => {}]))
 
-/** Opens `url` in a new window and runs the renderer in it. The page's errors and warnings reach the test output; JUNO_DOM_DEBUG=1 passes everything. */
-export function openWindow(url: string, clock?: PageClock, engineClock?: Parameters<PageClock['install']>[1]): Window {
+/**
+ * Opens `url` in a new window and runs the renderer in it, with `storage` in
+ * its localStorage first. The page's errors and warnings reach the test
+ * output; JUNO_DOM_DEBUG=1 passes everything.
+ */
+export function openWindow(url: string, clock?: PageClock, engineClock?: Parameters<PageClock['install']>[1], storage: ReadonlyArray<readonly [string, string]> = []): Window {
   const window = new Window({
     url,
     width: 1200,
@@ -71,11 +75,13 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
     },
   })
   patchPrototypes(window)
-  restorePrototypes(window)
+  if (open.size === 0) restorePrototypes(window)
+  open.add(window)
   fillGaps(window)
   // The sidebar trace (e2e README, "Sidebar trace") on: the driver waits for the list value a filter asks for.
   ;(window as unknown as Record<string, unknown>)['__junoSidebarTrace'] = { hold: [], list: { values: 0, errors: 0 } }
   clock?.install(window, engineClock)
+  for (const [key, value] of storage) window.localStorage.setItem(key, value)
   const { script, css } = renderer()
   window.document.write(`<!doctype html><html><head><style>${css}</style></head><body><div id="root"></div></body></html>`)
   script.runInContext(window as never)
@@ -86,10 +92,16 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
 const unescapeString = (text: string) => text.replace(/\\([0-9a-fA-F]{1,6}) ?|\\(.)/g, (_all, hex: string | undefined, char: string | undefined) => (hex === undefined ? char! : String.fromCodePoint(Number.parseInt(hex, 16))))
 const unescapeQuoted = (selector: string) => (selector.includes('\\') ? selector.replace(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g, (_all, double: string | undefined, single: string | undefined) => JSON.stringify(unescapeString(double ?? single ?? ''))) : selector)
 
+/** The attribute `Dom` keeps on the element under the pointer and its ancestors, which `:hover` reads here. */
+export const HOVER_ATTRIBUTE = 'data-dom-hover'
+
+const withHover = (selector: string) => (selector.includes(':hover') ? selector.replaceAll(':hover', `[${HOVER_ATTRIBUTE}]`) : selector)
+
 /**
  * happy-dom matches a quoted attribute value as written, escapes and all, so
  * `[data-message-row="${CSS.escape(ts)}"]` (the app's `rowOf`) finds nothing.
  * Selectors are unescaped inside their quotes before happy-dom reads them.
+ * happy-dom has no pointer, so `:hover` reads the elements `Dom.hover` marked.
  */
 function unescapeSelectors(window: Window): void {
   const W = window as unknown as Record<string, { prototype: object }>
@@ -105,7 +117,7 @@ function unescapeSelectors(window: Window): void {
       patched.add(key)
       const original = key as (this: unknown, selector: string) => unknown
       const wrapped = function (this: unknown, selector: string) {
-        return original.call(this, unescapeQuoted(selector))
+        return original.call(this, withHover(unescapeQuoted(selector)))
       }
       patched.add(wrapped)
       ;(owner as Record<string, unknown>)[name] = wrapped
@@ -209,14 +221,16 @@ function patchPrototypes(window: Window): void {
 }
 
 let pristine: Map<object, PropertyDescriptorMap> | undefined
+const open = new Set<Window>()
 
 /**
  * Puts the shared prototypes back as they were before any page ran. A page
  * patches them as if they were its own (`web/page/urls.ts` wraps
  * `setAttribute`), so without this each window would wrap the last one's
  * patch, every call would go through all of them, and the wrappers would
- * keep every closed window alive. Runs before each page and after it closes;
- * the first run records the prototypes as `patchPrototypes` leaves them.
+ * keep every closed window alive. Runs before a page when no other is open
+ * (`otherApp` opens a second) and after the last one closes; the first run
+ * records the prototypes as `patchPrototypes` leaves them.
  */
 function restorePrototypes(window: Window): void {
   pristine ??= sharedPrototypes(window)
@@ -250,7 +264,8 @@ export async function closeWindow(window: Window): Promise<void> {
   try {
     await window.happyDOM.close()
   } finally {
-    restorePrototypes(window)
+    open.delete(window)
+    if (open.size === 0) restorePrototypes(window)
   }
 }
 
@@ -264,6 +279,11 @@ function fillGaps(window: Window): void {
     globals['cancelIdleCallback'] = (id: number) => (window.clearTimeout as unknown as (id: number) => void)(id)
   }
   const document = window.document as unknown as Record<string, unknown>
+  // happy-dom answers from activeElement, which is null once a focused element leaves. A window has focus until it blurs.
+  let focused = true
+  window.addEventListener('blur', () => { focused = false })
+  window.addEventListener('focus', () => { focused = true })
+  document['hasFocus'] = () => focused
   if (document['timeline'] === undefined) Object.defineProperty(document, 'timeline', { value: { get currentTime() { return window.performance.now() } } })
   ;(document as { getAnimations?: () => unknown[] }).getAnimations ??= () => []
 }

@@ -68,7 +68,9 @@ export class Query {
   }
 
   getByLabel(text: TextMatch, options: { readonly exact?: boolean } = {}): Query {
-    return this.#within((root) => [...root.querySelectorAll<El>('input, textarea, select, [role="textbox"], [role="combobox"], [role="spinbutton"], [role="switch"], [role="checkbox"]')].filter((el) => matches(nameOf(el), text, options.exact === true)), `>> label=${String(text)}`)
+    // Fields by their name, and, as in Playwright, any other element by its `aria-label`.
+    const fields = 'input, textarea, select, [role="textbox"], [role="combobox"], [role="spinbutton"], [role="switch"], [role="checkbox"]'
+    return this.#within((root) => [...root.querySelectorAll<El>(`${fields}, [aria-label]`)].filter((el) => matches(el.matches(fields) ? nameOf(el) : el.getAttribute('aria-label') ?? '', text, options.exact === true)), `>> label=${String(text)}`)
   }
 
   getByTitle(text: TextMatch, options: { readonly exact?: boolean } = {}): Query {
@@ -129,7 +131,11 @@ export class Query {
   async click(options: ClickOptions = {}): Promise<void> {
     const el = await this.dom.until(`${this.description} to be enabled`, () => { const found = this.find().find(shown); return found !== undefined && !disabled(found) ? found : undefined }, options.timeout)
     if (options.button === 'right') this.dom.rightClick(el, options.modifiers)
-    else for (let n = 0; n < (options.clickCount ?? 1); n++) this.dom.click(el, options.modifiers, n + 1)
+    else for (let n = 0; n < (options.clickCount ?? 1); n++) {
+      // Each press is its own task in a browser, so React handles the first before the second arrives.
+      if (n > 0) await new Promise((done) => setTimeout(done, 0))
+      this.dom.click(el, options.modifiers, n + 1)
+    }
   }
 
   async dblclick(): Promise<void> {
@@ -151,6 +157,11 @@ export class Query {
   async fill(text: string): Promise<void> {
     const el = await this.element()
     this.dom.fill(el as HTMLInputElement, text)
+  }
+
+  /** Picks an option of a `<select>` by its value or label, as Playwright's `selectOption`. */
+  async selectOption(value: string): Promise<void> {
+    this.dom.select((await this.element()) as unknown as HTMLSelectElement, value)
   }
 
   /** Focuses the element, then the keys (`Enter`, `Meta+Enter`, `Shift+Tab`, `a`). */

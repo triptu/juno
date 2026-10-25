@@ -4,12 +4,25 @@ import type { Dom } from '../input'
 import type { Query } from '../query'
 import { escapeRegExp, type Menus } from './menus'
 
+export type PeekKeyName = 'option' | 'space'
+
+export const PEEK_KEYS: Record<PeekKeyName, string> = { option: 'Alt', space: 'Space' }
+
 /** The part of `@juno/state`'s sidebar trace the driver reads. */
 interface SidebarTrace {
   readonly list: { readonly last?: { readonly seq: number; readonly filter: string } }
 }
 
 /** One row in the sidebar, found by the start of its title. */
+/** What the view sheet is filled with. */
+interface ViewFields {
+  readonly name?: string
+  readonly icon?: string
+  readonly color?: string
+  readonly conversations?: ReadonlyArray<string>
+  readonly keepOutOfAll?: boolean
+}
+
 export class SidebarRow implements SidebarRowVerbs {
   readonly root: Query
 
@@ -45,6 +58,12 @@ export class SidebarRow implements SidebarRowVerbs {
 
   open(): Promise<void> {
     return this.select()
+  }
+
+  /** The pointer over the row, then the peek key held down (SPEC 5, "Peek"). */
+  async peek(key: PeekKeyName = 'option'): Promise<void> {
+    await this.hover()
+    this.dom.down(PEEK_KEYS[key])
   }
 
   /** ⌘-click: opens the topic in a new tab, and waits for the tab, so a next step does not land in the tab before. */
@@ -259,6 +278,60 @@ export class Sidebar implements SidebarVerbs {
       await this.viewPill(name).click()
       await expect(this.viewPill(name)).toHaveAttribute('aria-pressed', 'true')
     })
+  }
+
+  /** The views' names, in pill order. */
+  async viewNames(): Promise<string[]> {
+    return this.root.locator('[data-view-pill]').all().map((pill) => (pill.getAttribute('aria-label') ?? '').replace(/, unread mention$/, ''))
+  }
+
+  /** A view's id, for the menus' items. */
+  async viewId(name: string): Promise<string> {
+    return (await this.viewPill(name).getAttribute('data-view-pill'))!
+  }
+
+  async expectViewDot(name: string, shown: boolean): Promise<void> {
+    await expect(this.viewPill(name)).toHaveAccessibleName(shown ? `${name}, unread mention` : name, { timeout: 10_000 })
+  }
+
+  /** The view sheet, new or edit. */
+  get viewSheet(): Query {
+    return this.dom.locator('[data-view-sheet]')
+  }
+
+  /**
+   * Makes a view through the New view pill and the sheet: the name, an icon
+   * and its colour by their labels, the conversations by searching for each
+   * name, and Keep these out of All. A new view is selected once saved.
+   */
+  async createView(view: ViewFields & { readonly name: string }): Promise<void> {
+    await this.root.getByRole('button', { name: 'New view', exact: true }).click()
+    await expect(this.viewSheet).toBeVisible()
+    await this.fillViewSheet(view)
+    await this.viewSheet.getByRole('button', { name: 'Save' }).click()
+    await expect(this.viewSheet).toHaveCount(0)
+    await expect(this.viewPill(view.name)).toHaveAttribute('aria-pressed', 'true')
+  }
+
+  /** Fills the open sheet. Conversations are toggled: one already chosen is removed. */
+  async fillViewSheet(view: ViewFields): Promise<void> {
+    const sheet = this.viewSheet
+    if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
+    if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
+    if (view.color !== undefined) await sheet.getByRole('radiogroup', { name: 'Colour' }).getByRole('radio', { name: view.color, exact: true }).click()
+    for (const conversation of view.conversations ?? []) {
+      await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
+      await sheet.getByRole('option', { name: conversation, exact: true }).click()
+      await expect(sheet.getByRole('option', { name: conversation, exact: true })).toHaveAttribute('aria-selected', 'true')
+    }
+    if (view.keepOutOfAll !== undefined) await sheet.getByRole('checkbox', { name: /Keep these out of All/ }).setChecked(view.keepOutOfAll)
+  }
+
+  /** Right-click a view's pill, then `item` in its menu. Returns the menu's labels. */
+  async viewMenu(name: string, item: 'view-edit' | 'view-left' | 'view-right' | 'view-delete'): Promise<string[]> {
+    this.menus.choose(item)
+    await this.viewPill(name).click({ button: 'right' })
+    return (await this.menus.last()).labels
   }
 
   async expectEmpty(title: string): Promise<void> {

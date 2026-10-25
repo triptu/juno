@@ -4,5 +4,5 @@
  * dynamic `import()`; it shares no module with `./openrouter`.
  */
 export { startFakeLittlebird, unknownTool, type FakeLittlebird } from './littlebird'
-export { startFakeMcpServer, type FakeMcpServer } from './server'
+export { startFakeMcpServer } from './server'
 export { json } from './handler'

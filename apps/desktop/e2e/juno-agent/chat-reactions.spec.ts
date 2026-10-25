@@ -1,7 +1,9 @@
-// Reactions in the Juno chat (SPEC 13.1): the quick reactions and the emoji
-// picker a topic's messages use, badges that show whole at the panel's
-// narrowest and in the wide Juno tab, in light and dark. An answer keeps its
-// quote even right under the message it answers.
+// Reactions in the Juno chat (SPEC 13.1) in the browser: the quick reactions
+// and the emoji picker a topic's messages use, badges that show whole at the
+// panel's narrowest and in the wide Juno tab, in light and dark, and ↑ through
+// a draft's lines. An answer keeps its quote even right under the message it
+// answers. The keyboard's way to a bubble's menu is in the DOM lane
+// (`dom/juno-agent/chat-reactions.test.ts`).
 import type { Locator } from '@playwright/test'
 import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
@@ -136,7 +138,7 @@ async function expectWholeEverywhere(chat: JunoChatPane, name: string): Promise<
   expect(await expectBadgesWhole(chat, 4)).toContain('owner:👍')
 }
 
-test('a Juno bubble takes a quick reaction and any emoji from the picker, and its badge shows whole at every width and in both themes', async ({ juno, model }) => {
+test('a Juno bubble takes a quick reaction and any emoji from the picker, its badge shows whole at every width and in both themes, a custom emoji shows as an image, and ↑ walks a draft\'s lines before the bubbles', async ({ juno, model }) => {
   await ready(juno)
   await setWindowSize(juno, 1400, 640)
   const panel = await narrowestPanel(juno)
@@ -194,67 +196,22 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   await juno.tabs.expectActive('Juno')
   await expectWholeEverywhere(JunoChatPane.tab(juno.win), 'tab-wide-dark')
-})
-
-
-test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line, the menu’s keys react, and a custom emoji shows as an image', async ({ juno, model }) => {
-  await ready(juno)
-  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
-  const chat = JunoChatPane.tab(juno.win)
-  await expect(chat.composer).toBeFocused()
-  await chat.send('keyboard menu target')
-  await chat.expectJuno('You said: keyboard menu target')
-
-  // ↑ in the empty composer: the newest bubble; ↑ again: your own before it; ↓ twice: the newest, then back to
-  // the composer; Esc from a bubble: back to the composer too.
-  await chat.composer.press('ArrowUp')
-  const bubble = chat.junoBubble('You said: keyboard menu target').locator('[data-chat-row]')
-  await expect(bubble).toBeFocused()
-  await juno.win.keyboard.press('ArrowUp')
-  await expect(chat.ownerBubble('keyboard menu target').locator('[data-chat-row]')).toBeFocused()
-  await juno.win.keyboard.press('ArrowDown')
-  await expect(bubble).toBeFocused()
-  await juno.win.keyboard.press('ArrowDown')
-  await expect(chat.composer).toBeFocused()
-  await chat.composer.press('ArrowUp')
-  await juno.win.keyboard.press('ArrowUp')
-  await juno.win.keyboard.press('Escape')
-  await expect(chat.composer).toBeFocused()
-  // A two-line draft with the caret on its second line: ↑ moves the caret, ↑ again reaches the bubble, ↓ comes
-  // back to the draft and its caret.
-  await chat.composer.fill('first line\nsecond line')
-  await chat.composer.press('ArrowUp')
-  await expect(chat.composer).toBeFocused()
-  await chat.composer.press('ArrowUp')
-  await expect(bubble).toBeFocused()
-  await juno.win.keyboard.press('ArrowDown')
-  await expect(chat.composer).toBeFocused()
-  await expect(chat.composer).toHaveValue('first line\nsecond line')
-  await chat.composer.fill('')
-
-  // ⇧F10 on the bubble: its menu, under the bubble's first line, at its text.
-  await chat.composer.press('ArrowUp')
-  await expect(bubble).toBeFocused()
-  await juno.win.keyboard.press('Shift+F10')
-  const menu = juno.messageMenu
-  await expect(menu.root).toBeVisible()
-  const text = (await bubble.boundingBox())!
-  const box = (await menu.root.boundingBox())!
-  expect(box.x).toBeGreaterThanOrEqual(text.x)
-  expect(box.x).toBeLessThan(text.x + 40)
-  expect(box.y).toBeGreaterThan(text.y)
-  expect(await menu.labels()).toEqual(['Reply', 'Copy', '-', 'Remove…'])
-  // ↓ to the grid's first cell, Enter reacts with it; focus goes back to the bubble.
-  await juno.win.keyboard.press('ArrowDown')
-  await expect(menu.cell('+1')).toBeFocused()
-  await juno.win.keyboard.press('Enter')
-  await expect(menu.root).toHaveCount(0)
-  await expect(chat.junoBubble('You said: keyboard menu target').getByLabel('Reacted 👍')).toBeVisible()
-  await expect(bubble).toBeFocused()
 
   // A workspace's custom emoji from the picker: stored by name, drawn as an image, and Juno hears its name.
-  await chat.reactWithPicker('You said: keyboard menu target', 'hello_juno', 'juno_wave')
-  const custom = chat.junoBubble('You said: keyboard menu target').getByLabel('Reacted juno_wave')
-  await expect(custom.locator('img')).toBeVisible()
+  const tab = JunoChatPane.tab(juno.win)
+  await tab.reactWithPicker('You said: note 6', 'hello_juno', 'juno_wave')
+  await expect(tab.junoBubble('You said: note 6').getByLabel('Reacted juno_wave').locator('img')).toBeVisible()
   await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="juno_wave"'))).toBe(true)
+
+  // A two-line draft with the caret on its second line: ↑ moves the caret a line, ↑ again reaches the newest
+  // bubble, ↓ comes back to the draft. Which line the caret is on is the field's layout.
+  const newest = tab.junoBubble('You said: note 6').locator('[data-chat-row]')
+  await tab.composer.fill('first line\nsecond line')
+  await tab.composer.press('ArrowUp')
+  await expect(tab.composer).toBeFocused()
+  await tab.composer.press('ArrowUp')
+  await expect(newest).toBeFocused()
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(tab.composer).toBeFocused()
+  await expect(tab.composer).toHaveValue('first line\nsecond line')
 })

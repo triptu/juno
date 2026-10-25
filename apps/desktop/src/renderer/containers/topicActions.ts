@@ -55,12 +55,19 @@ export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' 
   readonly rootTs?: string | undefined
 }
 
-/** The header's detail when it is loaded, else the sidebar or All topics row, with its thread's root from the id. */
-export function topicOf(id: string): ActionTopic | undefined {
+const headerOf = (id: string): ActionTopic | undefined => {
   const header = registry.get(topicAtom(id))
-  if (header._tag === 'Success' && header.value !== null) return header.value
+  return header._tag === 'Success' && header.value !== null ? header.value : undefined
+}
+
+const rowOf = (id: string): ActionTopic | undefined => {
   const row = registry.get(sidebarRowAtom(id)) ?? registry.get(allTopicsRowAtom(id))
   return row === undefined ? undefined : { ...row, rootTs: threadRootTs(id) }
+}
+
+/** The header's detail when it is loaded, else the sidebar or All topics row, with its thread's root from the id. */
+export function topicOf(id: string): ActionTopic | undefined {
+  return headerOf(id) ?? rowOf(id)
 }
 
 /** How a toast names a topic: its title, or the channel label for Main ("#eng"). */
@@ -174,15 +181,21 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
   }
 }
 
-/** A sidebar row's menu: the row, with the detail when it is loaded, for the link items. */
+/**
+ * A row's menu reads the row, which is what the user sees. The header's detail is a separate live query that can
+ * trail the row by a moment after an action or its Undo, so it is only the fallback.
+ */
+const topicOfRow = (id: string): ActionTopic | undefined => rowOf(id) ?? headerOf(id)
+
+/** A sidebar row's menu. */
 export function showRowMenu(id: string): void {
-  const topic = topicOf(id)
+  const topic = topicOfRow(id)
   if (topic !== undefined) void showTopicMenu(topic, 'row')
 }
 
 /** An All topics row's menu: the same menu; Rename edits the table row. */
 export function showTableRowMenu(id: string): void {
-  const topic = topicOf(id)
+  const topic = topicOfRow(id)
   if (topic !== undefined) void showTopicMenu(topic, 'table')
 }
 
