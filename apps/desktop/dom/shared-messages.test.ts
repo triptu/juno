@@ -1,14 +1,13 @@
 // A message shared from another conversation (spec section 7, "Shared
 // messages"): its card says where it was posted, from Juno's own data, and
-// that place opens the original message in its topic, which flashes. A
+// that place opens the original message in its topic. A
 // conversation Juno does not have keeps Slack's footer, which opens the
 // message's Slack link outside. A shared message of only files shows its
-// files, never Slack's "[date] name: file" fallback line.
+// files, never Slack's "[date] name: file" fallback line. That the message
+// opened is in view and flashes is the browser lane's (notifications.spec.ts).
 import { sharedMessage, type FakeSlack } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
-import { watchFlashes } from './driver/flashes'
-
-test.describe.configure({ timeout: 120_000 })
+import { expect } from './expect'
+import { domTest } from './test'
 
 const NOWHERE = '1712345678.000200'
 
@@ -23,7 +22,7 @@ function seedShares(fake: FakeSlack): void {
   share('C0NOWHERE', { ts: NOWHERE, user: 'U0MAYA', text: 'Notes from a closed room' }, 'Sharing a closed room')
 }
 
-test('shared message cards: a video share names its video, the place says where it was posted, and a place Juno does not have opens outside', async ({ juno, fake }) => {
+domTest('shared message cards: a video share names its video, the place says where it was posted, and a place Juno does not have opens outside', async ({ juno, fake, step }) => {
   seedShares(fake)
   const clip = fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', media: [{ name: 'screen-recording.mp4', width: 1280, height: 720, kind: 'video' }] })
   // Forwarded with no note: the sharing message has no words of its own. It is the newest in #product.
@@ -33,14 +32,14 @@ test('shared message cards: a video share names its video, the place says where 
   const { topic, tabs } = juno
   const card = (words: string) => topic.message(words).locator('section[aria-label="Attachment"]')
 
-  await test.step("a shared message of only a video shows the video, and its row names it, not Slack's fallback line", async () => {
+  await step("a shared message of only a video shows the video, and its row names it, not Slack's fallback line", async () => {
     const row = juno.sidebar.row('#product')
     await row.expectPreview(/Shared message: Video$/)
     await row.open()
 
     const video = topic.list.locator('section[aria-label="Attachment"]').filter({ has: juno.win.locator('[data-inline-video]') })
     await expect(video).toBeVisible({ timeout: 15_000 })
-    await expect(video.getByLabel('screen-recording.mp4', { exact: true })).toBeVisible()
+    await expect(video.locator('video[aria-label="screen-recording.mp4"]')).toHaveCount(1)
     await expect(video).not.toContainText('Maya: screen-recording.mp4')
     await expect(video.locator('[data-shared-source]')).toHaveText('eng')
     // The video is drawn once, in the card, not again under it.
@@ -49,9 +48,8 @@ test('shared message cards: a video share names its video, the place says where 
   })
 
   // Before the in-app link below, which opens a second tab.
-  await test.step("a message shared from a conversation Juno does not have keeps Slack's footer, which opens outside", async () => {
+  await step("a message shared from a conversation Juno does not have keeps Slack's footer, which opens outside", async () => {
     const closed = card('Sharing a closed room')
-    await closed.scrollIntoViewIfNeeded()
     await expect(closed.locator('[data-shared-source]')).toHaveCount(0)
     const link = closed.getByRole('link', { name: 'Thread in Slack conversation' })
     await link.click()
@@ -60,25 +58,22 @@ test('shared message cards: a video share names its video, the place says where 
     await tabs.expectCount(1)
   })
 
-  await test.step('a shared message says where it was posted, and its place opens the message in its topic', async () => {
+  await step('a shared message says where it was posted, and its place opens the message in its topic', async () => {
     // The place comes from Juno's data, not Slack's generic footer.
     const reply = card('Sharing the reaper reply')
-    await reply.scrollIntoViewIfNeeded()
     await expect(reply.locator('[data-shared-source]')).toHaveText('Thread in eng')
     await expect(reply).not.toContainText('Slack conversation')
     const retro = card('Sharing the retro note').locator('[data-shared-source]')
     await expect(retro).toHaveText('leadership')
     await expect(retro.getByRole('img', { name: 'Private channel' })).toBeVisible()
 
-    // The place is a link inside Juno: hover says where it goes, a click opens the reply in its thread, which flashes.
+    // The place is a link inside Juno: hover says where it goes, a click opens the reply in its thread.
     const link = reply.locator('a:has([data-shared-source])')
     await expect(link).toHaveAttribute('data-in-app', '')
     await link.hover()
     await expect(link).toHaveAttribute('title', '#eng · Thread')
-    const flashed = await watchFlashes(juno.win)
     await link.click()
     await tabs.expectCount(2)
-    await expect(topic.message('Please do.')).toBeInViewport({ timeout: 15_000 })
-    await expect.poll(async () => (await flashed()).some((row) => row.includes('Please do.')), { timeout: 10_000 }).toBe(true)
+    await expect(topic.message('Please do.')).toBeVisible({ timeout: 15_000 })
   })
-})
+}, { synced: false })

@@ -168,6 +168,68 @@ export class TopicPane implements TopicVerbs {
     return this.header.getByRole('button', { name: 'More', exact: true })
   }
 
+  /** The context pill, a button named by the channel and its kind. */
+  get contextPill(): Query {
+    return this.header.locator('[data-island="left"]').getByRole('button').first()
+  }
+
+  /** The right island's Follow, on a thread you do not follow: a click follows it. */
+  get followButton(): Query {
+    return this.header.getByRole('button', { name: 'Follow', exact: true })
+  }
+
+  /** Clicks Follow and waits for it to give way. Answers whether a native menu opened on the way (none should). */
+  async follow(): Promise<{ readonly menuOpened: boolean }> {
+    const asked = this.menus.asked
+    await this.followButton.click()
+    await expect(this.followButton).toHaveCount(0, { timeout: 10_000 })
+    return { menuOpened: this.menus.asked !== asked }
+  }
+
+  get divider(): Query {
+    return this.root.locator('[data-new-divider]')
+  }
+
+  /** The "N new" divider sits right before the message that starts with `text`. Where it sits on screen is the browser lane's. */
+  async expectDividerBefore(text: string): Promise<void> {
+    await expect(this.root.locator('[data-new-divider] + [data-message-row]')).toContainText(text, { timeout: 15_000 })
+  }
+
+  async expectNew(count: number): Promise<void> {
+    await expect(this.divider).toHaveText(`${count} new`)
+  }
+
+  async expectNoDivider(): Promise<void> {
+    await expect(this.divider).toHaveCount(0)
+  }
+
+  /** A thread link under the Main message whose body contains `text`. */
+  threadLinkUnder(text: string): ThreadLink {
+    return new ThreadLink(this.message(text).locator('[data-thread-link]'))
+  }
+
+  /** A #channel chip in a message: clicking it scopes the sidebar. */
+  async clickChannel(name: string): Promise<void> {
+    await this.list.getByRole('button', { name: `#${name}` }).first().click()
+  }
+
+  /** Opens the topic switcher from the title. */
+  async openSwitcher(): Promise<TopicSwitcher> {
+    await this.titleButton.click()
+    const switcher = new TopicSwitcher(this.dom)
+    await expect(switcher.root).toBeVisible()
+    return switcher
+  }
+
+  /** Focuses the title and opens the switcher with Enter. */
+  async openSwitcherWithKeyboard(): Promise<TopicSwitcher> {
+    await this.titleButton.focus()
+    await this.dom.press('Enter')
+    const switcher = new TopicSwitcher(this.dom)
+    await expect(switcher.root).toBeVisible()
+    return switcher
+  }
+
   /** Opens the topic menu from ⋯ and picks `item`. */
   async chooseInMenu(item: string): Promise<MenuSeen> {
     this.menus.choose(item)
@@ -176,9 +238,50 @@ export class TopicPane implements TopicVerbs {
   }
 
   /** Opens the topic menu by right-clicking the title and picks `item`. */
-  async chooseInTitleMenu(item: string): Promise<MenuSeen> {
+  async chooseInTitleMenu(item: string | null): Promise<MenuSeen> {
     this.menus.choose(item)
     await this.titleButton.click({ button: 'right' })
     return this.menus.last()
+  }
+}
+
+/** A thread link under a Main message: a press opens the thread, with ⌘ in a new tab. */
+export class ThreadLink {
+  constructor(readonly root: Query) {}
+
+  async open(options: { readonly newTab?: boolean } = {}): Promise<void> {
+    await this.root.click(options.newTab === true ? { modifiers: ['Meta'] } : {})
+  }
+}
+
+/** The title's topic switcher: a search field over the channel's Main and threads. */
+export class TopicSwitcher {
+  readonly root: Query
+
+  constructor(readonly dom: Dom) {
+    this.root = dom.getByRole('dialog', { name: 'Topics in this channel' })
+  }
+
+  get search(): Query {
+    return this.root.getByRole('textbox', { name: 'Search this channel' })
+  }
+
+  /** A row, by the start of its title ("Main" for Main). */
+  row(title: string): Query {
+    return this.root.getByRole('option', { name: new RegExp(`^${escapeRegExp(title)}`) })
+  }
+
+  /** Row titles, top to bottom. */
+  titles(): string[] {
+    return this.root.getByRole('option').all().map((row) => (row.querySelector('span span')?.textContent ?? row.textContent ?? '').trim())
+  }
+
+  /** A press on a row; with `newTab`, ⌘ held. */
+  async open(title: string, options: { readonly newTab?: boolean } = {}): Promise<void> {
+    await this.row(title).click(options.newTab === true ? { modifiers: ['Meta'] } : {})
+  }
+
+  async type(text: string): Promise<void> {
+    await this.search.fill(text)
   }
 }

@@ -50,6 +50,8 @@ export class DomApp {
   window: Window
   dom: Dom
   #closing: Promise<void> | undefined
+  /** The welcome card shows by itself (`tour=auto`), as outside tests; off unless a relaunch asks. */
+  #tour = false
 
   private constructor(
     readonly host: TestHost,
@@ -79,6 +81,7 @@ export class DomApp {
     const ready = existsSync(sessionFile) ? (JSON.parse(readFileSync(sessionFile, 'utf8')) as { ready?: unknown }).ready : undefined
     const url = new URL(this.host.url)
     url.searchParams.set('e2e', '1')
+    if (this.#tour) url.searchParams.set('tour', 'auto')
     if (ready !== undefined) url.searchParams.set('session', JSON.stringify(ready))
     return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) })
   }
@@ -93,14 +96,16 @@ export class DomApp {
    * engine and agent stop, `whileClosed` runs, they start again and a new
    * window loads. localStorage goes with the window, as the browser lane's
    * launch preferences do not: a test of what main keeps stays in Electron.
+   * With `tour`, the new page shows the welcome card by itself, as outside tests.
    */
-  async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly engine?: EngineOptions } = {}): Promise<void> {
+  async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly engine?: EngineOptions; readonly tour?: boolean } = {}): Promise<void> {
     const local = this.window.localStorage
     const storage = Array.from({ length: local.length }, (_, at) => local.key(at)!).map((key) => [key, local.getItem(key)!] as const)
     await within(this.window.happyDOM.close(), 3_000, 'closing the page')
     await this.host.quitEngine()
     await options.whileClosed?.()
     await this.host.startEngine(options.engine)
+    this.#tour = options.tour === true
     this.window = this.#open()
     for (const [key, value] of storage) this.window.localStorage.setItem(key, value)
     this.dom = new Dom(this.window)
