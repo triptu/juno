@@ -8,6 +8,7 @@
 import { expect as bunExpect } from 'bun:test'
 import { checked, disabled, matches, nameOf, shown, type El, type TextMatch } from './find'
 import { Query } from './query'
+import { focusLog } from './window'
 
 const DEFAULT_TIMEOUT = 5_000
 
@@ -55,7 +56,7 @@ function checks(query: Query): Record<keyof QueryAssertions, (...args: never[]) 
       return { pass: actual !== null && (wanted === undefined || matches(actual, wanted, true)), seen: () => JSON.stringify(actual) }
     },
     toHaveValue: (wanted: TextMatch) => { const el = query.el(); return { pass: el !== undefined && matches(value(el), wanted, true), seen: () => JSON.stringify(el === undefined ? null : value(el)) } },
-    toBeFocused: () => { const el = query.el(); const active = el?.ownerDocument.activeElement; return { pass: el !== undefined && active === el, seen: () => (active === null || active === undefined ? 'nothing focused' : (active as El).outerHTML.slice(0, 160)) } },
+    toBeFocused: () => { const el = query.el(); const active = el?.ownerDocument.activeElement; return { pass: el !== undefined && active === el, seen: () => `${active === null || active === undefined ? 'nothing focused' : (active as El).outerHTML.slice(0, 160)}; the last focus calls:\n  ${focusLog(query.dom.window)}` } },
     toBeDisabled: () => { const el = query.el(); return { pass: el !== undefined && disabled(el), seen: () => (el === undefined ? 'no match' : 'enabled') } },
     toBeEnabled: () => { const el = query.el(); return { pass: el !== undefined && !disabled(el), seen: () => (el === undefined ? 'no match' : 'disabled') } },
     toBeChecked: (options?: { checked?: boolean }) => { const el = query.el(); return { pass: el !== undefined && checked(el) === (options?.checked ?? true), seen: () => (el === undefined ? 'no match' : String(checked(el))) } },

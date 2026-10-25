@@ -194,6 +194,24 @@ function unhidden(el: HTMLElement): boolean {
 
 let prototypesPatched = false
 
+const FOCUS_LOG = Symbol('focusLog')
+interface FocusMove {
+  readonly name: string
+  readonly element: HTMLElement
+  readonly by: string
+}
+
+/** The page's own functions on the stack, nearest first. */
+function callers(): string {
+  return (new Error().stack ?? '').split('\n').filter((line) => line.includes('renderer.js')).slice(0, 4).map((line) => line.trim().replace(/^at /, '').replace(/ \(.*$/, '')).join(' < ')
+}
+
+/** The last focus() and blur() calls in `window`, oldest first, and whether each element is still in the page. */
+export function focusLog(window: object): string {
+  const log = (window as { [FOCUS_LOG]?: FocusMove[] })[FOCUS_LOG] ?? []
+  return log.map(({ name, element, by }) => `${name} ${element.outerHTML.slice(0, 80)}${element.isConnected ? '' : ' (since removed)'} by ${by || 'the test'}`).join('\n  ')
+}
+
 /**
  * happy-dom's element classes are shared by every window, so their gaps are
  * filled once per worker, and what depends on the window is read from the
@@ -218,6 +236,20 @@ function patchPrototypes(window: Window): void {
     return { finished: Promise.resolve(), cancel() {}, finish() {}, play() {}, pause() {}, reverse() {}, onfinish: null, addEventListener(type: string, listener: () => void) { if (type === 'finish') queueMicrotask(listener) }, removeEventListener() {}, currentTime: 0, playState: 'finished' }
   }
   proto['getAnimations'] ??= function () { return [] }
+  // Each focus() and blur() with the page functions that called it, for a failed `toBeFocused` to show (`focusLog`).
+  const html = (window as unknown as { HTMLElement: typeof HTMLElement }).HTMLElement.prototype as unknown as Record<string, unknown>
+  for (const name of ['focus', 'blur']) {
+    const original = html[name] as (this: HTMLElement, ...args: unknown[]) => void
+    html[name] = function (this: HTMLElement, ...args: unknown[]) {
+      const view = this.ownerDocument.defaultView as { [FOCUS_LOG]?: FocusMove[] } | null
+      if (view !== null) {
+        const log = (view[FOCUS_LOG] ??= [])
+        log.push({ name, element: this, by: callers() })
+        if (log.length > 12) log.shift()
+      }
+      return original.apply(this, args)
+    }
+  }
   // A browser sets `window.event` while an event's listeners run, and React reads it: an update from a native
   // keydown or click listener is then discrete and renders at once, before any timer. happy-dom leaves it unset.
   const target = (window as unknown as { EventTarget: typeof EventTarget }).EventTarget.prototype as unknown as Record<string, unknown>
