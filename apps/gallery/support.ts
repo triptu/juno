@@ -80,9 +80,29 @@ export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
 /**
  * Opens one state and waits until it is drawn: chunks, fonts and images loaded, theme applied, entrance animations done.
  * With `finishMotion`, entrance animations are finished at once instead of waited for (the computed shift check).
+ * With `inPlace`, the open gallery document moves to the state through its hash instead of loading again: the frame is
+ * keyed by state, so the fixture mounts fresh, but module state, the window's scroll and listeners on it remain.
  */
-export async function openState(page: Page, route: Route, theme: Theme = 'light', accent?: string, { finishMotion = false } = {}): Promise<void> {
-  await page.goto(stateUrl(route, theme, accent))
+export async function openState(page: Page, route: Route, theme: Theme = 'light', accent?: string, { finishMotion = false, inPlace = false } = {}): Promise<void> {
+  if (inPlace) {
+    await page.evaluate(async (hash) => {
+      ;(document.activeElement as HTMLElement | null)?.blur?.()
+      getSelection()?.removeAllRanges()
+      // A state opened again must mount again, so pass through a page that draws no frame.
+      if (location.hash === hash) {
+        location.hash = '#/~'
+        const deadline = performance.now() + 5_000
+        while (document.querySelector('[data-fixture-frame]') !== null) {
+          if (performance.now() >= deadline) throw new Error('The gallery did not leave the state within 5 s')
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        }
+      }
+      scrollTo(0, 0)
+      location.hash = hash
+    }, stateUrl(route, theme, accent).slice(1))
+  } else {
+    await page.goto(stateUrl(route, theme, accent))
+  }
   await expect(page.locator(`[data-fixture-frame="${route.route}"]`)).toBeVisible()
   // Wait for code, not data: loading and pending-image fixtures intentionally never settle. Some chunks start in an idle
   // callback with a 5 s deadline (the destination lists), so on a busy machine the load begins only then.

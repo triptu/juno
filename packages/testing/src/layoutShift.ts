@@ -427,7 +427,7 @@ export interface ForcedInteractionOptions {
   readonly targets: string
   /** Elements inside a match of this selector are not touched (growth the user asks for). */
   readonly skipWithin?: string
-  /** Elements touched at most; a longer list is sampled from both ends. Default 16. */
+  /** Elements touched at most; a longer list gives its first ones and its last three. Default 8, as the walk. */
   readonly max?: number
   /** Index in that list to start at, after `next` asked for a fresh document. */
   readonly from?: number
@@ -449,9 +449,9 @@ export interface ForcedInteractionReport {
   readonly shifts: ReadonlyArray<ForcedShift>
   /** Elements touched in this call. */
   readonly touched: number
-  /** Set when a touch changed the markup and elements are left: open the state again and call with `from: next`. */
+  /** Set when a touch removed or hid elements still to touch: open the state again and call with `from: next`. */
   readonly next?: number
-  /** Pseudo-class rules that could not be rewritten, for the log. */
+  /** Pseudo-class rules in this document that could not be rewritten, for the log. */
   readonly unforced: number
 }
 
@@ -486,28 +486,34 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
       const rootEl = found instanceof HTMLElement ? found : document.body
       const names = { hover: 'data-juno-hover', active: 'data-juno-active', focus: 'data-juno-focus', 'focus-visible': 'data-juno-focus-visible', 'focus-within': 'data-juno-focus-within' }
       const pseudo = /:(hover|active|focus-visible|focus-within|focus)(?![\w-])/g
-      let unforced = 0
+      const counts = window as unknown as { __junoUnforced?: number }
+      counts.__junoUnforced ??= 0
       const rewrite = (rules: CSSRuleList) => {
         for (const rule of Array.from(rules)) {
           if (rule instanceof CSSStyleRule && rule.selectorText.search(pseudo) !== -1) {
             rule.selectorText = rule.selectorText.replace(pseudo, (_, name: keyof typeof names) => `[${names[name]}]`)
             // A pseudo-element before the pseudo-class (a scrollbar thumb's :hover) cannot take an attribute.
-            if (rule.selectorText.search(pseudo) !== -1) unforced++
+            if (rule.selectorText.search(pseudo) !== -1) counts.__junoUnforced!++
           }
           if ('cssRules' in rule) rewrite((rule as CSSGroupingRule).cssRules)
         }
       }
+      // Sheets already rewritten, by their rule count: a document that opens many states gains sheets with each chunk.
+      const scope = window as unknown as { __junoForcedSheets?: WeakMap<CSSStyleSheet, number> }
+      const seen = (scope.__junoForcedSheets ??= new WeakMap())
       const rewriteSheets = () => {
         for (const sheet of [...Array.from(document.styleSheets), ...document.adoptedStyleSheets]) {
           try {
+            if (seen.get(sheet) === sheet.cssRules.length) continue
             rewrite(sheet.cssRules)
+            seen.set(sheet, sheet.cssRules.length)
           } catch {
             // A cross-origin sheet cannot be read; the gallery has none.
           }
         }
       }
+      rewriteSheets()
       if (!document.getElementById('juno-forced-still')) {
-        rewriteSheets()
         const still = document.createElement('style')
         still.id = 'juno-forced-still'
         still.textContent = '*, *::before, *::after { transition: none !important; }'
@@ -567,13 +573,19 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
           await task()
           await task()
         }
-        for (const animation of document.getAnimations()) {
-          if (earlier.has(animation) || !Number.isFinite(Number(animation.effect?.getComputedTiming().endTime))) continue
-          try {
-            animation.finish()
-          } catch {
-            // An animation that cannot finish (playback rate 0) moves nothing either.
+        // Finish what the touch started; code waiting on the end (a morph that swaps its layers) runs in the tasks after.
+        for (let round = 0; round < 4; round++) {
+          const started = document.getAnimations().filter((animation) => !earlier.has(animation) && animation.playState !== 'finished' && Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)))
+          if (started.length === 0) break
+          for (const animation of started) {
+            try {
+              animation.finish()
+            } catch {
+              // An animation that cannot finish (playback rate 0) moves nothing either.
+            }
           }
+          await task()
+          await task()
         }
         syncFocus()
       }
@@ -588,10 +600,10 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
       const sample = Array.from(rootEl.querySelectorAll(arg.targets)).filter(
         (el): el is HTMLElement => el instanceof HTMLElement && (arg.skipWithin === null || el.parentElement?.closest(arg.skipWithin) == null),
       )
-      const tail = Math.floor(arg.max / 3)
+      // The first ones and the last three, as the real-input walk picks them.
+      const tail = Math.min(3, arg.max)
       const picked = sample.length <= arg.max ? sample : [...sample.slice(0, arg.max - tail), ...sample.slice(-tail)]
-      const markup = () => rootEl.innerHTML.replace(/ data-juno-[a-z-]+=""/g, '')
-      const initial = markup()
+      const drawn = new Set(picked.filter((el) => el.getClientRects().length > 0))
       const shifts: Array<{ element: number; target: string; step: string; moved: unknown[] }> = []
       let touched = 0
       let boxes = helpers.layoutBoxes(rootEl)
@@ -664,16 +676,17 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
           for (const el of hovered) fire('mouseleave', el, { ...at(x, y), bubbles: false })
           clear(names.hover)
         })
-        // A touch that changed what the state draws (Undo puts back other buttons) needs a fresh document for the rest.
-        if (index + 1 < picked.length && markup() !== initial) return { shifts, touched, next: index + 1, unforced }
+        // A touch that took away or hid elements still to touch (Undo puts back other buttons) needs a fresh state for the rest.
+        // Other changes stay: what follows is still something a person can do, and each step is measured on its own.
+        if (picked.slice(index + 1).some((next) => drawn.has(next) && (!next.isConnected || next.getClientRects().length === 0))) return { shifts, touched, next: index + 1, unforced: counts.__junoUnforced }
       }
-      return { shifts, touched, unforced }
+      return { shifts, touched, unforced: counts.__junoUnforced }
     },
     {
       root: options.root ?? defaults.root,
       targets: options.targets,
       skipWithin: options.skipWithin ?? null,
-      max: options.max ?? 16,
+      max: options.max ?? 8,
       from: options.from ?? 0,
       pending: options.pending ?? null,
       tolerance: options.tolerance ?? defaults.tolerance,

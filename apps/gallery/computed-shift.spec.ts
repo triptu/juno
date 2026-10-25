@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 import { checkForcedInteractions, formatForcedShift, type ForcedInteractionReport } from '@juno/testing/layout-shift'
-import { checkStateWithin, claimQueue, interactive, openState, readRoutes, walkPages, type Route } from './support'
+import { checkStateWithin, claimQueue, interactive, openState, readRoutes, type Route } from './support'
 
 /**
  * The computed tier of the shift guard, over every state on every run.
  *
  * Each state is opened once. In one call per state, every interactive element
- * (up to `perState`, sampled from both ends) is hovered, focused from the
+ * (up to `perState`, sampled from both ends as the walk samples them) is hovered, focused from the
  * keyboard, blurred, pressed, released and left by forcing the pseudo-class
  * styles and dispatching the events React listens to, with transitions off
  * (`checkForcedInteractions` in packages/testing says what it cannot see).
@@ -27,7 +27,10 @@ import { checkStateWithin, claimQueue, interactive, openState, readRoutes, walkP
  *
  * GALLERY_SHIFT_ONLY and JUNO_SHARD select states as for the walk.
  */
-const perState = 16
+const perState = 8
+
+/** States one document opens before a fresh one, so what fixtures leave behind stays small. */
+const perDocument = 150
 
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
@@ -60,9 +63,23 @@ const drawnRules = (page: Page, route: Route) =>
   }, route.route)
 
 for (let part = 0; part < parts; part++) {
-  test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, async ({ context }) => {
-    const pages = await walkPages(context)
-    const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
+  test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, async ({ page: first, context }) => {
+    // One document opens many states through its hash: loading the gallery again for each would cost more than the check.
+    let page = first
+    let opened = 0
+    let opening = 0
+    const open = async (route: Route, again = false) => {
+      if (!again && opened > 0 && opened % perDocument === 0) {
+        await page.close({ runBeforeUnload: false })
+        page = await context.newPage()
+      }
+      const inPlace = again || opened % perDocument !== 0
+      if (!again) opened++
+      const from = Date.now()
+      await openState(page, route, 'light', undefined, { finishMotion: true, inPlace })
+      opening += Date.now() - from
+    }
+    const routes = (await readRoutes(page)).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
     // Half a second a state is the target; a second a state leaves room on a loaded machine.
     test.setTimeout(Math.max(5 * 60_000, Math.ceil((routes.length * 1_000) / Math.min(parts, test.info().config.workers))))
@@ -75,8 +92,7 @@ for (let part = 0; part < parts; part++) {
     try {
       for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
         await checkStateWithin(route, async () => {
-          const page = await pages.next()
-          await openState(page, route, 'light', undefined, { finishMotion: true })
+          await open(route)
           states++
           const drawn = await drawnRules(page, route)
           for (const hit of drawn.cursors) cursors.push(`${route.route}: ${hit}`)
@@ -88,14 +104,14 @@ for (let part = 0; part < parts; part++) {
             for (const shift of report.shifts) shifts.push(`${route.route} (element ${shift.element + 1}, ${shift.target}) ${formatForcedShift(shift)}`)
             if (report.next === undefined) break
             resets++
-            await page.goto('about:blank')
-            await openState(page, route, 'light', undefined, { finishMotion: true })
+            await open(route, true)
           }
         })
       }
     } finally {
       const ms = states > 0 ? Math.round((Date.now() - started) / states) : 0
-      console.log(`computed shift: ${states} states, ${elements} elements, ${resets} resets, ${ms} ms a state, ${unforced} pseudo-class rules left unforced`)
+      const open = states > 0 ? Math.round(opening / states) : 0
+      console.log(`computed shift: ${states} states, ${elements} elements, ${resets} resets, ${ms} ms a state (${open} ms opening), ${unforced} pseudo-class rules left unforced`)
     }
     expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect.soft(rows, 'every message row is a whole number of pixels tall').toEqual([])
@@ -109,18 +125,19 @@ for (let part = 0; part < parts; part++) {
  */
 test.describe('the computed tier itself', () => {
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
-  const steps = async (page: Page) => (await forced(page)).shifts.map((shift) => `${shift.step}: ${formatForcedShift(shift)}`)
-  const base = '.b{display:block;width:100px;height:30px;font:12px sans-serif;padding:0;border:0}p{margin:0}'
+  const steps = async (page: Page) => (await forced(page)).shifts.map(formatForcedShift)
+  // No fixed height: a button's box includes its padding and border, so only a sized-by-content one can grow.
+  const base = '.b{display:block;width:100px;font:12px/18px sans-serif;padding:6px 0;border:0}p{margin:0}'
 
   for (const [name, css, step] of [
     ['a hover rule that changes padding', '.b:hover{padding-top:8px}', 'hover'],
     ['a hover rule that adds a border, inside a media query', '@media (hover: hover){.b:hover{border:2px solid}}', 'hover'],
-    ['a hover on the parent that grows the child', '.row:hover .b{height:40px}', 'hover'],
-    ['a hover transition of height', '.b{transition:height 200ms}.b:hover{height:60px}', 'hover'],
+    ['a hover on the parent that grows the child', '.row:hover .b{line-height:28px}', 'hover'],
+    ['a hover transition of padding', '.b{transition:padding 200ms}.b:hover{padding:12px 0}', 'hover'],
     ['a focus ring that takes room', '.b:focus-visible{border:3px solid blue}', 'focus from the keyboard'],
     ['focus-within that pads the row', '.row:focus-within{padding:4px}', 'focus from the keyboard'],
-    ['a press that changes size', '.b:active{height:34px}', 'press'],
-    ['a mouse focus that changes size', '.b:focus:not(:focus-visible){height:34px}', 'press'],
+    ['a press that changes size', '.b:active{padding-bottom:8px}', 'press'],
+    ['a mouse focus that changes size', '.b:focus:not(:focus-visible){padding-bottom:8px}', 'press'],
   ] as const) {
     test(`fails on ${name}`, async ({ page }) => {
       await page.setContent(frame(base + css, '<div class="row"><button class="b">Touch me</button></div><p>Below</p>'))
@@ -130,28 +147,33 @@ test.describe('the computed tier itself', () => {
     })
   }
 
-  test('fails when a React-style handler renders on pointer enter, and on a late chunk', async ({ page }) => {
-    await page.setContent(frame(base, '<button class="b">Hover me</button><p>Below</p><button class="c">Late</button>'))
+  test('fails when a handler at the root renders on pointer over, as React does', async ({ page }) => {
+    await page.setContent(frame(base, '<button class="b">Hover me</button><p>Below</p>'))
     await page.evaluate(() => {
-      // As React does: one listener at the root for every element, reacting to pointerover, rendering in a task.
+      // One listener at the root for every element, rendering in a later task.
       document.addEventListener('pointerover', (event) => {
         if (!(event.target as Element).matches('.b')) return
         setTimeout(() => document.querySelector('p')!.before(Object.assign(document.createElement('p'), { textContent: 'Inserted' })), 0)
       })
-      const late = document.querySelector<HTMLElement>('.c')!
-      late.addEventListener('pointerenter', () => {
+    })
+    expect((await forced(page)).shifts.map((shift) => shift.step)).toContain('hover')
+  })
+
+  test('waits for code a touch starts loading, and fails on what it moves', async ({ page }) => {
+    await page.setContent(frame(base, '<button class="b">Late</button><p>Below</p>'))
+    await page.locator('.b').evaluate((button: HTMLElement) => {
+      button.addEventListener('pointerenter', () => {
         const pending = document.createElement('span')
         pending.hidden = true
         pending.setAttribute('data-chunk-pending', '')
         document.body.append(pending)
         setTimeout(() => {
-          late.style.paddingBottom = '40px'
+          button.style.paddingBottom = '40px'
           pending.remove()
         }, 100)
       }, { once: true })
     })
-    const report = await forced(page)
-    expect(report.shifts.map((shift) => `${shift.element} ${shift.step}`)).toEqual(expect.arrayContaining(['0 hover', '1 hover']))
+    expect((await forced(page)).shifts.map((shift) => shift.step)).toContain('hover')
   })
 
   test('lets a press scale, a colour change, an outline ring and an opacity fade through', async ({ page }) => {
