@@ -14,6 +14,7 @@
  */
 import { AUTO_AWAY_MILLIS } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
+import type { Slack } from './driver/slack'
 import { expect, syncedTest as test } from './fixtures'
 
 // The socket spacing itself is covered by packages/slack/test/socket.test.ts.
@@ -28,10 +29,15 @@ async function setActive(juno: Juno): Promise<void> {
   await juno.accountMenu.close()
 }
 
+/** At the Mac: main reports it at once instead of at its next 10 s poll, until Slack shows you active. */
+async function expectSeenActiveAtMac(juno: Juno, slack: Slack): Promise<void> {
+  await expect.poll(async () => { await juno.setSystemIdle(0); return slack.fake.selfPresence() }, { timeout: 15_000 }).toBe('active')
+}
+
 test('Set yourself away and active from the avatar menu, and the avatar shows what Slack shows colleagues', async ({ juno, slack }) => {
   test.setTimeout(150_000)
   await setActive(juno)
-  await slack.expectSeenAs('active')
+  await expectSeenActiveAtMac(juno, slack)
   await juno.sidebar.expectOwnPresence('active')
 
   await test.step('Set yourself away sets Slack presence and stays away while you use the Mac', async () => {
@@ -58,7 +64,7 @@ test('Set yourself away and active from the avatar menu, and the avatar shows wh
     await juno.accountMenu.open()
     await juno.accountMenu.item('Set yourself active').click()
     await slack.expectPresenceSet('active')
-    await slack.expectSeenAs('active')
+    await expectSeenActiveAtMac(juno, slack)
     await juno.accountMenu.open()
     await expect(juno.accountMenu.item('Set yourself away')).toBeVisible()
     await juno.accountMenu.expectPresence(/^Active/)
@@ -82,7 +88,7 @@ test('Set yourself away and active from the avatar menu, and the avatar shows wh
   })
 
   await test.step('back at the Mac, Slack says active and the dot turns green', async () => {
-    await expect.poll(async () => { await juno.setSystemIdle(0); return slack.fake.selfPresence() }, { timeout: 15_000 }).toBe('active')
+    await expectSeenActiveAtMac(juno, slack)
     await juno.sidebar.expectOwnPresence('active')
   })
 
