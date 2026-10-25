@@ -129,11 +129,8 @@ syncedTest('the signed-in shell: its image policy, drag regions, surfaces over t
   await test.step('every surface that can open over a title bar opts out of its drag region', () => surfacesOptOut(juno, fake))
   await test.step('answers app.getInfo over the typed IPC bridge', () => buildLine(juno))
   await test.step('Settings › About keeps updates off in tests', () => updatesOff(juno))
-  await test.step('in full screen the title bars drop the traffic lights’ room, and keep it again after', async () => {
-    await juno.win.keyboard.press('Escape')
-    await expect(juno.settings.root).toHaveCount(0)
-    await fullScreenInsets(juno)
-  })
+  // Settings is a tab: the title bars stay as they are.
+  await test.step('in full screen the title bars drop the traffic lights’ room, and keep it again after', () => fullScreenInsets(juno))
 })
 
 async function dragRegions(juno: Juno): Promise<void> {
