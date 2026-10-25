@@ -398,3 +398,59 @@ it('live changes reach exactly the rows they touch, and names stand in for menti
     expect(after.find((row) => row.id === id)!.rev).not.toBe(before.find((row) => row.id === id)!.rev)
   })
 })
+
+it("Main's thread link previews the first reply once the thread is opened, and names its first three repliers", async () => {
+  const engine = await synced()
+  const thread = threadId(engine.fake, 'C0ENG', 'checkout.spec failed again')
+  const root = tsOf(thread)
+  const main = watchList(engine, messagesAtom('m:C0ENG'))
+  const link = (window: ListWindow<MessageView>) => window.rows.get(root)?.thread
+
+  await step('before the thread is opened, the link has its count and no preview: Main never fetches replies', async () => {
+    expect(link(await main.until((window) => link(window)?.replyCount === 5, 'the thread link'))?.preview).toBeUndefined()
+  })
+
+  await step('after the open, the link previews the first reply, not the root or the newest reply', async () => {
+    expect(valueOf(await openTopic(engine.registry, thread)).outcome).toBe('fetched')
+    const window = await main.until((value) => link(value)?.preview !== undefined, 'the preview')
+    expect(link(window)).toMatchObject({ replyCount: 5, preview: 'Sam: Quarantining it. Ticket filed.', replierIds: ['U0SAM', 'U0DEV'] })
+  })
+
+  await step('new replies keep the first reply as the preview and add repliers up to three, in Slack order', async () => {
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', threadTs: root, text: 'I will check the frame load.' })
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', threadTs: root, text: 'I can take the ticket.' })
+    const window = await main.until((value) => link(value)?.replyCount === 7, 'seven replies')
+    expect(link(window)).toMatchObject({ preview: 'Sam: Quarantining it. Ticket filed.', replierIds: ['U0SAM', 'U0DEV', 'U0MAYA'] })
+  })
+})
+
+it('a user group mention reads as its handle in Main, a thread and the sidebar, a deleted group keeps its name, and a rename reaches the open thread', async () => {
+  const engine = await synced()
+  const postgres = threadId(engine.fake, 'C0ENG', 'Draft plan is in the doc')
+  valueOf(await openTopic(engine.registry, postgres))
+  const thread = watchList(engine, messagesAtom(postgres))
+  const main = watchList(engine, messagesAtom('m:C0ENG'))
+  // Slack sends the bare id; the handle comes from `usergroups.list`.
+  const old = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Old pager notes from <!subteam^S0OLDOPS> are archived.' })
+  const design = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<!subteam^S0DESIGN> the new icons are ready for review.' })
+  const ask = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', threadTs: tsOf(postgres), text: '<!subteam^S0PLATFORM> can someone review the cutover runbook?' })
+  const group = (window: ListWindow<MessageView>, ts: string) => window.rows.get(ts)?.body.blocks.flatMap((block) => ('children' in block ? block.children : [])).find((inline) => inline.kind === 'usergroup')
+
+  await step('Main names the group by its handle, and a deleted group by the handle it had', async () => {
+    const window = await main.until((value) => value.rows.has(old.ts) && value.rows.has(design.ts), 'the mentions in Main')
+    expect([group(window, design.ts), group(window, old.ts)]).toMatchObject([{ id: 'S0DESIGN', handle: 'design-crew', name: 'Design crew' }, { id: 'S0OLDOPS', handle: 'old-ops' }])
+  })
+
+  await step('the sidebar previews read the handle, never the id', async () => {
+    const rows = await engine.rowsUntil((list) => list.find((row) => row.id === 'm:C0ENG')?.preview.text.startsWith('@design-crew the new icons') === true
+      && list.find((row) => row.id === postgres)?.preview.text.startsWith('@platform can someone review') === true, 'the handles in the previews')
+    expect(rows.filter((row) => /S0[A-Z]+/.test(`${row.title} ${row.preview.text}`)).map((row) => row.id)).toEqual([])
+  })
+
+  await step('the thread names it, and a rename from another client reaches it', async () => {
+    expect(group(await thread.until((value) => value.rows.has(ask.ts), 'the mention in the thread'), ask.ts)).toMatchObject({ id: 'S0PLATFORM', handle: 'platform', name: 'Platform team' })
+    engine.fake.putUsergroup({ id: 'S0PLATFORM', handle: 'platform-core', name: 'Platform core' })
+    const renamed = await thread.until((value) => JSON.stringify(group(value, ask.ts)).includes('platform-core'), 'the new handle')
+    expect(group(renamed, ask.ts)).toMatchObject({ handle: 'platform-core', name: 'Platform core' })
+  })
+})

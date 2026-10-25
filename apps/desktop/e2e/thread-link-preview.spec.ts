@@ -4,33 +4,21 @@ import { expectStableAnchor } from './shiftProbe'
 const ROOT = 'checkout.spec failed again on main.'
 const FIRST_REPLY = 'Sam: Quarantining it. Ticket filed.'
 
-syncedTest('Main previews the first reply after opening a thread, never the root or newest reply, and shows the first three reply_users', async ({ juno, slack }) => {
-  await test.step('after the thread is opened, its link previews the first reply', async () => {
-    await juno.sidebar.row('#eng').open()
-    await juno.topic.threadLinkUnder(ROOT).open()
-    await juno.topic.expectMessage('Quarantining it. Ticket filed.')
-    await juno.sidebar.row('#eng').open()
-    const link = juno.topic.threadLinkUnder(ROOT).root
-    await expect(link).toHaveAccessibleName(`5 replies: ${FIRST_REPLY}`)
-    await expect(link).toContainText(FIRST_REPLY)
-    await expect(link.locator('[data-kind="person"]')).toHaveCount(2)
-    expect(await link.locator('[data-kind="person"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).toEqual(['Sam', 'Dev'])
-    await expect(link).not.toContainText(ROOT)
-    await expect(link).not.toContainText('can we live with the quarantine')
-  })
-
-  await test.step('Main shows only the first three reply_users in their Slack order without an extra counter', async () => {
-    slack.as('Maya').replyIn(ROOT, 'I will check the frame load.')
-    slack.as('Leo').replyIn(ROOT, 'I can take the ticket.')
-    const link = juno.topic.threadLinkUnder(ROOT).root
-    // The preview stays the first reply, not the newest.
-    await expect(link).toHaveAccessibleName(`7 replies: ${FIRST_REPLY}`)
-    const avatars = link.locator('[data-kind="person"]')
-    await expect(avatars).toHaveCount(3)
-    expect(await avatars.evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).toEqual(['Sam', 'Dev', 'Maya'])
-    await expect(link).not.toContainText('+')
-    await expect(link.locator('svg')).toHaveCount(1)
-  })
+// Which reply previews and which repliers show is engine data (topic-view.flow.test.ts); this checks the link draws them.
+syncedTest('Main draws the thread link with its first reply and repliers once the thread is opened', async ({ juno }) => {
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.threadLinkUnder(ROOT).open()
+  await juno.topic.expectMessage('Quarantining it. Ticket filed.')
+  await juno.sidebar.row('#eng').open()
+  const link = juno.topic.threadLinkUnder(ROOT).root
+  await expect(link).toHaveAccessibleName(`5 replies: ${FIRST_REPLY}`)
+  await expect(link).toContainText(FIRST_REPLY)
+  const avatars = link.locator('[data-kind="person"]')
+  await expect(avatars).toHaveCount(2)
+  expect(await avatars.evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).toEqual(['Sam', 'Dev'])
+  // The avatars stand in for the speech bubble, with no extra counter.
+  await expect(link).not.toContainText('+')
+  await expect(link.locator('svg')).toHaveCount(1)
 })
 
 syncedTest('unknown first replies show only the count and fill in place when a peek fetch lands', async ({ juno, fake, slack, win }) => {
