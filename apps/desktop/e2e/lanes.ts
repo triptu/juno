@@ -91,7 +91,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'menus.spec.ts',
   'message-menu.spec.ts',
   'new-message-typing.spec.ts',
-  'palette-stable-results.spec.ts',
   'palette.spec.ts',
   'search.spec.ts',
   'peek.spec.ts',
