@@ -8,7 +8,10 @@ import type { NotificationPermission } from '@juno/contract'
 import { expect, type ElectronApplication, type Locator, type Page } from '@playwright/test'
 import { electronSurface, lastMenu as surfaceLastMenu, type AppMenuItem, type AppSurface, type WorkPassName } from './surface'
 
+import type { AccountMenuVerbs, HomeWriteVerbs, JunoVerbs, PaletteTabName, PaletteVerbs, SettingsSectionName, SettingsVerbs, SidebarFilterName, SidebarRowVerbs, SidebarSectionName, SidebarVerbs, TabStripVerbs, TopicVerbs } from './verbs'
+
 export type { AppMenuItem, AppSurface } from './surface'
+export type { PaletteTabName, SettingsSectionName, SidebarFilterName, SidebarSectionName } from './verbs'
 
 /**
  * How long a click holds the button, as a real one does. A pointerup in the
@@ -85,14 +88,12 @@ function settledBox(target: Locator): Promise<Box | null> {
   )
 }
 
-export type SidebarSectionName = 'Pinned' | 'Recent'
 /** Where a scroll came to rest: the first row whose top is in view, its top, and its top on each frame after. */
 export interface Landing {
   readonly ts: string
   readonly top: number
   readonly tops: ReadonlyArray<number>
 }
-export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
 /**
  * A selector for an element loading from main's `juno://<host>/` scheme. The
@@ -107,7 +108,7 @@ export const schemeUrl = (host: string): RegExp => new RegExp(`^(?:juno://|/__ju
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** One row in the sidebar, found by the start of its title. */
-export class SidebarRow {
+export class SidebarRow implements SidebarRowVerbs {
   readonly root: Locator
 
   constructor(
@@ -279,7 +280,7 @@ export type PeekKeyName = 'option' | 'space'
 const peekKeys: Record<PeekKeyName, string> = { option: 'Alt', space: 'Space' }
 
 /** The left pane: filters, sections and rows. */
-export class Sidebar {
+export class Sidebar implements SidebarVerbs {
   readonly root: Locator
 
   constructor(readonly win: Page) {
@@ -522,7 +523,7 @@ export class Sidebar {
 }
 
 /** The popover behind the avatar button: presence, privacy, Notifications, Settings and the session. */
-export class AccountMenu {
+export class AccountMenu implements AccountMenuVerbs {
   readonly root: Locator
 
   constructor(
@@ -570,7 +571,7 @@ export class AccountMenu {
 }
 
 /** Settings (inventory 14): its list of sections, and the open section's page. */
-export class SettingsPage {
+export class SettingsPage implements SettingsVerbs {
   readonly root: Locator
   readonly nav: Locator
 
@@ -639,7 +640,6 @@ export class SettingsPage {
   }
 }
 
-export type SettingsSectionName = 'General' | 'Appearance' | 'Notifications' | 'Ignored' | 'Tidy up' | 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac' | 'About'
 
 export type HoursSection = 'Notifications' | 'Active in Slack'
 export type HoursRowName = 'Weekdays' | 'Saturday' | 'Sunday'
@@ -758,7 +758,7 @@ export class PeekPopover {
   }
 }
 
-export class Juno {
+export class Juno implements JunoVerbs {
   readonly surface: AppSurface
   readonly win: Page
   readonly sidebar: Sidebar
@@ -1543,7 +1543,7 @@ export class AllTopicsPane {
  * the field, the field, the "Send to" list a first @ or # opens, and
  * the chip's destination list.
  */
-export class HomeWritePane {
+export class HomeWritePane implements HomeWriteVerbs {
   readonly root: Locator
 
   constructor(readonly win: Page) {
@@ -1657,7 +1657,7 @@ export class HomeWritePane {
   }
 }
 
-export class TopicPane {
+export class TopicPane implements TopicVerbs {
   readonly root: Locator
 
   constructor(readonly win: Page) {
@@ -2186,7 +2186,7 @@ export class TopicSwitcherDriver {
 /** A tab's close button: the tab's sibling in its box, not its child. */
 const closeOf = (tab: Locator): Locator => tab.locator('xpath=..').getByRole('button', { name: 'Close tab' })
 
-export class TabStrip {
+export class TabStrip implements TabStripVerbs {
   readonly root: Locator
 
   constructor(
@@ -2405,10 +2405,9 @@ export class WelcomeDriver {
   }
 }
 
-type PaletteTabName = 'All' | 'Conversations' | 'Messages' | 'Commands'
 
 /** ⌘K (spec section 10): the search and command palette. */
-export class PaletteDriver {
+export class PaletteDriver implements PaletteVerbs {
   readonly root: Locator
 
   constructor(
