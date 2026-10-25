@@ -59,7 +59,7 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
 // What each filter keeps, the chip counts and a row's status after an action are the engine's
 // all-topics flow test; the row menu is actions.spec.ts. This checks the controls reach the list.
 test('the filters reach the list, and the place picker searches conversations by word', async ({ juno }) => {
-  await test.step('a status chip, the text filter and Clear filters each change the list', () => useFilters(juno))
+  await test.step('a status chip, the text filter and the empty list\'s Clear filters each change the list', () => useFilters(juno))
   await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace({ juno }))
 })
 
@@ -74,6 +74,8 @@ async function useFilters(juno: Fixtures['juno']): Promise<void> {
   await allTopics.row(STAGING).expectVisible()
   await allTopics.row(POSTGRES).expectAbsent()
   await allTopics.expectCount('All', 1)
+  await allTopics.type('nothing in slack says this')
+  await allTopics.expectEmpty()
   await allTopics.clearFilters()
   await expect(allTopics.search).toHaveValue('')
   await allTopics.row(POSTGRES).expectVisible()

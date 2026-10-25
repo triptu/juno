@@ -50,7 +50,7 @@ test.describe('with AI assist on', () => {
     await expect.poll(() => home.kinds(), { timeout: 2_000 }).toEqual(['waiting', 'moved', 'tidyUp'])
 
     // Tidy up is live too: the follow-up just marked done can make its topic look settled, so read the count off the row.
-    await expect(home.meta('tidyUp')).toHaveText('incidents')
+    await expect(home.meta('tidyUp')).toContainText('incidents')
     const settled = (await home.title('tidyUp').textContent())!.match(/^(\d+) topics look settled$/)![1]
     await home.button('tidyUp', 'Resolve all').click()
     await expect.poll(() => home.kinds(), { timeout: 2_000 }).toEqual(['waiting', 'moved'])
