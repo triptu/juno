@@ -11,6 +11,7 @@ Found while porting, and so left in the browser lane:
 - **`document.execCommand`.** happy-dom has no `insertText`, and the app edits through it so ⌘Z undoes: a topic composer's suggestion picks (emoji, mentions), ⌘B and ⌘I, keys typed on Home's chips, and keys held after ⌘T.
 - **Lists sized by the viewport.** A virtual list draws no rows when its box is zero: the All topics table and the emoji picker's grid.
 - **Images loading.** An image that shows once it has loaded, or falls back when it fails, never does either here.
+- **When idle work runs.** `requestIdleCallback` runs almost at once here, so a check that something has not happened yet before idle time (Home's first picture) does not hold.
 - **Focus that follows Chromium's events.** Esc in Home's destination search ends on the chip in Chromium and on the field here; a mouse press on a tab differs too.
 
 `window.ts` fills the gaps the app needs to run (animations finish at once, `checkVisibility` answers from `hidden` and inline `display`, `:focus-visible` follows the last input, a `MessageChannel` made of the window's own event targets). None of them is a thing to test here.
