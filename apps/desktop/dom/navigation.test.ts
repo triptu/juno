@@ -65,6 +65,20 @@ domTest('Back and Forward move through the topics one tab showed', async ({ juno
   await nav.expectCanGo(true, true)
 })
 
+domTest('a click on the topic on screen, while another open waits for its topic, keeps the topic on screen', async ({ juno }) => {
+  const { sidebar, tabs, topic } = juno
+  await sidebar.row(POSTGRES).open()
+  await topic.expectTitle(POSTGRES)
+  // Rina's open waits for her thread to paint; the second click, on the topic on screen, is the last ask.
+  await sidebar.row(RINA).open()
+  await sidebar.row(POSTGRES).open()
+  // Changes apply in the order asked, so once the new tab shows, Rina's open has applied or been dropped.
+  await tabs.menu('new-tab')
+  await tabs.expectActive('Home')
+  await tabs.select(POSTGRES)
+  await topic.expectTitle(POSTGRES)
+})
+
 domTest('⌘⇧T reopens closed tabs, the last closed first, each with its history; an inactive tab shows the unread dot until its topic is read', async ({ juno, slack }) => {
   const { sidebar, tabs, topic, nav } = juno
 
