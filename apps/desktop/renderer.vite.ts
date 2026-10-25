@@ -14,7 +14,7 @@ import { resolve } from 'node:path'
 import type { PluginOption, Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import stylex from '@stylexjs/unplugin'
-import reactCompilerPlugin from 'babel-plugin-react-compiler'
+import { reactCompiler } from './react-compiler.vite'
 
 // The icon weights Juno draws: `IconWeight` in packages/ui/src/Icon.tsx. Keep the two lists the same.
 const ICON_WEIGHTS = new Set(['regular', 'bold', 'fill'])
@@ -66,24 +66,6 @@ function phosphorWeights(repoRoot: string): Plugin {
   }
 }
 
-// The React Compiler memoizes components and hooks at build time
-// (performance.md 5.4). It runs as a Babel plugin inside plugin-react 5, on
-// the workspace packages' source too. A component it cannot compile is left
-// as written; the build prints which one and why. The plugin itself, not its
-// name: Babel would look the name up from the working directory.
-const reactCompiler = (reportSkipped: boolean) =>
-  [
-    reactCompilerPlugin,
-    {
-      target: '19',
-      logger: {
-        logEvent(filename: string | null, event: { kind: string; detail?: { reason?: string } }) {
-          if (reportSkipped && (event.kind === 'CompileError' || event.kind === 'PipelineError')) console.warn(`react-compiler: skipped a function in ${filename}: ${event.detail?.reason ?? event.kind}`)
-        },
-      },
-    },
-  ] as const
-
 /**
  * `repoRoot` is the monorepo root: StyleX hashes class names relative to it
  * and needs it to resolve the workspace token package, no matter which
@@ -100,6 +82,9 @@ export function rendererPlugins(options: { readonly repoRoot: string; readonly m
       lightningcssOptions: { minify: options.minify },
       unstable_moduleResolution: { type: 'commonJS', rootDir: options.repoRoot },
     }),
-    react({ babel: { plugins: [reactCompiler(options.reportSkipped !== false)] } }),
+    // The React Compiler memoizes components and hooks at build time (react-compiler.vite.ts), on the
+    // workspace packages' source too. A component it cannot compile is left as written; the build prints which one and why.
+    reactCompiler(options.repoRoot, options.reportSkipped !== false),
+    react(),
   ]
 }

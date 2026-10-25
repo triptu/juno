@@ -51,8 +51,6 @@ export default {
     'apps/gallery': {
       entry: ['index.html'],
       project: ['src/**/*.{ts,tsx}', '*.ts'],
-      // Babel loads the shared reactCompiler tuple by its string name in the Vite config.
-      ignoreDependencies: ['babel-plugin-react-compiler'],
     },
   },
 }
