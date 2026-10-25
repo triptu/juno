@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { checkForcedInteractions, formatForcedShift, type ForcedInteractionReport } from '@juno/testing/layout-shift'
+import { checkForcedInteractions, formatForcedShift, type ForcedInteractionReport } from '@juno/testing/forced-shift'
 import { checkStateWithin, claimQueue, interactive, openState, readRoutes, type Route } from './support'
 
 /**
