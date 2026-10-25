@@ -98,7 +98,7 @@ async function watchSignInFrames(win: Page): Promise<() => Promise<SignInFrames>
     })
 }
 
-test('a relaunch opens on the shell and never paints the sign-in page while Slack checks the session', { tag: '@electron' }, async ({ juno, fake, userData, running }) => {
+test('a relaunch opens on the shell and never paints the sign-in page while Slack checks the session', { tag: ['@electron', '@nightly', '@nightly-crash'] }, async ({ juno, fake, userData, running }) => {
   await juno.signIn()
   await juno.waitForSync()
   await sessionSaved(userData, fake.teamId)
@@ -126,7 +126,7 @@ test('a relaunch opens on the shell and never paints the sign-in page while Slac
   }
 })
 
-test('a relaunch whose session Slack no longer accepts shows "Slack signed you out", then opens on it', { tag: '@electron' }, async ({ juno, fake, userData, running }) => {
+test('a relaunch whose session Slack no longer accepts shows "Slack signed you out", then opens on it', { tag: ['@electron', '@nightly', '@nightly-crash'] }, async ({ juno, fake, userData, running }) => {
   await juno.signIn()
   await juno.expectSignedIn('Juno Fake')
   await sessionSaved(userData, fake.teamId)

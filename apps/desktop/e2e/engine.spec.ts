@@ -1,7 +1,7 @@
 import { expect, hooks, syncedTest as test } from './fixtures'
 
 // Restart brings the engine back, so the supervisor can give up on it a second time.
-test('the app is served from the juno: scheme; when the engine stops for good, the sidebar and About say so, and Restart brings it back', async ({ juno, app, win }) => {
+test('the app is served from the juno: scheme; when the engine stops for good, the sidebar and About say so, and Restart brings it back', { tag: ['@nightly', '@nightly-crash'] }, async ({ juno, app, win }) => {
 
   await test.step('is served from the juno: scheme, and nothing outside the renderer folder', async () => {
     expect(await win.evaluate(() => `${location.protocol}//${location.host}${location.pathname}`)).toBe('juno://app/index.html')
