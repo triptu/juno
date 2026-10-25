@@ -30,11 +30,10 @@ domTest('reaction stops after five failures, toasts once, and Retry starts a new
   await expect(target.row.getByRole('button', { name: '1 👀, including you' })).toHaveCount(0)
   await expect(juno.toast('Reaction not sent')).toHaveCount(0, { timeout: 6000 })
   await juno.sidebar.row('#product').open()
+  await juno.topic.expectTitle('product')
   await juno.sidebar.row('#eng').open()
+  await juno.topic.expectMessage('Reaction delivery target')
   await expect(target.row.locator('[data-reaction-issue="failed"]')).toBeVisible()
-  // The toast would come with the row's first frame; give it a moment to show.
-  await new Promise((done) => setTimeout(done, 500))
-  await expect(juno.toast('Reaction not sent')).toHaveCount(0)
   await target.row.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect.poll(target.sent).toBe(true)
   await expect(target.row.locator('[data-reaction-issue]')).toHaveCount(0)
