@@ -4,11 +4,12 @@
  * `domTest` a `model` and the agent runs against it.
  */
 import { hooks } from '../../e2e/hooks'
-import type { JunoSettingsSection } from '../../e2e/juno-agent/agent'
+import type { JunoPage, JunoSettingsSection } from '../../e2e/juno-agent/agent'
 import { expect } from '../expect'
 import type { Dom } from '../input'
 import type { Query } from '../query'
 import type { Juno } from './juno'
+import { MessageMenuDriver } from './topic'
 
 /** One Juno chat on screen: the Juno tab's or the panel's. */
 export class JunoChatPane {
@@ -50,6 +51,23 @@ export class JunoChatPane {
   async expectJuno(text: string): Promise<void> {
     await expect(this.junoBubble(text)).toBeVisible({ timeout: 15_000 })
   }
+
+  /** Right-clicks a Juno bubble, or with `owner` your own, and returns its menu. */
+  menu(bubble: string, options: { readonly owner?: boolean } = {}): Promise<MessageMenuDriver> {
+    const row = options.owner === true ? this.ownerBubble(bubble) : this.junoBubble(bubble)
+    return new MessageMenuDriver(this.dom).openOn(row.locator('[data-chat-run], p').first())
+  }
+
+  /** A quick reaction (👍 ✅ 👀 by default), from the menu's grid. */
+  async react(bubble: string, emoji: string): Promise<void> {
+    const menu = await this.menu(bubble)
+    await menu.root.getByRole('button', { name: `React ${emoji}` }).click()
+    await expect(menu.root).toHaveCount(0)
+  }
+
+  async reply(bubble: string): Promise<void> {
+    await (await this.menu(bubble)).choose('reply')
+  }
 }
 
 export async function agentReady(juno: Juno): Promise<void> {
@@ -67,6 +85,51 @@ export async function openChat(juno: Juno): Promise<JunoChatPane> {
   await juno.dom.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   await juno.tabs.expectActive('Juno')
   return JunoChatPane.tab(juno.dom)
+}
+
+/** Opens one of the Juno menu's pages from the Juno tab and returns the page. Connections opens in Settings. */
+export async function openPage(juno: Juno, label: JunoPage): Promise<Query> {
+  await openChat(juno)
+  await juno.dom.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
+  await juno.dom.getByRole('menuitem', { name: label }).click()
+  await juno.tabs.expectActive(label === 'Connections' ? 'Settings' : label)
+  return juno.dom.locator('main')
+}
+
+/** Opens every run on the Activity page, so each shows its steps and actions. */
+export async function openRuns(page: Query): Promise<void> {
+  const closed = page.locator('[data-activity-run] button[aria-expanded="false"]')
+  for (let n = closed.count(); n > 0; n = closed.count()) {
+    await closed.first().click()
+    await page.dom.until('the run to open', () => closed.count() < n)
+  }
+}
+
+/**
+ * Adds an MCP server on Connections by its address, signs in (the fakes approve at once under
+ * JUNO_E2E) and returns the server's id and its row. Leaves Connections open.
+ */
+export async function addServer(juno: Juno, name: string, url: string): Promise<{ readonly id: string; readonly row: Query }> {
+  const page = await openPage(juno, 'Connections')
+  const add = page.locator('[data-add-server]')
+  await add.getByLabel('Name').fill(name)
+  await add.getByLabel('Address').fill(url)
+  await add.getByRole('button', { name: 'Add' }).click()
+  const row = page.locator('[data-connection-id^="server-"]').filter({ hasText: url })
+  await expect(row.locator('[data-connection-name]')).toHaveText(name)
+  const id = await row.getAttribute('data-connection-id')
+  if (id === null) throw new Error(`No connection id for ${name}`)
+  await row.getByRole('button', { name: 'Connect' }).click()
+  await expect(row).toHaveAttribute('data-connection', 'ready', { timeout: 20_000 })
+  return { id, row }
+}
+
+/** Opens Configure on a connection's row and returns its sheet: the tools, their Enabled switches and rules. */
+export async function configure(juno: Juno, row: Query): Promise<Query> {
+  await row.getByRole('button', { name: 'Configure' }).click()
+  const sheet = juno.dom.locator('[data-sheet="tools"]')
+  await expect(sheet).toBeVisible()
+  return sheet
 }
 
 /** Opens Settings from the Juno menu, which lands on its Juno section, then goes to `section`. Returns the page. */
