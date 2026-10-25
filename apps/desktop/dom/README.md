@@ -28,9 +28,9 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 })
 ```
 
-`domTest` gives the body `juno` (the driver), `fake`, `slack` (`e2e/driver/slack.ts`), `app`, `userData`, `clock`, `model`, `relaunch` and `step`. Options: `synced`, `engine` (the host's `EngineOptions`), `clock`, `model` (a function that starts the model the agent talks to; the agent then runs) and `timeout` (default 60 s).
+`domTest` gives the body `juno` (the driver), `fake`, `slack` (`e2e/driver/slack.ts`), `app`, `userData`, `clock`, `model`, `relaunch`, `otherApp` (a second app on its own folder against the same fake and model, signed out, as another Mac) and `step`. Options: `synced`, `engine` (the host's `EngineOptions`), `clock`, `model` (a function that starts the model the agent talks to; the agent then runs) and `timeout` (default 60 s).
 
-- **Driver.** `driver/` has the Playwright driver's page objects with the same verbs (`e2e/driver/verbs.ts`; both drivers implement it, so a renamed verb fails the typecheck in both): `juno.sidebar`, `.tabs`, `.topic`, `.write` (Home's composer), `.home`, `.palette`, `.settings`, `.notifications`, `.accountMenu`, `.nav`, `.surface` (an `AppSurface`, as the web surface is), `searchPage(juno.win)` and the agent's `openChat`, `openSettings`, `card` (`driver/agent.ts`).
+- **Driver.** `driver/` has the Playwright driver's page objects with the same verbs (`e2e/driver/verbs.ts`; both drivers implement it, so a renamed verb fails the typecheck in both): `juno.sidebar`, `.tabs`, `.topic`, `.write` (Home's composer), `.home`, `.palette`, `.settings`, `.notifications`, `.accountMenu`, `.nav`, `.surface` (an `AppSurface`, as the web surface is), `searchPage(juno.win)` and the agent's `openChat`, `openPage`, `openSettings`, `openRuns`, `addServer`, `configure`, `card` and the chat's `menu`, `reply` (`driver/agent.ts`).
 - **Queries.** `Query` (`query.ts`) is shaped like Playwright's Locator: `locator`, `getByRole`, `getByText`, `getByLabel`, `getByTitle`, `filter`, `first`, `nth`, `parent`, `and`, `or`, and actions that wait for a shown element (`click`, `hover`, `fill`, `press`, `pressSequentially`, `check`). Roles and names follow Playwright's rules near enough: a string name matches a substring, ignoring case; `exact` asks for the whole name. `juno.win` is the page (`Dom`, `input.ts`), with `win.keyboard.press('Meta+Enter')`.
 - **expect.** `expect(query)` has Playwright's assertions (`toBeVisible`, `toHaveCount`, `toHaveText`, `toContainText`, `toHaveAttribute`, `toHaveValue`, `toBeFocused`, `toBeDisabled`, `toHaveAccessibleName`, with `.not`), each polled for 5 s unless given `{ timeout }`. Any other value goes to Bun's `expect`. `expect.poll(fn)` polls.
 - **Visible** means in the document and not under `hidden`, `inert`, `aria-hidden` or an inline `display: none` (React's Activity hides tabs that way). Style sheets do not hide anything here.
@@ -57,6 +57,8 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 | Test step wall | 26.5 s | 15.8 s | 17.9 s |
 | CPU per test | 4.3 s | 3.9 s (2.6 s over 42 runs) | 2.4 s (about 2.0 once warm) |
 | Wall per test | 5.3 s | 4.2 s | 1.0–1.9 s |
+
+The agent's flows (`juno-agent/`, 10-25, same laptop, one run each, 4 workers): 40 browser tests took 73 s of script time; after the move, 31 DOM tests take 36 s and the 10 browser tests left take 34 s.
 
 A worker's first test pays for the host's fork and the renderer's compile (about 1.5 CPU-s), so a short run at many workers costs more per test than a long one. At four workers on four threads the job is CPU-bound (99% busy at the median).
 
