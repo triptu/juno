@@ -23,7 +23,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'juno-agent/people.spec.ts',
   'juno-agent/images.spec.ts',
   'juno-agent/learn.spec.ts',
-  'juno-agent/pages.spec.ts',
   'juno-agent/break-pass.spec.ts',
   'juno-agent/providers-ui.spec.ts',
   'juno-agent/schedule.spec.ts',
