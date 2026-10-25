@@ -6,16 +6,26 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { type TopicRow } from '@juno/contract'
 import { SELF_ID } from '@juno/fake-slack'
+import { controlledSweeps } from '../controlledClock'
 import { waitFor, type RunningEngine } from '../harness'
 import { apiCalls, DAY, notRecheck, quiet, readDb, restart, seedThread, storedFollow, threadId, tsOf, type SeededThread } from '../scenario'
 import { syncedEngine, type SyncedOptions } from '../synced'
 
 const engines: Array<RunningEngine> = []
+const clocks: Array<{ readonly close: () => Promise<void> }> = []
 afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
+  for (const clock of clocks.splice(0)) await clock.close()
 })
 
 const synced = (options: SyncedOptions = {}) => syncedEngine(engines, options)
+/** A warm engine whose periodic sweeps run only when the test calls `sweep()`. */
+async function sweeping(followPassMillis: number) {
+  const sweeps = await controlledSweeps()
+  clocks.push(sweeps)
+  const engine = await synced({ clock: sweeps.clock, timing: { sweepIntervalMillis: sweeps.sweepIntervalMillis, followPassMillis } })
+  return { engine, sweeps, sweep: () => sweeps.sweep(engine) }
+}
 
 /** Drops the socket and keeps it down while `whileOffline` runs, then waits for the catch-up to finish. */
 async function offline(engine: RunningEngine, whileOffline: () => void): Promise<void> {
@@ -292,29 +302,29 @@ it('asks search newest first, so a long gap is read in full and not sampled', as
 
 // Periodic sweeps
 it('discovery finds a late-indexed reply older than the previous sweep cursor', async () => {
-  const engine = await synced({ timing: { sweepIntervalMillis: 500, followPassMillis: 60 * 60_000 } })
+  const { engine, sweep } = await sweeping(60 * 60_000)
   const root = seedThread(engine.fake, { channel: 'C0ENG', text: 'An unfollowed thread for delayed search indexing.', ago: 2 * DAY, replies: [], follow: false })
-  await engine.nextSync()
+  await sweep()
   const late = engine.fake.workspace.post({ channel: 'C0ENG', threadTs: root.ts as never, user: 'U0MAYA', text: 'Indexed after the cursor moved', at: engine.fake.now() - 30_000, silent: true })
-  await engine.nextSync()
+  await sweep()
   // Slack's getView does not list this unfollowed thread; only discovery can find the retro-timestamped reply.
   await waitFor(() => (storedMessage(engine, 'C0ENG', late.ts)?.text === 'Indexed after the cursor moved' ? true : undefined), undefined, 'the late reply stored')
 })
 
 it('the thread view sweep leaves an unchanged cache alone and repairs a missed reply', async () => {
-  const engine = await synced({ timing: { sweepIntervalMillis: 500, followPassMillis: 0 } })
+  const { engine, sweep } = await sweeping(0)
   const rootTs = tsOf(threadId(engine.fake, 'C0ENG', 'Draft plan is in the doc.'))
   const cache = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'), { readOnly: true })
   try {
     const dataVersion = () => (cache.prepare('PRAGMA data_version').get() as { data_version: number }).data_version
-    await engine.nextSync()
+    await sweep()
     const before = dataVersion()
     engine.fake.resetCalls()
-    await engine.nextSync()
+    await sweep()
     expect(apiCalls(engine, 'subscriptions.thread.getView').length).toBeGreaterThan(0)
     expect(dataVersion()).toBe(before)
     const missed = engine.fake.workspace.post({ channel: 'C0ENG', threadTs: rootTs as never, user: 'U0MAYA', text: 'The silent canary reply', silent: true })
-    await engine.nextSync()
+    await sweep()
     expect(storedMessage(engine, 'C0ENG', missed.ts)).toMatchObject({ text: 'The silent canary reply' })
   } finally {
     cache.close()
@@ -322,7 +332,7 @@ it('the thread view sweep leaves an unchanged cache alone and repairs a missed r
 })
 
 it('the thread view sweep keeps the repairs from pages it fetched when a later page fails', async () => {
-  const engine = await synced({ timing: { sweepIntervalMillis: 500, followPassMillis: 0 } })
+  const { engine, sweep } = await sweeping(0)
   const target = [...engine.fake.workspace.subscriptions.values()]
     .filter((subscription) => subscription.subscribed && engine.fake.workspace.replies(subscription.channel, subscription.threadTs).length > 1)
     .toSorted((a, b) => {
@@ -336,13 +346,13 @@ it('the thread view sweep keeps the repairs from pages it fetched when a later p
   engine.fake.markThreadRead({ channel: target.channel, threadTs: target.threadTs, ts: replies.at(-1)!.ts, read: false })
   engine.fake.releaseFrames({ drop: true })
   engine.fake.gate((method, args) => method === 'subscriptions.thread.getView' && args['current_ts'] !== undefined)
-  const sweep = engine.nextSync()
+  const swept = sweep()
   const before = await waitFor(() => engine.fake.gated().find((call) => call.stage === 'before'), undefined, 'the later getView page')
   engine.fake.decide(before.id, { error: 'internal_error' })
   const answer = await waitFor(() => engine.fake.gated().find((call) => call.id === before.id && call.stage === 'answer'), undefined, 'the failed getView answer')
   engine.fake.decide(answer.id, 'answer')
   engine.fake.gate()
-  await sweep
+  await swept
   const row = (await engine.rowsUntil((rows) => rows.some((r) => r.id === id && r.unreadCount === 1), 'the thread unread from its last reply')).find((r) => r.id === id)
   expect(row).toMatchObject({ unreadCount: 1 } satisfies Partial<TopicRow>)
 })

@@ -8,20 +8,27 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { millisToTs, Ts } from '@juno/domain'
 import { productionTiming } from '../../src/config'
-import { controlledClock } from '../controlledClock'
+import { controlledClock, controlledSweeps } from '../controlledClock'
 import { WAIT_MS, waitFor, type EngineOptions, type RunningEngine } from '../harness'
 import { mutationSeed } from '../mutationSeed'
 import { bootedEngine, DAY, readDb, restart, seedThread } from '../scenario'
 import { syncedEngine, type SyncedOptions } from '../synced'
 
 const engines: Array<RunningEngine> = []
+const clocks: Array<{ readonly close: () => Promise<void> }> = []
 afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
+  for (const clock of clocks.splice(0)) await clock.close()
 })
 
 const synced = (options: SyncedOptions = {}) => syncedEngine(engines, { recheckTopics: 0, ...options })
 const booted = (options: EngineOptions = {}, liveMillis?: number) => bootedEngine(engines, { recheckTopics: 0, ...options }, liveMillis)
 const QUIET_FOLLOWS = { timing: { followPassMillis: 3_600_000 } }
+const sweepClock = async () => {
+  const sweeps = await controlledSweeps()
+  clocks.push(sweeps)
+  return sweeps
+}
 
 function message(engine: RunningEngine, channel: string, ts: string) {
   return readDb(engine, 'cache.db', (db) => db.prepare('SELECT text, deleted FROM messages WHERE channel = ? AND ts = ?').get(channel, ts)) as { text: string; deleted: number } | undefined
@@ -275,9 +282,11 @@ it('repairs offline changes in a thread outside the top ten on the large seed, w
 
 // The baseline is never promoted across a gap, a half-open socket or a failed frame.
 it('does not refresh a sweep baseline across a socket gap while counts is in flight', async () => {
-  const engine = await synced({ timing: { sweepIntervalMillis: 500, followPassMillis: DAY } })
+  const sweeps = await sweepClock()
+  const engine = await synced({ clock: sweeps.clock, timing: { sweepIntervalMillis: sweeps.sweepIntervalMillis, followPassMillis: DAY } })
   const target = engine.fake.workspace.main('C0ENG').at(-1)!
   engine.fake.holdNext({ method: 'client.counts', before: true })
+  await sweeps.start()
   await waitFor(() => (engine.fake.heldCount({ method: 'client.counts' }) === 1 ? true : undefined), 20_000, 'sweep counts held')
   engine.fake.goOffline()
   await engine.phase('offline')
@@ -328,7 +337,8 @@ it('repairs an edit lost on a half-open socket despite sweeps before the timeout
 }, 90_000)
 
 it('does not promote a conversation baseline after applying its frame fails', async () => {
-  const engine = await synced({ timing: { sweepIntervalMillis: 500, followPassMillis: DAY } })
+  const sweeps = await sweepClock()
+  const engine = await synced({ clock: sweeps.clock, timing: { sweepIntervalMillis: sweeps.sweepIntervalMillis, followPassMillis: DAY } })
   const ts = engine.fake.injectMessage({ channel: 'C0ENG', text: 'Before failed frame' }).ts
   await waitFor(() => (message(engine, 'C0ENG', ts) === undefined ? undefined : true), WAIT_MS, 'the message stored')
   // A trigger stands in for a write that fails while the frame is applied.
@@ -338,9 +348,9 @@ it('does not promote a conversation baseline after applying its frame fails', as
     let pongs = 0
     engine.fake.holdFramesWhere((frame) => { if (frame.type === 'pong') pongs++; return false })
     engine.fake.editMessage({ channel: 'C0ENG', ts, text: 'Failed frame edit' })
-    await engine.nextSync()
+    await sweeps.sweep(engine)
     await waitFor(() => (pongs > 0 ? true : undefined), 20_000, 'pong after failed frame')
-    await engine.nextSync()
+    await sweeps.sweep(engine)
     expect(message(engine, 'C0ENG', ts)?.text).toBe('Before failed frame')
     db.exec('DROP TRIGGER refuse_frame')
     // The next catch-up still sees the conversation as changed and repairs it.

@@ -33,8 +33,22 @@ export async function controlledSleep(millis: number) {
   const time = await controlledClock()
   const live = Effect.runSync(Clock.Clock)
   await time.freeze()
+  let armed = 0
+  const controlled = (duration: Duration.Duration) => Effect.suspend(() => {
+    armed++
+    return time.clock.sleep(duration).pipe(Effect.ensuring(Effect.sync(() => { armed-- })))
+  })
   return {
     ...time,
+    /** Waits until a sleep of this duration is armed, then ends it by advancing exactly that long. */
+    fire: async (timeoutMillis = 20_000) => {
+      const started = Date.now()
+      while (armed === 0) {
+        if (Date.now() - started > timeoutMillis) throw new Error(`timed out waiting for a ${millis} ms sleep`)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+      await time.advance(millis)
+    },
     clock: {
       currentTimeMillisUnsafe: () => live.currentTimeMillisUnsafe(),
       currentTimeNanosUnsafe: () => live.currentTimeNanosUnsafe(),
@@ -42,7 +56,29 @@ export async function controlledSleep(millis: number) {
       currentTimeMillis: live.currentTimeMillis,
       currentTimeNanos: live.currentTimeNanos,
       monotonicTimeNanos: live.monotonicTimeNanos,
-      sleep: (duration: Duration.Duration) => Duration.toMillis(duration) === millis ? time.clock.sleep(duration) : live.sleep(duration),
+      sleep: (duration: Duration.Duration) => Duration.toMillis(duration) === millis ? controlled(duration) : live.sleep(duration),
     } satisfies Clock.Clock,
+  }
+}
+
+/** An interval no other engine sleep uses, so only the periodic sweep waits on it. */
+const SWEEP_MILLIS = 4_567
+
+/**
+ * The periodic sweep on test-driven time: pass `clock` and `sweepIntervalMillis` to the engine, then
+ * `sweep(engine)` starts exactly one sweep and waits for its cycle to finish. Close after the engine stops.
+ */
+export async function controlledSweeps() {
+  const time = await controlledSleep(SWEEP_MILLIS)
+  return {
+    clock: time.clock,
+    sweepIntervalMillis: SWEEP_MILLIS,
+    close: time.close,
+    start: time.fire,
+    sweep: async (engine: { readonly nextSync: () => Promise<void> }) => {
+      const finished = engine.nextSync()
+      await time.fire()
+      await finished
+    },
   }
 }
