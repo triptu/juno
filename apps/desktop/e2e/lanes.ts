@@ -56,7 +56,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'avatars-unfurls.spec.ts',
   'topic-titles.spec.ts',
   'break-pass.spec.ts',
-  'quick-start.spec.ts',
   'home.spec.ts',
   'send-checks.spec.ts',
   'review-cards.spec.ts',

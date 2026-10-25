@@ -1,8 +1,8 @@
 // The sidebar against the fake Slack: filters swap in one step and keep
 // unchanged rows as the same objects (performance 5.3), a profile change
-// reaches every row, the participant stack, views (SPEC 5, "Views") and the
-// built-in Automated view (SPEC 5, "Automated"). The quiet window is in
-// `quiet-window.flow.test.ts`.
+// reaches every row, the participant stack, preview names and group DMs that
+// open with a message, views (SPEC 5, "Views") and the built-in Automated
+// view (SPEC 5, "Automated"). The quiet window is in `quiet-window.flow.test.ts`.
 import { afterEach, expect, it } from 'bun:test'
 import {
   homeMovesSeen,
@@ -23,7 +23,7 @@ import {
   type TopicCounts,
   type TopicRow,
 } from '@juno/contract'
-import { SELF_ID, type FakeSlack } from '@juno/fake-slack'
+import { SELF_ID, TEAM, type FakeSlack } from '@juno/fake-slack'
 import {
   closeSidebarSheet,
   defaultTopicListFilter,
@@ -41,7 +41,7 @@ import {
   type SidebarWindow,
 } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
-import { DAY, slackWrites, valueOf } from '../scenario'
+import { bootedEngine, DAY, slackWrites, valueOf } from '../scenario'
 import { step } from '../step'
 import { syncedEngine } from '../synced'
 
@@ -218,6 +218,45 @@ it('the sidebar across filters, a profile change, a busy thread, own changes and
     expect(slackWrites(engine, since)).toEqual([])
   })
 }, 60_000)
+
+// Cold: the people, messages and closed group DM must be in the fake before the first sync.
+it('previews name people and label an image, and a group DM shows as soon as someone posts in it', async () => {
+  const engine = await bootedEngine(engines, { initial: (fake) => {
+    for (const [id, name, real] of [['U0ALEXK', 'alexk', 'Alex Kim'], ['U0ALEXR', 'alexr', 'Alex Rivera'], ['U0ROBIN', 'robin', 'Robin Okafor']] as const) {
+      fake.workspace.addUser({ id, team_id: TEAM.id, name, real_name: real, profile: { display_name: real, real_name: real } })
+    }
+    fake.workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: '', files: [{ id: 'F0SIDEPIC', name: 'whiteboard.png', title: 'whiteboard.png', mimetype: 'image/png' }], silent: true })
+    fake.workspace.post({ channel: 'D0SAM', user: SELF_ID, text: 'Sent the notes', silent: true })
+    fake.workspace.post({ channel: 'C0ENG', user: 'U0ALEXR', text: 'Deploy window moved', silent: true })
+    fake.workspace.post({ channel: 'C0ENG', user: 'U0ALEXK', text: 'Works for me', silent: true })
+    fake.workspace.post({ channel: 'C0PRODUCT', user: 'U0ROBIN', text: 'Pricing copy is final', silent: true })
+    // Slack's counts leaves a closed group DM out, and a message opens it again with no membership event.
+    fake.addGroupDm({ id: 'G0CLOSED', users: ['U0MAYA', 'U0SAM'], open: false })
+    return fake.signIn()
+  } })
+  const { fake } = engine
+
+  await step('a preview reads "Image" for a picture alone, drops the other side of a DM, says "You", and adds a last initial for a namesake', async () => {
+    const rows = await engine.rows()
+    const preview = (id: string) => rows.find((row) => row.id === id)?.preview
+    expect([preview('m:D0MAYA'), preview('m:D0SAM'), preview('m:C0PRODUCT'), preview('m:C0ENG')]).toMatchObject([
+      { sender: '', text: 'Image' },
+      { sender: 'You', text: 'Sent the notes' },
+      { sender: 'Robin', text: 'Pricing copy is final' },
+      { sender: 'Alex K', text: 'Works for me' },
+    ])
+  })
+
+  await step('a group DM shows as soon as someone posts in it, when it was closed or Juno has never seen it', async () => {
+    expect((await engine.rows()).some((row) => row.id === 'm:G0CLOSED')).toBe(false)
+    fake.injectMessage({ channel: 'G0CLOSED', user: 'U0SAM', text: 'Picking the launch notes back up' })
+    await engine.rowsUntil((rows) => rows.some((row) => row.id === 'm:G0CLOSED'), 'the closed group DM')
+    // One made after the boot read the list, which Slack never announced either.
+    fake.addGroupDm({ id: 'G0FRESH', users: ['U0LEO', 'U0JONAS'] })
+    fake.injectMessage({ channel: 'G0FRESH', user: 'U0LEO', text: 'Quick question about the offsite' })
+    await engine.rowsUntil((rows) => rows.some((row) => row.id === 'm:G0FRESH'), 'the new group DM')
+  })
+})
 
 /** More top-level posts from the deploy bot than from people, but not nearly all: the rules cannot tell, so Juno asks. */
 function joinReleases(fake: FakeSlack): void {

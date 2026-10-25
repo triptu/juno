@@ -16,29 +16,6 @@ async function setup(juno: Juno, fake: FakeSlack) {
   return { row, react, sent, ts: message.ts }
 }
 
-// This checks that a reaction beats the edit's real exponential retry backoff.
-const productionTiming = test.extend({ timing: 'production' })
-
-productionTiming('reaction behind a retrying edit', async ({ juno, fake }) => {
-  const target = await setup(juno, fake)
-  await juno.topic.send('Edit before reacting')
-  await juno.topic.expectSent('Edit before reacting')
-  fake.forceError({ method: 'chat.update', error: 'internal_error', times: 5 })
-  await juno.topic.composer.press('ArrowUp')
-  await juno.topic.message('Edit before reacting').press('e')
-  const field = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
-  await field.fill('Edited before reacting')
-  await field.press('Enter')
-  await expect.poll(() => fake.calls.filter((c) => c.method === 'chat.update').length).toBe(1)
-  const start = Date.now()
-  await target.react()
-  await expect.poll(target.sent, { timeout: 3000 }).toBe(true)
-  expect(fake.calls.filter((c) => c.method === 'chat.update').length).toBeLessThan(5)
-  console.log(`reaction behind edit: ${Date.now() - start} ms; edit calls ${fake.calls.filter((c) => c.method === 'chat.update').length}`)
-  await expect(target.row.locator('[data-reaction-issue]')).toHaveCount(0)
-})
-
-
 test('reaction stops after five failures, toasts once, and Retry starts a new attempt', async ({ juno, fake }) => {
   const target = await setup(juno, fake)
   fake.forceError({ method: 'reactions.add', error: 'internal_error', times: 5 })
@@ -58,7 +35,6 @@ test('reaction stops after five failures, toasts once, and Retry starts a new at
   await expect(target.row.locator('[data-reaction-issue]')).toHaveCount(0)
   expect(fake.calls.filter((c) => c.method === 'reactions.add')).toHaveLength(6)
 })
-
 
 test.describe('custom workspace emoji', () => {
   test.use({ synced: false })

@@ -19,57 +19,15 @@ async function openMain(juno: Juno): Promise<void> {
   await juno.sidebar.leave()
 }
 
-// The engine's own checks of the same gap, and of events racing a held
-// reconnect snapshot, are in packages/engine/test/metadata.test.ts; here the
-// screen follows them.
-test('while the socket is down, changes in Slack and a message written offline wait, and both arrive once it is back', async ({ juno, fake }) => {
+// What changes in Slack while the socket is down, and a message written offline, reach the store, the rows
+// and the outbox in the engine's own tests (packages/engine/test/flows/gap-and-restart.flow.test.ts,
+// outbox.flow.test.ts and metadata.test.ts). Here the open topic's header and its tab follow a rename.
+test('a renamed channel shows its new name in the header and the tab of its open topic', async ({ juno, fake }) => {
   await openMain(juno)
-  const { topic, sidebar, tabs } = juno
-  const edited = fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Deploy at 3.' })
-  const deleted = fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Wrong channel, sorry.' })
-  const reacted = fake.injectMessage({ channel: 'C0ENG', user: 'U0PRIYA', text: 'Release notes are up.' })
-  await topic.expectMessage('Release notes are up.')
-  await expect(sidebar.row('#product').root).toBeVisible()
-  await expect(sidebar.row('#incidents').root).toBeVisible()
-
-  await test.step('offline: Slack changes reach nothing, and a written message shows pending and is not posted', async () => {
-    fake.goOffline()
-    await sidebar.expectSyncStatus("You're offline")
-    fake.resetCalls()
-    fake.editMessage({ channel: 'C0ENG', ts: edited.ts, text: 'Deploy at 4.' })
-    fake.deleteMessage({ channel: 'C0ENG', ts: deleted.ts })
-    fake.addReaction({ channel: 'C0ENG', ts: reacted.ts, name: 'tada', user: 'U0JONAS' })
-    fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
-    fake.leaveChannel({ channel: 'C0PRODUCT' })
-    fake.workspace.conversations.get('C0INCIDENTS')!.archived = true
-    await topic.send('Written on the train')
-    await expect(topic.message('Written on the train')).toHaveAttribute('data-pending', /.*/)
-    await expect(topic.message('Wrong channel, sorry.')).toBeVisible()
-    expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
-  })
-
-  await test.step('back online: the message is posted once', async () => {
-    fake.goOnline()
-    await topic.expectSent('Written on the train')
-    await sidebar.expectNoSyncStatus(30_000)
-    expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(1)
-    expect(fake.messages('C0ENG').filter((m) => m.text === 'Written on the train')).toHaveLength(1)
-  })
-
-  await test.step('the edit, the delete and the reaction show in the open topic', async () => {
-    await expect(topic.message('Deploy at 4.')).toContainText('edited', { timeout: 30_000 })
-    await expect(topic.message('Deploy at 3.')).toHaveCount(0)
-    await expect(topic.message('Wrong channel, sorry.')).toHaveCount(0)
-    await expect(topic.message('Release notes are up.').getByRole('button', { name: /^1 🎉/ })).toBeVisible()
-  })
-
-  await test.step('the renamed channel shows its new name in the sidebar, the header and the tab; the left and archived ones go', async () => {
-    await expect(sidebar.row('#engineering').root).toBeVisible({ timeout: 15_000 })
-    await expect(topic.header).toContainText('engineering')
-    await expect.poll(() => tabs.titles()).toEqual([expect.stringContaining('engineering')])
-    await expect(sidebar.row('#product').root).toHaveCount(0, { timeout: 15_000 })
-    await expect(sidebar.row('#incidents').root).toHaveCount(0, { timeout: 15_000 })
-  })
+  const { topic, tabs } = juno
+  fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
+  await expect(topic.header).toContainText('engineering')
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringContaining('engineering')])
 })
 
 test('an engine restart mid-session keeps the open topic, the unsent text and the sidebar, and live updates go on', { tag: '@electron' }, async ({ juno, app, fake }) => {

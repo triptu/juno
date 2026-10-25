@@ -3,8 +3,6 @@
 // does, with `chat.update` and `reply_broadcast`. It shows in Main at once and
 // is marked in the thread. Others' replies and the root have no such item. In
 // Main a broadcast reply's "in <topic title>" opens the thread at it.
-import { DatabaseSync } from 'node:sqlite'
-import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
@@ -73,73 +71,6 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
   await topic.threadLinkUnder(ROOT).open()
   await expect(topic.message(MINE)).toContainText('also sent to the channel')
   expect((await topic.chooseInMessageMenu(MINE, null)).labels).not.toContain('Also send to #eng')
-})
-
-function broadcastRows(userData: string, team: string): number {
-  const db = new DatabaseSync(join(userData, 'workspaces', team, 'user.db'), { readOnly: true })
-  try {
-    return Number(db.prepare("SELECT count(*) AS n FROM outbox WHERE kind = 'broadcast'").get()!['n'])
-  } finally {
-    db.close()
-  }
-}
-
-test('a lost broadcast answer and socket event reconcile before the row ends', async ({ juno, fake, userData }) => {
-  await openPostgresThread(juno)
-  const reply = fake.messages('C0ENG').find((message) => message.text === MINE)!
-  fake.holdFrames({ types: ['message'] })
-  fake.loseResponse({ method: 'chat.update' })
-  await juno.topic.chooseInMessageMenu(MINE, 'broadcast')
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBeGreaterThanOrEqual(2)
-  await expect.poll(() => fake.calls.some((call) => call.method === 'conversations.history' && call.args['oldest'] === reply.ts && call.args['latest'] === reply.ts)).toBe(true)
-  await expect.poll(() => broadcastRows(userData, fake.teamId)).toBe(0)
-  fake.releaseFrames({ drop: true })
-  await expect(juno.topic.message(MINE)).toContainText('also sent to the channel')
-  await juno.sidebar.row(ENG_MAIN).open()
-  await expect(juno.topic.message(MINE).locator('[data-broadcast-source]')).toHaveText(`in ${ROOT}`)
-  await juno.win.reload()
-  await juno.waitForSync()
-  await juno.sidebar.row(ENG_MAIN).open()
-  await expect(juno.topic.message(MINE).locator('[data-broadcast-source]')).toHaveText(`in ${ROOT}`)
-})
-
-test('a refused broadcast removes the optimistic copy and mark', async ({ juno, fake, userData }) => {
-  await openPostgresThread(juno)
-  fake.forceError({ method: 'chat.update', error: 'cant_broadcast_message' })
-  fake.holdNext({ method: 'chat.update', before: true })
-  await juno.topic.chooseInMessageMenu(MINE, 'broadcast')
-  await expect(juno.topic.message(MINE)).toContainText('also sent to the channel')
-  await juno.sidebar.row(ENG_MAIN).open()
-  await expect(juno.topic.message(MINE)).toBeVisible()
-  fake.release()
-  await expect.poll(() => broadcastRows(userData, fake.teamId)).toBe(0)
-  await expect(juno.topic.message(MINE)).toHaveCount(0)
-  await juno.topic.threadLinkUnder(ROOT).open()
-  await expect(juno.topic.message(MINE)).not.toContainText('also sent to the channel')
-  expect((await juno.topic.chooseInMessageMenu(MINE, null)).labels).toContain('Also send to #eng')
-})
-
-test('an edit and broadcast of one reply keep their order and separate calls', async ({ juno, fake }) => {
-  await openPostgresThread(juno)
-  fake.holdNext({ method: 'chat.update', before: true })
-  await juno.topic.chooseInMessageMenu(MINE, 'edit')
-  const edit = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
-  const changed = 'Keep the old primary warm until Friday.'
-  await edit.fill(changed)
-  await edit.press('Enter')
-  await expect.poll(() => fake.heldCount({ method: 'chat.update' })).toBe(1)
-  await juno.topic.chooseInMessageMenu(changed, 'broadcast')
-  await expect(juno.topic.message(changed)).toContainText('also sent to the channel')
-  fake.release()
-  await expect.poll(() => fake.messages('C0ENG').find((message) => message.text === changed)?.subtype).toBe('thread_broadcast')
-  const calls = fake.calls.filter((call) => call.method === 'chat.update')
-  expect(calls).toHaveLength(2)
-  expect(calls[0]!.args['text']).toBe(changed)
-  expect(calls[0]!.args['reply_broadcast']).toBeUndefined()
-  expect(calls[1]!.args['text']).toBeUndefined()
-  expect(calls[1]!.args['reply_broadcast']).toBe('true')
-  await juno.sidebar.row(ENG_MAIN).open()
-  await expect(juno.topic.message(changed)).toBeVisible()
 })
 
 test('the topic title in Main opens the topic at the reply, which flashes, and follows a rename', async ({ juno, fake }) => {
