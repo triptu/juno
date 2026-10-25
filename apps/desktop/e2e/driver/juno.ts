@@ -512,13 +512,6 @@ export class Sidebar {
   get accountButton() {
     return this.root.getByRole('button', { name: 'Account and settings' })
   }
-
-  /** Your presence on the avatar as Slack shows colleagues: the button's description, and its dot unless the snooze badge takes the dot's place. */
-  async expectOwnPresence(presence: 'active' | 'away'): Promise<void> {
-    const word = presence === 'active' ? 'Active' : 'Away'
-    await expect(this.accountButton).toHaveAccessibleDescription(new RegExp(`^${word}(\\. Notifications paused until .+)?$`), { timeout: 10_000 })
-    if ((await this.accountButton.locator('[data-paused]').count()) === 0) await expect(this.accountButton.locator('[data-presence]')).toHaveAttribute('data-presence', presence)
-  }
 }
 
 /** The popover behind the avatar button: presence, privacy, Notifications, Settings and the session. */
@@ -555,11 +548,6 @@ export class AccountMenu {
   /** Set yourself away or active, Hide message text, Notifications, Settings (inventory 2.1). */
   item(name: string | RegExp) {
     return this.root.getByRole('menuitem', { name })
-  }
-
-  /** The line under the name: "Active", "Away until 9am". */
-  async expectPresence(text: string | RegExp): Promise<void> {
-    await expect(this.root.getByText(text)).toBeVisible({ timeout: 10_000 })
   }
 
   async choose(name: string | RegExp): Promise<void> {
@@ -1076,7 +1064,6 @@ export class Juno {
   clickOsNotification(index: number): Promise<void> { return this.surface.system('clickNotification', index) }
   setNotificationPermission(permission: NotificationPermission): Promise<void> { return this.surface.system('notificationPermission', permission) }
   notificationSettingsOpened(): Promise<number> { return this.surface.system('notificationSettingsOpened') }
-  setSystemIdle(seconds: number): Promise<void> { return this.surface.system('systemIdle', seconds) }
   dockBadge(): Promise<string> { return this.surface.system('dockBadge') }
   dockBounces(): Promise<number> { return this.surface.system('dockBounces') }
   setFrontmost(frontmost: boolean): Promise<void> { return this.surface.system('frontmost', frontmost) }

@@ -46,11 +46,6 @@ export class Slack {
     this.fake.resetCalls()
   }
 
-  /** How many `tickle` frames Juno sent on the socket since the last `resetCalls`. */
-  tickles(): number {
-    return this.fake.received.filter((frame) => frame.type === 'tickle').length
-  }
-
   /** The `presence_sub` frames Juno sent since the last `resetCalls`, oldest first: each one's ids. */
   presenceSubs(): ReadonlyArray<ReadonlyArray<string>> {
     return this.fake.received.filter((frame) => frame.type === 'presence_sub').map((frame) => frame.ids ?? [])
@@ -60,21 +55,6 @@ export class Slack {
   async expectPresenceSubscribed(name: string, subscribed = true): Promise<void> {
     const { id } = this.as(name)
     await expect.poll(() => this.fake.presenceSubscriptions().includes(id), { timeout: 10_000 }).toBe(subscribed)
-  }
-
-  /** What colleagues see for you in Slack, within 10 s. */
-  async expectSeenAs(presence: 'active' | 'away'): Promise<void> {
-    await expect.poll(() => this.fake.selfPresence(), { timeout: 10_000 }).toBe(presence)
-  }
-
-  /** Time passes in Slack, as if `millis` went by: presence that depends on recent activity runs out. */
-  advanceClock(millis: number): void {
-    this.fake.advanceClock({ millis })
-  }
-
-  /** Juno set your presence in Slack: `active` or `away`, as the official client sends them. */
-  async expectPresenceSet(presence: 'active' | 'away'): Promise<void> {
-    await expect.poll(() => this.fake.calls.some((call) => call.method === 'presence.set' && call.args['presence'] === presence), { timeout: 10_000 }).toBe(true)
   }
 
   /** Juno sent no read mark to Slack since the last `resetCalls`. */

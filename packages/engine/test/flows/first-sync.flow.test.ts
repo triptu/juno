@@ -1,13 +1,13 @@
 // The first sync, from sign-in to live (SPEC 5, architecture 5.8): the list is usable before any
 // history, every row is named when it first shows, history is read in the order the user needs it,
-// conversations the user is not in cost nothing, and a boot that fails part way picks up where it
-// stopped. Each test is a cold boot on a fresh fake; that is what it tests.
+// conversations the user is not in cost nothing, a boot that fails part way picks up where it
+// stopped, and one that keeps failing says why. Each test is a cold boot on a fresh fake; that is what it tests.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
-import { viewsDelete, type TopicRow } from '@juno/contract'
+import { viewsDelete, type EngineStatus, type TopicRow } from '@juno/contract'
 import { CONVERSATIONS, largeSeed, SELF_ID } from '@juno/fake-slack'
-import { homeViewAtom, runCommand, topicCountsAtom } from '@juno/state'
+import { engineStatusAtom, homeViewAtom, runCommand, syncFailureAtom, syncNoticeAtom, topicCountsAtom } from '@juno/state'
 import { productionTiming } from '../../src/config'
 import { controlledSleep } from '../controlledClock'
 import { startTestEngine, waitFor, WAIT_MS, type EngineOptions, type RunningEngine } from '../harness'
@@ -15,7 +15,9 @@ import { apiCalls, bootedEngine, DAY, quiet, readDb, seedThread, threadId, tsOf,
 import { step } from '../step'
 
 const engines: Array<RunningEngine> = []
+const unmounts: Array<() => void> = []
 afterEach(async () => {
+  for (const unmount of unmounts.splice(0)) unmount()
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
 
@@ -391,4 +393,50 @@ it('reads history over the quiet window the user chose, finishes when discovery 
     const query = String(searches()[0]!.args['query'])
     expect(/after:(\d{4}-\d{2}-\d{2})/.exec(query)![1]).toBe(/after:(\d{4}-\d{2}-\d{2})/.exec(failedQuery)![1])
   })
+})
+
+// A first sync that keeps failing says why (SPEC 5, item 5)
+/** Every phase the engine reports and every sync notice the sidebar is given from now on. The card reads the failure's reason too, which keeps it while a retry boots. */
+function watchSync(engine: RunningEngine) {
+  const seen = { phases: [] as Array<EngineStatus['phase']>, notices: [] as Array<string | undefined> }
+  unmounts.push(
+    engine.registry.subscribe(engineStatusAtom, (status) => { if (status._tag === 'Success') seen.phases.push(status.value.phase) }, { immediate: true }),
+    engine.registry.mount(syncFailureAtom),
+    engine.registry.subscribe(syncNoticeAtom, (notice) => { seen.notices.push(notice) }, { immediate: true }),
+  )
+  return seen
+}
+
+it('a boot Slack answers with data Juno cannot read fails with that reason, and keeps it across the retries', async () => {
+  const engine = await started({ timing: { bootRetryMillis: 50 }, initial: (fake) => (fake.forceMalformed({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
+  const { phases: seen, notices: shown } = watchSync(engine)
+  const reason = { error: 'SlackDecodeError', method: 'client.userBoot' }
+  expect(await engine.phase('failed')).toEqual({ _tag: 'failed', reason })
+  await waitFor(() => (apiCalls(engine, 'client.userBoot').length >= 5 ? true : undefined), undefined, 'five boots')
+  const settled = seen.slice(seen.findIndex((phase) => phase._tag === 'failed')).filter((phase) => phase._tag !== 'booting')
+  expect(settled).toEqual(settled.map(() => ({ _tag: 'failed', reason })))
+  // The reason stays while it boots again, so a retry never clears the notice.
+  const fromFirst = shown.slice(shown.indexOf('failed'))
+  expect(fromFirst).toEqual(fromFirst.map(() => 'failed'))
+  expect(engine.registry.get(syncFailureAtom)).toEqual(reason)
+})
+
+it('a boot that never reaches Slack is offline, not failed, through the 30 s retry wait, and says so after the grace [controlled sleep]', async () => {
+  const time = await controlledSleep(productionTiming.bootRetryMillis)
+  try {
+    const timing = { bootRetryMillis: productionTiming.bootRetryMillis }
+    const engine = await started({ clock: time.clock, timing, initial: (fake) => (fake.loseResponse({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
+    const { phases: seen, notices: shown } = watchSync(engine)
+    await engine.phase('offline')
+    const boots = apiCalls(engine, 'client.userBoot').length
+    // The phase holds through the retry wait, so the 5 s offline grace passes and the notice shows.
+    await waitFor(() => (shown.at(-1) === 'offline' ? true : undefined), undefined, 'the offline notice')
+    expect(apiCalls(engine, 'client.userBoot')).toHaveLength(boots)
+    await time.advance(productionTiming.bootRetryMillis)
+    await waitFor(() => (apiCalls(engine, 'client.userBoot').length > boots && seen.at(-1)?._tag === 'offline' ? true : undefined), undefined, 'the next boot offline again')
+    expect(seen.some((phase) => phase._tag === 'failed')).toBe(false)
+    expect(engine.registry.get(syncFailureAtom)).toBeUndefined()
+  } finally {
+    await time.close()
+  }
 })

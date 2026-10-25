@@ -1,5 +1,5 @@
 // The background AI jobs against the fake Slack and the fake AI: Home, thread
-// titles and topic art with AI assist off and then on, Redraw and its undo,
+// titles and topic art with AI assist off and then on, follow-ups that look done, Redraw and its undo,
 // a drawing the model cannot make, and what titles cost: a key change asks
 // nothing again, a refused title is not asked again until the thread
 // changes, the fallback model answers a refusal, and the daily budget holds.
@@ -8,9 +8,9 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
-import { aiActivity, artRedraw, homeMarkDone, homeView, homeVisit, prefsSet, tidyUpSet, type AiActivity, type HomeView, type TopicRow } from '@juno/contract'
+import { aiActivity, artRedraw, followUpsRestore, homeMarkDone, homeView, homeVisit, prefsSet, tidyUpSet, type AiActivity, type HomeView, type TopicRow } from '@juno/contract'
 import { SELF_ID } from '@juno/fake-slack'
-import { liveQuery, redrawTopic, runAction, runCommand, topicAtom, undoLast } from '@juno/state'
+import { actOnDoneFollowUp, liveQuery, redrawTopic, runAction, runCommand, topicAtom, undoLast, undoOne } from '@juno/state'
 import { parseRecipe } from '@juno/topic-art'
 import { TITLE_DAILY_BUDGET } from '../../src/titleJob'
 import { controlledSleep } from '../controlledClock'
@@ -118,6 +118,7 @@ it('Home, titles and drawings with AI assist off, then on: Redraw and undo, hidd
       await homeUntil(engine, (view) => !kinds(view).includes('resume') && !kinds(view).includes('moved'), 'both threads read')
     })
 
+    let followUpTs = ''
     await step('with AI assist on, titles the sidebar threads without opening them, and Home adds a follow-up until Mark done and settled topics', async () => {
       // The fixture incident went quiet 70 minutes ago; one hour makes it eligible.
       valueOf(await runCommand(registry, tidyUpSet, { patch: { quiet: '1h' } }))
@@ -132,12 +133,45 @@ it('Home, titles and drawings with AI assist off, then on: Redraw and undo, hidd
       expect(view.items[0]).toMatchObject({ kind: 'waiting', topics: [{ id: elena }] })
       const followUp = view.items.find((item) => item.kind === 'followUp')!
       expect(followUp.topics[0]!.id).toBe(threadId(fake, 'D0SAM', 'Notes from today'))
-      valueOf(await runCommand(registry, homeMarkDone, { topicId: followUp.topics[0]!.id, messageTs: followUp.messageTs! }))
+      followUpTs = followUp.messageTs!
+      valueOf(await runCommand(registry, homeMarkDone, { topicId: followUp.topics[0]!.id, messageTs: followUpTs }))
       // Each proposal says why, from its last messages.
       const done = await homeUntil(engine, (value) => !kinds(value).includes('followUp') && kinds(value).includes('tidyUp'), 'the follow-up gone and settled topics')
       const tidy = done.items.find((item) => item.kind === 'tidyUp')!
       expect(tidy.topics.length).toBeGreaterThan(0)
       expect(tidy.topics.every((topic) => topic.settled?.kind === 'thanks')).toBe(true)
+    })
+
+    await step('a later link of yours makes a follow-up look done; Mark done and Undo, Not done, and a file proposes it again until Mark done', async () => {
+      const root = fake.messages('D0SAM').find((message) => message.text?.startsWith('Notes from today'))!.ts
+      const promise = `t:D0SAM:${root}`
+      const promiseTs = followUpTs
+      // The promise back as it was before Mark done, through the review's own Undo command.
+      valueOf(await runCommand(registry, followUpsRestore, { topicId: promise, messageTs: promiseTs, doneAt: null, matchKeptTs: null }))
+      await homeUntil(engine, (view) => kinds(view).includes('followUp'), 'the follow-up back')
+      const doneCard = (view: HomeView) => view.items.find((item) => item.kind === 'doneFollowUps')
+      // The user shares their review in the same thread: the promise leaves Follow-up for the card.
+      fake.injectMessage({ channel: 'D0SAM', threadTs: root, user: SELF_ID, text: 'Left my notes on the packet: https://docs.example.com/packet-review' })
+      const proposed = doneCard(await homeUntil(engine, (view) => doneCard(view) !== undefined && !kinds(view).includes('followUp'), 'the follow-up that looks done'))!
+      expect(proposed.topics.map((topic) => topic.id)).toEqual([promise])
+      const match = proposed.topics[0]!
+      expect(match.followUp).toMatchObject({ kind: 'link', promiseTs, text: expect.stringContaining('docs.example.com/packet-review') })
+
+      // Mark done takes it off the card; the row's Undo brings it back.
+      const undo = await actOnDoneFollowUp(registry, match, 'done')
+      await homeUntil(engine, (view) => doneCard(view) === undefined && !kinds(view).includes('followUp'), 'marked done')
+      await undoOne(registry, undo!)
+      await homeUntil(engine, (view) => doneCard(view) !== undefined, 'the card back after Undo')
+      // Not done: the promise is back in Follow-up, and this match is not proposed again.
+      await actOnDoneFollowUp(registry, match, 'notDone')
+      await homeUntil(engine, (view) => doneCard(view) === undefined && kinds(view).includes('followUp'), 'back in Follow-up')
+
+      // A newer message with a file proposes it again, and Mark done takes it off for good.
+      fake.workspace.post({ channel: 'D0SAM', threadTs: root, user: SELF_ID, text: "Here's the full review", files: [{ id: 'F0PACKETREVIEW', name: 'packet-review.pdf', title: 'packet-review.pdf', mimetype: 'application/pdf' }] })
+      const again = doneCard(await homeUntil(engine, (view) => doneCard(view) !== undefined, 'proposed again for the file'))!
+      expect(again.topics[0]!.followUp).toMatchObject({ kind: 'file' })
+      await actOnDoneFollowUp(registry, again.topics[0]!, 'done')
+      await homeUntil(engine, (view) => doneCard(view) === undefined && !kinds(view).includes('followUp'), 'done for good')
     })
 
     let before: ReadonlyArray<TopicRow> = []
