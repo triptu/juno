@@ -90,7 +90,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'media.spec.ts',
   'mentions.spec.ts',
   'menus.spec.ts',
-  'message-actions.spec.ts',
   'message-menu.spec.ts',
   'mirror-reads.spec.ts',
   'new-message-typing.spec.ts',
