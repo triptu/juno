@@ -10,13 +10,14 @@
  * of an older file such as the journal behind the archive (spec `rollback`).
  */
 import { spawn } from 'node:child_process'
-import { copyFileSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CRASH_ENV, CRASH_POINTS, type CrashPoint } from './points'
 
 export interface RunOptions {
-  /** Default: this Node. */
+  /** Default: this Bun, running a `.ts` program from a bundle. */
   readonly command?: string
   readonly args: ReadonlyArray<string>
   readonly env?: Record<string, string>
@@ -36,16 +37,46 @@ export interface AgentRun {
   readonly stderr: string
 }
 
-export function runAgent(options: RunOptions): Promise<AgentRun> {
-  if (options.crashAt !== undefined && !((options.crashAt.split(':')[0] ?? '') in CRASH_POINTS)) {
-    return Promise.reject(new Error(`unknown crash point ${options.crashAt}`))
+// Loading a program's module graph from source took most of a short run: 0.5 to 0.9 s per start on the
+// shared laptop. Under Bun, a `.ts` program is bundled once per test process and each run starts the bundle.
+// The bundle lands in the shared temp cache under the hash of its contents, so equal bundles share a file.
+const bundles = new Map<string, Promise<string>>()
+type Bundler = { build(options: { entrypoints: Array<string>; target: 'bun' }): Promise<{ success: boolean; logs: Array<unknown>; outputs: Array<{ text(): Promise<string> }> }> }
+
+function bundled(program: string): Promise<string> {
+  const bun = (globalThis as { Bun?: Bundler }).Bun
+  if (bun === undefined || !program.endsWith('.ts')) return Promise.resolve(program)
+  let bundle = bundles.get(program)
+  if (bundle === undefined) {
+    bundle = bun.build({ entrypoints: [program], target: 'bun' }).then(async (result) => {
+      const output = result.outputs[0]
+      if (!result.success || output === undefined) throw new Error(`could not bundle ${program}\n${result.logs.join('\n')}`)
+      const text = await output.text()
+      const dir = join(tmpdir(), 'juno-cache', 'agent-programs')
+      const file = join(dir, `${createHash('sha256').update(text).digest('hex').slice(0, 32)}.js`)
+      if (!existsSync(file)) {
+        mkdirSync(dir, { recursive: true })
+        const temporary = `${file}.${process.pid}`
+        writeFileSync(temporary, text)
+        renameSync(temporary, file)
+      }
+      return file
+    })
+    bundles.set(program, bundle)
   }
-  // Each run loads the agent from source. Node's compile cache, shared by every run and checked against each file's
-  // content, saves about a third of that start-up.
-  const env = { NODE_COMPILE_CACHE: join(tmpdir(), 'juno-cache', 'node-compile'), ...process.env, ...options.env, ...(options.crashAt ? { [CRASH_ENV]: options.crashAt } : {}) }
+  return bundle
+}
+
+export async function runAgent(options: RunOptions): Promise<AgentRun> {
+  if (options.crashAt !== undefined && !((options.crashAt.split(':')[0] ?? '') in CRASH_POINTS)) {
+    throw new Error(`unknown crash point ${options.crashAt}`)
+  }
+  const env: Record<string, string | undefined> = { ...process.env, ...options.env, ...(options.crashAt ? { [CRASH_ENV]: options.crashAt } : {}) }
   if (!options.crashAt) delete env[CRASH_ENV]
+  const [program, ...rest] = options.args
+  const args = options.command === undefined && program !== undefined ? [await bundled(program), ...rest] : [...options.args]
   return new Promise((resolve, reject) => {
-    const child = spawn(options.command ?? process.execPath, [...options.args], { env, cwd: options.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(options.command ?? process.execPath, args, { env, cwd: options.cwd, stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', (chunk) => (stdout += chunk))
