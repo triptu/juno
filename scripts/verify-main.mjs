@@ -303,7 +303,7 @@ const summary = {
   coverage: coverageNote, nightly, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
-  allocation: Object.fromEntries(['DESKTOP', 'GALLERY', 'UNIT', 'SPECS'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
+  allocation: Object.fromEntries(['DESKTOP', 'UNIT'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
   reports: keepReports(checkout, logDir, planStarted).map((file) => join('.juno-status', relative(statusDir, file))),
 }
 writeRecord(statusDir, runId, summary)

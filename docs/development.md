@@ -597,13 +597,12 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Store, Slack client, Slack-app import, merge rules, engine protocol, session and sync; the Juno agent's flows (turns, cards, connections, T3 and Codex, backup, crash recovery, memory, settings), the AI provider (`PiAiProvider` against pi-ai's scripted faux provider), the agent libraries, and the pure rules of domain, rich text, state, huddle and the small libraries | `packages/<name>/test/`, `apps/desktop/test/` (`bun test`; each file passes alone, in any order, and after any other file in the same process) | `bun run test`, or `bun test --timeout=30000 <files>` in the package |
 | Engine idle CPU, and the sidebar, topic and search queries on the large seed, failed on their budgets | `packages/engine/test/perf/*.perf.ts` | `bun run perf --unit` (Mac) |
 | User flows that check what the app shows and sends, with no layout: the real renderer in happy-dom against the engine host and fake Slack | `apps/desktop/dom/` (`bun test`; [README](../apps/desktop/dom/README.md)) | `bun run test:dom` |
-| User flows that need layout, scroll, paint, real focus rings or pointer coordinates, against the engine host; native Electron integration | `apps/desktop/e2e/` (Playwright browser and Electron projects) | `bun run test:browser`, `bun run test:electron`, or both with `bun run test:desktop` |
+| User flows that need layout, scroll, paint, real focus or pointer coordinates, against the engine host; native Electron integration | `apps/desktop/e2e/` (Playwright browser and Electron projects) | `bun run test:browser`, `bun run test:electron`, or both with `bun run test:desktop` |
 | Mouse-down activation, state switcher, in a real browser | `apps/gallery/activation.spec.ts`, `apps/gallery/behaviour.spec.ts` | `bun run test:gallery` |
 | Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `bun run test:gallery` |
 | No layout shift on hover, press or focus, and the cursor rule, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `bun run test:gallery` |
 | Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `bun run test:gallery` |
 | Sidebar rows as views: a DM's preview, the group DM tile, the row's description, the title tooltip, the list scrollbar | `apps/gallery/sidebar-rows.spec.ts` | `bun run test:gallery` |
-| No focus ring cut off by a scroller or paint containment, tabbing through the main surfaces in light, in four parts (`GALLERY_RING_ONLY=Sidebar` for one, `*` for every component; dark changes only colours) | `apps/gallery/focus-ring.spec.ts` | `bun run test:gallery` |
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `bun run gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `bun run test:feel` |
 
@@ -746,12 +745,12 @@ Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShi
 
 A fast sweep checks the same touches in every state without real input: `bun run remote --env GALLERY_SHIFT_COMPUTED=1 test:gallery computed-shift.spec.ts`. `checkForcedInteractions` (`@juno/testing/forced-shift`) rewrites `:hover`, `:active`, `:focus`, `:focus-visible` and `:focus-within` in the loaded sheets into attribute selectors of the same specificity, turns transitions off, sets those attributes where the browser would match and dispatches the pointer, mouse, key and focus events React listens to, all in one `page.evaluate` per state, and compares every box after each step with the guard's own comparison (both share `packages/testing/src/inPage.ts`). States open in one document through the gallery's hash. It took about 0.21 s a state on two cores (1,835 states in about 96 s at four workers), against about 2 s for the real walk. It cannot see a shift that exists only while a transition runs, one that waits for an animation frame or a ResizeObserver, or browser defaults of real input other than focus on press, so it does not replace the walk. Ordinary runs skip it: the walk's records already re-walk every state whose inputs changed, and on 10-25 an ordinary gallery job took 100 s with the sweep off and would take about twice that with it on. Its self-tests (`the computed tier itself`: hover padding, border and parent rules, a hover transition, a focus ring that takes room, `:focus-within` padding, a press and a mouse focus that change size, a root handler that renders on pointer over, a late chunk, and a gallery button with an injected rule) run every time. With the walk's regressions put back on current code (a hover margin on Button, TopicRow's time in flow on hover, Show result without its reserved width, the review explainer in the sheet's head, the review outcome slot sized by its label, the review key hints without their reserve) it failed on each.
 
-The broad shift and focus-ring walks cache each successful state. A key holds only what can move that state's boxes:
+The broad shift walk caches each successful state. A key holds only what can move that state's boxes:
 
 - the state and its fixture's transitive workspace imports, and the gallery shell (the registry, frame and theme code, not `compositions.tsx` or `testFixtures.tsx`), its styles, assets and bundled fonts;
 - the values of the design tokens those files read, in every theme, and of the tokens those values read. Tokens whose every value is a colour or a box shadow are left out: such a value is valid only where it paints, so it cannot move a box. A file that indexes a token group with a variable (`text[role]`) reads the whole group. The rest of the two token files (imports, constants, the theme lists) counts for every state; comments do not;
 - stylesheets without comments and paint-only declarations (`color`, `background-*`, `box-shadow`, `opacity` and the like);
-- the walk itself: `apps/gallery/shift-walk.ts` or `focus-ring.spec.ts` and what they import, which includes `open-state.ts` (how a state is opened and when it is ready) and the guard in `packages/testing`. The rest of `shift.spec.ts` (delayed loads, the guard's self-tests), the queue and page recycling in `support.ts`, the Playwright config and other specs do not count for the shift walk;
+- the walk itself: `apps/gallery/shift-walk.ts` and what it imports, which includes `open-state.ts` (how a state is opened and when it is ready) and the guard in `packages/testing`. The rest of `shift.spec.ts` (delayed loads, the guard's self-tests), the queue and page recycling in `support.ts`, the Playwright config and other specs do not count for the shift walk;
 - the locked versions of the packages those files import and the gallery builds with, and what those depend on, and the manifest fields that decide how imports resolve. Scripts, other workspaces' dependencies and an unrelated lockfile change do not count;
 - the actual Playwright/Chromium version, OS release, architecture and browser options.
 
@@ -759,7 +758,7 @@ The broad shift and focus-ring walks cache each successful state. A key holds on
 
 Records are shared across worktrees in the system temp folder's `juno-cache/results/gallery-walk-v1`. With `JUNO_BUILD_CACHE_DIR` they live in its `gallery-walk-v1` child, beside build entries; the remote runner sets this to `/cache/builds`. Writes use temporary files and atomic rename. `GALLERY_SHIFT_ALL=1 bun run test:gallery` bypasses both walk caches and refreshes successful records. `verify:main --nightly` and `verify:main --no-cache` set it automatically. Ordinary verification reuses matching states. Playwright `--repeat-each` also bypasses the caches, so every repeat exercises the states.
 
-`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. A remote job that runs only the gallery gets four workers per three allocated threads (eight on a full run's six), since the walk mostly waits for frames and motion; `scripts/remote/workers.sh` sets this. `GALLERY_RING_ONLY=Sidebar` and `GALLERY_RING_PARTS` control the focus check. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
+`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. A remote job that runs only the gallery gets four workers per three allocated threads (eight on a full run's six), since the walk mostly waits for frames and motion; `scripts/remote/workers.sh` sets this. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
 
 Each test owns one browser context. A walk opens a new document for each state, resetting fixture module state, selection, focus and scroll. It replaces its page after 20 states while keeping that context's HTTP cache. Fonts, visible images, lazy chunks and finite entrance motion must settle before measurement; a readiness deadline fails the state instead of silently treating it as ready. Scrolling an interaction target settles before the guard starts, so remembered off-screen row sizes are not charged to the following input. Motion stays enabled during the shift walk.
 
@@ -921,7 +920,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 - **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`. It hashes the app, packages, scripts, root configuration and lockfile, build command, Node version, platform, architecture and build flags (including Vite variables and local `.env` files). Desktop e2e files, app-level specs, Playwright configs, package/app `test/` and `tests/` directories, and `scripts/*.test.mjs` do not affect the build key. Seed definitions and other helpers under `src/` still do. It verifies output bytes before reuse. Remote runs also restore matching output from a persistent cache; a changed input, missing output or failed checksum rebuilds. `JUNO_REBUILD=1` forces a build. `bun run build` and `bun run dev` always build.
 - **React Compiler cache.** The React Compiler's Babel pass was about 60% of every cold renderer, web and gallery build on the runner (10-25, CPU profiles: the compiler 8.5 s, Babel's traverse, parser and generator 6 s of a 36 s desktop build); minifying was 2 to 3 s. `apps/desktop/react-compiler.vite.ts` runs the same transform `@vitejs/plugin-react` 5 ran and stores each file's result under a hash of its path, source, the Vite root, the compiler options, `NODE_ENV`, `BABEL_ENV`, `globalThis.__DEV__` and `bun.lock`. The mode matters: under `NODE_ENV=development` the compiler adds code that resets each memo cache on edit, and on 10-25 a dev web shell's results read back by a build put the first bundle 18 KB over its budget (`apps/desktop/test/react-compiler-cache.test.ts`). A new commit changes few files, so a build that misses the build cache still reads nearly every file from it. Entries live in `react-compiler-v1` under `JUNO_BUILD_CACHE_DIR` (the runner's `/cache/builds`, shared by every job) or the system temp folder's `juno-cache`; entries not written for a week are removed. `JUNO_REACT_COMPILER_CACHE=0` turns it off, and `bun run package` does, so a release compiles every file. The desktop, web and gallery outputs were byte-identical with and without it.
 - **Build measurements (10-25).** Single runs on 3 physical cores of the runner, outside Playwright. Desktop `out/`: 35.6 s before; 37.5 s with an empty compiler cache; 20.4 s with a full one; 14.4 s with a full one and main beside the renderer (parallel targets alone: 29.3 s). Web renderer: 28.6 s before, 13.1 s after the desktop build filled the cache. Gallery: 21.7 s before, 10.0 s with its entries cached (its Vite root differs, so it does not share the desktop's). An unminified desktop build saved 2.5 s and an unminified web or gallery build nothing, so test builds stay minified, like the app.
-- **Shift guard.** The gallery caches successful states by their layout inputs and browser runtime. Its parts take uncached states from a shared queue and check interactions and the cursor rule with motion enabled. `GALLERY_SHIFT_ALL=1` forces both the shift and focus-ring walks. `GALLERY_SHIFT_ONLY=Button,Chip bun run test:gallery` checks a few components while you iterate.
+- **Shift guard.** The gallery caches successful states by their layout inputs and browser runtime. Its parts take uncached states from a shared queue and check interactions and the cursor rule with motion enabled. `GALLERY_SHIFT_ALL=1` forces the shift walk. `GALLERY_SHIFT_ONLY=Button,Chip bun run test:gallery` checks a few components while you iterate.
 - **Changed tests only.** `bun run test --changed=main` runs only the `bun test` files affected by changes since `main` (Bun follows imports across packages).
 - **One parallel unit run.** `bun run test` runs every `bun test` package in one `bun test --parallel --no-isolate` from the root, `JUNO_TEST_WORKERS` worker processes at once (default half the cores), each keeping its globals and modules across the files it runs, in a shuffled order ("Order and isolation" under "Tests").
 - **Remote runs.** `bun run remote <script>` takes no local slot. See "Remote runs" below.
@@ -962,7 +961,7 @@ Agents run selective checks before reporting. Full runs (`bun run verify:main`, 
 
 **Flakes.** Desktop Playwright projects have zero retries. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `bun run flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit (with the spec checks), desktop and gallery jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `bun run affected` and `bun run verify:main` use two jobs on the SSH runner: a desktop job (browser and Electron lanes, spec checks and conformance) and a unit job (unit tests, DOM lane and gallery). The desktop job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `bun run affected` picks desktop e2e specs by a coverage map that `bun run verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -1156,7 +1155,7 @@ this Mac through the heavy lock; use them only when Tushar asks, since heavy run
 unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
-`test:plan` splits unit, desktop and gallery steps into independent SSH jobs; the DOM lane (`test:dom`), the spec checks and conformance run in the unit job after the unit tests, in that order, so the three jobs (2, 3 and 3 cores) fit Juno's eight lent cores at once. A separate specs job used to wait about 80 s for the unit job to release cores. Browser and Electron desktop steps run in order and share builds. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
+`test:plan` splits its steps into two independent SSH jobs of four cores each, which fit Juno's eight lent cores at once: a desktop job (`test:browser`, `test:electron`, `test:desktop`, `test:e2e`, `specs:check`, `specs:conformance`) and a unit job (`test`, `test:dom`, `test:gallery` and the rest). Each job runs its steps in order with all its threads. In a full run the two jobs carry about the same measured CPU ("Full runs"); smaller jobs each left one long suite on too few cores. A unit job without the DOM lane or the gallery keeps the size its steps ask for ("Machine shapes"). Browser and Electron desktop steps share builds. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order, whether set locally or passed with `--env`. An explicit `--env` value wins. `KEY=VALUE` before a step overrides its environment.
@@ -1228,6 +1227,8 @@ Causes found so far (2026-10-15):
 
 - **A row drawn at its estimate next to a held row.** When an older page went in above the rows in view, its rows were laid out at their size estimate; the one between the top of the view and the held row grew a frame later and moved what was on screen (the long-thread topic test, 12 of 200). The page's rows above the held row are now laid out in full (`eagerRows` in `containers/topic/scroll.ts`).
 
+- **A shift that counted only after the input window.** `expectStableAnchor` skips layout-shift entries Chromium marks `hadRecentInput` (within 500 ms of input). In the partial-thread test, the latest reply's name line goes when the same sender's replies arrive above it, and Chromium reports that row's top edge moving 20 px down with a 0.032 shift in every run, while the text stays at the same pixel in every frame. The replies render after a click, so the entry fell inside the window on a quiet runner and outside it under load (20 of 40 at 16 workers on 4 cores; at 4 workers, every pass came 189 to 409 ms after the click and every failure 538 to 1298 ms after it). The test now leaves that row to the anchor's samples (`outside`) (0 of 80). An entry that passes only because it came soon after a click is a timing result, not a pass: log `hadRecentInput` and the time since the input.
+
 - **A test marker made of digits.** The backup test that removes a message checked that no table of the restored database held the message's marker, `4417`. Timestamps and uuidv7 ids can hold those digits too: one run had `applied_at` 1792287544170 in `schema_migrations` and `created_at` 1792287544178 in `incarnations`; another had it in `incarnations`, `messages` and `inbox`, whose rows hold timestamps and the incarnation id. No removed text survived the purge. The marker is now a word with letters outside hex (`quokka`), which no number or id can contain. Search a database for a marker of letters, not digits.
 
 - **A menu command sent without its key.** `tabs.menu` clicks the item through main, which reaches the renderer over IPC, while `keyboard.type` goes straight to the page, so keys typed at once could arrive before the command. A real ⌘N cannot do this: its keydown reaches the page first and starts holding keys (`holdKeysAfterNewShortcut`). The ⌘N typing tests lost "m" to the old field 3 of 60 runs. Key presses in tests never reach Electron's menu accelerators on Linux, so `tabs.shortcut` sends the keydown to the page and then clicks the item.
@@ -1280,7 +1281,7 @@ Causes found so far (2026-10-15):
 
 - **A card button pressed while Juno still answered.** The remove card shows with the status bubble (40 px) under it, and Juno's "Done." (56 px) takes that bubble's place about 70 to 100 ms later, so the chat, held at the bottom, scrolls 15 px. `click()` had measured the button before the scroll and pressed its old centre after it, 0.06 px below the button's new bottom edge: `pointerdown` went to the card's inner `div`, and `onCard` never ran (`memory.spec.ts`, 1 of 20, then 2, 5 and 3 of 40 at 16 workers; a log in the page showed the event's target was the `div` while `elementFromPoint` at the same point still named the button). This is a chat taking a reply under the pointer, as SPEC 13.2 asks, not a lost click. The test now waits for the second "Done." and for the status bubble to go before it presses Remove (0 of 40). To press a button in the chat, wait until the run that drew it has ended. A target that `pointerdown` names and `elementFromPoint` does not means the point was measured before a move.
 
-- **A retry that walked no states.** The earlier shift and focus-ring claim queue was keyed by run and repeat without a retry boundary. A retried part found every state already claimed, walked none and passed, so a failure that happened on every walk showed as flaky: `AttachmentCard/shared-video` and `shared-files-quiet` gave the text cursor to their video box, video and file names without making them selectable (80 of 120 at `GALLERY_SHIFT_ONLY=AttachmentCard bun run flake apps/gallery/shift.spec.ts --repeat 40 --machines 1`, every repeat; a retry logged 0 states walked). Gallery retries are now disabled; a failed state remains uncached, and repeated runs walk their own queue. The files in a shared card keep the arrow and its file lines are selectable text (0 of 120 at the same command).
+- **A retry that walked no states.** The earlier shift claim queue was keyed by run and repeat without a retry boundary. A retried part found every state already claimed, walked none and passed, so a failure that happened on every walk showed as flaky: `AttachmentCard/shared-video` and `shared-files-quiet` gave the text cursor to their video box, video and file names without making them selectable (80 of 120 at `GALLERY_SHIFT_ONLY=AttachmentCard bun run flake apps/gallery/shift.spec.ts --repeat 40 --machines 1`, every repeat; a retry logged 0 states walked). Gallery retries are now disabled; a failed state remains uncached, and repeated runs walk their own queue. The files in a shared card keep the arrow and its file lines are selectable text (0 of 120 at the same command).
 
 ## Machine shapes
 
@@ -1290,7 +1291,7 @@ Juno requests physical cores from the laptop's shared `4-11` allocation:
 | --- | ---: | ---: |
 | Narrow unit, agent tests, cached spec check | 1 | 3 GiB |
 | Wide unit, uncached spec check, conformance, standalone gallery or app | 2 | 6 GiB |
-| Gallery or desktop inside a split plan | 3 | 9 GiB |
+| Desktop job of a split plan; unit job with the DOM lane or the gallery | 4 | 12 GiB |
 | Trace generation, other scripts | 4 | 12 GiB |
 
 Wide units have no named files or more than 20. `--cores` overrides the request;
@@ -1302,8 +1303,8 @@ CPU, with no burst to two.
 The shared host maps sibling CPUs and sets the actual thread quota. Workers
 use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
 threads from the request. At four threads units run four `bun test` processes.
-At six threads a split desktop job runs three workers and a split gallery job
-runs eight. Quint uses one simulation group per two threads and one
+At eight threads a split job runs eight unit, DOM, browser and Electron
+workers and six gallery walkers. Quint uses one simulation group per two threads and one
 Apalache checker per two threads, limited by the job’s cgroup memory ("Faster test runs").
 A two-core, 6 GiB job gets two simulation groups and two 1,536 MiB JVM heaps.
 Explicit worker settings win within the Apalache memory cap.
@@ -1311,7 +1312,7 @@ Explicit worker settings win within the Apalache memory cap.
 The host caps memory without swap and mounts `/tmp` and `/work` as tmpfs.
 Each tmpfs is 2 GiB, or 4 GiB for requests of four or more cores; tmpfs consumes
 the memory cap. Split plans release each job's cores independently.
-`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_GALLERY_CORES` override the two app jobs independently; `JUNO_RUNNER_UNIT_CORES` works the same way for the unit job, which also runs the spec checks. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
+`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_UNIT_CORES` override the two jobs independently. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
 Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue
@@ -1712,7 +1713,7 @@ for parsing the StyleX source files, not a lint speedup.
 
 ## Delayed-load layout checks
 
-Gallery image, avatar, thumbnail, replier and late-content checks run on every behavior invocation. The content cache applies only to the broad interaction and focus-ring walks; it does not replace delayed-load checks against fake Slack. `GALLERY_SHIFT_ALL=1` forces the broad walks too.
+Gallery image, avatar, thumbnail, replier and late-content checks run on every behavior invocation. The content cache applies only to the broad interaction walk; it does not replace delayed-load checks against fake Slack. `GALLERY_SHIFT_ALL=1` forces the broad walk too.
 
 At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remote runner with two workers. This is test time, excluding allocation, image pull and build. Use `bun run remote --machine linux/amd64:4x8 test:desktop layout-shift.spec.ts` for the same runner size.
 
@@ -1746,16 +1747,23 @@ Results live in the main checkout's shared `.juno-status`: latest `verify-main.j
 
 After fixing and committing the cause, run `bun run verify:main --ref origin/main --repair <record.json>` (or `--repair latest`). The baseline must be an ancestor with a version 2 record and the same runtime/platform. The repair runs failed and unfinished spec files, plus every test the fix reaches through `affected --wide --graph --no-cache`. It leaves out affected's typecheck and lint, which run on this Mac and are not part of a full run, and runs affected's `test:desktop` selection in both the browser and Electron lanes. There is no count or time cap and no heavy-test exclusion. A suite without a complete structured inventory reruns in full. Passed, untouched suites keep their provenance; repaired suites retain previous passing test outcomes. The release gate accepts the repair only with the recorded baseline chain and complete successful required suites. A Mac timing/nightly baseline needs a fresh `--with-mac` full run.
 
-### Compare desktop and gallery allocation
+### Job sizes
 
-After the browser lane lands on main, run `bun scripts/verify-benchmark.mjs --dry-run` to inspect the plan, then `bun scripts/verify-benchmark.mjs --ref origin/main`. It pins one commit and runs five laptop full runs sequentially at desktop/gallery core splits 2/2, 3/3, 4/4, 5/3 and 4/4. It stops on a failure for triage. It refuses local fallback and waits for both browser and Electron scripts before starting. Records live in shared `.juno-status/verify-benchmarks/` and include wall time, suite records and allocations; the retained logs contain allocator waits, peak container memory and CPU pressure. Compare the whole run, failure rate and shared-host pressure, not desktop time alone. A failed configuration is not eligible even when its raw wall time is lower.
+A full run is two four-core jobs. Each serial step prints `plan: step <n> <script> used <s> CPU-s, peak memory <g> GB`, read from the job's cgroup, so a re-plan can use measured CPU rather than guesses. Single runs on 2026-10-25, protocol suites reused from an unchanged earlier run:
 
-The 2026-10-24 warm-cache run at `baea08148` produced these single-run results:
+| Plan | Commit | Wall | Job | Cores | Steps (wall s) | Script wall | CPU busy | Peak memory |
+| --- | --- | ---: | --- | ---: | --- | ---: | ---: | ---: |
+| Before: unit 2, desktop 3, gallery 3 | `1e9e01c87` | 206.6 s | unit | 2 | test 70, test:dom 111, conformance 17 | 198 s | 92% | 3.6 GB |
+| | | | desktop | 3 | browser 120, Electron 61 | 181 s | 89% | 5.4 GB |
+| | | | gallery | 3 | gallery 82 | 81 s | 79% | 4.7 GB |
+| After: desktop 4, unit 4 | `e1e82b049` | 183.3 s | unit | 4 | test 36, test:dom 80, gallery 58 | 174 s | 75% | 5.4 GB |
+| | | | desktop | 4 | browser 111, Electron 67 | 178 s | 82% | 6.4 GB |
 
-| Desktop/gallery cores | Result | Wall | Unit | Gallery | Browser | Electron | Allocator wait | Desktop peak | Desktop median CPU |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2/2 | Passed | 567.1 s | 95 s | 75 s | 435 s | 121 s | 86 s | 4.10 GiB | 97% |
-| 3/3 | Passed | 387.4 s | 95 s | 61 s | 297 s | 81 s | 0 s | 5.39 GiB | 98% |
-| 4/4 | Failed | 353.6 s | 90 s | 45 s | 224 s | 73 s | 46 s | 6.81 GiB | 99% |
+Measured CPU per step at eight threads: test 259 CPU-s, test:dom 497, test:gallery 296, test:browser 747, test:electron 431 (2,230 in all; conformance about 60 when it runs). Two equal halves are the best split of that work: any smaller job left one long suite on two or three cores, and 16 threads at about 80% busy put the floor near 175 s. Below that the work itself has to shrink. Where the time goes:
 
-The 4/4 run failed a browser media-tab flow, so the harness stopped before 5/3 and the repeated 4/4 run. These are observations, not replicated medians. The browser lane was the long pole in both successful runs. The split-plan default is 3/3 because it was the fastest successful sample and the only sample without an allocator wait; 4/4 is ineligible despite its lower raw wall time.
+- The browser lane is a third of all CPU. Its 118 tests sum to 719 s of test time; 8 workers take 111 s wall, after a 13 s renderer build.
+- Builds run on the critical path in both jobs: DOM 14 s, web renderer 13 s, gallery 9 s. The build key (`scripts/build-cached.mjs`) hashes every file under `packages`, `scripts` and the app, so almost every commit builds them again.
+- The Electron lane is limited by its longest tests: the agent crash and transfer specs take 25 s each, and 8 workers finish its 366 s of test time in 66 s.
+- The DOM lane spends 3.6 CPU-s per test (137 tests).
+
+`bun scripts/verify-benchmark.mjs --ref origin/main` runs full runs one after another at desktop/unit core splits 4/4, 5/3, 3/5 and 4/4 (`--dry-run` prints the plan). It stops on a failure for triage and refuses local fallback. Records live in shared `.juno-status/verify-benchmarks/`. Compare the whole run, failure rate and shared-host pressure, not one job's time. A failed configuration is not eligible even when its raw wall time is lower.

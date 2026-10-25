@@ -1,4 +1,4 @@
-// Five sequential laptop runs at one commit. Do not tune from desktop time alone.
+// Sequential laptop runs at one commit, one per desktop/unit core split. Do not tune from one job's time alone.
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -9,8 +9,8 @@ const root = resolve(import.meta.dirname, '..')
 const args = process.argv.slice(2)
 const commit = git(root, 'rev-parse', args.includes('--ref') ? args[args.indexOf('--ref') + 1] : 'origin/main')
 const scripts = JSON.parse(git(root, 'show', `${commit}:package.json`)).scripts
-const splits = [[2, 2], [3, 3], [4, 4], [5, 3], [4, 4]]
-const plan = { commit, splits: splits.map(([desktop, gallery]) => ({ desktop, gallery })), unit: 'default', specs: 'reuse unchanged inputs', coverage: false,
+const splits = [[4, 4], [5, 3], [3, 5], [4, 4]]
+const plan = { commit, splits: splits.map(([desktop, unit]) => ({ desktop, unit })), specs: 'reuse unchanged inputs', coverage: false,
   measures: ['whole-run wall seconds', 'per-suite seconds', 'allocator waits', 'peak container memory', 'CPU pressure', 'failure causes', 'per-test durations'],
   pending: !(scripts['test:browser'] && scripts['test:electron']) }
 console.log(JSON.stringify(plan, null, 2))
@@ -25,12 +25,12 @@ forwardSignals(children)
 let cancelled = false
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = true })
 const runs = []
-for (const [desktop, gallery] of splits) {
+for (const [desktop, unit] of splits) {
   if (cancelled) break
   const started = Date.now()
   const code = await new Promise((done) => {
     const child = spawn('bun', ['run', 'verify:main', '--ref', commit, '--require-remote'], {
-      cwd: root, stdio: 'inherit', env: { ...process.env, JUNO_RUNNER_DESKTOP_CORES: String(desktop), JUNO_RUNNER_GALLERY_CORES: String(gallery) },
+      cwd: root, stdio: 'inherit', env: { ...process.env, JUNO_RUNNER_DESKTOP_CORES: String(desktop), JUNO_RUNNER_UNIT_CORES: String(unit) },
     })
     children.add(child)
     child.on('error', () => {})
@@ -38,7 +38,7 @@ for (const [desktop, gallery] of splits) {
   })
   const record = JSON.parse(readFileSync(join(statusFolder(root), 'verify-main.json'), 'utf8'))
   if (record.commit !== commit || Date.parse(record.finishedAt) < started) throw new Error('Benchmark did not produce a record for this run')
-  runs.push({ desktop, gallery, code, wallSeconds: (Date.now() - started) / 1000, record })
+  runs.push({ desktop, unit, code, wallSeconds: (Date.now() - started) / 1000, record })
   writeFileSync(join(folder, 'results.json'), JSON.stringify({ ...plan, runs }, null, 2) + '\n')
   // A failed run is evidence to fix, never a reason to loop until green.
   if (code !== 0) { process.exitCode = code; break }

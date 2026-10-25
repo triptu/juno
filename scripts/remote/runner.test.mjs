@@ -72,16 +72,16 @@ test('toolchain builds go through the shared host and failures stop before admis
   assert.deepEqual(f.calls().map((call) => call.sub), ['check', 'build'])
 })
 
-test('split plans run spec checks in the unit job, fit the eight lent cores together, and retain original results', (t) => {
+test('a full plan runs as two jobs that fit the eight lent cores together and retain original results', (t) => {
   const f = fixture(t)
-  const result = f.run(['--wait', '120', 'test:plan', 'test', '+', 'specs:check', '+', 'specs:conformance', '+', 'test:gallery', '+', 'test:desktop'])
+  const result = f.run(['--wait', '120', 'test:plan', 'test', '+', 'test:dom', '+', 'specs:check', '+', 'specs:conformance', '+', 'test:gallery', '+', 'test:browser', '+', 'test:electron'])
   assert.equal(result.status, 0, result.output)
   const jobs = f.calls().filter((call) => call.sub === 'run')
-  assert.equal(jobs.length, 3)
+  assert.equal(jobs.length, 2)
   const cores = jobs.map((job) => Number(job.args.find((arg) => arg.startsWith('cores=')).slice(6)))
   assert.ok(cores.reduce((sum, count) => sum + count, 0) <= 8, `${cores}`)
   for (const job of jobs) assert.ok(job.args.includes('wait=120'))
-  for (const [index, script] of ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop'].entries()) assert.match(result.output, new RegExp(`plan: step ${index} ${script} exited with 0`))
+  for (const [index, script] of ['test', 'test:dom', 'specs:check', 'specs:conformance', 'test:gallery', 'test:browser', 'test:electron'].entries()) assert.match(result.output, new RegExp(`plan: step ${index} ${script} exited with 0`))
 })
 
 test('split plans allow queued jobs to wait and keep an explicit wait override', (t) => {
