@@ -4,10 +4,13 @@
 // all queued requests without interrupting jobs that already hold a slot.
 // Child processes receive JUNO_HEAVY_HELD so nested heavy commands run under
 // their parent's reservation instead of waiting for a slot they cannot get.
+// On macOS a request also waits while the machine is overloaded (load above the
+// core count, or under 1 GB of free and inactive memory);
+// JUNO_HEAVY_IGNORE_LOAD=1 skips that wait.
 
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { cpus, loadavg, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
@@ -134,15 +137,42 @@ const tryAcquire = () => {
   return undefined
 }
 
-let slot = tryAcquire()
+// Free plus inactive pages: what macOS can hand out without swapping.
+const availableMb = () => {
+  const stat = execFileSync('vm_stat', { encoding: 'utf8' })
+  const pageSize = Number(/page size of (\d+)/.exec(stat)?.[1] ?? 16384)
+  const pages = (name) => Number(new RegExp(`Pages ${name}:\\s+(\\d+)`).exec(stat)?.[1] ?? 0)
+  return (pages('free') + pages('inactive') + pages('speculative')) * pageSize / 2 ** 20
+}
+const overloaded = () => {
+  if (process.platform !== 'darwin' || process.env.JUNO_HEAVY_IGNORE_LOAD === '1') return undefined
+  const load = loadavg()[0]
+  const cores = cpus().length
+  if (load > cores) return `load ${load.toFixed(1)} is above ${cores} cores`
+  try {
+    const memory = availableMb()
+    if (memory < 1024) return `only ${Math.round(memory)} MB of memory is free`
+  } catch {}
+  return undefined
+}
+
+let busy = overloaded()
+let checkedAt = Date.now()
+let slot = busy ? undefined : tryAcquire()
 let lastNotice = 0
 while (!slot) {
   if (Date.now() - lastNotice >= 30000) {
-    console.error(`heavy: waiting (${since(queuedAt)}). Run bun scripts/heavy.mjs --status to inspect the queue.`)
+    console.error(busy
+      ? `heavy: waiting (${since(queuedAt)}): ${busy}. JUNO_HEAVY_IGNORE_LOAD=1 skips this wait.`
+      : `heavy: waiting (${since(queuedAt)}). Run bun scripts/heavy.mjs --status to inspect the queue.`)
     lastNotice = Date.now()
   }
   await new Promise((resolve) => setTimeout(resolve, 500))
-  slot = tryAcquire()
+  if (Date.now() - checkedAt >= 2000) {
+    busy = overloaded()
+    checkedAt = Date.now()
+  }
+  slot = busy ? undefined : tryAcquire()
 }
 rmSync(ticket, { force: true })
 const release = () => { for (const dir of held.length ? held : slot) rmSync(dir, { recursive: true, force: true }) }
