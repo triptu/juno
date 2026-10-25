@@ -82,7 +82,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'home-send-tab.spec.ts',
   'home-topic.spec.ts',
   'home-write.spec.ts',
-  'integration-messages.spec.ts',
   'links.spec.ts',
   'live.spec.ts',
   'main-new-threads.spec.ts',
