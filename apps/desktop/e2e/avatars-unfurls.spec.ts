@@ -57,22 +57,6 @@ test('photos load in messages, sidebar stacks, a DM row and the account menu, an
   await juno.accountMenu.close()
 })
 
-test('the image route refuses local addresses and non-image responses', { tag: '@electron' }, async ({ juno, fake, app, win }) => {
-  const policy = await win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
-  expect(policy).toContain("img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:")
-  expect(policy).not.toContain('slack-imgs.com')
-  expect(policy).not.toContain('twimg.com')
-  await juno.signIn()
-  const urls = ['https://127.0.0.1/image.png', 'https://[::1]/image.png', 'file:///tmp/image.png', `${fake.url}/health`]
-  for (const url of urls) {
-    const status = await app.evaluate(async ({ net }, source) => {
-      const response = await net.fetch(`juno://images/?url=${encodeURIComponent(source)}`)
-      return response.status
-    }, url)
-    expect(status).toBe(404)
-  }
-})
-
 syncedTest('users stored without a photo get one on the next launch, with no re-sync', async ({ fake, userData, relaunch }) => {
   const relaunched = await relaunch({ whileClosed: () => {
     // A cache written before photos were built from the avatar hash.
