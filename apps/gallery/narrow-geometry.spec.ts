@@ -1,9 +1,9 @@
 // The main surfaces at the minimum window (720 by 480): with the sidebar
 // shown a page is 336 wide, without it 720. No text paints over other
 // text or runs out of its pill, and the buttons of a card keep their verbs.
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import { findOverlaps } from './overlap'
-import { openState, type Route } from './support'
+import { openState, paintTest as test, type Route } from './support'
 
 const route = (component: string, id: string): Route => ({ component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
 
@@ -33,12 +33,12 @@ const frameOf = (page: Page, at: Route) => page.locator(`[data-fixture-frame="${
 
 test.describe('the minimum window', () => {
   // In light only: the dark theme changes colours and shadows, never a size (packages/tokens/src/themes.stylex.ts).
-  for (const [at, buttons] of STATES) {
-    test(`${at.route}: no text overlaps`, async ({ page }) => {
+  test('no text overlaps in any state', async ({ page }) => {
+    for (const [at, buttons] of STATES) {
       await openState(page, at)
-      expect(await findOverlaps(page, { route: at.route, buttons })).toEqual([])
-    })
-  }
+      expect(await findOverlaps(page, { route: at.route, buttons }), at.route).toEqual([])
+    }
+  })
 
   test('the Send message card keeps its kind label whole and puts "in {topic}" under the pill', async ({ page }) => {
     const at = route('SendMessageCard', 'send-message/minimum-window')

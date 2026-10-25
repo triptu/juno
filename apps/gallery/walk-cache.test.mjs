@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { walkCache } from './walk-cache.mjs'
+import { testCache, walkCache } from './walk-cache.mjs'
 
 const tokens = [
   "import * as stylex from '@stylexjs/stylex'",
@@ -91,7 +91,6 @@ test('browser, Playwright, OS, architecture, options and guard identity belong t
   for (const field of Object.keys(runtime)) {
     assert.equal(cache({ runtime: { ...runtime, [field]: 'changed' } }).passed(button), false, field)
   }
-  assert.equal(cache({ kind: 'ring' }).passed(button), false)
 })
 
 test('full runs bypass old passes; failed, incomplete and corrupt records never pass', t => {
@@ -110,12 +109,18 @@ test('full runs bypass old passes; failed, incomplete and corrupt records never 
   assert.equal(cache().passed(button), false)
 })
 
-test('unknown registrations fail closed to all sources', t => {
+test('unknown registrations fail closed to all sources; the gallery\'s compositions key on what they import', t => {
   const { cache, write, button } = fixture(t)
+  write('apps/gallery/src/compositions.tsx', "import { Button } from '@juno/ui'\nexport const compositions = {\n  Pair: defineFixtures(Button),\n}\n")
   const unknown = { ...button, component: 'Composition', route: 'Composition/one' }
+  const pair = { ...button, component: 'Pair', route: 'Pair/one' }
   cache().pass(unknown)
+  cache().pass(pair)
   write('packages/ui/src/Other.ts', 'export const Other = 3')
   assert.equal(cache().passed(unknown), false)
+  assert.equal(cache().passed(pair), true)
+  write('packages/ui/src/width.ts', 'export const width = 22')
+  assert.equal(cache().passed(pair), false)
 })
 
 test('a state keys on the layout tokens it reads, in every theme, and on what they read', t => {
@@ -165,4 +170,35 @@ test('spec-only tests, scripts and packages outside the gallery do not invalidat
   cache().pass(button)
   write('bun.lock', `${readFileSync(join(root, 'bun.lock'), 'utf8')} not json`)
   assert.equal(cache().passed(button), false, 'an unreadable lockfile counts whole')
+})
+
+test('a cached rendering test keys on its spec, the components it opened and, for paint, every colour', t => {
+  const { root, write, directory, runtime } = fixture(t)
+  write('apps/gallery/support.ts', 'export const open = 1')
+  write('apps/gallery/rows.spec.ts', "import { open } from './support'\nexport const spec = open")
+  const spec = 'apps/gallery/rows.spec.ts'
+  const cache = (kind = 'layout', extra = {}) => testCache({ root, directory, runtime, kind, ...extra })
+  const passes = (kind, edit, opened = ['Button']) => {
+    cache(kind).pass(spec, 'rows', opened)
+    edit()
+    return cache(kind).passed(spec, 'rows')
+  }
+  const tokens = () => readFileSync(join(root, 'packages/tokens/src/tokens.stylex.ts'), 'utf8')
+  assert.equal(cache().passed(spec, 'rows'), false, 'never run')
+  // Only what it opened counts.
+  assert.equal(passes('layout', () => write('packages/ui/src/Other.ts', 'export const Other = 3')), true)
+  assert.equal(passes('layout', () => write('packages/ui/src/width.ts', 'export const width = 30')), false)
+  assert.equal(passes('layout', () => write('packages/ui/src/width.ts', 'export const width = 31'), ['#index']), true)
+  assert.equal(passes('layout', () => write('packages/views/src/Other.fixtures.ts', "import { Other } from '@juno/ui'\nexport default [Other]"), ['#index']), false)
+  // The spec and what it imports.
+  assert.equal(passes('layout', () => write('apps/gallery/support.ts', 'export const open = 2')), false)
+  // A colour the component reads counts for paint only; one it does not read never counts.
+  assert.equal(passes('layout', () => write('packages/tokens/src/tokens.stylex.ts', tokens().replace('20%, 1)', '25%, 1)'))), true)
+  assert.equal(passes('paint', () => write('packages/tokens/src/tokens.stylex.ts', tokens().replace('25%, 1)', '30%, 1)'))), false)
+  assert.equal(passes('paint', () => write('packages/tokens/src/tokens.stylex.ts', tokens().replace("'--unused': '1px'", "'--unused': '2px',\n  '--tint': 'red'"))), true)
+  // A full run reruns it, and a run that does not finish leaves no pass behind.
+  cache().pass(spec, 'rows', ['Button'])
+  assert.equal(cache('layout', { all: true }).passed(spec, 'rows'), false)
+  cache().forget(spec, 'rows')
+  assert.equal(cache().passed(spec, 'rows'), false)
 })

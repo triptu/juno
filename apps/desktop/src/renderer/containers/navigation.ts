@@ -679,7 +679,13 @@ function arriving(tabs: Tabs, tabId: string, place: Place | undefined, fresh: bo
 export function switchToTab(tabId: string): void {
   const at = performance.now()
   const tabs = registry.get(tabsAtom)
-  if (tabs.active === tabId) return
+  if (tabs.active === tabId) {
+    // Asking for what is on screen is the latest ask: a change still waiting for its topic no longer applies.
+    ++currentTicket
+    pending = undefined
+    registry.set(selectedTopicAtom, activeTopic(tabs))
+    return
+  }
   const tab = tabs.tabs.find((other) => other.id === tabId)
   if (tab === undefined) return
   traceSend('switch', () => ({ tab: tabId, from: tabs.active }))

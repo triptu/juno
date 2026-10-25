@@ -21,6 +21,10 @@ export class HomeWritePane implements HomeWriteVerbs {
     return this.root.locator('[data-mention-suggestions]')
   }
 
+  get composerChips(): Query {
+    return this.root.locator('[data-composer] [data-mark]')
+  }
+
   suggestion(name: string): Query {
     return this.suggestions.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
   }

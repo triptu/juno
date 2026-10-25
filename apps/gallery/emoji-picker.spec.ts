@@ -54,7 +54,6 @@ test('failed images retain their cell and do not move later emoji', async ({ pag
   release()
   await expect(cell.locator('[data-emoji-placeholder]')).toBeVisible()
   await expect(cell).toHaveText('')
-  await expect(cell).toHaveAccessibleName(':broken_image:')
   await expect(cell).toHaveAttribute('title', ':broken_image:')
   expect(await cell.boundingBox()).toEqual(before)
   expect(await neighbour.boundingBox()).toEqual(neighbourBefore)

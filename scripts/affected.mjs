@@ -73,7 +73,7 @@ const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standar
 /** What every suite installs and compiles with: a change reaches every unit test, and a sample of every e2e suite. */
 const dependencies = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
-const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/dom-tests.mjs', 'scripts/nightly-tests.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
+const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/dom-tests.mjs', 'scripts/nightly-tests.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/build-inputs.mjs', 'scripts/locked-packages.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
 const deletedSources = wide ? changed.filter((file) => /^(apps|packages)\//.test(file) && !file.endsWith('.md') && !files.has(file)) : []
 const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : []), ...deletedSources]
