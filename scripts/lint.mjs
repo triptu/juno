@@ -18,7 +18,9 @@ const checks = [
   ['dependencies', bun('check-deps.mjs')],
   ['fixtures redacted', bun('check-fixtures-redacted.mjs')],
   ['lfs', bun('check-lfs.mjs')],
-  ['health', bun('health.mjs', '--check')],
+  // Knip and jscpd are the heaviest checks, and every agent runs lint: take a heavy slot
+  // so many agents cannot scan at once. Inside a heavy job it runs in the parent's slot.
+  ['health', bun('heavy.mjs', process.execPath, 'scripts/health.mjs', '--check')],
 ]
 
 const started = performance.now()

@@ -188,8 +188,9 @@ batch branch with `git branch -D batch-N`. If a process was killed, remove its
 Run `bun run health` for a summary and the largest clone pairs, files, and functions.
 `bun run lint` runs the same scan with `--check` against `health-baseline.json`.
 Knip and jscpd run concurrently; neither uses a cached result. Knip runs on Node
-(see "Runtimes"), jscpd and the size scan on Bun. Health scans do not need the
-heavy-job lock. Tool errors fail both reporting and lint.
+(see "Runtimes"), jscpd and the size scan on Bun. Lint runs the scan through
+the heavy-job lock ("Heavy jobs share one queue"), so many agents' lints cannot
+scan at once; `bun run health` does not take it. Tool errors fail both reporting and lint.
 
 - **Knip** checks unused files, value exports, type exports, dependencies, and unlisted dependencies across all workspaces, scripts, and test entries. `bun run health:knip` prints every finding. Private package exports are included, so a barrel export with no consumers is a finding even if its implementation is used internally.
 - **jscpd** checks `packages/*/src` and `apps/*/src`, including fixtures and CSS. Clones need at least 100 tokens and eight lines. Comments and whitespace do not count as matching tokens. The percentage is duplicated lines divided by scanned source lines. `bun run health:clones` writes the full clone report.
@@ -1263,7 +1264,7 @@ Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue
 
-Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`bun run test`, `bun run test:e2e`, `bun run test:feel`, `bun run test:gallery`, `bun run gallery:shots`, `bun run specs:check`, `bun run test:agent-contracts`, `bun run test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`bun run perf`, `bun run test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging passes `--priority release` with `--exclusive`: it moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `bun scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `test:repo-tools`, `test:health` and `test:runner` skip the machine-wide queue. Queue tests reserve only their own temporary queues; `affected` sends all three tool suites to the laptop.
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`bun run test`, `bun run test:e2e`, `bun run test:feel`, `bun run test:gallery`, `bun run gallery:shots`, `bun run specs:check`, `bun run test:agent-contracts`, `bun run test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On macOS it also waits, before taking a slot, while the 1-minute load is above the core count or free plus inactive memory (from `vm_stat`) is under 1 GB, and prints why it waits; `JUNO_HEAVY_IGNORE_LOAD=1` skips that wait. The Mac froze several times when many agents ran work at once, and the slots alone did not see work started outside the queue. On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`bun run perf`, `bun run test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging and its smoke test (`package`, `test:package`) pass `--priority release` with `--exclusive`: each moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `bun scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `bun run lint` takes one slot for its health scan (Knip and jscpd) only. `test:repo-tools`, `test:health` and `test:runner` skip the machine-wide queue. Queue tests reserve only their own temporary queues; `affected` sends all three tool suites to the laptop.
 
 
 ## Releasing
@@ -1538,8 +1539,8 @@ changes nothing; it does not fetch.
    a corrected file if it is invalid, up to `--notes-timeout` minutes (60).
 5. It bumps the patch version in a detached worktree on the scratch volume
    (`release-<version>`), commits `Release x.y.z`, runs `bun run package` and
-   `bun run test:package` there (both through the heavy lock, packaging with
-   release priority), and publishes with `release:publish`.
+   `bun run test:package` there (both through the heavy lock with release
+   priority), and publishes with `release:publish`.
 6. It checks the GitHub release (not a draft, marked latest, with the DMG, its
    block map and `latest-mac.yml`) and that main has the version, then removes
    the worktree.
