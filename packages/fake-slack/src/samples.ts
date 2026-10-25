@@ -13,8 +13,23 @@ function pngChunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([length, body, crc])
 }
 
-/** An RGB PNG of a simple bar chart on a light background. */
+const pngs = new Map<string, Buffer>()
+
+/**
+ * An RGB PNG of a simple bar chart on a light background. Every fake seed makes the same few sizes,
+ * so each is drawn and compressed once per process; callers get their own copy.
+ */
 export function samplePng(width: number, height: number): Buffer {
+  const key = `${width}x${height}`
+  let png = pngs.get(key)
+  if (png === undefined) {
+    png = drawPng(width, height)
+    pngs.set(key, png)
+  }
+  return Buffer.from(png)
+}
+
+function drawPng(width: number, height: number): Buffer {
   const bars = [0.55, 0.8, 0.4, 0.95, 0.7]
   const slot = width / bars.length
   const row = 1 + width * 3
