@@ -45,16 +45,16 @@ async function openTwice(juno: Juno): Promise<void> {
 /**
  * The first tab follows three new replies at the bottom, and the window drops as many rows from its top; then the
  * second tab comes back with `row` where it was, in its first frame and every frame after. `meanwhile` runs while
- * the second tab is hidden.
+ * the second tab is hidden. `round` tells each call's replies apart.
  */
-async function hideWhileRepliesArrive(juno: Juno, fake: FakeSlack, row: { readonly ts: string; readonly top: number }, meanwhile?: () => Promise<unknown>): Promise<void> {
+async function hideWhileRepliesArrive(juno: Juno, fake: FakeSlack, round: number, row: { readonly ts: string; readonly top: number }, meanwhile?: () => Promise<unknown>): Promise<void> {
   const { tabs, topic } = juno
   await tabs.selectAt(THREAD, 0)
   await tabs.expectActiveAt(THREAD, 0)
   await meanwhile?.()
   const threadTs = fake.workspace.main(TOPIC300_THREAD_CHANNEL).find((message) => message.text?.startsWith(THREAD))!.ts
-  for (const n of [1, 2, 3]) fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text: `A reply while the other tab is hidden ${n}` })
-  await topic.expectMessage('A reply while the other tab is hidden 3')
+  for (const n of [1, 2, 3]) fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text: `A reply while the other tab is hidden ${round}.${n}` })
+  await topic.expectMessage(`A reply while the other tab is hidden ${round}.3`)
   await topic.expectAtBottom()
   await expectStableAnchor(juno.win, `[data-message-row="${row.ts}"]`, async () => {
     await tabs.selectAt(THREAD, 1)
@@ -104,32 +104,41 @@ test.describe('one topic in two tabs', () => {
     await expect(tabs.tab(THREAD)).toHaveCount(2)
   })
 
-  longTest('a tab left in the middle of a long topic comes back there after messages arrive while it is hidden', async ({ juno, fake }) => {
-    await openTwice(juno)
-    // Half the window up, past the rows kept laid out at the end, among rows of every height at their estimate.
-    const middle = await juno.topic.scrollUp(5000, FRAMES)
-    expectStill(middle)
-    await hideWhileRepliesArrive(juno, fake, middle)
-  })
-
-  longTest('a scroll that ends with a gap between groups at the top edge comes back there too', async ({ juno, fake }) => {
-    await openTwice(juno)
-    expectStill(await juno.topic.scrollUp(5000, FRAMES))
-    // No row is under the top edge; the first row whose top is in view is the one that stays.
-    const gap = await juno.topic.scrollToGroupGap(FRAMES)
-    expectStill(gap)
-    await hideWhileRepliesArrive(juno, fake, gap)
-  })
-
-  longTest('a click that scrolls nothing keeps the tab where it is for the next switch', async ({ juno, fake }) => {
+  longTest('a tab left in the middle of a long topic comes back there after messages arrive while it is hidden: after a wheel jump, at a gap between groups, and after a click that scrolled nothing', async ({ juno, fake }) => {
     await openTwice(juno)
     const { topic, win } = juno
-    expectStill(await topic.scrollUp(5000, FRAMES))
-    // A click on the text of a row in the middle of the view: the press lets go of the held row, and no scroll ends.
-    const at = await textInMiddle(juno)
-    await win.mouse.click(at.x, at.y)
-    const row = await topic.firstVisibleRow()
-    // The window narrows while the tab is hidden, so the rows around the view wrap again before it is laid out.
-    await hideWhileRepliesArrive(juno, fake, row, () => juno.setWindowSize(760, 700))
+    /** The second tab back at the bottom with nothing new below, then half the window up, among rows of every height at their estimate. */
+    const halfUp = async () => {
+      await topic.toLatest()
+      await topic.expectNoPill()
+      const up = await topic.scrollUp(5000, FRAMES)
+      expectStill(up)
+      return up
+    }
+
+    await test.step('after a wheel jump', async () => {
+      // Half the window up, past the rows kept laid out at the end.
+      const middle = await topic.scrollUp(5000, FRAMES)
+      expectStill(middle)
+      await hideWhileRepliesArrive(juno, fake, 1, middle)
+    })
+
+    await test.step('a scroll that ends with a gap between groups at the top edge', async () => {
+      await halfUp()
+      // No row is under the top edge; the first row whose top is in view is the one that stays.
+      const gap = await topic.scrollToGroupGap(FRAMES)
+      expectStill(gap)
+      await hideWhileRepliesArrive(juno, fake, 2, gap)
+    })
+
+    await test.step('a click that scrolls nothing keeps the tab where it is for the next switch', async () => {
+      await halfUp()
+      // A click on the text of a row in the middle of the view: the press lets go of the held row, and no scroll ends.
+      const at = await textInMiddle(juno)
+      await win.mouse.click(at.x, at.y)
+      const row = await topic.firstVisibleRow()
+      // The window narrows while the tab is hidden, so the rows around the view wrap again before it is laid out.
+      await hideWhileRepliesArrive(juno, fake, 3, row, () => juno.setWindowSize(760, 700))
+    })
   })
 })

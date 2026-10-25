@@ -5,6 +5,29 @@ import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { walkCache } from './walk-cache.mjs'
 
+const tokens = [
+  "import * as stylex from '@stylexjs/stylex'",
+  'export const colors = stylex.defineVars({',
+  "  '--ink': 'hsla(48, 5%, 20%, 1)',",
+  "  '--edge': '0 0 0 1px oklch(0 0 0 / 0.1)',",
+  '})',
+  'export const spacing = stylex.defineVars({',
+  "  '--unit': '4px',",
+  "  '--gap': `calc(${spacing['--unit']} * 2)`,",
+  "  '--unused': '1px',",
+  '})',
+].join('\n')
+const themes = `import * as stylex from '@stylexjs/stylex'
+import { colors, spacing } from './tokens.stylex'
+export const dark = stylex.createTheme(colors, { '--ink': 'hsla(48, 5%, 90%, 1)' })
+export const compact = stylex.createTheme(spacing, { '--unit': '3px' })
+`
+const lock = versions => JSON.stringify({
+  lockfileVersion: 1,
+  workspaces: { 'apps/gallery': { name: '@juno/gallery', devDependencies: { vite: '7' } }, 'packages/ui': { name: '@juno/ui' }, 'packages/tokens': { name: '@juno/tokens' }, 'packages/views': { name: '@juno/views' }, 'packages/testing': { name: '@juno/testing' }, 'apps/desktop': { name: '@juno/desktop', dependencies: { electron: '30' } } },
+  packages: Object.fromEntries(Object.entries(versions).map(([name, version]) => [name, [`${name}@${version}`, '', {}, 'sha']])),
+})
+
 function fixture(t) {
   const scratch = '/Volumes/AgentWork/scratch'
   const root = mkdtempSync(join(existsSync(scratch) ? scratch : tmpdir(), 'gallery-cache-'))
@@ -12,7 +35,7 @@ function fixture(t) {
   const write = (path, text) => { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text) }
   write('packages/ui/package.json', JSON.stringify({ name: '@juno/ui', exports: { '.': './src/index.ts' } }))
   write('packages/ui/src/index.ts', "export { Button } from './Button'\nexport { Other } from './Other'")
-  write('packages/ui/src/Button.ts', "import { width } from './width'\nexport const Button = width")
+  write('packages/ui/src/Button.ts', "import { colors, spacing } from '@juno/tokens/tokens.stylex'\nimport { width } from './width'\nexport const Button = [width, spacing['--gap'], colors['--ink'], colors['--edge']]")
   write('packages/ui/src/width.ts', 'export const width = 20')
   write('packages/ui/src/Other.ts', 'export const Other = 2')
   write('packages/views/package.json', JSON.stringify({ name: '@juno/views' }))
@@ -20,6 +43,15 @@ function fixture(t) {
   write('packages/views/src/Other.fixtures.ts', "import { Other } from '@juno/ui'\nexport default Other")
   write('packages/views/src/fixtures.ts', "import Button, { secondary } from './Button.fixtures'\nimport Other from './Other.fixtures'\nexport const fixtures = {\n Button,\n Alias: secondary,\n Other,\n}\n")
   write('apps/gallery/src/registry.ts', '// registry')
+  write('packages/tokens/package.json', JSON.stringify({ name: '@juno/tokens', exports: { './tokens.stylex': './src/tokens.stylex.ts', './themes.stylex': './src/themes.stylex.ts' } }))
+  write('packages/tokens/src/tokens.stylex.ts', tokens)
+  write('packages/tokens/src/themes.stylex.ts', themes)
+  write('apps/gallery/shift-walk.ts', "import { guard } from '@juno/testing/layout-shift'\nexport const walk = guard")
+  write('packages/testing/package.json', JSON.stringify({ name: '@juno/testing', exports: { './layout-shift': './src/layoutShift.ts' } }))
+  write('packages/testing/src/layoutShift.ts', 'export const guard = 1')
+  write('package.json', JSON.stringify({ name: 'juno', scripts: { test: 'bun test' } }))
+  write('apps/gallery/package.json', JSON.stringify({ name: '@juno/gallery', devDependencies: { vite: '7' } }))
+  write('bun.lock', lock({ vite: '7.0.0', electron: '30.0.0' }))
   const directory = join(root, 'cache')
   const runtime = { playwright: '1', chromium: '2', platform: 'linux', arch: 'x64', viewport: [1280, 800] }
   const cache = (extra = {}) => walkCache({ root, directory, runtime, kind: 'shift', ...extra })
@@ -39,11 +71,11 @@ test('transitive source and named fixture aliases invalidate only their componen
   assert.equal(after.passed({ ...other, id: 'two', route: 'Other/two' }), false)
 })
 
-test('dynamic imports, fixtures, fonts and build inputs invalidate successful states', t => {
+test('dynamic imports, fixtures, fonts, build inputs and the walk itself invalidate successful states', t => {
   const { root, cache, write, button } = fixture(t)
   write('packages/ui/src/Button.ts', "export const Button = () => import('./lazy')")
   write('packages/ui/src/lazy.ts', 'export const size = 1')
-  for (const file of ['packages/ui/src/lazy.ts', 'packages/views/src/Button.fixtures.ts', 'packages/tokens/src/global.css', 'packages/tokens/src/font.woff2', 'apps/gallery/dist/assets/font.woff2', 'apps/gallery/vite.config.ts', 'apps/gallery/.env.local', 'bun.lock', 'apps/gallery/shift.spec.ts']) {
+  for (const file of ['packages/ui/src/lazy.ts', 'packages/views/src/Button.fixtures.ts', 'packages/tokens/src/global.css', 'packages/tokens/src/font.woff2', 'apps/gallery/dist/assets/font.woff2', 'apps/gallery/vite.config.ts', 'apps/gallery/.env.local', 'apps/gallery/shift-walk.ts', 'packages/testing/src/layoutShift.ts']) {
     const before = cache()
     before.pass(button)
     let old = ''
@@ -84,4 +116,53 @@ test('unknown registrations fail closed to all sources', t => {
   cache().pass(unknown)
   write('packages/ui/src/Other.ts', 'export const Other = 3')
   assert.equal(cache().passed(unknown), false)
+})
+
+test('a state keys on the layout tokens it reads, in every theme, and on what they read', t => {
+  const { root, cache, write, button, other } = fixture(t)
+  const change = (from, to) => write('packages/tokens/src/tokens.stylex.ts', readFileSync(join(root, 'packages/tokens/src/tokens.stylex.ts'), 'utf8').replace(from, to))
+  const changeTheme = (from, to) => write('packages/tokens/src/themes.stylex.ts', readFileSync(join(root, 'packages/tokens/src/themes.stylex.ts'), 'utf8').replace(from, to))
+  const passes = edit => {
+    const before = cache()
+    for (const route of [button, other]) before.pass(route)
+    edit()
+    const after = cache()
+    return [after.passed(button), after.passed(other)]
+  }
+  // Colours and shadows cannot move a box; neither can a token nobody reads, or a comment.
+  assert.deepEqual(passes(() => change("'hsla(48, 5%, 20%, 1)'", "'hsla(200, 50%, 20%, 1)'")), [true, true])
+  assert.deepEqual(passes(() => changeTheme("'hsla(48, 5%, 90%, 1)'", "'#fff'")), [true, true])
+  assert.deepEqual(passes(() => change("1px oklch", "2px oklch")), [true, true])
+  assert.deepEqual(passes(() => change("'--unused': '1px'", "'--unused': '2px',\n  '--added': '9px'")), [true, true])
+  assert.deepEqual(passes(() => change('export const colors', '// Colours.\nexport const colors')), [true, true])
+  // A layout value Button reads, the token it reads in turn, and a theme's override of it.
+  assert.deepEqual(passes(() => change('* 2', '* 3')), [false, true])
+  assert.deepEqual(passes(() => change("'--unit': '4px'", "'--unit': '5px'")), [false, true])
+  assert.deepEqual(passes(() => changeTheme("'3px'", "'2px'")), [false, true])
+  // A colour that becomes a length is read as layout from then on.
+  assert.deepEqual(passes(() => change("'hsla(200, 50%, 20%, 1)'", "'2px'")), [false, true])
+  // A group indexed by a variable reads all of it.
+  write('packages/ui/src/Other.ts', "import { spacing } from '@juno/tokens/tokens.stylex'\nexport const Other = (key) => spacing[key]")
+  assert.deepEqual(passes(() => change("'--unused': '2px'", "'--unused': '3px'")), [true, false])
+})
+
+test('spec-only tests, scripts and packages outside the gallery do not invalidate states', t => {
+  const { root, cache, write, button } = fixture(t)
+  for (const [file, text] of [
+    ['apps/gallery/shift.spec.ts', "test('the guard itself', () => {})"],
+    ['apps/gallery/playwright.config.ts', 'export default { workers: 8 }'],
+    ['apps/gallery/src/compositions.tsx', 'export const compositions = {}'],
+    ['package.json', JSON.stringify({ name: 'juno', scripts: { test: 'bun test --randomize' } })],
+    ['bun.lock', lock({ vite: '7.0.0', electron: '31.0.0' })],
+  ]) {
+    cache().pass(button)
+    write(file, text)
+    assert.equal(cache().passed(button), true, file)
+  }
+  cache().pass(button)
+  write('bun.lock', lock({ vite: '7.0.1', electron: '31.0.0' }))
+  assert.equal(cache().passed(button), false, 'a gallery build tool')
+  cache().pass(button)
+  write('bun.lock', `${readFileSync(join(root, 'bun.lock'), 'utf8')} not json`)
+  assert.equal(cache().passed(button), false, 'an unreadable lockfile counts whole')
 })

@@ -513,13 +513,6 @@ export class Sidebar implements SidebarVerbs {
   get accountButton() {
     return this.root.getByRole('button', { name: 'Account and settings' })
   }
-
-  /** Your presence on the avatar as Slack shows colleagues: the button's description, and its dot unless the snooze badge takes the dot's place. */
-  async expectOwnPresence(presence: 'active' | 'away'): Promise<void> {
-    const word = presence === 'active' ? 'Active' : 'Away'
-    await expect(this.accountButton).toHaveAccessibleDescription(new RegExp(`^${word}(\\. Notifications paused until .+)?$`), { timeout: 10_000 })
-    if ((await this.accountButton.locator('[data-paused]').count()) === 0) await expect(this.accountButton.locator('[data-presence]')).toHaveAttribute('data-presence', presence)
-  }
 }
 
 /** The popover behind the avatar button: presence, privacy, Notifications, Settings and the session. */
@@ -556,11 +549,6 @@ export class AccountMenu implements AccountMenuVerbs {
   /** Set yourself away or active, Hide message text, Notifications, Settings (inventory 2.1). */
   item(name: string | RegExp) {
     return this.root.getByRole('menuitem', { name })
-  }
-
-  /** The line under the name: "Active", "Away until 9am". */
-  async expectPresence(text: string | RegExp): Promise<void> {
-    await expect(this.root.getByText(text)).toBeVisible({ timeout: 10_000 })
   }
 
   async choose(name: string | RegExp): Promise<void> {
@@ -1076,7 +1064,6 @@ export class Juno implements JunoVerbs {
   clickOsNotification(index: number): Promise<void> { return this.surface.system('clickNotification', index) }
   setNotificationPermission(permission: NotificationPermission): Promise<void> { return this.surface.system('notificationPermission', permission) }
   notificationSettingsOpened(): Promise<number> { return this.surface.system('notificationSettingsOpened') }
-  setSystemIdle(seconds: number): Promise<void> { return this.surface.system('systemIdle', seconds) }
   dockBadge(): Promise<string> { return this.surface.system('dockBadge') }
   dockBounces(): Promise<number> { return this.surface.system('dockBounces') }
   setFrontmost(frontmost: boolean): Promise<void> { return this.surface.system('frontmost', frontmost) }
@@ -1091,6 +1078,29 @@ export class Juno implements JunoVerbs {
     const started = performance.now()
     await expect(this.sidebar.root).toHaveAttribute('aria-busy', 'false', { timeout })
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: engine-live ${Math.round(performance.now() - started)} ms`)
+  }
+
+  /**
+   * Nothing on screen moves at rest (performance.md section 1, "Idle CPU"): no
+   * looping animation runs and no frame loop asks for frames, over a second.
+   * Finite animations may still be ending when the check starts.
+   */
+  async expectAtRest(): Promise<void> {
+    const second = () => this.win.evaluate(() => new Promise<{ readonly looping: ReadonlyArray<string>; readonly frames: number }>((resolve) => {
+      const request = window.requestAnimationFrame
+      let frames = 0
+      window.requestAnimationFrame = (callback) => { frames++; return request.call(window, callback) }
+      setTimeout(() => {
+        window.requestAnimationFrame = request
+        const looping = document.getAnimations()
+          .filter((animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations === Infinity)
+          .map((animation) => (animation as CSSAnimation).animationName ?? 'script animation')
+        resolve({ looping, frames })
+      }, 1_000)
+    }))
+    // A loop asks for a frame every 16 ms; a one-off paint callback asks for one or two.
+    await expect.poll(async () => { const rest = await second(); return { looping: rest.looping, frameLoop: rest.frames > 5 } }, { timeout: 6_000, intervals: [0] })
+      .toEqual({ looping: [], frameLoop: false })
   }
 
   /** Reads one of the app's performance measures (`@juno/state/perf`), in milliseconds. */

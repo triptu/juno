@@ -169,3 +169,33 @@ it('expires a reaction made offline, and Retry gives it a fresh window', async (
   await rows((list) => rowWith(list, 'Waited offline')?.reactionIssue === undefined, 'a fresh window')
   await waitFor(() => (inSlack(engine, message.ts)?.reactions?.some((r) => r.name === 'eyes') ? true : undefined), WAIT_MS, 'the retry sent')
 })
+
+it('sends a reaction made offline once the socket is back, and tries a transient failure again', async () => {
+  const engine = await booted()
+  const rows = await opened(engine)
+
+  await step('a reaction made offline waits, then reaches Slack once the socket is back', async () => {
+    const message = await sent(engine, 'Reacted on the train', rows)
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    valueOf(await reactToMessage(engine.registry, refOf(message), 'eyes', true))
+    const waiting = await rows((list) => rowWith(list, 'Reacted on the train')?.reactionIssue?.state === 'waiting', 'waiting offline')
+    expect(chip(rowWith(waiting, 'Reacted on the train'), 'eyes')?.me).toBe(true)
+    engine.fake.goOnline()
+    await actionsEnded(engine)
+    await rows((list) => rowWith(list, 'Reacted on the train')?.reactionIssue === undefined, 'no issue once sent')
+    expect(apiCalls(engine, 'reactions.add')).toHaveLength(1)
+    expect(inSlack(engine, message.ts)?.reactions?.map((r) => r.name)).toEqual(['eyes'])
+  })
+
+  await step('a transient failure is tried again, and the second call sends it', async () => {
+    await fresh(engine)
+    const message = await sent(engine, 'Flaky network', rows)
+    engine.fake.forceError({ method: 'reactions.add', error: 'internal_error', times: 1 })
+    valueOf(await reactToMessage(engine.registry, refOf(message), 'tada', true))
+    await actionsEnded(engine)
+    expect(apiCalls(engine, 'reactions.add')).toHaveLength(2)
+    expect(inSlack(engine, message.ts)?.reactions?.map((r) => r.name)).toEqual(['tada'])
+    await rows((list) => rowWith(list, 'Flaky network')?.reactionIssue === undefined && chip(rowWith(list, 'Flaky network'), 'tada')?.me === true, 'sent')
+  })
+})

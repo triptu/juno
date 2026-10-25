@@ -1,8 +1,9 @@
 // Home's other review cards (SPEC 12, docs/design/settled-suggestions/,
 // "More self-management"): follow-ups that look done, and old drafts. Each
 // card opens a sheet with every proposal and why; the action and the "no"
-// per row, with Undo; the info says nothing happens in Slack; and a "no"
-// stops the suggestion.
+// per row, with Undo; the info says nothing happens in Slack. What each
+// action changes, and that a "no" stops the suggestion, are in
+// packages/engine/test/flows (ai-jobs and home-reviews).
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID } from '@juno/fake-slack'
@@ -27,7 +28,7 @@ test.describe('follow-ups that look done', () => {
   // Promises come from the background AI jobs.
   test.use({ aiJobs: true })
 
-  test('a later link of yours proposes Mark done, with the message quoted; Undo and Not done put it back in Follow-up', async ({ juno, fake, win }) => {
+  test('a later link of yours shows on the sheet with the message quoted; Mark done, Undo and Not done per row', async ({ juno, fake, win }) => {
     await juno.signIn()
     await juno.waitForSync()
     // The job finds the promise the user made to Sam.
@@ -37,8 +38,6 @@ test.describe('follow-ups that look done', () => {
     const root = fake.workspace.main('D0SAM')[0]!
     fake.workspace.post({ channel: 'D0SAM', threadTs: root.ts, user: SELF_ID, text: 'Left my notes on the packet: https://docs.example.com/packet-review' })
     await expect.poll(() => freshHome(juno), { timeout: 30_000 }).toContain('doneFollowUps')
-    // The promise leaves Follow-up for the card.
-    expect(await juno.home.kinds()).not.toContain('followUp')
     await expect(juno.home.title('doneFollowUps')).toHaveText('1 follow-up looks done')
 
     const sheet = await juno.home.reviewOf('doneFollowUps', 'doneFollowUps')
@@ -67,28 +66,11 @@ test.describe('follow-ups that look done', () => {
     await juno.expectToast('Kept in Follow-up')
     await win.keyboard.press('Escape')
     await expect(sheet.root).toHaveCount(0)
-
-    // This match is not proposed again, and the promise is back in Follow-up.
-    const kinds = await freshHome(juno)
-    expect(kinds).not.toContain('doneFollowUps')
-    expect(kinds).toContain('followUp')
-
-    // A newer message with a file proposes it again; Mark done takes it off Follow-up for good.
-    fake.workspace.post({ channel: 'D0SAM', threadTs: root.ts, user: SELF_ID, text: "Here's the full review", files: [{ id: 'F0PACKETREVIEW', name: 'packet-review.pdf', title: 'packet-review.pdf', mimetype: 'application/pdf' }] })
-    await expect.poll(() => freshHome(juno), { timeout: 30_000 }).toContain('doneFollowUps')
-    const again = await juno.home.reviewOf('doneFollowUps', 'doneFollowUps')
-    await expect(again.reason(PROMISE)).toHaveText(/^You shared a file /)
-    await again.act(PROMISE).click()
-    await juno.expectToast('Follow-up done')
-    await again.close.click()
-    const after = await freshHome(juno)
-    expect(after).not.toContain('doneFollowUps')
-    expect(after).not.toContain('followUp')
   })
 })
 
 test.describe('old drafts', () => {
-  syncedTest('a draft untouched for two weeks is proposed with its age and first line; Delete, Undo and Keep work per row', async ({ fake, userData, relaunch }) => {
+  syncedTest('a draft untouched for two weeks shows its age and first line; Delete, Undo, Keep and D on the sheet', async ({ fake, userData, relaunch }) => {
     const app = await relaunch({
       whileClosed: () => {
         // Two drafts written 15 days ago, in topics that moved on since.
@@ -133,14 +115,5 @@ test.describe('old drafts', () => {
     await expect(sheet.row(ENG_MAIN)).toHaveAttribute('data-review-status', 'done')
     await app.win.keyboard.press('Escape')
     await expect(sheet.root).toHaveCount(0)
-
-    // The kept draft is not proposed again, and the deleted one is gone.
-    expect(await freshHome(app)).not.toContain('oldDrafts')
-    await app.sidebar.row(POSTGRES).open()
-    await expect(app.topic.composer).toHaveValue('Can we move the cutover to')
-    await app.sidebar.row(ENG_MAIN).open()
-    await app.topic.expectTitle('Main')
-    await expect(app.topic.composer).toHaveValue('')
-
   })
 })

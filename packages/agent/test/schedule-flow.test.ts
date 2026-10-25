@@ -1,9 +1,13 @@
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { Effect } from 'effect'
 import { OpId } from '@juno/agent-contract'
 import { fakeActionHost, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { answer, turnsHarness } from './turns-harness'
 import { served, closeServed } from './serve-harness'
+import { AGENT_DATABASE_FILE } from '../src/runtime/core'
+import { CHAT_MIGRATIONS } from '../src/index'
 import type { Executor } from '../src/actions/executor'
 import { liveGrant } from '../src/grants/grants'
 import { proposedScheduleCard, scheduleExecutors } from '../src/schedule/cards'
@@ -175,4 +179,54 @@ it('a Proposed schedule Start mints the grant and posts a Schedule card through 
     expect(h.turns.actions.views().map((v) => v.card._tag)).toEqual(['proposedSchedule', 'schedule'])
     expect(h.fake.requests).toHaveLength(0)
   } finally { await h.close() }
+})
+
+// Plan v3 §16 flow 6, SPEC 13.6: a once schedule made by a clean run wakes once after a quit past its due time,
+// under its own label, and is gone after it; a later start does not wake it again.
+it('a schedule from a clean run wakes once after a restart past its due time, under its own label, and never again', async () => {
+  const CHECKLIST = 'Post the launch checklist to me.'
+  // The chat's tables too, as the app opens them, so each start finds the same schema.
+  const first = await turnsHarness({ compaction: false, migrations: [CHAT_MIGRATIONS] })
+  first.fake.script([
+    reply({ type: 'toolCall', id: 'make-schedule', name: 'schedule_create', arguments: { what: 'Launch checklist', prompt: CHECKLIST, schedule: { _tag: 'once', at: Date.now() + 3_600_000 }, deliver: 'now' } }),
+    reply('<say>Scheduled.</say>'),
+  ])
+  await first.ended(first.send('remind me shortly'))
+  expect(first.turns.scheduler.list().map((row) => [row.definition.what, row.state])).toEqual([['Launch checklist', 'active']])
+  expect(first.turns.actions.views().map((view) => view.card._tag)).toContain('schedule')
+  // The two requests are the owner's run; nothing woke.
+  expect(first.fake.requests).toHaveLength(2)
+  await first.stop()
+  // The app was quit past the due time.
+  const db = new DatabaseSync(join(first.dir, AGENT_DATABASE_FILE))
+  try {
+    expect(db.prepare("UPDATE schedules SET due_at = 1, definition = json_set(definition, '$.schedule.at', 1) WHERE state = 'active'").run().changes).toBe(1)
+  } finally {
+    db.close()
+  }
+
+  const { h, client, follow, pageWhere } = await served({ dir: first.dir })
+  h.fake.script([reply('<say>Here is the launch checklist.</say>')])
+  await h.turns.checkSchedules()
+  const page = await pageWhere((value) => JSON.stringify(value).includes('Here is the launch checklist.'), 'the wake’s answer')
+  expect(page.items.filter((item) => item._tag === 'groupLabel').map((item) => (item as { text: string }).text)).toContain('Scheduled · Launch checklist')
+  expect(h.fake.requests).toHaveLength(1)
+  expect(JSON.stringify(h.fake.requests[0]!.context)).toContain(CHECKLIST)
+  // A once schedule is gone after its wake, and Activity lists the run under the schedule.
+  expect(h.turns.scheduler.list()).toEqual([])
+  const activity = follow(client['agent.activity.page']({ window: { limit: 50 } }))
+  const runs = await activity.where((value) => value.runs.some((run) => run.trigger._tag === 'schedule'), 'the scheduled run')
+  expect(runs.runs.filter((run) => run.trigger._tag === 'schedule').map((run) => [run.trigger, run.outcome])).toEqual([[{ _tag: 'schedule', name: 'Launch checklist' }, 'replied']])
+  await h.turns.checkSchedules()
+  expect(h.fake.requests).toHaveLength(1)
+  await h.stop()
+
+  const again = await turnsHarness({ compaction: false, dir: first.dir, migrations: [CHAT_MIGRATIONS] })
+  try {
+    await again.turns.checkSchedules()
+    expect(again.fake.requests).toHaveLength(0)
+    expect(again.turns.scheduler.occurrences().filter((occurrence) => occurrence.state !== 'started')).toEqual([])
+  } finally {
+    await again.stop()
+  }
 })

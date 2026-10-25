@@ -45,7 +45,7 @@ const test = chatTest.extend({
 
 test.describe.configure({ timeout: 90_000 })
 
-test('a read-only script runs in the built app, its answer cites what it read, and Activity lists the read', { tag: '@canary' }, async ({ juno, userData }) => {
+test('a read-only script runs in the built app, its answer cites what it read, and Activity lists the read', async ({ juno, userData }) => {
   await ready(juno)
   // The agent ran one script in the sandbox at start: the worker and the QuickJS binary loaded.
   await expect.poll(async () => JSON.parse(await readFile(join(userData, 'agent', 'codemode-probe.json'), 'utf8').catch(() => '{}')), { timeout: 20_000 }).toEqual({ ok: true, value: 12 })

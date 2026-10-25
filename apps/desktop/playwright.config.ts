@@ -60,7 +60,7 @@ export default defineConfig<object, { lane: Lane }>({
     {
       name: 'electron',
       outputDir: join(results, 'electron'),
-      testIgnore: ['web/web-shell.spec.ts', 'setup/**', 'perf.spec.ts', '*.perf.spec.ts', ...(process.env.JUNO_SCREENS === '1' ? [] : ['screens.spec.ts', 'home-screens.spec.ts', 'home-pictures-screens.spec.ts', 'juno-agent/panel-shots.spec.ts'])],
+      testIgnore: ['web/web-shell.spec.ts', 'setup/**', 'perf.spec.ts', '*.perf.spec.ts', ...(process.env.JUNO_SCREENS === '1' ? [] : ['screens.spec.ts', '**/screens/**'])],
       dependencies: ['build-electron'],
       workers: electronWorkers,
       grep: electronGrep,

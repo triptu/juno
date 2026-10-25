@@ -65,5 +65,16 @@ test('a saved key gives a new thread an AI title and art, Redraw draws it again,
     // The feature filter keeps only that feature's calls.
     await page.getByLabel('Feature').selectOption('topicArt.redraw')
     await expect(calls.locator('[data-ai-call-feature]')).toHaveCount(await calls.locator('[data-ai-call-feature="topicArt.redraw"]').count())
+
+    // The fallback model (SPEC 15, "When a model call fails") is Gemini Flash until set to None, which a fresh
+    // Settings view still shows. What each setting does to a refusal is in the engine's ai-jobs flow test.
+    await juno.openSettings('Juno')
+    const choice = page.getByLabel('Fallback model')
+    await expect(choice).toHaveValue('Gemini Flash')
+    await choice.selectOption('')
+    await expect(choice).toHaveValue('')
+    await juno.openSettings('AI activity')
+    await juno.openSettings('Juno')
+    await expect(choice).toHaveValue('')
   }
 })

@@ -650,7 +650,7 @@ Counts exclude build setup cases and count a canary once in each lane:
 | Browser | 123 / 450 (449 executed, one skipped) | 124 / 419, all passed |
 | Electron | 39 / 122 (71 executed, 51 skipped) | 32 / 63, all passed |
 
-The agent-flow consolidation on main removed 35 cases. Remaining renderer flows moved from mixed native files, notification-hours checks joined the notification flows, and duplicate diagnostics, key-limit, session and engine-restart checks joined existing flows. Manual screenshot tools and Mac performance specs are outside ordinary Electron discovery. Every surviving non-agent BROWSER-class file in the audit is registered. Eight canaries remain in both lanes; [Browser lane](../apps/desktop/e2e/README.md#browser-lane) lists them and the native responsibilities retained in Electron.
+The agent-flow consolidation on main removed 35 cases. Remaining renderer flows moved from mixed native files, notification-hours checks joined the notification flows, and duplicate diagnostics, key-limit, session and engine-restart checks joined existing flows. Manual screenshot tools and Mac performance specs are outside ordinary Electron discovery. Every surviving non-agent BROWSER-class file in the audit is registered. Three canaries remain in both lanes; [Browser lane](../apps/desktop/e2e/README.md#browser-lane) lists them and the native responsibilities retained in Electron.
 
 Across 387 matching measured browser flows, mean CPU cost per test was:
 
@@ -732,11 +732,20 @@ Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShi
 
 `apps/gallery/shift.spec.ts` hovers, leaves, presses, releases, focuses from the keyboard and blurs up to eight interactive elements per state, sampled from both ends of a longer list, with motion on. It also checks that an Avatar photo arriving late or failing moves nothing (the `photo/pending` state points at `/__fixture/pending.png`, which the gallery server never answers; the test answers it). The desktop e2e can import the same helper for sidebar hover, tab switches, live messages and image loads.
 
-The broad shift and focus-ring walks cache each successful state. A key includes the state and its fixture's transitive workspace imports, shared gallery code and configuration, tokens, styles, assets, bundled fonts, the lockfile, and the actual Playwright/Chromium version, OS release, architecture and browser options. Named imports through barrels keep unrelated components independent; unknown fixture registrations conservatively include all source. A failed or incomplete state gets no record. Matching DOM alone never skips interactions: two fixtures can draw the same DOM with different callbacks.
+The broad shift and focus-ring walks cache each successful state. A key holds only what can move that state's boxes:
+
+- the state and its fixture's transitive workspace imports, and the gallery shell (the registry, frame and theme code, not `compositions.tsx` or `testFixtures.tsx`), its styles, assets and bundled fonts;
+- the values of the design tokens those files read, in every theme, and of the tokens those values read. Tokens whose every value is a colour or a box shadow are left out: such a value is valid only where it paints, so it cannot move a box. A file that indexes a token group with a variable (`text[role]`) reads the whole group. The rest of the two token files (imports, constants, the theme lists) counts for every state; comments do not;
+- stylesheets without comments and paint-only declarations (`color`, `background-*`, `box-shadow`, `opacity` and the like);
+- the walk itself: `apps/gallery/shift-walk.ts` or `focus-ring.spec.ts` and what they import, which includes `open-state.ts` (how a state is opened and when it is ready) and the guard in `packages/testing`. The rest of `shift.spec.ts` (delayed loads, the guard's self-tests), the queue and page recycling in `support.ts`, the Playwright config and other specs do not count for the shift walk;
+- the locked versions of the packages those files import and the gallery builds with, and what those depend on, and the manifest fields that decide how imports resolve. Scripts, other workspaces' dependencies and an unrelated lockfile change do not count;
+- the actual Playwright/Chromium version, OS release, architecture and browser options.
+
+`apps/gallery/layout-tokens.mjs` decides which tokens and declarations paint. Named imports through barrels keep unrelated components independent; unknown fixture registrations conservatively include all source. A failed or incomplete state gets no record. Matching DOM alone never skips interactions: two fixtures can draw the same DOM with different callbacks.
 
 Records are shared across worktrees in the system temp folder's `juno-cache/results/gallery-walk-v1`. With `JUNO_BUILD_CACHE_DIR` they live in its `gallery-walk-v1` child, beside build entries; the remote runner sets this to `/cache/builds`. Writes use temporary files and atomic rename. `GALLERY_SHIFT_ALL=1 bun run test:gallery` bypasses both walk caches and refreshes successful records. `verify:main --nightly` and `verify:main --no-cache` set it automatically. Ordinary verification reuses matching states. Playwright `--repeat-each` also bypasses the caches, so every repeat exercises the states.
 
-`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. `GALLERY_RING_ONLY=Sidebar` and `GALLERY_RING_PARTS` control the focus check. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
+`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. A remote job that runs only the gallery gets four workers per three allocated threads (eight on a full run's six), since the walk mostly waits for frames and motion; `scripts/remote/workers.sh` sets this. `GALLERY_RING_ONLY=Sidebar` and `GALLERY_RING_PARTS` control the focus check. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
 
 Each test owns one browser context. A walk opens a new document for each state, resetting fixture module state, selection, focus and scroll. It replaces its page after 20 states while keeping that context's HTTP cache. Fonts, visible images, lazy chunks and finite entrance motion must settle before measurement; a readiness deadline fails the state instead of silently treating it as ready. Scrolling an interaction target settles before the guard starts, so remembered off-screen row sizes are not charged to the following input. Motion stays enabled during the shift walk.
 
@@ -764,6 +773,30 @@ These are individual runs, not medians. The revised full runner run includes a 2
 The fully cached run restored its build in 0.01 s and reused all 1,810 shift and 774 focus states; targeted regressions still ran. Peak container memory was 2.13 GB. Its observed script time was 91.9% shorter than the original. A separate recovery run checked the 423 states left unfinished by a host reset and passed in 246 s; it is not the warm-cache timing.
 
 The first revised Mac full run reached the former fixed 20-minute part deadline; the workload-based budget replaces that fixed cutoff. Later comparison attempts were interrupted by load above eight or machine restarts and are excluded. Verification stayed on the remote runner after the 10:32 IST reset. No revised Mac speedup is claimed.
+
+### Gallery workers, 2026-10-25
+
+Single runs of `bun run remote --cores 3 --env GALLERY_SHIFT_ALL=1 --env GALLERY_WORKERS=<n> test:gallery` at `1e776b39c`, on the full run's gallery allocation (three physical cores, six threads, a 9 GB container limit). Each shift part ran its share of the full walk; the four focus-ring parts are fixed.
+
+| Workers and shift parts | Script time | CPU busy, average | Peak container memory | Shift part durations | Result |
+| --- | --- | --- | --- | --- | --- |
+| 4 (the old default) | 1,101 s | 62% | 4.85 GB | 950–954 s | 225 passed |
+| 6 | 776 s | 84% | 5.96 GB | 623–702 s | 227 passed |
+| 8 (the new default) | 705 s | 94% | 6.73 GB | 506–637 s | 229 passed |
+
+No run failed or retried a test. More workers slow each focus-ring part (79 s at 4 workers, 114 s at 6, 157 s at 8) because they share the CPU, but the shift walk sets the length of the job. With six threads 94% busy, more than eight workers would mostly queue for CPU and bring memory close to the limit, so it was not tried. The laptop's own memory use, with other jobs running beside these, peaked at 16.2–18.5 GB used, with 11.9–14.3 GB still available.
+
+### Frame clock and page pool, 2026-10-25
+
+Single runs of `bun run remote --cores 4 --env GALLERY_SHIFT_ALL=1 test:gallery shift.spec.ts` at `8febc617c` (before the eight-worker default), each on four physical cores (eight threads, six shift parts, a 12 GB container). About 1,830 states each.
+
+| Variant | Frame interval | Shift part durations | Script time | CPU busy, average | Peak container memory | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| Default | 16.7 ms | 579–582 s | 612 s | 65% | 5.81 GB | 51 passed |
+| `--disable-frame-rate-limit --disable-gpu-vsync` | 17.3 ms | 572–576 s | 605 s | 78% | 6.28 GB | 51 passed |
+| Three pages per shift part | 16.7 ms | 450 s | 480 s | 94% | 9.42 GB | 51 passed |
+
+The headless shell keeps its 60 Hz frame clock with those flags, so the guard's two-frame wait is unchanged and the flags are not used. Three pages per part were faster only because the CPU had room; with eight workers the gallery allocation is already 94% busy, so the pool was not kept.
 
 ## Web shell
 
@@ -1054,7 +1087,7 @@ Replaying the 15 first-parent merges ending at `f601148d2` with `--plan --json -
 
 `--wide` keeps the rules from before 10-18: everything runs for the files in the first two rows, every spec the coverage map picks runs, shared e2e support and style sheets run every desktop spec, `packages/tokens/` runs the whole gallery, heavy tests always run, and protocol checks still follow only their own inputs. Repairs also pass `--graph --no-cache`, so coverage and cached branch results cannot narrow the fix's reach.
 
-**Heavy tests.** Some tests are slow because of what they check, and their code rarely changes: the small idle CPU and memory smoke check (about 53 seconds on the pinned runner), the first-sync cases in `layout-shift.spec.ts`, every test in `quick-start.spec.ts`, the 429 storm in `realtime.spec.ts`, and the gallery's shift guard over every component. Each is tagged `@heavy` and its area's tag (`{ tag: ['@heavy', '@heavy-sync'] }`). `HEAVY_AREAS` in `scripts/test-areas.mjs` is the one place that says which code each area covers: sync (`packages/sync/`, the engine's session and start, the Slack client's pacing, the large seed and the three specs), idle (the process monitor, the engine's workers, the agent's schedulers, `idle-cpu.spec.ts`) and the gallery harness. The idle spec's portable gate uses a 2,000-message seed, four states, 2 s settling and 10 s samples: every process stays below 25% of one core, below 96 MB peak/end memory growth, and below 32 MB growth if every interval grows by more than 2 MB. A focused run uses `--machine linux/amd64:2x4` (one physical core, two threads, 3 GB); full app runs retain their normal two-core allocation. Its fine per-process budgets and long large-seed walk stay in the Mac run (`bun run verify:main --with-mac`). App diagnostics remain the primary way to find field spins; this smoke check does not cover slow leaks or every deferred worker path. A plan runs an area's heavy tests only when a changed file, or a spec named with `--spec`, is in that area. Otherwise it sets `JUNO_SKIP_TAGS` (for example `@heavy-sync,@heavy-idle`), which each suite's Playwright config adds to its `grepInvert`, and leaves out a spec whose every test is heavy. The remote full run includes the coarse idle check. Fine idle budgets run in the `--with-mac` lane and on demand on the Mac; they do not run in remote plans or remote full runs.
+**Heavy tests.** Some tests are slow because of what they check, and their code rarely changes: the first-sync cases in `layout-shift.spec.ts`, and the gallery's shift guard over every component. Each is tagged `@heavy` and its area's tag (`{ tag: ['@heavy', '@heavy-sync'] }`). `HEAVY_AREAS` in `scripts/test-areas.mjs` is the one place that says which code each area covers: sync (`packages/sync/`, the engine's session and start, the Slack client's pacing, the large seed and `layout-shift.spec.ts`), idle (the process monitor, the engine's workers, the agent's schedulers, `idle-cpu.spec.ts`) and the gallery harness. Every test in `idle-cpu.spec.ts` is also `@mac`, so remote plans and remote full runs never run it: its portable walk was 51 s of the Electron lane's critical path and nearly all waiting. It runs in `bun run verify:main --with-mac` (and `--nightly`) and by hand on the Mac. The portable walk uses a 2,000-message seed, four states, 2 s settling and 10 s samples: every process stays below 25% of one core, below 96 MB peak/end memory growth, and below 32 MB growth if every interval grows by more than 2 MB; the fine per-process budgets and long large-seed walk run beside it. Every run instead has `packages/engine/test/flows/idle.flow.test.ts` (work passes at rest under a test clock, including the 10-18 backoff case) and the rest check in `juno-agent/chat.spec.ts` (no looping animation or frame loop after an answer). App diagnostics remain the primary way to find field spins; none of these checks covers slow leaks or every deferred worker path. A plan runs an area's heavy tests only when a changed file, or a spec named with `--spec`, is in that area. Otherwise it sets `JUNO_SKIP_TAGS` (for example `@heavy-sync,@heavy-idle`), which each suite's Playwright config adds to its `grepInvert`, and leaves out a spec whose every test is heavy. Idle CPU and memory budgets run in the `--with-mac` lane and on demand on the Mac; they do not run in remote plans or remote full runs.
 
 **Batch gate.** `bun run affected --batch --base <ref>` (what `scripts/batch-merge.mjs` runs after its own typecheck and lint) plans only the unit files and script tests the batch reaches, `specs:check` when `specs/` changed, and conformance when outbox inputs changed. It does not run the gallery or desktop e2e.
 
@@ -1254,7 +1287,7 @@ The shared host maps sibling CPUs and sets the actual thread quota. Workers
 use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
 threads from the request. At four threads units run four `bun test` processes.
 At six threads a split desktop job runs three workers and a split gallery job
-runs four. Quint uses one simulation group per two threads and one
+runs eight. Quint uses one simulation group per two threads and one
 Apalache checker per two threads, limited by the job’s cgroup memory ("Faster test runs").
 A two-core, 6 GiB job gets two simulation groups and two 1,536 MiB JVM heaps.
 Explicit worker settings win within the Apalache memory cap.
