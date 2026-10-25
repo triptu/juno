@@ -30,6 +30,8 @@ const grid = (selected: ReadonlyArray<string> = []): ReadonlyArray<GridReaction>
 const withCustom: ReadonlyArray<GridReaction> = [{ name: 'ship-it', unicode: ':ship-it:', url: shipIt, selected: false }, ...grid().slice(0, 10)]
 
 const S: MessageMenuEntry = { separator: true }
+/** Copy Slack link, at the end of Open in Slack. */
+const copyLink = { id: 'copy-link', label: 'Copy Slack link', icon: 'link' } as const
 /** Someone else's message in a thread. */
 const others: ReadonlyArray<MessageMenuEntry> = [
   { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
@@ -37,7 +39,7 @@ const others: ReadonlyArray<MessageMenuEntry> = [
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
   { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
 ]
 /** Someone else's message in Main, with text selected in it. */
 const mainSelection: ReadonlyArray<MessageMenuEntry> = [
@@ -47,7 +49,7 @@ const mainSelection: ReadonlyArray<MessageMenuEntry> = [
   S,
   { id: 'copy', label: 'Copy', icon: 'copy' },
   { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
 ]
 /** Your own reply in a thread. */
 const own: ReadonlyArray<MessageMenuEntry> = [
@@ -56,7 +58,7 @@ const own: ReadonlyArray<MessageMenuEntry> = [
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
   { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
   S,
   { id: 'broadcast', label: 'Also send to #eng', icon: 'broadcast' },
   { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell' },
@@ -72,9 +74,20 @@ const ownMain: ReadonlyArray<MessageMenuEntry> = [
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
   { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
   S,
   { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell', disabled: true },
+  S,
+  { id: 'edit', label: 'Edit', icon: 'edit', shortcut: 'E' },
+  { id: 'delete', label: 'Delete…', icon: 'delete', shortcut: '⌫' },
+]
+/** Your own message still sending: Slack has no link for it yet. */
+const pending: ReadonlyArray<MessageMenuEntry> = [
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
+  S,
+  { id: 'copy', label: 'Copy text', icon: 'copy' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F', disabled: true },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack' },
   S,
   { id: 'edit', label: 'Edit', icon: 'edit', shortcut: 'E' },
   { id: 'delete', label: 'Delete…', icon: 'delete', shortcut: '⌫' },
@@ -137,6 +150,8 @@ export default defineFixtures(MessageMenu, {
     own: menu({ items: own }),
     // Your own in Main: Open thread, Edit and Delete… show their keys at the row's end.
     'own-main': menu({ items: ownMain }),
+    // Still sending: Open in Slack has no Copy Slack link at its end.
+    pending: menu({ items: pending }),
     // Emoji you already reacted with show chosen; choosing one again takes it back.
     reacted: menu({ reactions: grid(['+1', 'eyes']) }),
     // A quick reaction can be a workspace's custom emoji.
@@ -172,5 +187,10 @@ export default defineFixtures(MessageMenu, {
     'hover-shortcut': menu({ items: ownMain }, undefined, { hover: '[data-menu-item="edit"]' }),
     'hover-cell': menu({ reactions: grid(['eyes']) }, undefined, { hover: '[data-grid-reaction="eyes"]' }),
     'hover-more': menu({}, undefined, { hover: '[data-grid-more]' }),
+    // Open in Slack with Copy Slack link at its end: the whole row highlights, and the link button has its own fill
+    // when the pointer is on it or the → key reached it.
+    'hover-open-in-slack': menu({}, undefined, { hover: '[data-menu-item="open-in-slack"]' }),
+    'hover-copy-link': menu({}, undefined, { hover: '[data-menu-trailing="copy-link"]' }),
+    'focus-copy-link': menu({}, undefined, { focus: '[data-menu-trailing="copy-link"]' }),
   },
 })

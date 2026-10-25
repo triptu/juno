@@ -1,14 +1,15 @@
 import * as stylex from '@stylexjs/stylex'
 import { ArrowBendUpLeft } from '@phosphor-icons/react/dist/icons/ArrowBendUpLeft'
 import { ArrowBendUpRight } from '@phosphor-icons/react/dist/icons/ArrowBendUpRight'
-import { ArrowSquareOut } from '@phosphor-icons/react/dist/icons/ArrowSquareOut'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { Copy } from '@phosphor-icons/react/dist/icons/Copy'
+import { Link } from '@phosphor-icons/react/dist/icons/Link'
 import { Megaphone } from '@phosphor-icons/react/dist/icons/Megaphone'
 import { PencilSimple } from '@phosphor-icons/react/dist/icons/PencilSimple'
 import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
+import { SlackLogo } from '@phosphor-icons/react/dist/icons/SlackLogo'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import { useLayoutEffect, useState } from 'react'
@@ -30,19 +31,27 @@ const ICONS: Record<MessageMenuIcon, PhosphorIcon> = {
   juno: Sparkle,
   copy: Copy,
   forward: ArrowBendUpRight,
-  open: ArrowSquareOut,
   bell: Bell,
   edit: PencilSimple,
   delete: Trash,
   pin: PushPin,
   broadcast: Megaphone,
+  slack: SlackLogo,
+  link: Link,
 }
 
 const withIcons = (items: ReadonlyArray<MessageMenuEntry>): ReadonlyArray<ContextMenuEntry> =>
   items.map((entry) =>
     'separator' in entry
       ? entry
-      : { id: entry.id, label: entry.label, icon: ICONS[entry.icon], ...(entry.disabled === true ? { disabled: true } : {}), ...(entry.shortcut === undefined ? {} : { shortcut: entry.shortcut }) },
+      : {
+          id: entry.id,
+          label: entry.label,
+          icon: ICONS[entry.icon],
+          ...(entry.disabled === true ? { disabled: true } : {}),
+          ...(entry.shortcut === undefined ? {} : { shortcut: entry.shortcut }),
+          ...(entry.trailing === undefined ? {} : { trailing: { ...entry.trailing, icon: ICONS[entry.trailing.icon] } }),
+        },
   )
 
 export interface MessageMenuProps {

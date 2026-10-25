@@ -80,13 +80,14 @@ const menuGrid = [
   { name: 'raised_hands', unicode: '🙌' },
   { name: 'slightly_smiling_face', unicode: '🙂' },
 ].map((emoji) => ({ ...emoji, selected: false }))
+const copyLink = { id: 'copy-link', label: 'Copy Slack link', icon: 'link' } as const
 const menuItems: ReadonlyArray<MessageMenuEntry> = [
   { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   { separator: true },
   { id: 'copy', label: 'Copy text', icon: 'copy' },
   { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
 ]
 
 /**
