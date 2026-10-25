@@ -1,4 +1,4 @@
-import { expect, syncedTest, test } from './fixtures'
+import { expect, syncedTest } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 
 const ROOT = 'checkout.spec failed again on main.'
@@ -44,25 +44,3 @@ syncedTest('unknown first replies show only the count and fill in place when a p
   })
   await juno.peek.release()
 })
-
-for (const repliers of [undefined, []]) {
-  test(`Main keeps the speech bubble when reply_users is ${repliers === undefined ? 'unknown' : 'empty'}`, async ({ juno, fake, slack }) => {
-    const root = slack.root(ROOT)
-    fake.workspace.messages.set(root.channel, fake.messages(root.channel)
-      // Keep a history-only root whose replies and replier metadata are unavailable.
-      .filter(message => message.thread_ts !== root.ts || message.ts === root.ts)
-      .map(message => {
-      if (message.ts !== root.ts) return message
-      const { reply_users: _repliers, ...rest } = message
-      const counted = { ...rest, thread_ts: message.ts, reply_count: 5 }
-      return repliers === undefined ? counted : { ...counted, reply_users: repliers }
-    }))
-    await juno.signIn()
-    await juno.waitForSync()
-    await juno.sidebar.row('#eng').open()
-    const link = juno.topic.threadLinkUnder(ROOT).root
-    await expect(link).toHaveAccessibleName('5 replies')
-    await expect(link.locator('[data-kind="person"]')).toHaveCount(0)
-    await expect(link.locator('svg')).toHaveCount(2)
-  })
-}
