@@ -244,8 +244,8 @@ it('names every row when it first shows, keeps a mention that arrives meanwhile 
 })
 
 it('reads DMs (unread first), then mentions, then unread followed threads, then other unread channels, before the bulk', async () => {
-  // Live in 2 to 5 s on a quiet machine, 7 to 23 s at four busy processes per core and 14 to 75 s at ten.
-  const engine = await booted({ fakeOptions: { seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) } }, 90_000)
+  // 120 conversations, so every group below has some; the order of history reads is checked, not throughput.
+  const engine = await booted({ fakeOptions: { seed: largeSeed({ topics: 300, messages: 3_000, users: 80, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) } }, 90_000)
   const ws = engine.fake.workspace
   const threads = ws.threadCounts()
   const members = [...ws.conversations.values()].filter((c) => c.members.has(SELF_ID))
@@ -269,10 +269,10 @@ it('reads DMs (unread first), then mentions, then unread followed threads, then 
 }, 150_000)
 
 it("with the app's pacing, reads thread previews and emoji beside history, not after it", async () => {
-  // Pacing ten times faster than the app's, every method alike, so the methods keep their real ratios; live calls took
+  // Pacing thirty times faster than the app's, every method alike, so the methods keep their real ratios; live calls took
   // about 450 ms (performance.md, "First sync timeline"), scaled the same way. Ten active conversations and 40 threads.
   const seed = largeSeed({ topics: 40, messages: 600, users: 80, days: 7, channels: { public: 6, private: 1, dms: 2, mpims: 1 } })
-  const engine = await booted({ paced: 10, fakeOptions: { seed, latencyMillis: 45 } }, 30_000)
+  const engine = await booted({ paced: 30, fakeOptions: { seed, latencyMillis: 15 } }, 30_000)
   const history = apiCalls(engine, 'conversations.history').filter((call) => call.args['_x_reason'] === 'history')
   const previews = apiCalls(engine, 'conversations.replies').filter((call) => call.args['_x_reason'] === 'thread-preview')
   const emoji = engine.fake.calls.filter((call) => call.method === 'emojis/list')
