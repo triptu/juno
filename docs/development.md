@@ -629,6 +629,18 @@ All 166 files and 2,386 tests on the SSH laptop, two physical cores (four thread
 
 No-isolate takes about 15% less time and about 15% less CPU (busy share × time: 255 → 202–230 thread-seconds); against a shuffled `--isolate` run it saves about 9 s. Shuffling loses the slowest-first start; within these runs it cost no clear time. The one failure was `huddle-recovery.flow.test.ts` timing out after 5 s: with `--no-isolate` the preload's 30 s default reached only the first file of each worker. The same happens to any multi-file `bun test` without `--parallel`, such as `cd packages/engine && bun test`, so the timeout is now on the command line. No failure in these seven shuffled runs came from another file's state or from the order of tests. These are single runs per seed under shared load, not medians. Tests that need the Effect test clock use `itEffect` from `@juno/testing/effect`, which provides `TestClock` and runs the effect; to time out a call that is in flight, fork it, wait until the request reaches the fake (a promise the fake resolves), then `TestClock.adjust` (`packages/ai/test/pi.test.ts`). Wait on a real signal (a Deferred, a subscription, a fake's call log); where there is none, `eventually` from `@juno/testing/eventually` retries a check. See the effect skill.
 
+### Unit run measurements, 2026-10-25
+
+All 168 files on two physical cores of the SSH laptop (four threads), the same seed (3952231788), one run each, so single observations under shared load. Before is the 10-24 full run; after is commit `0ff93659e`.
+
+| Run | Workers | Bun time | Summed test time | Result |
+| --- | --- | --- | --- | --- |
+| Before | 4 | 79.4 s | 306 s | all passed |
+| After | 4 | 54.3 s | 208 s | all passed |
+| After | 8 | 65.6 s | | one timing-sensitive markdown test failed |
+
+The run is CPU-bound (CPU 95–99% busy), so four workers, one per thread, stay the default. What changed: the crash tests start each agent program from a bundle built once per test process (`runAgent`), not from source (`recovery.test.ts` 25.0 → 5.6 s, `backup-crash.test.ts` 13.5 → 6.0 s); the mutation repair seed is 1,500 messages over two days (the large-seed test 18.9 → 5.2 s); periodic sweeps in the flow tests run on test-driven time; rate-limit tests use sub-second Retry-After values with a short `slackInteractiveMaxWaitMillis` (14.3 s → off the slowest list); first-sync, agent-host and reads start from smaller seeds or the synced template. A warm engine boot costs about 90 ms of CPU and waits on no timer, so the rest is the tests' own work; about 40 s needs a third core.
+
 ### Desktop lane measurements, 2026-10-24
 
 The full measurement at `7aa940589` passed both desktop lanes on the SSH laptop: **222 s browser, 73 s Electron, 295 s combined**. It used four physical cores (eight allocated threads), eight browser workers and eight Electron workers, in sequence. Coverage and traces were off, CPU timing was on, and there were no retries, failures or skips. The job averaged 89% CPU busy (99% median), with 6.64 GB peak container memory including file cache.
@@ -946,7 +958,7 @@ Agents run selective checks before reporting. Full runs (`bun run verify:main`, 
 
 **Flakes.** Desktop Playwright projects have zero retries. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `bun run flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit, app and specs jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit (with the spec checks), desktop and gallery jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `bun run affected` picks desktop e2e specs by a coverage map that `bun run verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -997,7 +1009,7 @@ Looked at and left: the 429 storm in `realtime.spec.ts` (33 s) and `idle-cpu.spe
 
 **Unit setup and parallel files** (10-19). The engine harness builds an empty migrated database template once per test process, closes it, then copies it into each fresh engine's private directory. It does not copy synced workspace data or share engines. Store migration tests still run from scratch. Related engine checks can share one named flow; tests of different starting states and failure cases remain independent. Large-seed repair and socket-liveness cases are separate files so existing remote file parallelism can overlap them. `bun run test` runs files on a few workers that keep their globals across files (`--no-isolate`, from 10-24), so the template and the synced workspace are built once per worker. Measurements and the assertion inventory are in [Unit suite timing](unit-suite-timing.md).
 
-**Further unit tuning** (10-19). Store now overlaps files on remote workers because every test owns a private temporary directory and database handles. The mutation scenarios use a smaller 20,000-message fixture while keeping 300 conversations, all 150 activity targets and the exact repair budgets; the 100,000-message performance fixture stays intact. The send flush check advances retry deadlines with TestClock. Home's AI-off setup now precedes its job startup, and quick-start's Automated hold is advanced explicitly, so both work under load. Five paired Agent pool/isolation samples found no consistent improvement, so its defaults stay unchanged. Wall-clock and CPU budgets are excluded from normal unit runs and `affected`: `bun run perf --unit` runs the Agent, Engine and AI performance configurations on the Mac. Mixed tests keep their correctness assertions in the normal suite; query-count and payload limits remain normal checks. The Agent no longer has a separate timing project in `bun run test`. Profiling commands and measurements are in [Unit suite timing](unit-suite-timing.md#round-3-smaller-repair-fixtures-and-independent-store-workers).
+**Further unit tuning** (10-19). Store now overlaps files on remote workers because every test owns a private temporary directory and database handles. The large-seed repair scenario uses a 1,500-message fixture that keeps 300 conversations and the exact repair budgets; the 100,000-message performance fixture stays intact. The send flush check advances retry deadlines with TestClock. Home's AI-off setup now precedes its job startup, and quick-start's Automated hold is advanced explicitly, so both work under load. Five paired Agent pool/isolation samples found no consistent improvement, so its defaults stay unchanged. Wall-clock and CPU budgets are excluded from normal unit runs and `affected`: `bun run perf --unit` runs the Agent, Engine and AI performance configurations on the Mac. Mixed tests keep their correctness assertions in the normal suite; query-count and payload limits remain normal checks. The Agent no longer has a separate timing project in `bun run test`. Profiling commands and measurements are in [Unit suite timing](unit-suite-timing.md#round-3-smaller-repair-fixtures-and-independent-store-workers).
 
 **Desktop scheduling and persistent builds** (10-19). The desktop fixture now selects the engine unit harness's fast scheduling for ordinary fake-Slack launches. Both e2e mode and a fake URL are required. Thumbnail recovery keeps four attempts at the same ratios; production still waits 1, 3, 10 and 30 seconds. The fast profile disables periodic discovery, uses explicit catch-ups, and preserves real socket hello/pong safety deadlines. Tests of real timing opt out with `test.use({ timing: 'production' })` or `launchApp(dir, { timing: 'production' })`; presence spacing and reaction-versus-edit backoff do so. Paced sync, idle, perf, feel and `@mac` launches retain production timing automatically. `juno.workPass(name)` waits for an engine job pass started after its request, so negative AI and Automated assertions no longer sleep for several seconds. `JUNO_E2E_TIMINGS=1` reports separate fake-start, Electron-launch, sign-in, sync-wait and close times. Related checks with the same starting state share one launch and use labelled `test.step` calls. Each flow owns its fake and user data. Cold starts, different initial fixtures and destructive failure cases stay separate. Timing budgets run on the Mac through `bun run perf`; normal e2e waits only establish readiness or fail a hung step.
 
@@ -1140,7 +1152,7 @@ this Mac through the heavy lock; use them only when Tushar asks, since heavy run
 unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
-`test:plan` splits unit, desktop and gallery, and specs steps into independent SSH jobs. `test:dom` goes in the unit job, after `test`; a unit job with a whole `test:dom` (or more than four files) takes two cores. Browser and Electron desktop steps run in order and share builds; conformance stays with specs. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
+`test:plan` splits unit, desktop and gallery steps into independent SSH jobs; the DOM lane (`test:dom`), the spec checks and conformance run in the unit job after the unit tests, in that order, so the three jobs (2, 3 and 3 cores) fit Juno's eight lent cores at once. A separate specs job used to wait about 80 s for the unit job to release cores. Browser and Electron desktop steps run in order and share builds. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order, whether set locally or passed with `--env`. An explicit `--env` value wins. `KEY=VALUE` before a step overrides its environment.
@@ -1273,9 +1285,9 @@ Juno requests physical cores from the laptop's shared `4-11` allocation:
 | Job | Cores | Memory cap |
 | --- | ---: | ---: |
 | Narrow unit, agent tests, cached spec check | 1 | 3 GiB |
-| Wide unit, uncached spec check, standalone gallery or app | 2 | 6 GiB |
+| Wide unit, uncached spec check, conformance, standalone gallery or app | 2 | 6 GiB |
 | Gallery or desktop inside a split plan | 3 | 9 GiB |
-| Conformance, trace generation, other scripts | 4 | 12 GiB |
+| Trace generation, other scripts | 4 | 12 GiB |
 
 Wide units have no named files or more than 20. `--cores` overrides the request;
 default sizes shrink to fit smaller hosts. Explicit oversized requests fail.
@@ -1295,7 +1307,7 @@ Explicit worker settings win within the Apalache memory cap.
 The host caps memory without swap and mounts `/tmp` and `/work` as tmpfs.
 Each tmpfs is 2 GiB, or 4 GiB for requests of four or more cores; tmpfs consumes
 the memory cap. Split plans release each job's cores independently.
-`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_GALLERY_CORES` override the two app jobs independently; `JUNO_RUNNER_UNIT_CORES` and `JUNO_RUNNER_SPECS_CORES` work the same way. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
+`JUNO_RUNNER_DESKTOP_CORES` and `JUNO_RUNNER_GALLERY_CORES` override the two app jobs independently; `JUNO_RUNNER_UNIT_CORES` works the same way for the unit job, which also runs the spec checks. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
 Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue

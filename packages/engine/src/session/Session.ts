@@ -106,6 +106,7 @@ export class Session extends Context.Service<
               slackConfigLayer({
                 transientBackoffMillis: timing.slackRetryBaseMillis,
                 transientBackoffCapMillis: timing.slackRetryCapMillis,
+                interactiveMaxWaitMillis: timing.slackInteractiveMaxWaitMillis,
                 socket: {
                   pingIntervalMillis: timing.socketPingMillis, pongTimeoutMillis: timing.socketPongTimeoutMillis,
                   helloTimeoutMillis: timing.socketHelloTimeoutMillis, backoffBaseMillis: timing.socketBackoffBaseMillis,

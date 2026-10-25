@@ -1,0 +1,1 @@
+- 10-25 18:47 · specs-in-unit-job · Run the spec checks and conformance in the unit job of a split SSH plan: unit (2), desktop (3) and gallery (3) fill Juno's eight lent cores at once, where a separate specs job waited about 80 s for the unit job's cores; conformance now counts as a two-core step.
