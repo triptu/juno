@@ -1,7 +1,7 @@
-// Setting up a model provider as a first-time user does (SPEC 13.10): "Set up Juno" right
-// after the first Slack sign-in, or Skip for now and later "Juno needs a model", the provider
-// section of Settings › Juno, then the chat.
-import { startFakeOpenAi } from '@juno/agent-testing/openai'
+// Setting up a model provider as a first-time user does (SPEC 13.10): Skip for now on "Set up
+// Juno" after the first Slack sign-in, later "Juno needs a model", the provider section of
+// Settings › Juno, then the chat. Set up Juno itself and an endpoint with a typed model id are in
+// the DOM lane (`dom/juno-agent/providers-ui.test.ts`).
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
 import { expect, hooks, test as base } from '../fixtures'
@@ -72,68 +72,4 @@ test('after Skip for now the tab and the panel say Juno needs a model, and Add a
   await chat.expectJuno('You said: what is on today?')
   expect(model.requests.at(-1)?.key).toBe(KEY)
   expect(model.requests.filter((request) => !request.model.includes('haiku')).at(-1)?.model).toBe('anthropic/claude-opus-5.5')
-})
-
-test('after sign-in, Set up Juno takes an OpenRouter key and the default model, and the first chat is answered', async ({ juno, model }) => {
-  await juno.signIn({ skipSetUp: false })
-  const { setUp } = juno
-  await expect(setUp.getByRole('heading', { name: 'Set up Juno' })).toBeVisible({ timeout: 15_000 })
-  // Codex is not installed under tests, so two choices.
-  await expect(setUp.getByRole('radio')).toHaveText(['OpenRouter', 'OpenAI-compatible'])
-  await expect(setUp.getByRole('button', { name: 'Continue' })).toBeDisabled()
-  await setUp.getByLabel('API key').fill(KEY)
-  await setUp.getByLabel('API key').press('Enter')
-  // Saved: the agent starts, and the model row offers its models with Sonnet chosen.
-  const select = setUp.locator('[data-set-up-model]').getByRole('combobox', { name: 'Model' })
-  await expect(select).toBeVisible({ timeout: 20_000 })
-  await expect(select.locator('option:checked')).toHaveText(/^Claude Sonnet/)
-  await setUp.getByRole('button', { name: 'Continue' }).click()
-
-  // The app, with Juno ready on the key just saved.
-  await juno.waitForSync()
-  await junoNav(juno).click()
-  const chat = JunoChatPane.tab(juno.win)
-  await chat.send('what is on today?')
-  await chat.expectJuno('You said: what is on today?')
-  expect(model.requests.at(-1)?.key).toBe(KEY)
-})
-
-test('an OpenAI-compatible endpoint that lists no models takes a typed model id', async ({ juno }) => {
-  const endpoint = await startFakeOpenAi({ models: null, answer: '<say>Hello from the local model.</say>' })
-  try {
-    await juno.signIn()
-    await juno.waitForSync()
-    await junoNav(juno).click()
-    await juno.win.locator('main [data-juno-no-provider]').getByRole('button', { name: 'Add a provider' }).click()
-    const page = juno.win.locator('main')
-    await page.getByRole('radio', { name: 'OpenAI-compatible' }).click()
-    await page.getByLabel('Base URL').fill('not an address')
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page.locator('[data-provider-error]')).toHaveText('Enter an http or https address.')
-    await page.getByLabel('Base URL').fill(endpoint.baseUrl)
-    await page.getByRole('button', { name: 'Save' }).click()
-    await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
-
-    // The endpoint lists nothing: the model id is typed, and compaction uses it.
-    const modelId = page.getByLabel('Model id')
-    await expect(modelId).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByLabel('Compaction model')).toHaveCount(0)
-    await expect(page.locator('[data-spend-untracked]')).toBeVisible()
-    await modelId.fill('mistral-small')
-    await modelId.press('Enter')
-    await expect.poll(() => modelId.inputValue()).toBe('mistral-small')
-
-    await junoNav(juno).click()
-    const chat = JunoChatPane.tab(juno.win)
-    await chat.send('hello')
-    await chat.expectJuno('Hello from the local model.')
-    expect(endpoint.requests.map((request) => request.model)).toEqual(['mistral-small'])
-    await juno.openSettings('Juno')
-    await page.getByRole('button', { name: 'Remove', exact: true }).click()
-    await expect.poll(() => hooks(juno.surface, 'agentState')).toBe('stopped')
-    await junoNav(juno).click()
-    await expect(juno.win.locator('main [data-juno-no-provider]')).toContainText('Juno needs a model')
-  } finally {
-    await endpoint.close()
-  }
 })

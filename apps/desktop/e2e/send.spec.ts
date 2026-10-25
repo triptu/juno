@@ -1,10 +1,8 @@
 // Sending from a topic (spec section 8; architecture 5.7): the message shows
-// at once and settles in place in a thread, drafts kept across tabs and a
-// restart, and the composer growing to about eight lines. Main's echo before
-// the answer and a refused send with Retry and Delete draft are in the DOM
-// lane (`dom/send.test.ts`).
-import { DatabaseSync } from 'node:sqlite'
-import { join } from 'node:path'
+// at once and settles in place in a thread, and the composer grows to about
+// eight lines. Main's echo before the answer, a refused send with Retry and
+// Delete draft, and drafts kept across tabs and a restart are in the DOM lane
+// (`dom/send.test.ts`).
 import { measureLayoutShift } from '@juno/testing/layout-shift'
 import { expect, test } from './fixtures'
 
@@ -14,27 +12,6 @@ test.use({ synced: true })
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite'
-
-interface SavedTab {
-  readonly id: string
-  readonly place?: { readonly kind: string; readonly topicId?: string }
-  readonly homeDraft?: { readonly draft?: string; readonly conversation?: unknown }
-}
-
-/** The tabs and topic drafts user.db holds (drafts by text), read while the app runs: what a relaunch reads back. */
-function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray<SavedTab>; readonly active: SavedTab | undefined; readonly drafts: ReadonlyMap<string, string> } {
-  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
-  try {
-    const row = db.prepare("SELECT value_json FROM prefs WHERE key = 'tabs'").get() as { value_json: string } | undefined
-    const value = row === undefined ? undefined : (JSON.parse(row.value_json) as { readonly tabs: ReadonlyArray<SavedTab>; readonly active: string | null })
-    const drafts = new Map(db.prepare('SELECT topic_id, text FROM drafts').all().map((draft) => [String(draft['text']), String(draft['topic_id'])]))
-    const tabs = value?.tabs ?? []
-    return { tabs, active: tabs.find((tab) => tab.id === value?.active), drafts }
-  } finally {
-    db.close()
-  }
-}
 
 test('a reply in a thread shows at once and settles in place, posted once', async ({ juno, fake }) => {
   const { topic } = juno
@@ -75,7 +52,7 @@ test('a reply in a thread shows at once and settles in place, posted once', asyn
   expect(copies).toHaveLength(1)
 })
 
-test('the composer grows to about eight lines, and a draft is kept per topic across tab switches and a restart', async ({ juno, relaunch, userData, fake }) => {
+test('the composer grows to about eight lines, then scrolls inside, and Shift Enter adds a line', async ({ juno, fake }) => {
   const { topic, sidebar } = juno
   await sidebar.row(POSTGRES).open()
 
@@ -95,27 +72,5 @@ test('the composer grows to about eight lines, and a draft is kept per topic acr
     await topic.composer.pressSequentially('second line')
     await expect(topic.composer).toHaveValue('first line\nsecond line')
     expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
-  })
-
-  await test.step('a draft is kept per topic across tab switches and a restart', async () => {
-    await topic.composer.fill('Half a thought about the freeze')
-    await sidebar.row(RINA).openInNewTab()
-    await topic.expectTitle(RINA)
-    await expect(topic.composer).toHaveValue('')
-    await juno.tabs.menu('previous-tab')
-    await topic.expectTitle(POSTGRES)
-    await expect(topic.composer).toHaveValue('Half a thought about the freeze')
-    // The draft and the tabs, with the Postgres tab active, are in user.db before the quit.
-    await expect
-      .poll(() => {
-        const state = saved(userData, fake.teamId)
-        const topic = state.drafts.get('Half a thought about the freeze')
-        return topic !== undefined && state.active?.place?.topicId === topic && state.tabs.length === 2
-      })
-      .toBe(true)
-    const restarted = await relaunch()
-    await restarted.tabs.menu('previous-tab')
-    await restarted.topic.expectTitle(POSTGRES)
-    await expect(restarted.topic.composer).toHaveValue('Half a thought about the freeze')
   })
 })

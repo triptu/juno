@@ -1,6 +1,7 @@
-// Ask Juno on text highlighted in a topic, in the app against the fake
-// Slack and a fake OpenRouter: the selection's toolbar, ⌘J with a
-// selection, the panel's explicit selection chip, and what the model gets.
+// The open Juno panel following text highlighted in a topic, in the browser:
+// which rows the selection spans is read from the page's layout, and the last
+// step is a mouse drag. Ask Juno from the selection's toolbar and ⌘J with a
+// selection are in the DOM lane (`dom/juno-agent/panel.test.ts`).
 import type { FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Locator } from '@playwright/test'
 import type { Juno } from '../driver/juno'
@@ -44,49 +45,15 @@ async function highlight(juno: Juno, row: Locator, words: string): Promise<void>
   await expect.poll(() => juno.win.evaluate(() => document.getSelection()?.toString())).toBe(words)
 }
 
-// One launch: Ask Juno from the toolbar opens the panel, then the open panel takes later selections.
-test('Ask Juno on highlighted text quotes it in the panel, and the open panel follows later selections', async ({ juno, model }) => {
+test('the open panel follows later selections: ⌘J asks about them, Backspace on the chip removes it, and a drag while the field has focus gives a new chip', async ({ juno, model }) => {
   await ready(juno)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
-  await test.step('Ask Juno on highlighted text opens the panel with the selection quoted, and Juno gets the words and where they are from', () => askFromToolbar(juno, model))
-  await test.step('⌘J with text selected across messages asks about it without closing the panel, Backspace on the chip removes it, and a drag while the field has focus gives a new chip', () => followSelection(juno, model))
+  await juno.tabs.menu('juno')
+  await followSelection(juno, model)
 })
 
-async function askFromToolbar(juno: Juno, model: FakeOpenRouter): Promise<void> {
-  await expect(juno.win.locator('aside[data-juno-panel]')).toHaveCount(0)
-
-  const root = juno.topic.message(POSTGRES)
-  await highlight(juno, root, 'logical replication')
-  // The selection's toolbar: Quote, and Ask Juno with its shortcut, icons named by their tooltips.
-  const toolbar = juno.win.getByRole('toolbar', { name: 'Selection' })
-  await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
-  const ask = toolbar.getByRole('button', { name: 'Ask Juno' })
-  await expect(ask).toHaveAttribute('data-tooltip-keys', '⌘J')
-  await ask.click()
-
-  // The panel opens with the selection quoted and its field focused; the highlight and the toolbar go.
-  const panel = JunoChatPane.panel(juno.win)
-  const chip = panel.root.locator('[data-panel-selection]')
-  await expect(chip).toHaveText('Leo: “logical replication”')
-  await expect(chip).toHaveAttribute('data-tooltip', 'Leo: logical replication')
-  await expect(panel.composer).toBeFocused()
-  await expect(toolbar).toHaveCount(0)
-  expect(await juno.win.evaluate(() => document.getSelection()?.toString())).toBe('')
-
-  await juno.win.keyboard.type('is this the plan?')
-  await juno.win.keyboard.press('Enter')
-  await panel.expectJuno('You said: is this the plan?')
-  // Juno gets the words, the topic they are in, and the message they come from: its sender and ts.
-  const ts = await root.getAttribute('data-message-row')
-  const input = model.inputs().at(-1)!
-  expect(input).toMatch(/^<message id="n1"><about topic="t:[^"]+" title="Draft plan is in the doc[^"]*" channel="#eng" [^>]*>/)
-  expect(input).toContain(`<selection from="Leo" ts="${ts}">logical replication</selection></about>is this the plan?</message>`)
-  await expect(chip).toHaveCount(0)
-}
-
 async function followSelection(juno: Juno, model: FakeOpenRouter): Promise<void> {
-  // The panel is still open from the toolbar's Ask Juno.
   const panel = JunoChatPane.panel(juno.win)
   await expect(panel.composer).toBeFocused()
 

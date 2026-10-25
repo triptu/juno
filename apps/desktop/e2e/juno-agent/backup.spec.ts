@@ -1,5 +1,7 @@
 // Backup, the recovery phrase and a restore on a second Mac (SPEC 13.8), as the owner does it: two
-// launches of the app play two Macs that share one backup folder, against one fake Slack.
+// launches of the app play two Macs that share one backup folder, against one fake Slack. This is
+// the Electron canary of the flow, with the native folder picker and keychain; the DOM lane runs it
+// against the host (`dom/juno-agent/backup.test.ts`).
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -43,7 +45,7 @@ async function openSettings(juno: Juno): Promise<void> {
 
 const lastBackupAt = async (juno: Juno) => Number((await juno.win.locator('main [data-last-backup]').getAttribute('data-last-backup')) || 0)
 
-test('backup to a shared folder, export the phrase, restore on a second Mac, and the first Mac turns read-only', { tag: '@canary' }, async ({ juno, otherApp, shared }) => {
+test('backup to a shared folder, export the phrase, restore on a second Mac, and the first Mac turns read-only', async ({ juno, otherApp, shared }) => {
   // The first Mac: the backup is on from the start, in its own folder.
   await ready(juno)
   await openSettings(juno)

@@ -4,15 +4,17 @@
  * hands the body the driver, the fake Slack and the people in it, and
  * closes everything after, pass or fail. With JUNO_E2E_TIMINGS=1 each test
  * prints a `dom timing:` line: wall time, and the CPU of this Bun worker
- * (test, fake, renderer) and of the hosts it forked (engine, agent).
+ * (test, fake, renderer) and of the hosts it forked (engine, agent), and
+ * the memory of both: the worker's peak and now, the hosts' now.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { test } from 'bun:test'
-import type { FakeSlack } from '@juno/fake-slack'
+import type { FakeSlack, FakeSlackOptions } from '@juno/fake-slack'
 import { Slack } from '../e2e/driver/slack'
 import type { EngineOptions } from '../web/host/testHost'
-import { DomApp, domSnapshot, startDomApp } from './app'
+import { DomApp, domSnapshot, startDomApp, tempUserData, warmWorker } from './app'
 import { PageClock } from './clock'
 import { Juno } from './driver/juno'
 
@@ -25,10 +27,12 @@ interface Model {
 export interface DomTestOptions<M extends Model | undefined = undefined> {
   /** Start signed in and synced from the snapshot (default), or signed out on an empty folder. */
   readonly synced?: boolean
+  /** The fake's own options, as a seed of its own; only with `synced: false`, since the snapshot is of the default seed. */
+  readonly fake?: FakeSlackOptions
   readonly engine?: EngineOptions
   /** Install the test clock before the page loads, at this time or now; the engine's clock follows its jumps. */
   readonly clock?: boolean | number | Date
-  /** Starts the model the agent talks to; the agent runs with it. */
+  /** Starts the model the agent talks to; the agent runs with it unless `engine.agent` is false, and the engine's AI uses it. */
   readonly model?: () => Promise<M & Model>
   readonly timeout?: number
 }
@@ -44,6 +48,8 @@ export interface DomContext<M extends Model | undefined = undefined> {
   readonly model: M
   /** Quits and opens the app again on the same data folder; answers the new driver (`DomApp.relaunch`). */
   relaunch(options?: Parameters<DomApp['relaunch']>[0]): Promise<Juno>
+  /** A second app, as another Mac: its own data folder and host, signed out, against the same fake and model, with `engine` on top. Closed after the test. */
+  otherApp(engine?: EngineOptions): Promise<Juno>
   /** A named part of the test; a failure inside says which. */
   step<T>(name: string, body: () => Promise<T>): Promise<T>
 }
@@ -60,14 +66,20 @@ export function domTest<M extends Model | undefined = undefined>(title: string, 
 
 async function run<M extends Model | undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M>): Promise<void> {
   const meter = cpuMeter()
+  // Every window shares the worker's `performance`: a mark from an earlier test is not this one's (`juno.lastMark`).
+  performance.clearMarks()
+  performance.clearMeasures()
   const model = options.model === undefined ? undefined : await options.model()
   try {
     const clock = options.clock === undefined || options.clock === false ? undefined : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())
-    const engine: EngineOptions = { ...options.engine, ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }) }
+    const engine: EngineOptions = { ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }), ...options.engine }
+    if (options.fake !== undefined && options.synced !== false) throw new Error('A fake of its own needs `synced: false`: the snapshot is of the default seed.')
+    warmWorker()
     const snapshot = options.synced === false ? undefined : await domSnapshot(signIn)
     const ready = meter.lap()
-    const started = await startDomApp({ snapshot, engine, ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
+    const started = await startDomApp({ snapshot, engine, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
     const warm = meter.lap()
+    const others: Array<{ app: DomApp | undefined; readonly userData: string }> = []
     try {
       const context: DomContext<M> = {
         juno: new Juno(started.app),
@@ -80,6 +92,13 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
           return clock
         },
         model: model as M,
+        otherApp: async (extra) => {
+          const userData = await tempUserData()
+          const other = { app: undefined as DomApp | undefined, userData }
+          others.push(other)
+          other.app = await DomApp.start(started.fake, userData, { engine: { ...engine, ...extra } })
+          return new Juno(other.app)
+        },
         relaunch: async (relaunch) => {
           await started.app.relaunch(relaunch)
           context.juno = new Juno(started.app)
@@ -101,8 +120,11 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
         throw error
       }
     } finally {
+      for (const other of others) {
+        try { await other.app?.close() } finally { await rm(other.userData, { recursive: true, force: true }) }
+      }
       await started.close()
-      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total() })}`)
+      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total(), memory: memoryMB() })}`)
     }
   } finally {
     await model?.close()
@@ -125,10 +147,20 @@ function savePage(title: string, app: DomApp, userData: string): void {
   } catch { /* the window is gone */ }
 }
 
+/** Megabytes resident: this worker at its peak and now, and the hosts it forked now (Linux; 0 elsewhere). */
+function memoryMB(): { readonly bunPeak: number; readonly bun: number; readonly host: number } {
+  return { bunPeak: Math.round(process.resourceUsage().maxRSS / 1024), bun: Math.round(process.memoryUsage().rss / 1e6), host: Math.round(hostStats().rssPages * 4096 / 1e6) }
+}
+
 /** CPU milliseconds of the host processes this worker forked (Linux; 0 elsewhere). */
 function hostCpuMillis(): number {
-  if (process.platform !== 'linux') return 0
+  return hostStats().cpuMillis
+}
+
+function hostStats(): { readonly cpuMillis: number; readonly rssPages: number } {
+  if (process.platform !== 'linux') return { cpuMillis: 0, rssPages: 0 }
   let total = 0
+  let rss = 0
   for (const name of readdirSync('/proc')) {
     if (!/^\d+$/.test(name)) continue
     try {
@@ -136,9 +168,10 @@ function hostCpuMillis(): number {
       const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
       if (Number(fields[1]) !== process.pid) continue
       total += (Number(fields[11]) + Number(fields[12])) * 10
+      rss += Number(fields[21])
     } catch { /* gone */ }
   }
-  return total
+  return { cpuMillis: total, rssPages: rss }
 }
 
 /** Wall and CPU since the last lap. */

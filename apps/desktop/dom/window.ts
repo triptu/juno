@@ -17,14 +17,51 @@ export const DOM_BUILD = resolve(__dirname, 'dist')
 let compiled: { readonly script: Script; readonly css: string } | undefined
 /** Compiled once per Bun worker; each window runs it in its own context. */
 function renderer() {
-  compiled ??= { script: new Script(readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8'), { filename: 'renderer.js' }), css: readFileSync(join(DOM_BUILD, 'style.css'), 'utf8') }
+  compiled ??= { script: new Script(readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8'), { filename: 'renderer.js' }), css: rootRules(readFileSync(join(DOM_BUILD, 'style.css'), 'utf8')) }
   return compiled
+}
+
+/** Compiles the renderer and its sheet ahead of the first window. */
+export function warmRenderer(): void {
+  renderer()
+}
+
+/**
+ * The sheet's rules for the root (`:root`, `html`): the tokens, such as the
+ * durations `rootDuration` reads. happy-dom matches every rule of every
+ * sheet against an element and its ancestors on each `getComputedStyle`,
+ * which the app calls in layout effects, and the class rules only give
+ * values that need layout to mean anything (README, "The rule").
+ */
+function rootRules(css: string): string {
+  const parser = new Window()
+  try {
+    const sheet = new parser.CSSStyleSheet()
+    sheet.replaceSync(css)
+    // A rule whose subject, the compound after the last combinator, is the root.
+    const forRoot = (selector: string) => selector.split(',').some((part) => { const subject = part.trim().split(/[\s>+~]+/).at(-1) ?? ''; return /:root\b/.test(subject) || /^html\b/.test(subject) })
+    const keep = (rules: CSSRuleList): string => [...rules].map((rule) => {
+      if ('selectorText' in rule) return forRoot(String(rule.selectorText)) ? rule.cssText : ''
+      if ('conditionText' in rule && 'cssRules' in rule) {
+        const inner = keep(rule.cssRules as CSSRuleList)
+        return inner === '' ? '' : `@${rule.constructor.name === 'CSSSupportsRule' ? 'supports' : 'media'} ${String(rule.conditionText)} {${inner}}`
+      }
+      return ''
+    }).join('')
+    return keep(sheet.cssRules as unknown as CSSRuleList)
+  } finally {
+    void parser.happyDOM.close()
+  }
 }
 
 const quiet = Object.fromEntries(['log', 'info', 'debug', 'trace', 'group', 'groupCollapsed', 'groupEnd', 'table', 'dir', 'time', 'timeEnd', 'timeLog', 'count', 'assert'].map((name) => [name, () => {}]))
 
-/** Opens `url` in a new window and runs the renderer in it. The page's errors and warnings reach the test output; JUNO_DOM_DEBUG=1 passes everything. */
-export function openWindow(url: string, clock?: PageClock, engineClock?: Parameters<PageClock['install']>[1]): Window {
+/**
+ * Opens `url` in a new window and runs the renderer in it, with `storage` in
+ * its localStorage first. The page's errors and warnings reach the test
+ * output; JUNO_DOM_DEBUG=1 passes everything.
+ */
+export function openWindow(url: string, clock?: PageClock, engineClock?: Parameters<PageClock['install']>[1], storage: ReadonlyArray<readonly [string, string]> = []): Window {
   const window = new Window({
     url,
     width: 1200,
@@ -37,10 +74,14 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
       navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36' },
     },
   })
+  patchPrototypes(window)
+  if (open.size === 0) restorePrototypes(window)
+  open.add(window)
   fillGaps(window)
   // The sidebar trace (e2e README, "Sidebar trace") on: the driver waits for the list value a filter asks for.
   ;(window as unknown as Record<string, unknown>)['__junoSidebarTrace'] = { hold: [], list: { values: 0, errors: 0 } }
   clock?.install(window, engineClock)
+  for (const [key, value] of storage) window.localStorage.setItem(key, value)
   const { script, css } = renderer()
   window.document.write(`<!doctype html><html><head><style>${css}</style></head><body><div id="root"></div></body></html>`)
   script.runInContext(window as never)
@@ -51,10 +92,16 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
 const unescapeString = (text: string) => text.replace(/\\([0-9a-fA-F]{1,6}) ?|\\(.)/g, (_all, hex: string | undefined, char: string | undefined) => (hex === undefined ? char! : String.fromCodePoint(Number.parseInt(hex, 16))))
 const unescapeQuoted = (selector: string) => (selector.includes('\\') ? selector.replace(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g, (_all, double: string | undefined, single: string | undefined) => JSON.stringify(unescapeString(double ?? single ?? ''))) : selector)
 
+/** The attribute `Dom` keeps on the element under the pointer and its ancestors, which `:hover` reads here. */
+export const HOVER_ATTRIBUTE = 'data-dom-hover'
+
+const withHover = (selector: string) => (selector.includes(':hover') ? selector.replaceAll(':hover', `[${HOVER_ATTRIBUTE}]`) : selector)
+
 /**
  * happy-dom matches a quoted attribute value as written, escapes and all, so
  * `[data-message-row="${CSS.escape(ts)}"]` (the app's `rowOf`) finds nothing.
  * Selectors are unescaped inside their quotes before happy-dom reads them.
+ * happy-dom has no pointer, so `:hover` reads the elements `Dom.hover` marked.
  */
 function unescapeSelectors(window: Window): void {
   const W = window as unknown as Record<string, { prototype: object }>
@@ -70,7 +117,7 @@ function unescapeSelectors(window: Window): void {
       patched.add(key)
       const original = key as (this: unknown, selector: string) => unknown
       const wrapped = function (this: unknown, selector: string) {
-        return original.call(this, unescapeQuoted(selector))
+        return original.call(this, withHover(unescapeQuoted(selector)))
       }
       patched.add(wrapped)
       ;(owner as Record<string, unknown>)[name] = wrapped
@@ -113,7 +160,7 @@ function messageChannel(window: Window): new () => { readonly port1: EventTarget
     }
 
     receive(data: unknown): void {
-      if (this.#closed) return
+      if (this.#closed || closed.has(window)) return
       if (!this.#started) return void this.#queue.push(data)
       this.dispatchEvent(new W.MessageEvent('message', { data }))
     }
@@ -145,15 +192,34 @@ function unhidden(el: HTMLElement): boolean {
   return el.parentElement === null || unhidden(el.parentElement)
 }
 
-function fillGaps(window: Window): void {
-  const globals = window as unknown as Record<string, unknown>
-  // Bun's own, which talk to the host for real.
-  for (const name of ['WebSocket', 'structuredClone', 'BroadcastChannel']) if (globals[name] === undefined) globals[name] = (globalThis as Record<string, unknown>)[name]
-  if (globals['MessageChannel'] === undefined) globals['MessageChannel'] = messageChannel(window)
-  if (globals['requestIdleCallback'] === undefined) {
-    globals['requestIdleCallback'] = (callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void) => (window.setTimeout as unknown as (run: () => void, delay: number) => number)(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1)
-    globals['cancelIdleCallback'] = (id: number) => (window.clearTimeout as unknown as (id: number) => void)(id)
-  }
+let prototypesPatched = false
+
+const FOCUS_LOG = Symbol('focusLog')
+interface FocusMove {
+  readonly name: string
+  readonly element: HTMLElement
+  readonly by: string
+}
+
+/** The page's own functions on the stack, nearest first. */
+function callers(): string {
+  return (new Error().stack ?? '').split('\n').filter((line) => line.includes('renderer.js')).slice(0, 4).map((line) => line.trim().replace(/^at /, '').replace(/ \(.*$/, '')).join(' < ')
+}
+
+/** The last focus() and blur() calls in `window`, oldest first, and whether each element is still in the page. */
+export function focusLog(window: object): string {
+  const log = (window as { [FOCUS_LOG]?: FocusMove[] })[FOCUS_LOG] ?? []
+  return log.map(({ name, element, by }) => `${name} ${element.outerHTML.slice(0, 80)}${element.isConnected ? '' : ' (since removed)'} by ${by || 'the test'}`).join('\n  ')
+}
+
+/**
+ * happy-dom's element classes are shared by every window, so their gaps are
+ * filled once per worker, and what depends on the window is read from the
+ * element's own.
+ */
+function patchPrototypes(window: Window): void {
+  if (prototypesPatched) return
+  prototypesPatched = true
   unescapeSelectors(window)
   const proto = (window as unknown as { Element: typeof Element }).Element.prototype as unknown as Record<string, unknown>
   proto['checkVisibility'] ??= function (this: HTMLElement) {
@@ -161,9 +227,8 @@ function fillGaps(window: Window): void {
   }
   // happy-dom matches :focus-visible on any focus. Browsers match it after keyboard input, not after a press (`Dom` keeps which).
   const matches = proto['matches'] as (this: Element, selector: string) => boolean
-  const modality = window as unknown as { __domPointerFocus?: boolean }
   proto['matches'] = function (this: Element, selector: string) {
-    if (selector === ':focus-visible') return this === this.ownerDocument.activeElement && modality.__domPointerFocus !== true
+    if (selector === ':focus-visible') return this === this.ownerDocument.activeElement && (this.ownerDocument.defaultView as { __domPointerFocus?: boolean } | null)?.__domPointerFocus !== true
     return matches.call(this, selector)
   }
   for (const name of ['scrollIntoView', 'scrollTo', 'scrollBy']) proto[name] ??= function () {}
@@ -171,7 +236,126 @@ function fillGaps(window: Window): void {
     return { finished: Promise.resolve(), cancel() {}, finish() {}, play() {}, pause() {}, reverse() {}, onfinish: null, addEventListener(type: string, listener: () => void) { if (type === 'finish') queueMicrotask(listener) }, removeEventListener() {}, currentTime: 0, playState: 'finished' }
   }
   proto['getAnimations'] ??= function () { return [] }
+  // Each focus() and blur() with the page functions that called it, for a failed `toBeFocused` to show (`focusLog`).
+  const html = (window as unknown as { HTMLElement: typeof HTMLElement }).HTMLElement.prototype as unknown as Record<string, unknown>
+  for (const name of ['focus', 'blur']) {
+    const original = html[name] as (this: HTMLElement, ...args: unknown[]) => void
+    html[name] = function (this: HTMLElement, ...args: unknown[]) {
+      const view = this.ownerDocument.defaultView as { [FOCUS_LOG]?: FocusMove[] } | null
+      if (view !== null) {
+        const log = (view[FOCUS_LOG] ??= [])
+        log.push({ name, element: this, by: callers() })
+        if (log.length > 12) log.shift()
+      }
+      return original.apply(this, args)
+    }
+  }
+  // A browser sets `window.event` while an event's listeners run, and React reads it: an update from a native
+  // keydown or click listener is then discrete and renders at once, before any timer. happy-dom leaves it unset.
+  const target = (window as unknown as { EventTarget: typeof EventTarget }).EventTarget.prototype as unknown as Record<string, unknown>
+  const dispatchEvent = target['dispatchEvent'] as (this: EventTarget, event: Event) => boolean
+  target['dispatchEvent'] = function (this: EventTarget, event: Event) {
+    const node = this as unknown as { ownerDocument?: Document | null; defaultView?: unknown; document?: unknown }
+    const view = (node.document !== undefined ? node : node.defaultView ?? node.ownerDocument?.defaultView) as { event?: Event } | null | undefined
+    if (view === null || view === undefined) return dispatchEvent.call(this, event)
+    const outer = view.event
+    view.event = event
+    try {
+      return dispatchEvent.call(this, event)
+    } finally { view.event = outer }
+  }
+}
+
+let pristine: Map<object, PropertyDescriptorMap> | undefined
+const open = new Set<Window>()
+
+/**
+ * Puts the shared prototypes back as they were before any page ran. A page
+ * patches them as if they were its own (`web/page/urls.ts` wraps
+ * `setAttribute`), so without this each window would wrap the last one's
+ * patch, every call would go through all of them, and the wrappers would
+ * keep every closed window alive. Runs before a page when no other is open
+ * (`otherApp` opens a second) and after the last one closes; the first run
+ * records the prototypes as `patchPrototypes` leaves them.
+ */
+function restorePrototypes(window: Window): void {
+  pristine ??= sharedPrototypes(window)
+  for (const [proto, descriptors] of pristine) {
+    const target = proto as Record<PropertyKey, unknown>
+    for (const key of Reflect.ownKeys(proto)) {
+      const before = descriptors[key as string]
+      if (before === undefined) delete target[key]
+      else {
+        const now = Object.getOwnPropertyDescriptor(proto, key)!
+        if (now.value !== before.value || now.get !== before.get || now.set !== before.set) Object.defineProperty(proto, key, before)
+      }
+    }
+    for (const key of Reflect.ownKeys(descriptors)) if (!Object.hasOwn(proto, key)) Object.defineProperty(proto, key, descriptors[key as string]!)
+  }
+}
+
+/** Every prototype the window's classes share with other windows (this realm's, not the window's own built-ins), with its properties now. */
+function sharedPrototypes(window: Window): Map<object, PropertyDescriptorMap> {
+  const found = new Map<object, PropertyDescriptorMap>()
+  const globals = window as unknown as Record<string, unknown>
+  for (const name of Object.getOwnPropertyNames(window)) {
+    const value = typeof Object.getOwnPropertyDescriptor(window, name)?.value === 'function' ? (globals[name] as { prototype?: unknown }).prototype : undefined
+    for (let proto = value; proto instanceof Object && !found.has(proto); proto = Object.getPrototypeOf(proto)) found.set(proto, Object.getOwnPropertyDescriptors(proto))
+  }
+  return found
+}
+
+/** Windows `closeWindow` has closed, and each window's open sockets. */
+const closed = new WeakSet<Window>()
+const sockets = new WeakMap<Window, Set<WebSocket>>()
+
+/**
+ * Bun's WebSocket, which happy-dom does not know about: each one is kept so
+ * `closeWindow` closes it, and a closed page cannot open another. Left open,
+ * a closed page keeps receiving, rendering and asking its host, and the
+ * worker's pooled host serves the next test on the same port.
+ */
+function pageSocket(window: Window): typeof WebSocket {
+  const live = new Set<WebSocket>()
+  sockets.set(window, live)
+  return class PageSocket extends WebSocket {
+    constructor(url: string | URL, protocols?: string | string[]) {
+      if (closed.has(window)) throw new Error(`This page has closed; it cannot connect to ${new URL(url).pathname}`)
+      super(url, protocols)
+      live.add(this)
+      this.addEventListener('close', () => live.delete(this))
+    }
+  }
+}
+
+/** Closes a window from `openWindow`, its sockets first, and undoes what its page did to the shared prototypes. */
+export async function closeWindow(window: Window): Promise<void> {
+  closed.add(window)
+  for (const socket of sockets.get(window) ?? []) socket.close()
+  try {
+    await window.happyDOM.close()
+  } finally {
+    open.delete(window)
+    if (open.size === 0) restorePrototypes(window)
+  }
+}
+
+function fillGaps(window: Window): void {
+  const globals = window as unknown as Record<string, unknown>
+  // Bun's own, which talk to the host for real.
+  for (const name of ['structuredClone', 'BroadcastChannel']) if (globals[name] === undefined) globals[name] = (globalThis as Record<string, unknown>)[name]
+  if (globals['WebSocket'] === undefined) globals['WebSocket'] = pageSocket(window)
+  if (globals['MessageChannel'] === undefined) globals['MessageChannel'] = messageChannel(window)
+  if (globals['requestIdleCallback'] === undefined) {
+    globals['requestIdleCallback'] = (callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void) => (window.setTimeout as unknown as (run: () => void, delay: number) => number)(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1)
+    globals['cancelIdleCallback'] = (id: number) => (window.clearTimeout as unknown as (id: number) => void)(id)
+  }
   const document = window.document as unknown as Record<string, unknown>
+  // happy-dom answers from activeElement, which is null once a focused element leaves. A window has focus until it blurs.
+  let focused = true
+  window.addEventListener('blur', () => { focused = false })
+  window.addEventListener('focus', () => { focused = true })
+  document['hasFocus'] = () => focused
   if (document['timeline'] === undefined) Object.defineProperty(document, 'timeline', { value: { get currentTime() { return window.performance.now() } } })
   ;(document as { getAnimations?: () => unknown[] }).getAnimations ??= () => []
 }

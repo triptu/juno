@@ -51,7 +51,11 @@ if (import.meta.main) {
   const built = spawnSync(process.execPath, [join(root, 'scripts/build-cached.mjs'), 'dom/dist', 'bun', 'run', 'build:dom'], { cwd: app, stdio: 'inherit' })
   if (built.status !== 0) process.exit(built.status ?? 1)
   console.log(`dom: test order seed ${seed}; \`bun run test:dom --seed ${seed}\` repeats it`)
-  const child = spawn('bun', args, { cwd: app, stdio: 'inherit' })
+  // JUNO_DOM_PROFILE=1: one process, no workers, a CPU profile of the Bun side and each host in test-results/dom-profile/.
+  const profile = process.env.JUNO_DOM_PROFILE === '1'
+  const dir = join(app, 'test-results/dom-profile')
+  const command = profile ? [args[0], '--preload=./dom/profile.ts', ...args.slice(1).filter((arg) => !arg.startsWith('--parallel'))] : args
+  const child = spawn('bun', command, { cwd: app, stdio: 'inherit', env: profile ? { ...process.env, JUNO_E2E_HOST_PROFILE: join(dir, 'host') } : process.env })
   forwardSignals(new Set([child]))
   child.on('error', (error) => console.error(error.message))
   child.on('close', (code, signal) => { process.exitCode = signal ? 130 : code ?? 1 })

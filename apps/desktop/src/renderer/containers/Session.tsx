@@ -1,8 +1,8 @@
-import type { SignInFailed } from '@juno/contract'
+import type { ProviderState, SignInFailed } from '@juno/contract'
 import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signOutCommand } from '@juno/state'
 import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { SessionView, SignInView } from '@juno/views'
 
 /** UI copy for a failed attempt (SPEC section 17: plain, one sentence, says what to do next). */
@@ -27,6 +27,23 @@ function failureLine(error: SignInFailed): string {
 }
 
 /**
+ * A first sign-in with no model set up is followed by "Set up Juno" (SPEC
+ * 13.10). Main's provider state may not have arrived when the owner presses
+ * sign in, so this decides once it is known, and only once: the step itself
+ * sets a provider up.
+ */
+function setUpAfterFirstSignIn(): void {
+  const decide = (state: ProviderState) => registry.set(junoSetupPendingAtom, state.active === null)
+  const known = registry.get(agentProviderAtom)
+  if (known !== undefined) return decide(known)
+  const stop = registry.subscribe(agentProviderAtom, (state) => {
+    if (state === undefined) return
+    stop()
+    decide(state)
+  })
+}
+
+/**
  * Wires the session live value and the session commands to the sign-in and
  * session views. `signInFooter` goes at the foot of the sign-in page.
  */
@@ -36,8 +53,8 @@ export function Session({ signInFooter }: { readonly signInFooter?: ReactNode })
   const signOutResult = useAtomValue(signOutCommand)
   const importSession = useAtomSet(importFromSlackAppCommand)
   const signOut = useAtomSet(signOutCommand)
-  // Read now, so it is known by the time the owner presses a sign-in button.
-  const noProvider = useAtomValue(agentProviderAtom, (state) => state?.active === null)
+  // Ask main now, so the answer is usually here by the time the owner presses a sign-in button.
+  useEffect(() => registry.mount(agentProviderAtom), [])
   const failed = importResult.waiting ? undefined : errorOf(importResult)
   // A transport failure (the engine restarting) is retried by the state layer and not shown.
   const error = failed?._tag === 'SignInFailed' ? failureLine(failed) : undefined
@@ -59,8 +76,6 @@ export function Session({ signInFooter }: { readonly signInFooter?: ReactNode })
   }
 
   const mode = value._tag === 'authRequired' ? 'expired' : 'first-run'
-  // A first sign-in with no model set up is followed by "Set up Juno" (SPEC 13.10).
-  const setUpAfter = () => registry.set(junoSetupPendingAtom, mode === 'first-run' && noProvider)
   return (
     <SignInView
       mode={mode}
@@ -69,7 +84,7 @@ export function Session({ signInFooter }: { readonly signInFooter?: ReactNode })
       {...(details === undefined ? {} : { onCopyDetails: () => copyText(details) })}
       {...(signInFooter === undefined ? {} : { footer: signInFooter })}
       onImport={() => {
-        setUpAfter()
+        if (mode === 'first-run') setUpAfterFirstSignIn()
         importSession(undefined)
       }}
     />

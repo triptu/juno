@@ -1,4 +1,6 @@
-// Plan flow 14: move between two Macs through Settings, then review the restored chat.
+// Plan flow 14 with a crash: move between two Macs through Settings while the new Mac's agent is
+// killed as the restored database is swapped in, then review the restored chat. Electron restarts
+// the killed agent. The same move with no crash is in the DOM lane (`dom/juno-agent/transfer.test.ts`).
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -27,8 +29,9 @@ const test = base.extend<{ readonly shared: string; readonly model: FakeOpenRout
 
 test.describe.configure({ timeout: 180_000 })
 
-for (const point of [undefined, 'restore.swapped'] as const) {
-test(`a move restores the chat and pending cards for review${point === undefined ? '' : ` after a crash at ${point}`}`, { tag: point === undefined ? [] : ['@electron'] }, async ({ juno, fake, otherApp, shared }) => {
+const point = 'restore.swapped'
+
+test(`a move restores the chat and pending cards for review after a crash at ${point}`, async ({ juno, fake, otherApp, shared }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send('what is on today?')
@@ -58,10 +61,8 @@ test(`a move restores the chat and pending cards for review${point === undefined
   const mac = await otherApp({ backupIntervalMs: 1_000 })
   {
     await ready(mac)
-    if (point !== undefined) {
-      await restartArmed(mac.app, point)
-      await agentReady(mac.app)
-    }
+    await restartArmed(mac.app, point)
+    await agentReady(mac.app)
     const page = await openSettings(mac, 'Backup & This Mac')
     await page.getByRole('button', { name: 'Restore', exact: true }).click()
     const restore = mac.win.getByRole('dialog', { name: 'Restore from backup' })
@@ -70,10 +71,8 @@ test(`a move restores the chat and pending cards for review${point === undefined
     await restore.getByLabel('Recovery phrase').fill(phrase)
     await restore.getByLabel('The old Mac is off, erased, or has Juno removed').check()
     await restore.getByRole('button', { name: 'Restore', exact: true }).click()
-    if (point !== undefined) {
-      await expectArmedCrash(mac.app)
-      await mac.win.keyboard.press('Escape')
-    } else await mac.tabs.expectActive('Review')
+    await expectArmedCrash(mac.app)
+    await mac.win.keyboard.press('Escape')
     const restored = await openChat(mac)
     await restored.expectJuno('You said: what is on today?')
     await expect(restored.ownerBubble('what is on today?')).toHaveCount(1)
@@ -94,5 +93,3 @@ test(`a move restores the chat and pending cards for review${point === undefined
     expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
   }
 })
-
-}
