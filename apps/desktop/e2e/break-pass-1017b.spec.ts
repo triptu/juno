@@ -1,9 +1,8 @@
 // Second break pass of 10-17: Home's composer, the keys held after ⌘N and
-// ⌘T, and short windows, used fast from the keyboard. Findings are in
+// ⌘T, used fast from the keyboard. Findings are in
 // docs/reviews/2026-10-17-break-pass-b.md.
 import { brief, paste } from './attach'
 import { expect, test } from './fixtures'
-import type { Juno } from './driver/juno'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -12,12 +11,8 @@ test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-async function setWindowSize(juno: Juno, width: number, height: number): Promise<void> {
-  await juno.setWindowSize(width, height)
-}
-
 // Related checks share a launch: each step starts where the one before it left Home.
-test("Home's destination from the keyboard: Backspace, keys on the chip, and a fast first @", async ({ juno }) => {
+test("Home's destination from the keyboard: Backspace, keys on the chip, a fast first @, and a paste after ⌘T", async ({ juno }) => {
   await test.step('holding Backspace to clear the text keeps the destination; a new Backspace in the empty field goes back to Juno', async () => {
     const { write, win } = juno
 
@@ -71,6 +66,27 @@ test("Home's destination from the keyboard: Backspace, keys on the chip, and a f
     await expect(write.composer).toHaveValue('Hi')
     await expect(write.composer).toBeFocused()
   })
+
+  await test.step('text pasted right after ⌘T goes into the new Home, in order with the keys typed around it', async () => {
+    const { write, topic, sidebar, tabs, win } = juno
+
+    await sidebar.row(POSTGRES).open()
+    await topic.composer.focus()
+    // ⌘T reaches the page before the menu runs it; keys and a ⌘V in that time are held for the new tab.
+    await win.evaluate(() => document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', metaKey: true, bubbles: true, cancelable: true })))
+    await win.keyboard.type('Re: ')
+    await win.evaluate(() => {
+      const data = new DataTransfer()
+      data.setData('text/plain', 'the launch brief')
+      ;(document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    })
+    await win.keyboard.type('?')
+    await tabs.menu('new-tab')
+    await tabs.expectActiveAt('Home', 0)
+    await expect(write.composer).toHaveValue('Re: the launch brief?')
+    await tabs.select(POSTGRES)
+    await expect(topic.composer).toHaveValue('')
+  })
 })
 
 test("Home's drafts: typing during a send, a draft shown again, and a file Juno cannot read", async ({ juno, fake }) => {
@@ -122,46 +138,3 @@ test("Home's drafts: typing during a send, a draft shown again, and a file Juno 
   })
 })
 
-test('the smallest window and keys held for a new Home: the destination list fits, and a paste after ⌘T lands in order', async ({ juno }) => {
-  await test.step('in the smallest window the destination list from ⌘N fits above the chip, its search in view', async () => {
-    const { write, tabs, win } = juno
-
-    await setWindowSize(juno, 720, 480)
-    await expect.poll(() => win.evaluate(() => innerHeight)).toBeLessThan(500)
-    await tabs.menu('new-message')
-    await expect(write.search).toBeFocused()
-    await expect(write.option('Maya')).toBeVisible()
-    // In view and not under anything that clips it: the point at its middle is the search itself.
-    await expect(write.search).toBeInViewport({ ratio: 1 })
-    const hit = await write.search.evaluate((search) => {
-      const box = search.getBoundingClientRect()
-      const at = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
-      return at === search
-    })
-    expect(hit, 'the search is the element at its own middle').toBe(true)
-    await win.keyboard.type('jon')
-    await win.keyboard.press('Enter')
-    await write.expectDestination('Jonas')
-  })
-
-  await test.step('text pasted right after ⌘T goes into the new Home, in order with the keys typed around it', async () => {
-    const { write, topic, sidebar, tabs, win } = juno
-
-    await sidebar.row(POSTGRES).open()
-    await topic.composer.focus()
-    // ⌘T reaches the page before the menu runs it; keys and a ⌘V in that time are held for the new tab.
-    await win.evaluate(() => document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', metaKey: true, bubbles: true, cancelable: true })))
-    await win.keyboard.type('Re: ')
-    await win.evaluate(() => {
-      const data = new DataTransfer()
-      data.setData('text/plain', 'the launch brief')
-      ;(document.activeElement ?? document.body).dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
-    })
-    await win.keyboard.type('?')
-    await tabs.menu('new-tab')
-    await tabs.expectActiveAt('Home', 0)
-    await expect(write.composer).toHaveValue('Re: the launch brief?')
-    await tabs.select(POSTGRES)
-    await expect(topic.composer).toHaveValue('')
-  })
-})

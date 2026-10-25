@@ -1,7 +1,7 @@
 // ⌘N and typing at once (spec section 12, "Writing"): keys typed right
 // after ⌘N, before the destination list's search has focus, reach the
 // search in order, Enter picks only once they are in it, and keys after
-// Enter reach the field. Each test types with no wait after the menu
+// Enter reach the field. Each step types with no wait after the menu
 // command.
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
@@ -22,49 +22,47 @@ async function newMessageAndType(juno: Juno): Promise<void> {
   await juno.win.keyboard.type('Hi')
 }
 
-test('keys typed right after ⌘N from a topic reach the new Home tab', async ({ juno }) => {
+test('keys typed right after ⌘N reach the destination list on Home, a new Home tab when Home has a draft, and a new Home tab from a topic', async ({ juno }) => {
   const { write, tabs, sidebar, topic } = juno
 
-  await sidebar.row(POSTGRES).open()
-  await topic.expectTitle(POSTGRES)
-  await topic.composer.focus()
-  await newMessageAndType(juno)
+  await test.step('on Home, the keys reach its destination list', async () => {
+    await write.composer.focus()
+    await newMessageAndType(juno)
+    await tabs.expectCount(1)
+    await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
+    await expect(write.composer).toHaveValue('Hi')
+    await expect(write.composer).toBeFocused()
+  })
 
-  await tabs.expectCount(2)
-  await tabs.expectActiveAt('Home', 0)
-  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
-  await expect(write.composer).toHaveValue('Hi')
-  await expect(write.composer).toBeFocused()
-  await tabs.select(POSTGRES)
-  await expect(topic.composer).toHaveValue('')
-})
+  await test.step('on Home with a draft, the keys reach a new Home tab, and the draft is untouched', async () => {
+    await write.composer.press('End')
+    await write.composer.pressSequentially(`. ${DRAFT}`)
+    await newMessageAndType(juno)
+    await tabs.expectCount(2)
+    await tabs.expectActiveAt('Home', 1)
+    await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
+    await expect(write.composer).toHaveValue('Hi')
+    await expect(write.composer).toBeFocused()
+    await tabs.selectAt('Home', 0)
+    await tabs.expectActiveAt('Home', 0)
+    await expect(write.composer).toHaveValue(`Hi. ${DRAFT}`)
+    await write.expectDestination('Maya')
+    await tabs.selectAt('Home', 1)
+    await tabs.menu('close-tab')
+    await tabs.expectCount(1)
+  })
 
-test('keys typed right after ⌘N on Home reach its destination list', async ({ juno }) => {
-  const { write, tabs } = juno
-
-  await write.composer.focus()
-  await newMessageAndType(juno)
-
-  await tabs.expectCount(1)
-  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
-  await expect(write.composer).toHaveValue('Hi')
-  await expect(write.composer).toBeFocused()
-})
-
-test('keys typed right after ⌘N on Home with a draft reach the new Home tab, and the draft is untouched', async ({ juno }) => {
-  const { write, tabs } = juno
-
-  await write.write(DRAFT)
-  await expect(write.composer).toBeFocused()
-  await newMessageAndType(juno)
-
-  await tabs.expectCount(2)
-  await tabs.expectActiveAt('Home', 1)
-  await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
-  await expect(write.composer).toHaveValue('Hi')
-  await expect(write.composer).toBeFocused()
-  await tabs.selectAt('Home', 0)
-  await tabs.expectActiveAt('Home', 0)
-  await expect(write.composer).toHaveValue(DRAFT)
-  await write.expectDestination('Juno')
+  await test.step('from a topic, the keys reach a new Home tab', async () => {
+    await sidebar.row(POSTGRES).open()
+    await topic.expectTitle(POSTGRES)
+    await topic.composer.focus()
+    await newMessageAndType(juno)
+    await tabs.expectCount(2)
+    await tabs.expectActiveAt('Home', 0)
+    await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
+    await expect(write.composer).toHaveValue('Hi')
+    await expect(write.composer).toBeFocused()
+    await tabs.select(POSTGRES)
+    await expect(topic.composer).toHaveValue('')
+  })
 })

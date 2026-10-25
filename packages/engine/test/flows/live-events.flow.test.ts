@@ -2,11 +2,11 @@
 // events each change only what they say, and an unknown user or an expired session is handled once.
 // Every test starts warm on the synced default workspace.
 import { afterEach, expect, it } from 'bun:test'
-import { topicsResolve } from '@juno/contract'
+import { topicsResolve, type MessageView } from '@juno/contract'
 import { SELF_ID } from '@juno/fake-slack'
-import { runCommand } from '@juno/state'
+import { messagesAtom, openTopic, runCommand, sendMessage, type ListWindow } from '@juno/state'
 import { waitFor, type RunningEngine } from '../harness'
-import { quiet, readDb, tsOf, valueOf } from '../scenario'
+import { bootedEngine, quiet, readDb, tsOf, valueOf } from '../scenario'
 import { step } from '../step'
 import { syncedEngine, type SyncedOptions } from '../synced'
 
@@ -130,4 +130,39 @@ it('an expired session found by the catch-up after a reconnect ends as session-e
   engine.fake.dropSocket()
   await engine.status('authRequired')
   await engine.phase('session-expired')
+})
+
+it('a message from a deactivated person, and a rename of them while it is shown, keep the message readable and answerable', async () => {
+  const engine = await bootedEngine(engines, {
+    initial: (fake) => {
+      const maya = fake.workspace.users.get('U0MAYA')!
+      fake.workspace.users.set(maya.id, { ...maya, deleted: true })
+      return fake.signIn()
+    },
+  })
+  const atom = messagesAtom('m:C0ENG')
+  const unmount = engine.registry.mount(atom)
+  const windowUntil = (predicate: (window: ListWindow<MessageView>) => boolean, label: string) =>
+    waitFor(() => {
+      const result = engine.registry.get(atom)
+      return result._tag === 'Success' && result.value.meta.seq > 0 && predicate(result.value) ? result.value : undefined
+    }, undefined, label)
+  try {
+    valueOf(await openTopic(engine.registry, 'm:C0ENG'))
+    const posted = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'A former teammate wrote this' })
+    const shown = await windowUntil((window) => window.rows.has(posted.ts), 'the message')
+    expect(shown.rows.get(posted.ts)!.senderId).toBe('U0MAYA')
+    expect(shown.refs.people.get('U0MAYA')?.name).toBe('Maya')
+
+    const maya = engine.fake.workspace.users.get('U0MAYA')!
+    const renamed = { ...maya, deleted: true, real_name: 'Former teammate', profile: { ...maya.profile, display_name: 'Former teammate', real_name: 'Former teammate' } }
+    engine.fake.workspace.users.set(maya.id, renamed)
+    engine.fake.emitFrame({ type: 'user_change', user: renamed })
+    await windowUntil((window) => window.refs.people.get('U0MAYA')?.name === 'Former teammate', 'the new name')
+
+    valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0ENG' }, 'Reply to the old message', 'm:C0ENG'))
+    await waitFor(() => (engine.fake.messages('C0ENG').some((message) => message.text === 'Reply to the old message') ? true : undefined), undefined, 'the reply in Slack')
+  } finally {
+    unmount()
+  }
 })

@@ -58,7 +58,7 @@ async function openLinks(juno: Juno) {
   return (text: string) => links.filter({ hasText: text })
 }
 
-test('message links open inside Juno at the message, which flashes: Main and a reply in new tabs, a message Juno never stored, and a tab showing the topic again', async ({ juno, fake }) => {
+test('message links open inside Juno at the message, which flashes: Main and a reply in new tabs, a message Juno never stored, a tab showing the topic again and ⌘-click behind; browser links open no tab', async ({ juno, fake }) => {
   seedLinks(fake)
   const link = await openLinks(juno)
   const { topic, tabs } = juno
@@ -71,6 +71,17 @@ test('message links open inside Juno at the message, which flashes: Main and a r
     await expect(link('the preview note')).toHaveAttribute('title', '#eng · Main')
     await link('the reaper reply').hover()
     await expect(link('the reaper reply')).toHaveAttribute('title', '#eng · Thread')
+  })
+
+  await test.step('a conversation Juno cannot reach, and another workspace, open in the browser and open no tab', async () => {
+    await link('a closed room').click()
+    await juno.expectToast('Juno cannot reach that conversation · Opened in the browser')
+    await expect.poll(() => juno.browserLinks()).toContain(`${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}`)
+
+    // Another workspace's link is any web link: ⌘-click opens it in the browser, with no toast.
+    await link('elsewhere').click({ modifiers: ['Meta'] })
+    await expect.poll(() => juno.browserLinks()).toContain(OTHER)
+    await tabs.expectCount(1)
   })
 
   const read = await watchFlashes(juno.win)
@@ -107,27 +118,13 @@ test('message links open inside Juno at the message, which flashes: Main and a r
     await tabs.expectActive(ENG)
     await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
   })
-})
 
-// The browser links first: they open no tab, so the ⌘-click step still starts with one.
-test('links that open in the browser open no tab, and ⌘-click opens the tab behind the current one', async ({ juno, fake }) => {
-  seedLinks(fake)
-  const link = await openLinks(juno)
-  await test.step('a conversation Juno cannot reach, and another workspace, open in the browser', async () => {
-    await link('a closed room').click()
-    await juno.expectToast('Juno cannot reach that conversation · Opened in the browser')
-    await expect.poll(() => juno.browserLinks()).toContain(`${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}`)
-
-    // Another workspace's link is any web link: ⌘-click opens it in the browser, with no toast.
-    await link('elsewhere').click({ modifiers: ['Meta'] })
-    await expect.poll(() => juno.browserLinks()).toContain(OTHER)
-    await juno.tabs.expectCount(1)
-  })
-  await test.step('⌘-click on a message link opens the tab behind the current one, at the message', async () => {
-    const { topic, tabs } = juno
-
-    await link('the preview note').click({ modifiers: ['Meta'] })
+  await test.step('with #eng closed, ⌘-click on a message link opens the tab behind the current one, at the message', async () => {
+    await tabs.menu('close-tab')
     await tabs.expectCount(2)
+    await tabs.select(POSTGRES)
+    await link('the preview note').click({ modifiers: ['Meta'] })
+    await tabs.expectCount(3)
     await tabs.expectActive(POSTGRES)
     await tabs.select(ENG)
     await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })

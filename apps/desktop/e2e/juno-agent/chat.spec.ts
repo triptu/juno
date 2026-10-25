@@ -23,7 +23,7 @@ async function setWindowWidth(juno: Juno, width: number): Promise<void> {
   await juno.setWindowSize(width)
 }
 
-test('a question written on Home goes to the Juno chat with its picks, the field where Home’s was, and Back returns to Home', { tag: '@canary' }, async ({ juno, model }) => {
+test('a question written on Home goes to the Juno chat with its picks, the field where Home’s was, and Back returns to Home', async ({ juno, model }) => {
   await ready(juno)
   const { write, tabs } = juno
   await juno.expectNothingOpen()
@@ -59,6 +59,10 @@ test('the Juno tab sends a message at once with its @ and # picks, shows the ans
     await chat.expectOwner('what is on today?')
     await chat.expectJuno('You said: what is on today?')
     expect(model.inputs().at(-1)).toBe('<message id="n1">what is on today?</message>')
+  })
+
+  await test.step('after the answer nothing moves', async () => {
+    await juno.expectAtRest()
   })
 
   await test.step('@ and # picks reach Juno by id and show as plain names', async () => {

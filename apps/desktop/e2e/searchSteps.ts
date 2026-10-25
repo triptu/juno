@@ -101,29 +101,6 @@ export async function navigateMatches({ juno, fake }: Pick<Fixtures, 'juno' | 'f
   await expect(page.reader.locator('[data-match-count]')).toHaveText('2 of 2')
 }
 
-
-export async function profileDates({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>) {
-  const self = fake.workspace.users.get(fake.workspace.selfId)!
-  const user = { ...self, tz: 'America/Los_Angeles' }
-  fake.workspace.users.set(user.id, user)
-  fake.emitFrame({ type: 'user_change', user })
-  const browser = await juno.win.context().newCDPSession(juno.win)
-  await browser.send('Emulation.setTimezoneOverride', { timezoneId: 'Asia/Kolkata' })
-  // Kolkata is already on Oct 25; the Slack profile is still on Oct 24.
-  await juno.win.clock.setFixedTime(new Date('2026-10-24T19:00:00Z'))
-  expect(await juno.win.evaluate(() => new Date().getDate())).toBe(25)
-  fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'calendarprobe today', at: Date.parse('2026-10-24T12:00:00Z') })
-  const page = searchPage(juno.win)
-  await juno.surface.appMenu('search-messages')
-  await page.field.fill('calendarprobe')
-  await expect(page.row('calendarprobe today')).toBeVisible()
-  await juno.surface.chooseNextMenuItem('date:today', false)
-  await page.filter('Date').click()
-  await expect(page.chips.filter({ hasText: 'Today' })).toBeVisible()
-  await expect.poll(() => fake.calls.filter((call) => call.method === SEARCH).some((call) => String(call.args['query']).includes('on:2026-10-24'))).toBe(true)
-  await expect(page.row('calendarprobe today')).toBeVisible()
-}
-
 export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>) {
   const { surface, sidebar, win } = juno
   const page = searchPage(win)

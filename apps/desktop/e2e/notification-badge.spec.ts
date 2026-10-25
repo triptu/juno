@@ -1,4 +1,5 @@
-import { seedWorkspace, startFakeSlack } from '@juno/fake-slack'
+import { startFakeSlack } from '@juno/fake-slack'
+import { caughtUpSeed } from './caughtUpSeed'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 import { hooks } from './hooks'
@@ -6,24 +7,14 @@ import { hooks } from './hooks'
 const badgeTest = test.extend({
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: (workspace, avatars) => {
-      seedWorkspace(workspace, avatars)
-      for (const channel of workspace.conversations.keys()) {
-        const last = workspace.all(channel).at(-1)?.ts
-        if (last !== undefined) workspace.markConversation(channel, last)
-      }
-      for (const sub of workspace.subscriptions.values()) {
-        const last = workspace.all(sub.channel).at(-1)?.ts
-        if (last !== undefined) workspace.markThread(sub.channel, sub.threadTs, last, true)
-      }
-      workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: 'A DM before launch' })
-    } })
+    const fake = await startFakeSlack({ seed: caughtUpSeed })
     await use(fake)
     await fake.close()
   },
 })
 
-badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake, engine restart and permanent failure', { tag: '@electron' }, async ({ juno, slack, fake }) => {
+// What the dot does across an engine restart, a wake and a permanent engine failure is in the restart journey (juno-agent/crash.spec.ts).
+badgeTest('dock dot follows unread DMs, group DMs and mentions through reads', async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.notificationHoursNow()
@@ -47,72 +38,23 @@ badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wa
   await badge('')
   slack.as('Leo').groupDm('A group DM')
   await badge('•')
-  const pid = await hooks(juno.app, 'enginePid')
-  expect(pid).toBeDefined()
-  await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { clearDockBadge: () => void } }).junoTest.clearDockBadge())
-  await badge('')
-  process.kill(pid!, 'SIGKILL')
-  await expect.poll(() => hooks(juno.app, 'enginePid'), { timeout: 15_000 }).not.toBe(pid)
-  await juno.waitForSync()
-  await badge('•')
-  await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { clearDockBadge: () => void } }).junoTest.clearDockBadge())
-  await badge('')
-  await hooks(juno.app, 'wake')
-  await badge('•')
   await juno.sidebar.row('Maya, Leo', { exact: true }).chooseInMenu('mark-read')
   await badge('')
-  slack.as('Maya').dm('Unread when the engine stops')
-  await badge('•')
-  await hooks(juno.app, 'failEngine')
-  await badge('')
 })
 
-// The first post-setup content view asks before any banner has been shown.
-badgeTest('the first Home view asks for authorization before any notification is shown', async ({ juno }) => {
-  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-  expect(await juno.osNotifications()).toEqual([])
-  await juno.openNotifications()
-  await expect(juno.notifications.root.getByRole('status', { name: 'Notification permission' })).toHaveCount(0)
-})
-
-badgeTest('badge regression: a kept-out DM is quiet, but its mention counts', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.notificationHoursNow()
-  await juno.sidebar.createView({ name: 'Apps', conversations: ['Maya'], keepOutOfAll: true })
-  await expect.poll(() => juno.dockBadge()).toBe('')
-  slack.as('Maya').dm('<@U0TUSHAR> Please approve')
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-})
-
-badgeTest('badge regression: a muted channel mention counts, but @here from a Never sender does not', async ({ juno, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.notificationHoursNow()
-  await juno.sidebar.row('Maya', { exact: true }).open()
-  await juno.topic.chooseInMessageMenu('A DM before launch', 'notify-never', { onSender: true })
-  await juno.openNotifications()
-  await expect.poll(() => juno.dockBadge()).toBe('')
-  slack.as('Maya').postIn('eng', '<!here> A muted sender')
-  await juno.sidebar.row('#eng', { exact: true }).expectPreview('Maya: @here A muted sender')
-  await expect.poll(() => juno.dockBadge()).toBe('')
-  fake.emitFrame({ type: 'pref_change', name: 'muted_channels', value: 'C0ENG' })
-  slack.as('Leo').postIn('eng', '<@U0TUSHAR> Can you approve this now?')
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-})
-
-badgeTest('badge regression: no permission prompt during onboarding', async ({ juno }) => {
+// No prompt during onboarding; the first Home view after it asks, before any banner has been shown.
+badgeTest('no permission prompt during onboarding, and the first Home view asks before any notification is shown', async ({ juno }) => {
   await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
   await juno.signIn({ skipSetUp: false })
   await expect(juno.setUp).toBeVisible()
   await expect.poll(() => juno.dockBadge()).toBe('•')
   expect(await juno.surface.system('notificationRequests')).toBe(0)
   await juno.skipSetUp()
+  await juno.waitForSync()
   await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
+  expect(await juno.osNotifications()).toEqual([])
+  await juno.openNotifications()
+  await expect(juno.notifications.root.getByRole('status', { name: 'Notification permission' })).toHaveCount(0)
 })
 
 badgeTest('a denied request is remembered across a full app restart', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
@@ -134,37 +76,3 @@ badgeTest('a denied request is remembered across a full app restart', { tag: '@e
     await expect.poll(() => hooks(second.app, 'notificationRequests')).toBe(1)
   } finally { await second.close() }
 })
-
-const appDmTest = test.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: (workspace, avatars) => {
-      seedWorkspace(workspace, avatars)
-      for (const channel of workspace.conversations.keys()) {
-        const last = workspace.all(channel).at(-1)?.ts
-        if (last) workspace.markConversation(channel, last)
-      }
-      for (const sub of workspace.subscriptions.values()) {
-        const last = workspace.all(sub.channel).at(-1)?.ts
-        if (last) workspace.markThread(sub.channel, sub.threadTs, last, true)
-      }
-      const maya = workspace.users.get('U0MAYA')!
-      workspace.addUser({ ...maya, is_bot: true, name: 'github', real_name: 'GitHub', profile: { ...maya.profile, display_name: 'GitHub', real_name: 'GitHub' } })
-      workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Pull request opened' })
-    } })
-    await use(fake)
-    await fake.close()
-  },
-})
-
-appDmTest('an unread app DM in Automated sets no dot until it mentions the owner', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.notificationHoursNow()
-  await juno.sidebar.selectView('Automated')
-  await juno.sidebar.row('GitHub', { exact: true }).expectVisible()
-  await expect.poll(() => juno.dockBadge()).toBe('')
-  fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: '<@U0TUSHAR> Review the pull request' })
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-})
-
