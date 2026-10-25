@@ -1,6 +1,7 @@
 // Reading a topic (SPEC 6 and 7): prefetch on hover, where it opens, the context pill and a
 // #channel chip, the "N new" divider and the read mark, the topic menu's Notify me, Follow and
 // ⌘Z, Main's thread links, the title's topic switcher and the header's Tab order.
+import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
 import { domTest } from './test'
@@ -50,13 +51,14 @@ domTest('a read topic warms on hover, opens from the cache with no divider, and 
 /** The driver, and whether Slack was called with `method` (in `channel`). */
 interface Following {
   readonly juno: Juno
+  readonly fake: FakeSlack
   readonly called: (method: string, channel?: string) => boolean
 }
 
 // Rina’s thread opens first, while it still has its 2 unread. Then checkout’s thread from Main: the Follow step
 // ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
-domTest('Rina’s thread opens at the "N new" divider and its ⋯ menu unfollows and follows it; Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack, step }) => {
-  const context: Following = { juno, called: (method, channel) => slack.fake.calls.some((call) => call.method === method && (channel === undefined || call.args['channel'] === channel)) }
+domTest('Rina’s thread opens at the "N new" divider and its ⋯ menu unfollows and follows it; Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack, fake, step }) => {
+  const context: Following = { juno, fake, called: (method, channel) => slack.fake.calls.some((call) => call.method === method && (channel === undefined || call.args['channel'] === channel)) }
   await step('a topic with unread messages opens at the "N new" divider and is marked read', () => openAtDivider(context))
   await step('⋯ opens the topic menu, as a right-click on the title does, and Notify me follows and unfollows the thread', () => notifyMeFromMenus(context))
   await step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with Auto, no menu, and ⌘Z undoes it', () => followFromMain(context))
@@ -84,7 +86,7 @@ async function openAtDivider({ juno, called }: Following): Promise<void> {
   await expect.poll(() => called('subscriptions.thread.mark'), { timeout: 10_000 }).toBe(true)
 }
 
-async function notifyMeFromMenus({ juno, called }: Following): Promise<void> {
+async function notifyMeFromMenus({ juno, fake, called }: Following): Promise<void> {
   const rina = juno.sidebar.row(RINA)
   await rina.open()
   await juno.topic.expectTitle(RINA)
@@ -98,14 +100,21 @@ async function notifyMeFromMenus({ juno, called }: Following): Promise<void> {
   expect(never.labels).toContain('Ignore #hiring')
   await rina.expectAbsent()
   await expect.poll(() => called('subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
+  expect((await juno.topic.chooseInTitleMenu(null)).labels).toContain('> Never ✓')
 
-  // Always follows it again, and it comes back; a right-click on the title shows the same menu, with Never checked once the engine has it.
-  await expect.poll(async () => (await juno.topic.chooseInTitleMenu(null)).labels).toContain('> Never ✓')
+  // Always follows it again and it comes back. Slack has not answered yet, and the settings are written after its
+  // answer, but a right-click on the title already shows Always checked.
+  fake.holdNext({ method: 'subscriptions.thread.add' })
   const every = await juno.topic.chooseInTitleMenu('notify-always')
   expect(every.labels).toContain('Ignore #hiring')
   expect(every.labels).toContain('> Never ✓')
   await rina.expectVisible()
+  await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.add' }), { timeout: 10_000 }).toBe(1)
+  expect((await juno.topic.chooseInTitleMenu(null)).labels).toContain('> Always ✓')
+  fake.release()
   await expect.poll(() => called('subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
+  await juno.expectToast('Always')
+  expect((await juno.topic.chooseInTitleMenu(null)).labels).toContain('> Always ✓')
 }
 
 async function followFromMain({ juno, called }: Following): Promise<void> {

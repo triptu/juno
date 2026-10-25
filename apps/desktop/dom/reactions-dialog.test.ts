@@ -4,18 +4,14 @@
  * See all opens the reactions dialog on that emoji. The dialog lists
  * everyone, also the people Slack's page left out (the fake lists 25 per
  * emoji, as `reactions.get` without `full`), and another emoji in its strip
- * changes the list. Esc closes it.
+ * changes the list. Esc closes it. Where the sentence wraps is the gallery's.
  */
-import { expect, test } from './fixtures'
-
-// Starts signed in and synced (README, "Synced start").
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
+import { expect } from './expect'
+import { domTest } from './test'
 
 const TEXT = 'Launch day: the new onboarding is live for everyone.'
 
-test('See all on the card opens every reaction, and the strip changes the list', async ({ juno, fake }) => {
+domTest('See all on the card opens every reaction, and the strip changes the list', async ({ juno, fake }) => {
   const seed = fake.seedManyReactions({ channel: 'C0ENG' })
   const thumbs = seed.reactions.find((reaction) => reaction.name === '+1')!
   const tada = seed.reactions.find((reaction) => reaction.name === 'tada')!
@@ -28,24 +24,18 @@ test('See all on the card opens every reaction, and the strip changes the list',
   await expect(chip).toBeVisible()
 
   // The card: a sentence, you first, cut short, then See all.
-  await chip.scrollIntoViewIfNeeded()
   await chip.hover()
   const card = juno.win.getByRole('tooltip').filter({ hasText: 'reacted with :+1:' })
   await expect(card).toBeVisible()
   await expect(card.locator('[data-reactors-names]')).toHaveText(/^You, .+ and \d+ others$/)
   await expect(card.getByRole('listitem')).toHaveCount(0)
-  // The sentence wraps between people, never between the words of one name.
-  expect(await card.locator('[data-reactors-names] bdi').evaluateAll((names) => names.every((name) => {
-    const range = document.createRange()
-    range.selectNodeContents(name)
-    return new Set([...range.getClientRects()].map((box) => box.top)).size === 1
-  }))).toBe(true)
   const seeAll = card.locator('[data-see-all]')
   await expect(seeAll).toHaveText('See all')
 
   // See all opens the dialog on 👍, listing all forty, you first.
   fake.holdNext({ method: 'edge:users/info' })
-  await seeAll.click()
+  // See all is for the pointer only: hidden from the accessibility tree and out of the Tab order.
+  juno.win.click(seeAll.all()[0]!)
   const dialog = juno.win.getByRole('dialog', { name: 'Reactions' })
   await expect(dialog).toBeVisible()
   await expect(card).toHaveCount(0)
@@ -54,11 +44,11 @@ test('See all on the card opens every reaction, and the strip changes the list',
   await expect(strip.getByRole('tab', { selected: true })).toHaveAccessibleName('40 👍, including you')
   await expect(strip.getByRole('tab', { selected: true })).toBeFocused()
   const people = dialog.getByRole('tabpanel').getByRole('listitem')
-  // Keep the final row geometry while known reactor IDs still await their names.
+  // Every row is there while known reactor IDs still await their names.
   await expect.poll(() => fake.heldCount()).toBe(1)
   await expect(dialog.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true')
   await expect(dialog.getByRole('tabpanel').getByRole('listitem', { includeHidden: true })).toHaveCount(40)
-  expect(await people.filter({ hasText: /\S/ }).count()).toBeLessThan(40)
+  expect(people.filter({ hasText: /\S/ }).count()).toBeLessThan(40)
   fake.release()
   // Slack's page named 25; the dialog asks for the rest, and every name arrives.
   await expect(people.filter({ hasText: /\S/ })).toHaveCount(40)
