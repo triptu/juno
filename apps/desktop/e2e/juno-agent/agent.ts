@@ -88,14 +88,6 @@ export async function addServer(juno: Juno, name: string, url: string): Promise<
   return { id, row }
 }
 
-/** Opens Configure on a connection's row and returns its sheet: the tools, their Enabled switches and rules. */
-export async function configure(juno: Juno, row: Locator): Promise<Locator> {
-  await row.getByRole('button', { name: 'Configure' }).click()
-  const sheet = juno.win.locator('[data-sheet="tools"]')
-  await expect(sheet).toBeVisible()
-  return sheet
-}
-
 /**
  * Launches the app with the agent set to kill itself (SIGKILL) at `point`, on its `nth` hit
  * (`runtime/crash.ts`). Main restarts a killed agent with the same setting, so close this
