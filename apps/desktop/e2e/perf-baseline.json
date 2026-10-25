@@ -1,6 +1,6 @@
 {
   "identity": "linux-x64, 4 threads, Electron 44.7.0",
-  "commit": "f6fa68cec1e2d1e13ef726c8c13a36c6d9eeeb5a",
+  "commit": "cd4bc80a1a08ebf1f68be9a2ff6ff3e9c6d379ef",
   "recorded": "2026-10-25",
   "runs": 3,
   "metrics": {
@@ -22,6 +22,24 @@
       "n": 1,
       "unit": "ms"
     },
+    "activity: newest window, cold": {
+      "median": 10.704564000000005,
+      "p95": 10.704564000000005,
+      "highMedian": 11.865801000000033,
+      "highP95": 11.865801000000033,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "activity: newest window, median": {
+      "median": 3.3647609999999872,
+      "p95": 3.3647609999999872,
+      "highMedian": 3.465420999999992,
+      "highP95": 3.465420999999992,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
     "All topics open, press to rows painted (juno.all-topics-open)": {
       "median": 65.19999998807907,
       "p95": 68,
@@ -29,6 +47,51 @@
       "highP95": 134.29999995231628,
       "runs": 3,
       "n": 7,
+      "unit": "ms"
+    },
+    "allTopics.list: counts p95": {
+      "median": 3.13,
+      "p95": 3.13,
+      "highMedian": 4.28,
+      "highP95": 4.28,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "allTopics.list: first window p95": {
+      "median": 6.45,
+      "p95": 6.45,
+      "highMedian": 7.1,
+      "highP95": 7.1,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "allTopics.list: text filter p95": {
+      "median": 6.04,
+      "p95": 6.04,
+      "highMedian": 8.06,
+      "highP95": 8.06,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "chat cache: event to encoded window p95": {
+      "median": 14.304615000000013,
+      "p95": 14.304615000000013,
+      "highMedian": 14.539696999999933,
+      "highP95": 14.539696999999933,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "chat cache: query p95": {
+      "median": 0.19307900000001155,
+      "p95": 0.19307900000001155,
+      "highMedian": 0.19976300000001856,
+      "highP95": 0.19976300000001856,
+      "runs": 3,
+      "n": 1,
       "unit": "ms"
     },
     "chat first bubble, Enter to Juno's bubble painted, fake model (juno.chat-bubble)": {
@@ -74,6 +137,24 @@
       "highP95": 27.356,
       "runs": 3,
       "n": 20,
+      "unit": "ms"
+    },
+    "conversation search: palette query p95": {
+      "median": 6.891922000002523,
+      "p95": 6.891922000002523,
+      "highMedian": 7.652335999999195,
+      "highP95": 7.652335999999195,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "conversation search: picker query p95": {
+      "median": 6.988075000001118,
+      "p95": 6.988075000001118,
+      "highMedian": 8.097486000002391,
+      "highP95": 8.097486000002391,
+      "runs": 3,
+      "n": 1,
       "unit": "ms"
     },
     "emoji picker, first open in a second app": {
@@ -180,6 +261,51 @@
       "p95": 37.59999996423721,
       "highMedian": 57.19999998807907,
       "highP95": 57.19999998807907,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "messages.list: decode median": {
+      "median": 1.61,
+      "p95": 1.61,
+      "highMedian": 1.72,
+      "highP95": 1.72,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "messages.list: encode median": {
+      "median": 1.72,
+      "p95": 1.72,
+      "highMedian": 1.82,
+      "highP95": 1.82,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "messages.list: live query p95": {
+      "median": 3.55,
+      "p95": 3.55,
+      "highMedian": 3.64,
+      "highP95": 3.64,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "messages.list: Main rerun p95": {
+      "median": 0.54,
+      "p95": 0.54,
+      "highMedian": 0.56,
+      "highP95": 0.56,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "messages.list: thread rerun p95": {
+      "median": 3,
+      "p95": 3,
+      "highMedian": 3.09,
+      "highP95": 3.09,
       "runs": 3,
       "n": 1,
       "unit": "ms"
@@ -400,6 +526,51 @@
       "n": 4,
       "unit": "ms"
     },
+    "search.query: decode p95": {
+      "median": 2.263455000000249,
+      "p95": 2.263455000000249,
+      "highMedian": 2.9069570000001477,
+      "highP95": 2.9069570000001477,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "search.query: encode p95": {
+      "median": 1.626296000000366,
+      "p95": 1.626296000000366,
+      "highMedian": 2.86562800000047,
+      "highP95": 2.86562800000047,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "search.query: filtered p95": {
+      "median": 7.464085000000523,
+      "p95": 7.464085000000523,
+      "highMedian": 7.533642000000327,
+      "highP95": 7.533642000000327,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "search.query: p95 while a backfill writes": {
+      "median": 9.92695300000014,
+      "p95": 9.92695300000014,
+      "highMedian": 10.158108000000539,
+      "highP95": 10.158108000000539,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "search.query: session p95": {
+      "median": 23.62793900000088,
+      "p95": 23.62793900000088,
+      "highMedian": 24.096384999999827,
+      "highP95": 24.096384999999827,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
     "selection drag with the panel open, frame work": {
       "median": 3.526,
       "p95": 14.479,
@@ -585,6 +756,33 @@
       "p95": 33.69999998807907,
       "highMedian": 52.19999998807907,
       "highP95": 52.19999998807907,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "topics.list: query p95 in the engine": {
+      "median": 3.71,
+      "p95": 3.71,
+      "highMedian": 3.72,
+      "highP95": 3.72,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "turn timing: message to first bubble p95": {
+      "median": 14.1,
+      "p95": 14.1,
+      "highMedian": 14.5,
+      "highP95": 14.5,
+      "runs": 3,
+      "n": 1,
+      "unit": "ms"
+    },
+    "turn timing: run after an approved card to first bubble p95": {
+      "median": 16.7,
+      "p95": 16.7,
+      "highMedian": 23.3,
+      "highP95": 23.3,
       "runs": 3,
       "n": 1,
       "unit": "ms"
