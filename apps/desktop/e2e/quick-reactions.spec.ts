@@ -83,7 +83,7 @@ test('the picker marks the chosen quick reactions and choosing one does not reco
     const row = juno.topic.message('Release notes are ready for review')
     const ts = fake.messages('C0ENG').find((m) => m.text === 'Release notes are ready for review')!.ts
     await menu.react('rocket')
-    await expect(row.locator('[data-reaction="rocket"][aria-pressed="true"]')).toHaveText('1')
+    await expect(row.locator('[data-reaction="rocket"][aria-pressed="true"]')).toHaveText('🚀1')
     await expect.poll(() => fake.messages('C0ENG').find((m) => m.ts === ts)?.reactions?.map((r) => r.name)).toEqual(['rocket'])
   })
 })
