@@ -143,7 +143,7 @@ export function reactWithCompiler(repoRoot: string, reportSkipped: boolean): Plu
   const plugins: PluginOption[] =
     process.env['JUNO_REACT_COMPILER'] === 'babel'
       ? [reactCompiler(repoRoot, reportSkipped), react()]
-      : [react({ compiler: { ...options, logDiagnostics: reportSkipped } })]
+      : [react({ compiler: { ...options, reportDiagnostics: reportSkipped } })]
   const probe = process.env['JUNO_REACT_COMPILER_PROBE']
   if (probe !== undefined) plugins.push(compilerProbe(probe))
   return plugins

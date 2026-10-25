@@ -20,12 +20,15 @@ const record = (entry) => {
   writeFileSync(join(results, 'builds.json'), JSON.stringify(log, null, 1))
 }
 
-/** Runs a command under bash's `time`, which counts the CPU of every child process. */
+/** Runs a command in bash; `times` then prints the CPU its children used (user, then system). */
 let runs = 0
 function timed(cwd, command, env) {
   const output = join(results, `build-${runs++}.log`)
-  const result = spawnSync('bash', ['-c', `TIMEFORMAT='%R %U %S'; { time (${command}) > '${output}' 2>&1 ; } 2>&1`], { cwd, env: { ...process.env, ...env }, encoding: 'utf8' })
-  const [wall, user, sys] = result.stdout.trim().split('\n').at(-1).split(' ').map(Number)
+  const started = performance.now()
+  const result = spawnSync('bash', ['-c', `(${command}) > '${output}' 2>&1; status=$?; times; exit $status`], { cwd, env: { ...process.env, ...env }, encoding: 'utf8' })
+  const wall = Math.round((performance.now() - started) / 100) / 10
+  const seconds = (text) => Array.from(text.matchAll(/(\d+)m([\d.]+)s/g), (m) => Number(m[1]) * 60 + Number(m[2]))
+  const [user = NaN, sys = NaN] = seconds(result.stdout.trim().split('\n').at(-1) ?? '')
   const text = readFileSync(output, 'utf8')
   if (result.status !== 0) console.error(text)
   return { ok: result.status === 0, wall, cpu: Math.round((user + sys) * 10) / 10, log: output, compilerLines: text.split('\n').filter((line) => /react-compiler|React Compiler/i.test(line)).length }
