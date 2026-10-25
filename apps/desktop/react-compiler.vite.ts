@@ -2,8 +2,8 @@
  * The React Compiler pass (performance.md 5.4), as a Vite plugin with a
  * per-file cache. It runs the same Babel transform that `@vitejs/plugin-react`
  * 5 runs in a production build, so the output is the same, and it stores each
- * result under a hash of the file's path and source, the compiler's options
- * and `bun.lock`, which pins Babel and the compiler. The compiler looks at one file at a time,
+ * result under a hash of the file's path and source, the compiler's options,
+ * the build mode and `bun.lock`, which pins Babel and the compiler. The compiler looks at one file at a time,
  * so a file whose source did not change gets the stored result. The pass was
  * about 60% of a cold renderer, web or gallery build (10-25); a new commit
  * changes few files, so most builds read nearly all of it from the cache.
@@ -72,7 +72,11 @@ export function reactCompiler(repoRoot: string, reportSkipped: boolean): Plugin 
     async transform(code, id) {
       const [file = id] = id.split('?')
       if (ssr || !include.test(file) || exclude.test(file)) return undefined
-      const key = createHash('sha256').update(JSON.stringify([lock, options, root, id, code])).digest('hex')
+      // The compiler adds code that resets a component's memo cache on edit when NODE_ENV is
+      // `development` or `globalThis.__DEV__` is true, read as each file compiles; Babel reads
+      // BABEL_ENV and NODE_ENV. A dev server's results must not reach a build, so all three are in the key.
+      const mode = [process.env['NODE_ENV'] ?? null, process.env['BABEL_ENV'] ?? null, (globalThis as { __DEV__?: unknown }).__DEV__ === true]
+      const key = createHash('sha256').update(JSON.stringify([lock, options, mode, root, id, code])).digest('hex')
       const path = dir === undefined ? undefined : join(dir, `${key}.json`)
       let entry: Entry | undefined
       if (path !== undefined) {
