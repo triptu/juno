@@ -285,7 +285,7 @@ it('decides socket messages within the hours: Always once per message, a reading
   })
 })
 
-it('the dock badge: a DM kept out of All or in Automated counts only when it mentions you, a Never sender’s @here does not count, and a channel muted in Slack does', async () => {
+it('the dock badge: unread DMs, group DMs and mentions through reads and Notify me; a DM kept out of All or in Automated counts only when it mentions you, a Never sender’s @here does not count, and a channel muted in Slack does', async () => {
   const badge: Array<boolean> = []
   const engine = await synced({ notifications: { notifier: recorder().notifier, badge: (unread) => Effect.sync(() => { badge.push(unread) }) } })
   const shows = (unread: boolean, label: string) => waitFor(() => (badge.at(-1) === unread ? true : undefined), WAIT_MS, label)
@@ -295,6 +295,29 @@ it('the dock badge: a DM kept out of All or in Automated counts only when it men
   }
   await setPref(engine, 'notifications', { ...defaultNotificationSettings, notificationHours: hoursAroundNow() })
   await readAll()
+
+  await step('an unread DM, group DM or mention sets it until read, here or in another client; Never on the sender clears it and Always brings it back', async () => {
+    const level = async (choice: 'always' | 'auto' | 'never') => valueOf(await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'person', id: 'U0MAYA' }, choice }))
+    const dm = engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Are you around?' }).ts
+    await shows(true, 'the badge for an unread DM')
+    await level('never')
+    await shows(false, 'no badge once Maya is set to Never')
+    await level('always')
+    await shows(true, 'the badge again once Maya is set to Always')
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> Can you review this now?' })
+    const unread = { kind: 'all', unreadOnly: true } as const
+    await engine.rowsUntil((rows) => rows.some((row) => row.id === 'm:C0ENG'), 'the mention unread', unread)
+    engine.fake.markRead({ channel: 'D0MAYA', ts: dm })
+    await engine.rowsUntil((rows) => !rows.some((row) => row.id === 'm:D0MAYA'), 'the DM read in another client', unread)
+    expect(badge.at(-1)).toBe(true)
+    valueOf(await runCommand(engine.registry, readsMarkRead, { id: 'm:C0ENG' }))
+    await shows(false, 'no badge once the mention is read')
+    engine.fake.injectMessage({ channel: 'G0MAYALEO', user: 'U0LEO', text: 'A group DM' })
+    await shows(true, 'the badge for a group DM')
+    valueOf(await runCommand(engine.registry, readsMarkRead, { id: 'm:G0MAYALEO' }))
+    await shows(false, 'no badge once the group DM is read')
+    await level('auto')
+  })
 
   await step('a DM in a view kept out of All is quiet, but a mention in it counts', async () => {
     engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'A DM before the view' })
