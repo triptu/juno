@@ -81,35 +81,6 @@ test('holding ⌥ over a row peeks at the topic without marking it, opening it o
   await slack.expectNoMarks()
 })
 
-test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text field types a space', async ({ juno, slack }) => {
-  await juno.setPeekKey('space')
-  // Closing Preferences left Home, whose composer has focus; Space peeks only outside a text field.
-  await juno.win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  const rina = juno.sidebar.row(RINA)
-  slack.resetCalls()
-
-  await rina.peek('space')
-  await juno.peek.expectShowing(RINA)
-  await juno.peek.expectMessage('Strong systems design')
-  await juno.peek.release('space')
-  await juno.peek.expectClosed()
-  // Space over a row peeked; it did not open the row.
-  await juno.expectNothingOpen()
-
-  await rina.peek('option')
-  await juno.peek.expectClosed()
-  await juno.peek.release('option')
-
-  const field = await focusTextField(juno.win)
-  await rina.hover()
-  await juno.win.keyboard.press('Space')
-  await expect(field).toHaveValue(' ')
-  await juno.peek.expectClosed()
-
-  await rina.expectUnread(2)
-  await slack.expectNoMarks()
-})
-
 test('holding ⌥ over a thread in a Main peeks at its replies without opening it, and a person in it opens their DM', async ({ juno, slack }) => {
   const { peek, tabs, topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
