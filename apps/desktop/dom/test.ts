@@ -66,6 +66,9 @@ export function domTest<M extends Model | undefined = undefined>(title: string, 
 
 async function run<M extends Model | undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M>): Promise<void> {
   const meter = cpuMeter()
+  // Every window shares the worker's `performance`: a mark from an earlier test is not this one's (`juno.lastMark`).
+  performance.clearMarks()
+  performance.clearMeasures()
   const model = options.model === undefined ? undefined : await options.model()
   try {
     const clock = options.clock === undefined || options.clock === false ? undefined : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())

@@ -160,7 +160,7 @@ function messageChannel(window: Window): new () => { readonly port1: EventTarget
     }
 
     receive(data: unknown): void {
-      if (this.#closed) return
+      if (this.#closed || closed.has(window)) return
       if (!this.#started) return void this.#queue.push(data)
       this.dispatchEvent(new W.MessageEvent('message', { data }))
     }
@@ -218,6 +218,20 @@ function patchPrototypes(window: Window): void {
     return { finished: Promise.resolve(), cancel() {}, finish() {}, play() {}, pause() {}, reverse() {}, onfinish: null, addEventListener(type: string, listener: () => void) { if (type === 'finish') queueMicrotask(listener) }, removeEventListener() {}, currentTime: 0, playState: 'finished' }
   }
   proto['getAnimations'] ??= function () { return [] }
+  // A browser sets `window.event` while an event's listeners run, and React reads it: an update from a native
+  // keydown or click listener is then discrete and renders at once, before any timer. happy-dom leaves it unset.
+  const target = (window as unknown as { EventTarget: typeof EventTarget }).EventTarget.prototype as unknown as Record<string, unknown>
+  const dispatchEvent = target['dispatchEvent'] as (this: EventTarget, event: Event) => boolean
+  target['dispatchEvent'] = function (this: EventTarget, event: Event) {
+    const node = this as unknown as { ownerDocument?: Document | null; defaultView?: unknown; document?: unknown }
+    const view = (node.document !== undefined ? node : node.defaultView ?? node.ownerDocument?.defaultView) as { event?: Event } | null | undefined
+    if (view === null || view === undefined) return dispatchEvent.call(this, event)
+    const outer = view.event
+    view.event = event
+    try {
+      return dispatchEvent.call(this, event)
+    } finally { view.event = outer }
+  }
 }
 
 let pristine: Map<object, PropertyDescriptorMap> | undefined
@@ -259,8 +273,33 @@ function sharedPrototypes(window: Window): Map<object, PropertyDescriptorMap> {
   return found
 }
 
-/** Closes a window from `openWindow` and undoes what its page did to the shared prototypes. */
+/** Windows `closeWindow` has closed, and each window's open sockets. */
+const closed = new WeakSet<Window>()
+const sockets = new WeakMap<Window, Set<WebSocket>>()
+
+/**
+ * Bun's WebSocket, which happy-dom does not know about: each one is kept so
+ * `closeWindow` closes it, and a closed page cannot open another. Left open,
+ * a closed page keeps receiving, rendering and asking its host, and the
+ * worker's pooled host serves the next test on the same port.
+ */
+function pageSocket(window: Window): typeof WebSocket {
+  const live = new Set<WebSocket>()
+  sockets.set(window, live)
+  return class PageSocket extends WebSocket {
+    constructor(url: string | URL, protocols?: string | string[]) {
+      if (closed.has(window)) throw new Error(`This page has closed; it cannot connect to ${new URL(url).pathname}`)
+      super(url, protocols)
+      live.add(this)
+      this.addEventListener('close', () => live.delete(this))
+    }
+  }
+}
+
+/** Closes a window from `openWindow`, its sockets first, and undoes what its page did to the shared prototypes. */
 export async function closeWindow(window: Window): Promise<void> {
+  closed.add(window)
+  for (const socket of sockets.get(window) ?? []) socket.close()
   try {
     await window.happyDOM.close()
   } finally {
@@ -272,7 +311,8 @@ export async function closeWindow(window: Window): Promise<void> {
 function fillGaps(window: Window): void {
   const globals = window as unknown as Record<string, unknown>
   // Bun's own, which talk to the host for real.
-  for (const name of ['WebSocket', 'structuredClone', 'BroadcastChannel']) if (globals[name] === undefined) globals[name] = (globalThis as Record<string, unknown>)[name]
+  for (const name of ['structuredClone', 'BroadcastChannel']) if (globals[name] === undefined) globals[name] = (globalThis as Record<string, unknown>)[name]
+  if (globals['WebSocket'] === undefined) globals['WebSocket'] = pageSocket(window)
   if (globals['MessageChannel'] === undefined) globals['MessageChannel'] = messageChannel(window)
   if (globals['requestIdleCallback'] === undefined) {
     globals['requestIdleCallback'] = (callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void) => (window.setTimeout as unknown as (run: () => void, delay: number) => number)(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1)
