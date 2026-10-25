@@ -95,21 +95,6 @@ test('file cards open Markdown, CSV, audio and voice clips, with viewer navigati
   })
 })
 
-test('the browser lane serves a PDF to Chromium’s sandboxed viewer frame', async ({ juno, fake }) => {
-  const row = await postFiles({ juno, fake }, 'The capacity review', ['pdf'])
-  const viewer = await openCard({ juno }, row, 'capacity-review.pdf')
-  const frame = viewer.locator('[data-viewer-kind="pdf"] iframe')
-  await expect(frame).toHaveAttribute('sandbox', 'allow-scripts')
-  await expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
-  await expect(frame).toHaveAttribute('src', schemeUrl('files'))
-  const src = await frame.getAttribute('src')
-  const answer = await juno.win.evaluate(async (url) => {
-    const response = await fetch(url)
-    return { type: response.headers.get('content-type'), start: new TextDecoder().decode((await response.arrayBuffer()).slice(0, 5)) }
-  }, src!)
-  expect(answer).toEqual({ type: 'application/pdf', start: '%PDF-' })
-})
-
 // Main serves the PDF, sees Esc pressed inside a frame and shows Quick Look: Electron only.
 test('a PDF opens in Chromium’s PDF viewer, an HTML file in a sandboxed frame, Esc closes both from inside, and Quick Look on a zip leaves Downloads alone', { tag: '@electron' }, async ({ juno, fake }) => {
   await test.step('a PDF opens in Chromium’s PDF viewer from the content main serves as a PDF', async () => {
@@ -119,6 +104,7 @@ test('a PDF opens in Chromium’s PDF viewer, an HTML file in a sandboxed frame,
     const viewer = await openCard({ juno }, row, 'capacity-review.pdf')
     const frame = viewer.locator('[data-viewer-kind="pdf"] iframe')
     await expect(frame).toHaveAttribute('sandbox', 'allow-scripts')
+    await expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
     const src = await frame.getAttribute('src')
     expect(src).toMatch(/^juno:\/\/files\/[^/]+\/content\/capacity-review\.pdf\?url=/)
     const answer = await juno.win.evaluate(async (url) => {
