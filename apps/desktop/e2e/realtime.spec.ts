@@ -1,9 +1,8 @@
-import { expectStableAnchor } from './shiftProbe'
 // Realtime hardening (M7, architecture 5.1, 5.8 and 2.5): what changes in
 // Slack while the socket is down reaches the open topic and the sidebar once
-// it is back,
-// Slack's rate limits slow Juno down without stopping it, a message written
-// offline waits and goes once, and an engine restart keeps what is on screen.
+// it is back, a message written offline waits and goes once, and an engine
+// restart keeps what is on screen. Slack's rate limits are checked in
+// packages/engine/test/flows/rate-limits.flow.test.ts.
 import { expect, hooks, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
@@ -71,37 +70,6 @@ test('while the socket is down, changes in Slack and a message written offline w
     await expect(sidebar.row('#product').root).toHaveCount(0, { timeout: 15_000 })
     await expect(sidebar.row('#incidents').root).toHaveCount(0, { timeout: 15_000 })
   })
-})
-
-// The header notice also takes the same slot each time, so the pages below it never move.
-test('a 429 storm: the line says Slack asked us to slow down, every method waits out Retry-After, and the gap still arrives', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-  await juno.allTopics.open()
-  // Every method the catch-up calls gets a 429 asking for six seconds, longer than the interactive lane waits.
-  const methods = ['client.counts', 'conversations.history', 'subscriptions.thread.getView', 'search.modules.messages']
-  await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
-    fake.goOffline()
-    await sidebar.expectSyncStatus("You're offline")
-    slack.as('Priya').postIn('product', 'Pricing page copy is live.')
-    fake.resetCalls()
-    for (const method of methods) fake.force429({ method, retryAfter: 6 })
-    fake.goOnline()
-    await sidebar.expectSyncStatus('Slack asked us to slow down')
-    await sidebar.expectNoSyncStatus(60_000)
-    // The gap can land inside this window: #product's Main then takes its place at the top of the list. Only that move is skipped.
-  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
-  await expect(sidebar.row('#product').preview).toContainText('Pricing page copy is live.', { timeout: 30_000 })
-
-  await juno.expectEngineLive(60_000)
-  const limited = fake.calls.filter((call) => call.kind === 'api' && call.status === 429)
-  expect(new Set(limited.map((call) => call.method))).toEqual(new Set(methods))
-  for (const call of limited) {
-    const next = fake.calls.find((later) => later.method === call.method && later.at > call.at)
-    if (next === undefined) continue
-    expect(next.at - call.at, call.method).toBeGreaterThanOrEqual(6_000 - 50)
-  }
 })
 
 test('an engine restart mid-session keeps the open topic, the unsent text and the sidebar, and live updates go on', { tag: '@electron' }, async ({ juno, app, fake }) => {

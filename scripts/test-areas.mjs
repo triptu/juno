@@ -20,7 +20,7 @@ export const HEAVY_AREAS = [
     area: 'sync',
     suite: 'desktop',
     tag: '@heavy-sync',
-    tests: 'the first-sync cases in layout-shift.spec.ts, every test in quick-start.spec.ts, the 429 storm in realtime.spec.ts',
+    tests: 'the first-sync cases in layout-shift.spec.ts, every test in quick-start.spec.ts',
     // Spec files whose every test is heavy: the plan drops them when the area did not change.
     whole: ['apps/desktop/e2e/quick-start.spec.ts'],
     paths: [
@@ -32,7 +32,6 @@ export const HEAVY_AREAS = [
       'packages/fake-slack/src/seeds/',
       'apps/desktop/e2e/layout-shift.spec.ts',
       'apps/desktop/e2e/quick-start.spec.ts',
-      'apps/desktop/e2e/realtime.spec.ts',
     ],
   },
   {
