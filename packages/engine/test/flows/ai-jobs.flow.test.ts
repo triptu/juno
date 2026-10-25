@@ -239,9 +239,12 @@ it('titles cost one call each: a key change asks nothing again, a refusal goes t
     await engine.rowsUntil((rows) => rows.find((row) => row.id === id)?.titleSource === 'ai', 'the fallback title')
     const activity = await activityUntil(engine, (value) => titleCalls(id, value).length === 2, 'both title calls logged')
     const [answered, refused] = titleCalls(id, activity)
-    expect(refused!.outcome).toBe('error')
-    expect(answered!.outcome).toBe('ok')
-    expect(answered!.model).not.toBe(refused!.model)
+    // Settings › AI activity labels these "Refused by the model’s policy. Sent to the fallback model." and "Answered by the fallback model".
+    expect(refused).toMatchObject({ outcome: 'error', kind: 'policy.fallback' })
+    expect(answered).toMatchObject({ outcome: 'ok', kind: 'fallback' })
+    // The default fallback is from another maker.
+    expect(answered!.model).toStartWith('google/')
+    expect(refused!.model).not.toStartWith('google/')
   })
 
   await step('without a fallback, asks a refused title once, not again after a wake, and again once the thread has a new message', async () => {
@@ -250,10 +253,16 @@ it('titles cost one call each: a key change asks nothing again, a refusal goes t
     await activityUntil(engine, (value) => titleCalls(id, value).length > 0, 'the refusal logged')
     await engine.workPass('title')
     const refused = calls(engine, 'titleTopic')
+    // A new key, and main's wake (as after a higher daily limit), send nothing again.
     engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-other-key' })
+    await engine.workPass('title')
+    engine.main.host.deliver({ _tag: 'wake' })
     await engine.workPass('title')
     expect(calls(engine, 'titleTopic')).toBe(refused)
     expect((await engine.rows()).find((row) => row.id === id)?.titleSource).toBe('fallback')
+    // AI activity shows it once, as "Refused by the model’s policy. Not retried."
+    const logged = titleCalls(id, await activityUntil(engine, () => true, 'AI activity'))
+    expect(logged.map((call) => [call.outcome, call.kind, call.repeats])).toEqual([['error', 'policy', 1]])
 
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Any update?', threadTs: tsOf(id) })
     await engine.rowsUntil((rows) => rows.find((row) => row.id === id)?.preview.text === 'Any update?', 'the new reply')
