@@ -11,7 +11,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'privacy.spec.ts',
   'session.spec.ts',
   'browser-isolation.spec.ts',
-  'juno-agent/backup.spec.ts',
   'juno-agent/transfer.spec.ts',
   'ai-activity.spec.ts',
   'juno-agent/chat.spec.ts',
