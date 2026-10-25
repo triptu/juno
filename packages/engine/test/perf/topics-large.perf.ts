@@ -21,6 +21,7 @@ import { listAllTopics, summarizeAllTopics } from '../../src/topics/allTopics'
 import { countTopics, cutoffTs, listStatements, listTopics, makeRowCache } from '../../src/topics/query'
 import { sleep } from '../harness'
 import { largeSeedEngine } from './largeSeedEngine'
+import { perfBudget } from '@juno/testing/perf-budget'
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
 const decodeRow = Schema.decodeUnknownSync(Schema.toCodecJson(TopicListRow))
@@ -173,7 +174,7 @@ describe('topics.list on the large seed', () => {
     console.log(`topics.list plans with views: ${JSON.stringify(isolated.plans, null, 1)}`)
     expect(rows.length).toBe(300)
     expect(budgets.deltaBytesMax).toBe(true)
-    expect(budgets.queryMsP95).toBe(true)
+    perfBudget('topics.list: query p95 in the engine', report.queryMsP95, 10)
     expect(budgets.snapshotBytes).toBe(true)
   }, 900_000)
 })
@@ -230,9 +231,9 @@ describe('allTopics.list on the large seed', () => {
     console.log(`allTopics.list large seed: ${JSON.stringify(result)}`)
     expect(report.top.rows.length).toBe(ALL_TOPICS_WINDOW)
     // All topics' first window may take 8 ms: it orders every topic, and it is a page open, not a sidebar update.
-    expect(result.firstMsP95).toBeLessThan(8)
-    expect(result.countsMsP95).toBeLessThan(5)
-    expect(result.textMsP95).toBeLessThan(20)
+    perfBudget('allTopics.list: first window p95', result.firstMsP95, 8)
+    perfBudget('allTopics.list: counts p95', result.countsMsP95, 5)
+    perfBudget('allTopics.list: text filter p95', result.textMsP95, 20)
     expect(snapshotBytes).toBeLessThan(200 * 1024)
   }, 900_000)
 })

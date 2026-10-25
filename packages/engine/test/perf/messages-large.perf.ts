@@ -24,6 +24,7 @@ import { Store, StoreReader, workspacePathsFromDir } from '@juno/store'
 import { listMessages, makeMessageCache } from '../../src/messages/query'
 import { listTopics, makeRowCache } from '../../src/topics/query'
 import { sleep, startTestEngine, waitFor } from '../harness'
+import { perfBudget } from '@juno/testing/perf-budget'
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(MessageView))
 const decodeRow = Schema.decodeUnknownSync(Schema.toCodecJson(MessageView))
@@ -213,10 +214,11 @@ describe('messages.list on the large seed', () => {
       expect(budgets.snapshot).toBe(true)
       expect(budgets.delta).toBe(true)
       expect(budgets.topicsSnapshot).toBe(true)
-      expect(budgets.rerunP95).toBe(true)
-      expect(budgets.mainRerunP95).toBe(true)
-      expect(budgets.liveQueryP95).toBe(true)
-      expect(budgets.codec).toBe(true)
+      perfBudget('messages.list: thread rerun p95', report.isolatedRerunMsP95, 5)
+      perfBudget('messages.list: Main rerun p95', report.mainRerunMsP95, 5)
+      perfBudget('messages.list: live query p95', report.liveQueryMsP95, 5)
+      perfBudget('messages.list: encode median', report.encodeMsMedian, 5)
+      perfBudget('messages.list: decode median', report.decodeMsMedian, 5)
     } finally {
       await engine.stop()
     }

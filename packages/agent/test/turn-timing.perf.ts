@@ -12,6 +12,7 @@ import { reply } from '@juno/agent-testing'
 import { ActionId, ConnectionId, AccountId, Digest, Revision, SourceGeneration, type CardPayload } from '@juno/agent-cards'
 import type { Executor, TurnEvent } from '../src/index'
 import { HAIKU, say, turnsHarness } from './turns-harness'
+import { perfBudget } from '@juno/testing/perf-budget'
 
 type Models = Parameters<NonNullable<Parameters<typeof turnsHarness>[0]>['transport'] & {}>[0]['models']
 type Sent = { readonly at: number; readonly chars: number }
@@ -158,6 +159,6 @@ it('a normal message and the run after an approved card: the agent\'s time to th
 
   // A regression ceiling for the agent's share of the 2.5 s first-bubble budget (docs/performance.md), with room for a
   // shared machine: the rest of the budget is the model's.
-  expect(report.message.toBubble.p95).toBeLessThan(100)
-  expect(report.resume.toBubble.p95).toBeLessThan(100)
+  perfBudget('turn timing: message to first bubble p95', report.message.toBubble.p95, 100)
+  perfBudget('turn timing: run after an approved card to first bubble p95', report.resume.toBubble.p95, 100)
 }, 300_000)

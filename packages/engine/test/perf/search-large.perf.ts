@@ -13,6 +13,7 @@ import { inBatches, Store, StoreReader, StoreWriter, transaction, workspacePaths
 import { parseSearchQuery } from '@juno/domain'
 import { compileSearchSql } from '../../src/searchCompiler'
 import { querySearch } from '../../src/searchQuery'
+import { perfBudget } from '@juno/testing/perf-budget'
 
 const encode = Schema.encodeSync(Schema.toCodecJson(SearchUpdate))
 const decode = Schema.decodeUnknownSync(Schema.toCodecJson(SearchUpdate))
@@ -78,12 +79,12 @@ describe('local FTS on 100 k messages', () => {
       console.log(`search.query large seed: ${JSON.stringify(report)}`)
       expect(report.backfillMessages).toBe(10_000)
       expect(report.messageSearches).toBeGreaterThan(0)
-      expect(report.p95Ms).toBeLessThanOrEqual(20)
-      expect(report.sessionP95Ms).toBeLessThanOrEqual(20)
-      expect(report.encodeP95Ms).toBeLessThanOrEqual(5)
-      expect(report.decodeP95Ms).toBeLessThanOrEqual(5)
+      perfBudget('search.query: p95 while a backfill writes', report.p95Ms, 20)
+      perfBudget('search.query: session p95', report.sessionP95Ms ?? Number.POSITIVE_INFINITY, 20)
+      perfBudget('search.query: encode p95', report.encodeP95Ms ?? Number.POSITIVE_INFINITY, 5)
+      perfBudget('search.query: decode p95', report.decodeP95Ms ?? Number.POSITIVE_INFINITY, 5)
       expect(report.sessionBytes).toBeLessThanOrEqual(200 * 1024)
-      expect(report.filteredP95Ms).toBeLessThanOrEqual(20)
+      perfBudget('search.query: filtered p95', report.filteredP95Ms ?? Number.POSITIVE_INFINITY, 20)
     } finally {
       await fake.close()
       await rm(dir, { recursive: true, force: true })
