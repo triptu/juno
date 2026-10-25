@@ -1,7 +1,7 @@
-// The sidebar from a first sign-in: the list while the first sync runs, and
-// row previews and group DMs that need data in the fake before sign-in. The
-// signed-in sidebar is in sidebar.spec.ts.
-import { SELF_ID, TEAM } from '@juno/fake-slack'
+// The sidebar from a first sign-in: the list while the first sync runs. Row
+// previews and group DMs that need data in the fake before sign-in are in
+// packages/engine/test/flows/sidebar.flow.test.ts. The signed-in sidebar is
+// in sidebar.spec.ts.
 import { expect, test } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 
@@ -55,47 +55,4 @@ test('during the first sync the list says Juno is getting the topics, then shows
   }, { within: '[aria-label="Sidebar"]', outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   await sidebar.expectNoSyncStatus()
   expect(await header.boundingBox()).toEqual(headerBox)
-})
-
-// Both steps need data in the fake before the first sign-in.
-test('previews name people and label an image, and a group DM shows as soon as someone posts in it', async ({ juno, fake }) => {
-  for (const [id, name, real] of [
-    ['U0ALEXK', 'alexk', 'Alex Kim'],
-    ['U0ALEXR', 'alexr', 'Alex Rivera'],
-    ['U0ROBIN', 'robin', 'Robin Okafor'],
-  ] as const) {
-    fake.workspace.addUser({ id, team_id: TEAM.id, name, real_name: real, profile: { display_name: real, real_name: real } })
-  }
-  fake.workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: '', files: [{ id: 'F0SIDEPIC', name: 'whiteboard.png', title: 'whiteboard.png', mimetype: 'image/png' }], silent: true })
-  fake.workspace.post({ channel: 'D0SAM', user: SELF_ID, text: 'Sent the notes', silent: true })
-  fake.workspace.post({ channel: 'C0ENG', user: 'U0ALEXR', text: 'Deploy window moved', silent: true })
-  fake.workspace.post({ channel: 'C0ENG', user: 'U0ALEXK', text: 'Works for me', silent: true })
-  fake.workspace.post({ channel: 'C0PRODUCT', user: 'U0ROBIN', text: 'Pricing copy is final', silent: true })
-  // Slack's counts leaves a closed group DM out, and a message opens it again with no membership event.
-  fake.addGroupDm({ id: 'G0CLOSED', users: ['U0MAYA', 'U0SAM'], open: false })
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-
-  // The preview line (SPEC 5, "Row anatomy"): a message with only an image reads "Image"; the other side of a
-  // one-to-one DM has no name, yours read "You:"; a channel shows a first name, with a last initial when two people
-  // there share it.
-  await test.step('previews name people by first name, drop the other side of a DM, and label an image', async () => {
-    await sidebar.row('Maya', { exact: true }).expectPreview('Image')
-    await sidebar.row('Sam', { exact: true }).expectPreview('You: Sent the notes')
-    await sidebar.row('#product').expectPreview('Robin: Pricing copy is final')
-    await sidebar.row('#eng').expectPreview('Alex K: Works for me')
-  })
-
-  await test.step('a group DM shows as soon as someone posts in it, when it was closed or Juno has never seen it', async () => {
-    const closed = juno.win.locator('[data-topic-id="m:G0CLOSED"]')
-    await expect(closed).toHaveCount(0)
-    fake.injectMessage({ channel: 'G0CLOSED', user: 'U0SAM', text: 'Picking the launch notes back up' })
-    await expect(closed).toBeVisible()
-
-    // One made after Juno loaded the list, which Slack never announced either.
-    fake.addGroupDm({ id: 'G0FRESH', users: ['U0LEO', 'U0JONAS'] })
-    fake.injectMessage({ channel: 'G0FRESH', user: 'U0LEO', text: 'Quick question about the offsite' })
-    await expect(juno.win.locator('[data-topic-id="m:G0FRESH"]')).toBeVisible()
-  })
 })
