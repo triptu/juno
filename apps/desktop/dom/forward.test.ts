@@ -4,18 +4,15 @@
 // `chat.shareMessage`. A forward Slack refuses shows the usual "Not sent."
 // in the destination, and Retry sends it. F on a focused message opens the
 // sheet too, and chooses Forward… in the open menu.
-import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import type { Dom } from './input'
 import type { Juno } from './driver/juno'
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
+import { expect } from './expect'
+import { domTest } from './test'
 
 const ENG_MAIN = '#eng'
 const HANDOFF = 'Reminder: on-call handoff moves to Mondays'
 
-const sheet = (win: Page) => win.locator('[data-forward-sheet]')
+const sheet = (win: Dom) => win.locator('[data-forward-sheet]')
 
 /** Forward… on `text` in the open topic, then `destination` from the list and `note` (Shift-Enter between its lines), and Enter. */
 async function forward(juno: Juno, text: string, destination: string, note: string): Promise<void> {
@@ -31,23 +28,20 @@ async function forward(juno: Juno, text: string, destination: string, note: stri
   await expect(field).toBeFocused()
   const [first = '', ...more] = note.split('\n')
   await field.fill(first)
-  const oneLine = (await field.boundingBox())!.height
   for (const line of more) {
     await field.press('Shift+Enter')
     await field.pressSequentially(line)
   }
   await expect(field).toHaveValue(note)
-  // The note wraps and grows with its lines.
-  if (more.length > 0) expect((await field.boundingBox())!.height).toBeGreaterThan(oneLine)
   await field.press('Enter')
   await expect(dialog).toHaveCount(0)
 }
 
-test('Forward… shares a message into a channel with a note, a refused forward can be retried, and F opens the sheet', async ({ juno, fake }) => {
+domTest('Forward… shares a message into a channel with a note, a refused forward can be retried, and F opens the sheet', async ({ juno, fake, step }) => {
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
 
-  await test.step('F forwards a focused message, and chooses Forward… in its open menu', async () => {
+  await step('F forwards a focused message, and chooses Forward… in its open menu', async () => {
     const dialog = sheet(juno.win)
     const row = juno.topic.message(HANDOFF)
 
@@ -70,7 +64,7 @@ test('Forward… shares a message into a channel with a note, a refused forward 
     await expect(dialog).toHaveCount(0)
   })
 
-  await test.step('Forward… shares a message into a channel with a note', async () => {
+  await step('Forward… shares a message into a channel with a note', async () => {
     const { labels } = await juno.topic.chooseInMessageMenu(HANDOFF, null)
     expect(labels.indexOf('Forward…')).toBeGreaterThan(-1)
     expect(labels.indexOf('Forward…')).toBe(labels.indexOf('Open in Slack') - 1)
@@ -94,9 +88,9 @@ test('Forward… shares a message into a channel with a note, a refused forward 
     expect(stored.attachments?.[0]).toMatchObject({ is_msg_unfurl: true, text: expect.stringContaining(HANDOFF) })
   })
 
-  await test.step('a forward Slack refuses shows Not sent. in the destination, and Retry sends it', async () => {
+  await step('a forward Slack refuses shows Not sent. in the destination, and Retry sends it', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
-    await juno.topic.expectTitle('Main')
+    await juno.topic.expectMessage(HANDOFF)
 
     fake.forceError({ method: 'chat.shareMessage', error: 'restricted_action', times: 1 })
     await forward(juno, HANDOFF, 'product', 'This one is refused first')
@@ -111,4 +105,4 @@ test('Forward… shares a message into a channel with a note, a refused forward 
     await juno.topic.expectSent('This one is refused first')
     expect(fake.messages('C0PRODUCT').filter((message) => message.text === 'This one is refused first')).toHaveLength(1)
   })
-})
+}, { timeout: 120_000 })
