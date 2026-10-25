@@ -8,8 +8,9 @@
 // import(), import.meta.glob, a local path that resolves to no file, or an
 // output with no entry list here. A stale build is worse than a slow one.
 
-import { readFileSync } from 'node:fs'
-import { dirname, join, normalize } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, normalize, relative } from 'node:path'
 import { ImportGraph } from './import-graph.mjs'
 import { lockedPackages, packageName } from './locked-packages.mjs'
 
@@ -149,6 +150,23 @@ class BuildGraph extends ImportGraph {
     }
     return ''
   }
+}
+
+const ignored = new Set(['node_modules', '.git', 'out', 'dist', 'test-results', 'playwright-report', 'blob-report', 'coverage', 'shots', 'feel-report', '.scratch'])
+const walk = (dir) => existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+  if (ignored.has(entry.name)) return []
+  const path = join(dir, entry.name)
+  return entry.isDirectory() ? walk(path) : [path]
+}) : []
+
+/** Every source path under apps/, packages/, scripts/ and the root that Git sees, tracked or not; remote archives have no Git, so there it walks the folders, skipping generated ones. */
+export function sourceFiles(root) {
+  const rootFiles = readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name)
+  const sources = ['apps', 'packages', 'scripts', ...rootFiles]
+  const git = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...sources], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  // A deleted file that is still in the index is not an input; one the graph needs widens its key.
+  if (git.status === 0 && git.stdout.length > 0) return new Set(git.stdout.split('\0').filter((file) => file && existsSync(join(root, file))))
+  return new Set(sources.flatMap((name) => rootFiles.includes(name) ? [name] : walk(join(root, name)).map((file) => relative(root, file))))
 }
 
 /**

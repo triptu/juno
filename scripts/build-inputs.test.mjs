@@ -2,12 +2,12 @@ import { toolFixture } from './tool-test-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { buildInputs, builds } from './build-inputs.mjs'
+import { buildInputs, builds, sourceFiles } from './build-inputs.mjs'
 
 const repo = resolve(import.meta.dirname, '..')
-const tracked = new Set(spawnSync('git', ['ls-files', '-z'], { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout.split('\0').filter(Boolean))
+const tracked = sourceFiles(repo)
 const commands = { 'apps/desktop out': ['bun', 'run', 'build'], 'apps/desktop dist': ['bun', 'run', 'build:web'], 'apps/desktop dom/dist': ['bun', 'run', 'build:dom'], 'apps/gallery dist': ['vite', 'build'] }
 // Files no build bundles: tests, e2e specs, docs and repo tools.
 const outside = ['packages/engine/test/ai.test.ts', 'apps/desktop/e2e/app.spec.ts', 'apps/desktop/dom/live.test.ts', 'apps/gallery/shift-walk.ts', 'docs/development.md', 'scripts/remote/plan.mjs', 'scripts/build-cached.test.mjs']
@@ -17,7 +17,9 @@ function copyOf(t, build, inputs) {
   const { root, env } = toolFixture(t)
   for (const file of [...inputs, ...outside, 'package.json', 'bun.lock']) {
     mkdirSync(dirname(join(root, file)), { recursive: true })
-    cpSync(join(repo, file), join(root, file))
+    // A remote archive has no docs.
+    if (existsSync(join(repo, file))) cpSync(join(repo, file), join(root, file))
+    else writeFileSync(join(root, file), 'outside\n')
   }
   const [app, outDir] = build.split(' ')
   const run = () => {

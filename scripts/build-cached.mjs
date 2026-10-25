@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
-import { buildInputs } from './build-inputs.mjs'
+import { buildInputs, sourceFiles } from './build-inputs.mjs'
 
 // `--key` prints the build key and builds nothing.
 const printKey = process.argv[2] === '--key'
@@ -13,11 +13,9 @@ const app = process.cwd()
 const root = resolve(app, '../..')
 const output = join(app, outDir)
 const marker = '.inputs-hash'
-const ignored = new Set(['node_modules', '.git', 'out', 'dist', 'test-results', 'playwright-report', 'blob-report', 'coverage', 'shots', 'feel-report', '.scratch'])
-const walk = (dir, filter = () => true) => existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-  if (!filter(entry.name)) return []
+const walk = (dir) => existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const path = join(dir, entry.name)
-  return entry.isDirectory() ? walk(path, filter) : [path]
+  return entry.isDirectory() ? walk(path) : [path]
 }) : []
 const hashFiles = (base, files) => {
   const hash = createHash('sha256')
@@ -26,14 +24,7 @@ const hashFiles = (base, files) => {
   }
   return hash.digest('hex')
 }
-const rootFiles = readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name)
-const sources = ['apps', 'packages', 'scripts', ...rootFiles]
-const git = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...sources], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-// Remote archives have no Git directory. Walk the same source roots, excluding generated files.
-// A deleted file that is still in the index is not an input; one the graph needs widens its key.
-const files = new Set(git.status === 0 && git.stdout.length > 0
-  ? git.stdout.split('\0').filter((file) => file && existsSync(join(root, file)))
-  : sources.flatMap((name) => rootFiles.includes(name) ? [name] : walk(join(root, name), (part) => !ignored.has(part)).map((file) => relative(root, file))))
+const files = sourceFiles(root)
 // Vite reads ignored .env files too; their contents affect local builds.
 const envFiles = [root, app].flatMap((dir) => readdirSync(dir).filter((name) => /^\.env(?:\.|$)/.test(name)).map((name) => relative(root, join(dir, name))))
 // A known output keys on what its entry points and configs reach (scripts/build-inputs.mjs).
