@@ -148,6 +148,8 @@ export interface RunningEngine {
   readonly socketIdle: () => Promise<void>
   /** Requests and awaits a complete pass through its normal serial worker. */
   readonly workPass: (name: WorkName) => Promise<void>
+  /** Passes started so far by each worker that has run, for counting work at rest. */
+  readonly passes: () => ReadonlyMap<WorkName, number>
   /** Number of actions that passed preflight and requested the send lane. */
   readonly actionsReady: () => number
   /** Commands holding or waiting for the same target lock. */
@@ -330,6 +332,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     },
     actionsReady: () => actionsReady,
     pendingCommands: (key) => commands.get(key) ?? 0,
+    passes: () => new Map([...work].map(([name, state]) => [name, state.started])),
     workPass: async (name) => {
       const state = stateOf(name)
       const wake = await waitFor(() => state.wake, WAIT_MS, `${name} worker ready`)
