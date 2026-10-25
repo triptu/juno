@@ -85,10 +85,12 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
 export const ELECTRON_FIRST: ReadonlyArray<string> = [
   'juno-agent/transfer.spec.ts',
   'juno-agent/crash.spec.ts',
-  'file-viewer.spec.ts',
   'juno-agent/backup.spec.ts',
+  'file-viewer.spec.ts',
   'app.spec.ts',
-  'break-pass.spec.ts',
-  'engine.spec.ts',
   'huddle-share.spec.ts',
+  'engine.spec.ts',
+  'privacy.spec.ts',
+  'break-pass.spec.ts',
+  'notifications.spec.ts',
 ]
