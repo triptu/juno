@@ -20,8 +20,9 @@ export function fullSuites(scripts, { nightly = false, noCache = false, seed, te
     { name: 'test', words: ['test', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] },
     // The DOM lane (apps/desktop/dom), in the unit job; a commit from before it has no test:dom.
     ...(scripts['test:dom'] ? [{ name: 'test:dom', words: [...skip, 'test:dom', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] }] : []),
-    { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
-    { name: 'specs:conformance', words: ['specs:conformance'] },
+    // A nightly run uses no cached result: every Quint run and conformance trace is fresh.
+    { name: 'specs:check', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : []), ...(nightly ? ['--nightly'] : [])] },
+    { name: 'specs:conformance', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
     { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },
     ...apps.map((name) => ({ name, words: [...(nightly ? ['JUNO_COVERAGE=1'] : []), ...skip, name] })),
   ]

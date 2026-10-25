@@ -2,7 +2,8 @@
 import { Schema } from 'effect'
 import { Block as SlackBlockSchema, type Block as SlackBlock, type RichTextElement, type RichTextInline, type RichTextListStyle, type TableBlock, type TableCell, type TableColumnSetting, type TextObject } from '@juno/slack-schema'
 import type { ContentBlock as Block, Inline, ListStyle, Lookups, TableColumn } from './model'
-import { channelInline, dateInline, emojiInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
+import { channelInline, dateInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
+import { emojiInline } from './emoji'
 import { codeBlock } from './code'
 import { mrkdwnBlocks, mrkdwnInlines, plainTextInlines } from './from-mrkdwn'
 
