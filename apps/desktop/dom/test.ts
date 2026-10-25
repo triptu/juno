@@ -25,8 +25,8 @@ interface Model {
 export interface DomTestOptions<M extends Model | undefined = undefined> {
   /** Start signed in and synced from the snapshot (default), or signed out on an empty folder. */
   readonly synced?: boolean
-  /** The fake's workspace instead of the default one; signed out only. */
-  readonly seed?: FakeSlackOptions['seed']
+  /** The fake's own options, as a seed of its own; only with `synced: false`, since the snapshot is of the default seed. */
+  readonly fake?: FakeSlackOptions
   readonly engine?: EngineOptions
   /** Install the test clock before the page loads, at this time or now; the engine's clock follows its jumps. */
   readonly clock?: boolean | number | Date
@@ -66,10 +66,10 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
   try {
     const clock = options.clock === undefined || options.clock === false ? undefined : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())
     const engine: EngineOptions = { ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }), ...options.engine }
-    if (options.seed !== undefined && options.synced !== false) throw new Error('A seeded fake starts signed out; give domTest `synced: false`.')
+    if (options.fake !== undefined && options.synced !== false) throw new Error('A fake of its own needs `synced: false`: the snapshot is of the default seed.')
     const snapshot = options.synced === false ? undefined : await domSnapshot(signIn)
     const ready = meter.lap()
-    const started = await startDomApp({ snapshot, engine, ...(options.seed === undefined ? {} : { seed: options.seed }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
+    const started = await startDomApp({ snapshot, engine, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
     const warm = meter.lap()
     try {
       const context: DomContext<M> = {

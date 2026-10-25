@@ -39,6 +39,11 @@ export class MessageMenuDriver {
     return this.root.locator('[data-grid-more]')
   }
 
+  /** The emoji grid's names, in order. */
+  async grid(): Promise<string[]> {
+    return this.root.locator('[data-grid-reaction]').all().map((cell) => cell.getAttribute('data-grid-reaction') ?? '')
+  }
+
   get search(): Query {
     return this.root.getByRole('textbox', { name: 'Search emoji' })
   }
@@ -172,6 +177,12 @@ export class TopicPane implements TopicVerbs {
 
   async expectMessage(text: string): Promise<void> {
     await expect(this.message(text)).toBeVisible({ timeout: 15_000 })
+  }
+
+  /** A DM's person, active or away, in the context pill. */
+  async expectPresence(presence: 'active' | 'away'): Promise<void> {
+    await expect(this.contextPill.locator('[data-pill-presence]')).toHaveAttribute('data-pill-presence', presence)
+    await expect(this.contextPill).toHaveAccessibleName(new RegExp(`, ${presence}\\. Show in sidebar\\.$`))
   }
 
   get titleButton(): Query {

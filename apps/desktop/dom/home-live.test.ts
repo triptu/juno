@@ -112,6 +112,6 @@ domTest('answering the last row shows the caught-up picture at once, with the DM
   // The answer takes the last row away, and the same Home is caught up: an unread message that asks nothing makes no row.
   await expect(home.root.locator('[data-home-item]')).toHaveCount(0)
   await expect(home.picture.locator('img')).toBeVisible()
-}, { synced: false, seed: oneQuestion })
+}, { synced: false, fake: { seed: oneQuestion } })
 
 // With no rows, the first Home is caught up even while a DM is unread: the engine's home-view flow test.

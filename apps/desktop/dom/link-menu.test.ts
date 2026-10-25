@@ -1,18 +1,16 @@
 // Native menus on links in messages (SPEC 8, "Links"): their actions are
 // about the link itself, not the message around it. Message text keeps the
-// message's own menu.
-import type { Locator } from '@playwright/test'
-import { expect, test } from './fixtures'
-import { MessageMenuDriver, type Juno } from './driver/juno'
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
+// message's own menu. A link inside selected text is message-menu.spec.ts's:
+// whether the press is inside the selection is a question of boxes.
+import { expect } from './expect'
+import type { Query } from './query'
+import { domTest } from './test'
+import type { Juno } from './driver/juno'
 
 const WEB_URL = 'https://example.com/releases/42'
 const EMAIL = 'ana@example.com'
 
-async function choose(juno: Juno, link: Locator, item: string | null): Promise<string[]> {
+async function choose(juno: Juno, link: Query, item: string | null): Promise<string[]> {
   const before = await juno.menusAsked()
   await juno.chooseNextMenuItem(item)
   await link.click({ button: 'right' })
@@ -21,7 +19,7 @@ async function choose(juno: Juno, link: Locator, item: string | null): Promise<s
   return menu.labels
 }
 
-test('web and email links have link menus; message text keeps the message menu', async ({ juno, fake }) => {
+domTest('web and email links have link menus; message text keeps the message menu', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   const target = fake.messages('C0ENG').find((message) => message.text?.includes('preview environments never shut down'))
   if (target === undefined) throw new Error('the fake seed has no preview-environments message')
@@ -50,16 +48,7 @@ test('web and email links have link menus; message text keeps the message menu',
   expect(await choose(juno, slack, 'copy-link')).toEqual(['Open link', 'Open in background · ⌘ click', '-', 'Copy link'])
   await expect.poll(() => juno.clipboard()).toBe(slackUrl)
 
-  // A selection takes precedence when the right-click point is inside it: the message's own menu opens, not a native link menu.
-  await web.selectText()
   const asked = await juno.menusAsked()
-  const selected = await new MessageMenuDriver(juno.win).openOn(web)
-  const selectedMenu = await selected.labels()
-  expect(selectedMenu).toContain('Start thread')
-  expect(selectedMenu).toContain('Open in Slack')
-  expect(selectedMenu).not.toContain('Copy link')
-  await selected.close()
-
   const plain = await juno.topic.messageMenu('Plain message menu sample')
   const messageMenu = await plain.labels()
   expect(messageMenu).toContain('Start thread')

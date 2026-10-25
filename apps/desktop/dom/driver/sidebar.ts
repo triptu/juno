@@ -4,6 +4,10 @@ import type { Dom } from '../input'
 import type { Query } from '../query'
 import { escapeRegExp, type Menus } from './menus'
 
+export type PeekKeyName = 'option' | 'space'
+
+export const PEEK_KEYS: Record<PeekKeyName, string> = { option: 'Alt', space: 'Space' }
+
 /** The part of `@juno/state`'s sidebar trace the driver reads. */
 interface SidebarTrace {
   readonly list: { readonly last?: { readonly seq: number; readonly filter: string } }
@@ -61,6 +65,12 @@ export class SidebarRow implements SidebarRowVerbs {
 
   open(): Promise<void> {
     return this.select()
+  }
+
+  /** The pointer over the row, then the peek key held down (SPEC 5, "Peek"). */
+  async peek(key: PeekKeyName = 'option'): Promise<void> {
+    await this.hover()
+    this.dom.down(PEEK_KEYS[key])
   }
 
   /** ⌘-click: opens the topic in a new tab, and waits for the tab, so a next step does not land in the tab before. */

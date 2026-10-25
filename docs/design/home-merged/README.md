@@ -82,7 +82,7 @@ SPEC §4 (pages in a tab), §5 item 1 (title bar), §6 (new tabs, Back after sen
 - `newchat.spec.ts` (11 tests): moves to Home, for example `home-write.spec.ts`; the flows stay (pick, thread first, never-messaged person, send, draft kept and restored, Draft closed · Undo).
 - `tabs.spec.ts` "closing the last tab opens a new tab…": Home always, ⌘N focuses Home's composer; the "New tabs open" part goes.
 - `send-checks.spec.ts` (3 New chat tests), `mentions.spec.ts` "suggestions in New chat…", `attachments.spec.ts` "a New chat keeps its files…", `emoji-colon.spec.ts` "New chat supports Tab…": the same checks from Home.
-- `palette.spec.ts` "a person's result opens your DM, or a New chat…" (the never-messaged person) and `dom/palette-pages.test.ts` (its list of page rows includes "New chat").
+- `dom/palette.test.ts` "a person never messaged opens Home addressed to them" and `dom/palette-pages.test.ts` (its list of page rows includes "New chat").
 - `screens.spec.ts` "New chat with a destination…", `perf.spec.ts` "New chat open to first paint", `feel/newchat.feel.ts`, `feel/launch.feel.ts`, `feel/tabs.feel.ts`: Home in its place.
 - `app.spec.ts`, `navigation.spec.ts`, `layout-shift.spec.ts`, `home.spec.ts`, `peek.spec.ts`, `break-pass-1017*.spec.ts`, `juno-agent/chat.spec.ts`: they start from the launch tab (a New chat today) and wait for it; they wait for Home instead.
 - Driver: `NewChatPane` and `expectNothingOpen('New chat')` in `e2e/driver/juno.ts` become part of the Home pane; the "+" label "New chat ⌘T" becomes "New tab ⌘T".

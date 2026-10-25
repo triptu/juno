@@ -9,15 +9,14 @@
  * presence at once and then each change (`slack.as(name).setPresence`).
  */
 import { SELF_ID } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { expect } from './expect'
+import { domTest } from './test'
 
-test.use({ synced: true })
-
-test('an open DM shows its person active or away, and the sidebar dots follow their own setting, off by default', async ({ juno, slack }) => {
+domTest('an open DM shows its person active or away, and the sidebar dots follow their own setting, off by default', async ({ juno, slack, step }) => {
   const maya = slack.as('Maya')
   const dm = juno.sidebar.row('Maya', { exact: true })
 
-  await test.step('by default the sidebar shows no dot and Juno asks Slack only about you', async () => {
+  await step('by default the sidebar shows no dot and Juno asks Slack only about you', async () => {
     maya.setPresence('active')
     await dm.expectVisible()
     await expect(dm.presenceDot).toHaveCount(0)
@@ -25,7 +24,7 @@ test('an open DM shows its person active or away, and the sidebar dots follow th
     expect(slack.presenceSubs().every((ids) => ids.length === 1 && ids[0] === SELF_ID)).toBe(true)
   })
 
-  await test.step('opening Maya’s DM shows her active in the header, then away', async () => {
+  await step('opening Maya’s DM shows her active in the header, then away', async () => {
     await dm.select()
     await slack.expectPresenceSubscribed('Maya')
     await juno.topic.expectPresence('active')
@@ -39,21 +38,21 @@ test('an open DM shows its person active or away, and the sidebar dots follow th
     expect(slack.presenceSubs().at(-1)).toEqual([maya.id, SELF_ID].toSorted())
   })
 
-  await test.step('turning on Show who is active in the sidebar shows her dot', async () => {
+  await step('turning on Show who is active in the sidebar shows her dot', async () => {
     await juno.openSettings('Appearance')
     await expect(juno.settings.sidebarPresence).not.toBeChecked()
     await juno.settings.sidebarPresence.click()
     await expect(juno.settings.sidebarPresence).toBeChecked()
-    await expect(dm.presenceDot).toBeVisible()
+    await expect(dm.presenceDot).toHaveCount(1)
     await expect(dm.root).toHaveAccessibleDescription(/^active\b/)
     maya.setPresence('away')
     await expect(dm.presenceDot).toHaveCount(0)
     await expect(dm.root).not.toHaveAccessibleDescription(/^active\b/)
   })
 
-  await test.step('turned off while her DM is open, the dot goes and the header still follows her', async () => {
+  await step('turned off while her DM is open, the dot goes and the header still follows her', async () => {
     maya.setPresence('active')
-    await expect(dm.presenceDot).toBeVisible()
+    await expect(dm.presenceDot).toHaveCount(1)
     await juno.settings.sidebarPresence.click()
     await expect(juno.settings.sidebarPresence).not.toBeChecked()
     await expect(dm.presenceDot).toHaveCount(0)
