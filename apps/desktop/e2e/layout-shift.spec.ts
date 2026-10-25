@@ -114,11 +114,14 @@ for (const divider of [false, true]) {
     const rows = juno.topic.list.locator('[data-message-row]')
     await expect(rows).toHaveCount(divider ? 0 : 1)
     // The same sender's replies above it take the latest into their group, so its name line goes; its text stays.
-    await expectStableAnchor(win, divider ? '[data-new-divider]' : `[data-message-row="${latest.ts}"] [data-msg-text]`, async () => {
+    // Chromium reports the row's top edge moving down as a shift; it skips that only within 500 ms of the click, and
+    // under load the replies render later. The text is the anchor, so the samples check it stays to the pixel.
+    const latestRow = `[data-message-row="${latest.ts}"]`
+    await expectStableAnchor(win, divider ? '[data-new-divider]' : `${latestRow} [data-msg-text]`, async () => {
       fake.release({ method: 'conversations.replies' })
       await juno.topic.expectMessage('Earlier reply 0')
       await expect(rows).toHaveCount(32)
-    })
+    }, divider ? {} : { outside: latestRow })
   })
 }
 
