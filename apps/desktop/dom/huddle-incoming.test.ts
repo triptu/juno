@@ -85,7 +85,7 @@ domTest('someone starts a huddle: the card rings, Join joins, Dismiss hides it, 
   await juno.clickOsNotification(eng)
   await juno.tabs.expectActive('eng · Huddle')
   await expect(win.getByRole('button', { name: 'Join huddle' })).toBeVisible()
-}, { timeout: 90_000 })
+}, { timeout: 90_000, tag: ['@nightly', '@nightly-huddle'] })
 
 domTest('a huddle the user started elsewhere shows no card, an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async ({ juno, fake, step }) => {
   const { win } = juno

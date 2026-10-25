@@ -79,7 +79,7 @@ function textInMiddle(juno: Juno): Promise<{ readonly x: number; readonly y: num
 }
 
 test.describe('one topic in two tabs', () => {
-  longTest('each tab keeps its own scroll position', async ({ juno }) => {
+  longTest('each tab keeps its own scroll position, and comes back there after messages arrive while it is hidden', async ({ juno, fake }) => {
     await openTwice(juno)
     const { sidebar, tabs, topic } = juno
     // The wheel jumps onto rows still at their size estimate; they reach their real height without moving the row in view.
@@ -95,6 +95,7 @@ test.describe('one topic in two tabs', () => {
     // The row that was first in view is back where it was. Which row counts as first can flip on a
     // sub-pixel when a row edge sits on the list's top, so the same row is followed instead.
     expect(await topic.rowTop(up.ts)).toBeCloseTo(up.top, 0)
+    await hideWhileRepliesArrive(juno, fake, 1, up)
 
     // A plain open focuses the tab that was active last, without moving it.
     await tabs.selectAt(THREAD, 0)
@@ -104,7 +105,7 @@ test.describe('one topic in two tabs', () => {
     await expect(tabs.tab(THREAD)).toHaveCount(2)
   })
 
-  longTest('a tab left in the middle of a long topic comes back there after messages arrive while it is hidden: after a wheel jump, at a gap between groups, and after a click that scrolled nothing', async ({ juno, fake }) => {
+  longTest('a tab left in the middle of a long topic comes back there after messages arrive while it is hidden: at a gap between groups, and after a click that scrolled nothing', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, fake }) => {
     await openTwice(juno)
     const { topic, win } = juno
     /** The second tab back at the bottom with nothing new below, then half the window up, among rows of every height at their estimate. */
@@ -115,13 +116,6 @@ test.describe('one topic in two tabs', () => {
       expectStill(up)
       return up
     }
-
-    await test.step('after a wheel jump', async () => {
-      // Half the window up, past the rows kept laid out at the end.
-      const middle = await topic.scrollUp(5000, FRAMES)
-      expectStill(middle)
-      await hideWhileRepliesArrive(juno, fake, 1, middle)
-    })
 
     await test.step('a scroll that ends with a gap between groups at the top edge', async () => {
       await halfUp()
