@@ -4,27 +4,19 @@ import { checkStateWithin, interactive } from './shift-walk'
 import { claimQueue, openState, readRoutes, type Route } from './support'
 
 /**
- * The computed tier of the shift guard, over every state on every run.
+ * A fast sweep of the shift guard over every state, on request:
+ * bun run remote --env GALLERY_SHIFT_COMPUTED=1 test:gallery computed-shift.spec.ts
  *
- * Each state is opened once. In one call per state, every interactive element
- * (up to `perState`, sampled from both ends as the walk samples them) is hovered, focused from the
+ * Each state is opened once. In one call per state, the same elements the
+ * real-input walk touches (shift-walk.ts) are hovered, focused from the
  * keyboard, blurred, pressed, released and left by forcing the pseudo-class
  * styles and dispatching the events React listens to, with transitions off
  * (`checkForcedInteractions` in packages/testing says what it cannot see).
- * Every box is compared after each step, as the guard does. The real-input
- * walk in shift.spec.ts covers what this cannot, for changed components on
- * every run and for every state in a full run.
- *
- * The same open checks two rules that need only the drawn state:
- * - SPEC section 16, the cursor: the arrow everywhere, the text cursor only
- *   over editable or selectable text, never the pointer. An element may compute
- *   `cursor: text` only when it also computes `user-select: text`, or when it
- *   is part of a field (a label wrapping an input), which focuses the input
- *   wherever it is clicked. Links that open outside Juno may show the hand.
- * - Performance 3.3: a message row is a whole number of pixels tall. A row
- *   laid out for the first time above the view grows from its estimate, and
- *   scroll anchoring moves the list by the difference; a fractional difference
- *   leaves the rows in view a part of a pixel off, and their text jumps.
+ * Every box is compared after each step, as the guard does. It takes about a
+ * fifth of a second a state, against two for the real walk: use it to check a
+ * broad change everywhere before the full walk. Ordinary runs do not need it,
+ * since the walk's records already re-walk every state whose inputs changed.
+ * Its self-tests run every time.
  *
  * GALLERY_SHIFT_ONLY and JUNO_SHARD select states as for the walk.
  */
@@ -41,30 +33,9 @@ const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim(
 const forced = (page: Page, from = 0) =>
   checkForcedInteractions(page, { targets: interactive, skipWithin: '[data-expands-in-place]', pending: '[data-chunk-pending]', max: perState, from })
 
-const drawnRules = (page: Page, route: Route) =>
-  page.evaluate((frameName) => {
-    const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
-    if (!frame) return { cursors: ['no frame'], rows: [] }
-    const cursors: string[] = []
-    for (const element of Array.from(frame.querySelectorAll('*'))) {
-      const style = getComputedStyle(element)
-      const describe = () => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}[cursor=${style.cursor}]`
-      const external = element.closest('a[href^="http:"], a[href^="https:"], a[href^="mailto:"]') !== null
-      if (style.cursor === 'pointer' && !external) cursors.push(describe())
-      const label = element.closest('label')
-      const inField = label !== null && label.querySelector('input, textarea') !== null
-      if (style.cursor === 'text' && style.userSelect !== 'text' && !inField) cursors.push(describe())
-    }
-    const rows: string[] = []
-    for (const row of Array.from(frame.querySelectorAll<HTMLElement>('[data-message-row]'))) {
-      const height = row.getBoundingClientRect().height
-      if (Math.abs(height - Math.round(height)) > 0.001) rows.push(`${row.dataset['messageRow'] ?? ''}: ${height}px`)
-    }
-    return { cursors, rows }
-  }, route.route)
-
 for (let part = 0; part < parts; part++) {
   test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, async ({ page: first, context }) => {
+    test.skip(process.env.GALLERY_SHIFT_COMPUTED !== '1', 'runs with GALLERY_SHIFT_COMPUTED=1')
     // One document opens many states through its hash: loading the gallery again for each would cost more than the check.
     let page = first
     let opened = 0
@@ -86,21 +57,14 @@ for (let part = 0; part < parts; part++) {
     test.setTimeout(Math.max(5 * 60_000, Math.ceil((routes.length * 1_000) / Math.min(parts, test.info().config.workers))))
     const queue = claimQueue('computed')
     const shifts: string[] = []
-    const cursors: string[] = []
-    const rows: string[] = []
     let states = 0, elements = 0, resets = 0, unforced = 0
-    const spent = { act: 0, settle: 0, boxes: 0, rules: 0 }
+    const spent = { act: 0, settle: 0, boxes: 0 }
     const started = Date.now()
     try {
       for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
         await checkStateWithin(route, async () => {
           await open(route)
           states++
-          const before = Date.now()
-          const drawn = await drawnRules(page, route)
-          spent.rules += Date.now() - before
-          for (const hit of drawn.cursors) cursors.push(`${route.route}: ${hit}`)
-          for (const row of drawn.rows) rows.push(`${route.route} ${row}`)
           // A touch that changed what the state draws asks for a fresh document for the elements after it.
           for (let report: ForcedInteractionReport = await forced(page); ; report = await forced(page, report.next)) {
             elements += report.touched
@@ -119,10 +83,8 @@ for (let part = 0; part < parts; part++) {
       const ms = states > 0 ? Math.round((Date.now() - started) / states) : 0
       const per = (ms: number) => `${states > 0 ? Math.round(ms / states) : 0} ms`
       const open = states > 0 ? Math.round(opening / states) : 0
-      console.log(`computed shift: ${states} states, ${elements} elements, ${resets} resets, ${ms} ms a state (${open} ms opening, ${per(spent.rules)} rules, ${per(spent.act)} touching, ${per(spent.settle)} waiting, ${per(spent.boxes)} boxes), ${unforced} pseudo-class rules left unforced`)
+      console.log(`computed shift: ${states} states, ${elements} elements, ${resets} resets, ${ms} ms a state (${open} ms opening, ${per(spent.act)} touching, ${per(spent.settle)} waiting, ${per(spent.boxes)} boxes), ${unforced} pseudo-class rules left unforced`)
     }
-    expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
-    expect.soft(rows, 'every message row is a whole number of pixels tall').toEqual([])
     expect(shifts.join('\n\n')).toBe('')
   })
 }

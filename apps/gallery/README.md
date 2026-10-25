@@ -11,6 +11,10 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 
 Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency. Every test owns one context; long walks reset the document between states and recycle pages every 20 states. Screenshots remain review artifacts, not pixel baselines in the behavior gate.
 
+## Fast sweep
+
+`computed-shift.spec.ts` checks the walk's touches in every state with forced pseudo-class styles and synthetic events, about a tenth of the walk's time a state. It runs with `GALLERY_SHIFT_COMPUTED=1`; its self-tests always run. See [the layout-shift guard](../../docs/development.md#the-layout-shift-guard).
+
 ## Cached walks
 
 `walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports, plus the gallery shell, its styles, assets and fonts. Tokens count by value: only the layout tokens the state's files read, in every theme; colour and shadow tokens, comments, and paint-only CSS declarations do not count (`layout-tokens.mjs`). The walk counts through `shift-walk.ts` (or `focus-ring.spec.ts`) and its imports, which include `open-state.ts` and the guard; the spec's other tests, the scaffolding in `support.ts` and the Playwright config do not. Compositions key on all source, so editing `compositions.tsx` re-walks only them. Locked versions count only for packages the gallery imports or builds with. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
