@@ -1286,8 +1286,9 @@ export const menu = stylex.defineVars({
   '--menu-cell-selected': 'color-mix(in oklch, var(--hl) 22%, transparent)',
   // A row's trailing button (Copy Slack link on Open in Slack): its icon in a
   // box 2px larger each side, inside the row's highlight, with its own fill
-  // over the highlight when it has focus. The radius is the row's less that 2px.
+  // over the highlight when it has focus: the highlight's text colour, light or
+  // dark by theme, at 22%. The radius is the row's less that 2px.
   '--menu-trailing-size': '18px',
   '--menu-trailing-radius': '4px',
-  '--menu-trailing-hover': 'hsla(0, 0%, 100%, 0.24)',
+  '--menu-trailing-hover': 'color-mix(in srgb, currentColor 22%, transparent)',
 })
