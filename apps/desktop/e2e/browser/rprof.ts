@@ -16,7 +16,8 @@ const groupOf = ({ functionName, url }: Node['callFrame']): string =>
   ['(idle)', '(program)', '(garbage collector)', '(root)'].includes(functionName) ? functionName
     : /\/assets\//.test(url) ? 'app' : url === '' ? 'injected-or-eval' : 'other'
 
-async function collect(session: CDPSession, groups: Groups, fns: Map<string, number>): Promise<void> {
+async function collect(session: CDPSession, groups: Groups, fns: Map<string, number>): Promise<ReadonlyArray<readonly [string, number]>> {
+  const own = new Map<string, number>()
   const { profile } = (await session.send('Profiler.stop')) as unknown as { profile: Profile }
   const byId = new Map(profile.nodes.map((node) => [node.id, node]))
   profile.samples.forEach((id, index) => {
@@ -27,7 +28,9 @@ async function collect(session: CDPSession, groups: Groups, fns: Map<string, num
     if (group === '(idle)') return
     const name = `${frame.functionName || '(anon)'} ${frame.url.replace(/^.*\//, '')}`
     fns.set(name, (fns.get(name) ?? 0) + millis)
+    own.set(name, (own.get(name) ?? 0) + millis)
   })
+  return [...own].toSorted((a, b) => b[1] - a[1]).slice(0, 25).map(([name, ms]) => [name, Math.round(ms)] as const)
 }
 
 const rounded = (groups: Groups) => Object.fromEntries(Object.entries(groups).map(([key, value]) => [key, Math.round(value)]))
@@ -41,6 +44,7 @@ export async function startRendererProfile(page: Page): Promise<{ readonly mark:
   const marks: Record<string, Record<string, number>> = {}
   const phases: Record<string, Groups> = {}
   const fns = new Map<string, number>()
+  const tops: Record<string, ReadonlyArray<readonly [string, number]>> = {}
   const metrics = async () => {
     const { metrics: list } = await session.send('Performance.getMetrics')
     return Object.fromEntries(list.filter((m) => METRICS.includes(m.name)).map((m) => [m.name, Math.round(m.name.endsWith('Duration') ? m.value * 1000 : m.value)]))
@@ -48,15 +52,15 @@ export async function startRendererProfile(page: Page): Promise<{ readonly mark:
   return {
     mark: async (name) => {
       marks[name] = await metrics()
-      await collect(session, phases[name] = {}, fns)
+      tops[name] = await collect(session, phases[name] = {}, fns)
       await session.send('Profiler.start')
     },
     stop: async (title) => {
       try {
         marks['end'] = await metrics()
-        await collect(session, phases['end'] = {}, fns)
+        tops['end'] = await collect(session, phases['end'] = {}, fns)
         const top = [...fns].toSorted((a, b) => b[1] - a[1]).slice(0, 12).map(([name, ms]) => [name, Math.round(ms)])
-        console.log(`e2e rprof: ${JSON.stringify({ title, marks, phases: Object.fromEntries(Object.entries(phases).map(([key, groups]) => [key, rounded(groups)])), top })}`)
+        console.log(`e2e rprof: ${JSON.stringify({ title, marks, phases: Object.fromEntries(Object.entries(phases).map(([key, groups]) => [key, rounded(groups)])), top, tops })}`)
       } finally { await session.detach().catch(() => undefined) }
     },
   }
