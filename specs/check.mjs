@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { connect, createServer } from 'node:net'
-import { homedir, tmpdir } from 'node:os'
+import { homedir, setPriority, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
@@ -125,6 +125,11 @@ function apalacheServer(lane) {
   return servers[lane]
 }
 
+// When simulations overlap the Apalache lanes, they run at a lower CPU priority. The longest bounded
+// check (follow's boundedSafety, about 95 s in Apalache alone) is the run's critical path, and with
+// equal priority the simulations slowed it past its 180-second deadline on four cores.
+let simulationNiceness = 0
+
 function spawnQuint(args, timeout, port) {
   processes++
   const verify = args[0] === 'verify'
@@ -139,6 +144,7 @@ function spawnQuint(args, timeout, port) {
   return new Promise(resolve => {
     // Keep Apalache's generated directory inside the ignored trace directory.
     const child = spawn(process.execPath, command, { cwd: verify ? generated : root, detached: process.platform !== 'win32' })
+    if (!verify && simulationNiceness > 0) setPriority(child.pid, simulationNiceness)
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', chunk => { stdout += chunk })
@@ -218,6 +224,10 @@ function shardJobs() {
 }
 
 async function runAll() {
+  // A run or verify job parses and typechecks its whole file before it starts, and fails on a type error,
+  // so a separate typecheck is kept only for files no other job reads.
+  const read = new Set(jobs.filter(job => job.args[0] !== 'typecheck').map(job => job.args[1]))
+  jobs.splice(0, jobs.length, ...jobs.filter(job => job.args[0] !== 'typecheck' || !read.has(job.args[1])))
   shardJobs()
   // Local execution serializes the JVM lane after simulations. Remote jobs
   // overlap independent JVM lanes with simulation groups within their quota.
@@ -234,7 +244,7 @@ async function runAll() {
   const lane = async (queue, index = 0) => {
     while (queue.length > 0 && !failed) {
       const group = queue.shift()
-      const batch = group.length > 1 ? simulationBatch(root) : undefined
+      const batch = group.length > 1 ? simulationBatch(root, { niceness: simulationNiceness }) : undefined
       let launched = false
       const execute = batch ? (args, timeout) => {
         if (!launched) { processes++; launched = true }
@@ -255,7 +265,10 @@ async function runAll() {
   }
   const simulations = () => Promise.all(Array.from({ length: parallel }, () => lane(queues[1])))
   const checks = () => Promise.all(Array.from({ length: apalacheLanes }, (_, index) => lane(queues[0], index)))
-  if (apalacheLanes > 1 || process.env.SPECS_OVERLAP === '1') await Promise.all([simulations(), checks()])
+  if (apalacheLanes > 1 || process.env.SPECS_OVERLAP === '1') {
+    simulationNiceness = queues[0].length > 0 ? 10 : 0
+    await Promise.all([simulations(), checks()])
+  }
   else {
     await simulations()
     await checks()

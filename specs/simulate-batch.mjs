@@ -1,12 +1,13 @@
 // Quint 0.33's CLI pipeline, with one parse/typecheck per input file. Each call
 // still creates a fresh evaluator and RNG and uses Quint's own ITF writer.
 import { spawn } from 'node:child_process'
+import { setPriority } from 'node:os'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { format } from 'node:util'
 
-export function simulationBatch(root) {
+export function simulationBatch(root, { niceness = 0 } = {}) {
   let child
   let pending
   const stop = () => {
@@ -28,6 +29,7 @@ export function simulationBatch(root) {
           cwd: root, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], detached: process.platform !== 'win32',
         })
         process.on('exit', stop)
+        if (niceness > 0) setPriority(child.pid, niceness)
         child.on('message', finish)
         child.on('error', (error) => finish({ status: null, stdout: '', stderr: '', error }))
         let diagnostic = ''
