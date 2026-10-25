@@ -4,11 +4,11 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed, full gallery walks, coverage and Mac suites
+//   bun run verify:main --nightly         varied Quint seed, full gallery walks and coverage
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
-//                                    then `perf` and `test:feel`
+//                                    then `perf` and `test:feel`; only when Tushar asks
 //
 // It checks main out into a temporary detached worktree, so nothing local is
 // sent, and runs `test`, `specs:check` (reused while its inputs match),
@@ -48,7 +48,8 @@ import { stopFromLog } from './verify-failures.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
-const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
+// A nightly run is all on the laptop; the Mac suites run only when asked.
+const withMac = argv.includes('--with-mac')
 const nightly = argv.includes('--nightly')
 const smoke = argv.includes('--smoke')
 if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
