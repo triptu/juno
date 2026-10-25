@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import { layoutTest, openState, paintTest, type Route } from './support'
 
 const open = (page: Page, component: string, id: string) =>
