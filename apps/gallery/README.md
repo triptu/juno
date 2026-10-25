@@ -13,7 +13,7 @@ Install the pinned headless shell with `bunx playwright install chromium --only-
 
 ## Cached walks
 
-`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports. Shared gallery code, configuration, styles, assets, fonts, tokens, test helpers and the lockfile also count. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
+`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports, plus the gallery shell, its styles, assets and fonts. Tokens count by value: only the layout tokens the state's files read, in every theme; colour and shadow tokens, comments, and paint-only CSS declarations do not count (`layout-tokens.mjs`). The walk counts through `shift-walk.ts` (or `focus-ring.spec.ts`) and its imports, which include `support.ts` and the guard; the spec's other tests and the Playwright config do not. Locked versions count only for packages the gallery imports or builds with. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
 
 Only a completed successful state is recorded. Before rechecking a state its old record is removed, so failure or interruption cannot preserve a previous pass. Records are written atomically under `$JUNO_BUILD_CACHE_DIR/gallery-walk-v1`, or the shared system temp directory's `juno-cache/results/gallery-walk-v1`. The remote runner uses `/cache/builds/gallery-walk-v1`.
 
