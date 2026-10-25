@@ -80,6 +80,7 @@ test('fresh archives reuse verified output and rebuild changed or damaged inputs
   writeFileSync(join(freshApp, 'untracked.txt'), 'new')
   assert.match(run(freshApp).stdout, /BUILT/)
   assert.equal(spawnSync('git', ['add', '.'], { cwd: fresh, env: fixtureEnv }).status, 0)
+  // A deleted file still in the index is not an input: the tree matches the earlier build again.
   rmSync(join(freshApp, 'untracked.txt'))
-  assert.match(run(freshApp).stdout, /BUILT/)
+  assert.match(run(freshApp).stdout, /restored/)
 })
