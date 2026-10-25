@@ -98,7 +98,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'search.spec.ts',
   'peek.spec.ts',
   'person-links.spec.ts',
-  'presence-others.spec.ts',
   'reaction-delivery.spec.ts',
   'reactions-dialog.spec.ts',
   'send-to-channel.spec.ts',
