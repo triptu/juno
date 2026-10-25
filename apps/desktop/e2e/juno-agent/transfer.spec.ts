@@ -31,7 +31,7 @@ test.describe.configure({ timeout: 180_000 })
 
 const point = 'restore.swapped'
 
-test(`a move restores the chat and pending cards for review after a crash at ${point}`, async ({ juno, fake, otherApp, shared }) => {
+test(`a move restores the chat and pending cards for review after a crash at ${point}`, { tag: ['@nightly', '@nightly-crash'] }, async ({ juno, fake, otherApp, shared }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send('what is on today?')

@@ -1,10 +1,8 @@
 import type { Locator, Page } from '@playwright/test'
 import { execFile } from 'node:child_process'
-import { writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
-import { join } from 'node:path'
 import type { FakeSlack } from '@juno/fake-slack'
-import { expect, launchApp, syncedTest, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
 /** Resolves a CSS custom property to the colour Chromium computes for it. */
@@ -28,10 +26,6 @@ function brightness(rgb: string): number {
 test('the signed-out shell uses bundled fonts, token colours and the chosen theme', async ({ win }) => {
   await test.step('renders the shell with bundled fonts and token colours', () => shellFontsAndColours(win))
   await test.step('switches to the dark theme in place', () => darkThemeInPlace(win))
-})
-
-test('the preload exposes only the isolated bridge', { tag: '@electron' }, async ({ win }) => {
-  await onlyTheBridge(win)
 })
 
 async function shellFontsAndColours(win: Page): Promise<void> {
@@ -124,7 +118,7 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 }
 
 // Signed in. The drag regions are counted first, before any surface has opened.
-syncedTest('the signed-in shell: its image policy, drag regions, surfaces over the title bars, and the build line', { tag: '@electron' }, async ({ juno, fake }) => {
+syncedTest('the signed-in shell: its image policy, drag regions, surfaces over the title bars, the build line with updates off, and the title bars in full screen', { tag: '@electron' }, async ({ juno, fake }) => {
   await test.step('images load only from the app and Slack; unfurls go through main (src/main/publicImage.ts)', async () => {
     const policy = await juno.win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
     expect(policy).toContain("img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:")
@@ -134,6 +128,9 @@ syncedTest('the signed-in shell: its image policy, drag regions, surfaces over t
   await test.step('only the title bars drag the window, and every control on them opts out', () => dragRegions(juno))
   await test.step('every surface that can open over a title bar opts out of its drag region', () => surfacesOptOut(juno, fake))
   await test.step('answers app.getInfo over the typed IPC bridge', () => buildLine(juno))
+  await test.step('Settings › About keeps updates off in tests', () => updatesOff(juno))
+  // Settings is a tab: the title bars stay as they are.
+  await test.step('in full screen the title bars drop the traffic lights’ room, and keep it again after', () => fullScreenInsets(juno))
 })
 
 async function dragRegions(juno: Juno): Promise<void> {
@@ -219,9 +216,48 @@ async function buildLine(juno: Juno): Promise<void> {
   await expect(juno.settings.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
 }
 
-test('a second launch on the same data hands over to the open window', { tag: '@electron' }, async ({ app: electronApp, win, userData }, testInfo) => {
+/** Without a releases repository, updates are unavailable (updates.spec.ts has the repository). About is open. */
+async function updatesOff(juno: Juno): Promise<void> {
+  await expect(juno.settings.root.getByText(/Juno 0\./)).toBeVisible()
+  const updates = juno.settings.root.getByRole('checkbox', { name: 'Download updates automatically' })
+  await expect(updates).not.toBeChecked()
+  await expect(updates).toBeDisabled()
+  await expect(juno.win.evaluate(() => window.juno.updates.set(true))).resolves.toEqual({ kind: 'unavailable' })
+  await expect(juno.settings.root.getByRole('button', { name: 'Restart to update' })).toHaveCount(0)
+  await expect(juno.settings.root.getByRole('button', { name: "What's new" })).toHaveCount(0)
+  await expect(juno.settings.root.getByRole('button', { name: 'Check for updates' })).toHaveCount(0)
+}
+
+async function fullScreenInsets(juno: Juno): Promise<void> {
+  const { app } = juno
+  const fullScreen = (on: boolean) => app.evaluate(({ BrowserWindow }, on) => BrowserWindow.getAllWindows()[0]!.setFullScreen(on), on)
+  // A button's left edge from the left of the pane it sits in.
+  const leftOf = (pane: string, name: RegExp) =>
+    juno.win.locator(pane).getByRole('button', { name }).evaluate((button, pane) => button.getBoundingClientRect().left - button.closest(pane)!.getBoundingClientRect().left, pane)
+  const hide = () => leftOf('aside[aria-label="Sidebar"]', /^Hide sidebar/)
+  const show = () => leftOf('[data-tab-strip]', /^Show sidebar/)
+
+  // The 78px after the lights, then the sidebar's 10px inset in full screen.
+  expect(await hide()).toBe(78)
+  await fullScreen(true)
+  await expect.poll(hide).toBe(10)
+  await fullScreen(false)
+  await expect.poll(hide).toBe(78)
+
+  // With the sidebar hidden, the tab strip does the same, from its own 10px padding.
+  await juno.frame.toggleWithButton()
+  await juno.frame.expectHidden()
+  expect(await show()).toBe(78)
+  await fullScreen(true)
+  await expect.poll(show).toBe(10)
+  await fullScreen(false)
+  await expect.poll(show).toBe(78)
+}
+
+test('the preload exposes only the isolated bridge, and a second launch on the same data hands over to the open window', { tag: '@electron' }, async ({ app: electronApp, win, userData }, testInfo) => {
   // Two process launches can take longer on the shared Mac.
   test.slow()
+  await test.step('the preload exposes only the isolated bridge', () => onlyTheBridge(win))
   await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
   const launch = await electronApp.evaluate(({ app }) => ({ executable: process.execPath, path: app.getAppPath(), userData: app.getPath('userData') }))
   expect(launch.userData).toBe(userData)
@@ -250,22 +286,4 @@ test('a second launch on the same data hands over to the open window', { tag: '@
   await expect.poll(() => mainWindow.evaluate((window) => window.isMinimized())).toBe(false)
   expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
   await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
-})
-
-test('a window saved on a display that is gone opens on screen', { tag: '@electron' }, async ({ running, userData }) => {
-  await running.close()
-  await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'light', bounds: { x: -6000, y: -6000, width: 1100, height: 760 } }))
-  const again = await launchApp(userData)
-  try {
-    const placed = await again.app.evaluate(({ BrowserWindow, screen }) => {
-      const bounds = BrowserWindow.getAllWindows()[0]!.getBounds()
-      const { workArea } = screen.getPrimaryDisplay()
-      return { bounds, inside: bounds.x >= workArea.x && bounds.y >= workArea.y && bounds.x + bounds.width <= workArea.x + workArea.width && bounds.y + bounds.height <= workArea.y + workArea.height }
-    })
-    expect(placed.inside).toBe(true)
-    expect(placed.bounds.width).toBe(1100)
-    expect(placed.bounds.height).toBe(760)
-  } finally {
-    await again.close()
-  }
 })

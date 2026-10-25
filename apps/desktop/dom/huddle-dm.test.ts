@@ -48,4 +48,4 @@ domTest('a DM huddle shows both people and counts up while huddles/info lags the
   }
   expect(durations.filter(([barTime, tabTime]) => barTime === null || barTime !== tabTime)).toEqual([])
   expect(new Set(durations.map(([time]) => time)).size).toBeGreaterThan(1)
-}, { timeout: 90_000 })
+}, { timeout: 90_000, tag: ['@nightly', '@nightly-huddle'] })
