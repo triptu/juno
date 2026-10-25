@@ -2,8 +2,8 @@
 // files"; architecture 9): a PDF, an HTML page, a Markdown snippet, a CSV
 // and audio open from their cards in the viewer, read from main's
 // `juno://files/<id>/content` on the Slack session; a zip gets Quick Look.
+// Markdown, CSV and audio cards are in the DOM lane (`dom/file-viewer.test.ts`).
 import { expect, test, type Fixtures } from './fixtures'
-import { schemeUrl } from './driver/juno'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -45,55 +45,6 @@ async function openCard({ juno }: Pick<Fixtures, 'juno'>, row: ReturnType<Fixtur
   await expect(viewer.locator('[data-viewer-name]')).toHaveText(name)
   return viewer
 }
-
-test('file cards open Markdown, CSV, audio and voice clips, with viewer navigation and external links', async ({ juno, fake }) => {
-  await test.step('read snippets and move between files', async () => {
-    const row = await postFiles({ juno, fake }, 'Notes and metrics', ['markdown', 'csv'])
-    const viewer = await openCard({ juno }, row, 'release-notes.md')
-    // The snippet's preview is cut short; the viewer reads the whole file.
-    await expect(viewer.locator('[data-viewer-text]').getByText('Release 4.2', { exact: true })).toBeVisible()
-    await expect(viewer.locator('[data-viewer-text]').getByText('Questions go to the release thread.')).toBeVisible()
-    await expect(viewer.locator('[data-viewer-meta]')).toHaveText(/ · 1 of 2$/)
-    // Its links are in the tab order and open as a message's do: ⌘-click in the browser.
-    const link = viewer.locator('[data-viewer-text]').getByRole('link', { name: 'the tracker' })
-    await expect(link).not.toHaveAttribute('tabindex', '-1')
-    await link.click({ modifiers: ['Meta'] })
-    await expect.poll(() => juno.browserLinks()).toContain('https://example.com/tracker')
-
-    await juno.win.keyboard.press('ArrowRight')
-    await expect(viewer.locator('[data-viewer-name]')).toHaveText('cluster-metrics.csv')
-    const table = viewer.getByRole('table')
-    await expect(table.getByRole('columnheader')).toHaveCount(40)
-    await expect(table.getByRole('columnheader').first()).toHaveText('host')
-    await expect(table.getByRole('row')).toHaveCount(81)
-    // A quoted field keeps its comma.
-    await expect(table.getByRole('cell', { name: 'eu-west, 1' }).first()).toBeVisible()
-    // The table scrolls inside the stage; the stage never grows.
-    const scroller = viewer.locator('[data-viewer-text]')
-    const sizes = await scroller.evaluate((element) => ({ client: element.clientHeight, scroll: element.scrollHeight, window: window.innerHeight }))
-    expect(sizes.scroll).toBeGreaterThan(sizes.client)
-    expect(sizes.client).toBeLessThan(sizes.window)
-    await juno.win.keyboard.press('Escape')
-    await expect(viewer).toHaveCount(0)
-  })
-  await test.step('play recordings and voice clips', async () => {
-    const row = await postFiles({ juno, fake }, 'Stand-up recording', ['audio'])
-    await expect(row.locator('audio[data-inline-audio]')).toHaveAttribute('src', schemeUrl('files'))
-    await expect(row.locator('[data-file-card]')).toContainText('5:00')
-    const viewer = await openCard({ juno }, row, 'standup-recording.wav')
-    const player = viewer.locator('audio[controls]')
-    await expect(player).toHaveCount(1)
-    await expect(viewer.locator('[data-viewer-item]')).toContainText('5:00')
-    await expect.poll(() => player.evaluate((audio: HTMLAudioElement) => audio.duration), { timeout: 15_000 }).toBeCloseTo(300, 0)
-    await juno.win.keyboard.press('Escape')
-    await expect(viewer).toHaveCount(0)
-
-    fake.control('injectFiles', { channel: 'C0ENG', text: 'Voice note', files: [{ kind: 'voice' }] })
-    const voice = juno.topic.message('Voice note')
-    // A voice clip plays Slack's transcoded copy.
-    await expect(voice.locator('audio[data-inline-audio]')).toHaveAttribute('src', /aac%3D1$/)
-  })
-})
 
 // Main serves the PDF, sees Esc pressed inside a frame and shows Quick Look: Electron only.
 test('a PDF opens in Chromium’s PDF viewer, an HTML file in a sandboxed frame, Esc closes both from inside, and Quick Look on a zip leaves Downloads alone', { tag: '@electron' }, async ({ juno, fake }) => {
