@@ -1,9 +1,9 @@
 // Formatting in the composer (spec section 8): Slack's markup typed in the
 // field goes to Slack as rich_text styles and a code block, the message
-// shows them, the edit field shows them back as markup, and ⌘B wraps a
-// selection in one edit that ⌘Z takes back. ⌘B and picked mentions edit
-// through `execCommand`, so they, the cold formatting chunk and the caret in
-// mixed-direction lines stay in the browser lane (`e2e/formatting.spec.ts`).
+// shows them, the edit field shows them back as markup, and ⌘B and ⌘I keep
+// picked mentions and linked words, in the composer and the inline edit. ⌘Z
+// after ⌘B, the cold formatting chunk and the caret in mixed-direction lines
+// stay in the browser lane (`e2e/formatting.spec.ts`).
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -93,4 +93,80 @@ async function sendMarkup({ juno, fake }: Context): Promise<void> {
       { type: 'text', text: 'code', style: { code: true } }] },
     { type: 'rich_text_preformatted', border: 0, elements: [{ type: 'text', text: 'make test' }] },
   ])
+}
+
+/** ⌘V with `text` on the clipboard, into `field`. */
+function pasteText(juno: Juno, field: HTMLElement, text: string): void {
+  const page = juno.win.window as unknown as typeof globalThis
+  const data = new page.DataTransfer()
+  data.setData('text/plain', text)
+  field.dispatchEvent(new page.ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+}
+
+domTest('formatting keeps picked mentions and linked words, in the composer and the inline edit', async ({ juno, fake, step }) => {
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  await step('formatting keeps picked mentions and linked words', () => formatMentionsAndLinks({ juno, fake }))
+  await step('inline edit formatting expands partial mentions and links', () => formatInEdit({ juno, fake }))
+})
+
+const posts = (fake: FakeSlack) => fake.calls.filter((call) => call.method === 'chat.postMessage').length
+const updates = (fake: FakeSlack) => fake.calls.filter((call) => call.method === 'chat.update')
+
+async function formatMentionsAndLinks({ juno, fake }: Context): Promise<void> {
+  const { topic } = juno
+  await topic.composer.fill('')
+  const before = posts(fake)
+  await topic.composer.pressSequentially('@ma')
+  // The list for "@ma", not the one for "@m" still on screen.
+  await expect(topic.suggestions.getByRole('option').first()).toHaveAccessibleName(/^Maya/)
+  await topic.composer.press('Enter')
+  select(await topic.composer.element(), 2, 4)
+  await topic.composer.press('Meta+i')
+  await expect(topic.composer).toHaveValue('_@Maya_ ')
+  await expect(topic.composerChips).toHaveText(['@Maya'])
+  await topic.composer.press('Enter')
+  await topic.expectSent('Maya')
+  expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'user', user_id: 'U0MAYA', style: { italic: true } }] }])
+
+  await topic.composer.fill('plan')
+  select(await topic.composer.element(), 0, 4)
+  pasteText(juno, await topic.composer.element(), 'https://example.com/plan')
+  select(await topic.composer.element(), 0, 4)
+  await topic.composer.press('Meta+b')
+  await expect(topic.composerLinks).toHaveText('plan')
+  await topic.composer.press('Enter')
+  await expect.poll(() => posts(fake)).toBe(before + 2)
+  expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } }] }])
+}
+
+async function formatInEdit({ juno, fake }: Context): Promise<void> {
+  const composer = juno.topic.composer
+  const before = { posts: posts(fake), updates: updates(fake).length }
+  await composer.pressSequentially('@ma')
+  await expect(juno.topic.suggestions.getByRole('option').first()).toHaveAccessibleName(/^Maya/)
+  await composer.press('Enter')
+  await composer.pressSequentially('plan')
+  select(await composer.element(), 6, 10)
+  pasteText(juno, await composer.element(), 'https://example.com/plan')
+  await composer.press('Enter')
+  await expect.poll(() => posts(fake)).toBe(before.posts + 1)
+  await juno.topic.expectSent('Maya plan')
+  await composer.press('ArrowUp')
+  await juno.topic.message('Maya plan').press('e')
+  const field = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
+  await expect(field).toHaveValue('@Maya plan')
+  select(await field.element(), 2, 4)
+  await field.press('Meta+i')
+  await expect(field).toHaveValue('_@Maya_ plan')
+  select(await field.element(), 9, 10)
+  await field.press('Meta+b')
+  await expect(field).toHaveValue('_@Maya_ *plan*')
+  await field.press('Enter')
+  await expect.poll(() => updates(fake).length).toBe(before.updates + 1)
+  const update = updates(fake).at(-1)!
+  expect(lastPost([{ method: 'chat.postMessage', args: update.args }]).elements).toEqual([{ type: 'rich_text_section', elements: [
+    { type: 'user', user_id: 'U0MAYA', style: { italic: true } }, { type: 'text', text: ' ' },
+    { type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } },
+  ] }])
 }

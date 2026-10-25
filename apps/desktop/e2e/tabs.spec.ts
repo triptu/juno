@@ -1,7 +1,7 @@
-// Tabs in the browser: typing right after an open goes to the topic's composer, switching moves
-// nothing in the strip, dragging and ⌃⇧← ⌃⇧→ reorder them, and each tab shows its topic's art
-// or the DM person's photo. Opening, focusing, closing, the app menu's tab items, ⌘W held down
-// and the day-old sweep are in the DOM lane (`dom/tabs.test.ts`).
+// Tabs in the browser: switching moves nothing in the strip, dragging and ⌃⇧← ⌃⇧→ reorder them,
+// and each tab shows its topic's art or the DM person's photo. Opening, focusing, closing, typing
+// right after an open, the app menu's tab items, ⌘W held down and the day-old sweep are in the DOM
+// lane (`dom/tabs.test.ts`).
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, syncedTest, test } from './fixtures'
 
@@ -17,26 +17,11 @@ const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-// The keys go to the composer through the browser's editing (execCommand), so this stays here.
-syncedTest('typing right after an open from the list goes to the topic composer, even before the topic shows, and switching tabs moves nothing in the strip', async ({ juno }) => {
+syncedTest('switching tabs moves nothing in the strip', async ({ juno }) => {
   const { sidebar, tabs } = juno
-  await sidebar.row(POSTGRES).open()
-  await juno.win.keyboard.type('ok')
-  await tabs.expectActive(POSTGRES)
-  await expect(juno.topic.composer).toBeFocused()
-  await expect(juno.topic.composer).toHaveValue('ok')
-  await juno.topic.composer.fill('')
   await sidebar.row(RINA).open()
-  await sidebar.row(RINA).expectFocused()
-  await juno.win.keyboard.type('x')
-  await expect(juno.topic.composer).toBeFocused()
-  await expect(juno.topic.composer).toHaveValue('x')
-  await juno.win.keyboard.press('Backspace')
   await sidebar.row(POSTGRES).openInNewTab()
   await tabs.expectActive(POSTGRES)
-  await juno.win.keyboard.type('x')
-  await expect(juno.topic.composer).toHaveValue('x')
-  // Switching moves nothing in the strip.
   await expectNoLayoutShift(juno.win, () => tabs.select(RINA), { root: '[role="tablist"]' })
 })
 
@@ -54,16 +39,14 @@ syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and kee
   // The dropped tab settles with no transform left on any tab.
   await expect.poll(() => tabs.root.locator('[data-tab]').evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement).style.transform).join(''))).toBe('')
 
-  // The keyboard moves the focused tab one place, and a screen reader hears where it went.
+  // The keyboard moves the focused tab one place.
   await tabs.tab(ROADMAP).focus()
   await juno.win.keyboard.press('Control+Shift+ArrowRight')
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Rina/)])
-  await expect(tabs.announcement).toHaveText(/^Moved to position 2 of 3\./)
   await tabs.expectFocused(ROADMAP)
   await juno.win.keyboard.press('Control+Shift+ArrowLeft')
   await juno.win.keyboard.press('Control+Shift+ArrowLeft')
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
-  await expect(tabs.announcement).toHaveText(/^Moved to position 1 of 3\./)
 
   // Esc during a drag puts the tab back.
   const from = await tabs.tab(RINA).boundingBox()

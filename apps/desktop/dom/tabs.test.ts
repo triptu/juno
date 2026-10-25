@@ -22,7 +22,7 @@ domTest('tabs open, focus and close from the sidebar, the keyboard and the app m
 
 async function openFocusAndClose(juno: Juno): Promise<void> {
   const { sidebar, tabs } = juno
-  // An open from the list keeps focus on its row for the arrows. Typing then goes to the composer (tabs.spec.ts: it needs execCommand).
+  // An open from the list keeps focus on its row for the arrows. Typing then goes to the composer (the test after this one).
   await sidebar.row(POSTGRES).open()
   await tabs.expectActive(POSTGRES)
   await sidebar.row(RINA).open()
@@ -120,6 +120,26 @@ async function appMenuMovesBetweenTabs(juno: Juno): Promise<void> {
   await tabs.expectCount(2)
   await tabs.expectActive(ROADMAP)
 }
+
+domTest('typing right after an open from the list goes to the topic composer, even before the topic shows', async ({ juno }) => {
+  const { sidebar, tabs, topic } = juno
+  await sidebar.row(POSTGRES).open()
+  await juno.win.keyboard.type('ok')
+  await tabs.expectActive(POSTGRES)
+  await expect(topic.composer).toBeFocused()
+  await expect(topic.composer).toHaveValue('ok')
+  await topic.composer.fill('')
+  await sidebar.row(RINA).open()
+  await sidebar.row(RINA).expectFocused()
+  await juno.win.keyboard.type('x')
+  await expect(topic.composer).toBeFocused()
+  await expect(topic.composer).toHaveValue('x')
+  await juno.win.keyboard.press('Backspace')
+  await sidebar.row(POSTGRES).openInNewTab()
+  await tabs.expectActive(POSTGRES)
+  await juno.win.keyboard.type('x')
+  await expect(topic.composer).toHaveValue('x')
+})
 
 domTest('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno

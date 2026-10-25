@@ -15,7 +15,8 @@ export const tokenFiles = ['packages/tokens/src/tokens.stylex.ts', 'packages/tok
 /**
  * The token part of walk keys over a repository: `structure` (the token files
  * without their values) and `key(files)`, the values of the layout tokens
- * those files read and of the tokens those values read.
+ * those files read and of the tokens those values read (every token they read
+ * with `{ paint: true }`).
  */
 export function layoutTokens(root, files, graph) {
   const { tokens, structure } = parseTokens(tokenFiles.filter(file => files.has(file)).map(file => [file, readFileSync(join(root, file), 'utf8')]))
@@ -29,13 +30,14 @@ export function layoutTokens(root, files, graph) {
     }
     return reads.get(file)
   }
-  const key = inputs => {
+  // With `paint`, colours and shadows count too: for checks that read colours (contrast).
+  const key = (inputs, { paint: withPaint = false } = {}) => {
     const read = new Set()
     const add = name => {
       if (read.has(name)) return
       read.add(name)
       // A paint value cannot move a box, whatever it reads.
-      if (!paint.has(name)) for (const next of tokens.get(name).reads) add(next)
+      if (withPaint || !paint.has(name)) for (const next of tokens.get(name).reads) add(next)
     }
     for (const file of inputs) {
       if (tokenFiles.includes(file)) continue
@@ -47,7 +49,7 @@ export function layoutTokens(root, files, graph) {
       }
       for (const name of names) add(name)
     }
-    return [...read].filter(name => !paint.has(name)).toSorted().map(name => [name, tokens.get(name).values])
+    return [...read].filter(name => withPaint || !paint.has(name)).toSorted().map(name => [name, tokens.get(name).values])
   }
   return { structure, key }
 }

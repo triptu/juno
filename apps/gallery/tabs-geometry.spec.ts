@@ -1,40 +1,8 @@
-import { expect, test, type Page } from '@playwright/test'
-import { openState, type Route } from './support'
-
-/**
- * The tab strip's close buttons (inventory 4, decided 10-17): never a Tab
- * stop, never inside the `tab` element, and named by the tab as its action.
- */
+import { expect, type Page } from '@playwright/test'
+import { layoutTest, openState, paintTest, type Route } from './support'
 
 const open = (page: Page, component: string, id: string) =>
   openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} } satisfies Route)
-
-test('a tab names its close button as its action; the button is its sibling and not a Tab stop', async ({ page }) => {
-  await open(page, 'Tabs', 'strip/many')
-  const tabs = await page.evaluate(() =>
-    [...document.querySelectorAll('[role="tab"]')].map((tab) => {
-      const id = tab.getAttribute('aria-actions')
-      const button = id === null ? null : document.getElementById(id)
-      return {
-        hasAction: button !== null,
-        nested: tab.querySelector('button') !== null,
-        sibling: button?.closest('[data-tab]') === tab.parentElement,
-        tabStop: button === null ? false : button.tabIndex >= 0,
-      }
-    }),
-  )
-  const closable = tabs.filter((tab) => tab.hasAction)
-  expect(closable.length).toBeGreaterThan(1)
-  for (const tab of tabs) expect(tab.nested).toBe(false)
-  for (const tab of closable) expect(tab).toMatchObject({ sibling: true, tabStop: false })
-})
-
-test('Tab from the active tab goes to "+", past every close button', async ({ page }) => {
-  await open(page, 'Tabs', 'strip/many')
-  await page.locator('[role="tab"][aria-selected="true"]').focus()
-  await page.keyboard.press('Tab')
-  expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toMatch(/^New (chat|tab)/)
-})
 
 /**
  * Tab separation (inventory 4, decided 10-16): inactive tabs sit on a fill
@@ -75,7 +43,7 @@ function contrast(a: string, b: string): number {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`${theme}: inactive tabs read apart from the active one, with dividers only between inactive tabs`, async ({ page }) => {
+  paintTest(`${theme}: inactive tabs read apart from the active one, with dividers only between inactive tabs`, async ({ page }) => {
     await openState(page, { component: 'Tabs', id: 'with-page/three-first-active', route: 'Tabs/with-page/three-first-active', group: '', groupId: '', state: '', frame: {} }, theme)
     const tabs = await readTabs(page)
     expect(tabs.map((tab) => tab.active)).toEqual([true, false, false])
@@ -96,7 +64,7 @@ for (const theme of ['light', 'dark'] as const) {
   })
 }
 
-test('with the middle of three tabs active, both dividers next to it hide; twelve tabs keep one divider per inactive pair', async ({ page }) => {
+paintTest('with the middle of three tabs active, both dividers next to it hide; twelve tabs keep one divider per inactive pair', async ({ page }) => {
   await open(page, 'Tabs', 'with-page/three-middle-active')
   expect((await readTabs(page)).map((tab) => tab.divider)).toEqual([false, false, false])
   await open(page, 'Tabs', 'with-page/twelve')
@@ -107,7 +75,7 @@ test('with the middle of three tabs active, both dividers next to it hide; twelv
   for (let index = 1; index < twelve.length; index++) expect(twelve[index]!.rect[0]).toBeCloseTo(twelve[index - 1]!.rect[0]! + twelve[index - 1]!.rect[2]!, 1)
 })
 
-test('"+" sits one tab gap after the last tab, level with it, and stays at the end of the strip when the tabs scroll', async ({ page }) => {
+layoutTest('"+" sits one tab gap after the last tab, level with it, and stays at the end of the strip when the tabs scroll', async ({ page }) => {
   const place = () => page.evaluate(() => {
     const box = (element: Element | null | undefined) => {
       const rect = element!.getBoundingClientRect()

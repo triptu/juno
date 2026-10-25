@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { openState } from './support'
+import { expect } from '@playwright/test'
+import { layoutTest as test, openState } from './support'
 
 // Light only: a theme changes colours, never a size.
 for (const density of ['compact', 'comfortable'] as const) {
@@ -28,24 +28,24 @@ for (const density of ['compact', 'comfortable'] as const) {
   })
 }
 
-for (const component of ['AllTopics', 'Home', 'TopicSwitcher']) {
-  test(`${component} grows its title rows without overlaps`, async ({ page }) => {
+test('AllTopics, Home and TopicSwitcher grow their title rows without overlaps', async ({ page }) => {
+  for (const component of ['AllTopics', 'Home', 'TopicSwitcher']) {
     await openState(page, { component, id: 'titles/two-lines', route: `${component}/titles/two-lines`, frame: {}, group: 'Titles', groupId: 'titles', state: 'two-lines' })
     const selector = component === 'AllTopics' ? '[data-all-topics-row]' : component === 'Home' ? '[data-home-item]' : '[role="option"]'
     const rows = page.locator(`[data-fixture-frame] ${selector}`)
-    expect(await rows.count()).toBeGreaterThan(1)
+    expect(await rows.count(), component).toBeGreaterThan(1)
     const boxes = await rows.evaluateAll((nodes) => nodes.map((node) => {
       const rect = node.getBoundingClientRect()
       return { top: rect.top, bottom: rect.bottom }
     }))
-    for (let i = 1; i < boxes.length; i++) expect(boxes[i]!.top).toBeGreaterThanOrEqual(boxes[i - 1]!.bottom)
-  })
-}
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i]!.top, `${component} row ${i}`).toBeGreaterThanOrEqual(boxes[i - 1]!.bottom)
+  }
+})
 
 // Like Mail: a wrapped title keeps its time, and the icons and tags beside it, on its first line. A zero-size inline
 // block's bottom edge is the baseline of the line it starts.
-for (const id of ['titles/one-line-compact', 'titles/two-lines-compact', 'titles/two-lines-comfortable', 'titles/two-lines-wrapped']) {
-  test(`a row's time sits on its title's first line: ${id}`, async ({ page }) => {
+test('a row\'s time sits on its title\'s first line, one or two lines, each density', async ({ page }) => {
+  for (const id of ['titles/one-line-compact', 'titles/two-lines-compact', 'titles/two-lines-comfortable', 'titles/two-lines-wrapped']) {
     await openState(page, { component: 'TopicRow', id, route: `TopicRow/${id}`, frame: {}, group: 'Titles', groupId: 'titles', state: id.slice('titles/'.length) })
     const rows = await page.locator('[data-fixture-frame] [data-topic-row]').evaluateAll((nodes) => nodes.map((row) => {
       // In a flex box the text is an anonymous item: wrap it in a span, which lays out the same, and probe inside.
@@ -84,15 +84,15 @@ for (const id of ['titles/one-line-compact', 'titles/two-lines-compact', 'titles
         }),
       }
     }))
-    expect(rows.length).toBeGreaterThan(1)
-    if (id !== 'titles/one-line-compact') expect(rows.filter((row) => row.lines === 2).length).toBeGreaterThan(0)
+    expect(rows.length, id).toBeGreaterThan(1)
+    if (id !== 'titles/one-line-compact') expect(rows.filter((row) => row.lines === 2).length, id).toBeGreaterThan(0)
     for (const row of rows) {
       if (row.title === null || row.first === null) continue
-      expect(Math.abs(row.time - row.title)).toBeLessThanOrEqual(1)
+      expect(Math.abs(row.time - row.title), id).toBeLessThanOrEqual(1)
       for (const part of row.beside) {
-        expect(part.top).toBeGreaterThanOrEqual(row.first.top - 1)
-        expect(part.bottom).toBeLessThanOrEqual(row.first.bottom + 1)
+        expect(part.top, id).toBeGreaterThanOrEqual(row.first.top - 1)
+        expect(part.bottom, id).toBeLessThanOrEqual(row.first.bottom + 1)
       }
     }
-  })
-}
+  }
+})

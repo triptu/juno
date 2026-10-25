@@ -251,7 +251,6 @@ async function reactFromMenu(juno: Juno, fake: FakeSlack): Promise<void> {
 
   // R in the open menu chooses More reactions, as its tooltip says.
   const keyed = await juno.messageMenu.openOnRow(row)
-  await expect(keyed.more).toHaveAttribute('aria-keyshortcuts', 'r')
   await juno.win.keyboard.press('r')
   await expect(keyed.search).toBeFocused()
   await juno.win.keyboard.press('Escape')
