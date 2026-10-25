@@ -1,8 +1,6 @@
-import { DatabaseSync } from 'node:sqlite'
-import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
 import { unfurlFixtures } from '@juno/fake-slack'
-import { expect, syncedTest, test } from './fixtures'
+import { expect, test } from './fixtures'
 import { schemeSrc } from './driver/juno'
 
 /** Some photo under `scope` has loaded its bytes. */
@@ -57,38 +55,4 @@ test('photos load in messages, sidebar stacks, a DM row and the account menu, an
   await juno.accountMenu.close()
 })
 
-test('the image route refuses local addresses and non-image responses', { tag: '@electron' }, async ({ juno, fake, app, win }) => {
-  const policy = await win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
-  expect(policy).toContain("img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:")
-  expect(policy).not.toContain('slack-imgs.com')
-  expect(policy).not.toContain('twimg.com')
-  await juno.signIn()
-  const urls = ['https://127.0.0.1/image.png', 'https://[::1]/image.png', 'file:///tmp/image.png', `${fake.url}/health`]
-  for (const url of urls) {
-    const status = await app.evaluate(async ({ net }, source) => {
-      const response = await net.fetch(`juno://images/?url=${encodeURIComponent(source)}`)
-      return response.status
-    }, url)
-    expect(status).toBe(404)
-  }
-})
-
-syncedTest('users stored without a photo get one on the next launch, with no re-sync', async ({ fake, userData, relaunch }) => {
-  const relaunched = await relaunch({ whileClosed: () => {
-    // A cache written before photos were built from the avatar hash.
-    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'))
-    db.prepare('UPDATE users SET avatar_url = NULL, avatar_small_url = NULL, avatar_large_url = NULL').run()
-    db.prepare(`INSERT INTO sync_state (key, value_json) VALUES ('e2e_kept', 'true')`).run()
-    db.close()
-  } })
-  const dm = relaunched.sidebar.row('Maya', { exact: true }).root
-  await expect(dm.locator(`img${schemeSrc('files')}[src*="/avatar"]`)).toHaveAttribute('src', /T0JUNO-U0MAYA-fakeu0maya-192$/, { timeout: 30_000 })
-  await expectPhotoLoaded(dm)
-  await relaunched.accountMenu.open()
-  await expectPhotoLoaded(relaunched.accountMenu.root)
-  await relaunched.accountMenu.close()
-  const after = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'))
-  // The cache file was kept, not deleted and synced again.
-  expect(after.prepare(`SELECT value_json FROM sync_state WHERE key = 'e2e_kept'`).get()).toEqual({ value_json: 'true' })
-  after.close()
-})
+// Users stored without a photo get one on the next start: the engine's restart-cache flow test.

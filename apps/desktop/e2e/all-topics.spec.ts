@@ -1,7 +1,7 @@
 // The All topics page (SPEC 11, inventory 10) against the fake Slack: it
 // lists what the sidebar leaves out (quiet, resolved, unfollowed and
-// never-followed topics), every filter narrows it, a row opens its topic in
-// the tab, and the row menu's actions work here with their undo.
+// never-followed topics), a row opens its topic in the tab, the filters reach
+// the list, and the place picker finds conversations by word.
 import { expect, test, type Fixtures } from './fixtures'
 
 // Starts signed in and synced (README, "Synced start").
@@ -56,50 +56,20 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
   await juno.topic.expectTitle(/We have 142 flags/)
 })
 
-test('filters all topics by status, kind, text and place, then acts on rows with Undo', async ({ juno, slack }) => {
-  const context = { juno, slack }
-  await test.step('each filter narrows the list: status chips, kind, sort and text', () => filterTopics(context))
-  await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace(context))
-  await test.step('the row menu works from All topics, each action with its undo', () => actOnTopicRows(context))
+// What each filter keeps, the chip counts and a row's status after an action are the engine's
+// all-topics flow test; the row menu is actions.spec.ts. This checks the controls reach the list.
+test('the filters reach the list, and the place picker searches conversations by word', async ({ juno }) => {
+  await test.step('a status chip, the text filter and the empty list\'s Clear filters each change the list', () => useFilters(juno))
+  await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace({ juno }))
 })
 
-async function filterTopics({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
+async function useFilters(juno: Fixtures['juno']): Promise<void> {
   const { allTopics } = juno
   await allTopics.open()
-
-  // Status chips, with their counts.
   await allTopics.filterStatus('Quiet')
   await allTopics.row(QUIET).expectVisible()
   await allTopics.row(POSTGRES).expectAbsent()
-  for (const title of await allTopics.titles()) expect(title).not.toBe('')
-  await allTopics.filterStatus('Open')
-  await allTopics.row(POSTGRES).expectVisible()
-  await allTopics.row(QUIET).expectAbsent()
-  await allTopics.filterStatus('Resolved')
-  await allTopics.expectEmpty()
-  await allTopics.expectCount('Resolved', 0)
   await allTopics.filterStatus('All')
-
-  // Kind: DMs only, then channels only.
-  await allTopics.filterKind('DMs')
-  await allTopics.row(POSTGRES).expectAbsent()
-  await allTopics.row(OFFSITE).expectVisible()
-  await allTopics.filterKind('Channels')
-  await allTopics.row(OFFSITE).expectAbsent()
-  await allTopics.row(POSTGRES).expectVisible()
-
-  // Place: the next test.
-
-  // Sort: most messages puts the six-reply Postgres thread above the two-reply quiet one.
-  await allTopics.sort('Most messages')
-  const byMessages = await allTopics.titles()
-  expect(byMessages.findIndex((title) => title.startsWith('Draft plan'))).toBeLessThan(byMessages.findIndex((title) => title.startsWith('Lag alerts')))
-  await allTopics.sort('Oldest first')
-  const oldest = await allTopics.titles()
-  expect(oldest.findIndex((title) => title.startsWith('Lag alerts'))).toBeLessThan(oldest.findIndex((title) => title.startsWith('Draft plan')))
-  await allTopics.sort('Most recent')
-
-  // Text: a word from a reply finds its thread, not just titles.
   await allTopics.type('reaper')
   await allTopics.row(STAGING).expectVisible()
   await allTopics.row(POSTGRES).expectAbsent()
@@ -109,7 +79,6 @@ async function filterTopics({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await allTopics.clearFilters()
   await expect(allTopics.search).toHaveValue('')
   await allTopics.row(POSTGRES).expectVisible()
-  await allTopics.row(QUIET).expectVisible()
 }
 
 async function pickTopicPlace({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
@@ -152,59 +121,4 @@ async function pickTopicPlace({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await allTopics.row(POSTGRES).expectAbsent()
   await allTopics.filterPlace('any', 'Anywhere')
   await allTopics.row(POSTGRES).expectVisible()
-}
-
-async function actOnTopicRows({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
-  const { allTopics, sidebar } = juno
-  await allTopics.open()
-  const postgres = allTopics.row(POSTGRES)
-
-  // Resolve, then Undo from the toast.
-  await postgres.chooseInMenu('resolve')
-  await juno.expectToast(`Resolved · ${POSTGRES}`)
-  await postgres.expectStatus('Resolved')
-  await juno.undoFromToast()
-  await postgres.expectStatus('Open')
-
-  // Reopen a resolved topic from here, and ⌘Z.
-  await postgres.chooseInMenu('resolve')
-  await postgres.expectStatus('Resolved')
-  await postgres.chooseInMenu('reopen')
-  await juno.expectToast(`Reopened · ${POSTGRES}`)
-  await postgres.expectStatus('Open')
-  await juno.undo()
-  await postgres.expectStatus('Resolved')
-  await juno.undo()
-  await postgres.expectStatus('Open')
-
-  // Pin shows the pin; undo takes it off.
-  await postgres.chooseInMenu('pin')
-  await juno.expectToast(`Pinned · ${POSTGRES}`)
-  await expect(postgres.root.getByTitle('Pinned')).toBeVisible()
-  await juno.undo()
-  await expect(postgres.root.getByTitle('Pinned')).toHaveCount(0)
-
-  // Notify me: Never unfollows: Unfollowed here, gone from the sidebar. Always follows again; undo unfollows.
-  await postgres.chooseInMenu('notify-never')
-  await postgres.expectStatus('Unfollowed')
-  await sidebar.row(POSTGRES).expectAbsent()
-  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
-  await postgres.chooseInMenu('notify-always')
-  await postgres.expectStatus('Open')
-  await sidebar.row(POSTGRES).expectVisible()
-  await juno.undo()
-  await postgres.expectStatus('Unfollowed')
-  await juno.undo()
-  await postgres.expectStatus('Open')
-
-  // A never-followed thread followed from here gets a sidebar row.
-  await allTopics.row(FLAGS).chooseInMenu('notify-auto')
-  await sidebar.row(FLAGS).expectVisible()
-
-  // Rename edits the row in place; undo puts the old title back.
-  await postgres.chooseInMenu('rename')
-  await juno.rename('Postgres cutover')
-  await allTopics.row('Postgres cutover').expectVisible()
-  await juno.undo()
-  await postgres.expectVisible()
 }

@@ -148,6 +148,8 @@ export interface RunningEngine {
   readonly socketIdle: () => Promise<void>
   /** Requests and awaits a complete pass through its normal serial worker. */
   readonly workPass: (name: WorkName) => Promise<void>
+  /** Passes started so far by each worker that has run, for counting work at rest. */
+  readonly passes: () => ReadonlyMap<WorkName, number>
   /** Number of actions that passed preflight and requested the send lane. */
   readonly actionsReady: () => number
   /** Commands holding or waiting for the same target lock. */
@@ -195,6 +197,8 @@ export interface EngineOptions {
   readonly paced?: number
   /** Run the background AI jobs (titles, art, Home's AI items, Juno's Automated check). Off by default, so a test sees no AI result it did not ask for. */
   readonly aiJobs?: boolean
+  /** Open the cache with one more migration (`cacheMigrationsWithProbe`), as a build that adds one does. */
+  readonly cacheMigrationProbe?: boolean
 }
 
 /** All scheduling ratios stay at 1:20; explicit sync passes replace periodic work in ordinary tests. */
@@ -239,7 +243,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     if (state === undefined) { state = { started: 0, finished: 0 }; work.set(name, state) }
     return state
   }
-  const handle = await timed('engine construction', () => startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }) }, {
+  const handle = await timed('engine construction', () => startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.cacheMigrationProbe === true ? { cacheMigrationProbe: true } : {}), ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }) }, {
     timing: { ...fastTiming, ...options.timing },
     ...(options.clock === undefined ? {} : { clock: options.clock }),
     work: {
@@ -330,6 +334,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     },
     actionsReady: () => actionsReady,
     pendingCommands: (key) => commands.get(key) ?? 0,
+    passes: () => new Map([...work].map(([name, state]) => [name, state.started])),
     workPass: async (name) => {
       const state = stateOf(name)
       const wake = await waitFor(() => state.wake, WAIT_MS, `${name} worker ready`)

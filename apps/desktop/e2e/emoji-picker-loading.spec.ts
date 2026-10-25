@@ -5,7 +5,8 @@ import { holdWorkspaceEmoji } from './emojiDelay'
 
 test('cold picker paints Frequently used complete and keeps its first cell still', async ({ juno, fake, relaunch, userData }) => {
   test.setTimeout(120_000)
-  for (let i = 0; i < 20_000; i++) fake.addEmoji({ name: `cold_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
+  // The gate below holds the workspace emoji, so a few hundred stand for a large workspace; perf.spec.ts times 20,000.
+  for (let i = 0; i < 300; i++) fake.addEmoji({ name: `cold_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
   await juno.signIn()
   await juno.waitForSync()
   const second = await relaunch({ whileClosed: () => {
