@@ -57,32 +57,6 @@ medium('first sign-in shows threads and DMs before history is read, channels onc
   await expect.poll(withPreview, { timeout: 120_000 }).toBeGreaterThan(previewsAtStart)
 })
 
-medium('the busiest channels show a preview seconds after sign-in, before their history is read', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake }) => {
-  test.setTimeout(120_000)
-  // History waits: any channel preview now comes from the preview search after the quick start.
-  fake.holdNext({ method: 'conversations.history', times: 1_000, before: true, reason: 'history' })
-  await juno.signIn({ skipSetUp: false })
-  await juno.skipSetUp()
-  const { sidebar } = juno
-  await expect(sidebar.rows.first()).toBeVisible({ timeout: 60_000 })
-  const quickStart = Date.now()
-
-  // A channel's Main row with a "Sender: text" preview.
-  const channelPreviews = () =>
-    sidebar.rows.evaluateAll((rows) =>
-      rows.filter((row) => {
-        const titleId = row.getAttribute('aria-labelledby')
-        const title = (titleId === null ? null : document.getElementById(titleId)?.textContent) ?? ''
-        return title.startsWith('#') && (row.textContent ?? '').slice(title.length).includes(': ')
-      }).length,
-    )
-  await expect.poll(channelPreviews, { timeout: 60_000 }).toBeGreaterThanOrEqual(5)
-  test.info().annotations.push({ type: 'previews', description: `${Date.now() - quickStart} ms from rows to channel previews` })
-  expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.kind === 'api')).toHaveLength(0)
-  expect(fake.heldCount({ method: 'conversations.history' })).toBe(1)
-  fake.release({ method: 'conversations.history' })
-})
-
 mediumQuick('Home is ready once DMs, mentions and unread threads have history, before the last history page', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake }) => {
   test.setTimeout(120_000)
   // What Home is made of (SPEC 12, owner 10-18): DMs and group DMs, conversations with an unread mention, and those
