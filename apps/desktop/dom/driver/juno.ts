@@ -6,6 +6,7 @@
  * Native menus and app-menu items go through the page's test seam
  * (`web/page/testSeam.ts`), as in the browser lane (`menus.ts`).
  */
+import type { NotificationPermission } from '@juno/contract'
 import type { AppMenuItem, AppSurface, WorkPassName } from '../../e2e/driver/surface'
 import type { JunoVerbs, MenuSeen, SettingsSectionName, TabStripVerbs } from '../../e2e/driver/verbs'
 import type { SystemHooks } from '../../web/shell'
@@ -16,8 +17,8 @@ import type { Query } from '../query'
 import { HomePane, HomeWritePane } from './home'
 import { domSurface, escapeRegExp, Menus } from './menus'
 import { PaletteDriver } from './palette'
-import { AccountMenu, NotificationsPage, SettingsPage } from './settings'
-import { Sidebar } from './sidebar'
+import { AccountMenu, hoursRows, NotificationsPage, PrivacyMode, SettingsPage } from './settings'
+import { PEEK_KEYS, Sidebar, type PeekKeyName } from './sidebar'
 import { TopicPane } from './topic'
 
 /** The tab strip over the workspace. */
@@ -88,6 +89,17 @@ export class TabStrip implements TabStripVerbs {
     await expect(this.tab(title)).toBeFocused()
   }
 
+  async expectPinned(title: string, pinned = true): Promise<void> {
+    if (pinned) await expect(this.tab(title)).toHaveAttribute('data-pinned', '')
+    else await expect(this.tab(title)).not.toHaveAttribute('data-pinned')
+  }
+
+  /** The dot of an inactive tab whose topic has unread messages. */
+  async expectUnread(title: string, unread = true): Promise<void> {
+    if (unread) await expect(this.tab(title)).toHaveAttribute('data-unread', '', { timeout: 15_000 })
+    else await expect(this.tab(title)).not.toHaveAttribute('data-unread', undefined, { timeout: 15_000 })
+  }
+
   /** The "+" after the last tab: a new tab with Home. */
   get newTabButton(): Query {
     return this.dom.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New tab ⌘T' })
@@ -144,6 +156,33 @@ export class Navigation {
   }
 }
 
+/** The peek popover (SPEC 5, "Peek"). */
+export class PeekPopover {
+  readonly root: Query
+
+  constructor(readonly dom: Dom) {
+    this.root = dom.locator('[role="dialog"][aria-roledescription="peek"]')
+  }
+
+  async expectShowing(title: string): Promise<void> {
+    await expect(this.root).toBeVisible()
+    await expect(this.root).toHaveAccessibleName(new RegExp(`^${escapeRegExp(title)}`))
+  }
+
+  async expectMessage(text: string): Promise<void> {
+    await expect(this.root.getByRole('list', { name: 'Messages' }).getByText(text).first()).toBeVisible()
+  }
+
+  async expectClosed(): Promise<void> {
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** Lets go of the peek key. */
+  async release(key: PeekKeyName = 'option'): Promise<void> {
+    this.dom.up(PEEK_KEYS[key])
+  }
+}
+
 export class Juno implements JunoVerbs {
   readonly dom: Dom
   readonly menus: Menus
@@ -158,6 +197,8 @@ export class Juno implements JunoVerbs {
   readonly nav: Navigation
   readonly home: HomePane
   readonly palette: PaletteDriver
+  readonly privacy: PrivacyMode
+  readonly peek: PeekPopover
 
   constructor(readonly app: DomApp) {
     this.dom = app.dom
@@ -173,6 +214,8 @@ export class Juno implements JunoVerbs {
     this.nav = new Navigation(this.dom, this.menus)
     this.home = new HomePane(this.dom, this.menus)
     this.palette = new PaletteDriver(this.dom, this.menus)
+    this.privacy = new PrivacyMode(this.dom, this.surface)
+    this.peek = new PeekPopover(this.dom)
   }
 
   /** The page, for a test's own queries, as `juno.win` is in the Playwright driver. */
@@ -290,6 +333,15 @@ export class Juno implements JunoVerbs {
     await expect(this.tabs.tab('Settings')).toHaveCount(0)
   }
 
+  async setPeekKey(key: PeekKeyName): Promise<void> {
+    await this.openSettings('General')
+    const radio = this.settings.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
+    await radio.click()
+    await expect(radio).toHaveAttribute('aria-checked', 'true')
+    await this.tabs.close('Settings')
+    await expect(this.tabs.tab('Settings')).toHaveCount(0)
+  }
+
   async openSettings(section: SettingsSectionName = 'General'): Promise<void> {
     await this.accountMenu.choose(/^Settings/)
     await this.tabs.expectActive('Settings')
@@ -301,6 +353,48 @@ export class Juno implements JunoVerbs {
     await this.accountMenu.choose(/^Notifications/)
     await this.tabs.expectActive('Settings')
     await expect(this.settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
+  }
+
+  /** Notification hours around now (or, with `outside`, away from now) on every day, saved, as the Playwright driver's. */
+  async notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+    await this.openNotifications()
+    const now = new this.dom.window.Date()
+    const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
+    const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
+    const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
+    for (const row of hoursRows) await this.notifications.setRow('Notifications', row, { from, to })
+    await this.tabs.close('Settings')
+    await this.openNotifications()
+    for (const row of hoursRows) await this.notifications.expectRow('Notifications', row, { from, to })
+  }
+
+  /** The OS notifications the host's shell showed, oldest first. */
+  osNotifications(): Promise<Array<{ readonly title: string; readonly body: string; readonly silent?: true }>> {
+    return this.surface.system('notifications')
+  }
+
+  clickOsNotification(index: number): Promise<void> {
+    return this.surface.system('clickNotification', index)
+  }
+
+  setNotificationPermission(permission: NotificationPermission): Promise<void> {
+    return this.surface.system('notificationPermission', permission)
+  }
+
+  /** The dock's badge as main would set it: '•' or ''. */
+  dockBadge(): Promise<string> {
+    return this.surface.system('dockBadge')
+  }
+
+  /** The window goes to the background, as main reports it: a `blur` on the window. */
+  async blurWindow(): Promise<void> {
+    const W = this.dom.window as unknown as { FocusEvent: typeof FocusEvent; dispatchEvent: (event: Event) => boolean }
+    W.dispatchEvent(new W.FocusEvent('blur'))
+  }
+
+  async focusWindow(): Promise<void> {
+    const W = this.dom.window as unknown as { FocusEvent: typeof FocusEvent; dispatchEvent: (event: Event) => boolean }
+    W.dispatchEvent(new W.FocusEvent('focus'))
   }
 
   /** What the engine host's shell did (`SystemHooks`): notifications, the dock, the agent's state. */

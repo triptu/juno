@@ -299,6 +299,16 @@ export class Query {
     if (checked(el)) this.dom.click(el)
   }
 
+  /** Picks the option with this value in a `<select>`, as a choice from its list does: the value, then `input` and `change`. */
+  async selectOption(value: string): Promise<void> {
+    const el = (await this.element()) as unknown as HTMLSelectElement
+    if (![...el.options].some((option) => option.value === value)) throw new Error(`${this.description} has no option ${value}`)
+    el.value = value
+    const W = el.ownerDocument.defaultView as unknown as { Event: typeof Event }
+    el.dispatchEvent(new W.Event('input', { bubbles: true }))
+    el.dispatchEvent(new W.Event('change', { bubbles: true }))
+  }
+
   async setChecked(value: boolean): Promise<void> {
     await (value ? this.check() : this.uncheck())
   }
