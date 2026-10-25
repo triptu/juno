@@ -24,7 +24,7 @@ export default defineConfig({
     reportCompressedSize: false,
     cssCodeSplit: false,
     lib: { entry: resolve(__dirname, '../web/page/main.ts'), formats: ['iife'], name: 'junoRenderer', fileName: () => 'renderer.js', cssFileName: 'style' },
-    rollupOptions: { output: { inlineDynamicImports: true } },
+    rolldownOptions: { output: { codeSplitting: false } },
   },
   plugins: rendererPlugins({ repoRoot, minify: false, reportSkipped: false, cssLayers: false }),
 })

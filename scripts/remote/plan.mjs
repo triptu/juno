@@ -7,15 +7,19 @@ import { forwardSignals } from './children.mjs'
 // Two four-core jobs that carry about the same measured CPU in a full run (docs/development.md,
 // "Full runs"): the browser and Electron lanes, which share builds, with the spec checks; and the
 // unit tests, the DOM lane and the gallery. Smaller jobs each left one long suite on too few cores.
-const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'specs:check', 'specs:conformance']
+// A release's nightly tests (test:nightly) join the desktop job, which has the builds.
+const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:nightly', 'test:e2e', 'specs:check', 'specs:conformance']
 
 export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
   if (options.script !== 'test:plan' || setting('JUNO_RUNNER_PLAN') === 'single' || setting('JUNO_PLAN_SERIAL') === '1') return []
   const steps = parsePlan(options.args)
+  // An uncached gallery walk (a nightly, --no-cache) is about half of all the CPU: it gets a job of
+  // its own, and the other job takes every other step.
+  const fullWalk = steps.some((step) => step.script === 'test:gallery' && step.env.GALLERY_SHIFT_ALL === '1')
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
-    const kind = desktopJob.includes(step.script) ? 'desktop' : 'unit'
+    const kind = fullWalk ? step.script === 'test:gallery' ? 'gallery' : 'desktop' : desktopJob.includes(step.script) ? 'desktop' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
     groups.get(kind).push({ ...step, index })
   }

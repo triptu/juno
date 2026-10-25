@@ -204,7 +204,7 @@ async function removeKey({ juno, post, calls, missing }: Journey): Promise<void>
 // it reads from the keychain, the agent's and the window's ports, the window's own state and the dock dot.
 // The engine's AI answers only with the key saved in Settings › Juno, as the live provider does. The
 // supervisor giving up after repeated crashes is in engine.spec.ts.
-restartTest('after one engine kill, main gives the new engine the AI key and its ports, the window keeps its topic and draft, and the dock dot comes back', async ({ userData, fake, slackApp, model }) => {
+restartTest('after one engine kill, main gives the new engine the AI key and its ports, the window keeps its topic and draft, and the dock dot comes back', { tag: ['@nightly', '@nightly-crash'] }, async ({ userData, fake, slackApp, model }) => {
   const options = { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeOpenRouterUrl: model.origin, fakeAiRequiresKey: true, aiJobs: true }
   await using(launchApp(userData, options), async (juno, { app }) => {
     const run = journey(juno, app, fake)
@@ -254,7 +254,7 @@ restartTest('after one engine kill, main gives the new engine the AI key and its
 const MESSAGE_POINTS: ReadonlyArray<CrashPoint> = ['inbox.committed']
 
 for (const point of MESSAGE_POINTS) {
-  test(`a message sent as the agent dies at ${point} is kept and answered once after a relaunch`, async ({ userData, options }) => {
+  test(`a message sent as the agent dies at ${point} is kept and answered once after a relaunch`, { tag: ['@nightly', '@nightly-crash'] }, async ({ userData, options }) => {
     await using(launchArmed(userData, options, point, 2), async (juno, { app }) => {
       await ready(juno)
       const chat = await openChat(juno)

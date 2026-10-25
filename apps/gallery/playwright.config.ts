@@ -31,7 +31,7 @@ export default defineConfig({
   workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,
   retries: 0,
-  reporter: [[process.env.CI ? 'github' : 'list'], ['json', { outputFile: 'playwright-report/results.json' }], ['../../scripts/test-results-reporter.mjs']],
+  reporter: [[process.env.CI ? 'github' : 'list'], ['json', { outputFile: 'playwright-report/results.json' }], ['../../scripts/test-results-reporter.mjs'], ['../../scripts/gallery-cpu-reporter.mjs']],
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     channel: process.env.GALLERY_BROWSER === 'chrome' ? 'chrome' : undefined,

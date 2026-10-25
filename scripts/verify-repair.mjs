@@ -33,7 +33,7 @@ export function repairPlan({ baseline, identity, suites, affected: selected }) {
     const failures = completeInventory ? previous.tests.cases.filter((test) => !['expected', 'flaky'].includes(test.outcome) && test.expectedStatus !== 'skipped') : []
     const files = failures.map((test) => test.file)
     const selective = previous && (suitePassed(previous) || (completeInventory && files.length > 0 && files.every(Boolean)))
-      && (!reached || reached.args.length > 0) && /^test:(desktop|browser|electron|gallery)$/.test(suite.name)
+      && (!reached || reached.args.length > 0) && /^test:(desktop|browser|electron|nightly|gallery)$/.test(suite.name)
     if (selective) {
       const prefix = suite.name === 'test:gallery' ? 'apps/gallery/' : 'apps/desktop/'
       const args = [...new Set([...files.map((file) => file.replace(prefix, '')), ...(reached?.args ?? [])])]

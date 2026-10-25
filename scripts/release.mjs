@@ -8,8 +8,11 @@
 //    no user-facing change since the last release, or does not descend from it.
 // 2. Prints the commits since the last release and the highlights file to write.
 // 3. Unless a green full run covers the tip, runs one on the laptop
-//    (verify:main --ref <tip>), or a repair of the newest failed run when main has
-//    changed since it. A red run stops with its failures and the repair command.
+//    (verify:main --ref <tip> --release), or a repair of the newest failed run when
+//    main has changed since it. A red run stops with its failures and the repair
+//    command. --release adds the nightly tests the change reaches since each last
+//    passed; when the full run alone covers the tip, it runs only those
+//    (verify:main --nightly-reach-only).
 // 4. Waits for the highlights file, which the agent writes while the full run goes.
 // 5. Bumps the patch version in a release worktree, packages, runs the packaged
 //    smoke, publishes, checks the GitHub release and main's version, and removes
@@ -25,7 +28,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { compareVersions, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
 import { MAP_PATH } from './coverage-map.mjs'
-import { assessRecord, git, isAncestor, printGate, readRecords, releaseGate, statusFolder } from './release-gate.mjs'
+import { assessRecord, fullRunGate, git, isAncestor, nightlyCovered, nightlyGate, printGate, readRecords, releaseGate, statusFolder } from './release-gate.mjs'
 import { highlightLines, userFacingChanges } from './release-highlights.mjs'
 import { checkPublishedRelease, commitOnMain, syncReleasedVersion } from './release-main.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
@@ -112,18 +115,30 @@ async function release() {
   say(`released ${version} from ${tip} in ${Math.round((Date.now() - started) / 1000)} s`)
 }
 
-/** Makes sure a green full run covers the tip, running one on the laptop if needed. False on a dry run that would need one. */
+/** Makes sure a green full run and the nightly tier cover the tip, running them on the laptop if needed. False on a dry run that would need one. */
 async function fullRun(tip) {
-  const records = readRecords(status)
-  const covered = releaseGate(root, tip, records)
+  const covered = releaseGate(root, tip, readRecords(status))
   if (covered) { printGate(covered); if (!dry) pushCoverage(tip); return true }
-  const newest = records.find((record) => isAncestor(root, record.commit, tip))
+  if (!fullRunGate(root, tip, readRecords(status)) && !(await fullSuites(tip))) return false
+  if (!nightlyGate(root, tip, readRecords(status)) && !nightlyReach(tip)) return false
+  const gate = releaseGate(root, tip)
+  if (!gate) throw new Error('the full run and the nightly tier passed, but no record covers the tip; see the records above')
+  printGate(gate)
+  pushCoverage(tip)
+  return true
+}
+
+/** Runs the full run, or the repair of the newest failed one, with the nightly tests it reaches. */
+async function fullSuites(tip) {
+  const records = readRecords(status)
+  const newest = records.find((record) => record.smoke !== true && !record.reachOnly && isAncestor(root, record.commit, tip))
   const repairable = newest && !assessRecord(newest) && newest.version === 2 && newest.identity && newest.required && !newest.required.some((suite) => ['test:desktop @mac', 'perf @mac', 'test:feel'].includes(suite))
   if (repairable && newest.commit === tip) {
     report(newest, recordFile(newest))
     throw new Error('the newest full run at the tip failed and main has not changed since; fix the failures first')
   }
-  const args = repairable ? ['--ref', tip, '--repair', recordFile(newest)] : ['--ref', tip, ...(values.nightly ? ['--nightly'] : [])]
+  // A nightly run runs every nightly test; a repair leaves the nightly reach to its own run afterwards.
+  const args = repairable ? ['--ref', tip, '--repair', recordFile(newest)] : ['--ref', tip, ...(values.nightly ? ['--nightly'] : ['--release'])]
   if (repairable && values.nightly) say('--nightly does not apply to a repair; the coverage map is not refreshed')
   args.push('--require-remote')
   const command = `bun run verify:main ${args.join(' ')}`
@@ -138,16 +153,32 @@ async function fullRun(tip) {
     writeFileSync(join(status, 'release-coverage.json'), JSON.stringify({ source: tip, map: readFileSync(join(root, MAP_PATH), 'utf8') }))
     git(root, 'checkout', '--', MAP_PATH)
   }
-  const gate = exit === 0 ? releaseGate(root, tip) : null
-  if (!gate) {
-    const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
-    if (record) report(record, recordFile(record))
-    else say(`the full run exited with ${exit} and wrote no record; see its output above`)
-    throw new Error('the full run failed; nothing was built or published')
+  if (exit === 0 && fullRunGate(root, tip)) return true
+  const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
+  if (record) report(record, recordFile(record))
+  else say(`the full run exited with ${exit} and wrote no record; see its output above`)
+  throw new Error('the full run failed; nothing was built or published')
+}
+
+/** Runs the nightly tests the change since each last passed reaches (scripts/nightly-reach.mjs). */
+function nightlyReach(tip) {
+  const command = `bun run verify:main --ref ${tip} --nightly-reach-only --require-remote`
+  const newest = readRecords(status).find((record) => record.reachOnly && record.commit === tip)
+  if (newest && !nightlyCovered(newest)) {
+    report(newest, recordFile(newest))
+    throw new Error('the newest nightly reach at the tip failed and main has not changed since; fix the failures first')
   }
-  printGate(gate)
-  pushCoverage(tip)
-  return true
+  if (dry) { say(`the full run covers ${tip}, but the nightly tier does not; would run ${command} on the laptop`); return false }
+  say(`the full run covers ${tip}, but the nightly tier does not; running ${command} on the laptop`)
+  const begun = new Date().toISOString()
+  const begunAt = Date.now()
+  const exit = spawnSync('bun', ['run', 'verify:main', '--ref', tip, '--nightly-reach-only', '--require-remote'], { cwd: root, stdio: 'inherit' }).status
+  recordReleaseTiming('nightly reach', begunAt, { source: tip, status: exit === 0 ? 'passed' : 'failed' }, root)
+  if (exit === 0 && nightlyGate(root, tip)) return true
+  const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
+  if (record) report(record, recordFile(record))
+  else say(`the nightly reach exited with ${exit} and wrote no record; see its output above`)
+  throw new Error('the nightly tests failed; nothing was built or published')
 }
 
 /** Preserve a nightly map across a failed run and publish it after the gate passes. */
@@ -164,9 +195,9 @@ function pushCoverage(tip) {
   say(`pushed the refreshed ${MAP_PATH} to main`)
 }
 
-/** The failed suites of a full-run record, their causes and the way on. */
+/** The failed suites of a full-run or nightly reach record, their causes and the way on. */
 function report(record, file) {
-  say(`the full run at ${record.commit} failed: ${file}`)
+  say(`the ${record.reachOnly ? 'nightly reach' : 'full run'} at ${record.commit} failed: ${file}`)
   for (const suite of record.suites.filter((suite) => suite.code !== 0 || suite.tests?.status === 'failed')) {
     const cause = suite.cause ? `, cause ${suite.cause.category}${suite.cause.provisional ? ' (provisional)' : ''}${suite.cause.evidence ? `: ${suite.cause.evidence}` : ''}` : ''
     console.log(`  ${suite.suite}: failed (${suite.code})${cause}`)
@@ -174,6 +205,7 @@ function report(record, file) {
     if (suite.log) console.log(`    log ${suite.log}`)
   }
   say('confirm each cause: bun scripts/verify-records.mjs <record> <suite> product|test|infrastructure|cancellation "evidence"')
+  if (record.reachOnly) { say('fix the failures and push the fixes to main, then rerun this command: it runs the nightly tests the fix reaches again'); return }
   say('fix the failures and push the fixes to main, then rerun this command: it runs the repair itself. The repair by hand:')
   console.log(`  bun run verify:main --ref origin/main --repair ${file}`)
 }

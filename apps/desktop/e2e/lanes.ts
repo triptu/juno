@@ -30,7 +30,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'topic-titles.spec.ts',
   'send-checks.spec.ts',
   'review-cards.spec.ts',
-  'navigation.spec.ts',
   'break-pass-1017b.spec.ts',
   'tab-scroll.spec.ts',
   'scroll-rest.spec.ts',
@@ -42,11 +41,9 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'quick-reactions.spec.ts',
   'emoji-frequents.spec.ts',
   'all-topics.spec.ts',
-  'automated-record.spec.ts',
   'code-highlight.spec.ts',
   'composer-up.spec.ts',
   'formatting.spec.ts',
-  'grammar-spelling.spec.ts',
   'home-pictures.spec.ts',
   'links.spec.ts',
   'live.spec.ts',
@@ -74,4 +71,23 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'topic.spec.ts',
   'usergroups.spec.ts',
   'views.spec.ts',
+]
+
+/**
+ * Electron spec files that start before the rest, slowest first, so a long
+ * test does not start last and hold the run open (`e2e/order.ts`). Every
+ * other file follows in Playwright's order. Take the order from a run's
+ * `e2e-timing` lines (`bun scripts/e2e-timings.mjs <run.log>`).
+ */
+export const ELECTRON_FIRST: ReadonlyArray<string> = [
+  'juno-agent/transfer.spec.ts',
+  'juno-agent/crash.spec.ts',
+  'juno-agent/backup.spec.ts',
+  'file-viewer.spec.ts',
+  'app.spec.ts',
+  'huddle-share.spec.ts',
+  'engine.spec.ts',
+  'privacy.spec.ts',
+  'break-pass.spec.ts',
+  'notifications.spec.ts',
 ]

@@ -15,7 +15,7 @@ import { Slack } from './driver/slack'
 import { startDisplay } from './display'
 import { copySynced, fakeState, syncedKey, SyncedWorkspaces, type SyncedWorkspace } from './synced'
 import { attachSendTrace, attachSidebarTrace } from './traces'
-import { cpuMeter } from './cpu'
+import { cpuAll, cpuMeter, printCpuSince } from './cpu'
 import { launchApp, launchTiming, tempUserData, writeSlackApp, type Lane, type LaunchOptions, type RunningApp, type SlackAppFixture } from './launch'
 
 export * from './launch'
@@ -98,6 +98,7 @@ export interface RelaunchOptions extends Pick<LaunchOptions, 'aiJobs' | 'cacheMi
 /** Signs in to a fresh default seed on `dir` and syncs, for `SyncedWorkspaces`. */
 async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<SyncedWorkspace, 'dir'>> {
   const started = performance.now()
+  const startedCpu = cpuAll()
   const seedTime = Date.now()
   const fake = await startFakeSlack({ seedTime })
   const appDir = await mkdtemp(join(process.env.JUNO_TEST_SCRATCH ?? tmpdir(), 'juno-slack-app-'))
@@ -107,6 +108,7 @@ async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<Sync
     const juno = new Juno(running.app, running.win)
     await juno.signIn().then(() => juno.waitForSync()).finally(running.close)
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: synced-build ${Math.round(performance.now() - started)} ms`)
+    printCpuSince('synced-build', startedCpu)
     return { port: Number(new URL(fake.url).port), seedTime, sessions: fake.sessions(), fakeState: fakeState(fake) }
   } finally {
     await fake.close()
@@ -277,9 +279,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   sidebarTrace: [false, { option: true }],
   sendTrace: [false, { option: true }],
   // oxlint-disable-next-line no-empty-pattern
-  cpu: async ({}, use) => {
-    await use(process.env.JUNO_E2E_CPU === '1' ? cpuMeter() : undefined)
-  },
+  cpu: [async ({}, use) => {
+    const meter = process.env.JUNO_E2E_CPU === '1' ? cpuMeter() : undefined
+    await use(meter)
+    // After every other fixture's teardown, the app's close included.
+    if (meter !== undefined && process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: cpu-all ${Math.round(meter.all())} ms`)
+  }, { auto: true }],
   running: async ({ agentLaunch, lane, fake, slackApp, userData, syncedStart, aiJobs, paced, tour, fakeAiRequiresKey, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, webPage, cpu }, use, testInfo) => {
     const printCpu = () => {
       for (const [kind, millis] of Object.entries(cpu?.stop() ?? {})) console.log(`e2e timing: cpu-${kind} ${Math.round(millis)} ms`)

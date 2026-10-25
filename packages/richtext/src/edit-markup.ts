@@ -9,7 +9,8 @@
 import type { RichTextElement, RichTextInline } from '@juno/slack-schema'
 import type { Lookups } from './model'
 import { plainText, messageBody, type MessageContent } from './body'
-import { channelInline, dateInline, emojiInline, inlineText, usergroupInline, userInline } from './inline'
+import { channelInline, dateInline, inlineText, usergroupInline, userInline } from './inline'
+import { emojiInline } from './emoji'
 import { MARKER_OF, type MarkupStyle } from './markup'
 
 /** Markers open in this order, so code is always innermost: nothing inside code is markup. */

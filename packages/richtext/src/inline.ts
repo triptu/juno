@@ -1,7 +1,6 @@
 /** Helpers shared by the block and mrkdwn parsers. */
 import type { Inline, InlineStyle, Lookups } from './model'
 import type { RichTextStyle } from '@juno/slack-schema'
-import { emojiUnicode, splitEmojiName, unicodeFromHex } from './emoji'
 import { findLinks } from './links'
 
 export function toStyle(style: RichTextStyle | undefined): InlineStyle | undefined {
@@ -115,18 +114,6 @@ export function usergroupInline(id: string, fallbackHandle: string | undefined, 
     ...(known?.name ? { name: known.name } : {}),
     isMine: lookups.myUsergroups?.includes(id) ?? false,
   }
-}
-
-export function emojiInline(rawName: string, lookups: Lookups, hex?: string): Inline {
-  const unicode = (hex !== undefined ? unicodeFromHex(hex) : undefined) ?? emojiUnicode(rawName)
-  if (unicode !== undefined) return { kind: 'emoji', name: rawName, unicode }
-  const name = splitEmojiName(rawName).name
-  const url = lookups.emoji?.(name)
-  if (url !== undefined) return { kind: 'emoji', name: rawName, url }
-  const target = lookups.emojiAlias?.(name)
-  const aliased = target === undefined ? undefined : emojiUnicode(target)
-  if (aliased !== undefined) return { kind: 'emoji', name: rawName, unicode: aliased }
-  return { kind: 'emoji', name: rawName }
 }
 
 export function dateInline(timestamp: number, format: string, fallback?: string, url?: string): Inline {

@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { openState, readRoutes, type Route, type Theme } from './support'
+import { expect, type Page } from '@playwright/test'
+import { openState, paintTest as test, readRoutes, type Route, type Theme } from './support'
 
 /**
  * A control that opens a menu or popover keeps the fill it had under the
