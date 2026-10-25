@@ -27,9 +27,6 @@ const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMa
 /** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (bun run remote uses one per worker). */
 const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
 
-/** Pages walking at once in each part. */
-const pagesPerPart = Number(process.env.GALLERY_SHIFT_PAGES ?? 1)
-
 const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim())
 
 for (let part = 0; part < shards; part++) {
@@ -50,24 +47,20 @@ for (let part = 0; part < shards; part++) {
     const cursors: string[] = []
     let states = 0, cached = 0, elements = 0, resets = 0
     try {
-      // Each page walks its own states from the shared queue: the walk mostly waits on frames, not the CPU.
-      await Promise.all(Array.from({ length: pagesPerPart }, async (_, index) => {
-        const walker = index === 0 ? pages : await walkPages(context)
-        for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
-          if (cache.passed(route)) { cached++; continue }
-          cache.forget(route)
-          const started = Date.now()
-          const result = await walkState(walker, route)
-          states++
-          elements += result.elements
-          resets += result.resets
-          failures.push(...result.failures)
-          cursors.push(...result.cursors)
-          if (result.failures.length + result.cursors.length === 0) cache.pass(route)
-          // A slow state holds up its part; name it so it can be looked at.
-          if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
-        }
-      }))
+      for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
+        if (cache.passed(route)) { cached++; continue }
+        cache.forget(route)
+        const started = Date.now()
+        const result = await walkState(pages, route)
+        states++
+        elements += result.elements
+        resets += result.resets
+        failures.push(...result.failures)
+        cursors.push(...result.cursors)
+        if (result.failures.length + result.cursors.length === 0) cache.pass(route)
+        // A slow state holds up its part; name it so it can be looked at.
+        if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
+      }
     } finally {
       console.log(`shift walk: ${states} states, ${cached} cached, ${elements} elements, ${resets} resets`)
     }
