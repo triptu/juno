@@ -332,16 +332,25 @@ const NO_TAGS: ReadonlySet<string> = new Set()
 
 function byRole(root: El, role: string, options: RoleOptions): El[] {
   // A walk, not a selector: the page changes between most polls, so happy-dom's
-  // query cache misses and its selector engine costs several times this.
-  // Hidden subtrees are skipped whole unless asked for.
+  // query cache misses and its selector engine costs several times this. Each
+  // element costs a tag and one attribute; only an element with the role has
+  // its ancestors checked for hiding, each ancestor once per query.
   const tags = IMPLICIT_TAGS[role] ?? NO_TAGS
   const visibleOnly = options.includeHidden !== true
   if (visibleOnly && !shown(root)) return []
+  const visible = new Map<Element, boolean>([[root, true]])
+  const isVisible = (el: Element): boolean => {
+    let answer = visible.get(el)
+    if (answer === undefined) {
+      answer = !hidesSubtree(el) && isVisible(el.parentElement!)
+      visible.set(el, answer)
+    }
+    return answer
+  }
   const found: El[] = []
   const walk = (parent: Element) => {
     for (const el of parent.children) {
-      if (visibleOnly && hidesSubtree(el)) continue
-      if ((tags.has(el.tagName) || el.hasAttribute('role')) && roleOf(el) === role && fits(el as El, options)) found.push(el as El)
+      if ((tags.has(el.tagName) || el.hasAttribute('role')) && roleOf(el) === role && (!visibleOnly || isVisible(el)) && fits(el as El, options)) found.push(el as El)
       walk(el)
     }
   }
@@ -349,13 +358,14 @@ function byRole(root: El, role: string, options: RoleOptions): El[] {
   return found
 }
 
+/** The name last: it reads the element's text. */
 function fits(el: El, options: RoleOptions): boolean {
-  if (options.name !== undefined && !matches(nameOf(el), options.name, options.exact === true)) return false
   if (options.selected !== undefined && (el.getAttribute('aria-selected') === 'true') !== options.selected) return false
   if (options.checked !== undefined && checked(el) !== options.checked) return false
   if (options.pressed !== undefined && (el.getAttribute('aria-pressed') === 'true') !== options.pressed) return false
   if (options.expanded !== undefined && (el.getAttribute('aria-expanded') === 'true') !== options.expanded) return false
   if (options.disabled !== undefined && disabled(el) !== options.disabled) return false
+  if (options.name !== undefined && !matches(nameOf(el), options.name, options.exact === true)) return false
   return true
 }
 
