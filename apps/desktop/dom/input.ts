@@ -79,8 +79,28 @@ export class Dom {
         last = error
       }
       if (performance.now() > deadline) throw new Error(`Timed out after ${timeout} ms waiting for ${what}${last instanceof Error ? `: ${last.message}` : ''}\nPage text: ${normalize(this.document.body?.textContent ?? '').slice(0, 800)}`)
-      await new Promise((done) => setTimeout(done, 10))
+      await this.changed()
     }
+  }
+
+  /**
+   * Resolves at the page's next change (a node, an attribute or text), or
+   * after `millis`: a wait checks again when there is something new to see,
+   * not on a fast timer. Focus and the fake's state change no node, so the
+   * timer still runs. Bun's timer, which a test clock does not hold.
+   */
+  changed(millis = 50): Promise<void> {
+    return new Promise((done) => {
+      const Observer = (this.window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
+      const finish = () => {
+        clearTimeout(timer)
+        observer.disconnect()
+        done()
+      }
+      const observer = new Observer(finish)
+      observer.observe(this.document, { subtree: true, childList: true, attributes: true, characterData: true })
+      const timer = setTimeout(finish, millis)
+    })
   }
 
   #pointerFocus(value: boolean): void {

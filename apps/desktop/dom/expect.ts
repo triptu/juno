@@ -84,7 +84,7 @@ function assertions(query: Query, negate: boolean): QueryAssertions {
         const page = query.dom.document.body?.textContent?.replace(/\s+/g, ' ').trim().slice(0, 600) ?? ''
         throw new Error(`expect(${query.description})${negate ? '.not' : ''}.${name}(${args.filter((arg) => typeof arg !== 'object' || arg instanceof RegExp || Array.isArray(arg)).map((arg) => String(arg)).join(', ')}) failed after ${timeout} ms; saw ${seen}\nPage text: ${page}`)
       }
-      await new Promise((done) => setTimeout(done, 10))
+      await query.dom.changed()
     }
   }])) as unknown as QueryAssertions
 }

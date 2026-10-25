@@ -327,8 +327,12 @@ export class Query {
 export const disabled = (el: El) => (el as HTMLButtonElement).disabled === true || el.getAttribute('aria-disabled') === 'true'
 export const checked = (el: El) => (el as HTMLInputElement).checked === true || el.getAttribute('aria-checked') === 'true'
 
+const IMPLICIT_SELECTOR = new Map(IMPLICIT.map(([role, selector]) => [role, selector]))
+
 function byRole(root: El, role: string, options: RoleOptions): El[] {
-  return [...root.querySelectorAll<El>('*')].filter((el) => {
+  // Only elements that can have the role: an explicit role, or the tags that imply it.
+  const implicit = IMPLICIT_SELECTOR.get(role)
+  return [...root.querySelectorAll<El>(`[role]${implicit === undefined ? '' : `, ${implicit}`}`)].filter((el) => {
     if (roleOf(el) !== role) return false
     if (options.includeHidden !== true && !shown(el)) return false
     if (options.name !== undefined && !matches(nameOf(el), options.name, options.exact === true)) return false

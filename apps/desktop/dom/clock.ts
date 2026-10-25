@@ -62,10 +62,19 @@ export class PageClock {
       }
     }
     target['Date'] = FakeDate
-    const performance = target['performance'] as { now: () => number } | undefined
-    if (performance !== undefined) {
+    // happy-dom hands the window Bun's own `performance`; the page gets a view of it whose `now` is the clock's.
+    const real = target['performance'] as Performance | undefined
+    if (real !== undefined) {
       const origin = this.now()
-      Object.defineProperty(performance, 'now', { configurable: true, value: () => this.now() - origin })
+      const now = () => this.now() - origin
+      const view = new Proxy(real, {
+        get: (object, key) => {
+          if (key === 'now') return now
+          const value: unknown = Reflect.get(object, key, object)
+          return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(object) : value
+        },
+      })
+      Object.defineProperty(target, 'performance', { configurable: true, value: view })
     }
     target['setTimeout'] = (run: Callback, delay = 0, ...args: unknown[]) => this.#add(run, delay, args, undefined)
     target['setInterval'] = (run: Callback, delay = 0, ...args: unknown[]) => this.#add(run, delay, args, Math.max(1, Number(delay) || 0))

@@ -6,7 +6,7 @@
  * prints a `dom timing:` line: wall time, and the CPU of this Bun worker
  * (test, fake, renderer) and of the hosts it forked (engine, agent).
  */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'bun:test'
 import type { FakeSlack } from '@juno/fake-slack'
@@ -97,7 +97,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
       try {
         await body(context)
       } catch (error) {
-        savePage(title, started.app)
+        savePage(title, started.app, started.userData)
         throw error
       }
     } finally {
@@ -109,8 +109,8 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
   }
 }
 
-/** A failed test's page as it was, in `test-results/dom/` (a remote run brings it back). */
-function savePage(title: string, app: DomApp): void {
+/** A failed test's page as it was, its sidebar trace and its logs, in `test-results/dom/` (a remote run brings them back). */
+function savePage(title: string, app: DomApp, userData: string): void {
   try {
     const dir = join(__dirname, '../test-results/dom')
     mkdirSync(dir, { recursive: true })
@@ -118,6 +118,9 @@ function savePage(title: string, app: DomApp): void {
     writeFileSync(file, app.window.document.documentElement.outerHTML)
     // The sidebar's hold and list values (e2e README, "Sidebar trace"), for a row that did not move.
     writeFileSync(file.replace(/\.html$/, '.sidebar-trace.json'), JSON.stringify((app.window as unknown as { __junoSidebarTrace?: unknown }).__junoSidebarTrace ?? null, null, 1))
+    // The engine's and the host's logs, which say why a command failed when the page shows nothing.
+    const logs = join(userData, 'logs')
+    if (existsSync(logs)) cpSync(logs, file.replace(/\.html$/, '.logs'), { recursive: true })
     console.error(`dom: the failed page is in ${file}`)
   } catch { /* the window is gone */ }
 }
