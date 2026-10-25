@@ -66,6 +66,7 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'composer-up.spec.ts',
   'formatting.spec.ts',
   'grammar-spelling.spec.ts',
+  'home-pictures.spec.ts',
   'integration-messages.spec.ts',
   'links.spec.ts',
   'live.spec.ts',
