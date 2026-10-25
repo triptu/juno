@@ -3,6 +3,7 @@
 import type { TopicRow } from '@juno/contract'
 import { sendMessage } from '@juno/state'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { controlledSweeps } from './controlledClock'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { readDb, valueOf } from './scenario'
 import { syncedEngine } from './synced'
@@ -134,7 +135,8 @@ it('leaves omitted topic and purpose to the snapshot while a partial event chang
 })
 
 it('merges a partial incremental counts row without clearing unread state or latest', async () => {
-  const engine = await syncedEngine(engines, { timing: { sweepIntervalMillis: 500 } })
+  const sweeps = await controlledSweeps()
+  const engine = await syncedEngine(engines, { clock: sweeps.clock, timing: { sweepIntervalMillis: sweeps.sweepIntervalMillis } })
   const reads = () => readDb(engine, 'cache.db', (db) => db.prepare(
     "SELECT slack_last_read, latest, has_unreads, mention_count, counts_updated FROM channel_reads WHERE channel = 'C0ENG'",
   ).get())
@@ -144,13 +146,19 @@ it('merges a partial incremental counts row without clearing unread state or lat
   engine.fake.workspace.changedAt.clear()
   const pointer = engine.fake.workspace.main('C0ENG').at(-1)!.ts
   engine.fake.workspace.reads.set('C0ENG', pointer)
-  await waitFor(() => {
-    const row = reads()
-    return row?.counts_updated !== before?.counts_updated ? row : undefined
-  }, 20_000, 'partial counts merged')
-  expect(reads()).toMatchObject({
-    slack_last_read: pointer, latest: before?.latest,
-    has_unreads: before?.has_unreads, mention_count: before?.mention_count,
-  })
-  expect(engine.fake.calls.some((call) => call.method === 'client.counts' && call.args['counts_last_fetched'] !== undefined)).toBe(true)
+  try {
+    await sweeps.sweep(engine)
+    await waitFor(() => {
+      const row = reads()
+      return row?.counts_updated !== before?.counts_updated ? row : undefined
+    }, 20_000, 'partial counts merged')
+    expect(reads()).toMatchObject({
+      slack_last_read: pointer, latest: before?.latest,
+      has_unreads: before?.has_unreads, mention_count: before?.mention_count,
+    })
+    expect(engine.fake.calls.some((call) => call.method === 'client.counts' && call.args['counts_last_fetched'] !== undefined)).toBe(true)
+  } finally {
+    await engines.splice(engines.indexOf(engine), 1)[0]!.stop()
+    await sweeps.close()
+  }
 })

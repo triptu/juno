@@ -11,13 +11,9 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 
 Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency. Every test owns one context; long walks reset the document between states and recycle pages every 20 states. Screenshots remain review artifacts, not pixel baselines in the behavior gate.
 
-## Shift tiers
-
-`computed-shift.spec.ts` checks every state on every run: forced hover, focus and press styles, synthetic events and a box comparison in one call per state, plus the cursor rule and whole-pixel message rows. `shift.spec.ts` is the real-input walk: on an ordinary run only states whose own component changed (at most 60), every state with `GALLERY_SHIFT_ALL=1`. See [the layout-shift guard](../../docs/development.md#the-layout-shift-guard).
-
 ## Cached walks
 
-`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports. Shared gallery code, configuration, styles, assets, fonts, tokens, test helpers and the lockfile also count. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
+`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports, plus the gallery shell, its styles, assets and fonts. Tokens count by value: only the layout tokens the state's files read, in every theme; colour and shadow tokens, comments, and paint-only CSS declarations do not count (`layout-tokens.mjs`). The walk counts through `shift-walk.ts` (or `focus-ring.spec.ts`) and its imports, which include `open-state.ts` and the guard; the spec's other tests, the scaffolding in `support.ts` and the Playwright config do not. Compositions key on all source, so editing `compositions.tsx` re-walks only them. Locked versions count only for packages the gallery imports or builds with. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
 
 Only a completed successful state is recorded. Before rechecking a state its old record is removed, so failure or interruption cannot preserve a previous pass. Records are written atomically under `$JUNO_BUILD_CACHE_DIR/gallery-walk-v1`, or the shared system temp directory's `juno-cache/results/gallery-walk-v1`. The remote runner uses `/cache/builds/gallery-walk-v1`.
 
@@ -33,7 +29,7 @@ Reviewed every spec and its non-merge history. Commit counts alone do not prove 
 | --- | --- |
 | `shift`, `focus-ring` | Keep and cache broad walks. Shift history includes real regressions, the disabled-control hang and fallback-font failures; retain injected-shift self-tests and delayed loads. Size checks run in light only, and the header band and Resolve button are checked against each other, not against pinned pixels. |
 | `activation` | Merge eight small cases into three pointer, nested-control and keyboard flows. |
-| `behaviour` | Keep scroll chaining, truncation, late palette and gallery routing checks. These have specific regression history. The cursor and whole-pixel row checks moved into `computed-shift` on 10-25. |
+| `behaviour` | Keep cursor, scroll chaining, whole-pixel row, truncation, late palette and gallery routing checks. These have specific regression history. |
 | `tooltip` | Merge six checks into a timing/dismissal flow and an edge-containment check. Drive time explicitly instead of racing wall-clock sleeps. |
 | `memory-edit` | Merge five cases into one edit/save/cancel flow, including the empty draft and both save keys. |
 | `geometry` | Keep stable filter height, long-path truncation and count alignment. Remove fixed insets, chip dimensions, column widths and decorative alignment; 17 of its 23 commits accompanied UI changes. |

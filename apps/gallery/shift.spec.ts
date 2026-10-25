@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
-import { expectNoLayoutShift, measureLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
-import { checkStateWithin, claimQueue, interactive, openState, readRoutes, stateCache, walkPages, type Route } from './support'
+import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
+import { claimQueue, openState, readRoutes, stateCache, walkPages, type Route } from './support'
+import { touch, walkState, walkUse } from './shift-walk'
 
 /**
  * Nothing in the product may move when the pointer or the keyboard touches
@@ -13,21 +14,12 @@ import { checkStateWithin, claimQueue, interactive, openState, readRoutes, state
  * motion that can move a box (`motion: 'layout'`). Buttons have instant
  * colour feedback and keep their geometry on press.
  *
- * This real-input walk is the slow tier, about two seconds a state. Every
- * run checks every state with the computed tier (computed-shift.spec.ts),
- * which forces the same touches without real input in a fraction of that.
- * On an ordinary run this walk takes only the states whose own component
- * changed (`ownKeys` in walk-cache.mjs), at most `changedCap`; a change that
- * reaches a state only through a shared file waits for the full walk, which
- * GALLERY_SHIFT_ALL=1 runs (verify:main --nightly and --no-cache set it).
+ * The same walk checks the cursor rule on each state as it opens it, so the
+ * states are opened once for both.
  *
  * To look at one component: GALLERY_SHIFT_ONLY=Button,Chip bun run test:gallery
- * walks every uncached state of those components.
  */
-test.use({ reducedMotion: 'no-preference' })
-
-/** Elements tried per state. A state with more (an icon grid) is sampled from both ends. */
-const perState = 8
+test.use(walkUse)
 
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
@@ -35,98 +27,7 @@ const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMa
 /** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (bun run remote uses one per worker). */
 const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
 
-async function targets(page: Page, route: Route): Promise<Locator[]> {
-  // A disclosure that grows its content in place (Show more) moves what is under it on purpose.
-  const all = page.locator(`[data-fixture-frame="${route.route}"]`).locator(interactive).and(page.locator(':not([data-expands-in-place] *)'))
-  const count = await all.count()
-  const indexes = Array.from({ length: count }, (_, index) => index)
-  const picked = count <= perState ? indexes : [...indexes.slice(0, perState - 3), ...indexes.slice(-3)]
-  const selected = picked.map((index) => all.nth(index))
-  const visible = await Promise.all(selected.map((element) => element.isVisible()))
-  return selected.filter((_, index) => visible[index])
-}
-
-/** After a touch: code the touch started loading (a popover's content) has rendered, so what it moves is measured too. */
-const chunksLoaded = (page: Page) => page.evaluate(() => {
-  if (document.querySelector('[data-chunk-pending]') === null) return
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      observer.disconnect()
-      reject(new Error('Gallery chunks did not load within 15 s'))
-    }, 15_000)
-    const observer = new MutationObserver(() => {
-      if (document.querySelector('[data-chunk-pending]') !== null) return
-      clearTimeout(timer)
-      observer.disconnect()
-      resolve()
-    })
-    observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true })
-  })
-})
-
-/** Touches one element every way a person can; returns what shifted, as readable text. */
-async function touch(page: Page, element: Locator): Promise<string[]> {
-  const failures: string[] = []
-  const check = async (what: string, action: () => Promise<unknown>) => {
-    try {
-      await expectNoLayoutShift(
-        page,
-        async () => {
-          await action()
-          await chunksLoaded(page)
-        },
-        { motion: 'layout' },
-      )
-    } catch (error) {
-      failures.push(`${what}: ${(error as Error).message}`)
-    }
-  }
-
-  // In one call, and without Playwright's actionability waits: the state is still, and they cost more than a touch.
-  const position = await element.evaluate((node) => {
-    const before = node.getBoundingClientRect()
-    node.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    const box = node.getBoundingClientRect()
-    return node.getClientRects().length > 0 ? { x: box.x, y: box.y, width: box.width, height: box.height, scrolled: before.x !== box.x || before.y !== box.y } : null
-  }, undefined, { timeout: 5_000 })
-  if (!position) return failures
-  // Scrolling can lay out content-visibility rows; finish that before measuring input.
-  if (position.scrolled) await waitForLayoutReady(page)
-  const box = position.scrolled ? await element.boundingBox() : position
-  if (!box) return failures
-  const x = box.x + box.width / 2
-  const y = box.y + box.height / 2
-
-  await check('hover', () => page.mouse.move(x, y))
-  await check('focus from the keyboard', async () => {
-    // A key first, so the browser is in keyboard mode and :focus-visible matches.
-    await page.keyboard.press('Shift')
-    await element.evaluate((node) => (node as HTMLElement).focus(), undefined, { timeout: 5_000 })
-  })
-  await check('blur', () => element.evaluate((node) => (node as HTMLElement).blur(), undefined, { timeout: 5_000 }))
-  await check('press', () => page.mouse.down())
-  await check('release', () => page.mouse.up())
-  await check('leave', () => page.mouse.move(2, 2))
-  return failures
-}
-
-/** Keep the exact markup in the browser: some states have hundreds of KB of DOM. */
-const rememberMarkup = (page: Page, route: Route) => page.evaluate((frameName) => {
-  Object.assign(globalThis, { __junoShiftMarkup: document.querySelector(`[data-fixture-frame="${frameName}"]`)?.innerHTML ?? '' })
-}, route.route)
-
-const markupChanged = (page: Page, route: Route) => page.evaluate((frameName) => {
-  const scope: object = globalThis
-  return !('__junoShiftMarkup' in scope) || scope.__junoShiftMarkup !== (document.querySelector(`[data-fixture-frame="${frameName}"]`)?.innerHTML ?? '')
-}, route.route)
-
 const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim())
-
-/** States an ordinary run walks for real at most; spread over the changed list so each changed component gets some. */
-const changedCap = 60
-
-const spread = <T,>(items: ReadonlyArray<T>, count: number): T[] =>
-  items.length <= count ? [...items] : Array.from({ length: count }, (_, index) => items[Math.floor((index * items.length) / count)]!)
 
 for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once a page is open.
@@ -136,59 +37,34 @@ for (let part = 0; part < shards; part++) {
     // JUNO_SHARD=i/n (bun run remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
-    const queue = claimQueue('shift')
-    const cache = stateCache('shift', browser)
-    const own = stateCache('shift', browser, { own: true })
-    // A full run or a component selection walks every uncached state; an ordinary run only those whose own files changed.
-    const changedOnly = !only && !cache.all
-    let changed = 0
-    const picked = new Set(queue.shared(() => {
-      const uncached = routes.filter((route) => !cache.passed(route) && (!changedOnly || !own.passed(route)))
-      changed = uncached.length
-      return (changedOnly ? spread(uncached, changedCap) : uncached).map((route) => route.route)
-    }))
-    const selected = routes.filter((route) => picked.has(route.route))
     // Budget the whole queue for the workers that can actually walk it. Three seconds per state
     // leaves room above the measured two-second average; each individual state still has a 30 s limit.
     const parallelParts = Math.min(shards, test.info().config.workers)
-    test.setTimeout(Math.max((only || changedOnly ? 15 : 20) * 60_000, Math.ceil(selected.length * 3_000 / parallelParts)))
+    test.setTimeout(Math.max((only ? 15 : 20) * 60_000, Math.ceil(routes.length * 3_000 / parallelParts)))
+    const queue = claimQueue('shift')
+    const cache = stateCache('shift', browser)
     const failures: string[] = []
-    let states = 0, elements = 0, resets = 0
+    const cursors: string[] = []
+    let states = 0, cached = 0, elements = 0, resets = 0
     try {
-      for (let route = queue.next(selected); route !== undefined; route = queue.next(selected)) {
+      for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
+        if (cache.passed(route)) { cached++; continue }
         cache.forget(route)
-        own.forget(route)
-        const failedBefore = failures.length
         const started = Date.now()
-        await checkStateWithin(route, async () => {
-          const page = await pages.next()
-          await openState(page, route)
-          states++
-          await rememberMarkup(page, route)
-          // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
-          // after it would be gone or different: open the state again whenever a touch changed what it draws.
-          for (const [index, element] of (await targets(page, route)).entries()) {
-            if (await markupChanged(page, route)) {
-              // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
-              resets++
-              await page.goto('about:blank')
-              await openState(page, route)
-              await rememberMarkup(page, route)
-            }
-            elements++
-            for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
-          }
-        })
-        if (failures.length === failedBefore) {
-          cache.pass(route)
-          own.pass(route)
-        }
+        const result = await walkState(pages, route)
+        states++
+        elements += result.elements
+        resets += result.resets
+        failures.push(...result.failures)
+        cursors.push(...result.cursors)
+        if (result.failures.length + result.cursors.length === 0) cache.pass(route)
         // A slow state holds up its part; name it so it can be looked at.
         if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
       }
     } finally {
-      console.log(`shift walk: ${states} states of ${selected.length} selected${changedOnly && changed > 0 ? ` (${changed} changed, cap ${changedCap})` : ''}, ${routes.length - selected.length} skipped, ${elements} elements, ${resets} resets`)
+      console.log(`shift walk: ${states} states, ${cached} cached, ${elements} elements, ${resets} resets`)
     }
+    expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect(failures.join('\n\n')).toBe('')
   })
 }

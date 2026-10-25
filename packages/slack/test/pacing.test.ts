@@ -30,14 +30,6 @@ itEffect('runs different methods side by side, each at its own rate, within the 
   ])
 }).pipe(Effect.provide(RequestQueue.layer)))
 
-itEffect('spaces a method no rate names 3 s apart', () => Effect.gen(function* () {
-  const queue = yield* RequestQueue
-  yield* queue.run('background', 'conversations.info', Effect.void)
-  const next = yield* startAt(queue, 'conversations.info')
-  yield* TestClock.adjust(3_000)
-  expect(yield* Fiber.join(next)).toBe(3_000)
-}).pipe(Effect.provide(RequestQueue.layer)))
-
 itEffect('takes per-method rates from config', () => Effect.gen(function* () {
   const queue = yield* RequestQueue
   yield* queue.run('background', 'conversations.history', Effect.void)

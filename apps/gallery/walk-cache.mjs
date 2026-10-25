@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ImportGraph } from '../../scripts/import-graph.mjs'
+import { layoutCss, layoutTokens, tokenFiles } from './layout-tokens.mjs'
 
 const ignored = new Set(['node_modules', '.git', 'dist', 'out', 'test-results', 'playwright-report', 'shots', 'coverage'])
 const filesUnder = (root, dir) => !existsSync(join(root, dir)) ? [] : readdirSync(join(root, dir), { withFileTypes: true }).flatMap(entry => {
@@ -20,49 +21,29 @@ class LayoutGraph extends ImportGraph {
   }
 }
 
-/** Each registered component's fixture file, from the registries' imports. */
-function registeredFixtures(root, graph, files) {
-  const registries = ['ui', 'views', 'huddle-views'].map(name => `packages/${name}/src/fixtures.ts`).filter(file => files.has(file))
-  const components = new Map()
-  for (const registry of registries) {
-    const text = readFileSync(join(root, registry), 'utf8')
-    const sources = new Map()
-    for (const match of text.matchAll(/import\s+([\w{},\s]+?)\s+from\s+['"]([^'"]+)['"]/g)) {
-      const target = graph.resolveImport(registry, match[2])
-      if (!target) continue
-      for (const binding of match[1].replace(/[{}]/g, '').split(',')) {
-        const local = binding.trim().split(/\s+as\s+/).at(-1)
-        if (local) sources.set(local, target)
-      }
-    }
-    for (const match of text.slice(text.indexOf('export const fixtures')).matchAll(/^\s+(\w+)(?::\s*(\w+))?,/gm)) {
-      const source = sources.get(match[2] ?? match[1])
-      if (source) components.set(match[1], source)
-    }
-  }
-  return { registries, components }
-}
-
 /** Source keys work in remote archives too: no Git metadata or worktree paths. */
 export function sourceKeys(root, kind) {
   const files = new Set([...filesUnder(root, 'packages'), ...filesUnder(root, 'apps/gallery')])
   const graph = new LayoutGraph(root, files)
-  const { registries, components } = registeredFixtures(root, graph, files)
+  const registries = ['ui', 'views', 'huddle-views'].map(name => `packages/${name}/src/fixtures.ts`).filter(file => files.has(file))
+  const components = fixtureSources(root, graph, registries)
 
+  // What a walk does to a state. The spec's other tests (delayed loads, the guard's
+  // self-tests) are not part of it; the guard is, through the walk's imports.
+  const walk = kind === 'shift' ? 'apps/gallery/shift-walk.ts' : 'apps/gallery/focus-ring.spec.ts'
   const shared = new Set([
-    'bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json',
+    'bunfig.toml', 'tsconfig.base.json',
     'scripts/import-graph.mjs', 'scripts/build-cached.mjs',
-    'apps/gallery/package.json', 'apps/gallery/index.html', 'apps/gallery/vite.config.ts',
-    'apps/gallery/playwright.config.ts', 'apps/gallery/support.ts', 'apps/gallery/walk-cache.mjs',
-    `apps/gallery/${kind === 'shift' ? 'shift' : 'focus-ring'}.spec.ts`,
+    'apps/gallery/index.html', 'apps/gallery/vite.config.ts',
+    'apps/gallery/walk-cache.mjs', 'apps/gallery/layout-tokens.mjs',
     ...registries,
   ])
   for (const file of files) {
-    if (/^apps\/gallery\/(src|public)\//.test(file) || /^packages\/(tokens|testing)\//.test(file)
-      || /^packages\/[^/]+\/package\.json$/.test(file)
+    // Compositions and test fixtures register states of their own, which key on all source.
+    if (/^apps\/gallery\/(src|public)\/(?!(compositions|testFixtures)\.)/.test(file) || /^packages\/tokens\/src\/.*\.(css|woff2?|ttf|otf)$/.test(file)
       || /^packages\/(ui|views|huddle-views)\/.*\.(css|woff2?|ttf|otf|svg|png|jpg|webp)$/.test(file)) shared.add(file)
   }
-  for (const file of ['apps/gallery/vite.config.ts', 'apps/gallery/support.ts']) {
+  for (const file of ['apps/gallery/vite.config.ts', walk]) {
     if (files.has(file)) for (const reached of graph.closure(file)) shared.add(reached)
   }
   // Frame, theme and highlighting imports affect every state. Registries and
@@ -81,63 +62,125 @@ export function sourceKeys(root, kind) {
   for (const dir of ['', 'apps/gallery']) {
     for (const entry of readdirSync(join(root, dir))) if (/^\.env(?:\.|$)/.test(entry)) shared.add(dir ? `${dir}/${entry}` : entry)
   }
+
+  // Token files key by value: each record holds the values of the layout tokens
+  // its files read, and the rest of the two files.
+  const tokens = layoutTokens(root, files, graph)
+  const source = inputs => [...inputs].filter(file => !tokenFiles.includes(file))
   const hashes = new Map()
   const hash = file => {
-    if (!hashes.has(file)) hashes.set(file, existsSync(join(root, file)) ? digest(readFileSync(join(root, file))) : null)
+    if (!hashes.has(file)) {
+      const path = join(root, file)
+      hashes.set(file, !existsSync(path) ? null : file.endsWith('.css') ? digest(layoutCss(readFileSync(path, 'utf8'))) : digest(readFileSync(path)))
+    }
     return hashes.get(file)
   }
-  const hashFiles = inputs => digest(JSON.stringify([...inputs].toSorted().map(file => [file, hash(file)])))
-  const base = hashFiles(shared)
+  const hashFiles = inputs => digest(JSON.stringify(source(inputs).toSorted().map(file => [file, hash(file)])))
+  const sharedTokens = tokens.key(shared)
   const keys = new Map()
+  const inputsOf = component => components.has(component) ? graph.closure(components.get(component)) : files
+  const reached = new Set([...shared, ...[...components.keys()].flatMap(component => [...inputsOf(component)])])
+  const base = digest(JSON.stringify([hashFiles(shared), tokens.structure, sharedTokens, packagesKey(root, files, reached)]))
   return component => {
     if (!keys.has(component)) {
-      const fixture = components.get(component)
       // Unknown registrations (including compositions) conservatively depend on
       // all source. A new registration must never acquire an incomplete key.
-      const inputs = fixture ? graph.closure(fixture) : files
-      keys.set(component, digest(JSON.stringify([base, hashFiles(inputs)])))
+      const inputs = inputsOf(component)
+      keys.set(component, digest(JSON.stringify([base, hashFiles(inputs), tokens.key(inputs)])))
     }
     return keys.get(component)
   }
+}
+
+/** Which fixture module each registered component name comes from. */
+function fixtureSources(root, graph, registries) {
+  const components = new Map()
+  for (const registry of registries) {
+    const text = readFileSync(join(root, registry), 'utf8')
+    const sources = new Map()
+    for (const match of text.matchAll(/import\s+([\w{},\s]+?)\s+from\s+['"]([^'"]+)['"]/g)) {
+      const target = graph.resolveImport(registry, match[2])
+      if (!target) continue
+      for (const binding of match[1].replace(/[{}]/g, '').split(',')) {
+        const local = binding.trim().split(/\s+as\s+/).at(-1)
+        if (local) sources.set(local, target)
+      }
+    }
+    for (const match of text.slice(text.indexOf('export const fixtures')).matchAll(/^\s+(\w+)(?::\s*(\w+))?,/gm)) {
+      const source = sources.get(match[2] ?? match[1])
+      if (source) components.set(match[1], source)
+    }
+  }
+
+  return components
 }
 
 /**
- * Keys over a component's own files only: its fixture file and the files it
- * reaches that are named after it (`Button.tsx`, `Button.stylex.ts`, a
- * `Button/` folder). A change to a shared primitive, a token or the test code
- * leaves them alone. Gallery compositions are keyed by the gallery's own
- * registration files. The shift walk uses them to pick the states whose own
- * component changed.
+ * The packages the reached files belong to and import from outside the
+ * workspace: the manifest fields that decide how imports resolve, and the
+ * locked versions of what they import and the gallery builds with.
  */
-export function ownKeys(root) {
-  const files = new Set([...filesUnder(root, 'packages'), ...filesUnder(root, 'apps/gallery')])
-  const graph = new LayoutGraph(root, files)
-  const { components } = registeredFixtures(root, graph, files)
-  const gallery = [...files].filter(file => /^apps\/gallery\/src\/(compositions|testFixtures)\./.test(file))
-  const keys = new Map()
-  return component => {
-    if (!keys.has(component)) {
-      const fixture = components.get(component)
-      const stem = fixture?.split('/').at(-1).split('.')[0]
-      const named = file => file === fixture || file.split('/').some((part, index, parts) => part === stem || (index === parts.length - 1 && part.split('.')[0] === stem))
-      const inputs = fixture ? [...graph.closure(fixture)].filter(named) : gallery
-      keys.set(component, digest(JSON.stringify(inputs.toSorted().map(file => [file, existsSync(join(root, file)) ? digest(readFileSync(join(root, file))) : null]))))
+function packagesKey(root, files, reached) {
+  const packageDirs = new Set(['apps/gallery', ...[...reached].map(file => /^(packages\/[^/]+)\//.exec(file)?.[1]).filter(dir => dir && files.has(`${dir}/package.json`))])
+  const manifests = Object.fromEntries(['package.json', ...[...packageDirs].toSorted().map(dir => `${dir}/package.json`)].map(file => [file, manifest(root, file)]))
+  const workspace = new Set(Object.values(manifests).map(entry => entry?.name))
+  const imported = new Set()
+  for (const file of reached) {
+    if (!/\.(ts|tsx|mjs|js|css)$/.test(file) || !existsSync(join(root, file))) continue
+    const owner = manifests[`${/^((?:packages|apps)\/[^/]+)\//.exec(file)?.[1]}/package.json`]?.name ?? ''
+    for (const match of readFileSync(join(root, file), 'utf8').matchAll(/(?:(?:import|export)\s+[\w*{}\s,$]*?from\s*|\bimport\s*\(?\s*|\brequire\(\s*|@import\s+(?:url\()?)['"]([^'"]+)['"]/g)) {
+      const name = /^(?:@[\w.-]+\/)?[\w.-]+(?=\/|$)/.exec(match[1])?.[0]
+      if (name && !/^[./]|^\w+:/.test(match[1]) && !workspace.has(name)) imported.add(`${owner} ${name}`)
     }
-    return keys.get(component)
   }
+  const gallery = manifests['apps/gallery/package.json'] ?? {}
+  for (const name of Object.keys({ ...gallery.dependencies, ...gallery.devDependencies })) if (!workspace.has(name)) imported.add(`@juno/gallery ${name}`)
+  const resolution = Object.fromEntries(Object.entries(manifests).map(([file, entry]) => [file, entry && pick(entry, file === 'package.json' ? rootFields : packageFields)]))
+  return [resolution, lockedPackages(root, [...imported].toSorted().map(entry => entry.split(' ')))]
+}
+
+/** Manifest fields that decide how an import resolves; dependency ranges count through the lockfile. */
+const packageFields = ['name', 'type', 'exports', 'imports', 'main', 'module', 'browser', 'sideEffects']
+const rootFields = ['workspaces', 'packageManager', 'packageExtensions', 'overrides', 'resolutions', 'patchedDependencies', 'trustedDependencies']
+const pick = (entry, fields) => Object.fromEntries(fields.filter(field => field in entry).map(field => [field, entry[field]]))
+const manifest = (root, file) => existsSync(join(root, file)) ? JSON.parse(readFileSync(join(root, file), 'utf8')) : null
+
+/**
+ * The locked versions of the packages the reached files import and the
+ * gallery builds with, and of what those depend on: `[importer, name]` pairs.
+ * Other workspaces' packages and tools do not count. An unreadable lockfile
+ * counts whole.
+ */
+function lockedPackages(root, roots) {
+  const text = existsSync(join(root, 'bun.lock')) ? readFileSync(join(root, 'bun.lock'), 'utf8') : ''
+  let lock
+  try { lock = JSON.parse(text.replace(/,(\s*[}\]])/g, '$1')) } catch { return digest(text) }
+  const { packages = {}, workspaces: _workspaces, ...settings } = lock
+  const picked = new Map()
+  const names = key => key.split('/').reduce((list, part) => list.at(-1)?.startsWith('@') && !list.at(-1).includes('/') ? [...list.slice(0, -1), `${list.at(-1)}/${part}`] : [...list, part], [])
+  const visit = (parent, name) => {
+    // Bun keys a nested copy under its dependent: `parent/name`, then each ancestor.
+    const chain = names(parent)
+    const key = Array.from({ length: chain.length + 1 }, (_, index) => [...chain.slice(0, chain.length - index), name].join('/')).find(candidate => packages[candidate])
+    if (key === undefined || picked.has(key)) return
+    picked.set(key, packages[key])
+    const info = packages[key][2]
+    if (typeof info !== 'object' || info === null) return
+    for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) for (const next of Object.keys(info[field] ?? {})) visit(key, next)
+  }
+  for (const [importer, name] of roots) visit(importer, name)
+  return digest(JSON.stringify([settings, [...picked].toSorted(([a], [b]) => a < b ? -1 : 1)]))
 }
 
 /** Immutable successful state records beside the shared build/results caches. */
-export function walkCache({ root, kind, runtime, directory, all = false, own = false }) {
-  const componentKey = own ? ownKeys(root) : sourceKeys(root, kind)
+export function walkCache({ root, kind, runtime, directory, all = false }) {
+  const componentKey = sourceKeys(root, kind)
   const cache = directory ?? join(process.env.JUNO_BUILD_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'results'), 'gallery-walk-v1')
   const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['NODE_ENV', 'JUNO_UNMINIFIED'].includes(name)).toSorted()
-  const key = route => digest(JSON.stringify({ kind, own, route, runtime, environment, source: componentKey(route.component) }))
+  const key = route => digest(JSON.stringify({ kind, route, runtime, environment, source: componentKey(route.component) }))
   const record = route => `${kind} ${route.route}\n`
   return {
     key,
-    /** True when every state is checked again whatever its record. */
-    all,
     passed(route) {
       if (all) return false
       try { return readFileSync(join(cache, key(route)), 'utf8') === record(route) } catch { return false }
