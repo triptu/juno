@@ -50,7 +50,7 @@ function cacheOptions(browser: Browser) {
   }
 }
 
-export function stateCache(kind: 'shift' | 'ring', browser: Browser) {
+export function stateCache(kind: 'shift', browser: Browser) {
   return walkCache({ ...cacheOptions(browser), kind })
 }
 

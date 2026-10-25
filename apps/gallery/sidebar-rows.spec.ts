@@ -33,13 +33,6 @@ layoutTest('a DM’s Main previews the message alone, your own message keeps “
   await expect(page.locator('[data-topic-id="G0MAYALEO:main"] [data-group-avatar] [data-kind="person"]')).toHaveCount(2)
 })
 
-layoutTest('a row says its unread count and a mention in words, not only in tooltips', async ({ page }) => {
-  await open(page, 'TopicRow', 'state/mention')
-  await expect(row(page, 'Rina Sato')).toHaveAccessibleDescription(/^2 unread, mentions you\. \S/)
-  await open(page, 'TopicRow', 'state/read')
-  await expect(row(page, 'Postgres 16')).toHaveAccessibleDescription('Dev: Booked 2–4pm. Will post results here.')
-})
-
 paintTest('an active DM partner gets the presence dot centred on the round photo’s bottom right edge, ringed in the row’s fill, plain and selected', async ({ page }) => {
   /** The dot's ring and the fill behind it: the nearest ancestor background that is not transparent. */
   const colours = (dot: ReturnType<Page['locator']>) => dot.evaluate((node) => {

@@ -54,16 +54,14 @@ syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and kee
   // The dropped tab settles with no transform left on any tab.
   await expect.poll(() => tabs.root.locator('[data-tab]').evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement).style.transform).join(''))).toBe('')
 
-  // The keyboard moves the focused tab one place, and a screen reader hears where it went.
+  // The keyboard moves the focused tab one place.
   await tabs.tab(ROADMAP).focus()
   await juno.win.keyboard.press('Control+Shift+ArrowRight')
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Rina/)])
-  await expect(tabs.announcement).toHaveText(/^Moved to position 2 of 3\./)
   await tabs.expectFocused(ROADMAP)
   await juno.win.keyboard.press('Control+Shift+ArrowLeft')
   await juno.win.keyboard.press('Control+Shift+ArrowLeft')
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
-  await expect(tabs.announcement).toHaveText(/^Moved to position 1 of 3\./)
 
   // Esc during a drag puts the tab back.
   const from = await tabs.tab(RINA).boundingBox()

@@ -4,9 +4,9 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 
 - `bun run gallery`: interactive review on port 4174.
 - `bun run test:gallery`: cache checks, build, then parallel Chromium behavior tests with zero retries.
-- `GALLERY_SHIFT_ALL=1 bun run test:gallery`: refresh every selected shift and focus state, even if cached.
+- `GALLERY_SHIFT_ALL=1 bun run test:gallery`: refresh every selected shift state, even if cached.
 - `bun run remote --env GALLERY_SHIFT_ALL=1 test:gallery`: the same full check on the runner.
-- `verify:main --nightly` and `verify:main --no-cache` force both broad walks automatically.
+- `verify:main --nightly` and `verify:main --no-cache` force the broad walk automatically.
 - `bun run gallery:shots`: review screenshots in both themes. `GALLERY_SHOTS_ONLY=Button` narrows them.
 
 Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency. Every test owns one context; long walks reset the document between states and recycle pages every 20 states. Screenshots remain review artifacts, not pixel baselines in the behavior gate.
@@ -17,11 +17,11 @@ Install the pinned headless shell with `bunx playwright install chromium --only-
 
 ## Cached walks
 
-`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports, plus the gallery shell, its styles, assets and fonts. Tokens count by value: only the layout tokens the state's files read, in every theme; colour and shadow tokens, comments, and paint-only CSS declarations do not count (`layout-tokens.mjs`). The walk counts through `shift-walk.ts` (or `focus-ring.spec.ts`) and its imports, which include `open-state.ts` and the guard; the spec's other tests, the scaffolding in `support.ts` and the Playwright config do not. Compositions key on all source, so editing `compositions.tsx` re-walks only them. Locked versions count only for packages the gallery imports or builds with. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
+`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports, plus the gallery shell, its styles, assets and fonts. Tokens count by value: only the layout tokens the state's files read, in every theme; colour and shadow tokens, comments, and paint-only CSS declarations do not count (`layout-tokens.mjs`). The walk counts through `shift-walk.ts` and its imports, which include `open-state.ts` and the guard; the spec's other tests, the scaffolding in `support.ts` and the Playwright config do not. Compositions key on all source, so editing `compositions.tsx` re-walks only them. Locked versions count only for packages the gallery imports or builds with. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
 
 Only a completed successful state is recorded. Before rechecking a state its old record is removed, so failure or interruption cannot preserve a previous pass. Records are written atomically under `$JUNO_BUILD_CACHE_DIR/gallery-walk-v1`, or the shared system temp directory's `juno-cache/results/gallery-walk-v1`. The remote runner uses `/cache/builds/gallery-walk-v1`.
 
-`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS`, `GALLERY_RING_ONLY`, `GALLERY_RING_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass both caches. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its document reset, still has a 30-second limit. Playwright owns context teardown. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
+`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass the cache. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its document reset, still has a 30-second limit. Playwright owns context teardown. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
 
 Measured full and cached timings, including the interrupted Mac comparison, are in [development notes](../../docs/development.md#gallery-measurements-2026-10-24).
 
@@ -31,7 +31,7 @@ Reviewed every spec and its non-merge history. Commit counts alone do not prove 
 
 | Specs | Decision and evidence |
 | --- | --- |
-| `shift`, `focus-ring` | Keep and cache broad walks. Shift history includes real regressions, the disabled-control hang and fallback-font failures; retain injected-shift self-tests and delayed loads. Size checks run in light only, and the header band and Resolve button are checked against each other, not against pinned pixels. |
+| `shift` | Keep and cache the broad walk. Shift history includes real regressions, the disabled-control hang and fallback-font failures; retain injected-shift self-tests and delayed loads. Size checks run in light only, and the header band and Resolve button are checked against each other, not against pinned pixels. |
 | `activation` | Merge eight small cases into three pointer, nested-control and keyboard flows. |
 | `behaviour` | Keep cursor, scroll chaining, whole-pixel row, truncation, late palette and gallery routing checks. These have specific regression history. |
 | `tooltip` | Merge six checks into a timing/dismissal flow and an edge-containment check. Drive time explicitly instead of racing wall-clock sleeps. |
@@ -53,6 +53,10 @@ Reviewed every spec and its non-merge history. Commit counts alone do not prove 
 | `message-more` | Keep hover/focus visibility, stable rows and menu anchoring; remove unasserted screenshots and fixed button size. |
 | `message-hover`, `button-press`, `trigger-open` | Keep actual hover, selection, held-press and trigger feedback checks. |
 | `narrow-geometry`, `confirm-geometry`, `popover-anchor-geometry` | Keep clipping/overlap and edge-placement regressions. Narrow layouts have a series of real fixes in history. |
-| `tabs-geometry`, `topic-titles`, `welcome-geometry` | Keep keyboard semantics, stable/contained geometry and wrapping. Remove fixed tab inset/title heights and duplicate light/dark geometry screenshots. The room kept after Welcome's Hide is checked in desktop `welcome.spec.ts` on the real Hide. |
-| `sidebar-rows`, `roving`, `card-working`, `table`, `formatting`, `topic-art` | Keep behavior and regression checks: accessible state, keyboard navigation, disabled mutation, copying/wrapping, preview alignment and deferred art. Right-to-left caret placement is checked in desktop `formatting.spec.ts`. |
+| `tabs-geometry`, `topic-titles`, `welcome-geometry` | Keep stable/contained geometry and wrapping. Remove fixed tab inset/title heights and duplicate light/dark geometry screenshots. The room kept after Welcome's Hide is checked in desktop `welcome.spec.ts` on the real Hide. |
+| `sidebar-rows`, `card-working`, `table`, `formatting`, `topic-art` | Keep behavior and regression checks: disabled mutation, copying/wrapping, preview alignment and deferred art. Right-to-left caret placement is checked in desktop `formatting.spec.ts`. |
 | `shots` | Keep the review screenshot command separate from behavior tests. |
+
+### Accessibility-only tests removed, 2026-10-25
+
+At Tushar's request the gallery no longer checks accessibility alone: `roving.spec.ts` (Tab stops and radio groups), `focus-ring.spec.ts` (focus rings never clipped, with its walk and cache kind), the tab strip's close-button and Tab-stop tests, the sidebar row's accessible description, the table scroll box's Tab stop, and single steps that asserted only an `aria-*` attribute, `tabindex` or an accessible name. `contrast.spec.ts` and `peek-contrast.spec.ts` stay: they guard the readable text levels in both themes and every accent, which `SPEC.md` sets as a design rule.

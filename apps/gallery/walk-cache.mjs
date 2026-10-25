@@ -23,7 +23,7 @@ class LayoutGraph extends ImportGraph {
 
 /**
  * Source keys work in remote archives too: no Git metadata or worktree paths.
- * `shift` and `ring` key on a broad walk and what can move a box; `layout` and
+ * `shift` keys on the walk and what can move a box; `layout` and
  * `paint` key the cached rendering tests (support.ts), whose own code counts
  * through `specKey`. `paint` also counts colour and shadow tokens and CSS
  * declarations that only paint.
@@ -43,7 +43,7 @@ export function sourceKeys(root, kind) {
 
   // What a walk does to a state. The spec's other tests (delayed loads, the guard's
   // self-tests) are not part of it; the guard is, through the walk's imports.
-  const walk = { shift: 'apps/gallery/shift-walk.ts', ring: 'apps/gallery/focus-ring.spec.ts' }[kind]
+  const walk = { shift: 'apps/gallery/shift-walk.ts' }[kind]
   const paint = kind === 'paint'
   const shared = new Set([
     'bunfig.toml', 'tsconfig.base.json',

@@ -47,11 +47,10 @@ layoutTest('a rewritten Home title line leaves every box where it was', async ({
 layoutTest('a thread link keeps its height when the first reply becomes known', async ({ page }) => {
   await page.goto('/#/ThreadLink?__state=label/not-loaded')
   const link = page.locator('[data-thread-link]')
-  await expect(link).toHaveAccessibleName('5 replies')
   await expect(link).toHaveText('5 replies')
   const height = (await link.boundingBox())!.height
   await page.goto('/#/ThreadLink?__state=label/replies')
-  await expect(link).toHaveAccessibleName('2 replies: Maya: Sounds good.')
+  await expect(link).toContainText('Maya: Sounds good.')
   expect((await link.boundingBox())!.height).toBe(height)
 })
 

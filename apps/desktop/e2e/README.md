@@ -9,7 +9,7 @@ The app's end-to-end tests, against the fake Slack server. Fixtures and the opti
 | A protocol, merge, parser or state machine rule | a unit test in its package | `bun run test` |
 | Engine or agent behaviour with no UI (sync, read state, the outbox, Home's rules) | `packages/engine/test/flows/`, `packages/agent/test/` | `bun run test` |
 | What the app shows and sends after a user's steps: send, edit, fail and retry, unread and read state, filters, tabs, search, the palette, menus through the seam, Settings forms, the agent's chat and cards, Home | the DOM lane, `apps/desktop/dom/` ([README](../dom/README.md)) | `bun run test:dom` |
-| Layout, scroll, virtual lists past their overscan, shift, focus rings, drag, pointer coordinates, paint, the CSS cascade, images | the browser lane (below) | `bun run test:browser` |
+| Layout, scroll, virtual lists past their overscan, shift, drag, pointer coordinates, paint, the CSS cascade, images | the browser lane (below) | `bun run test:browser` |
 | Main, windows, native menus, protocols, keychain, packaging | the Electron lane | `bun run test:electron` |
 | One component's look and states | the gallery | `bun run test:gallery` |
 
