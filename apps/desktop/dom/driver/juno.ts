@@ -13,7 +13,7 @@ import type { DomApp } from '../app'
 import { expect } from '../expect'
 import type { Dom } from '../input'
 import type { Query } from '../query'
-import { HomePane, HomeWritePane } from './home'
+import { HomePane, HomeWritePane, WelcomeCard } from './home'
 import { domSurface, escapeRegExp, Menus } from './menus'
 import { PaletteDriver } from './palette'
 import { AccountMenu, NotificationsPage, SettingsPage } from './settings'
@@ -164,6 +164,7 @@ export class Juno implements JunoVerbs {
   readonly nav: Navigation
   readonly home: HomePane
   readonly palette: PaletteDriver
+  readonly welcome: WelcomeCard
 
   constructor(readonly app: DomApp) {
     this.dom = app.dom
@@ -179,6 +180,7 @@ export class Juno implements JunoVerbs {
     this.nav = new Navigation(this.dom, this.menus)
     this.home = new HomePane(this.dom, this.menus)
     this.palette = new PaletteDriver(this.dom, this.menus)
+    this.welcome = new WelcomeCard(this.dom, this.menus)
   }
 
   /** The page, for a test's own queries, as `juno.win` is in the Playwright driver. */
