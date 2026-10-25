@@ -65,6 +65,8 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
       navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36' },
     },
   })
+  patchPrototypes(window)
+  restorePrototypes(window)
   fillGaps(window)
   // The sidebar trace (e2e README, "Sidebar trace") on: the driver waits for the list value a filter asks for.
   ;(window as unknown as Record<string, unknown>)['__junoSidebarTrace'] = { hold: [], list: { values: 0, errors: 0 } }
@@ -173,6 +175,80 @@ function unhidden(el: HTMLElement): boolean {
   return el.parentElement === null || unhidden(el.parentElement)
 }
 
+let prototypesPatched = false
+
+/**
+ * happy-dom's element classes are shared by every window, so their gaps are
+ * filled once per worker, and what depends on the window is read from the
+ * element's own.
+ */
+function patchPrototypes(window: Window): void {
+  if (prototypesPatched) return
+  prototypesPatched = true
+  unescapeSelectors(window)
+  const proto = (window as unknown as { Element: typeof Element }).Element.prototype as unknown as Record<string, unknown>
+  proto['checkVisibility'] ??= function (this: HTMLElement) {
+    return unhidden(this)
+  }
+  // happy-dom matches :focus-visible on any focus. Browsers match it after keyboard input, not after a press (`Dom` keeps which).
+  const matches = proto['matches'] as (this: Element, selector: string) => boolean
+  proto['matches'] = function (this: Element, selector: string) {
+    if (selector === ':focus-visible') return this === this.ownerDocument.activeElement && (this.ownerDocument.defaultView as { __domPointerFocus?: boolean } | null)?.__domPointerFocus !== true
+    return matches.call(this, selector)
+  }
+  for (const name of ['scrollIntoView', 'scrollTo', 'scrollBy']) proto[name] ??= function () {}
+  proto['animate'] ??= function () {
+    return { finished: Promise.resolve(), cancel() {}, finish() {}, play() {}, pause() {}, reverse() {}, onfinish: null, addEventListener(type: string, listener: () => void) { if (type === 'finish') queueMicrotask(listener) }, removeEventListener() {}, currentTime: 0, playState: 'finished' }
+  }
+  proto['getAnimations'] ??= function () { return [] }
+}
+
+let pristine: Map<object, PropertyDescriptorMap> | undefined
+
+/**
+ * Puts the shared prototypes back as they were before any page ran. A page
+ * patches them as if they were its own (`web/page/urls.ts` wraps
+ * `setAttribute`), so without this each window would wrap the last one's
+ * patch, every call would go through all of them, and the wrappers would
+ * keep every closed window alive. Runs before each page and after it closes;
+ * the first run records the prototypes as `patchPrototypes` leaves them.
+ */
+function restorePrototypes(window: Window): void {
+  pristine ??= sharedPrototypes(window)
+  for (const [proto, descriptors] of pristine) {
+    const target = proto as Record<PropertyKey, unknown>
+    for (const key of Reflect.ownKeys(proto)) {
+      const before = descriptors[key as string]
+      if (before === undefined) delete target[key]
+      else {
+        const now = Object.getOwnPropertyDescriptor(proto, key)!
+        if (now.value !== before.value || now.get !== before.get || now.set !== before.set) Object.defineProperty(proto, key, before)
+      }
+    }
+    for (const key of Reflect.ownKeys(descriptors)) if (!Object.hasOwn(proto, key)) Object.defineProperty(proto, key, descriptors[key as string]!)
+  }
+}
+
+/** Every prototype the window's classes share with other windows (this realm's, not the window's own built-ins), with its properties now. */
+function sharedPrototypes(window: Window): Map<object, PropertyDescriptorMap> {
+  const found = new Map<object, PropertyDescriptorMap>()
+  const globals = window as unknown as Record<string, unknown>
+  for (const name of Object.getOwnPropertyNames(window)) {
+    const value = typeof Object.getOwnPropertyDescriptor(window, name)?.value === 'function' ? (globals[name] as { prototype?: unknown }).prototype : undefined
+    for (let proto = value; proto instanceof Object && !found.has(proto); proto = Object.getPrototypeOf(proto)) found.set(proto, Object.getOwnPropertyDescriptors(proto))
+  }
+  return found
+}
+
+/** Closes a window from `openWindow` and undoes what its page did to the shared prototypes. */
+export async function closeWindow(window: Window): Promise<void> {
+  try {
+    await window.happyDOM.close()
+  } finally {
+    restorePrototypes(window)
+  }
+}
+
 function fillGaps(window: Window): void {
   const globals = window as unknown as Record<string, unknown>
   // Bun's own, which talk to the host for real.
@@ -182,23 +258,6 @@ function fillGaps(window: Window): void {
     globals['requestIdleCallback'] = (callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void) => (window.setTimeout as unknown as (run: () => void, delay: number) => number)(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1)
     globals['cancelIdleCallback'] = (id: number) => (window.clearTimeout as unknown as (id: number) => void)(id)
   }
-  unescapeSelectors(window)
-  const proto = (window as unknown as { Element: typeof Element }).Element.prototype as unknown as Record<string, unknown>
-  proto['checkVisibility'] ??= function (this: HTMLElement) {
-    return unhidden(this)
-  }
-  // happy-dom matches :focus-visible on any focus. Browsers match it after keyboard input, not after a press (`Dom` keeps which).
-  const matches = proto['matches'] as (this: Element, selector: string) => boolean
-  const modality = window as unknown as { __domPointerFocus?: boolean }
-  proto['matches'] = function (this: Element, selector: string) {
-    if (selector === ':focus-visible') return this === this.ownerDocument.activeElement && modality.__domPointerFocus !== true
-    return matches.call(this, selector)
-  }
-  for (const name of ['scrollIntoView', 'scrollTo', 'scrollBy']) proto[name] ??= function () {}
-  proto['animate'] ??= function () {
-    return { finished: Promise.resolve(), cancel() {}, finish() {}, play() {}, pause() {}, reverse() {}, onfinish: null, addEventListener(type: string, listener: () => void) { if (type === 'finish') queueMicrotask(listener) }, removeEventListener() {}, currentTime: 0, playState: 'finished' }
-  }
-  proto['getAnimations'] ??= function () { return [] }
   const document = window.document as unknown as Record<string, unknown>
   if (document['timeline'] === undefined) Object.defineProperty(document, 'timeline', { value: { get currentTime() { return window.performance.now() } } })
   ;(document as { getAnimations?: () => unknown[] }).getAnimations ??= () => []

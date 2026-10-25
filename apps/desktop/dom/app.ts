@@ -17,7 +17,7 @@ import type { EngineOptions } from '../web/host/testHost'
 import type { WebTestSeam } from '../web/page/testSeam'
 import { PageClock } from './clock'
 import { Dom } from './input'
-import { DOM_BUILD, openWindow } from './window'
+import { closeWindow, DOM_BUILD, openWindow } from './window'
 
 let pool: HostPool | undefined
 /** One pool per Bun worker, kept across files; a host exits when the worker that forked it goes away. */
@@ -103,7 +103,7 @@ export class DomApp {
   async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly engine?: EngineOptions } = {}): Promise<void> {
     const local = this.window.localStorage
     const storage = Array.from({ length: local.length }, (_, at) => local.key(at)!).map((key) => [key, local.getItem(key)!] as const)
-    await within(this.window.happyDOM.close(), 3_000, 'closing the page')
+    await within(closeWindow(this.window), 3_000, 'closing the page')
     await this.host.quitEngine()
     await options.whileClosed?.()
     await this.host.startEngine(options.engine)
@@ -117,7 +117,7 @@ export class DomApp {
     return this.#closing ??= (async () => {
       try {
         this.clock?.close()
-        await within(this.window.happyDOM.close(), 3_000, 'closing the page')
+        await within(closeWindow(this.window), 3_000, 'closing the page')
       } finally {
         await within(this.host.stop(), 8_000, 'stopping the host')
       }
