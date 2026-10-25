@@ -107,6 +107,19 @@ export const schemeUrl = (host: string): RegExp => new RegExp(`^(?:juno://|/__ju
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+/** `text` as a quoted CSS string, for an attribute selector. */
+const cssString = (text: string) => JSON.stringify(text)
+
+/**
+ * The sidebar, its topic list, a topic's message list and the tab strip by the attributes that name them. Role and
+ * name queries walk the page and compute names in Playwright's injected script on every `expect`
+ * poll; these are native queries. Specs that test the names use `getByRole` themselves.
+ */
+const SIDEBAR = 'aside[aria-label="Sidebar"]'
+const TOPIC_LIST = '[role="group"][aria-label="Topics"]'
+const MESSAGE_LIST = '[role="list"][aria-label="Messages"]'
+const TAB_STRIP = '[data-tab-strip] [role="tablist"]'
+
 /** One row in the sidebar, found by the start of its title. */
 export class SidebarRow implements SidebarRowVerbs {
   readonly root: Locator
@@ -116,8 +129,9 @@ export class SidebarRow implements SidebarRowVerbs {
     readonly title: string,
     exact = false,
   ) {
-    // Rows are focusable list items named by their title.
-    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}${exact ? '$' : ''}`) })
+    // Rows are focusable list items named by their title; the DOM lane finds them by that name. Here the
+    // title's own attribute finds them in one native query: expect polls this locator more than any other.
+    this.root = win.locator(`[data-topic-row]:has([data-bold-title${exact ? '' : '^'}=${cssString(title)}])`)
   }
 
   /** The presence dot on a DM's photo, while Slack shows the person active. */
@@ -284,11 +298,11 @@ export class Sidebar implements SidebarVerbs {
   readonly root: Locator
 
   constructor(readonly win: Page) {
-    this.root = win.getByRole('complementary', { name: 'Sidebar' })
+    this.root = win.locator(SIDEBAR)
   }
 
   get list() {
-    return this.root.getByRole('group', { name: 'Topics' })
+    return this.root.locator(TOPIC_LIST)
   }
 
   /** Moves the pointer off the list, onto the workspace, so the list stops holding its order (SPEC 5). */
@@ -997,7 +1011,7 @@ export class Juno implements JunoVerbs {
     await this.expectEngineLive()
     // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
     // where a blind click would land, so wait for it and click its empty top corner, which does nothing.
-    const tabOpen = this.win.getByRole('tablist').getByRole('tab', { selected: true })
+    const tabOpen = this.win.locator(`${TAB_STRIP} [role="tab"][aria-selected="true"]`)
     await expect(this.home.root.or(tabOpen).first()).toBeVisible()
     if (await this.home.root.isVisible()) await this.home.root.click({ position: { x: 4, y: 4 } })
     else await this.win.mouse.click(900, 400)
@@ -1679,7 +1693,7 @@ export class TopicPane implements TopicVerbs {
   }
 
   get list() {
-    return this.root.getByRole('list', { name: 'Messages' })
+    return this.root.locator(MESSAGE_LIST)
   }
 
   get scroller() {
@@ -2203,11 +2217,12 @@ export class TabStrip implements TabStripVerbs {
     readonly surface: AppSurface,
     readonly win: Page,
   ) {
-    this.root = win.getByRole('tablist')
+    this.root = win.locator(TAB_STRIP)
   }
 
+  /** A tab whose label starts with `title`; `data-tooltip` holds the label the tab is named by. */
   tab(title: string): Locator {
-    return this.root.getByRole('tab', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    return this.root.locator(`[role="tab"][data-tooltip^=${cssString(title)}]`)
   }
 
   /** The `index`th tab titled `title`, left to right, when several show the same place. */
@@ -2267,11 +2282,11 @@ export class TabStrip implements TabStripVerbs {
 
   /** Tab titles, left to right. */
   titles(): Promise<string[]> {
-    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-tooltip') ?? ''))
+    return this.root.locator('[role="tab"]').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-tooltip') ?? ''))
   }
 
   async expectCount(count: number): Promise<void> {
-    await expect(this.root.getByRole('tab')).toHaveCount(count, { timeout: 15_000 })
+    await expect(this.root.locator('[role="tab"]')).toHaveCount(count, { timeout: 15_000 })
   }
 
   async expectActive(title: string): Promise<void> {
@@ -2605,7 +2620,7 @@ export class SidebarFrame {
     readonly surface: AppSurface,
     readonly win: Page,
   ) {
-    this.sidebar = win.getByRole('complementary', { name: 'Sidebar' })
+    this.sidebar = win.locator(SIDEBAR)
     this.edge = win.getByRole('separator', { name: 'Resize sidebar' })
   }
 
