@@ -1,11 +1,11 @@
-import { expect, test } from '@playwright/test'
-import { openState, readRoutes } from './support'
+import { expect } from '@playwright/test'
+import { openState, paintTest as test, readRoutes } from './support'
 
 for (const theme of ['light', 'dark'] as const) {
-  for (const accent of ['coral', 'ink']) {
-    test(`PeekView separates from a topic: ${theme}, ${accent}`, async ({ page }) => {
-      const routes = (await readRoutes(page)).filter((route) => route.component === 'PeekView' && route.groupId === 'over-topic')
-      expect(routes).toHaveLength(2)
+  test(`PeekView separates from a topic: ${theme}, coral and ink`, async ({ page }) => {
+    const routes = (await readRoutes(page)).filter((route) => route.component === 'PeekView' && route.groupId === 'over-topic')
+    expect(routes).toHaveLength(2)
+    for (const accent of ['coral', 'ink']) {
       for (const route of routes) {
         await openState(page, route, theme, accent)
         await expect(page.locator('[data-peek]')).toBeVisible()
@@ -46,10 +46,10 @@ for (const theme of ['light', 'dark'] as const) {
           return { contrast: ratio(surface, background), text }
         })
         const after = await measure()
-        for (const item of after.text) expect(item.contrast, JSON.stringify(item)).toBeGreaterThanOrEqual(4.5)
+        for (const item of after.text) expect(item.contrast, `${accent}, ${route.route}: ${JSON.stringify(item)}`).toBeGreaterThanOrEqual(4.5)
         // The panel's surface reads apart from the page behind it.
-        if (theme === 'light') expect(after.contrast).toBeGreaterThan(1.03)
+        if (theme === 'light') expect(after.contrast, `${accent}, ${route.route}`).toBeGreaterThan(1.03)
       }
-    })
-  }
+    }
+  })
 }

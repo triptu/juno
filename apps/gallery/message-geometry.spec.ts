@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { openState, type Route } from './support'
+import { expect, type Page } from '@playwright/test'
+import { layoutTest as test, openState, type Route } from './support'
 
 /**
  * The message list is as dense as Slack's (SPEC 7, "Stable geometry";
@@ -59,32 +59,30 @@ const rows = (page: Page) =>
     })
   })
 
-for (const id of ['main/conversation', 'main/conversation-comfortable', 'thread/long', 'main/thread-links']) {
-  test(`${id}: rows hold no empty space, senders sit the group gap apart, runs touch`, async ({ page }) => {
+test('rows hold no empty space, senders sit the group gap apart, runs touch, and the time sits right after the name', async ({ page }) => {
+  for (const id of ['main/conversation', 'main/conversation-comfortable', 'thread/long', 'main/thread-links']) {
     await open(page, 'MessageList', id)
     const measured = await rows(page)
-    expect(measured.length).toBeGreaterThan(3)
+    expect(measured.length, id).toBeGreaterThan(3)
     for (const [index, row] of measured.entries()) {
-      expect(row.empty, `row ${index} holds empty space`).toEqual([])
+      expect(row.empty, `${id} row ${index} holds empty space`).toEqual([])
       // The content column rounds up to a whole pixel (performance 3.3) and an emoji-only line's
       // images can sit a fraction past its box, so the row may end up to two pixels later.
       const below = row.bottom - row.inkBottom - row.paddingBottom
-      expect(below, `row ${index}: space under its content`).toBeGreaterThanOrEqual(-0.01)
-      expect(below, `row ${index}: space under its content`).toBeLessThan(2)
+      expect(below, `${id} row ${index}: space under its content`).toBeGreaterThanOrEqual(-0.01)
+      expect(below, `${id} row ${index}: space under its content`).toBeLessThan(2)
       const previous = measured[index - 1]
       if (previous === undefined) continue
       const gap = row.top - previous.bottom
-      if (row.header) expect(gap, `gap before row ${index}, a new sender`).toBeCloseTo(row.groupGap, 1)
-      else expect(gap, `gap before row ${index}, the same sender`).toBeCloseTo(0, 1)
+      if (row.header) expect(gap, `${id} gap before row ${index}, a new sender`).toBeCloseTo(row.groupGap, 1)
+      else expect(gap, `${id} gap before row ${index}, the same sender`).toBeCloseTo(0, 1)
     }
-  })
-}
-
-test('the time sits right after the name, short or long', async ({ page }) => {
-  await open(page, 'MessageList', 'main/conversation')
-  const headers = (await rows(page)).filter((row) => row.nameRight !== undefined)
-  expect(headers.length).toBeGreaterThan(3)
-  for (const row of headers) expect(row.timeLeft! - row.nameRight!, `row ${row.ts}`).toBeCloseTo(row.headerGap, 0)
+    if (id !== 'main/conversation') continue
+    // The time follows the name, short or long.
+    const headers = measured.filter((row) => row.nameRight !== undefined)
+    expect(headers.length).toBeGreaterThan(3)
+    for (const row of headers) expect(row.timeLeft! - row.nameRight!, `row ${row.ts}`).toBeCloseTo(row.headerGap, 0)
+  }
 })
 
 test('custom reactions show the workspace image, and an unknown one shows its name apart from the count', async ({ page }) => {
@@ -133,8 +131,8 @@ test('at scroll top the first row starts as far under the islands as the last en
 
 // A link preview's picture is 360px wide. The body once took that as its least width, so in a narrow
 // column it grew past the row and every line of a list wrapped past the row's hover background.
-for (const id of ['rich-text/narrow', 'rich-text/wide']) {
-  test(`${id}: every block and every word ends inside the message's text column`, async ({ page }) => {
+test('every block and every word ends inside the message\'s text column, narrow and wide', async ({ page }) => {
+  for (const id of ['rich-text/narrow', 'rich-text/wide']) {
     await open(page, 'Message', id)
     const measured = await page.evaluate(() => {
       const row = document.querySelector('[data-message-row]')!
@@ -154,9 +152,9 @@ for (const id of ['rich-text/narrow', 'rich-text/wide']) {
       }
       return { column, body: body.getBoundingClientRect().right, blocks, words }
     })
-    expect(measured.words.length).toBeGreaterThan(50)
-    expect(measured.body, 'the body ends inside the column').toBeLessThanOrEqual(measured.column + 0.5)
-    for (const block of measured.blocks) expect(block.right, `${block.block} ends inside the column`).toBeLessThanOrEqual(measured.column + 0.5)
-    expect(measured.words.filter((word) => word.right > measured.column + 0.5), 'words past the column').toEqual([])
-  })
-}
+    expect(measured.words.length, id).toBeGreaterThan(50)
+    expect(measured.body, `${id}: the body ends inside the column`).toBeLessThanOrEqual(measured.column + 0.5)
+    for (const block of measured.blocks) expect(block.right, `${id}: ${block.block} ends inside the column`).toBeLessThanOrEqual(measured.column + 0.5)
+    expect(measured.words.filter((word) => word.right > measured.column + 0.5), `${id}: words past the column`).toEqual([])
+  }
+})

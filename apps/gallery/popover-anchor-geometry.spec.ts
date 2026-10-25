@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { openState, readRoutes } from './support'
+import { expect } from '@playwright/test'
+import { layoutTest as test, openState, readRoutes } from './support'
 
 /**
  * A popover lines up with the control that opened it, not with a wrapper
@@ -14,17 +14,18 @@ const cases = [
   { component: 'Home', state: 'chip-open', trigger: 'button[aria-label="Send to: Juno"]', panel: '[aria-label="Send to"]' },
 ] as const
 
-for (const { component, state, trigger, panel } of cases) {
-  test(`${component} ${state}: the popover starts at its trigger's left edge`, async ({ page }) => {
-    const route = (await readRoutes(page)).find((each) => each.component === component && each.state === state)
+test('a popover starts at its trigger\'s left edge', async ({ page }) => {
+  const routes = await readRoutes(page)
+  for (const { component, state, trigger, panel } of cases) {
+    const route = routes.find((each) => each.component === component && each.state === state)
     expect(route, `${component}/${state} exists`).toBeDefined()
     await openState(page, route!)
     const frame = page.locator(`[data-fixture-frame="${route!.route}"]`)
     const button = (await frame.locator(trigger).first().boundingBox())!
     const box = (await frame.locator(panel).first().boundingBox())!
-    expect(Math.abs(box.x - button.x)).toBeLessThanOrEqual(1)
-  })
-}
+    expect(Math.abs(box.x - button.x), route!.route).toBeLessThanOrEqual(1)
+  }
+})
 
 test('TopicHeader at 336px: the switcher moves in from the window edge and stays inside', async ({ page }) => {
   const route = (await readRoutes(page)).find((each) => each.component === 'TopicHeader' && each.state === 'switcher-336')!

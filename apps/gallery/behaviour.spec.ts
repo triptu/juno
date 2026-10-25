@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openState, readRoutes } from './support'
+import { layoutTest, openState, readRoutes } from './support'
 
 /**
  * Behaviour that a screenshot cannot show, checked against the built gallery
@@ -10,7 +10,7 @@ import { openState, readRoutes } from './support'
 
 const log = (page: Page) => page.locator('[data-activation-log]')
 
-test('message links use the hand cursor only when they open outside Juno', async ({ page }) => {
+layoutTest('message links use the hand cursor only when they open outside Juno', async ({ page }) => {
   await page.goto('/#/MessageList?__state=thread/long')
   await expect(page.getByRole('link', { name: 'runbook' })).toHaveCSS('cursor', 'pointer')
   await expect(page.locator('[data-channel="C0ENG"]')).toHaveCSS('cursor', 'default')
@@ -22,7 +22,7 @@ test('message links use the hand cursor only when they open outside Juno', async
  * the rewritten titles: every row, title, meta line, button and the ask
  * field sit in the same boxes in both, so the swap moves nothing.
  */
-test('a rewritten Home title line leaves every box where it was', async ({ page }) => {
+layoutTest('a rewritten Home title line leaves every box where it was', async ({ page }) => {
   const boxes = async (state: string) => {
     await page.goto(`/#/Home?__state=${state}`)
     await expect(page.locator('[data-home-item]')).toHaveCount(3)
@@ -44,7 +44,7 @@ test('a rewritten Home title line leaves every box where it was', async ({ page 
   await expect(page.locator('[data-home-title]').first()).toHaveText("Elena wants a call on Rina's competing offer by Friday")
 })
 
-test('a thread link keeps its height when the first reply becomes known', async ({ page }) => {
+layoutTest('a thread link keeps its height when the first reply becomes known', async ({ page }) => {
   await page.goto('/#/ThreadLink?__state=label/not-loaded')
   const link = page.locator('[data-thread-link]')
   await expect(link).toHaveText('5 replies')
@@ -72,7 +72,7 @@ test.describe('truncation tooltip', () => {
     return name
   }
 
-  test('a cut-off sender name shows the full name; one that fits does not', async ({ page }) => {
+  layoutTest('a cut-off sender name, thread link preview, topic header title or switcher row title shows in full; one that fits does not', async ({ page }) => {
     await page.goto('/#/Message?__state=row/long-name')
     const long = await hoverName(page)
     await expect(long).toHaveText('Maximilian-Alexander Fitzgerald-Montgomery-Rutherford of the platform team')
@@ -82,18 +82,14 @@ test.describe('truncation tooltip', () => {
     await expect(page.locator('[data-message-row] span[dir="auto"]').first()).toHaveText('Leo Park')
     const short = await hoverName(page)
     await expect(short).not.toHaveAttribute('title')
-  })
 
-  test('a cut-off thread link preview shows the full preview; one that fits does not', async ({ page }) => {
     await page.goto('/#/ThreadLink?__state=label/long-preview')
-    const long = await hoverText(page, /^Priya: Rotate the staging secrets/)
-    await expect(long).toHaveAttribute('title', 'Priya: Rotate the staging secrets before the audit, and document where each one lives so nobody has to ask again')
+    const longPreview = await hoverText(page, /^Priya: Rotate the staging secrets/)
+    await expect(longPreview).toHaveAttribute('title', 'Priya: Rotate the staging secrets before the audit, and document where each one lives so nobody has to ask again')
     await page.goto('/#/ThreadLink?__state=label/replies')
-    const short = await hoverText(page, 'Maya: Sounds good.')
-    await expect(short).not.toHaveAttribute('title')
-  })
+    const shortPreview = await hoverText(page, 'Maya: Sounds good.')
+    await expect(shortPreview).not.toHaveAttribute('title')
 
-  test('a cut-off topic header title shows the full title; one that fits does not', async ({ page }) => {
     const title = page.locator('[data-fixture-frame] h1 button span[dir="auto"]')
     await page.goto('/#/TopicHeader?__state=content/long-title')
     await title.hover()
@@ -102,14 +98,12 @@ test.describe('truncation tooltip', () => {
     await title.hover()
     await expect(title).toHaveText('Postgres 16 migration plan')
     await expect(title).not.toHaveAttribute('title')
-  })
 
-  test('a cut-off topic switcher row title shows the full title; one that fits does not', async ({ page }) => {
     await page.goto('/#/TopicSwitcher?__state=list/long-title')
-    const long = await hoverText(page, /^Two options for the thread list/)
-    await expect(long).toHaveAttribute('title', 'Two options for the thread list: compact rows versus two-line previews, and what we lose with each one')
-    const short = await hoverText(page, 'Pin the Node version in CI')
-    await expect(short).not.toHaveAttribute('title')
+    const longRow = await hoverText(page, /^Two options for the thread list/)
+    await expect(longRow).toHaveAttribute('title', 'Two options for the thread list: compact rows versus two-line previews, and what we lose with each one')
+    const shortRow = await hoverText(page, 'Pin the Node version in CI')
+    await expect(shortRow).not.toHaveAttribute('title')
   })
 })
 
@@ -172,7 +166,7 @@ test('a code block in the message list shows its thumb only while the pointer is
  * scroll anchoring moves the list by the difference; a fractional difference
  * leaves the rows in view a part of a pixel off, and their text jumps.
  */
-test('every message row is a whole number of pixels tall', async ({ page }) => {
+layoutTest('every message row is a whole number of pixels tall', async ({ page }) => {
   const routes = (await readRoutes(page)).filter((route) => route.component === 'MessageList' || route.component === 'Message')
   expect(routes.length).toBeGreaterThan(0)
   const fractional: string[] = []
@@ -188,7 +182,7 @@ test('every message row is a whole number of pixels tall', async ({ page }) => {
 
 // The cursor rule (SPEC section 16) is checked on every state by the shift guard's walk in shift.spec.ts, which opens each state anyway.
 
-test('the gallery chrome keeps the arrow cursor too', async ({ page }) => {
+layoutTest('the gallery chrome keeps the arrow cursor too', async ({ page }) => {
   await page.goto('/#/Button?__state=variant/primary')
   const cursors = await page.evaluate(() =>
     Array.from(document.querySelectorAll('.g-chrome a, .g-chrome select, .g-chrome input')).map((element) => getComputedStyle(element).cursor),
@@ -338,7 +332,7 @@ test.describe('state switcher', () => {
 
 // Shift and screenshot checks assume the bundled faces on every platform
 // (Linux under bun run remote too), never a system fallback.
-test('every font family comes from the bundle', async ({ page }) => {
+layoutTest('every font family comes from the bundle', async ({ page }) => {
   await page.goto('/#/Button')
   const families = await page.evaluate(async () => {
     const loaded: Record<string, number> = {}
@@ -379,7 +373,7 @@ test('palette keeps the highlighted item through late commands and reordered res
  * so a shot in teal never shows coral checked (decision 10-21 17:01). Every
  * state that holds the swatches, in a non-default accent and theme.
  */
-test('the checked swatch is the accent the frame is drawn in', async ({ page }) => {
+layoutTest('the checked swatch is the accent the frame is drawn in', async ({ page }) => {
   const routes = (await readRoutes(page)).filter(
     (route) =>
       route.component === 'AppearanceSettings' ||

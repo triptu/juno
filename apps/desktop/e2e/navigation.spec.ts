@@ -1,24 +1,13 @@
-// Navigation that needs main (spec sections 4 and 6): window swipes, the
-// sidebar's resize and hide, and full screen. Back and Forward, the reopen
-// stack, pinned tabs and the tab menu are in the DOM lane (dom/navigation.test.ts).
+// Navigation that needs main (spec sections 4 and 6): the sidebar's resize
+// and hide. Window swipes share a launch in break-pass.spec.ts, and full
+// screen in app.spec.ts. Back and Forward, the reopen stack, pinned tabs and
+// the tab menu are in the DOM lane (dom/navigation.test.ts).
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
-
-const RINA = 'Rina finished the onsite'
-const ROADMAP = 'Proposal: cut offline mode and public'
-
-syncedTest('window swipe events move back and forward', { tag: '@electron' }, async ({ juno }) => {
-  await juno.sidebar.row(RINA).open()
-  await juno.sidebar.row(ROADMAP).open()
-  await juno.nav.swipe('left')
-  await juno.topic.expectTitle(RINA)
-  await juno.nav.swipe('right')
-  await juno.topic.expectTitle(ROADMAP)
-})
 
 // @mac: on Linux the width is not restored after the relaunch at the end (macOS quit and menu path); the Mac runs it.
 syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', { tag: ['@mac', '@electron'] }, async ({ juno, running, userData, fake, slackApp }) => {
@@ -74,30 +63,4 @@ syncedTest('the sidebar resizes by its edge, resets on double-click, and hides',
   } finally {
     await again.close()
   }
-})
-
-test('in full screen the title bars drop the traffic lights’ room, and keep it again after', { tag: '@electron' }, async ({ juno, app }) => {
-  await juno.signIn()
-  const fullScreen = (on: boolean) => app.evaluate(({ BrowserWindow }, on) => BrowserWindow.getAllWindows()[0]!.setFullScreen(on), on)
-  // A button's left edge from the left of the pane it sits in.
-  const leftOf = (pane: string, name: RegExp) =>
-    juno.win.locator(pane).getByRole('button', { name }).evaluate((button, pane) => button.getBoundingClientRect().left - button.closest(pane)!.getBoundingClientRect().left, pane)
-  const hide = () => leftOf('aside[aria-label="Sidebar"]', /^Hide sidebar/)
-  const show = () => leftOf('[data-tab-strip]', /^Show sidebar/)
-
-  // The 78px after the lights, then the sidebar's 10px inset in full screen.
-  expect(await hide()).toBe(78)
-  await fullScreen(true)
-  await expect.poll(hide).toBe(10)
-  await fullScreen(false)
-  await expect.poll(hide).toBe(78)
-
-  // With the sidebar hidden, the tab strip does the same, from its own 10px padding.
-  await juno.frame.toggleWithButton()
-  await juno.frame.expectHidden()
-  expect(await show()).toBe(78)
-  await fullScreen(true)
-  await expect.poll(show).toBe(10)
-  await fullScreen(false)
-  await expect.poll(show).toBe(78)
 })

@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
-import { openState, type Route } from './support'
+import { expect, type Locator, type Page } from '@playwright/test'
+import { layoutTest as test, openState, type Route } from './support'
 
 /**
  * The delete confirm (ADR 0010) straddles the row's top edge, mostly above
@@ -66,22 +66,6 @@ async function read(row: Locator): Promise<Geometry> {
   })
 }
 
-for (const [id, header] of [
-  ['interaction/confirm-delete', true],
-  ['interaction/confirm-delete-grouped', false],
-] as const) {
-  test(`${id}: the confirm straddles the row's top edge, above its text`, async ({ page }) => {
-    await open(page, id)
-    const at = await measure(page)
-    expect(at.header).toBe(header)
-    expect(at.confirm.top).toBeLessThan(at.row.top)
-    // It comes into the row by the row's top padding less 2px: none in Compact density, so its bottom meets the edge.
-    expect(at.confirm.bottom).toBeGreaterThanOrEqual(at.row.top)
-    expect(at.confirm.bottom).toBeLessThanOrEqual(at.textTop)
-    expect(at.confirm.top).toBeGreaterThanOrEqual(at.listTop)
-  })
-}
-
 /** Whether the confirm runs over the row's name or time: their boxes against the confirm's left edge. */
 const clearOfHeader = (row: Locator) =>
   row.evaluate((element) => {
@@ -91,9 +75,26 @@ const clearOfHeader = (row: Locator) =>
     return confirm.left >= right
   })
 
-test('the first row at scroll top, with no room above, gets the confirm inside its top edge, clear of its name and time', async ({ page }) => {
+// One document, each placement in turn: above the row, inside its top, flipped below, inside a tall last row.
+test('the delete confirm takes the room the row has, and never covers its text', async ({ page }) => {
+  for (const [id, header] of [
+    ['interaction/confirm-delete', true],
+    ['interaction/confirm-delete-grouped', false],
+  ] as const) {
+    // It straddles the row's top edge, above its text.
+    await open(page, id)
+    const at = await measure(page)
+    expect(at.header, id).toBe(header)
+    expect(at.confirm.top, id).toBeLessThan(at.row.top)
+    // It comes into the row by the row's top padding less 2px: none in Compact density, so its bottom meets the edge.
+    expect(at.confirm.bottom, id).toBeGreaterThanOrEqual(at.row.top)
+    expect(at.confirm.bottom, id).toBeLessThanOrEqual(at.textTop)
+    expect(at.confirm.top, id).toBeGreaterThanOrEqual(at.listTop)
+  }
+
+  // The first row at scroll top, with no room above, gets the confirm inside its top edge, clear of its name and time.
   await open(page, 'interaction/confirm-delete-first')
-  const at = await measure(page)
+  let at = await measure(page)
   expect(at.header).toBe(true)
   // At scroll top the row starts where the band ends: a confirm above it would sit under the band.
   expect(at.row.top).toBeGreaterThanOrEqual(at.listTop)
@@ -103,21 +104,19 @@ test('the first row at scroll top, with no room above, gets the confirm inside i
   // Inside the row, not flipped below it over the next row's name.
   expect(at.confirm.bottom).toBeLessThan(at.row.bottom)
   expect(await clearOfHeader(page.locator('[data-fixture-frame] [data-message-row]').first())).toBe(true)
-})
 
-test('a row whose top is under the header band gets the confirm below it, clear of its text', async ({ page }) => {
+  // A row whose top is under the header band gets the confirm below it, clear of its text.
   await open(page, 'interaction/confirm-delete-under-band')
-  const at = await measure(page)
+  at = await measure(page)
   expect(at.row.top).toBeLessThan(at.listTop)
   expect(at.confirm.top).toBeGreaterThanOrEqual(at.textBottom)
   // Flipped, it straddles the bottom edge the same way: in Compact density its top meets the edge.
   expect(at.confirm.top).toBeLessThanOrEqual(at.row.bottom)
   expect(at.confirm.bottom).toBeGreaterThan(at.row.bottom)
-})
 
-test('a last row taller than the list, ending on the composer, gets the confirm inside it, in full view', async ({ page }) => {
+  // A last row taller than the list, ending on the composer, gets the confirm inside it, in full view.
   await open(page, 'interaction/confirm-delete-tall-last')
-  const at = await measure(page)
+  at = await measure(page)
   expect(at.row.top).toBeLessThan(at.listTop)
   // No room below either: a confirm under the row would run past the list's bottom.
   expect(at.row.bottom + (at.confirm.bottom - at.confirm.top)).toBeGreaterThan(at.listBottom)

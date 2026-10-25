@@ -9,6 +9,7 @@ export default {
     // Playwright loads this opt-in reporter by its file name.
     'apps/desktop/e2e/timings.ts': ['exports'],
     'scripts/test-results-reporter.mjs': ['exports'],
+    'scripts/gallery-cpu-reporter.mjs': ['exports'],
     // This module asserts wire compatibility at compile time.
     'packages/engine/src/messages/body.ts': ['exports', 'types'],
     // createRequire is rooted at apps/desktop/package.json, which declares Playwright.
@@ -16,7 +17,7 @@ export default {
   },
   workspaces: {
     '.': {
-      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
+      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/verify-agent.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
       project: ['scripts/**/*.{mjs,ts}', 'specs/**/*.mjs'],
     },
     // Knip reads every package.json exports map; bun test's *.test.ts files are entries
