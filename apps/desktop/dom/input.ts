@@ -107,7 +107,7 @@ export class Dom {
       this.#waiting.add(finish)
       if (this.#observer === undefined) {
         const Observer = (this.window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
-        this.#observer = new Observer(() => { for (const waiting of [...this.#waiting]) waiting() })
+        this.#observer = new Observer(() => { for (const waiting of this.#waiting) waiting() })
         this.#observer.observe(this.document, { subtree: true, childList: true, attributes: true, characterData: true })
       }
     })

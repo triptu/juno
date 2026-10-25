@@ -22,22 +22,25 @@ export function matches(text: string, wanted: TextMatch, exact = false): boolean
   return exact ? value === normalize(wanted) : value.toLowerCase().includes(normalize(wanted).toLowerCase())
 }
 
+/** `hidden`, `inert`, `display: none` inline (React's Activity) or `aria-hidden` on the element itself. */
+function hidesSubtree(el: Element): boolean {
+  const html = el as El
+  return Boolean(html.hidden) || el.hasAttribute('inert') || el.getAttribute('aria-hidden') === 'true' || html.style?.display === 'none'
+}
+
 /** Not in a subtree that is `hidden`, `inert`, `display: none` inline (React's Activity) or `aria-hidden`. */
 export function shown(el: Element | null | undefined): el is El {
   if (el === null || el === undefined || !el.isConnected) return false
-  for (let node: Element | null = el; node !== null; node = node.parentElement) {
-    const html = node as El
-    if (html.hidden || html.hasAttribute?.('inert') || html.style?.display === 'none' || node.getAttribute('aria-hidden') === 'true') return false
-  }
+  for (let node: Element | null = el; node !== null; node = node.parentElement) if (hidesSubtree(node)) return false
   return true
 }
 
 /** The tags that can imply each role, for finding candidates (`byRole`). */
-const IMPLICIT_TAGS: Readonly<Record<string, string>> = {
-  button: 'button, input, summary', link: 'a[href]', checkbox: 'input', radio: 'input', textbox: 'textarea, input', combobox: 'select, input', spinbutton: 'input', slider: 'input',
-  heading: 'h1, h2, h3, h4, h5, h6', img: 'img', list: 'ul, ol', listitem: 'li', navigation: 'nav', complementary: 'aside', main: 'main', dialog: 'dialog', option: 'option',
-  group: 'fieldset, details, optgroup', region: 'section', separator: 'hr', table: 'table', row: 'tr', cell: 'td', form: 'form', progressbar: 'progress', status: 'output',
-}
+const IMPLICIT_TAGS: Readonly<Record<string, ReadonlySet<string>>> = Object.fromEntries(Object.entries({
+  button: 'BUTTON INPUT SUMMARY', link: 'A', checkbox: 'INPUT', radio: 'INPUT', textbox: 'TEXTAREA INPUT', combobox: 'SELECT INPUT', spinbutton: 'INPUT', slider: 'INPUT',
+  heading: 'H1 H2 H3 H4 H5 H6', img: 'IMG', list: 'UL OL', listitem: 'LI', navigation: 'NAV', complementary: 'ASIDE', main: 'MAIN', dialog: 'DIALOG', option: 'OPTION',
+  group: 'FIELDSET DETAILS OPTGROUP', region: 'SECTION', separator: 'HR', table: 'TABLE', row: 'TR', cell: 'TD', form: 'FORM', progressbar: 'PROGRESS', status: 'OUTPUT',
+}).map(([role, tags]) => [role, new Set(tags.split(' '))]))
 
 const BY_TAG: Readonly<Record<string, string>> = {
   BUTTON: 'button', SUMMARY: 'button', TEXTAREA: 'textbox', SELECT: 'combobox', H1: 'heading', H2: 'heading', H3: 'heading', H4: 'heading', H5: 'heading', H6: 'heading',
@@ -325,27 +328,52 @@ export class Query {
 export const disabled = (el: El) => (el as HTMLButtonElement).disabled === true || el.getAttribute('aria-disabled') === 'true'
 export const checked = (el: El) => (el as HTMLInputElement).checked === true || el.getAttribute('aria-checked') === 'true'
 
+const NO_TAGS: ReadonlySet<string> = new Set()
+
 function byRole(root: El, role: string, options: RoleOptions): El[] {
-  // Only elements that can have the role: an explicit role, or the tags that imply it.
-  const implicit = IMPLICIT_TAGS[role]
-  return [...root.querySelectorAll<El>(`[role]${implicit === undefined ? '' : `, ${implicit}`}`)].filter((el) => {
-    if (roleOf(el) !== role) return false
-    if (options.includeHidden !== true && !shown(el)) return false
-    if (options.name !== undefined && !matches(nameOf(el), options.name, options.exact === true)) return false
-    if (options.selected !== undefined && (el.getAttribute('aria-selected') === 'true') !== options.selected) return false
-    if (options.checked !== undefined && checked(el) !== options.checked) return false
-    if (options.pressed !== undefined && (el.getAttribute('aria-pressed') === 'true') !== options.pressed) return false
-    if (options.expanded !== undefined && (el.getAttribute('aria-expanded') === 'true') !== options.expanded) return false
-    if (options.disabled !== undefined && disabled(el) !== options.disabled) return false
-    return true
-  })
+  // A walk, not a selector: the page changes between most polls, so happy-dom's
+  // query cache misses and its selector engine costs several times this.
+  // Hidden subtrees are skipped whole unless asked for.
+  const tags = IMPLICIT_TAGS[role] ?? NO_TAGS
+  const visibleOnly = options.includeHidden !== true
+  if (visibleOnly && !shown(root)) return []
+  const found: El[] = []
+  const walk = (parent: Element) => {
+    for (const el of parent.children) {
+      if (visibleOnly && hidesSubtree(el)) continue
+      if ((tags.has(el.tagName) || el.hasAttribute('role')) && roleOf(el) === role && fits(el as El, options)) found.push(el as El)
+      walk(el)
+    }
+  }
+  walk(root)
+  return found
 }
 
-/** The smallest elements whose text matches: none of their children match on their own. */
+function fits(el: El, options: RoleOptions): boolean {
+  if (options.name !== undefined && !matches(nameOf(el), options.name, options.exact === true)) return false
+  if (options.selected !== undefined && (el.getAttribute('aria-selected') === 'true') !== options.selected) return false
+  if (options.checked !== undefined && checked(el) !== options.checked) return false
+  if (options.pressed !== undefined && (el.getAttribute('aria-pressed') === 'true') !== options.pressed) return false
+  if (options.expanded !== undefined && (el.getAttribute('aria-expanded') === 'true') !== options.expanded) return false
+  if (options.disabled !== undefined && disabled(el) !== options.disabled) return false
+  return true
+}
+
+/**
+ * The smallest elements whose text matches: none of their children match on
+ * their own. A substring cannot be in a child's text and not in its
+ * parent's, so a parent that does not match is not walked into.
+ */
 function byText(root: El, text: TextMatch, exact: boolean): El[] {
-  return [...root.querySelectorAll<El>('*')].filter((el) => {
-    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || !matches(el.textContent ?? '', text, exact)) return false
-    return ![...el.children].some((child) => matches(child.textContent ?? '', text, exact))
-  })
+  const prune = typeof text === 'string' && !exact
+  const found: El[] = []
+  const walk = (parent: Element) => {
+    for (const el of parent.children) {
+      const hit = el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE' && matches(el.textContent ?? '', text, exact)
+      if (hit && ![...el.children].some((child) => matches(child.textContent ?? '', text, exact))) found.push(el as El)
+      if (hit || !prune) walk(el)
+    }
+  }
+  walk(root)
+  return found
 }
-
