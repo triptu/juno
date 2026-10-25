@@ -24,7 +24,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'juno-agent/learn.spec.ts',
   'juno-agent/providers-ui.spec.ts',
   'juno-agent/tool-approval.spec.ts',
-  'juno-agent/connections.spec.ts',
   'juno-agent/search.spec.ts',
   'break-pass-1017.spec.ts',
   'emoji-picker-loading.spec.ts',

@@ -3,14 +3,14 @@
 // in the chat; a tool the owner turns off is never called; Disconnect forgets the sign-in.
 // The server is agent-testing's fake Littlebird on loopback; main fetches the sign-in page under
 // JUNO_E2E instead of opening the browser, and the fake approves at once.
-import type { FakeLittlebird } from '@juno/agent-testing/mcp'
-import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import type { Locator } from '@playwright/test'
+import { startFakeLittlebird, type FakeLittlebird } from '@juno/agent-testing/mcp'
+import { startFakeOpenRouter, type OpenRouterRequest, type ToolCallAnswer } from '@juno/agent-testing/openrouter'
+import { answer as echo } from '../../e2e/juno-agent/model'
+import { configure, JunoChatPane, readySynced as ready } from '../driver/agent'
 import type { Juno } from '../driver/juno'
-import { hooks } from '../fixtures'
-import { configure } from './agent'
-import { answer as echo, expect, JunoChatPane, test as chat } from './chat'
+import { expect } from '../expect'
+import type { Query } from '../query'
+import { domTest } from '../test'
 
 /** "search meetings on <id>" calls a read; "save a note on <id>" an outward tool; the rest is echoed. */
 function answer(request: OpenRouterRequest): string | ToolCallAnswer {
@@ -29,32 +29,6 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   return echo(request)
 }
 
-const test = chat.extend<{ readonly mcp: FakeLittlebird; readonly model: FakeOpenRouter }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startFakeOpenRouter({ answer })
-    await use(model)
-    await model.close()
-  },
-  // oxlint-disable-next-line no-empty-pattern
-  mcp: async ({}, use) => {
-    // pi-mcp has only an ESM entry and Playwright loads specs as CommonJS (see `@juno/agent-testing/mcp`).
-    const { startFakeLittlebird } = await import('@juno/agent-testing/mcp')
-    const server = await startFakeLittlebird()
-    await use(server)
-    await server.close()
-  },
-})
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
-
-async function ready(juno: Juno): Promise<void> {
-  await juno.waitForSync()
-  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
-}
-
 async function openConnections(juno: Juno): Promise<void> {
   await openChat(juno)
   await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
@@ -62,20 +36,28 @@ async function openConnections(juno: Juno): Promise<void> {
   await juno.tabs.expectActive('Settings')
 }
 
-const openChat = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+async function openChat(juno: Juno): Promise<void> {
+  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  await expect(juno.win.locator('main [data-juno-header="chat"]')).toBeVisible()
+}
 
-test('adds a server, signs in, configures its tools, uses a read in chat, turns a write off, and disconnects', async ({ juno, mcp }) => {
-  await ready(juno)
-  await openConnections(juno)
-  const page = juno.win.locator('main')
-  await test.step('Notion, Littlebird and T3 Code are offered, off until connected', () => offeredRows(juno, page))
-  const { row, id } = await test.step('a server added by its address signs in with OAuth', () => addAndSignIn(page, mcp))
-  await test.step('Configure lists, searches and sets rules for its tools', () => configureTools(juno, row))
-  await test.step('a read runs with no click, and a tool turned off is never called', () => useAndTurnOff(juno, row, id, mcp))
-  await test.step('Disconnect forgets the sign-in, and an added server can be removed', () => disconnectAndRemove(juno, page, row, mcp))
-})
+domTest('adds a server, signs in, configures its tools, uses a read in chat, turns a write off, and disconnects', async ({ juno, step }) => {
+  const mcp = await startFakeLittlebird()
+  try {
+    await ready(juno)
+    await openConnections(juno)
+    const page = juno.win.locator('main')
+    await step('Notion, Littlebird and T3 Code are offered, off until connected', () => offeredRows(juno, page))
+    const { row, id } = await step('a server added by its address signs in with OAuth', () => addAndSignIn(page, mcp))
+    await step('Configure lists, searches and sets rules for its tools', () => configureTools(juno, row))
+    await step('a read runs with no click, and a tool turned off is never called', () => useAndTurnOff(juno, row, id, mcp))
+    await step('Disconnect forgets the sign-in, and an added server can be removed', () => disconnectAndRemove(juno, page, row, mcp))
+  } finally {
+    await mcp.close()
+  }
+}, { model: () => startFakeOpenRouter({ answer }), timeout: 120_000 })
 
-async function offeredRows(juno: Juno, page: Locator): Promise<void> {
+async function offeredRows(juno: Juno, page: Query): Promise<void> {
   // Notion, Littlebird and T3 Code are offered as compact rows, off until connected; T3 Code is on this Mac.
   for (const label of ['Notion', 'Littlebird', 'T3 Code']) await expect(page.locator('[data-connection-name]').filter({ hasText: new RegExp(`^${label}$`) })).toBeVisible()
   await expect(page.locator('[data-connection-id="notion"]').getByRole('button', { name: 'Connect' })).toBeVisible()
@@ -85,7 +67,7 @@ async function offeredRows(juno: Juno, page: Locator): Promise<void> {
   await expect(t3).toHaveCount(0)
 }
 
-async function addAndSignIn(page: Locator, mcp: FakeLittlebird): Promise<{ readonly row: Locator; readonly id: string }> {
+async function addAndSignIn(page: Query, mcp: FakeLittlebird): Promise<{ readonly row: Query; readonly id: string }> {
   // An address off this Mac must be https.
   const add = page.locator('[data-add-server]')
   await add.getByLabel('Address').fill('http://example.com/mcp')
@@ -108,7 +90,7 @@ async function addAndSignIn(page: Locator, mcp: FakeLittlebird): Promise<{ reado
   return { row, id }
 }
 
-async function configureTools(juno: Juno, row: Locator): Promise<void> {
+async function configureTools(juno: Juno, row: Query): Promise<void> {
   // Configure lists every tool across the server's pages (three to a page), each on and Auto; the server marks the
   // lookups read-only. A delete always asks.
   const sheet = await configure(juno, row)
@@ -134,7 +116,7 @@ async function configureTools(juno: Juno, row: Locator): Promise<void> {
   await expect(sheet).toHaveCount(0)
 }
 
-async function useAndTurnOff(juno: Juno, row: Locator, id: string, mcp: FakeLittlebird): Promise<void> {
+async function useAndTurnOff(juno: Juno, row: Query, id: string, mcp: FakeLittlebird): Promise<void> {
   // A read runs with no click, and Juno answers from its result.
   await openChat(juno)
   const pane = JunoChatPane.tab(juno.win)
@@ -156,7 +138,7 @@ async function useAndTurnOff(juno: Juno, row: Locator, id: string, mcp: FakeLitt
   expect(mcp.materials()).toHaveLength(0)
 }
 
-async function disconnectAndRemove(juno: Juno, page: Locator, row: Locator, mcp: FakeLittlebird): Promise<void> {
+async function disconnectAndRemove(juno: Juno, page: Query, row: Query, mcp: FakeLittlebird): Promise<void> {
   // Disconnect forgets the sign-in: the next Connect signs in again.
   await openConnections(juno)
   await row.getByRole('button', { name: 'Disconnect' }).click()
