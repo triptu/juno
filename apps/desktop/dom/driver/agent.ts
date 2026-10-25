@@ -1,10 +1,10 @@
 /**
- * The Juno agent's chat, pages and cards as a user drives them, as
+ * The Juno agent's chat, Settings and cards as a user drives them, as
  * `e2e/juno-agent/agent.ts` and `chat.ts` do for Playwright. Give
  * `domTest` a `model` and the agent runs against it.
  */
 import { hooks } from '../../e2e/hooks'
-import type { JunoPage, JunoSettingsSection } from '../../e2e/juno-agent/agent'
+import type { JunoSettingsSection } from '../../e2e/juno-agent/agent'
 import { expect } from '../expect'
 import type { Dom } from '../input'
 import type { Query } from '../query'
@@ -67,21 +67,6 @@ export async function openChat(juno: Juno): Promise<JunoChatPane> {
   await juno.dom.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   await juno.tabs.expectActive('Juno')
   return JunoChatPane.tab(juno.dom)
-}
-
-/** Opens one of the Juno menu's pages from the Juno tab and returns the page. Connections opens in Settings. */
-export async function openPage(juno: Juno, label: JunoPage): Promise<Query> {
-  await openChat(juno)
-  await juno.dom.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
-  await juno.dom.getByRole('menuitem', { name: label }).click()
-  await juno.tabs.expectActive(label === 'Connections' ? 'Settings' : label)
-  return juno.dom.locator('main')
-}
-
-/** Opens every run on the Activity page, so each shows its steps and actions. */
-export async function openRuns(page: Query): Promise<void> {
-  const closed = page.locator('[data-activity-run] button[aria-expanded="false"]')
-  for (let n = closed.count(); n > 0; n = closed.count()) await closed.first().click()
 }
 
 /** Opens Settings from the Juno menu, which lands on its Juno section, then goes to `section`. Returns the page. */
