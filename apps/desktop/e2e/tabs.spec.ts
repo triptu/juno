@@ -1,7 +1,7 @@
-// Tabs in the browser: typing right after an open goes to the topic's composer, switching moves
-// nothing in the strip, dragging and ⌃⇧← ⌃⇧→ reorder them, and each tab shows its topic's art
-// or the DM person's photo. Opening, focusing, closing, the app menu's tab items, ⌘W held down
-// and the day-old sweep are in the DOM lane (`dom/tabs.test.ts`).
+// Tabs in the browser: switching moves nothing in the strip, dragging and ⌃⇧← ⌃⇧→ reorder them,
+// and each tab shows its topic's art or the DM person's photo. Opening, focusing, closing, typing
+// right after an open, the app menu's tab items, ⌘W held down and the day-old sweep are in the DOM
+// lane (`dom/tabs.test.ts`).
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, syncedTest, test } from './fixtures'
 
@@ -17,26 +17,11 @@ const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-// The keys go to the composer through the browser's editing (execCommand), so this stays here.
-syncedTest('typing right after an open from the list goes to the topic composer, even before the topic shows, and switching tabs moves nothing in the strip', async ({ juno }) => {
+syncedTest('switching tabs moves nothing in the strip', async ({ juno }) => {
   const { sidebar, tabs } = juno
-  await sidebar.row(POSTGRES).open()
-  await juno.win.keyboard.type('ok')
-  await tabs.expectActive(POSTGRES)
-  await expect(juno.topic.composer).toBeFocused()
-  await expect(juno.topic.composer).toHaveValue('ok')
-  await juno.topic.composer.fill('')
   await sidebar.row(RINA).open()
-  await sidebar.row(RINA).expectFocused()
-  await juno.win.keyboard.type('x')
-  await expect(juno.topic.composer).toBeFocused()
-  await expect(juno.topic.composer).toHaveValue('x')
-  await juno.win.keyboard.press('Backspace')
   await sidebar.row(POSTGRES).openInNewTab()
   await tabs.expectActive(POSTGRES)
-  await juno.win.keyboard.type('x')
-  await expect(juno.topic.composer).toHaveValue('x')
-  // Switching moves nothing in the strip.
   await expectNoLayoutShift(juno.win, () => tabs.select(RINA), { root: '[role="tablist"]' })
 })
 

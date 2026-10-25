@@ -1,17 +1,23 @@
+// Late spelling fixes (SPEC 8, "Send checks"): the grammar model answers after the send, in a self-DM and in a
+// channel; Review edits the sent message with the fixes, Save sends one update, Dismiss keeps it as sent.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { expect, test } from './fixtures'
+import { expect } from './expect'
+import { domTest } from './test'
 
-test.use({ fakeAiDelayMillis: 2_000, synced: true })
-test.describe.configure({ timeout: 120_000 })
-
-test('late spelling fixes in a self-DM and in a channel can be reviewed, saved and dismissed', async ({ juno, fake, userData }) => {
+domTest('late spelling fixes in a self-DM and in a channel can be reviewed, saved and dismissed', async ({ juno, fake, userData, step }) => {
   const updates = () => fake.calls.filter((call) => call.method === 'chat.update').length
-  for (const destination of ['self-DM', 'channel'] as const) await test.step(`late spelling fixes in a ${destination} can be reviewed, saved and dismissed`, async () => {
+  for (const destination of ['self-DM', 'channel'] as const) await step(`late spelling fixes in a ${destination} can be reviewed, saved and dismissed`, async () => {
     const updatesBefore = updates()
     const channel = destination === 'self-DM' ? fake.workspace.open([fake.selfId]).conversation.id : 'C0ENG'
     if (destination === 'self-DM') fake.injectMessage({ channel, user: fake.selfId, text: 'Notes for today' })
-    await juno.sidebar.row(destination === 'self-DM' ? 'Tushar' : '#eng').open()
+    const title = destination === 'self-DM' ? 'Tushar' : '#eng'
+    // Wait for each open before typing: the composer on screen until then is the last topic's.
+    const open = async (row: string, shown: string) => {
+      await juno.sidebar.row(row).open()
+      await juno.topic.expectTitle(shown)
+    }
+    await open(title, title.replace('#', ''))
     const original = 'does grammer chek properly happen?'
     const fixed = 'does grammar check properly happen?'
     const suggestion = juno.win.locator('[data-send-suggestion]')
@@ -38,8 +44,8 @@ test('late spelling fixes in a self-DM and in a channel can be reviewed, saved a
     await expect(suggestion).toContainText('chek → check')
     await suggestion.getByRole('button', { name: 'Dismiss', exact: true }).click()
     await expect(suggestion).toHaveCount(0)
-    await juno.sidebar.row('Rina finished the onsite').open()
-    await juno.sidebar.row(destination === 'self-DM' ? 'Tushar' : '#eng').open()
+    await open('Rina finished the onsite', 'Rina finished the onsite')
+    await open(title, title.replace('#', ''))
     await expect(suggestion).toHaveCount(0)
     expect(fake.messages(channel).some((message) => message.text === 'please chek the the report')).toBe(true)
     expect(updates()).toBe(updatesBefore + 1)
@@ -53,4 +59,4 @@ test('late spelling fixes in a self-DM and in a channel can be reviewed, saved a
     }, { timeout: 10_000 }).toBe('No fixes')
     await expect(suggestion).toHaveCount(0)
   })
-})
+}, { engine: { fakeAiDelayMillis: 2_000 }, timeout: 120_000 })

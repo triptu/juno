@@ -2,7 +2,8 @@
 // after ⌘N, before the destination list's search has focus, reach the
 // search in order, Enter picks only once they are in it, and keys after
 // Enter reach the field. Each step types with no wait after the menu
-// command.
+// command. It stays in the browser: in the DOM lane the focus moves before
+// the keys arrive, so the test passed there with the keys not held at all.
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 

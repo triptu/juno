@@ -358,4 +358,26 @@ function fillGaps(window: Window): void {
   document['hasFocus'] = () => focused
   if (document['timeline'] === undefined) Object.defineProperty(document, 'timeline', { value: { get currentTime() { return window.performance.now() } } })
   ;(document as { getAnimations?: () => unknown[] }).getAnimations ??= () => []
+  document['execCommand'] = (command: string, _ui?: boolean, value?: string) => editFocusedField(window, command, value)
+}
+
+/**
+ * `execCommand('insertText')` and `('delete')` as Chromium runs them on the focused input or textarea, which is all the
+ * composers use (`editField`, Home's held keys): the selection replaced, the caret after it, one `input` event and no
+ * `beforeinput`. No undo stack: a check of ⌘Z after such an edit stays in the browser lane.
+ */
+function editFocusedField(window: Window, command: string, value: string | undefined): boolean {
+  const field = window.document.activeElement as unknown as HTMLInputElement | HTMLTextAreaElement | null
+  if (field === null || !/^(INPUT|TEXTAREA)$/.test(field.tagName) || (command !== 'insertText' && command !== 'delete')) return false
+  const end = field.selectionEnd ?? field.value.length
+  let start = field.selectionStart ?? end
+  const text = command === 'insertText' ? value ?? '' : ''
+  // A delete with nothing selected takes the character before the caret.
+  if (command === 'delete' && start === end) start = Math.max(0, start - (/[\uDC00-\uDFFF]/.test(field.value[start - 1] ?? '') ? 2 : 1))
+  const W = window as unknown as { HTMLTextAreaElement: typeof HTMLTextAreaElement; HTMLInputElement: typeof HTMLInputElement; InputEvent: typeof InputEvent }
+  const proto = field.tagName === 'TEXTAREA' ? W.HTMLTextAreaElement.prototype : W.HTMLInputElement.prototype
+  Object.getOwnPropertyDescriptor(proto, 'value')!.set!.call(field, field.value.slice(0, start) + text + field.value.slice(end))
+  field.setSelectionRange(start + text.length, start + text.length)
+  field.dispatchEvent(new W.InputEvent('input', { bubbles: true, inputType: command === 'insertText' ? 'insertText' : 'deleteContentBackward', data: command === 'insertText' ? text : null }))
+  return true
 }

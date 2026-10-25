@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { viewsDelete, type EngineStatus, type TopicRow } from '@juno/contract'
 import { CONVERSATIONS, largeSeed, SELF_ID } from '@juno/fake-slack'
-import { engineStatusAtom, runCommand, syncFailureAtom, syncNoticeAtom, topicCountsAtom } from '@juno/state'
+import { engineStatusAtom, noticeClockAtom, OFFLINE_GRACE_MILLIS, runCommand, syncFailureAtom, syncNoticeAtom, topicCountsAtom } from '@juno/state'
 import { productionTiming } from '../../src/config'
 import { controlledSleep } from '../controlledClock'
 import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from '../harness'
@@ -378,21 +378,23 @@ it('a boot Slack answers with data Juno cannot read fails with that reason, and 
 })
 
 it('a boot that never reaches Slack is offline, not failed, through the 30 s retry wait, and says so after the grace [controlled sleep]', async () => {
-  const time = await controlledSleep(productionTiming.bootRetryMillis)
+  const [time, grace] = await Promise.all([controlledSleep(productionTiming.bootRetryMillis), controlledSleep(OFFLINE_GRACE_MILLIS)])
   try {
-    const timing = { bootRetryMillis: productionTiming.bootRetryMillis }
-    const engine = await started({ clock: time.clock, timing, initial: (fake) => (fake.loseResponse({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
+    const engine = await started({ clock: time.clock, timing: { bootRetryMillis: productionTiming.bootRetryMillis }, initial: (fake) => (fake.loseResponse({ method: 'client.userBoot', times: 1_000 }), fake.signIn()) })
+    engine.registry.set(noticeClockAtom, grace.clock)
     const { phases: seen, notices: shown } = watchSync(engine)
     await engine.phase('offline')
-    // The phase holds through the retry wait, so the 5 s offline grace passes and the notice shows.
+    // The client's quick retries are over once the retry wait is armed, and the phase holds through it: the notice shows after the grace, not before.
+    await time.armed()
+    expect(shown).not.toContain('offline')
+    await grace.fire()
     await waitFor(() => (shown.at(-1) === 'offline' ? true : undefined), undefined, 'the offline notice')
-    // The client's own quick retries of the lost call are over by then; the next boot waits for the retry time.
     const boots = apiCalls(engine, 'client.userBoot').length
     await time.advance(productionTiming.bootRetryMillis)
     await waitFor(() => (apiCalls(engine, 'client.userBoot').length > boots && seen.at(-1)?._tag === 'offline' ? true : undefined), undefined, 'the next boot offline again')
     expect(seen.some((phase) => phase._tag === 'failed')).toBe(false)
     expect(engine.registry.get(syncFailureAtom)).toBeUndefined()
   } finally {
-    await time.close()
+    await Promise.all([time.close(), grace.close()])
   }
 })

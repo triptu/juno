@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ImportGraph } from '../../scripts/import-graph.mjs'
+import { lockedPackages } from '../../scripts/locked-packages.mjs'
 import { layoutCss, layoutTokens, tokenFiles } from './layout-tokens.mjs'
 
 const ignored = new Set(['node_modules', '.git', 'dist', 'out', 'test-results', 'playwright-report', 'shots', 'coverage'])
@@ -33,13 +34,7 @@ export function sourceKeys(root, kind) {
   const graph = new LayoutGraph(root, files)
   const registries = ['ui', 'views', 'huddle-views'].map(name => `packages/${name}/src/fixtures.ts`).filter(file => files.has(file))
   const components = fixtureSources(root, graph, registries)
-  // The gallery's own compositions and test fixtures key on their file and what it imports.
-  const galleryOwn = new Map()
-  for (const [file, name] of [['apps/gallery/src/compositions.tsx', 'compositions'], ['apps/gallery/src/testFixtures.tsx', 'testFixtures']]) {
-    if (!files.has(file)) continue
-    const text = readFileSync(join(root, file), 'utf8')
-    for (const match of text.slice(text.indexOf(`export const ${name}`)).matchAll(/^ {2}(\w+): defineFixtures\(/gm)) galleryOwn.set(match[1], file)
-  }
+  const galleryOwn = galleryFixtureSources(root, files)
 
   // What a walk does to a state. The spec's other tests (delayed loads, the guard's
   // self-tests) are not part of it; the guard is, through the walk's imports.
@@ -47,7 +42,7 @@ export function sourceKeys(root, kind) {
   const paint = kind === 'paint'
   const shared = new Set([
     'bunfig.toml', 'tsconfig.base.json',
-    'scripts/import-graph.mjs', 'scripts/build-cached.mjs',
+    'scripts/import-graph.mjs', 'scripts/locked-packages.mjs', 'scripts/build-cached.mjs', 'scripts/build-inputs.mjs',
     'apps/gallery/index.html', 'apps/gallery/vite.config.ts',
     'apps/gallery/walk-cache.mjs', 'apps/gallery/layout-tokens.mjs',
     ...registries,
@@ -93,12 +88,8 @@ export function sourceKeys(root, kind) {
   const tokenKey = inputs => tokens.key(inputs, { paint })
   const sharedTokens = tokenKey(shared)
   const keys = new Map()
-  // `#index`, the gallery's list of states, changes with the registries and the fixture modules and helpers that declare
-  // them. A state list built from a constant outside fixture code is missed until a full run.
-  const fixtureCode = file => /(^|\/)fixtures(\/|\.)|\.fixtures\./.test(file)
   let index
-  const indexInputs = () => index ??= new Set([...registries, 'apps/gallery/src/compositions.tsx', 'apps/gallery/src/testFixtures.tsx',
-    ...[...new Set(components.values())].flatMap(source => [...graph.closure(source)].filter(fixtureCode))])
+  const indexInputs = () => index ??= stateListInputs(graph, registries, components)
   const inputsOf = component => component === '#index' ? indexInputs()
     : components.has(component) ? graph.closure(components.get(component))
     : galleryOwn.has(component) ? graph.closure(galleryOwn.get(component)) : files
@@ -116,6 +107,28 @@ export function sourceKeys(root, kind) {
   /** A test file and what it imports. */
   componentKey.specKey = file => digest(JSON.stringify([hashFiles(graph.closure(file)), packagesKey(root, files, graph.closure(file))]))
   return componentKey
+}
+
+/** The gallery's own compositions and test fixtures key on their file and what it imports. */
+function galleryFixtureSources(root, files) {
+  const sources = new Map()
+  for (const [file, name] of [['apps/gallery/src/compositions.tsx', 'compositions'], ['apps/gallery/src/testFixtures.tsx', 'testFixtures']]) {
+    if (!files.has(file)) continue
+    const text = readFileSync(join(root, file), 'utf8')
+    for (const match of text.slice(text.indexOf(`export const ${name}`)).matchAll(/^ {2}(\w+): defineFixtures\(/gm)) sources.set(match[1], file)
+  }
+  return sources
+}
+
+/**
+ * `#index`, the gallery's list of states: the registries and the fixture modules
+ * and helpers that declare them. A state list built from a constant outside
+ * fixture code is missed until a full run.
+ */
+function stateListInputs(graph, registries, components) {
+  const fixtureCode = file => /(^|\/)fixtures(\/|\.)|\.fixtures\./.test(file)
+  return new Set([...registries, 'apps/gallery/src/compositions.tsx', 'apps/gallery/src/testFixtures.tsx',
+    ...[...new Set(components.values())].flatMap(source => [...graph.closure(source)].filter(fixtureCode))])
 }
 
 /** Which fixture module each registered component name comes from. */
@@ -170,33 +183,6 @@ const packageFields = ['name', 'type', 'exports', 'imports', 'main', 'module', '
 const rootFields = ['workspaces', 'packageManager', 'packageExtensions', 'overrides', 'resolutions', 'patchedDependencies', 'trustedDependencies']
 const pick = (entry, fields) => Object.fromEntries(fields.filter(field => field in entry).map(field => [field, entry[field]]))
 const manifest = (root, file) => existsSync(join(root, file)) ? JSON.parse(readFileSync(join(root, file), 'utf8')) : null
-
-/**
- * The locked versions of the packages the reached files import and the
- * gallery builds with, and of what those depend on: `[importer, name]` pairs.
- * Other workspaces' packages and tools do not count. An unreadable lockfile
- * counts whole.
- */
-function lockedPackages(root, roots) {
-  const text = existsSync(join(root, 'bun.lock')) ? readFileSync(join(root, 'bun.lock'), 'utf8') : ''
-  let lock
-  try { lock = JSON.parse(text.replace(/,(\s*[}\]])/g, '$1')) } catch { return digest(text) }
-  const { packages = {}, workspaces: _workspaces, ...settings } = lock
-  const picked = new Map()
-  const names = key => key.split('/').reduce((list, part) => list.at(-1)?.startsWith('@') && !list.at(-1).includes('/') ? [...list.slice(0, -1), `${list.at(-1)}/${part}`] : [...list, part], [])
-  const visit = (parent, name) => {
-    // Bun keys a nested copy under its dependent: `parent/name`, then each ancestor.
-    const chain = names(parent)
-    const key = Array.from({ length: chain.length + 1 }, (_, index) => [...chain.slice(0, chain.length - index), name].join('/')).find(candidate => packages[candidate])
-    if (key === undefined || picked.has(key)) return
-    picked.set(key, packages[key])
-    const info = packages[key][2]
-    if (typeof info !== 'object' || info === null) return
-    for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies']) for (const next of Object.keys(info[field] ?? {})) visit(key, next)
-  }
-  for (const [importer, name] of roots) visit(importer, name)
-  return digest(JSON.stringify([settings, [...picked].toSorted(([a], [b]) => a < b ? -1 : 1)]))
-}
 
 const cacheDirectory = directory => directory ?? join(process.env.JUNO_BUILD_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'results'), 'gallery-walk-v1')
 const environment = () => Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['NODE_ENV', 'JUNO_UNMINIFIED'].includes(name)).toSorted()
