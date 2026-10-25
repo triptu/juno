@@ -6,7 +6,8 @@
  * colour or a computed style (README, "The rule").
  */
 import { expect as bunExpect } from 'bun:test'
-import { checked, disabled, matches, nameOf, Query, shown, type El, type TextMatch } from './query'
+import { checked, disabled, matches, nameOf, shown, type El, type TextMatch } from './find'
+import { Query } from './query'
 
 const DEFAULT_TIMEOUT = 5_000
 

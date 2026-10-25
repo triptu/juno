@@ -5,7 +5,8 @@
  * at no coordinate.
  */
 import type { Window } from 'happy-dom'
-import { disabled, Query, roleOf, shown, type El, type RoleOptions, type TextMatch } from './query'
+import { disabled, roleOf, shown, type El, type RoleOptions, type TextMatch } from './find'
+import { Query } from './query'
 
 const DEFAULT_TIMEOUT = 5_000
 
