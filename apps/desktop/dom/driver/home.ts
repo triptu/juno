@@ -38,6 +38,15 @@ export class HomeWritePane implements HomeWriteVerbs {
     return this.root.getByRole('dialog', { name: 'Send to' }).getByRole('listbox')
   }
 
+  /** The list a first @ or # opens while Juno is chosen. */
+  get sendTo(): Query {
+    return this.root.locator('[data-send-to]')
+  }
+
+  sendToOption(name: string): Query {
+    return this.sendTo.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+  }
+
   get search(): Query {
     return this.root.getByRole('dialog', { name: 'Send to' }).getByRole('textbox')
   }
@@ -103,8 +112,9 @@ export class HomePane {
     return this.dom.locator('[data-home]:not([data-home-waiting]):not([data-home-loading])').filter({ visible: true })
   }
 
+  /** The greeting; with a picture, Home's heading for screen readers only (SPEC 12, "A picture"). */
   get greeting(): Query {
-    return this.root.getByRole('heading').first()
+    return this.root.getByRole('heading', { level: 2 })
   }
 
   async expectShown(): Promise<void> {
@@ -131,6 +141,16 @@ export class HomePane {
 
   meta(kind: HomeItemKind): Query {
     return this.item(kind).locator('[data-home-meta]')
+  }
+
+  /** What Home shows above its composer: the scene or picture, the greeting, the rows and the welcome card (SPEC 12). */
+  get column(): Query {
+    return this.root.locator('[data-home-column]')
+  }
+
+  /** The picture in the caught-up scene's place (SPEC 12, "A picture"). */
+  get picture(): Query {
+    return this.root.locator('[data-home-picture]')
   }
 
   async kinds(): Promise<string[]> {
@@ -201,6 +221,31 @@ export class ReviewSheet {
 
   undo(title: string): Query {
     return this.row(title).locator('[data-review-undo]')
+  }
+
+  /** The line under the title: what the rows are, and what the action does in Slack. */
+  get lead(): Query {
+    return this.root.locator('[data-review-lead]')
+  }
+
+  /** The message or draft quoted in the row. */
+  quote(title: string): Query {
+    return this.row(title).locator('[data-review-quote]')
+  }
+
+  /** `open`, `done` or `declined`. */
+  status(title: string): Promise<string | null> {
+    return this.row(title).getAttribute('data-review-status')
+  }
+
+  /** What the row says once acted on: "Resolved", "Moved back", "Kept in Follow-up". */
+  outcome(title: string): Query {
+    return this.row(title).locator('[data-review-outcome]')
+  }
+
+  /** Done, which closes the sheet. */
+  get close(): Query {
+    return this.root.locator('[data-review-close]')
   }
 
   /** The bottom button that acts on every row still open. */

@@ -32,7 +32,8 @@ export class SidebarRow implements SidebarRowVerbs {
     readonly title: string,
     exact = false,
   ) {
-    this.root = dom.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}${exact ? '$' : ''}`) })
+    // Topic rows only: a row's avatar stack is a list of its own, whose items are named by people.
+    this.root = dom.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}${exact ? '$' : ''}`) }).and(dom.locator('[data-topic-row]'))
   }
 
   get presenceDot(): Query {
@@ -41,6 +42,12 @@ export class SidebarRow implements SidebarRowVerbs {
 
   get art(): Query {
     return this.root.locator('[data-topic-art]')
+  }
+
+  /** The row's drawing, once it has one. */
+  async artMarkup(): Promise<string> {
+    await expect(this.art).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
+    return this.art.innerHTML()
   }
 
   hover(): Promise<void> {
@@ -278,6 +285,24 @@ export class Sidebar implements SidebarVerbs {
       await this.viewPill(name).click()
       await expect(this.viewPill(name)).toHaveAttribute('aria-pressed', 'true')
     })
+  }
+
+  /** The status card's title at the foot of the sidebar: the first sync, or why the list may be behind Slack. */
+  get syncStatus(): Query {
+    return this.root.getByRole('status', { name: 'Sync status' })
+  }
+
+  /** The first sync's ring in the status card; its value text is "N of M conversations". */
+  get syncProgress(): Query {
+    return this.root.getByRole('progressbar', { name: 'Sync progress' })
+  }
+
+  async expectSyncStatus(text: string | RegExp): Promise<void> {
+    await expect(this.syncStatus).toContainText(text, { timeout: 15_000 })
+  }
+
+  async expectNoSyncStatus(timeout = 15_000): Promise<void> {
+    await expect(this.syncStatus).toHaveCount(0, { timeout })
   }
 
   /** The views' names, in pill order. */

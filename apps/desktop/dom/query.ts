@@ -204,6 +204,15 @@ export class Query {
     return (await this.dom.until(this.description, () => this.el())).getAttribute(name)
   }
 
+  /** Selects characters `start` to `end` of the element's text with the pointer (`Dom.selectText`). */
+  async selectText(start: number, end: number): Promise<void> {
+    this.dom.selectText(await this.element(), start, end)
+  }
+
+  async innerHTML(): Promise<string> {
+    return (await this.dom.until(this.description, () => this.el())).innerHTML
+  }
+
   async inputValue(): Promise<string> {
     return ((await this.element()) as HTMLInputElement).value
   }

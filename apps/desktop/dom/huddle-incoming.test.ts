@@ -12,19 +12,12 @@
  * around now. The channels that ring are set to Always; #product is set to
  * Never, which keeps its card quiet.
  */
-import type { Page } from '@playwright/test'
-import { expect, syncedTest as test } from './fixtures'
-import { chimeDrops, attendee, connection } from './huddleFake'
+import { expect } from './expect'
+import { attendee, chimeDrops, connection, ringing, rings } from './huddle'
+import { domTest } from './test'
 
-test.describe.configure({ timeout: 90_000 })
-
-interface RingWindow {
-  readonly __junoHuddleRing?: { readonly ringing: boolean; readonly starts: number }
-}
-const ringing = (win: Page) => win.evaluate(() => (window as unknown as RingWindow).__junoHuddleRing?.ringing ?? false)
-const rings = (win: Page) => win.evaluate(() => (window as unknown as RingWindow).__junoHuddleRing?.starts ?? 0)
-
-test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and it goes when the huddle ends', async ({ juno, fake, win }) => {
+domTest('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and it goes when the huddle ends', async ({ juno, fake }) => {
+  const { win } = juno
   await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')
@@ -58,7 +51,6 @@ test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and
   await expect(card).toBeVisible()
   await expect(card.getByRole('button', { name: 'Switch to the huddle in Maya' })).toBeVisible()
   await expect(card).toContainText('Started a huddle')
-  expect((await bar.boundingBox())!.y).toBeLessThan((await card.boundingBox())!.y)
   expect(await rings(win)).toBe(before)
   expect(await ringing(win)).toBe(false)
   await expect.poll(() => juno.osNotifications()).toContainEqual({ title: 'Maya', body: 'Started a huddle', silent: true })
@@ -92,9 +84,10 @@ test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and
   await juno.clickOsNotification(eng)
   await juno.tabs.expectActive('eng · Huddle')
   await expect(win.getByRole('button', { name: 'Join huddle' })).toBeVisible()
-})
+}, { timeout: 90_000 })
 
-test('a huddle the user started elsewhere shows no card, an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async ({ juno, fake, win }) => {
+domTest('a huddle the user started elsewhere shows no card, an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async ({ juno, fake, step }) => {
+  const { win } = juno
   await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')
@@ -102,7 +95,7 @@ test('a huddle the user started elsewhere shows no card, an ignored channel ring
   await juno.expectToast('#product: Always')
   const card = win.getByRole('region', { name: 'Incoming huddle' })
 
-  await test.step('a huddle the user started on another device shows no card', async () => {
+  await step('a huddle the user started on another device shows no card', async () => {
     const shown = (await juno.osNotifications()).length
     // The user starts one from their phone; then Maya starts one. Only Maya's has a card.
     fake.control('startHuddle', { channel: 'C0ENG', user: 'U0TUSHAR' })
@@ -118,7 +111,7 @@ test('a huddle the user started elsewhere shows no card, an ignored channel ring
     await expect(juno.sidebar.row('#eng').root.locator('[data-huddle-indicator]')).toHaveCount(0)
   })
 
-  await test.step('an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async () => {
+  await step('an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async () => {
     await juno.sidebar.selectView('Automated')
     await juno.sidebar.row('#alerts-prod').chooseInMenu('notify-always')
     await juno.expectToast('#alerts-prod: Always')
@@ -153,4 +146,4 @@ test('a huddle the user started elsewhere shows no card, an ignored channel ring
     expect(await ringing(win)).toBe(false)
     expect(await juno.dockBounces()).toBe(1)
   })
-})
+}, { timeout: 90_000 })

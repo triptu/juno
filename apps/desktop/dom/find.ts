@@ -47,7 +47,7 @@ export function shown(el: Element | null | undefined): el is El {
 const IMPLICIT_TAGS: Readonly<Record<string, ReadonlySet<string>>> = Object.fromEntries(Object.entries({
   button: 'BUTTON INPUT SUMMARY', link: 'A', checkbox: 'INPUT', radio: 'INPUT', textbox: 'TEXTAREA INPUT', combobox: 'SELECT INPUT', spinbutton: 'INPUT', slider: 'INPUT',
   heading: 'H1 H2 H3 H4 H5 H6', img: 'IMG', list: 'UL OL', listitem: 'LI', navigation: 'NAV', complementary: 'ASIDE', main: 'MAIN', dialog: 'DIALOG', option: 'OPTION',
-  group: 'FIELDSET DETAILS OPTGROUP', region: 'SECTION', separator: 'HR', table: 'TABLE', row: 'TR', cell: 'TD', form: 'FORM', progressbar: 'PROGRESS', status: 'OUTPUT',
+  group: 'FIELDSET DETAILS OPTGROUP', region: 'SECTION', separator: 'HR', table: 'TABLE', row: 'TR', columnheader: 'TH', rowheader: 'TH', cell: 'TD', form: 'FORM', progressbar: 'PROGRESS', status: 'OUTPUT',
 }).map(([role, tags]) => [role, new Set(tags.split(' '))]))
 
 const BY_TAG: Readonly<Record<string, string>> = {
@@ -70,6 +70,10 @@ export function roleOf(el: Element): string | undefined {
     const type = el.getAttribute('type')
     if (type === null || TEXT_INPUTS.has(type)) return el.hasAttribute('list') ? 'combobox' : 'textbox'
     return INPUT_ROLES[type]
+  }
+  if (tag === 'TH') {
+    const scope = el.getAttribute('scope')
+    return scope === 'col' || (scope !== 'row' && el.closest('thead') !== null) ? 'columnheader' : scope === 'row' ? 'rowheader' : undefined
   }
   if (tag === 'A') return el.hasAttribute('href') ? 'link' : undefined
   if (tag === 'IMG') return el.getAttribute('alt') === '' ? undefined : 'img'
@@ -139,6 +143,8 @@ export interface RoleOptions {
   readonly pressed?: boolean
   readonly expanded?: boolean
   readonly disabled?: boolean
+  /** A heading's level: `h2`, or `aria-level`. */
+  readonly level?: number
   /** Hidden elements too, as Playwright's `includeHidden`. */
   readonly includeHidden?: boolean
 }
@@ -182,6 +188,7 @@ function fits(el: El, options: RoleOptions): boolean {
   if (options.pressed !== undefined && (el.getAttribute('aria-pressed') === 'true') !== options.pressed) return false
   if (options.expanded !== undefined && (el.getAttribute('aria-expanded') === 'true') !== options.expanded) return false
   if (options.disabled !== undefined && disabled(el) !== options.disabled) return false
+  if (options.level !== undefined && Number(el.getAttribute('aria-level') ?? /^H(\d)$/.exec(el.tagName)?.[1]) !== options.level) return false
   if (options.name !== undefined && !matches(nameOf(el), options.name, options.exact === true)) return false
   return true
 }

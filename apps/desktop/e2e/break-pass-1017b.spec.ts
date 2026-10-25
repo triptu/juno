@@ -1,7 +1,7 @@
-// Second break pass of 10-17: Home's composer, the keys held after ⌘N and
-// ⌘T, used fast from the keyboard. Findings are in
+// Second break pass of 10-17: keys typed on Home's chip and keys held after
+// ⌘T, which reach the field through `execCommand`. The rest of the pass is in
+// the DOM lane (`dom/break-pass-1017b.test.ts`). Findings are in
 // docs/reviews/2026-10-17-break-pass-b.md.
-import { brief, paste } from './attach'
 import { expect, test } from './fixtures'
 
 // Starts signed in and synced (README, "Synced start").
@@ -11,23 +11,7 @@ test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-// Related checks share a launch: each step starts where the one before it left Home.
-test("Home's destination from the keyboard: Backspace, keys on the chip, a fast first @, and a paste after ⌘T", async ({ juno }) => {
-  await test.step('holding Backspace to clear the text keeps the destination; a new Backspace in the empty field goes back to Juno', async () => {
-    const { write, win } = juno
-
-    await write.pickConversation('ma', 'Maya')
-    await write.expectDestination('Maya')
-    await write.composer.pressSequentially('ok')
-    // A held key: the first press, then repeats past the last character.
-    for (let i = 0; i < 4; i++) await win.keyboard.down('Backspace')
-    await win.keyboard.up('Backspace')
-    await expect(write.composer).toHaveValue('')
-    await write.expectDestination('Maya')
-    await write.composer.press('Backspace')
-    await write.expectDestination('Juno')
-  })
-
+test("Home's field takes keys typed on its chips and a paste after ⌘T, and Esc gives focus back to a chip", async ({ juno }) => {
   await test.step('keys typed on the destination chip go into the field; arrows and Space still drive the chip', async () => {
     const { write, tabs, win } = juno
 
@@ -51,20 +35,20 @@ test("Home's destination from the keyboard: Backspace, keys on the chip, a fast 
     await expect(write.composer).toHaveValue('What changed today?')
   })
 
-  await test.step('a first @ and a name typed fast with Enter picks the person typed, not a row from before', async () => {
-    const { write, win } = juno
+  await test.step("the topic chip: Esc from its list gives focus back to it, and a key typed on it goes into the field", async () => {
+    const { write } = juno
 
-    // Empty again: the step above left its text in the field.
     await write.composer.fill('')
-    await write.composer.pressSequentially('@')
-    await expect(write.sendTo).toBeVisible()
-    // No wait: the rows for "@j" are still on their way when Enter lands.
-    await win.keyboard.type('j')
-    await win.keyboard.press('Enter')
-    await win.keyboard.type('Hi')
-    await write.expectDestination('Jonas')
-    await expect(write.composer).toHaveValue('Hi')
+    await write.pickConversation('eng', 'eng')
+    await write.expectTopic('Main')
+    await write.composer.press('Shift+Tab')
+    await write.topicChip.press('ArrowDown')
+    await expect(write.topicSearch).toBeFocused()
+    await write.topicSearch.press('Escape')
+    await expect(write.topicChip).toBeFocused()
+    await write.topicChip.press('D')
     await expect(write.composer).toBeFocused()
+    await expect(write.composer).toHaveValue('D')
   })
 
   await test.step('text pasted right after ⌘T goes into the new Home, in order with the keys typed around it', async () => {
@@ -88,53 +72,3 @@ test("Home's destination from the keyboard: Backspace, keys on the chip, a fast 
     await expect(topic.composer).toHaveValue('')
   })
 })
-
-test("Home's drafts: typing during a send, a draft shown again, and a file Juno cannot read", async ({ juno, fake }) => {
-  await test.step('text typed while a Home send waits for Slack stays in the field', async () => {
-    const { write, win } = juno
-
-    await write.pickConversation('jon', 'Jonas')
-    fake.holdNext({ method: 'conversations.open', before: true })
-    await write.write('Welcome aboard')
-    await write.send()
-    await expect.poll(() => fake.heldCount({ method: 'conversations.open' })).toBe(1)
-    await win.keyboard.type('Next one')
-    fake.release({ method: 'conversations.open' })
-    await juno.expectToast('Sent to Jonas')
-    await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['text'])).toEqual(['Welcome aboard'])
-    await expect(write.composer).toHaveValue('Next one')
-    await write.expectDestination('Juno')
-  })
-
-  await test.step('a Home draft shown again takes typing at its end', async () => {
-    const { write, topic, sidebar, nav, win } = juno
-
-    await write.write('A long thought')
-    await sidebar.row(POSTGRES).open()
-    await topic.expectTitle(POSTGRES)
-    await nav.back()
-    await expect(write.composer).toHaveValue('A long thought')
-    await expect(write.composer).toBeFocused()
-    await win.keyboard.type(' and more')
-    await expect(write.composer).toHaveValue('A long thought and more')
-  })
-
-  await test.step('a file Juno cannot read, attached with Juno chosen, says so until a person or channel is chosen', async () => {
-    const { write } = juno
-    const note = write.root.locator('[data-attachment-note]')
-
-    await write.write('Brief for the launch')
-    await paste(write.composer, [brief()])
-    await expect(write.root.getByRole('button', { name: 'Remove launch-brief.pdf' })).toBeVisible()
-    await expect(note).toHaveText('Juno reads images and text files. Pick a person or channel to send the others.')
-    await write.pickConversation('eng', 'eng')
-    await expect(note).toHaveCount(0)
-    await expect(write.root.getByRole('button', { name: 'Remove launch-brief.pdf' })).toBeVisible()
-    // Back to Juno: the files stay, and the line comes back.
-    await write.composer.fill('')
-    await write.composer.press('Backspace')
-    await write.expectDestination('Juno')
-    await expect(note).toBeVisible()
-  })
-})
-

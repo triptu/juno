@@ -1,4 +1,3 @@
-import type { Fixtures } from './fixtures'
 // Topic art's Redraw art against the fake Slack and the fake AI (SPEC 5 "Row
 // anatomy", inventory 15.1 and 16): Redraw art in the row's menu and in the
 // header's title menu draws the topic again, the toast's Undo and ⌘Z put the
@@ -9,26 +8,27 @@ import type { Fixtures } from './fixtures'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
+import { expect } from './expect'
+import { domTest, type DomContext } from './test'
 
-test.describe.configure({ timeout: 120_000 })
 // These tests watch the background art job.
-test.use({ aiJobs: true })
+const ART = { synced: false, engine: { aiJobs: true }, timeout: 120_000 } as const
 
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 
 // AI assist off goes last: it relaunches the app with the preference stored off.
-test('shares channel art with Home, redraws topic art with Undo, and with AI assist off offers neither', async ({ juno, fake, userData, relaunch }) => {
+domTest('shares channel art with Home, redraws topic art with Undo, and with AI assist off offers neither', async ({ juno, fake, userData, relaunch, step }) => {
   await juno.signIn()
   await juno.waitForSync()
   const context = { juno }
-  await test.step("a channel in Home's destination list shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
-  await test.step('Redraw art draws a topic again, and Undo puts the previous drawing back', () => redrawTopicArt(context))
-  await test.step('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', () => aiAssistOff({ fake, userData, relaunch }))
-})
+  await step("a channel in Home's destination list shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
+  await step('Redraw art draws a topic again, and Undo puts the previous drawing back', () => redrawTopicArt(context))
+  await step('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', () => aiAssistOff({ fake, userData, relaunch }))
+}, ART)
 
-async function homeChannelArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
+async function homeChannelArt({ juno }: { readonly juno: Juno }): Promise<void> {
   const markup = await juno.sidebar.row('#eng').artMarkup()
   await juno.write.chip.click()
   await juno.write.search.fill('eng')
@@ -42,7 +42,7 @@ async function homeChannelArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect(juno.write.list).toBeHidden()
 }
 
-async function redrawTopicArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
+async function redrawTopicArt({ juno }: { readonly juno: Juno }): Promise<void> {
   const row = juno.sidebar.row(POSTGRES)
   const first = await row.artMarkup()
 
@@ -64,7 +64,7 @@ async function redrawTopicArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect.poll(() => row.artMarkup()).toBe(first)
 }
 
-async function aiAssistOff({ fake, userData, relaunch }: Pick<Fixtures, 'fake' | 'userData' | 'relaunch'>): Promise<void> {
+async function aiAssistOff({ fake, userData, relaunch }: Pick<DomContext, 'fake' | 'userData' | 'relaunch'>): Promise<void> {
   const again = await relaunch({ whileClosed: () => {
     const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
     db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
@@ -77,16 +77,7 @@ async function aiAssistOff({ fake, userData, relaunch }: Pick<Fixtures, 'fake' |
 
   // Text selected in a message: the toolbar has Quote and no Ask Juno.
   await row.open()
-  const text = topic.message(POSTGRES).locator('[data-msg-text] p').first()
-  const box = (await text.boundingBox())!
-  await text.evaluate((node) => {
-    const range = document.createRange()
-    range.setStart(node.firstChild!, 0)
-    range.setEnd(node.firstChild!, 'Draft plan'.length)
-    document.getSelection()!.removeAllRanges()
-    document.getSelection()!.addRange(range)
-  })
-  await text.dispatchEvent('pointerup', { bubbles: true, clientX: box.x + 20, clientY: box.y + 5 })
+  await topic.message(POSTGRES).locator('[data-msg-text] p').first().selectText(0, 'Draft plan'.length)
   const toolbar = again.win.getByRole('toolbar', { name: 'Selection' })
   await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
   await expect(toolbar.getByRole('button', { name: 'Ask Juno' })).toHaveCount(0)
@@ -96,19 +87,9 @@ async function aiAssistOff({ fake, userData, relaunch }: Pick<Fixtures, 'fake' |
   expect(labels).not.toContain('Redraw art')
 }
 
-const keyedTest = test.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  agentOptions: async ({}, use) => {
-    const model = await startFakeOpenRouter({ key: 'fake-engine-test-key' })
-    await use({ fakeOpenRouterUrl: model.origin })
-    await model.close()
-  },
-})
-keyedTest.describe('key and daily limit', () => {
-keyedTest.use({ fakeAiRequiresKey: true })
+const KEY = 'fake-engine-test-key'
 
-keyedTest('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', async ({ juno }) => {
-  const KEY = 'fake-engine-test-key'
+domTest('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const row = juno.sidebar.row(POSTGRES)
@@ -144,6 +125,4 @@ keyedTest('Redraw art needs an OpenRouter key; at the daily limit it says so, an
   await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $2.00 today')
   await row.chooseInMenu('redraw')
   await juno.expectToast(`Redrawn · ${POSTGRES}`)
-})
-
-})
+}, { ...ART, engine: { aiJobs: true, fakeAiRequiresKey: true, agent: false }, model: () => startFakeOpenRouter({ key: KEY }) })

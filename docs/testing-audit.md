@@ -82,7 +82,7 @@ Tests in one spec file that signed in and set up the same way and then checked o
 ### 4.4 Removed, with the reason
 
 Desktop e2e:
-- `topic.spec` "⋯ runs Rename…": every check is made by `actions.spec` "header rename".
+- `topic.spec` "⋯ runs Rename…": every check is made by `dom/actions.test.ts` "Rename".
 - `notifications.spec` "Set yourself away and active…": its two menu checks moved into `presence.spec`'s away test, which made the rest of its checks.
 
 Gallery (24 runs):
@@ -167,7 +167,7 @@ Ten behaviours, each broken in the code (not committed), run against the slimmer
 | 3 | A drawing the model failed is not asked again (`art/job.ts`: failed rows are due) | `engine/art.test` "…does not ask again" (37 calls, 35 expected), the check that slept before |
 | 4 | A resolved topic leaves the sidebar (`domain/status.ts`: resolved placed in Recent) | `domain/status.test` "hides a resolved topic", the check kept from the removed test |
 | 5 | A 429 pauses only its own method (`queue.ts`: a pause on one method pauses all) | `slack/api.test` "a 429 on one method pauses only that method", as rewritten |
-| 6 | Rename from the topic header saves the title (`header.tsx`: save does nothing) | `actions.spec` "Rename from a row …, from the header …", which took over from the removed `topic.spec` test |
+| 6 | Rename from the topic header saves the title (`header.tsx`: save does nothing) | `dom/actions.test.ts` "Rename from a row …, from the header …", which took over from the removed `topic.spec` test |
 | 7 | The account menu offers Set yourself active when away (`AccountMenu.tsx`: always "away") | `presence.spec`, both tests, with the checks moved from `notifications.spec` |
 | 8 | Pinned tabs survive a restart (`tabs.ts`: saved unpinned) | `navigation.spec` "…pins survive a restart" (now polls `user.db`) and `state/tabs-saved.test` |
 | 9 | A chosen accent survives a relaunch (`main/index.ts`: accent not written) | `theme.spec`, the merged theme and accent test, at its step "…survives a relaunch: after the relaunch" |
