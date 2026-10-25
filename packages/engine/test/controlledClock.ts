@@ -33,17 +33,17 @@ export async function controlledSleep(millis: number) {
   const time = await controlledClock()
   const live = Effect.runSync(Clock.Clock)
   await time.freeze()
-  let armed = 0
+  const armed = { count: 0 }
   const controlled = (duration: Duration.Duration) => Effect.suspend(() => {
-    armed++
-    return time.clock.sleep(duration).pipe(Effect.ensuring(Effect.sync(() => { armed-- })))
+    armed.count++
+    return time.clock.sleep(duration).pipe(Effect.ensuring(Effect.sync(() => { armed.count-- })))
   })
   return {
     ...time,
     /** Waits until a sleep of this duration is armed, then ends it by advancing exactly that long. */
     fire: async (timeoutMillis = 20_000) => {
       const started = Date.now()
-      while (armed === 0) {
+      while (armed.count === 0) {
         if (Date.now() - started > timeoutMillis) throw new Error(`timed out waiting for a ${millis} ms sleep`)
         await new Promise((resolve) => setTimeout(resolve, 5))
       }
