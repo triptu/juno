@@ -1,29 +1,136 @@
 /**
- * A happy-dom window that runs the renderer bundle (`vite.config.ts`). Each
- * window is its own VM context, so the renderer's module state is new for
- * every test and every relaunch. What happy-dom leaves out and the app calls
- * is filled in here, each answering as an unhidden, laid-out page would:
- * a test whose assertion depends on one of these belongs in Playwright
- * (README, "The rule").
+ * A happy-dom window that runs the renderer bundle (`vite.config.ts`). The
+ * bundle runs in one VM context per Bun worker (`Realm`), so the code JSC
+ * has compiled and optimised carries from test to test; each window gets
+ * the bundle's module state new, and its globals are that window's. What
+ * happy-dom leaves out and the app calls is filled in here, each answering
+ * as an unhidden, laid-out page would: a test whose assertion depends on
+ * one of these belongs in Playwright (README, "The rule").
  */
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { Script } from 'node:vm'
+import { createContext, runInContext, Script } from 'node:vm'
 import { Window } from 'happy-dom'
 import type { PageClock } from './clock'
 
 export const DOM_BUILD = resolve(__dirname, 'dist')
 
-let compiled: { readonly script: Script; readonly css: string } | undefined
-/** Compiled once per Bun worker; each window runs it in its own context. */
-function renderer() {
-  compiled ??= { script: new Script(readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8'), { filename: 'renderer.js' }), css: rootRules(readFileSync(join(DOM_BUILD, 'style.css'), 'utf8')) }
-  return compiled
+/**
+ * The renderer's realm. JSC keeps compiled and optimised code per VM
+ * context, so a bundle run in each window's own context ran cold in every
+ * test. Here the bundle is one function, compiled once in a context of its
+ * own, and each window calls it: its modules start new, as on a page load,
+ * and every global the bundle names is a variable bound to that window's
+ * value (`document`, `setTimeout`, `globalThis`), so a closed page's late
+ * callbacks still reach only its own window, and two windows (`otherApp`)
+ * run side by side. JavaScript's own globals (`Array`, `Promise`, `Map`)
+ * are the realm's, except one a test replaced on the window (the clock's
+ * `Date`). A global read by bare name is bound when the page starts: one
+ * set on the window later is read as `window.name`.
+ *
+ * What the realm itself holds is checked after every page (`checkRealm`).
+ */
+interface Realm {
+  /** Runs the bundle for `window`. */
+  readonly start: (window: Window, language: Readonly<Record<string, unknown>>) => void
+  readonly global: Record<string, unknown>
+  /** The realm's own globals and JavaScript's objects, as they were before any page ran. */
+  readonly pristine: Map<object, PropertyDescriptorMap>
+  readonly labels: Map<object, string>
 }
 
-/** Compiles the renderer and its sheet ahead of the first window. */
+let realm: Realm | undefined
+let css: string | undefined
+
+/** JavaScript's own globals, as a new VM context has them. `console` is the window's. */
+const LANGUAGE = (runInContext('Object.getOwnPropertyNames(globalThis)', createContext({})) as string[]).filter((name) => name !== 'console' && name !== 'globalThis')
+/** Bound as variables in the bundle: everything but the ones a function cannot declare or that change how code runs. */
+const LANGUAGE_BOUND = LANGUAGE.filter((name) => !['undefined', 'NaN', 'Infinity', 'eval'].includes(name))
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/
+const RESERVED = new Set(['arguments', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'implements', 'import', 'in', 'instanceof', 'interface', 'let', 'new', 'null', 'package', 'private', 'protected', 'public', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with', 'yield'])
+
+/** The globals a window gives its page: its own properties and its classes', less JavaScript's and `Object.prototype`'s. */
+function windowGlobals(window: Window): string[] {
+  const names = new Set<string>(['globalThis'])
+  for (let proto: object | null = window; proto !== null && proto !== Object.prototype; proto = Object.getPrototypeOf(proto) as object | null) {
+    for (const name of Object.getOwnPropertyNames(proto)) if (IDENTIFIER.test(name) && !RESERVED.has(name) && !LANGUAGE.includes(name) && !(name in Object.prototype)) names.add(name)
+  }
+  return [...names]
+}
+
+/** Compiles the bundle in a new context, with the globals of `window` (the worker's first, or a probe) as its variables. */
+function makeRealm(window: Window): Realm {
+  const fromWindow = windowGlobals(window)
+  const source = readFileSync(join(DOM_BUILD, 'renderer.js'), 'utf8')
+  const bind = [...fromWindow.map((name, at) => `${name} = $w[${at}]`), ...LANGUAGE_BOUND.map((name, at) => `${name} = $l[${at}]`)].join(', ')
+  // One line before the bundle, so its stack lines keep the bundle's numbers (`callers`).
+  const script = new Script(`(function ($w, $l) { var ${bind};\n${source}\n})`, { filename: 'renderer.js', lineOffset: -1 })
+  const context = createContext({})
+  const run = script.runInContext(context) as (fromWindow: unknown[], language: unknown[]) => void
+  const global = runInContext('globalThis', context) as Record<string, unknown>
+  const own = Object.fromEntries(LANGUAGE.map((name) => [name, global[name]]))
+  const labels = new Map<object, string>([[global, 'globalThis']])
+  for (const name of LANGUAGE) {
+    const value = own[name]
+    if (!(value instanceof Object) && typeof value !== 'function') continue
+    if (!labels.has(value as object)) labels.set(value as object, name)
+    const proto = (value as { prototype?: unknown }).prototype
+    if (proto instanceof Object && !labels.has(proto)) labels.set(proto, `${name}.prototype`)
+  }
+  for (const [object, label] of [...labels]) {
+    // Prototypes with no global of their own: functions', iterators', generators'.
+    const above = Object.getPrototypeOf(object) as object | null
+    if (above !== null && !labels.has(above)) labels.set(above, `${label}'s prototype`)
+  }
+  return {
+    start: (page, language) => {
+      const globals = page as unknown as Record<string, unknown>
+      run(fromWindow.map((name) => (name === 'globalThis' ? page : globals[name])), LANGUAGE_BOUND.map((name) => (globals[name] !== language[name] ? globals[name] : own[name])))
+    },
+    global,
+    pristine: new Map([...labels.keys()].map((object) => [object, Object.getOwnPropertyDescriptors(object)])),
+    labels,
+  }
+}
+
+/**
+ * Fails when a page has left something in the realm the next page would
+ * see: a global set through the realm's own `globalThis` (a sloppy `this`,
+ * `Function('return this')()`), or a property of a JavaScript object or
+ * prototype added, removed or replaced (`Error.stackTraceLimit`, a
+ * polyfill). The realm is dropped, so the tests after run in a new one.
+ */
+function checkRealm(): void {
+  const current = realm
+  if (current === undefined) return
+  for (const [object, before] of current.pristine) {
+    const keys = new Set([...Reflect.ownKeys(object), ...Reflect.ownKeys(before)])
+    for (const key of keys) {
+      const was = before[key as string]
+      const now = Object.getOwnPropertyDescriptor(object, key)
+      // RegExp's legacy statics (`RegExp.$1`, `lastMatch`) are accessors whose value follows the last match.
+      if (was !== undefined && now !== undefined && Object.is(now.value, was.value) && now.get === was.get && now.set === was.set) continue
+      realm = undefined
+      throw new Error(`This page left ${current.labels.get(object)}.${String(key)} ${now === undefined ? 'removed' : was === undefined ? 'added' : 'changed'} in the renderer's realm, which every later page in the worker shares (window.ts, "Realm"). Set it on the window, or put it back when the page closes.`)
+    }
+  }
+}
+
+/** The sheet's root rules, read once per worker. */
+function rootSheet(): string {
+  return css ??= rootRules(readFileSync(join(DOM_BUILD, 'style.css'), 'utf8'))
+}
+
+/** Compiles the renderer in its realm and reads its sheet ahead of the first window, from a window that runs nothing. */
 export function warmRenderer(): void {
-  renderer()
+  rootSheet()
+  if (realm !== undefined) return
+  const probe = new Window()
+  try {
+    fillGaps(probe)
+    ;(probe as unknown as Record<string, unknown>)['__junoSidebarTrace'] = undefined
+    realm = makeRealm(probe)
+  } finally { void probe.happyDOM.close() }
 }
 
 /**
@@ -74,6 +181,8 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
       navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36' },
     },
   })
+  // JavaScript's globals as the window made them, before the gaps and the clock replace any.
+  const language = Object.fromEntries(LANGUAGE.map((name) => [name, (window as unknown as Record<string, unknown>)[name]]))
   patchPrototypes(window)
   if (open.size === 0) restorePrototypes(window)
   open.add(window)
@@ -82,9 +191,9 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
   ;(window as unknown as Record<string, unknown>)['__junoSidebarTrace'] = { hold: [], list: { values: 0, errors: 0 } }
   clock?.install(window, engineClock)
   for (const [key, value] of storage) window.localStorage.setItem(key, value)
-  const { script, css } = renderer()
-  window.document.write(`<!doctype html><html><head><style>${css}</style></head><body><div id="root"></div></body></html>`)
-  script.runInContext(window as never)
+  window.document.write(`<!doctype html><html><head><style>${rootSheet()}</style></head><body><div id="root"></div></body></html>`)
+  warmRenderer()
+  realm!.start(window, language)
   return window
 }
 
@@ -338,6 +447,7 @@ export async function closeWindow(window: Window): Promise<void> {
     open.delete(window)
     if (open.size === 0) restorePrototypes(window)
   }
+  checkRealm()
 }
 
 function fillGaps(window: Window): void {
