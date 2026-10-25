@@ -784,6 +784,18 @@ Single runs of `bun run remote --cores 3 --env GALLERY_SHIFT_ALL=1 --env GALLERY
 
 No run failed or retried a test. More workers slow each focus-ring part (79 s at 4 workers, 114 s at 6, 157 s at 8) because they share the CPU, but the shift walk sets the length of the job. With six threads 94% busy, more than eight workers would mostly queue for CPU and bring memory close to the limit, so it was not tried. The laptop's own memory use, with other jobs running beside these, peaked at 16.2–18.5 GB used, with 11.9–14.3 GB still available.
 
+### Frame clock and page pool, 2026-10-25
+
+Single runs of `bun run remote --cores 4 --env GALLERY_SHIFT_ALL=1 test:gallery shift.spec.ts` at `8febc617c` (before the eight-worker default), each on four physical cores (eight threads, six shift parts, a 12 GB container). About 1,830 states each.
+
+| Variant | Frame interval | Shift part durations | Script time | CPU busy, average | Peak container memory | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| Default | 16.7 ms | 579–582 s | 612 s | 65% | 5.81 GB | 51 passed |
+| `--disable-frame-rate-limit --disable-gpu-vsync` | 17.3 ms | about 575 s | 605 s | 78% | 6.28 GB | 51 passed |
+| Three pages per shift part | 16.7 ms | 450 s | 480 s | 94% | 9.42 GB | 51 passed |
+
+The headless shell keeps its 60 Hz frame clock with those flags, so the guard's two-frame wait is unchanged and the flags are not used. Three pages per part were faster only because the CPU had room; with eight workers the gallery allocation is already 94% busy, so the pool was not kept.
+
 ## Web shell
 
 `bun run web` runs the real renderer in a browser, for UI-only work, with no build and no Electron. One Node process holds three things:
