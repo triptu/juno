@@ -4,8 +4,8 @@ import { readUserDb } from './driver/userDb'
  * thread or person, the OS notification, its title for a group DM, and its click (also on a topic
  * already open in a tab), why a message did or did not notify, the
  * Notifications and Ignored sections of Settings, and the test
- * notification and macOS permission line. Set yourself away and active
- * is in presence.spec.ts.
+ * notification and macOS permission line. Presence (away and active) is
+ * in apps/desktop/test/activity.test.ts.
  * Main records OS notifications instead of showing them
  * (`junoTest.notifications`) and fakes macOS's permission
  * (`junoTest.notificationPermission`).
