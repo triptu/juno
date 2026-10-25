@@ -109,7 +109,8 @@ const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
 let suites = required.filter((suite) => {
-  if (baseline || !protocolRoots[suite.name] || noCache || (seed !== undefined && suite.name === 'specs:check')) return true
+  // A nightly run reuses no suite from an earlier run: it runs everything.
+  if (baseline || nightly || !protocolRoots[suite.name] || noCache || (seed !== undefined && suite.name === 'specs:check')) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
     if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
