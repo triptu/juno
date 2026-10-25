@@ -4,15 +4,18 @@ import { createInterface } from 'node:readline'
 import { appSuites, parsePlan } from '../plan.mjs'
 import { forwardSignals } from './children.mjs'
 
+// Two four-core jobs that carry about the same measured CPU in a full run (docs/development.md,
+// "Full runs"): the browser and Electron lanes, which share builds, with the spec checks; and the
+// unit tests, the DOM lane and the gallery. Smaller jobs each left one long suite on too few cores.
+const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'specs:check', 'specs:conformance']
+
 export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
   if (options.script !== 'test:plan' || setting('JUNO_RUNNER_PLAN') === 'single' || setting('JUNO_PLAN_SERIAL') === '1') return []
   const steps = parsePlan(options.args)
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
-    // Spec checks share the unit job: unit, desktop and gallery fill the eight lent cores, and a separate
-    // specs job had to wait for one of them to finish before it got cores.
-    const kind = step.script === 'test:gallery' ? 'gallery' : appSuites.includes(step.script) ? 'desktop' : 'unit'
+    const kind = desktopJob.includes(step.script) ? 'desktop' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
     groups.get(kind).push({ ...step, index })
   }
@@ -23,12 +26,14 @@ export const planWords = (steps) => steps.flatMap((step, index) => [
   ...(index ? ['+'] : []), ...Object.entries(step.env).map(([key, value]) => `${key}=${value}`), step.script, ...step.args,
 ])
 
-export const defaultPlanCores = { desktop: 3, gallery: 3 }
+/** A unit job without the DOM lane or the gallery keeps the size its steps ask for (runnerJobSize). */
+export const defaultPlanCores = (kind, steps) =>
+  kind === 'desktop' || steps.some((step) => step.script === 'test:dom' || step.script === 'test:gallery') ? 4 : undefined
 
-export function planCores(kind, options, env = process.env) {
+export function planCores(kind, options, env = process.env, steps = []) {
   const key = `JUNO_RUNNER_${kind.toUpperCase()}_CORES`
   const value = options.env.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
-  const cores = value === undefined ? options.cores ?? defaultPlanCores[kind] : Number(value)
+  const cores = value === undefined ? options.cores ?? defaultPlanCores(kind, steps) : Number(value)
   if (cores !== undefined && (!Number.isInteger(cores) || cores < 1)) throw new Error(`${key} must be a positive whole number`)
   return cores
 }
@@ -40,7 +45,7 @@ export async function runRunnerPlan(jobs, { self, root, options, log }) {
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = true })
   log(`remote: SSH plan in ${jobs.length} jobs: ${jobs.map((job) => job.kind).join(', ')}; each waits for runner capacity`)
   const codes = await Promise.all(jobs.map(({ kind, steps }) => new Promise((done) => {
-    const cores = planCores(kind, options)
+    const cores = planCores(kind, options, process.env, steps)
     const flags = [
       ...(cores !== undefined ? ['--cores', String(cores)] : []),
       '--wait', String(options.wait ?? 60),
