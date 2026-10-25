@@ -14,11 +14,11 @@ export interface LargeSeedBoot {
 let boot: Promise<LargeSeedBoot> | undefined
 
 /**
- * One cold boot of the large seed, shared by the large-seed budgets that run
- * in one `bun test` process (`scripts/perf.mjs` runs them together): each
- * boot took about 17 s on the laptop, four of them most of the engine's
- * perf time. Each budget reads what it needs and leaves the engine running;
- * the process ends with it.
+ * One cold boot of the large seed, shared by the sidebar, All topics and
+ * conversation search budgets, which run in one `bun test` process
+ * (`scripts/perf.mjs` runs them together, in bun's shuffled order): each
+ * boot took about 17 s on the laptop. Each budget reads what it needs and
+ * leaves the engine running; the process ends with it.
  */
 export function largeSeedEngine(): Promise<LargeSeedBoot> {
   boot ??= (async () => {

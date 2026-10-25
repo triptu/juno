@@ -15,8 +15,11 @@ import { expect, test } from '@playwright/test'
  */
 export const RATIO = 1.2
 
-/** Absolute floors, so a 2 ms metric does not fail on 0.5 ms of noise. */
-const FLOORS = { ms: 5, MB: 20 } as const
+/**
+ * Absolute floors, so a 2 ms metric does not fail on 0.5 ms of noise: for a
+ * count of long animation frames, 3; for a share of dropped frames, 5 points.
+ */
+const FLOORS = { ms: 5, MB: 20, frames: 3, '%': 5 } as const
 
 export interface Metric {
   readonly name: string

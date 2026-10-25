@@ -931,7 +931,8 @@ test.describe('large workspace', () => {
       const loaf = await win.evaluate(() => (window as unknown as { __loaf: number }).__loaf)
       const perFrame = stats('sidebar drag, main-thread work per frame', work)
       budget(perFrame, 8.3, { compare: 'p95', floor: 1 })
-      expect(loaf).toBe(0)
+      if (absolute) expect(loaf).toBe(0)
+      else budget(reading('sidebar drag: long animation frames', loaf, 'frames'), 0)
       await juno.frame.expectWidth(384)
     } finally {
       await running.close()
@@ -1225,7 +1226,8 @@ test.describe('topic view', () => {
       const heaviest = [...work].toSorted((a, b) => b - a).slice(0, 3)
       console.log(`code jump: heaviest frames ${heaviest.map((ms) => ms.toFixed(1)).join(' ')} ms (scroll budget 8.3), long animation frames ${longFrames.map((ms) => ms.toFixed(0)).join(' ') || 'none'}, landed row moved ${moved.toFixed(1)} px, load ${loadavg()[0]!.toFixed(1)}`)
       expect(moved, 'the row the jump landed on moves').toBeLessThan(0.5)
-      expect.soft(longFrames, 'long animation frames after the jump').toEqual([])
+      if (absolute) expect.soft(longFrames, 'long animation frames after the jump').toEqual([])
+      else budget(reading('code jump: long animation frames after the jump', longFrames.length, 'frames'), 0)
     } finally {
       await running.close()
     }
@@ -1312,7 +1314,8 @@ test.describe('topic view', () => {
       const panel = await selectionDragReading(win, juno.topic.scroller, 'select-drag-panel', interval)
       await expect(win.locator('[data-panel-selection]')).toHaveText(/^\d+ messages: “/)
       budget(stats('selection drag with the panel open, frame work', panel.work), 8.3, { compare: 'p95', floor: 1 })
-      expect.soft(panel.loaf, 'long animation frames while dragging a selection').toBe(0)
+      if (absolute) expect.soft(panel.loaf, 'long animation frames while dragging a selection').toBe(0)
+      else budget(reading('selection drag with the panel open: long animation frames', panel.loaf, 'frames'), 0)
     } finally {
       await running.close()
     }
