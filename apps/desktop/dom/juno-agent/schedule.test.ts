@@ -1,11 +1,14 @@
 // Schedules end to end (plan v3 §16 flow 6, §11, §19.2; SPEC 13.6): Pause, Resume and Delete on the
-// Scheduled page and the card; a tainted run only proposes a schedule until the owner starts it. Reply watches made in the chat and from the message menu end quietly
-// when the person replies.
+// Scheduled page and the card; a tainted run only proposes a schedule until the owner starts it.
+// Reply watches made in the chat and from the message menu end quietly when the person replies.
+import type { FakeSlack } from '@juno/fake-slack'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import type { Locator } from '@playwright/test'
-import { card, openChat, openPage, readySynced as ready } from './agent'
-import { answer as echo, expect, test as chat } from './chat'
-import { startScriptedModel, type ScriptedModel } from './model'
+import type { Slack } from '../../e2e/driver/slack'
+import { answer as echo, startScriptedModel } from '../../e2e/juno-agent/model'
+import { card, openChat, openPage, readySynced as ready } from '../driver/agent'
+import { expect } from '../expect'
+import type { Query } from '../query'
+import { domTest } from '../test'
 
 const WATCH = 'Check whether Leo answered about the cutover.'
 const ENG = 'C0ENG'
@@ -42,31 +45,28 @@ function scripted(postgres: () => { readonly channel: string; readonly root: str
   }
 }
 
-const test = chat.extend<{ readonly model: ScriptedModel }>({
-  model: async ({ slack, fake }, use) => {
-    // Leo already replied in the thread, so the watch starts after its newest message.
-    const thread = () => {
-      const { channel, ts } = slack.root(POSTGRES)
-      const last = fake.messages(channel).filter((message) => message.thread_ts === ts).map((message) => message.ts).toSorted((a, b) => Number(a) - Number(b)).at(-1) ?? ts
-      return { channel, root: ts, last }
-    }
-    const model = await startScriptedModel({ answer: scripted(thread) })
-    await use(model)
-    await model.close()
-  },
+interface Thread { readonly channel: string; readonly root: string; readonly last: string }
 
-})
+/** The model, and where the test tells it which thread to watch once the fake Slack is up. */
+async function model() {
+  const thread: { find?: () => Thread } = {}
+  const scriptedModel = await startScriptedModel({ answer: scripted(() => thread.find!()) })
+  return Object.assign(scriptedModel, { thread })
+}
 
-test.use({ synced: true })
+/** Leo already replied in the thread, so the watch starts after its newest message. */
+const postgresThread = (slack: Slack, fake: FakeSlack) => (): Thread => {
+  const { channel, ts } = slack.root(POSTGRES)
+  const last = fake.messages(channel).filter((message) => message.thread_ts === ts).map((message) => message.ts).toSorted((a, b) => Number(a) - Number(b)).at(-1) ?? ts
+  return { channel, root: ts, last }
+}
 
-test.describe.configure({ timeout: 180_000 })
-
-const scheduleRow = (page: Locator, what: string) => page.locator('[data-schedule]').filter({ hasText: what })
+const scheduleRow = (page: Query, what: string) => page.locator('[data-schedule]').filter({ hasText: what })
 
 // A schedule from a clean run waking once after a quit past its due time, under its own label: the agent's
 // schedule-flow test.
 
-test('Pause, Resume and Delete work on the Scheduled page and on the Schedule card, and a schedule from a run that read Slack waits for Start', async ({ juno, model }) => {
+domTest('Pause, Resume and Delete work on the Scheduled page and on the Schedule card, and a schedule from a run that read Slack waits for Start', async ({ juno, model }) => {
   await ready(juno)
   const chatPane = await openChat(juno)
   await chatPane.send('schedule standup notes')
@@ -120,12 +120,13 @@ test('Pause, Resume and Delete work on the Scheduled page and on the Schedule ca
   await expect(digest).toContainText('Deleted')
   const after = await openPage(juno, 'Scheduled')
   await expect(after.getByText('Nothing scheduled')).toBeVisible()
-})
+}, { model, timeout: 180_000 })
 
-test('reply watches from the chat and the message menu: Undo deletes one, and a reply ends the others quietly', async ({ juno, slack, model }) => {
+domTest('reply watches from the chat and the message menu: Undo deletes one, and a reply ends the others quietly', async ({ juno, slack, fake, model, step }) => {
+  model.thread.find = postgresThread(slack, fake)
   await ready(juno)
   // Undo first: it leaves nothing scheduled, so the second watch is the only one.
-  await test.step('Undo on a menu reply watch deletes it without a model run', async () => {
+  await step('Undo on a menu reply watch deletes it without a model run', async () => {
     const requests = model.inputs().length
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.composer.fill('Please confirm the test window.')
@@ -140,7 +141,7 @@ test('reply watches from the chat and the message menu: Undo deletes one, and a 
     expect(model.inputs()).toHaveLength(requests)
   })
 
-  await test.step('a watch made in the chat and "Tell me if nobody replies" on a message both end when Leo replies, with no wake', async () => {
+  await step('a watch made in the chat and "Tell me if nobody replies" on a message both end when Leo replies, with no wake', async () => {
     const chatPane = await openChat(juno)
     await chatPane.send("tell me if Leo doesn't reply by tomorrow")
     await chatPane.expectJuno('Scheduled.')
@@ -163,4 +164,4 @@ test('reply watches from the chat and the message menu: Undo deletes one, and a 
     await expect(page.getByText('Nothing scheduled')).toBeVisible({ timeout: 30_000 })
     expect(model.inputs().some((input) => input.includes(WATCH))).toBe(false)
   })
-})
+}, { model, timeout: 180_000 })
