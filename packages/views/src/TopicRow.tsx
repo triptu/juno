@@ -263,9 +263,7 @@ export const TopicRow = memo(function TopicRow({
           <span {...stylex.props(styles.line3)}>
             <span {...stylex.props(styles.where)}>
               <span {...stylex.props(styles.place)}>
-                <span {...stylex.props(styles.glyph)} title={row.channel.kind === 'private' ? PRIVATE_TITLE : undefined}>
-                  <Icon icon={kindIcon(row.channel.kind)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
-                </span>
+                <PlaceGlyph channel={row.channel} />
                 <Text variant="meta" tone="muted" truncate dir="auto" tooltipWhenTruncated data-row-part="place">
                   {row.channel.name}
                 </Text>
@@ -319,6 +317,30 @@ function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' |
   return (
     <span {...stylex.props(styles.artSlot)}>
       <TopicArt topicId={row.id} recipe={row.art} size={40} />
+    </span>
+  )
+}
+
+/**
+ * Line three's glyph: in a DM the person's photo, so a DM's threads read
+ * apart from channel threads at a glance (their colour when there is no
+ * photo; 13px fits no letter). Elsewhere the kind of place: # or a lock,
+ * and the person glyph for a DM whose partner is not known yet.
+ */
+function PlaceGlyph({ channel }: { readonly channel: TopicRowModel['channel'] }) {
+  const partner = channel.kind === 'im' ? channel.partner : undefined
+  if (partner !== undefined) {
+    const src = partner.avatarSmallUrl || partner.avatarUrl
+    return (
+      <span {...stylex.props(styles.glyph)}>
+        <Avatar label="" size={13} hue={hueFor(partner.color, partner.id)} {...(src ? { src } : {})} />
+      </span>
+    )
+  }
+  const priv = channel.kind === 'private'
+  return (
+    <span {...stylex.props(styles.glyph)} title={priv ? PRIVATE_TITLE : undefined}>
+      <Icon icon={kindIcon(channel.kind)} size={13} {...(priv ? { label: PRIVATE_TITLE } : {})} />
     </span>
   )
 }
