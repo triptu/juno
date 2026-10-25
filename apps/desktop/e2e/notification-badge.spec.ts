@@ -1,4 +1,5 @@
-import { seedWorkspace, startFakeSlack } from '@juno/fake-slack'
+import { startFakeSlack } from '@juno/fake-slack'
+import { caughtUpSeed } from './caughtUpSeed'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 import { hooks } from './hooks'
@@ -6,24 +7,14 @@ import { hooks } from './hooks'
 const badgeTest = test.extend({
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: (workspace, avatars) => {
-      seedWorkspace(workspace, avatars)
-      for (const channel of workspace.conversations.keys()) {
-        const last = workspace.all(channel).at(-1)?.ts
-        if (last !== undefined) workspace.markConversation(channel, last)
-      }
-      for (const sub of workspace.subscriptions.values()) {
-        const last = workspace.all(sub.channel).at(-1)?.ts
-        if (last !== undefined) workspace.markThread(sub.channel, sub.threadTs, last, true)
-      }
-      workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: 'A DM before launch' })
-    } })
+    const fake = await startFakeSlack({ seed: caughtUpSeed })
     await use(fake)
     await fake.close()
   },
 })
 
-badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake, engine restart and permanent failure', { tag: '@electron' }, async ({ juno, slack, fake }) => {
+// What the dot does across an engine restart, a wake and a permanent engine failure is in the restart journey (juno-agent/crash.spec.ts).
+badgeTest('dock dot follows unread DMs, group DMs and mentions through reads', async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.notificationHoursNow()
@@ -47,23 +38,7 @@ badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wa
   await badge('')
   slack.as('Leo').groupDm('A group DM')
   await badge('•')
-  const pid = await hooks(juno.app, 'enginePid')
-  expect(pid).toBeDefined()
-  await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { clearDockBadge: () => void } }).junoTest.clearDockBadge())
-  await badge('')
-  process.kill(pid!, 'SIGKILL')
-  await expect.poll(() => hooks(juno.app, 'enginePid'), { timeout: 15_000 }).not.toBe(pid)
-  await juno.waitForSync()
-  await badge('•')
-  await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { clearDockBadge: () => void } }).junoTest.clearDockBadge())
-  await badge('')
-  await hooks(juno.app, 'wake')
-  await badge('•')
   await juno.sidebar.row('Maya, Leo', { exact: true }).chooseInMenu('mark-read')
-  await badge('')
-  slack.as('Maya').dm('Unread when the engine stops')
-  await badge('•')
-  await hooks(juno.app, 'failEngine')
   await badge('')
 })
 

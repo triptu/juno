@@ -37,7 +37,7 @@ export const HEAVY_AREAS = [
     area: 'idle',
     suite: 'desktop',
     tag: '@heavy-idle',
-    tests: 'small CPU and memory smoke check, plus fine Mac budgets, in idle-cpu.spec.ts',
+    tests: 'CPU and memory checks in idle-cpu.spec.ts, all @mac, so only Mac runs reach them',
     whole: [],
     paths: [
       'apps/desktop/e2e/idle-cpu.spec.ts',

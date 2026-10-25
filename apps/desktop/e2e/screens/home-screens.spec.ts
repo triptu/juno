@@ -3,15 +3,15 @@
 // card, light and dark, at 1200×800 and in a large window. Not part of the
 // suite: run it by hand, and copy the shots worth keeping into docs/progress/.
 //
-//   JUNO_SCREENS=1 JUNO_SCREENS_OUT=<dir> JUNO_SCREENS_PICTURES=/Volumes/AgentWork/pictures-juno-art bun run --cwd apps/desktop playwright test e2e/home-screens.spec.ts
+//   JUNO_SCREENS=1 JUNO_SCREENS_OUT=<dir> JUNO_SCREENS_PICTURES=/Volumes/AgentWork/pictures-juno-art bun run --cwd apps/desktop playwright test e2e/screens/home-screens.spec.ts
 import { cp, mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SELF_ID, startFakeSlack, TEAM, type Workspace } from '@juno/fake-slack'
 import { labelOf } from '@juno/pictures'
 import { PICTURES } from '@juno/pictures/catalog'
 import type { Page } from '@playwright/test'
-import type { Juno } from './driver/juno'
-import { expect, launchApp, syncedTest, test } from './fixtures'
+import type { Juno } from '../driver/juno'
+import { expect, launchApp, syncedTest, test } from '../fixtures'
 
 const out = process.env['JUNO_SCREENS_OUT'] ?? ''
 const files = process.env['JUNO_SCREENS_PICTURES']

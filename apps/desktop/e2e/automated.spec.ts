@@ -1,9 +1,7 @@
 // The built-in Automated view (SPEC 5 "Automated", 12) against the fake
-// Slack and the fake AI: it fills on the first sync and keeps the bot
-// channels out of All; Home asks about a channel neither the rules nor Juno
-// could place, and says why; Move and Keep in All stick, with Undo; the question's
-// menu ignores a noisy channel; a channel taken out by hand is never moved
-// back; and a deleted view stays deleted.
+// Slack and the fake AI: Home asks about a channel neither the rules nor Juno
+// could place, and says why; Move and Keep in All stick, with Undo; the view's
+// sheet marks what Juno added; and the question's menu ignores a noisy channel.
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
@@ -12,8 +10,6 @@ test.describe.configure({ timeout: 120_000 })
 // Juno's judgement of unclear channels is a background AI job.
 test.use({ aiJobs: true, sidebarTrace: true })
 
-const ALERTS_MAIN = '#alerts-prod'
-const DEPLOYS_MAIN = '#deploys'
 const RELEASES_MAIN = '#releases'
 const POSTGRES = 'Draft plan is in the doc'
 
@@ -52,32 +48,7 @@ async function homeAsks(juno: Juno): Promise<void> {
 /** The job has examined the changed rows, including a pass that keeps their placement. */
 const afterAPass = (juno: Juno) => juno.workPass('automated')
 
-test('the view fills on the first sync, keeps the bot channels out of All, and its sheet says what Juno added', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-
-  // An icon pill, with its name as the tooltip.
-  const pill = sidebar.viewPill('Automated')
-  await expect(pill).toHaveAttribute('data-tooltip', 'Automated')
-  await expect(pill).toHaveText('')
-  await sidebar.row(POSTGRES).expectVisible()
-  await sidebar.row(ALERTS_MAIN).expectAbsent()
-  await sidebar.row(DEPLOYS_MAIN).expectAbsent()
-
-  await sidebar.selectView('Automated')
-  await sidebar.row(ALERTS_MAIN).expectVisible()
-  await sidebar.row(DEPLOYS_MAIN).expectVisible()
-  await sidebar.row(POSTGRES).expectAbsent()
-
-  await sidebar.viewMenu('Automated', 'view-edit')
-  const alerts = sidebar.viewSheet.getByRole('option').filter({ hasText: 'alerts-prod' })
-  await expect(alerts).toHaveAttribute('aria-selected', 'true')
-  await expect(alerts).toContainText('Added by Juno')
-  await expect(sidebar.viewSheet.getByRole('checkbox', { name: /Keep these out of All/ })).toBeChecked()
-  await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
-})
-
+// The view's first fill, a channel taken out by hand and a deleted view are the engine's sidebar flow test.
 test('Home asks about an unclear channel; Move puts it in Automated with Undo, and Keep in All is remembered', async ({ juno, fake }) => {
   addReleases(fake)
   await juno.signIn()
@@ -88,6 +59,17 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
   await expect(home.title('automated')).toHaveText('Move #releases?')
   // The reason: Juno's, from the fake AI.
   await expect(home.meta('automated')).toHaveText('To Automated · 4 of 7 messages from apps')
+
+  // The view is an icon pill named by its tooltip, and its sheet marks what Juno added.
+  const pill = sidebar.viewPill('Automated')
+  await expect(pill).toHaveAttribute('data-tooltip', 'Automated')
+  await expect(pill).toHaveText('')
+  await sidebar.viewMenu('Automated', 'view-edit')
+  const alerts = sidebar.viewSheet.getByRole('option').filter({ hasText: 'alerts-prod' })
+  await expect(alerts).toHaveAttribute('aria-selected', 'true')
+  await expect(alerts).toContainText('Added by Juno')
+  await expect(sidebar.viewSheet.getByRole('checkbox', { name: /Keep these out of All/ })).toBeChecked()
+  await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
 
   await home.button('automated', 'Move').click()
   await juno.expectToast('Moved #releases to Automated')
@@ -125,30 +107,4 @@ test("the question's menu ignores a noisy channel", async ({ juno, fake }) => {
   expect(labels).toContain('Ignore channel')
   await juno.expectToast('Ignoring #releases')
   await juno.sidebar.row(RELEASES_MAIN).expectAbsent()
-})
-
-test('a channel taken out of Automated is never moved back, and a deleted view stays deleted', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-
-  await sidebar.selectView('Automated')
-  await sidebar.row(ALERTS_MAIN).chooseInMenu('view-remove:automated')
-  await juno.expectToast('Removed #alerts-prod from Automated')
-  await sidebar.filter('All')
-  await sidebar.row(ALERTS_MAIN).expectVisible()
-  fake.injectMessage({ channel: 'C0ALERTSPROD', user: 'U0GRAFANA', text: '[FIRING] disk 90% on db-replica-2' })
-  await sidebar.row(ALERTS_MAIN).expectPreview('Grafana: [FIRING] disk 90% on db-replica-2')
-  await afterAPass(juno)
-  await sidebar.row(ALERTS_MAIN).expectVisible()
-
-  await sidebar.viewMenu('Automated', 'view-delete')
-  await juno.expectToast('Deleted view · Automated')
-  await expect.poll(() => sidebar.viewNames()).toEqual([])
-  await sidebar.row(DEPLOYS_MAIN).expectVisible()
-  fake.injectMessage({ channel: 'C0DEPLOYS', user: 'U0DEPLOYBOT', text: 'web@aa11 deployed to prod' })
-  await sidebar.row(DEPLOYS_MAIN).expectPreview(/web@aa11 deployed to prod$/)
-  await afterAPass(juno)
-  expect(await sidebar.viewNames()).toEqual([])
-  await sidebar.row(DEPLOYS_MAIN).expectVisible()
 })

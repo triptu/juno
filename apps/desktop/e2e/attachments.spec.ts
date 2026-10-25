@@ -17,30 +17,6 @@ test.describe.configure({ timeout: 120_000 })
 const ENG_MAIN = '#eng'
 const PROPOSAL = 'Proposal: cut offline mode'
 
-test('multi-chunk archives and files with no MIME type can be pasted, picked and sent', async ({ juno, win, fake, userData }) => {
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-  const diskImage = { name: 'Juno.dmg', mimeType: '', buffer: Buffer.alloc(3 * 1024 * 1024, 7) }
-  await paste(topic.composer, [diskImage])
-  const downloads = join(userData, 'Downloads')
-  await mkdir(downloads, { recursive: true })
-  const archive = join(downloads, 'archive.zip')
-  await writeFile(archive, Buffer.alloc(2 * 1024 * 1024, 9))
-  const chooser = win.waitForEvent('filechooser')
-  await topic.root.getByRole('button', { name: 'Attach files', exact: true }).click()
-  await (await chooser).setFiles(archive)
-  await staged(topic, 2)
-
-  await topic.send('Archives attached')
-  await topic.expectSent('Archives attached')
-  const posted = fake.messages('C0ENG').find((message) => message.text === 'Archives attached')
-  expect(posted?.files?.map((file) => ({ name: file.name, size: file.size }))).toEqual([
-    { name: 'Juno.dmg', size: diskImage.buffer.length },
-    { name: 'archive.zip', size: 2 * 1024 * 1024 },
-  ])
-})
-
 for (const failure of ['read_error', 'bad_chunk'] as const) {
   test(`an attachment ${failure} has a specific title and a safe app log entry`, async ({ juno, win, userData }) => {
     const { topic } = juno
@@ -102,6 +78,12 @@ test('a pasted image goes with the message and shows in it at its final size', {
   const posted = fake.messages('C0ENG').filter((m) => m.client_msg_id === shares[0]!.args['client_msg_id'])
   expect(posted.map((m) => m.files?.map((f) => f.name))).toEqual([['chart.png']])
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
+
+  // Another person's 800 × 600 image shows at its own final size.
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from today', media: [{ name: 'whiteboard.png', width: 800, height: 600 }] })
+  const whiteboard = topic.message('Whiteboard from today').getByRole('button', { name: 'Open whiteboard.png' })
+  await expect(whiteboard.locator(`img${schemeSrc('files')}`)).toHaveCount(1)
+  expect(await whiteboard.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
 // Live, Slack shares a fresh image before it has made thumbnails: the echo has no `thumb_*` and no size, and
@@ -128,8 +110,8 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
     // Stored without thumbnails: still the staged copy, still an image.
     await expect(image.locator(`img${schemeSrc('uploads')}`)).toHaveCount(1)
     await expect(row.getByRole('button', { name: 'Download chart.png' })).toHaveCount(0)
-    // Processing can outlast all four background tries. Only file_created follows.
-    await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 60_000 }).toBe(4)
+    // After the first background try Slack makes them, and file_created follows.
+    await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
     fake.releaseThumbnails({ event: 'file_created' })
     await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
     await expect.poll(() => image.locator(`img${schemeSrc('files')}`).evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
@@ -138,53 +120,13 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
   expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length).toBeGreaterThan(0)
 })
 
-test('another person\'s image that arrives without thumbnails fills in after the refetch', async ({ juno, fake }) => {
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-
-  fake.holdThumbnails()
-  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from today', media: [{ name: 'whiteboard.png', width: 800, height: 600 }] })
-  const row = topic.message('Whiteboard from today')
-  await expect(row.getByRole('button', { name: 'Download whiteboard.png' })).toBeVisible()
-  // The first try finds no thumbnails yet; Slack makes them without an event, and a later try brings them.
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
-  fake.releaseThumbnails({ event: 'none' })
-  const image = row.getByRole('button', { name: 'Open whiteboard.png' })
-  await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 20_000 })
-  expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
-})
-
-test('a reply image takes Slack thumbnails after processing without a message update or file event', async ({ juno, fake }) => {
-  const { topic } = juno
-  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc'))!
-  await juno.sidebar.row('Draft plan is in the doc').open()
-  fake.setFilesInfoSupported({ supported: false })
-  fake.holdThumbnails()
-  fake.resetCalls()
-  await paste(topic.composer, [chart()])
-  await staged(topic, 1)
-  await topic.send('The processed reply image')
-  await topic.expectSent('The processed reply image')
-  const image = topic.message('The processed reply image').getByRole('button', { name: 'Open chart.png' })
-  await expect(image.locator(`img${schemeSrc('uploads')}`)).toHaveCount(1)
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.replies' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
-  fake.releaseThumbnails({ event: 'none' })
-  const remote = image.locator(`img${schemeSrc('files')}`)
-  await expect(remote).toHaveCount(1, { timeout: 20_000 })
-  await expect.poll(() => remote.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0)
-  const reads = fake.calls.filter((call) => call.method === 'conversations.replies' && call.args['_x_reason'] === 'file')
-  expect(reads.every((call) => call.args['ts'] === root.ts && call.args['oldest'] === call.args['latest'])).toBe(true)
-  const info = fake.calls.filter((call) => call.method === 'files.info')
-  expect(info.length).toBeGreaterThan(0)
-  expect(info.every((call) => call.error === 'unknown_method')).toBe(true)
-})
-
-test('drops files in Main and replies and removes a chip before sending', async ({ juno, fake }) => {
-  const context = { juno, fake }
+// Images that arrive or are stored before Slack made thumbnails, and the four background tries, are the engine's
+// file-thumbnails flow test.
+test('drops files in Main and replies and removes a chip before sending', async ({ juno, fake, win, userData }) => {
+  const context = { juno, fake, win, userData }
   await test.step('a file dropped on the topic is sent on its own as a file row with Download', () => dropInMain(context))
   await test.step('a file dropped on a reply composer is attached once and shared in that thread', () => dropInReply(context))
-  await test.step('a removed chip is not sent, and the text row does not move', () => removeBeforeSending(context))
+  await test.step('a removed chip is not sent, a file picked with Attach files is, and the text row does not move', () => removeBeforeSending(context))
 })
 
 async function dropInMain({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
@@ -227,7 +169,7 @@ async function dropInReply({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pro
   expect(fake.calls.filter((call) => call.method === 'files.getUploadURL')).toHaveLength(1)
 }
 
-async function removeBeforeSending({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+async function removeBeforeSending({ juno, fake, win, userData }: Pick<Fixtures, 'juno' | 'fake' | 'win' | 'userData'>): Promise<void> {
   fake.resetCalls()
 
   const { topic } = juno
@@ -243,11 +185,21 @@ async function removeBeforeSending({ juno, fake }: Pick<Fixtures, 'juno' | 'fake
   await expect(chips(topic)).toHaveCount(1)
   expect((await topic.composer.boundingBox())!.y).toBe(field!.y)
   await expect(topic.composer).toHaveValue('Two files, then one')
-  await staged(topic, 1)
+
+  // Staging in chunks and a file with no MIME type are the engine's outbox-copies flow test; this is the picker.
+  const downloads = join(userData, 'Downloads')
+  await mkdir(downloads, { recursive: true })
+  const archive = join(downloads, 'archive.zip')
+  await writeFile(archive, Buffer.alloc(64 * 1024, 9))
+  const chooser = win.waitForEvent('filechooser')
+  await topic.root.getByRole('button', { name: 'Attach files', exact: true }).click()
+  await (await chooser).setFiles(archive)
+  await staged(topic, 2)
+  expect((await topic.composer.boundingBox())!.y).toBe(field!.y)
 
   await topic.composer.press('Enter')
   await topic.expectSent('Two files, then one')
-  expect(fake.calls.filter((call) => call.method === 'files.getUploadURL').map((call) => call.args['filename'])).toEqual(['launch-brief.pdf'])
+  expect(fake.calls.filter((call) => call.method === 'files.getUploadURL').map((call) => call.args['filename'])).toEqual(['launch-brief.pdf', 'archive.zip'])
 }
 
 test('a failed upload keeps the text and the file for Retry, and is sent once', async ({ juno, fake }) => {

@@ -320,6 +320,7 @@ it('Automated holds bot channels, asks about an unclear one, records its own mov
     expect(automatedOf(views)!.addedByJuno).toContain('C0BUILDS')
     const home = await homeUntil(engine, (view) => record(view) !== undefined, 'the record on Home')
     expect(record(home)!.topics.map((topic) => [topic.moved?.change, topic.moved?.channel.id])).toEqual([['in', 'C0BUILDS']])
+    expect(record(home)!.topics[0]!.moved?.reason).toBe('Apps wrote 5 of the last 5 top-level messages')
 
     // Shown: the card waits a day, and the move stays.
     valueOf(await runCommand(registry, homeMovesShown, {}))
@@ -338,6 +339,7 @@ it('Automated holds bot channels, asks about an unclear one, records its own mov
     await viewsUntil(engine, (list) => !holds(list, 'C0ALERTSPROD'), 'alerts moved back')
     const home = await homeUntil(engine, (view) => record(view) !== undefined, 'the record on Home')
     expect(record(home)!.topics.map((topic) => [topic.moved?.change, topic.moved?.channel.id])).toEqual([['out', 'C0ALERTSPROD']])
+    expect(record(home)!.topics[0]!.moved).toMatchObject({ reason: 'Moved back: people start most conversations here', detail: 'People wrote 21 of the last 30 top-level messages' })
     await engine.rowsUntil((rows) => channelsOf(rows).has('C0ALERTSPROD'), 'alerts back in All')
   })
 
@@ -360,3 +362,28 @@ it('Automated holds bot channels, asks about an unclear one, records its own mov
     expect(automatedOf(await viewsUntil(engine, () => true, 'views'))).toBeUndefined()
   })
 }, 60_000)
+
+it('keeps a channel where people start the conversations in All, however much a bot replies in its threads', async () => {
+  // People ask the coding bot in top-level posts; it answers in each thread, many times.
+  const engine = await bootedEngine(engines, {
+    initial: (fake) => {
+      fake.addChannel({
+        id: 'C0ENGAGENTS',
+        name: 'eng-agents',
+        messages: ['U0SAM', 'U0PRIYA', 'U0SAM', 'U0DEV', 'U0PRIYA', 'U0SAM'].map((user, n) => ({
+          user,
+          text: `<@U0DEPLOYBOT> please look at the flaky test in suite ${n + 1}`,
+          ago: 120 - n * 15,
+          replies: Array.from({ length: 5 }, (_, r) => ({ user: 'U0DEPLOYBOT', text: `Step ${r + 1}: reran suite ${n + 1}`, ago: 118 - n * 15 - r })),
+        })),
+      })
+      return fake.signIn()
+    },
+  })
+  await engine.rowsUntil((rows) => channelsOf(rows).has('C0ENGAGENTS'), 'eng-agents in All')
+  engine.fake.injectMessage({ channel: 'C0ENGAGENTS', user: 'U0PRIYA', text: 'Thanks, the suite is green now' })
+  await engine.rowsUntil((rows) => rows.some((row) => row.channel.id === 'C0ENGAGENTS' && row.preview.text.endsWith('the suite is green now')), 'the new post in All')
+  await engine.workPass('automated')
+  expect(channelsOf(await engine.rows()).has('C0ENGAGENTS')).toBe(true)
+  expect(holds(await viewsUntil(engine, (list) => automatedOf(list) !== undefined, 'the Automated view'), 'C0ENGAGENTS')).toBe(false)
+})
