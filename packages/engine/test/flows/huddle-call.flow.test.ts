@@ -328,7 +328,7 @@ it('keeps an unlisted DM call under a lagging edge, follows who leaves, ends on 
 })
 
 it('a full read that was asked before a channel\'s first frame does not erase that channel (specs/huddle.qnt discardInfo)', async () => {
-  const engine = await booted({ timing: { huddleInfoSettleMillis: 1_000 } })
+  const engine = await booted({ timing: { huddleInfoSettleMillis: 300 } })
   const infoReads = () => engine.fake.calls.filter((call) => call.kind === 'edge' && call.method === 'huddles/info').length
   const held = (label: string) => waitFor(() => (engine.fake.heldCount({ method: 'edge:huddles/info' }) === 1 ? true : undefined), WAIT_MS, label)
   await waitFor(() => (infoReads() > 0 ? true : undefined), WAIT_MS, 'the full read after boot')
