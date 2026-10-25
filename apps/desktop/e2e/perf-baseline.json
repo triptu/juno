@@ -1,0 +1,403 @@
+{
+  "identity": "linux-x64, 4 threads, Electron 44.7.0",
+  "commit": "d297b2b76b5bf18ea789ce8c5b449d639f8e75ff",
+  "recorded": "2026-10-25",
+  "metrics": {
+    "20,000 distinct workspace URLs, cold subscription, click to loaded visible images": {
+      "median": 311.5999999642372,
+      "p95": 334.69999998807907,
+      "n": 3,
+      "unit": "ms"
+    },
+    "account menu, first open in a second app": {
+      "median": 57.60000002384186,
+      "p95": 57.60000002384186,
+      "n": 1,
+      "unit": "ms"
+    },
+    "All topics open, press to rows painted (juno.all-topics-open)": {
+      "median": 65.19999998807907,
+      "p95": 68,
+      "n": 7,
+      "unit": "ms"
+    },
+    "chat first bubble, Enter to Juno's bubble painted, fake model (juno.chat-bubble)": {
+      "median": 131.39999997615814,
+      "p95": 226.19999998807907,
+      "n": 20,
+      "unit": "ms"
+    },
+    "chat send, Enter to your bubble painted (juno.chat-send)": {
+      "median": 21.30000001192093,
+      "p95": 39.89999997615814,
+      "n": 20,
+      "unit": "ms"
+    },
+    "code jump: long animation frames after the jump": {
+      "median": 0,
+      "p95": 0,
+      "n": 1,
+      "unit": "frames"
+    },
+    "composer with a long draft, input timestamp to character presented": {
+      "median": 11.909,
+      "p95": 20.94,
+      "n": 20,
+      "unit": "ms"
+    },
+    "composer, input timestamp to character presented": {
+      "median": 12.385,
+      "p95": 27.356,
+      "n": 20,
+      "unit": "ms"
+    },
+    "emoji picker, first open in a second app": {
+      "median": 64.30000001192093,
+      "p95": 64.30000001192093,
+      "n": 1,
+      "unit": "ms"
+    },
+    "emoji typing, input timestamp to character presented": {
+      "median": 17.112,
+      "p95": 36.222,
+      "n": 20,
+      "unit": "ms"
+    },
+    "engine private memory after scrolling": {
+      "median": 88.328125,
+      "p95": 88.328125,
+      "n": 1,
+      "unit": "MB"
+    },
+    "filter change, press to new list painted (juno.filter)": {
+      "median": 33.5,
+      "p95": 60.19999998807907,
+      "n": 9,
+      "unit": "ms"
+    },
+    "home open, quick (pointerdown on Home) to Home painted": {
+      "median": 17.80000001192093,
+      "p95": 33.5,
+      "n": 7,
+      "unit": "ms"
+    },
+    "Juno mention typing, input timestamp to character presented": {
+      "median": 17.15,
+      "p95": 39.472,
+      "n": 16,
+      "unit": "ms"
+    },
+    "live update in the topic, engine commit to pixels (juno.live-update, messages.list)": {
+      "median": 48.10000002384186,
+      "p95": 67.30000001192093,
+      "n": 7,
+      "unit": "ms"
+    },
+    "live update, engine commit to pixels (juno.live-update)": {
+      "median": 18.200097680091858,
+      "p95": 33.50009769201279,
+      "n": 7,
+      "unit": "ms"
+    },
+    "main private memory after scrolling": {
+      "median": 78.39453125,
+      "p95": 78.39453125,
+      "n": 1,
+      "unit": "MB"
+    },
+    "media viewer open (click on a picture) to the viewer painted": {
+      "median": 17.899999976158142,
+      "p95": 71.40000003576279,
+      "n": 8,
+      "unit": "ms"
+    },
+    "mention typing, input timestamp to character presented": {
+      "median": 11.081,
+      "p95": 30.29,
+      "n": 16,
+      "unit": "ms"
+    },
+    "message menu, first open in a second app": {
+      "median": 57.19999998807907,
+      "p95": 57.19999998807907,
+      "n": 1,
+      "unit": "ms"
+    },
+    "New tab with Home to its composer": {
+      "median": 20.600000023841858,
+      "p95": 65.09999996423721,
+      "n": 8,
+      "unit": "ms"
+    },
+    "palette input timestamp to character presented": {
+      "median": 17.41,
+      "p95": 34.47,
+      "n": 56,
+      "unit": "ms"
+    },
+    "palette keystroke to its rows painted (juno.palette-results)": {
+      "median": 61.89999997615814,
+      "p95": 129.70000004768372,
+      "n": 5,
+      "unit": "ms"
+    },
+    "palette open, ⌘K to recent rows painted (juno.palette-open)": {
+      "median": 41.80000001192093,
+      "p95": 79,
+      "n": 5,
+      "unit": "ms"
+    },
+    "palette, input timestamp to character presented": {
+      "median": 10.098,
+      "p95": 17.654,
+      "n": 20,
+      "unit": "ms"
+    },
+    "panel open, ⌘J to the panel painted (juno.panel-open)": {
+      "median": 36.59999996423721,
+      "p95": 103.89999997615814,
+      "n": 8,
+      "unit": "ms"
+    },
+    "peek open, key down to the peeked rows painted (juno.peek-open)": {
+      "median": 22,
+      "p95": 79.30000001192093,
+      "n": 8,
+      "unit": "ms"
+    },
+    "quick start, sign-in to sidebar rows": {
+      "median": 3225,
+      "p95": 3225,
+      "n": 1,
+      "unit": "ms"
+    },
+    "renderer private memory after scrolling": {
+      "median": 167.8671875,
+      "p95": 167.8671875,
+      "n": 1,
+      "unit": "MB"
+    },
+    "row hover (pointerover event) to next frame presented": {
+      "median": 6.800000011920929,
+      "p95": 7.900000035762787,
+      "n": 7,
+      "unit": "ms"
+    },
+    "scroll-all-topics: continuous scroll frame work": {
+      "median": 11.104,
+      "p95": 18.83,
+      "n": 493,
+      "unit": "ms"
+    },
+    "scroll-all-topics: dropped frames, continuous": {
+      "median": 2.0325203252032518,
+      "p95": 2.0325203252032518,
+      "n": 1,
+      "unit": "%"
+    },
+    "scroll-all-topics: long animation frames": {
+      "median": 0,
+      "p95": 0,
+      "n": 1,
+      "unit": "frames"
+    },
+    "scroll-chat: continuous scroll frame work": {
+      "median": 8.401,
+      "p95": 20.91,
+      "n": 371,
+      "unit": "ms"
+    },
+    "scroll-chat: dropped frames, continuous": {
+      "median": 2.9729729729729732,
+      "p95": 2.9729729729729732,
+      "n": 1,
+      "unit": "%"
+    },
+    "scroll-chat: long animation frames": {
+      "median": 0,
+      "p95": 0,
+      "n": 1,
+      "unit": "frames"
+    },
+    "scroll-messages: continuous scroll frame work": {
+      "median": 7.222,
+      "p95": 14.85,
+      "n": 382,
+      "unit": "ms"
+    },
+    "scroll-messages: dropped frames, continuous": {
+      "median": 0.26246719160104987,
+      "p95": 0.26246719160104987,
+      "n": 1,
+      "unit": "%"
+    },
+    "scroll-messages: long animation frames": {
+      "median": 0,
+      "p95": 0,
+      "n": 1,
+      "unit": "frames"
+    },
+    "scroll-sidebar: continuous scroll frame work": {
+      "median": 11.747,
+      "p95": 23.98,
+      "n": 362,
+      "unit": "ms"
+    },
+    "scroll-sidebar: dropped frames, continuous": {
+      "median": 5.8171745152354575,
+      "p95": 5.8171745152354575,
+      "n": 1,
+      "unit": "%"
+    },
+    "scroll-sidebar: long animation frames": {
+      "median": 0,
+      "p95": 0,
+      "n": 1,
+      "unit": "frames"
+    },
+    "search arrow to reader painted": {
+      "median": 34.799999952316284,
+      "p95": 74.70000004768372,
+      "n": 17,
+      "unit": "ms"
+    },
+    "search keystroke to rows painted": {
+      "median": 15.399999976158142,
+      "p95": 78,
+      "n": 7,
+      "unit": "ms"
+    },
+    "selection drag with the panel open, frame work": {
+      "median": 4.237,
+      "p95": 17.369,
+      "n": 321,
+      "unit": "ms"
+    },
+    "selection drag with the panel open: long animation frames": {
+      "median": 0,
+      "p95": 0,
+      "n": 1,
+      "unit": "frames"
+    },
+    "send in Main with a 1 s model, Enter through the checks to the pending row painted (juno.send)": {
+      "median": 124.69999998807907,
+      "p95": 212.10000002384186,
+      "n": 7,
+      "unit": "ms"
+    },
+    "send, Enter to the pending row painted (juno.send)": {
+      "median": 47.80000001192093,
+      "p95": 92.89999997615814,
+      "n": 9,
+      "unit": "ms"
+    },
+    "Settings, first open in a second app": {
+      "median": 110.59999996423721,
+      "p95": 110.59999996423721,
+      "n": 1,
+      "unit": "ms"
+    },
+    "show sidebar, click to frame presented": {
+      "median": 43.5,
+      "p95": 124.19999998807907,
+      "n": 7,
+      "unit": "ms"
+    },
+    "sidebar drag, main-thread work per frame": {
+      "median": 10.622,
+      "p95": 11.599,
+      "n": 180,
+      "unit": "ms"
+    },
+    "sidebar drag: long animation frames": {
+      "median": 0,
+      "p95": 0,
+      "n": 1,
+      "unit": "frames"
+    },
+    "switch to Activity in the panel, pick to the page painted (juno.page-switch)": {
+      "median": 17.100000023841858,
+      "p95": 37.200000047683716,
+      "n": 8,
+      "unit": "ms"
+    },
+    "tab switch, mounted (juno.tab-switch)": {
+      "median": 29,
+      "p95": 40.69999998807907,
+      "n": 8,
+      "unit": "ms"
+    },
+    "tab switch, mounted, one tab scrolled up (juno.tab-switch)": {
+      "median": 39,
+      "p95": 62.89999997615814,
+      "n": 8,
+      "unit": "ms"
+    },
+    "tab switch, unmounted with scroll restore (juno.tab-switch)": {
+      "median": 30.700000047683716,
+      "p95": 65.20000004768372,
+      "n": 11,
+      "unit": "ms"
+    },
+    "topic open, cached 300 rows, press to rows painted at position (juno.topic-open)": {
+      "median": 79.19999998807907,
+      "p95": 157.80000001192093,
+      "n": 8,
+      "unit": "ms"
+    },
+    "topic open, prefetched (juno.topic-open)": {
+      "median": 58.30000001192093,
+      "p95": 99.5,
+      "n": 8,
+      "unit": "ms"
+    },
+    "topic open, uncached, press to header and stored rows painted (juno.topic-open)": {
+      "median": 59,
+      "p95": 110.5,
+      "n": 5,
+      "unit": "ms"
+    },
+    "topic reopen, #eng, press to rows painted": {
+      "median": 20.66399996423752,
+      "p95": 26.198000011921067,
+      "n": 4,
+      "unit": "ms"
+    },
+    "topic reopen, 50 code blocks with known colours, press to rows painted (juno.topic-open)": {
+      "median": 78.29999995231628,
+      "p95": 80,
+      "n": 5,
+      "unit": "ms"
+    },
+    "topic reopen, Draft plan is in the doc, press to rows painted": {
+      "median": 13.098000011920703,
+      "p95": 28.66199996423711,
+      "n": 4,
+      "unit": "ms"
+    },
+    "topic reopen, link, press to rows painted": {
+      "median": 26.999999976158506,
+      "p95": 90.69999998807907,
+      "n": 4,
+      "unit": "ms"
+    },
+    "topic reopen, Long rollout log for perf, press to rows painted": {
+      "median": 12.965999964237199,
+      "p95": 44.76400001192087,
+      "n": 4,
+      "unit": "ms"
+    },
+    "topic switcher, first open in a second app": {
+      "median": 52.19999998807907,
+      "p95": 52.19999998807907,
+      "n": 1,
+      "unit": "ms"
+    },
+    "warm start, main process created to sidebar rows painted": {
+      "median": 2570.10009765625,
+      "p95": 2834.900146484375,
+      "n": 5,
+      "unit": "ms"
+    }
+  }
+}
