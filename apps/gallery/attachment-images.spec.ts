@@ -1,7 +1,8 @@
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
+import { ownPageTest, test } from './support'
 
 // In light only: the dark theme changes colours and shadows, never a size (packages/tokens/src/themes.stylex.ts).
-test('attachment image reserves its box before a late image arrives', async ({ page }) => {
+ownPageTest('attachment image reserves its box before a late image arrives', async ({ page }) => {
   await page.goto('/#/AttachmentCard?__state=image')
   const frame = page.locator('[data-fixture-frame]')
   const image = frame.getByRole('img', { name: 'Synthetic latency chart' })

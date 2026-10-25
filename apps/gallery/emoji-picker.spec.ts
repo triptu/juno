@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { openState, readRoutes } from './support'
+import { expect } from '@playwright/test'
+import { openState, ownPageTest, readRoutes, test } from './support'
 
 test('Workspace follows the standard emoji categories', async ({ page }) => {
   const route = (await readRoutes(page)).find((route) => route.component === 'EmojiPicker' && route.state === 'workspace')
@@ -40,7 +40,7 @@ test('focused emoji survives wheel scrolling, arrows still move and Escape dismi
   await expect(picker).toHaveCount(0)
 })
 
-test('failed images retain their cell and do not move later emoji', async ({ page }) => {
+ownPageTest('failed images retain their cell and do not move later emoji', async ({ page }) => {
   let release: () => void = () => {}
   const held = new Promise<void>((resolve) => { release = resolve })
   await page.route('**/broken-emoji.svg', async (route) => { await held; await route.fulfill({ status: 404, body: '' }) })

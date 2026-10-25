@@ -1,7 +1,7 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import { checkForcedInteractions, formatForcedShift, type ForcedInteractionReport } from '@juno/testing/forced-shift'
 import { checkStateWithin, interactive } from './shift-walk'
-import { claimQueue, openState, readRoutes, type Route } from './support'
+import { claimQueue, openState, readRoutes, statesPerDocument, test, type Route } from './support'
 
 /**
  * A fast sweep of the shift guard over every state, on request:
@@ -22,8 +22,6 @@ import { claimQueue, openState, readRoutes, type Route } from './support'
  */
 const perState = 8
 
-/** States one document opens before a fresh one, so what fixtures leave behind stays small. */
-const perDocument = 150
 
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
@@ -34,21 +32,19 @@ const forced = (page: Page, from = 0) =>
   checkForcedInteractions(page, { targets: interactive, skipWithin: '[data-expands-in-place]', pending: '[data-chunk-pending]', max: perState, from })
 
 for (let part = 0; part < parts; part++) {
-  test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, async ({ page: first, context }) => {
+  test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, async ({ page }) => {
     test.skip(process.env.GALLERY_SHIFT_COMPUTED !== '1', 'runs with GALLERY_SHIFT_COMPUTED=1')
     // One document opens many states through its hash: loading the gallery again for each would cost more than the check.
-    let page = first
     let opened = 0
     let opening = 0
     const open = async (route: Route, again = false) => {
-      if (!again && opened > 0 && opened % perDocument === 0) {
-        await page.close({ runBeforeUnload: false })
-        page = await context.newPage()
+      if (!again && opened > 0 && opened % statesPerDocument === 0) {
+        await page.evaluate(() => { location.hash = '#/~' })
+        await page.reload()
       }
-      const inPlace = again || opened % perDocument !== 0
       if (!again) opened++
       const from = Date.now()
-      await openState(page, route, 'light', undefined, { finishMotion: true, inPlace })
+      await openState(page, route, 'light', undefined, { finishMotion: true, inPlace: true })
       opening += Date.now() - from
     }
     const routes = (await readRoutes(page)).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
@@ -94,6 +90,8 @@ for (let part = 0; part < parts; part++) {
  * the spot; `frame` gives it the gallery's frame, which the check measures.
  */
 test.describe('the computed tier itself', () => {
+  // setContent pages and an injected style tag: nothing to share.
+  test.use({ ownPage: true })
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
   const steps = async (page: Page) => (await forced(page)).shifts.map(formatForcedShift)
   // No fixed height: a button's box includes its padding and border, so only a sized-by-content one can grow.

@@ -41,6 +41,8 @@ export function App() {
   useKeys()
 
   if (!location.component) return <Index theme={location.theme} accent={location.accent} query={location.query} />
+  // `#/~` draws nothing: the test runners pass through it to open a state again, and rest on it between tests.
+  if (location.component === '~') return <div data-gallery-blank="" />
   if (!entry) return <Missing text={`No component named ${location.component}.`} />
   if (!state) return <Missing text={`No state ${location.state ?? ''} on ${entry.name}.`} />
   return <ComponentPage entry={entry} state={state} theme={location.theme} accent={location.accent} />

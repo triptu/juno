@@ -1,6 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
-import { layoutTest, openState, paintTest, type Route } from './support'
+import { layoutTest, openState, paintTest, test, type Route } from './support'
 
 /**
  * Sidebar rows and the topic list as views: what a row says and shows, the

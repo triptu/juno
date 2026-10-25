@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
+import { test } from './support'
 
 // Both themes: code and quote fills must differ in each. Right-to-left lines are checked against the
 // native caret in apps/desktop/e2e/formatting.spec.ts.

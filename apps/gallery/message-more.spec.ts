@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
-import { openState, type Route, type Theme } from './support'
+import { expect, type Locator, type Page } from '@playwright/test'
+import { openState, test, type Route, type Theme } from './support'
 
 /**
  * A message's menu button (inventory 6.5): hidden at rest, shown over the

@@ -171,22 +171,22 @@ export async function walkState(pages: { readonly next: () => Promise<Page> }, r
   let elements = 0, resets = 0
   await checkStateWithin(route, async () => {
     const page = await pages.next()
-    await openState(page, route)
+    await openState(page, route, 'light', undefined, { inPlace: true })
     for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
     await rememberMarkup(page, route)
     // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
     // after it would be gone or different: open the state again whenever a touch changed what it draws.
     for (const [index, element] of (await targets(page, route)).entries()) {
       if (await markupChanged(page, route)) {
-        // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
+        // In place, the same state again passes through a page that draws no frame, so the fixture mounts fresh.
         resets++
-        await page.goto('about:blank')
-        await openState(page, route)
+        await openState(page, route, 'light', undefined, { inPlace: true })
         await rememberMarkup(page, route)
       }
       elements++
       for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
     }
+    await page.evaluate(() => { delete (globalThis as { __junoShiftMarkup?: string }).__junoShiftMarkup })
   })
   return { failures, cursors, elements, resets }
 }

@@ -1,11 +1,11 @@
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
-import { openState, readRoutes } from './support'
+import { openState, ownPageTest, readRoutes, test } from './support'
 
 test.use({ reducedMotion: 'no-preference' })
 
 // Light only: a theme changes colours, never a size.
-test('thread-link photos replace initials without moving the link', async ({ page }) => {
+ownPageTest('thread-link photos replace initials without moving the link', async ({ page }) => {
   let release = () => {}
   const gate = new Promise<void>(resolve => { release = resolve })
   await page.route('**/__fixture/pending.png', async route => {

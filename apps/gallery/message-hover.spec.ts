@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { openState, type Route } from './support'
+import { expect, type Page } from '@playwright/test'
+import { openState, test, type Route } from './support'
 
 /**
  * A message under the pointer (inventory 6.1) looks as it does at rest: no

@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { openState, type Route } from './support'
+import { expect, type Page } from '@playwright/test'
+import { openState, test, type Route } from './support'
 
 /**
  * Tables in messages (SPEC 7, "Tables"): a column Slack wraps wraps so the

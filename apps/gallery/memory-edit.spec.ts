@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test'
+import { expect } from '@playwright/test'
+import { test } from './support'
 
 // One editing flow covers wrapping, invalid drafts, both save keys and cancellation.
 test('edit a long note, save a new line, cancel a draft and save with Command', async ({ page }) => {
