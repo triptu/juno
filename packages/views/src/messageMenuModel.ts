@@ -20,13 +20,21 @@ export interface GridReaction {
 export const GRID_REACTIONS = 11
 
 /** The icons a menu row may have, by name, so containers need no icon set. */
-export type MessageMenuIcon = 'thread' | 'reply' | 'quote' | 'juno' | 'copy' | 'forward' | 'open' | 'bell' | 'edit' | 'delete' | 'pin' | 'broadcast'
+export type MessageMenuIcon = 'thread' | 'reply' | 'quote' | 'juno' | 'copy' | 'forward' | 'bell' | 'edit' | 'delete' | 'pin' | 'broadcast' | 'slack' | 'link'
 
 /**
  * A row of the message menu, or a separator between groups. `shortcut` is
  * the key that does the same on a focused message, shown at the row's end
- * and read while the menu is open (`ContextMenuItem`).
+ * and read while the menu is open; `trailing` is a second action drawn as an
+ * icon at the row's end (`ContextMenuItem`).
  */
 export type MessageMenuEntry =
-  | { readonly id: string; readonly label: string; readonly icon: MessageMenuIcon; readonly disabled?: boolean; readonly shortcut?: string }
+  | {
+      readonly id: string
+      readonly label: string
+      readonly icon: MessageMenuIcon
+      readonly disabled?: boolean
+      readonly shortcut?: string
+      readonly trailing?: { readonly id: string; readonly label: string; readonly icon: MessageMenuIcon }
+    }
   | { readonly separator: true }

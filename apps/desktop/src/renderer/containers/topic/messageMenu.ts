@@ -4,8 +4,8 @@
  * idle (`../messageMenu.tsx`).
  */
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import type { MessageView } from '@juno/contract'
-import { broadcastMessage, copyText, forwardSheetAtom, junoAvailableAtom, registry, signedInAtom } from '@juno/state'
+import type { MessageView, TopicDetail } from '@juno/contract'
+import { broadcastMessage, copyText, forwardSheetAtom, junoAvailableAtom, messageLink, registry, signedInAtom, threadRootTs } from '@juno/state'
 import { junoNavAtom, watchReply } from '@juno/state/agent'
 import type { MenuPoint, MessageMenuEntry, MessageMenuIcon } from '@juno/views'
 import { askJunoAboutSelection } from '../juno/actions'
@@ -35,7 +35,7 @@ export interface MenuFacts {
 
 /**
  * The rows, in groups: Start thread or Open thread (Main), Quote, Ask Juno;
- * Copy text, Forward…, Open in Slack; on your own, Also send
+ * Copy text, Forward…, Open in Slack with Copy Slack link at its end; on your own, Also send
  * to #eng (a thread reply) and Tell me if nobody replies; then Edit and Delete….
  * Rows whose key works on a focused message show it (`rowKeyAction`): T, Q, F, E and ⌫; R, More reactions,
  * names its key in its tooltip.
@@ -52,7 +52,8 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
     SEPARATOR,
     item('copy', selection === undefined ? 'Copy text' : 'Copy', 'copy'),
     item('forward', 'Forward…', 'forward', !forwardable(message), 'F'),
-    item('open-in-slack', 'Open in Slack', 'open'),
+    // The channel opens in Slack; the link copied is the message's.
+    { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', ...(linkable ? { trailing: { id: 'copy-link', label: 'Copy Slack link', icon: 'link' } } : {}) },
     ...(broadcastable || (own && linkable) ? [SEPARATOR] : []),
     ...(broadcastable ? [item('broadcast', broadcastLabel(topic.channel), 'broadcast')] : []),
     ...(own && linkable ? [item('watch-reply', 'Tell me if nobody replies', 'bell', !mayWatch)] : []),
@@ -130,6 +131,8 @@ function choose(id: string, now: MessageView, input: MenuInput, selection: strin
       return forwardable(now) ? openForward(channel, now, latest.current) : undefined
     case 'open-in-slack':
       return openTopicInSlack(detail)
+    case 'copy-link':
+      return copyMessageLink(detail, now)
     case 'broadcast':
       // Main shows the reply at once and the thread marks it; the outbox sends it. The engine refuses a reply deleted meanwhile.
       return void broadcastMessage(registry, { channelId: detail.channel.id, ts: now.ts })
@@ -140,6 +143,17 @@ function choose(id: string, now: MessageView, input: MenuInput, selection: strin
     case 'delete':
       return isOwnEditable(now) ? askDelete(now) : undefined
   }
+}
+
+/**
+ * Copy Slack link: the message's own link. A reply carries its thread's
+ * root: the thread's in a thread, the one it was sent from in Main.
+ */
+function copyMessageLink(detail: TopicDetail, message: MessageView): void {
+  const session = registry.get(signedInAtom)
+  if (session === undefined || message.pending !== undefined) return
+  const threadTs = detail.kind === 'thread' ? detail.rootTs : message.broadcastFrom === undefined ? undefined : threadRootTs(message.broadcastFrom.id)
+  void copyText(messageLink(session.workspaceUrl, detail.channel.id, message.ts, threadTs))
 }
 
 /** F on a focused message: Forward…, as the menu's row does. */

@@ -1,10 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
-import { useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { accent, menu, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
+import { tooltip } from './Tooltip'
 import { MorphLayers } from './internal/MorphLayers'
 import { useMenuState } from './internal/menuMorph'
+import { highlight, menuKey, ownsFocus, SHORTCUT_KEYS } from './internal/menuKeys'
 import { placeMenu, useDismiss, type MenuPoint } from './internal/menuPlacement'
 
 export type { MenuPoint } from './internal/menuPlacement'
@@ -21,6 +23,20 @@ export interface ContextMenuItem {
    * is open chooses the row. Only for a key that does the same outside the menu.
    */
   readonly shortcut?: string
+  /**
+   * A second action on the row, drawn as an icon at its end in place of a
+   * key equivalent: Copy Slack link on Open in Slack. It is its own menu
+   * item: → from the row reaches it, ← goes back, and choosing it calls
+   * `onSelect` with its id. Not shown on a disabled row.
+   */
+  readonly trailing?: ContextMenuTrailing
+}
+
+/** A row's trailing action: `label` is its accessible name and tooltip. */
+export interface ContextMenuTrailing {
+  readonly id: string
+  readonly label: string
+  readonly icon: PhosphorIcon
 }
 
 export type ContextMenuEntry = ContextMenuItem | { readonly separator: true }
@@ -58,16 +74,6 @@ export interface ContextMenuProps {
    */
   readonly inline?: boolean
 }
-
-const ITEM = '[role="menuitem"]:not([aria-disabled="true"])'
-const CELL = '[data-menu-cell]'
-/** A part that takes its own keys and focus: the emoji picker the menu turned into. */
-const OWN_KEYS = '[data-menu-own-keys]'
-/** How long typed letters add up before they start a new search, as in a macOS menu. */
-const TYPE_AHEAD_MS = 1000
-/** The keys a shown key equivalent stands for, beyond its own letter. */
-const SHORTCUT_KEYS: Readonly<Record<string, ReadonlyArray<string>>> = { '⌫': ['Backspace', 'Delete'] }
-const pressed = (shortcut: string, key: string) => (SHORTCUT_KEYS[shortcut] ?? [shortcut.toLowerCase()]).includes(key.length === 1 ? key.toLowerCase() : key)
 
 const isItem = (entry: ContextMenuEntry): entry is ContextMenuItem => !('separator' in entry)
 
@@ -183,8 +189,33 @@ function MenuContent({ header, items, onSelect }: Pick<ContextMenuProps, 'header
   )
 }
 
-/** One row: a click, or Enter while it has focus, chooses it. */
+/**
+ * One row: a click, or Enter while it has focus, chooses it. A row with a
+ * trailing action is two items side by side in one highlight, which shows
+ * while either has focus; the trailing one has its own fill when it does.
+ */
 function Row({ item, onSelect }: { readonly item: ContextMenuItem; readonly onSelect: ContextMenuProps['onSelect'] }) {
+  const trailing = item.disabled === true ? undefined : item.trailing
+  if (trailing === undefined) return <RowItem item={item} onSelect={onSelect} />
+  return (
+    <div role="none" data-menu-pair="" {...stylex.props(styles.row, styles.pair)}>
+      <RowItem item={item} onSelect={onSelect} lead />
+      <div
+        role="menuitem"
+        tabIndex={-1}
+        data-menu-trailing={trailing.id}
+        aria-label={trailing.label}
+        {...tooltip(trailing.label)}
+        onClick={(event) => onSelect(trailing.id, { metaKey: event.metaKey })}
+        {...stylex.props(styles.trailing)}
+      >
+        <Icon icon={trailing.icon} size={14} />
+      </div>
+    </div>
+  )
+}
+
+function RowItem({ item, onSelect, lead = false }: { readonly item: ContextMenuItem; readonly onSelect: ContextMenuProps['onSelect']; readonly lead?: boolean }) {
   return (
     <div
       role="menuitem"
@@ -196,7 +227,7 @@ function Row({ item, onSelect }: { readonly item: ContextMenuItem; readonly onSe
       onClick={(event) => {
         if (item.disabled !== true) onSelect(item.id, { metaKey: event.metaKey })
       }}
-      {...stylex.props(styles.row, item.disabled === true && styles.disabled)}
+      {...stylex.props(lead ? styles.lead : styles.row, item.disabled === true && styles.disabled)}
     >
       <span {...stylex.props(styles.icon)}>{item.icon === undefined ? null : <Icon icon={item.icon} size={14} />}</span>
       <span {...stylex.props(styles.label)}>{item.label}</span>
@@ -207,90 +238,6 @@ function Row({ item, onSelect }: { readonly item: ContextMenuItem; readonly onSe
       )}
     </div>
   )
-}
-
-/**
- * The menu's keys. ↓ from the menu goes to the grid's first cell, ↑ to the
- * last row; ↑ ↓ then move through the grid's rows and the menu's rows, and
- * ← → along the grid. Enter or Space chooses, Esc closes, Tab stays, a
- * row's key equivalent chooses it, and letters typed within a second of each
- * other jump to the first row whose label starts with them.
- */
-function menuKey(event: KeyboardEvent<HTMLDivElement>, onClose: () => void, typed: { text: string; at: number }): void {
-  const root = event.currentTarget
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    event.stopPropagation()
-    return onClose()
-  }
-  if (event.key === 'Tab') return event.preventDefault()
-  // The panel the menu turned into takes its own keys.
-  if (event.target instanceof Element && event.target.closest(OWN_KEYS) !== null) return
-  const live = (node: HTMLElement) => node.closest('[inert]') === null
-  const rows = Array.from(root.querySelectorAll<HTMLElement>(ITEM)).filter(live)
-  const cells = Array.from(root.querySelectorAll<HTMLElement>(CELL)).filter(live)
-  const at = document.activeElement instanceof HTMLElement ? document.activeElement : null
-  const row = at === null ? -1 : rows.indexOf(at)
-  const cell = at === null ? -1 : cells.indexOf(at)
-  const columns = Number(root.querySelector<HTMLElement>('[data-menu-columns]')?.dataset['menuColumns'] ?? cells.length) || 1
-  const focus = (node: HTMLElement | undefined) => {
-    if (node === undefined) return
-    event.preventDefault()
-    node.focus({ preventScroll: true })
-  }
-  switch (event.key) {
-    case 'ArrowDown':
-      if (cell >= 0) return focus(cell + columns < cells.length ? cells[cell + columns] : (rows[0] ?? cells[cell]))
-      if (row >= 0) return focus(rows[Math.min(row + 1, rows.length - 1)])
-      return focus(cells[0] ?? rows[0])
-    case 'ArrowUp':
-      if (cell >= 0) return focus(cells[cell - columns] ?? cells[cell])
-      if (row > 0) return focus(rows[row - 1])
-      if (row === 0) return focus(cells[Math.floor((cells.length - 1) / columns) * columns] ?? rows[0])
-      return focus(rows[rows.length - 1] ?? cells[cells.length - 1])
-    case 'ArrowRight':
-      return cell >= 0 ? focus(cells[Math.min(cell + 1, cells.length - 1)]) : undefined
-    case 'ArrowLeft':
-      return cell >= 0 ? focus(cells[Math.max(cell - 1, 0)]) : undefined
-    case 'Home':
-      return focus(cells[0] ?? rows[0])
-    case 'End':
-      return focus(rows[rows.length - 1] ?? cells[cells.length - 1])
-    case 'Enter':
-    case ' ':
-      event.preventDefault()
-      // ⌘Enter reads as ⌘-click.
-      return void at?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: event.metaKey }))
-  }
-  if (event.metaKey || event.ctrlKey || event.altKey) return
-  const now = performance.now()
-  const fresh = now - typed.at > TYPE_AHEAD_MS || typed.text === ''
-  // ⌫ always; a letter only as the first key, so typing on into a label still works. A cell can have a key too.
-  const equivalent = fresh || event.key.length !== 1 ? [...rows, ...cells].find((node) => node.dataset['menuShortcut'] !== undefined && pressed(node.dataset['menuShortcut'], event.key)) : undefined
-  if (equivalent !== undefined) {
-    event.preventDefault()
-    event.stopPropagation()
-    typed.text = ''
-    return void equivalent.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  }
-  if (event.key.length !== 1) return
-  typed.text = (fresh ? '' : typed.text) + event.key.toLowerCase()
-  typed.at = now
-  focus(rows.find((node) => (node.textContent ?? '').trim().toLowerCase().startsWith(typed.text)))
-}
-
-/** Focus is in the panel the menu turned into. */
-const ownsFocus = (root: HTMLElement | null) => document.activeElement?.closest(OWN_KEYS) != null && root?.contains(document.activeElement) === true
-
-/**
- * Focuses the enabled row or cell under the pointer, or the menu itself over
- * a gap or a disabled row. Over the panel the menu turned into, focus stays
- * where it is, so typing keeps going to its search field.
- */
-function highlight(event: PointerEvent<HTMLDivElement>, root: HTMLDivElement | null): void {
-  if (root === null || !(event.target instanceof Element) || ownsFocus(root) || event.target.closest(OWN_KEYS) !== null) return
-  const next = event.target.closest<HTMLElement>(`${ITEM}, ${CELL}`) ?? root
-  if (document.activeElement !== next) next.focus({ preventScroll: true })
 }
 
 const styles = stylex.create({
@@ -339,7 +286,8 @@ const styles = stylex.create({
   morphed: {
     width: 'max-content',
   },
-  // The highlight is focus, set by the pointer and the arrows alike, so plain :focus (not a focus ring).
+  // The highlight is focus, set by the pointer and the arrows alike, so plain :focus (not a focus ring); :focus-within
+  // so a row with a trailing action stays highlighted while the action has focus.
   row: {
     display: 'flex',
     alignItems: 'center',
@@ -349,9 +297,38 @@ const styles = stylex.create({
     borderRadius: menu['--menu-row-radius'],
     whiteSpace: 'nowrap',
     outline: 'none',
-    backgroundColor: { default: 'transparent', ':focus': accent['--hl'] },
-    color: { default: 'inherit', ':focus': accent['--hl-fg'] },
-    '--menu-row-icon': { default: menu['--menu-icon'], ':focus': accent['--hl-fg'] },
+    backgroundColor: { default: 'transparent', ':focus-within': accent['--hl'] },
+    color: { default: 'inherit', ':focus-within': accent['--hl-fg'] },
+    '--menu-row-icon': { default: menu['--menu-icon'], ':focus-within': accent['--hl-fg'] },
+  },
+  // Its two items take the row's room: the row's item from the start edge, the trailing action at the end.
+  pair: {
+    gap: 0,
+    paddingInline: 0,
+  },
+  lead: {
+    display: 'flex',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    flexGrow: 1,
+    gap: menu['--menu-icon-gap'],
+    paddingInlineStart: menu['--menu-row-inset'],
+    outline: 'none',
+  },
+  // Its icon ends where a key equivalent would, the row inset from the highlight's edge.
+  trailing: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: menu['--menu-trailing-size'],
+    height: menu['--menu-trailing-size'],
+    marginInlineStart: `calc(${menu['--menu-shortcut-gap']} - (${menu['--menu-trailing-size']} - ${menu['--menu-icon-size']}) / 2)`,
+    marginInlineEnd: `calc(${menu['--menu-row-inset']} - (${menu['--menu-trailing-size']} - ${menu['--menu-icon-size']}) / 2)`,
+    borderRadius: menu['--menu-trailing-radius'],
+    outline: 'none',
+    color: 'var(--menu-row-icon)',
+    backgroundColor: { default: 'transparent', ':focus': menu['--menu-trailing-hover'] },
   },
   disabled: {
     color: menu['--menu-text-disabled'],

@@ -1274,9 +1274,9 @@ export class MessageMenuDriver {
     return this.openOn(row.locator('[data-msg-text]').first(), options.scroll === false ? { x: 8, y: 8 } : undefined, options)
   }
 
-  /** A row by its id (`data-menu-item`): `quote`, `copy`, `edit`, `delete`, `reply`, `remember`, `remove`… */
+  /** A row by its id (`data-menu-item`): `quote`, `copy`, `edit`, `delete`, `reply`, `remember`, `remove`…, or a row's trailing action (`copy-link`). */
   item(id: string): Locator {
-    return this.root.locator(`[data-menu-item="${id}"]`)
+    return this.root.locator(`[data-menu-item="${id}"], [data-menu-trailing="${id}"]`)
   }
 
   /** A grid cell by its emoji's Slack name. */
@@ -1293,10 +1293,10 @@ export class MessageMenuDriver {
     return this.root.getByRole('textbox', { name: 'Search emoji' })
   }
 
-  /** The rows' labels in order, without their keys: "-" for a separator, "(label)" for a disabled row. */
+  /** The rows' labels in order, without their keys or trailing actions: "-" for a separator, "(label)" for a disabled row. */
   labels(): Promise<string[]> {
     return this.root.evaluate((root) =>
-      [...root.querySelectorAll('[role="menuitem"], [role="separator"]')].filter((node) => node.closest('[inert]') === null).map((node) => {
+      [...root.querySelectorAll('[role="menuitem"]:not([data-menu-trailing]), [role="separator"]')].filter((node) => node.closest('[inert]') === null).map((node) => {
         const label = [...node.childNodes].filter((child) => !(child instanceof Element && child.getAttribute('aria-hidden') === 'true')).map((child) => child.textContent ?? '').join('')
         return node.getAttribute('role') === 'separator' ? '-' : node.getAttribute('aria-disabled') === 'true' ? `(${label})` : label
       }),

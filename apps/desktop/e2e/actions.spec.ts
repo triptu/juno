@@ -116,22 +116,29 @@ test('Mark as read and unread, Ignore, the Slack links and Rename, each from the
     await alerts.expectVisible()
   })
 
-  await test.step('Copy Slack link and Open in Slack from a row, and Open in Slack from a message', async () => {
+  await test.step('Copy Slack link and Open in Slack from a row and from a message', async () => {
     // Back from the Automated view the step above chose.
     await juno.sidebar.filter('All')
     const postgres = juno.sidebar.row(POSTGRES)
 
     await postgres.chooseInMenu('copy-link')
     await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+$/)
+    const topicLink = await juno.clipboard()
     await postgres.chooseInMenu('open-in-slack')
     await expect.poll(() => juno.slackLinks()).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C0ENG$/)])
 
-    // A message's menu has Open in Slack, and no Copy Slack link: the topic's menus and ⌘K keep that.
+    // A message's Open in Slack opens its channel; Copy Slack link at its end copies the message's own link. A reply's
+    // carries its thread's root, as Slack builds it; the root's is the thread's link.
     await postgres.open()
     await juno.topic.expectMessage('Booked 2–4pm')
-    const { labels } = await juno.topic.chooseInMessageMenu('Booked 2–4pm', 'open-in-slack')
-    expect(labels).not.toContain('Copy Slack link')
+    await juno.topic.chooseInMessageMenu('Booked 2–4pm', 'open-in-slack')
     await expect.poll(async () => (await juno.slackLinks()).length).toBe(2)
+    await juno.topic.chooseInMessageMenu('Booked 2–4pm', 'copy-link')
+    const rootTs = /p(\d+)(\d{6})$/.exec(topicLink)!.slice(1).join('.')
+    await expect.poll(() => juno.clipboard()).toMatch(new RegExp(`/archives/C0ENG/p\\d+\\?thread_ts=${rootTs.replace('.', '\\.')}&cid=C0ENG$`))
+    expect(await juno.clipboard()).not.toBe(topicLink)
+    await juno.topic.chooseInMessageMenu(POSTGRES, 'copy-link')
+    await expect.poll(() => juno.clipboard()).toBe(topicLink)
   })
 
   await test.step('Rename from a row edits the row, from the header edits the header, and clearing a title brings the old one back', async () => {

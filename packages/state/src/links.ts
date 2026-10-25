@@ -1,6 +1,6 @@
 /**
- * Slack links for a topic (research, slack-data-access "Permalinks"): no
- * API call. A thread links to its root message, Main to its channel.
+ * Slack links for a topic or a message (research, slack-data-access
+ * "Permalinks"): no API call. A thread links to its root message, Main to its channel.
  */
 import type { TopicDetail } from '@juno/contract'
 
@@ -10,8 +10,15 @@ export function threadRootTs(topicId: string): string | undefined {
 }
 
 export function slackLink(workspaceUrl: string, topic: Pick<TopicDetail, 'channel' | 'rootTs'>): string {
-  const base = new URL(`archives/${topic.channel.id}`, workspaceUrl.endsWith('/') ? workspaceUrl : `${workspaceUrl}/`).toString()
-  return topic.rootTs === undefined ? base : `${base}/p${topic.rootTs.replace('.', '')}`
+  return topic.rootTs === undefined ? channelLink(workspaceUrl, topic.channel.id) : messageLink(workspaceUrl, topic.channel.id, topic.rootTs)
+}
+
+const channelLink = (workspaceUrl: string, channel: string) => new URL(`archives/${channel}`, workspaceUrl.endsWith('/') ? workspaceUrl : `${workspaceUrl}/`).toString()
+
+/** A message's link, as Slack's client builds it: a reply adds its thread's root and its channel. */
+export function messageLink(workspaceUrl: string, channel: string, ts: string, threadTs?: string): string {
+  const link = `${channelLink(workspaceUrl, channel)}/p${ts.replace('.', '')}`
+  return threadTs === undefined || threadTs === ts ? link : `${link}?thread_ts=${threadTs}&cid=${channel}`
 }
 
 /** Where a Slack link points (research, slack-data-access "Permalinks"). */
