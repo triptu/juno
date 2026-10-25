@@ -74,7 +74,7 @@ function specHash(file, seen = new Set()) {
 
 // Deadlines per Quint process, about four times the slowest run measured on a
 // loaded machine (docs/development.md, "Faster test runs"). A timeout is a failure.
-const deadlines = { verify: 180000, other: 60000 }
+const deadlines = { verify: 360000, other: 60000 }
 
 function quint(args, { violation = false, timeout = args[0] === 'verify' ? deadlines.verify : deadlines.other, trace, check = () => {}, checks = '' } = {}) {
   jobs.push({ args, violation, timeout, trace, check, checks })
@@ -94,7 +94,7 @@ function freePort() {
 // One Apalache server per lane. Starting its JVM takes from a few
 // seconds to over a minute on a loaded machine; Quint would start one per
 // check. It starts on the first uncached Apalache check and has its own
-// two-minute deadline; each check has 180 seconds. Without a downloaded
+// two-minute deadline; each check has 360 seconds. Without a downloaded
 // Apalache, each check lets Quint start (and download) its own on a free port.
 const servers = []
 function apalacheServer(lane) {
@@ -126,8 +126,9 @@ function apalacheServer(lane) {
 }
 
 // When simulations overlap the Apalache lanes, they run at a lower CPU priority. The longest bounded
-// check (follow's boundedSafety, about 95 s in Apalache alone) is the run's critical path, and with
-// equal priority the simulations slowed it past its 180-second deadline on four cores.
+// check (follow's boundedSafety, about 95 s in Apalache alone) is the run's critical path. Beside the
+// simulations on four cores it took 154 to over 180 s even so: a simulation on the sibling thread of
+// the same core still slows it.
 let simulationNiceness = 0
 
 function spawnQuint(args, timeout, port) {
