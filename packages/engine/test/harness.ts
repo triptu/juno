@@ -202,6 +202,8 @@ export const fastTiming: EngineTimingConfig = {
   ...Record.map(productionTiming, (millis) => millis / 20),
   sweepIntervalMillis: 0,
   followPassMillis: 0,
+  // Retry-After stays real, so the wait it is compared with does too.
+  slackInteractiveMaxWaitMillis: productionTiming.slackInteractiveMaxWaitMillis,
 }
 
 /** Starts a fake (unless reused) and the engine on it, with the atoms a test reads. */
