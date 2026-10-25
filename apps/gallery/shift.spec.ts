@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
 import { expectNoLayoutShift, measureLayoutShift, waitForLayoutReady } from '@juno/testing/layout-shift'
-import { claimQueue, openState, readRoutes, stateCache, walkPages, type Route } from './support'
+import { checkStateWithin, claimQueue, interactive, openState, readRoutes, stateCache, walkPages, type Route } from './support'
 
 /**
  * Nothing in the product may move when the pointer or the keyboard touches
@@ -13,31 +13,18 @@ import { claimQueue, openState, readRoutes, stateCache, walkPages, type Route } 
  * motion that can move a box (`motion: 'layout'`). Buttons have instant
  * colour feedback and keep their geometry on press.
  *
- * The same walk checks the cursor rule on each state as it opens it, so the
- * states are opened once for both.
+ * This real-input walk is the slow tier, about two seconds a state. Every
+ * run checks every state with the computed tier (computed-shift.spec.ts),
+ * which forces the same touches without real input in a fraction of that.
+ * On an ordinary run this walk takes only the states whose own component
+ * changed (`ownKeys` in walk-cache.mjs), at most `changedCap`; a change that
+ * reaches a state only through a shared file waits for the full walk, which
+ * GALLERY_SHIFT_ALL=1 runs (verify:main --nightly and --no-cache set it).
  *
  * To look at one component: GALLERY_SHIFT_ONLY=Button,Chip bun run test:gallery
+ * walks every uncached state of those components.
  */
 test.use({ reducedMotion: 'no-preference' })
-
-/** What a person can point at or tab to, plus scroll areas. Disabled controls cannot be pointed at. */
-const interactive = [
-  'button:not(:disabled)',
-  'a[href]',
-  'input:not(:disabled)',
-  'select:not(:disabled)',
-  'textarea:not(:disabled)',
-  '[role="button"]',
-  '[role="tab"]',
-  '[role="option"]',
-  '[role="radio"]',
-  '[role="menuitem"]',
-  '[role="switch"]',
-  '[role="slider"]',
-  '[tabindex]:not([tabindex="-1"])',
-  // Scroll areas show their thumb on hover; the gutter must not change.
-  '[data-scroll-area]',
-].join(', ')
 
 /** Elements tried per state. A state with more (an icon grid) is sampled from both ends. */
 const perState = 8
@@ -133,45 +120,13 @@ const markupChanged = (page: Page, route: Route) => page.evaluate((frameName) =>
   return !('__junoShiftMarkup' in scope) || scope.__junoShiftMarkup !== (document.querySelector(`[data-fixture-frame="${frameName}"]`)?.innerHTML ?? '')
 }, route.route)
 
-/**
- * SPEC section 16: the arrow cursor everywhere, the text cursor only over
- * editable or selectable text, never the pointer. An element may compute
- * `cursor: text` only when it also computes `user-select: text`, or when it
- * is part of a field (a label wrapping an input), which focuses the input
- * wherever it is clicked. Links that open outside Juno are the one place the
- * hand cursor is allowed.
- */
-const cursorOffenders = (page: Page, route: Route) =>
-  page.evaluate((frameName) => {
-    const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
-    if (!frame) return ['no frame']
-    const bad: string[] = []
-    for (const element of Array.from(frame.querySelectorAll('*'))) {
-      const style = getComputedStyle(element)
-      const describe = () => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}[cursor=${style.cursor}]`
-      const external = element.closest('a[href^="http:"], a[href^="https:"], a[href^="mailto:"]') !== null
-      if (style.cursor === 'pointer' && !external) bad.push(describe())
-      const inField = element.closest('label') !== null && element.closest('label')!.querySelector('input, textarea') !== null
-      if (style.cursor === 'text' && style.userSelect !== 'text' && !inField) bad.push(describe())
-    }
-    return bad
-  }, route.route)
-
 const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim())
 
-async function checkStateWithin(route: Route, check: () => Promise<void>): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    await Promise.race([
-      check(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${route.route}: state check did not finish within 30 s`)), 30_000)
-      }),
-    ])
-  } finally {
-    clearTimeout(timer)
-  }
-}
+/** States an ordinary run walks for real at most; spread over the changed list so each changed component gets some. */
+const changedCap = 60
+
+const spread = <T,>(items: ReadonlyArray<T>, count: number): T[] =>
+  items.length <= count ? [...items] : Array.from({ length: count }, (_, index) => items[Math.floor((index * items.length) / count)]!)
 
 for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once a page is open.
@@ -181,26 +136,34 @@ for (let part = 0; part < shards; part++) {
     // JUNO_SHARD=i/n (bun run remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
+    const queue = claimQueue('shift')
+    const cache = stateCache('shift', browser)
+    const own = stateCache('shift', browser, { own: true })
+    // A full run or a component selection walks every uncached state; an ordinary run only those whose own files changed.
+    const changedOnly = !only && !cache.all
+    let changed = 0
+    const picked = new Set(queue.shared(() => {
+      const uncached = routes.filter((route) => !cache.passed(route) && (!changedOnly || !own.passed(route)))
+      changed = uncached.length
+      return (changedOnly ? spread(uncached, changedCap) : uncached).map((route) => route.route)
+    }))
+    const selected = routes.filter((route) => picked.has(route.route))
     // Budget the whole queue for the workers that can actually walk it. Three seconds per state
     // leaves room above the measured two-second average; each individual state still has a 30 s limit.
     const parallelParts = Math.min(shards, test.info().config.workers)
-    test.setTimeout(Math.max((only ? 15 : 20) * 60_000, Math.ceil(routes.length * 3_000 / parallelParts)))
-    const queue = claimQueue('shift')
-    const cache = stateCache('shift', browser)
+    test.setTimeout(Math.max((only || changedOnly ? 15 : 20) * 60_000, Math.ceil(selected.length * 3_000 / parallelParts)))
     const failures: string[] = []
-    const cursors: string[] = []
-    let states = 0, cached = 0, elements = 0, resets = 0
+    let states = 0, elements = 0, resets = 0
     try {
-      for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
-        if (cache.passed(route)) { cached++; continue }
+      for (let route = queue.next(selected); route !== undefined; route = queue.next(selected)) {
         cache.forget(route)
-        const failedBefore = failures.length + cursors.length
+        own.forget(route)
+        const failedBefore = failures.length
         const started = Date.now()
         await checkStateWithin(route, async () => {
           const page = await pages.next()
           await openState(page, route)
           states++
-          for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
           await rememberMarkup(page, route)
           // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
           // after it would be gone or different: open the state again whenever a touch changed what it draws.
@@ -216,14 +179,16 @@ for (let part = 0; part < shards; part++) {
             for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
           }
         })
-        if (failures.length + cursors.length === failedBefore) cache.pass(route)
+        if (failures.length === failedBefore) {
+          cache.pass(route)
+          own.pass(route)
+        }
         // A slow state holds up its part; name it so it can be looked at.
         if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
       }
     } finally {
-      console.log(`shift walk: ${states} states, ${cached} cached, ${elements} elements, ${resets} resets`)
+      console.log(`shift walk: ${states} states of ${selected.length} selected${changedOnly && changed > 0 ? ` (${changed} changed, cap ${changedCap})` : ''}, ${routes.length - selected.length} skipped, ${elements} elements, ${resets} resets`)
     }
-    expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect(failures.join('\n\n')).toBe('')
   })
 }

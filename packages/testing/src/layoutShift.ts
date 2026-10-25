@@ -121,6 +121,79 @@ const stateKey = '__junoLayoutShiftGuard'
 
 const defaults = { root: '[data-fixture-frame]', settleMs: 0, tolerance: 0.5, motion: 'all' }
 
+// The in-page helpers below are shared by the guard and `checkForcedInteractions`, so both judge a shift the same way.
+// They reach the page through `toString()`, so each must use nothing outside its own body.
+
+/** A readable name for an element: tag, id, role, label, text and place among its siblings. */
+function describeNode(node: Node | null): string {
+  if (!node) return '(removed element)'
+  const el = node instanceof Element ? node : node.parentElement
+  if (!el) return '(detached node)'
+  const parts: string[] = [el.tagName.toLowerCase()]
+  if (el.id) parts.push(`#${el.id}`)
+  const role = el.getAttribute('role')
+  if (role) parts.push(`[role=${role}]`)
+  const label = el.getAttribute('aria-label') ?? el.getAttribute('title')
+  if (label) parts.push(`[label="${label}"]`)
+  const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
+  if (text) parts.push(` "${text.length > 32 ? `${text.slice(0, 31)}…` : text}"`)
+  const parent = el.parentElement
+  if (parent) parts.push(` (child ${Array.prototype.indexOf.call(parent.children, el) + 1} of <${parent.tagName.toLowerCase()}>)`)
+  return parts.join('')
+}
+
+/** The layout box of every HTML element under the root, relative to the root. */
+function layoutBoxes(rootEl: HTMLElement): Snapshot[] {
+  // Many elements share an offset parent. Read each ancestor once per snapshot;
+  // the page cannot change during this synchronous walk.
+  const origins = new Map<HTMLElement, { x: number; y: number }>()
+  const layoutOrigin = (el: HTMLElement): { x: number; y: number } => {
+    const saved = origins.get(el)
+    if (saved) return saved
+    const parent = el.offsetParent
+    const at = parent instanceof HTMLElement ? layoutOrigin(parent) : { x: 0, y: 0 }
+    const origin = { x: at.x + el.offsetLeft, y: at.y + el.offsetTop }
+    origins.set(el, origin)
+    return origin
+  }
+  const origin = layoutOrigin(rootEl)
+  const html = [rootEl, ...Array.from(rootEl.querySelectorAll('*'))].filter((el): el is HTMLElement => el instanceof HTMLElement)
+  return html.map((el) => {
+    const at = layoutOrigin(el)
+    return { el, box: { x: at.x - origin.x, y: at.y - origin.y, width: el.offsetWidth, height: el.offsetHeight }, rendered: el.getClientRects().length > 0 }
+  })
+}
+
+/** Elements rendered in both snapshots whose box moved or resized by more than `epsilon`; `grows` elements may change width. */
+function changedBoxes(before: ReadonlyArray<Snapshot>, after: ReadonlyArray<Snapshot>, epsilon: number, grows: string | null, describe: (node: Node | null) => string): MovedElement[] {
+  const nowByElement = new Map(after.map((item) => [item.el, item]))
+  const moved: MovedElement[] = []
+  for (const was of before) {
+    const now = nowByElement.get(was.el)
+    if (!now || !was.rendered || !now.rendered) continue
+    const resized = Math.abs(was.box.width - now.box.width) > epsilon && (grows === null || !was.el.matches(grows))
+    const differs =
+      Math.abs(was.box.x - now.box.x) > epsilon ||
+      Math.abs(was.box.y - now.box.y) > epsilon ||
+      resized ||
+      Math.abs(was.box.height - now.box.height) > epsilon
+    if (differs) moved.push({ element: describe(was.el), before: was.box, after: now.box })
+  }
+  return moved
+}
+
+interface Helpers {
+  readonly describeNode: typeof describeNode
+  readonly layoutBoxes: typeof layoutBoxes
+  readonly changedBoxes: typeof changedBoxes
+}
+
+const helperSource = `{ describeNode: ${describeNode.toString()}, layoutBoxes: ${layoutBoxes.toString()}, changedBoxes: ${changedBoxes.toString()} }`
+
+/** Runs `fn(arg, helpers)` in the page. `arg` must be JSON. */
+const withHelpers = <A, R>(page: Page, fn: (arg: A, helpers: Helpers) => R, arg: A): Promise<Awaited<R>> =>
+  page.evaluate(`(${fn.toString()})(${JSON.stringify(arg)}, ${helperSource})`) as Promise<Awaited<R>>
+
 /** Waits for loaded fonts and their layout to paint before starting an interaction measurement. */
 export async function waitForLayoutReady(page: Page): Promise<void> {
   await page.evaluate(async () => {
@@ -137,51 +210,17 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
   const layoutOnly = (options.motion ?? defaults.motion) === 'layout'
   const grows = options.grows ?? null
 
-  await page.evaluate(
-    ({ root: rootSelector, key }) => {
+  await withHelpers(
+    page,
+    ({ root: rootSelector, key }: { root: string; key: string }, helpers) => {
       const w = window as unknown as Record<string, PageState | undefined>
       w[key]?.observer?.disconnect()
 
       const found = document.querySelector(rootSelector)
       const rootEl = found instanceof HTMLElement ? found : document.body
 
-      const describe = (node: Node | null): string => {
-        if (!node) return '(removed element)'
-        const el = node instanceof Element ? node : node.parentElement
-        if (!el) return '(detached node)'
-        const parts: string[] = [el.tagName.toLowerCase()]
-        if (el.id) parts.push(`#${el.id}`)
-        const role = el.getAttribute('role')
-        if (role) parts.push(`[role=${role}]`)
-        const label = el.getAttribute('aria-label') ?? el.getAttribute('title')
-        if (label) parts.push(`[label="${label}"]`)
-        const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim()
-        if (text) parts.push(` "${text.length > 32 ? `${text.slice(0, 31)}…` : text}"`)
-        const parent = el.parentElement
-        if (parent) parts.push(` (child ${Array.prototype.indexOf.call(parent.children, el) + 1} of <${parent.tagName.toLowerCase()}>)`)
-        return parts.join('')
-      }
-
-      const snapshot = (): Snapshot[] => {
-        // Many elements share an offset parent. Read each ancestor once per snapshot;
-        // the page cannot change during this synchronous walk.
-        const origins = new Map<HTMLElement, { x: number; y: number }>()
-        const layoutOrigin = (el: HTMLElement): { x: number; y: number } => {
-          const saved = origins.get(el)
-          if (saved) return saved
-          const parent = el.offsetParent
-          const at = parent instanceof HTMLElement ? layoutOrigin(parent) : { x: 0, y: 0 }
-          const origin = { x: at.x + el.offsetLeft, y: at.y + el.offsetTop }
-          origins.set(el, origin)
-          return origin
-        }
-        const origin = layoutOrigin(rootEl)
-        const html = [rootEl, ...Array.from(rootEl.querySelectorAll('*'))].filter((el): el is HTMLElement => el instanceof HTMLElement)
-        return html.map((el) => {
-          const at = layoutOrigin(el)
-          return { el, box: { x: at.x - origin.x, y: at.y - origin.y, width: el.offsetWidth, height: el.offsetHeight }, rendered: el.getClientRects().length > 0 }
-        })
-      }
+      const describe = helpers.describeNode
+      const snapshot = () => helpers.layoutBoxes(rootEl)
 
       const earlier = new Set(rootEl.getAnimations({ subtree: true }))
       // Properties whose motion repaints but moves no layout box (offsets ignore transforms).
@@ -299,8 +338,12 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
 
   await action()
 
-  return await page.evaluate(
-    async ({ key, settle, tolerance: epsilon, layoutOnly: onlyLayout, grows: growsSelector }) => {
+  return await withHelpers(
+    page,
+    async (
+      { key, settle, tolerance: epsilon, layoutOnly: onlyLayout, grows: growsSelector }: { key: string; settle: number; tolerance: number; layoutOnly: boolean; grows: string | null },
+      helpers,
+    ) => {
       const w = window as unknown as Record<string, PageState | undefined>
       const state = w[key]
       if (!state) throw new Error('Layout-shift guard was not started')
@@ -324,19 +367,7 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
       for (const entry of state.observer?.takeRecords() ?? []) state.entries.push(state.toEntry(entry))
       state.observer?.disconnect()
 
-      const nowByElement = new Map(state.snapshot().map((item) => [item.el, item]))
-      const moved: MovedElement[] = []
-      for (const before of state.before) {
-        const now = nowByElement.get(before.el)
-        if (!now || !before.rendered || !now.rendered) continue
-        const resized = Math.abs(before.box.width - now.box.width) > epsilon && (growsSelector === null || !before.el.matches(growsSelector))
-        const differs =
-          Math.abs(before.box.x - now.box.x) > epsilon ||
-          Math.abs(before.box.y - now.box.y) > epsilon ||
-          resized ||
-          Math.abs(before.box.height - now.box.height) > epsilon
-        if (differs) moved.push({ element: state.describe(before.el), before: before.box, after: now.box })
-      }
+      const moved = helpers.changedBoxes(state.before, state.snapshot(), epsilon, growsSelector, state.describe)
 
       delete w[key]
       return {
@@ -387,4 +418,271 @@ export async function expectNoLayoutShift(page: Page, action: () => Promise<unkn
   if (shifted || report.moved.length > 0) {
     throw new Error(`Layout shifted during the action.\n${formatLayoutShiftReport(report)}`)
   }
+}
+
+export interface ForcedInteractionOptions {
+  /** CSS selector of the region to check. Default: the gallery's `[data-fixture-frame]`, else `body`. */
+  readonly root?: string
+  /** CSS selector of the elements to touch. */
+  readonly targets: string
+  /** Elements inside a match of this selector are not touched (growth the user asks for). */
+  readonly skipWithin?: string
+  /** Elements touched at most; a longer list is sampled from both ends. Default 16. */
+  readonly max?: number
+  /** Index in that list to start at, after `next` asked for a fresh document. */
+  readonly from?: number
+  /** Marks code still loading after a touch; the check waits until none is left. */
+  readonly pending?: string
+  readonly tolerance?: number
+  readonly grows?: string
+}
+
+export interface ForcedShift {
+  /** Index of the touched element in the sampled list. */
+  readonly element: number
+  readonly target: string
+  readonly step: string
+  readonly moved: ReadonlyArray<MovedElement>
+}
+
+export interface ForcedInteractionReport {
+  readonly shifts: ReadonlyArray<ForcedShift>
+  /** Elements touched in this call. */
+  readonly touched: number
+  /** Set when a touch changed the markup and elements are left: open the state again and call with `from: next`. */
+  readonly next?: number
+  /** Pseudo-class rules that could not be rewritten, for the log. */
+  readonly unforced: number
+}
+
+/**
+ * The cheap tier of the guard: every touch of `measureLayoutShift`, without
+ * real input or animation frames, in one `page.evaluate`.
+ *
+ * It rewrites `:hover`, `:active`, `:focus`, `:focus-visible` and
+ * `:focus-within` in every loaded style sheet into attribute selectors of the
+ * same specificity, turns transitions off and finishes any animation a touch
+ * starts. For each target it then hovers, focuses from the keyboard, blurs,
+ * presses, releases and leaves: it sets the attributes where the browser would
+ * match the pseudo-class (the element under the target's centre and its
+ * ancestors for hover and press, the active element and its ancestors for
+ * focus) and dispatches the pointer, mouse, key and focus events React
+ * listens to, then waits two tasks so React renders. After each step it compares
+ * every box with `changedBoxes`, the guard's own comparison.
+ *
+ * What it cannot see: a shift that exists only while a transition runs, one
+ * that waits for an animation frame or a ResizeObserver, and browser defaults
+ * of real input other than focus on press (text selection, `:active` from a
+ * keyboard press). The real-input walk covers those.
+ */
+export async function checkForcedInteractions(page: Page, options: ForcedInteractionOptions): Promise<ForcedInteractionReport> {
+  return await withHelpers(
+    page,
+    async (
+      arg: { root: string; targets: string; skipWithin: string | null; max: number; from: number; pending: string | null; tolerance: number; grows: string | null },
+      helpers,
+    ) => {
+      const found = document.querySelector(arg.root)
+      const rootEl = found instanceof HTMLElement ? found : document.body
+      const names = { hover: 'data-juno-hover', active: 'data-juno-active', focus: 'data-juno-focus', 'focus-visible': 'data-juno-focus-visible', 'focus-within': 'data-juno-focus-within' }
+      const pseudo = /:(hover|active|focus-visible|focus-within|focus)(?![\w-])/g
+      let unforced = 0
+      const rewrite = (rules: CSSRuleList) => {
+        for (const rule of Array.from(rules)) {
+          if (rule instanceof CSSStyleRule && rule.selectorText.search(pseudo) !== -1) {
+            rule.selectorText = rule.selectorText.replace(pseudo, (_, name: keyof typeof names) => `[${names[name]}]`)
+            // A pseudo-element before the pseudo-class (a scrollbar thumb's :hover) cannot take an attribute.
+            if (rule.selectorText.search(pseudo) !== -1) unforced++
+          }
+          if ('cssRules' in rule) rewrite((rule as CSSGroupingRule).cssRules)
+        }
+      }
+      const rewriteSheets = () => {
+        for (const sheet of [...Array.from(document.styleSheets), ...document.adoptedStyleSheets]) {
+          try {
+            rewrite(sheet.cssRules)
+          } catch {
+            // A cross-origin sheet cannot be read; the gallery has none.
+          }
+        }
+      }
+      if (!document.getElementById('juno-forced-still')) {
+        rewriteSheets()
+        const still = document.createElement('style')
+        still.id = 'juno-forced-still'
+        still.textContent = '*, *::before, *::after { transition: none !important; }'
+        document.head.append(still)
+        // Like a real click, a synthetic one follows a link or submits a form. Neither belongs to this document's check.
+        window.addEventListener('click', (event) => {
+          const target = event.target instanceof Element ? event.target : null
+          if (target?.closest('a[href], form button:not([type="button"]), form input[type="submit"]')) event.preventDefault()
+        })
+      }
+
+      const chain = (el: Element): Element[] => {
+        const out: Element[] = []
+        for (let node: Element | null = el; node; node = node.parentElement) out.push(node)
+        return out
+      }
+      const clear = (name: string) => {
+        for (const el of Array.from(document.querySelectorAll(`[${name}]`))) el.removeAttribute(name)
+      }
+      let keyboard = false
+      const syncFocus = () => {
+        for (const name of [names.focus, names['focus-visible'], names['focus-within']]) clear(name)
+        const active = document.activeElement
+        if (!active || active === document.body) return
+        active.setAttribute(names.focus, '')
+        const field = active.matches('input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="reset"], [type="range"], [type="color"]), textarea, [contenteditable]:not([contenteditable="false"])')
+        if (keyboard || field) active.setAttribute(names['focus-visible'], '')
+        for (const el of chain(active)) el.setAttribute(names['focus-within'], '')
+      }
+
+      const task = () => new Promise<void>((resolve) => {
+        const channel = new MessageChannel()
+        channel.port1.onmessage = () => resolve()
+        channel.port2.postMessage(0)
+      })
+      const earlier = new Set(document.getAnimations())
+      const settle = async () => {
+        // React renders a continuous event's update in a scheduler task, and an effect's update in the next.
+        await task()
+        await task()
+        if (arg.pending !== null && document.querySelector(arg.pending) !== null) {
+          const selector = arg.pending
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              observer.disconnect()
+              reject(new Error('Code a touch started loading did not arrive within 15 s'))
+            }, 15_000)
+            const observer = new MutationObserver(() => {
+              if (document.querySelector(selector) !== null) return
+              clearTimeout(timer)
+              observer.disconnect()
+              resolve()
+            })
+            observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true })
+          })
+          rewriteSheets()
+          await task()
+          await task()
+        }
+        for (const animation of document.getAnimations()) {
+          if (earlier.has(animation) || !Number.isFinite(Number(animation.effect?.getComputedTiming().endTime))) continue
+          try {
+            animation.finish()
+          } catch {
+            // An animation that cannot finish (playback rate 0) moves nothing either.
+          }
+        }
+        syncFocus()
+      }
+
+      const at = (x: number, y: number) => ({ bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', isPrimary: true, relatedTarget: null })
+      const fire = (type: string, target: Element, init: ReturnType<typeof at> & { buttons?: number; bubbles?: boolean }) => {
+        const event = type.startsWith('pointer') ? new PointerEvent(type, init) : new MouseEvent(type, init)
+        return target.dispatchEvent(event)
+      }
+      const focusable = 'button, a[href], input, select, textarea, [tabindex], [contenteditable]:not([contenteditable="false"])'
+
+      const sample = Array.from(rootEl.querySelectorAll(arg.targets)).filter(
+        (el): el is HTMLElement => el instanceof HTMLElement && (arg.skipWithin === null || el.parentElement?.closest(arg.skipWithin) == null),
+      )
+      const tail = Math.floor(arg.max / 3)
+      const picked = sample.length <= arg.max ? sample : [...sample.slice(0, arg.max - tail), ...sample.slice(-tail)]
+      const markup = () => rootEl.innerHTML.replace(/ data-juno-[a-z-]+=""/g, '')
+      const initial = markup()
+      const shifts: Array<{ element: number; target: string; step: string; moved: unknown[] }> = []
+      let touched = 0
+      let boxes = helpers.layoutBoxes(rootEl)
+
+      for (let index = arg.from; index < picked.length; index++) {
+        const element = picked[index]!
+        if (!element.isConnected || element.getClientRects().length === 0 || getComputedStyle(element).visibility === 'hidden') continue
+        const was = element.getBoundingClientRect()
+        element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        const box = element.getBoundingClientRect()
+        if (box.x !== was.x || box.y !== was.y) {
+          // Scrolling can lay out content-visibility rows; that is not the touch's doing.
+          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+          boxes = helpers.layoutBoxes(rootEl)
+        }
+        touched++
+        const x = box.x + box.width / 2
+        const y = box.y + box.height / 2
+        const hit = document.elementFromPoint(x, y) ?? element
+        const hovered = chain(hit)
+        const target = helpers.describeNode(element)
+        const step = async (name: string, action: () => void) => {
+          action()
+          await settle()
+          const now = helpers.layoutBoxes(rootEl)
+          const moved = helpers.changedBoxes(boxes, now, arg.tolerance, arg.grows, helpers.describeNode)
+          if (moved.length > 0) shifts.push({ element: index, target, step: name, moved })
+          boxes = now
+        }
+
+        await step('hover', () => {
+          fire('pointerover', hit, at(x, y))
+          for (const el of [...hovered].reverse()) fire('pointerenter', el, { ...at(x, y), bubbles: false })
+          fire('mouseover', hit, at(x, y))
+          for (const el of [...hovered].reverse()) fire('mouseenter', el, { ...at(x, y), bubbles: false })
+          fire('pointermove', hit, at(x, y))
+          fire('mousemove', hit, at(x, y))
+          for (const el of hovered) el.setAttribute(names.hover, '')
+        })
+        await step('focus from the keyboard', () => {
+          const keyTarget = document.activeElement ?? document.body
+          keyTarget.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift', code: 'ShiftLeft', shiftKey: true, bubbles: true, cancelable: true, composed: true }))
+          keyTarget.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift', code: 'ShiftLeft', bubbles: true, cancelable: true, composed: true }))
+          keyboard = true
+          element.focus({ preventScroll: true })
+        })
+        await step('blur', () => element.blur())
+        await step('press', () => {
+          fire('pointerdown', hit, { ...at(x, y), buttons: 1 })
+          const unprevented = fire('mousedown', hit, { ...at(x, y), buttons: 1 })
+          for (const el of hovered) el.setAttribute(names.active, '')
+          // A press moves focus to what it lands on, or away when that cannot take it.
+          keyboard = false
+          if (unprevented) {
+            const into = hit.closest(focusable)
+            if (into instanceof HTMLElement && !into.matches(':disabled')) into.focus({ preventScroll: true })
+            else if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+          }
+        })
+        await step('release', () => {
+          fire('pointerup', hit, at(x, y))
+          fire('mouseup', hit, at(x, y))
+          clear(names.active)
+          if (hit.isConnected) fire('click', hit, at(x, y))
+        })
+        await step('leave', () => {
+          fire('pointerout', hit, at(x, y))
+          for (const el of hovered) fire('pointerleave', el, { ...at(x, y), bubbles: false })
+          fire('mouseout', hit, at(x, y))
+          for (const el of hovered) fire('mouseleave', el, { ...at(x, y), bubbles: false })
+          clear(names.hover)
+        })
+        // A touch that changed what the state draws (Undo puts back other buttons) needs a fresh document for the rest.
+        if (index + 1 < picked.length && markup() !== initial) return { shifts, touched, next: index + 1, unforced }
+      }
+      return { shifts, touched, unforced }
+    },
+    {
+      root: options.root ?? defaults.root,
+      targets: options.targets,
+      skipWithin: options.skipWithin ?? null,
+      max: options.max ?? 16,
+      from: options.from ?? 0,
+      pending: options.pending ?? null,
+      tolerance: options.tolerance ?? defaults.tolerance,
+      grows: options.grows ?? null,
+    },
+  ) as ForcedInteractionReport
+}
+
+/** One line per forced shift, in the guard's report format. */
+export function formatForcedShift(shift: ForcedShift): string {
+  return `${shift.step}: Layout shifted during the action.\n${formatLayoutShiftReport({ shifts: [], moved: shift.moved, observerSupported: true, waitedMs: 0 })}`
 }

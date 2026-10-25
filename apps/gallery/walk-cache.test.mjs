@@ -85,3 +85,18 @@ test('unknown registrations fail closed to all sources', t => {
   write('packages/ui/src/Other.ts', 'export const Other = 3')
   assert.equal(cache().passed(unknown), false)
 })
+
+test('own keys change with a component’s own files, not with what it shares', t => {
+  const { cache, write, button, other } = fixture(t)
+  const own = () => cache({ own: true })
+  own().pass(button)
+  own().pass(other)
+  assert.equal(cache().passed(button), false, 'own records are not full records')
+  for (const file of ['packages/ui/src/width.ts', 'apps/gallery/shift.spec.ts', 'packages/tokens/src/global.css']) {
+    write(file, '// changed')
+    assert.equal(own().passed(button), true, file)
+  }
+  write('packages/ui/src/Button.ts', "import { width } from './width'\nexport const Button = width + 1")
+  assert.equal(own().passed(button), false)
+  assert.equal(own().passed(other), true)
+})

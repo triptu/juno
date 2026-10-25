@@ -20,10 +20,8 @@ class LayoutGraph extends ImportGraph {
   }
 }
 
-/** Source keys work in remote archives too: no Git metadata or worktree paths. */
-export function sourceKeys(root, kind) {
-  const files = new Set([...filesUnder(root, 'packages'), ...filesUnder(root, 'apps/gallery')])
-  const graph = new LayoutGraph(root, files)
+/** Each registered component's fixture file, from the registries' imports. */
+function registeredFixtures(root, graph, files) {
   const registries = ['ui', 'views', 'huddle-views'].map(name => `packages/${name}/src/fixtures.ts`).filter(file => files.has(file))
   const components = new Map()
   for (const registry of registries) {
@@ -42,6 +40,14 @@ export function sourceKeys(root, kind) {
       if (source) components.set(match[1], source)
     }
   }
+  return { registries, components }
+}
+
+/** Source keys work in remote archives too: no Git metadata or worktree paths. */
+export function sourceKeys(root, kind) {
+  const files = new Set([...filesUnder(root, 'packages'), ...filesUnder(root, 'apps/gallery')])
+  const graph = new LayoutGraph(root, files)
+  const { registries, components } = registeredFixtures(root, graph, files)
 
   const shared = new Set([
     'bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json',
@@ -95,15 +101,43 @@ export function sourceKeys(root, kind) {
   }
 }
 
+/**
+ * Keys over a component's own files only: its fixture file and the files it
+ * reaches that are named after it (`Button.tsx`, `Button.stylex.ts`, a
+ * `Button/` folder). A change to a shared primitive, a token or the test code
+ * leaves them alone. Gallery compositions are keyed by the gallery's own
+ * registration files. The shift walk uses them to pick the states whose own
+ * component changed.
+ */
+export function ownKeys(root) {
+  const files = new Set([...filesUnder(root, 'packages'), ...filesUnder(root, 'apps/gallery')])
+  const graph = new LayoutGraph(root, files)
+  const { components } = registeredFixtures(root, graph, files)
+  const gallery = [...files].filter(file => /^apps\/gallery\/src\/(compositions|testFixtures)\./.test(file))
+  const keys = new Map()
+  return component => {
+    if (!keys.has(component)) {
+      const fixture = components.get(component)
+      const stem = fixture?.split('/').at(-1).split('.')[0]
+      const named = file => file === fixture || file.split('/').some((part, index, parts) => part === stem || (index === parts.length - 1 && part.split('.')[0] === stem))
+      const inputs = fixture ? [...graph.closure(fixture)].filter(named) : gallery
+      keys.set(component, digest(JSON.stringify(inputs.toSorted().map(file => [file, existsSync(join(root, file)) ? digest(readFileSync(join(root, file))) : null]))))
+    }
+    return keys.get(component)
+  }
+}
+
 /** Immutable successful state records beside the shared build/results caches. */
-export function walkCache({ root, kind, runtime, directory, all = false }) {
-  const componentKey = sourceKeys(root, kind)
+export function walkCache({ root, kind, runtime, directory, all = false, own = false }) {
+  const componentKey = own ? ownKeys(root) : sourceKeys(root, kind)
   const cache = directory ?? join(process.env.JUNO_BUILD_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'results'), 'gallery-walk-v1')
   const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['NODE_ENV', 'JUNO_UNMINIFIED'].includes(name)).toSorted()
-  const key = route => digest(JSON.stringify({ kind, route, runtime, environment, source: componentKey(route.component) }))
+  const key = route => digest(JSON.stringify({ kind, own, route, runtime, environment, source: componentKey(route.component) }))
   const record = route => `${kind} ${route.route}\n`
   return {
     key,
+    /** True when every state is checked again whatever its record. */
+    all,
     passed(route) {
       if (all) return false
       try { return readFileSync(join(cache, key(route)), 'utf8') === record(route) } catch { return false }

@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir, release } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
@@ -27,6 +27,41 @@ export interface Route {
 
 export type Theme = 'light' | 'dark'
 
+/** What a person can point at or tab to, plus scroll areas. Disabled controls cannot be pointed at. */
+export const interactive = [
+  'button:not(:disabled)',
+  'a[href]',
+  'input:not(:disabled)',
+  'select:not(:disabled)',
+  'textarea:not(:disabled)',
+  '[role="button"]',
+  '[role="tab"]',
+  '[role="option"]',
+  '[role="radio"]',
+  '[role="menuitem"]',
+  '[role="switch"]',
+  '[role="slider"]',
+  '[tabindex]:not([tabindex="-1"])',
+  // Scroll areas show their thumb on hover; the gutter must not change.
+  '[data-scroll-area]',
+].join(', ')
+
+/** Runs one state's check with a 30-second deadline, so one stuck state names itself instead of using up its part. */
+export async function checkStateWithin(route: Route, check: () => Promise<void>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      check(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${route.route}: state check did not finish within 30 s`)), 30_000)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+
 /** The address of a state, for example `/#/Button?__state=variant/primary&theme=dark`. */
 export function stateUrl(route: Pick<Route, 'component' | 'id'>, theme: Theme = 'light', accent?: string): string {
   return `/#/${encodeURIComponent(route.component)}?__state=${route.id}${theme === 'light' ? '' : `&theme=${theme}`}${accent === undefined ? '' : `&accent=${accent}`}`
@@ -42,8 +77,11 @@ export async function readRoutes(page: Page): Promise<ReadonlyArray<Route>> {
   return routes
 }
 
-/** Opens one state and waits until it is drawn: chunks, fonts and images loaded, theme applied, entrance animations done. */
-export async function openState(page: Page, route: Route, theme: Theme = 'light', accent?: string): Promise<void> {
+/**
+ * Opens one state and waits until it is drawn: chunks, fonts and images loaded, theme applied, entrance animations done.
+ * With `finishMotion`, entrance animations are finished at once instead of waited for (the computed shift check).
+ */
+export async function openState(page: Page, route: Route, theme: Theme = 'light', accent?: string, { finishMotion = false } = {}): Promise<void> {
   await page.goto(stateUrl(route, theme, accent))
   await expect(page.locator(`[data-fixture-frame="${route.route}"]`)).toBeVisible()
   // Wait for code, not data: loading and pending-image fixtures intentionally never settle. Some chunks start in an idle
@@ -51,7 +89,7 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
   await expect(page.locator('[data-chunk-pending]')).toHaveCount(0, { timeout: 15_000 })
   // Let the frame's images load or fail: a failed unfurl image removes its box (AttachmentCard), and on a busy machine
   // the error can land after the state looks drawn. The held Avatar photo and lazy images out of view are not waited for.
-  await page.evaluate(async (frameName) => {
+  await page.evaluate(async ({ frameName, finish }) => {
     document.body.getBoundingClientRect()
     await document.fonts.ready
     const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
@@ -81,6 +119,10 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
       await new Promise((resolve) => requestAnimationFrame(resolve))
     }
     // Let entrances finish, with the same cap for long finite motion. Endless spinners are not waited for.
+    if (finish) {
+      for (const animation of document.getAnimations()) if (Number.isFinite(Number(animation.effect?.getComputedTiming().endTime))) animation.finish()
+      return
+    }
     try {
       await Promise.race([
         Promise.all(document.getAnimations()
@@ -92,7 +134,7 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
       ])
     } finally { clearTimeout(timer) }
 
-  }, route.route)
+  }, { frameName: route.route, finish: finishMotion })
 }
 
 /** Each test owns its browser context; parts claim work through atomic directories. */
@@ -102,6 +144,27 @@ export function claimQueue(name: string) {
   mkdirSync(dir, { recursive: true })
   let from = 0
   return {
+    /**
+     * The same list for every part: the first part to get here computes and records it.
+     * Parts pass states while others start, so computing it in each part could differ.
+     */
+    shared(compute: () => ReadonlyArray<string>): ReadonlyArray<string> {
+      const file = join(dir, 'selection.json')
+      try {
+        return JSON.parse(readFileSync(file, 'utf8')) as string[]
+      } catch {
+        const temporary = `${file}.${process.pid}.${Date.now()}.tmp`
+        writeFileSync(temporary, JSON.stringify(compute()))
+        try {
+          linkSync(temporary, file)
+        } catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
+        } finally {
+          rmSync(temporary, { force: true })
+        }
+        return JSON.parse(readFileSync(file, 'utf8')) as string[]
+      }
+    },
     next(routes: ReadonlyArray<Route>): Route | undefined {
       while (from < routes.length) {
         const route = routes[from++]!
@@ -117,11 +180,13 @@ export function claimQueue(name: string) {
   }
 }
 
-export function stateCache(kind: 'shift' | 'ring', browser: Browser) {
+/** With `own`, records are keyed by the component's own files only (`ownKeys` in walk-cache.mjs). */
+export function stateCache(kind: 'shift' | 'ring', browser: Browser, { own = false } = {}) {
   const { baseURL: _baseURL, ...options } = test.info().project.use
   return walkCache({
     root: resolvePath(import.meta.dirname, '../..'),
     kind,
+    own,
     runtime: { playwright: test.info().config.version, browser: browser.version(), platform: process.platform, arch: process.arch, os: release(), options },
     // Repeats are flake hunts: every repeat must exercise the state again.
     all: process.env.GALLERY_SHIFT_ALL === '1' || test.info().project.repeatEach > 1 || test.info().retry > 0,
