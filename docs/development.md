@@ -627,6 +627,18 @@ All 166 files and 2,386 tests on the SSH laptop, two physical cores (four thread
 
 No-isolate takes about 15% less time and about 15% less CPU (busy share × time: 255 → 202–230 thread-seconds); against a shuffled `--isolate` run it saves about 9 s. Shuffling loses the slowest-first start; within these runs it cost no clear time. The one failure was `huddle-recovery.flow.test.ts` timing out after 5 s: with `--no-isolate` the preload's 30 s default reached only the first file of each worker. The same happens to any multi-file `bun test` without `--parallel`, such as `cd packages/engine && bun test`, so the timeout is now on the command line. No failure in these seven shuffled runs came from another file's state or from the order of tests. These are single runs per seed under shared load, not medians. Tests that need the Effect test clock use `itEffect` from `@juno/testing/effect`, which provides `TestClock` and runs the effect; to time out a call that is in flight, fork it, wait until the request reaches the fake (a promise the fake resolves), then `TestClock.adjust` (`packages/ai/test/pi.test.ts`). Wait on a real signal (a Deferred, a subscription, a fake's call log); where there is none, `eventually` from `@juno/testing/eventually` retries a check. See the effect skill.
 
+### Unit run measurements, 2026-10-25
+
+All 168 files on two physical cores of the SSH laptop (four threads), the same seed (3952231788), one run each, so single observations under shared load. Before is the 10-24 full run; after is commit `0ff93659e`.
+
+| Run | Workers | Bun time | Summed test time | Result |
+| --- | --- | --- | --- | --- |
+| Before | 4 | 79.4 s | 306 s | all passed |
+| After | 4 | 54.3 s | 208 s | all passed |
+| After | 8 | 65.6 s | | one timing-sensitive markdown test failed |
+
+The run is CPU-bound (CPU 95–99% busy), so four workers, one per thread, stay the default. What changed: the crash tests start each agent program from a bundle built once per test process (`runAgent`), not from source (`recovery.test.ts` 25.0 → 5.6 s, `backup-crash.test.ts` 13.5 → 6.0 s); the mutation repair seed is 1,500 messages over two days (the large-seed test 18.9 → 5.2 s); periodic sweeps in the flow tests run on test-driven time; rate-limit tests use sub-second Retry-After values with a short `slackInteractiveMaxWaitMillis` (14.3 s → off the slowest list); first-sync, agent-host and reads start from smaller seeds or the synced template. A warm engine boot costs about 90 ms of CPU and waits on no timer, so the rest is the tests' own work; about 40 s needs a third core.
+
 ### Desktop lane measurements, 2026-10-24
 
 The full measurement at `7aa940589` passed both desktop lanes on the SSH laptop: **222 s browser, 73 s Electron, 295 s combined**. It used four physical cores (eight allocated threads), eight browser workers and eight Electron workers, in sequence. Coverage and traces were off, CPU timing was on, and there were no retries, failures or skips. The job averaged 89% CPU busy (99% median), with 6.64 GB peak container memory including file cache.
