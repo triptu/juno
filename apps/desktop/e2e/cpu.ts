@@ -7,10 +7,9 @@ import { readdirSync, readFileSync } from 'node:fs'
  * (the test host, the browser and its renderers, Electron and its engine),
  * by kind. The `running` fixture prints them as `e2e timing: cpu-<kind>`
  * lines, which `JUNO_E2E_TIMINGS=1` collects (README, "Scheduling and setup
- * timings"). A process that ended during the test counts only in `cpu-all`
- * (on Linux), the whole tree's CPU with every reaped child, which is also what
- * `cpuAll` answers for the `cpu-launch`, `cpu-sync`, `cpu-close` and
- * `cpu-synced-build` phases.
+ * timings"). A process that ended during the test is not counted there;
+ * `cpu-all` (the whole test) and the `cpu-launch`, `cpu-sync`, `cpu-close`
+ * and `cpu-synced-build` phases use `cpuAll`, which counts it.
  */
 interface Process {
   readonly pid: number
@@ -81,13 +80,30 @@ function sample(): Map<number, { readonly kind: string; readonly cpuMillis: numb
   return new Map(tree().map((entry) => [entry.pid, { kind: kindOf(entry, process.pid), cpuMillis: entry.cpuMillis }]))
 }
 
+/** The job's own cgroup counter (Linux), which also counts processes an app leaves behind as it quits. */
+function cgroupMillis(): number | undefined {
+  try {
+    const usec = /^usage_usec (\d+)$/m.exec(readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8'))?.[1]
+    return usec === undefined ? undefined : Number(usec) / 1000
+  } catch {
+    return undefined
+  }
+}
+
 /**
- * The CPU milliseconds this worker's whole tree has burned so far, counting
- * children that have exited (Linux only); the difference of two readings is
- * what ran between them. Undefined unless JUNO_E2E_CPU=1.
+ * The CPU milliseconds burned so far; the difference of two readings is what
+ * ran between them. With one worker (JUNO_E2E_WORKERS=1) on Linux that is the
+ * job's cgroup, everything the test caused. Otherwise it is this worker's
+ * tree, counting reaped children: Chromium's helpers and the utility
+ * processes that outlive main as an app quits are lost. Undefined unless
+ * JUNO_E2E_CPU=1.
  */
 export function cpuAll(): number | undefined {
   if (process.env.JUNO_E2E_CPU !== '1') return undefined
+  if (process.env.JUNO_E2E_WORKERS === '1') {
+    const job = cgroupMillis()
+    if (job !== undefined) return job
+  }
   // When a process exits, its time and its own reaped children's move into its parent's reaped time.
   return tree().reduce((total, entry) => total + entry.cpuMillis + entry.reapedMillis, 0)
 }
