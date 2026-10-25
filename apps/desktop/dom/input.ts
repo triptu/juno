@@ -6,6 +6,7 @@
  */
 import type { Window } from 'happy-dom'
 import { disabled, Query, roleOf, shown, type El, type RoleOptions, type TextMatch } from './query'
+import { HOVER_ATTRIBUTE } from './window'
 
 const DEFAULT_TIMEOUT = 5_000
 
@@ -14,7 +15,7 @@ const normalize = (text: string) => text.replace(/\s+/g, ' ').trim()
 const MODIFIERS = { Meta: 'metaKey', Shift: 'shiftKey', Alt: 'altKey', Control: 'ctrlKey' } as const
 type Modifier = keyof typeof MODIFIERS
 
-const CODES: Record<string, string> = { ' ': 'Space', Enter: 'Enter', Escape: 'Escape', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown' }
+const CODES: Record<string, string> = { ' ': 'Space', Alt: 'AltLeft', Meta: 'MetaLeft', Shift: 'ShiftLeft', Control: 'ControlLeft', Enter: 'Enter', Escape: 'Escape', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown' }
 const codeOf = (key: string) => CODES[key] ?? (/^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : /^\d$/.test(key) ? `Digit${key}` : key)
 
 const TABBABLE = 'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable="true"]'
@@ -26,6 +27,8 @@ const TABBABLE = 'a[href], button, input, select, textarea, summary, [tabindex],
  */
 export class Dom {
   #hovered: El | null = null
+  /** Keys held down with `down`, until `up`. */
+  readonly #held = new Set<string>()
 
   constructor(readonly window: Window) {}
 
@@ -38,8 +41,8 @@ export class Dom {
   }
 
   /** As Playwright's `page.keyboard`: keys go to the focused element. */
-  get keyboard(): { readonly press: (keys: string) => Promise<void>; readonly type: (text: string) => Promise<void> } {
-    return { press: (keys) => this.press(keys), type: (text) => this.type(text) }
+  get keyboard(): { readonly press: (keys: string) => Promise<void>; readonly type: (text: string) => Promise<void>; readonly down: (key: string) => Promise<void>; readonly up: (key: string) => Promise<void> } {
+    return { press: (keys) => this.press(keys), type: (text) => this.type(text), down: async (key) => this.down(key), up: async (key) => this.up(key) }
   }
 
   /** The whole page, as a Query. */
@@ -129,6 +132,8 @@ export class Dom {
       if (from !== null) for (const type of ['pointerout', 'mouseout']) this.#mouse(type, from, { relatedTarget: el })
       for (const node of left.filter((node) => !entered.includes(node))) for (const type of ['pointerleave', 'mouseleave']) this.#mouse(type, node, { relatedTarget: el })
       for (const type of ['pointerover', 'mouseover']) this.#mouse(type, el, { relatedTarget: from })
+      for (const node of left.filter((node) => !entered.includes(node))) node.removeAttribute(HOVER_ATTRIBUTE)
+      for (const node of entered) node.setAttribute(HOVER_ATTRIBUTE, '')
       for (const node of entered.filter((node) => !left.includes(node)).toReversed()) for (const type of ['pointerenter', 'mouseenter']) this.#mouse(type, node, { relatedTarget: from })
       this.#hovered = el
     }
@@ -140,6 +145,7 @@ export class Dom {
     const from = this.#hovered
     if (from === null || !from.isConnected) { this.#hovered = null; return }
     for (const type of ['pointerout', 'mouseout']) this.#mouse(type, from, { relatedTarget: null })
+    for (let node: El | null = from; node !== null; node = node.parentElement) node.removeAttribute(HOVER_ATTRIBUTE)
     for (let node: El | null = from; node !== null; node = node.parentElement) for (const type of ['pointerleave', 'mouseleave']) this.#mouse(type, node, { relatedTarget: null })
     this.#hovered = null
   }
@@ -226,13 +232,41 @@ export class Dom {
    * then keyup. Answers whether the keydown was let through.
    */
   key(el: El, key: string, modifiers: ReadonlyArray<Modifier> = []): boolean {
+    const kept = this.#keydown(el, key, modifiers)
+    this.#keyup(this.active ?? el, key, modifiers)
+    return kept
+  }
+
+  /** Presses `key` (`Alt`, `Space`) on the focused element and keeps it down until `up`; a held modifier joins later keys' events. */
+  down(key: string): void {
+    const name = key === 'Space' ? ' ' : key
+    const modifiers = [...this.#held].filter((held): held is Modifier => held in MODIFIERS)
+    if (name in MODIFIERS) modifiers.push(name as Modifier)
+    this.#held.add(name)
+    this.#keydown(this.active ?? this.document.body as El, name, modifiers)
+  }
+
+  up(key: string): void {
+    const name = key === 'Space' ? ' ' : key
+    this.#held.delete(name)
+    this.#keyup(this.active ?? this.document.body as El, name, [...this.#held].filter((held): held is Modifier => held in MODIFIERS))
+  }
+
+  #keyInit(key: string, modifiers: ReadonlyArray<Modifier>) {
+    return { key, code: codeOf(key), bubbles: true, cancelable: true, composed: true, ...this.#modifiers(modifiers) }
+  }
+
+  #keydown(el: El, key: string, modifiers: ReadonlyArray<Modifier>): boolean {
     const K = (this.window as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent
     this.#pointerFocus(false)
-    const init = { key, code: codeOf(key), bubbles: true, cancelable: true, composed: true, ...this.#modifiers(modifiers) }
-    const kept = el.dispatchEvent(new K('keydown', init))
+    const kept = el.dispatchEvent(new K('keydown', this.#keyInit(key, modifiers)))
     if (kept) this.#defaultAction(el, key, modifiers)
-    ;(this.active ?? el).dispatchEvent(new K('keyup', init))
     return kept
+  }
+
+  #keyup(el: El, key: string, modifiers: ReadonlyArray<Modifier>): void {
+    const K = (this.window as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent
+    el.dispatchEvent(new K('keyup', this.#keyInit(key, modifiers)))
   }
 
   #defaultAction(el: El, key: string, modifiers: ReadonlyArray<Modifier>): void {
