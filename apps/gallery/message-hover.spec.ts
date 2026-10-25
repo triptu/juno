@@ -39,3 +39,12 @@ test('the pointer stays the arrow over message text, and the text stays selectab
   await page.mouse.up()
   expect(await page.evaluate(() => document.getSelection()?.toString().length ?? 0)).toBeGreaterThan(10)
 })
+
+test('a follow-up shows no header and no time, under the pointer or not', async ({ page }) => {
+  await openState(page, { component: 'Message', id: 'interaction/hover-continuation', route: 'Message/interaction/hover-continuation', group: 'Interaction', groupId: 'interaction', state: 'hover-continuation', frame: {} })
+  const follow = page.locator('[data-message-row]').first()
+  await expect(follow.locator('[data-message-header]')).toHaveCount(0)
+  await expect(follow.locator('time')).toHaveCount(0)
+  await follow.locator('[data-msg-text]').first().hover()
+  await expect(follow.locator('time')).toHaveCount(0)
+})
