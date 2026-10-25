@@ -1,7 +1,7 @@
 // One SSH plan owns independent jobs through the shared tstack allocator.
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import { appSuites, parsePlan } from '../plan.mjs'
+import { parsePlan } from '../plan.mjs'
 import { forwardSignals } from './children.mjs'
 
 // Two four-core jobs that carry about the same measured CPU in a full run (docs/development.md,
