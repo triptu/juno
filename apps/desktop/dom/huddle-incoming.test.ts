@@ -42,7 +42,8 @@ domTest('someone starts a huddle: the card rings, Join joins, Dismiss hides it, 
   await expect(bar).toBeVisible()
   await expect(card).toBeHidden()
   await expect.poll(() => ringing(win)).toBe(false)
-  expect(fake.calls.filter((call) => call.method === 'rooms.join').map((call) => call.args)).toMatchObject([{ channel_id: 'C0ENG' }])
+  // The bar shows while the join is on its way to Slack.
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.join').map((call) => call.args['channel_id'])).toEqual(['C0ENG'])
   await expect.poll(() => connection(win)).toBe('connected')
 
   // While in a call, Maya's DM huddle shows its card under the bar with Switch, and does not ring.
