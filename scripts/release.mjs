@@ -108,18 +108,21 @@ async function release() {
   // Start the laptop first; its preflight may refuse an unchanged failed commit.
   let verificationFailed = false
   const verification = Promise.resolve(fullRun(build)).catch((error) => { verificationFailed = true; throw error })
-  const publisher = (args) => run(process.execPath, [join(here, 'release-publish.ts'), '--checkout', checkout, '--source', tip, '--repo', repo, ...args], checkout)
-  const outcomes = await Promise.allSettled([verification, packageRelease(checkout, detail).then(() => {
-    if (!verificationFailed) timedSync('stage draft', detail, () => publisher(['--stage']))
+  const publisher = async (args) => {
+    const code = await runAsync(process.execPath, [join(here, 'release-publish.ts'), '--checkout', checkout, '--source', tip, '--repo', repo, ...args], checkout)
+    if (code !== 0) throw new Error(`release:publish ${args.join(' ')} failed (${code})`)
+  }
+  const outcomes = await Promise.allSettled([verification, packageRelease(checkout, detail).then(async () => {
+    if (!verificationFailed) await timed('stage draft', detail, () => publisher(['--stage']))
   })])
   const failed = outcomes.find((outcome) => outcome.status === 'rejected')
   if (failed) {
-    try { publisher(['--discard-draft']) } catch (error) { say(`draft cleanup failed: ${error.message}; inspect the draft before rerunning`) }
+    try { await publisher(['--discard-draft']) } catch (error) { say(`draft cleanup failed: ${error.message}; inspect the draft before rerunning`) }
     rmSync(join(checkout, 'apps/desktop/release'), { recursive: true, force: true })
     throw failed.reason
   }
   await timed('highlights wait', detail, () => waitForHighlights(notes))
-  timedSync('publish', detail, () => publisher(['--notes', notes]))
+  await timed('publish', detail, () => publisher(['--notes', notes]))
   check(version)
   timedSync('cleanup', { version, source: tip }, () => run(process.execPath, [join(here, 'worktree.mjs'), 'remove', `release-${version}`, '--force']))
   say(`released ${version} from ${tip} in ${Math.round((Date.now() - started) / 1000)} s`)
@@ -149,7 +152,7 @@ function fullRun(tip) {
     const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
     if (record) report(record, recordFile(record))
     else say(`the full run exited with ${exit} and wrote no record; see its output above`)
-    throw new Error('the full run failed; the package was discarded and nothing was published')
+    throw new Error('the full run failed; discarding the package; nothing was published')
   })
 }
 
@@ -224,6 +227,7 @@ function prepare(source, version) {
         || manifest.version !== version || git(checkout, 'diff', '--name-only', parent, build) !== 'apps/desktop/package.json'
         || !compatible(root, parent, build)) throw new Error(`${checkout} is not a clean release worktree; inspect it and remove it with bun scripts/worktree.mjs remove release-${version} --force`)
       if (parent === source) return
+      run(process.execPath, [join(here, 'release-publish.ts'), '--checkout', checkout, '--repo', repo, '--discard-draft'], checkout)
       run(process.execPath, [join(here, 'worktree.mjs'), 'remove', name, '--force'])
     }
     run(process.execPath, [join(here, 'worktree.mjs'), 'add', name, '--detach', source])

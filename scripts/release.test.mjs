@@ -167,7 +167,7 @@ test('a red full run stops with its failures; after a fix, the same command veri
   assert.match(red.output, /1\) sidebar\.spec\.ts:40 › keeps the selected row/)
   const repairCommand = /bun run verify:main --ref <fixed-descendant-of-\w+> --repair (\S+\.json)/.exec(red.output)
   assert.ok(repairCommand, red.output)
-  assert.match(red.output, /the package was discarded and nothing was published/)
+  assert.match(red.output, /discarding the package; nothing was published/)
   assert.equal(github().releases.some((entry) => entry.tagName === 'v0.1.9'), false)
   assert.equal(existsSync(file('worktrees/release-0.1.9/apps/desktop/release')), false)
   assert.equal(lines('gh-calls').some((call) => call.startsWith('release edit')), false)
@@ -301,4 +301,50 @@ test('the version commit lands on a newer main, keeping concurrent work and ever
   assert.equal(git('diff', '--name-only', 'origin/main^', 'origin/main'), app)
   assert.equal(sync('v0.1.9'), 'false')
   assert.equal(sync('0.1.8'), 'false')
+})
+
+
+test('a staged draft cannot publish without a full run, and only its build can resume or discard it', { timeout: 30_000 }, async (t) => {
+  const { commit, env, file, github, lines, git, plan } = fixture(t)
+  const build = commit('Keep your place after scrolling', { 'apps/desktop/src/app.js': 'scroll', [app]: '{"version":"0.1.9","main":"app.js"}' })
+  execFileSync('bun', [file('package.mjs')], { cwd: file('repo'), env })
+  writeFileSync(file('notes.md'), '- Keep your place after scrolling.\n')
+  const publish = (args) => {
+    try {
+      return { code: 0, output: execFileSync(process.execPath, [publishScript, '--checkout', file('repo'), '--repo', 'triptu/fixture', ...args], { cwd: file('repo'), env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) }
+    } catch (error) { return { code: error.status, output: error.stdout + error.stderr } }
+  }
+  const staged = publish(['--stage'])
+  assert.equal(staged.code, 0, staged.output)
+  assert.equal(github().releases.find((entry) => entry.tagName === 'v0.1.9').isDraft, true)
+  assert.equal(github().releases.find((entry) => entry.isLatest).tagName, 'v0.1.8')
+  assert.doesNotMatch(github().changelog, /0.1.9/)
+  const unverified = publish(['--notes', file('notes.md')])
+  assert.equal(unverified.code, 1)
+  assert.match(unverified.output, /no eligible full-run record/)
+  assert.equal(lines('gh-calls').some((call) => call.startsWith('release edit')), false)
+
+  // A partial upload is never accepted just because the gate is green.
+  plan('green')
+  execFileSync('bun', ['run', 'verify:main', '--ref', build], { cwd: file('repo'), env })
+  const state = github()
+  const draft = state.releases.find((entry) => entry.tagName === 'v0.1.9')
+  const assets = draft.assets
+  draft.assets = assets.slice(1)
+  writeFileSync(file('gh-state.json'), JSON.stringify(state))
+  const partial = publish(['--notes', file('notes.md')])
+  assert.equal(partial.code, 1)
+  assert.match(partial.output, /incomplete or mismatched draft assets/)
+  draft.assets = assets
+  writeFileSync(file('gh-state.json'), JSON.stringify(state))
+
+  commit('A different build', { 'apps/desktop/src/app.js': 'another' })
+  const other = publish(['--discard-draft'])
+  assert.equal(other.code, 1)
+  assert.match(other.output, /refusing to change another release/)
+  git('reset', '--hard', build)
+  const discarded = publish(['--discard-draft'])
+  assert.equal(discarded.code, 0, discarded.output)
+  assert.equal(github().releases.some((entry) => entry.tagName === 'v0.1.9'), false)
+  assert.equal(github().releases.find((entry) => entry.isLatest).tagName, 'v0.1.8')
 })
