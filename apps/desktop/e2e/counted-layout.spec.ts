@@ -4,12 +4,14 @@
 // A forced layout in a scroll handler, a style written on every row per frame, or a keystroke that
 // re-renders the list each add layouts or mutations, and the count fails on any machine and load.
 // Each scroll step moves the list programmatically by the same distance and waits until it has drawn,
-// every picture in view has loaded and the page is idle, after a first pass over the same rows, so the
-// counts do not depend on frame timing: layouts and mutations are the same in every run, style
-// recalculations within one. Work that comes by timing stays out: counting starts once Slack shows the user
-// active, which the shell's 10 s activity poll sets off (the test polls at once), and mutations are counted in the open topic only,
-// not in the sidebar, whose sync cycles mark it busy on their own schedule. Budgets are today's counts plus a
-// little headroom; a failure prints the counts and the mutations.
+// every picture in view has loaded and the page is idle, after a first pass over the same rows, so layouts
+// and mutations are the same in every run. The scroll's style recalculations are not counted: the list's
+// 100 ms scroll-rest timer commits before or after a frame by timing, which splits or joins a recalculation,
+// so the same code read 25 to 38. A style written to every row still shows, as mutations. Work that comes by
+// timing stays out: counting starts once Slack shows the user active, which the shell's 10 s activity poll
+// sets off (the test polls at once), and mutations are counted in the open topic only, not in the sidebar,
+// whose sync cycles mark it busy on their own schedule. Budgets are today's counts plus a little headroom; a
+// failure prints the counts and the mutations.
 import type { CDPSession, Page } from '@playwright/test'
 import { expectWork } from '@juno/testing/work-budget'
 import { expect } from './fixtures'
@@ -80,8 +82,8 @@ longTest('scrolling a long message list and typing in its composer stay within t
       await scroller.evaluate((node, distance) => { node.scrollTop -= distance }, STEP_PX)
       await drawn(win)
     }
-    const work = since(await metrics(cdp, win), before)
-    expectWork('scroll', { ...work }, { layouts: 8, styles: 36, mutations: 3 }, await mutationsSince(win, before))
+    const { layouts, mutations } = since(await metrics(cdp, win), before)
+    expectWork('scroll', { layouts, mutations }, { layouts: 8, mutations: 3 }, await mutationsSince(win, before))
   })
 
   await longTest.step('typing twenty-one characters in the composer', async () => {

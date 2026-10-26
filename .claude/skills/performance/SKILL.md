@@ -64,7 +64,7 @@ Count work; do not time it (Tushar, 10-26: "count work instead of timing it ... 
 
 - Engine SQL, statements and rows per path: `packages/engine/test/flows/counted-work.flow.test.ts` (engine time frozen, stepped by the test).
 - Renderer React commits and renders by component, and port requests, messages and bytes by route: `apps/desktop/dom/counted-work.test.ts` (`domTest(..., { counted: true })`, `dom/work.ts`).
-- Layouts, style recalculations and DOM mutations per scroll step and keystroke: `apps/desktop/e2e/counted-layout.spec.ts` (CDP `Performance.getMetrics`).
+- Layouts and DOM mutations per scroll step, and those and style recalculations per keystroke: `apps/desktop/e2e/counted-layout.spec.ts` (CDP `Performance.getMetrics`).
 - A new main path gets a counted step in the cheapest lane that sees it, counted from rest to rest, with nothing on a timer inside the window; prove it by putting a regression in and seeing it fail. Show the counts are the same over three runs at different loads (`bun run remote --cores 1|2|4`).
 - A budget fails only when work grows. If the growth is on purpose, raise the budget to the new count plus about 10 % in the same change and say why; lower it when the run prints that a count is well under. `JUNO_WORK_COUNTS=1` prints the counts, `detail` what they are made of.
 
