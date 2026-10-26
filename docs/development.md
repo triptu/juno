@@ -1239,7 +1239,7 @@ bun run flake apps/desktop/e2e/sidebar-hold.spec.ts -g "order holds" --repeat 12
 bun run flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 400 --workers 32
 ```
 
-Measure the failure rate before a fix and prove the fix with the same count and load. A test that fails a few times in a hundred needs a hundred or more runs to show it. To see what the app was doing when a test failed, add a temporary `console.log` of what the test cannot see in its assertion (what `:hover` matches, which Slack calls arrived) and repeat; the line reporter prints it.
+Measure the failure rate before a fix and prove the fix with the same count and load. Past about 8 browser workers on a four-core job, pages crash for memory (`Target crashed`, `Page crashed`): count those apart from the failure you are hunting. A test that fails a few times in a hundred needs a hundred or more runs to show it. To see what the app was doing when a test failed, add a temporary `console.log` of what the test cannot see in its assertion (what `:hover` matches, which Slack calls arrived) and repeat; the line reporter prints it.
 
 Causes found so far (2026-10-15):
 
@@ -1327,6 +1327,8 @@ Causes found so far (2026-10-15):
 - **A Home card shown again from a view read before its write.** Home tells the engine it showed Automated's record (`home.movesShown`), and the engine leaves the card out after that. Views it had read before the write still held the card and, under load, reached the renderer about 600 ms later, after the test had opened a topic and Home again: that Home showed the card a second time and kept it for the visit (`dom/automated.test.ts`, 8 of 32 with the unit tests running beside the DOM lane; 0 of 12 after). A later Home now leaves the card out until a view comes without it (`movesShownPendingAtom` in `packages/state/src/home.ts`). An identity check on the shown item was not enough: each stale view decodes a new item. To see this kind of race, log each live value's `seq` as it arrives in the renderer beside the engine's reads.
 
 - **Live events for history.** The search restore step posted 280 older messages through the fake's socket, then waited 5 s for a newer one to reach #eng's preview. The engine takes them one transaction at a time, as designed (performance.md: 5 ms per event), and in the browser lane at 3 workers the preview took 3.4 to 4.0 s; at 8 workers 38 of 40 failed with the preview at an older message. Slack sends no event for a message older than the newest, so the step now stores them as history (`silent: true`) and Search finds them through Slack: 0 of 40 at 8 workers. Set up history as history; send through the socket only what Slack would send live.
+
+- **A download that beat the first sync.** Home downloads its next picture when idle after it paints, which can be during the first sync, and shows a picture already on disk when it first becomes caught up (SPEC 12). `home-pictures.spec.ts` checked that the first caught-up Home had no picture, which held only while the sync ended before the download: 3 of 160 failed at 12 and 16 browser workers with Home showing a picture. The test now holds the small picture (`picture:small`) until it has checked that Home, then releases it and checks the picture does not arrive on that Home: 0 of 160 at 12 workers.
 
 ## Machine shapes
 
