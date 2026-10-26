@@ -249,10 +249,11 @@ test('search: Tab from the field lands on a card and the topic’s edge moves wi
 })
 
 // The restored window needs a relaunch, so it goes last. Each step has a Search tab of its own, as above.
-test('search: reader navigation applies the whole query beyond the message window; a result not on this Mac shows at once and held arrows load only where they stop; a held Slack answer restores a saved window beyond 200 matches', async ({ juno, slack, fake, relaunch, userData }) => {
-  await test.step('reader navigation applies the whole query beyond the message window', () => navigateMatches({ juno, fake }))
-  await juno.tabs.menu('close-tab')
+test('search: a result not on this Mac shows at once and held arrows load only where they stop; reader navigation applies the whole query beyond the message window; a held Slack answer restores a saved window beyond 200 matches', async ({ juno, slack, fake, relaunch, userData }) => {
+  // First, while #eng's Main is as the sync left it: the step after posts 651 messages there.
   await test.step('a result not on this Mac shows in the reader at once, never the last topic, and held arrows load only where they stop', () => readerWithoutCache({ juno, slack, fake }))
+  await juno.tabs.menu('close-tab')
+  await test.step('reader navigation applies the whole query beyond the message window', () => navigateMatches({ juno, fake }))
   await juno.tabs.menu('close-tab')
   await test.step('a held Slack answer restores a saved window beyond 200 matches', () => restoreWindow({ juno, fake, relaunch, userData }))
 })
