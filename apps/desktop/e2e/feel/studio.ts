@@ -13,8 +13,8 @@ import { join, resolve } from 'node:path'
 import { PIXEL_DELTA, type ShotPixels, type Verdict } from './checks'
 import { STAMP, type Recording, type Rect } from './recorder'
 
-/** Where every run writes its artefacts; gitignored and emptied at the start of a run. */
-export const REPORT_DIR = resolve(__dirname, '../../feel-report')
+/** Where every run writes its artefacts; gitignored and emptied at the start of a run. The e2e config puts it with the test results. */
+export const REPORT_DIR = process.env.JUNO_FEEL_REPORT ?? resolve(__dirname, '../../feel-report')
 
 /** Video plays this many times slower than the recording. */
 export const SLOW_MOTION = 4
@@ -48,7 +48,8 @@ export class Studio {
   #browser: Browser | undefined
 
   async #page(dir: string): Promise<Page> {
-    this.#browser ??= await chromium.launch({ channel: process.env.FEEL_BROWSER === 'chromium' ? undefined : 'chrome', headless: true })
+    // As the gallery's: the installed Chrome, or Playwright's build where none is installed (the remote runner sets GALLERY_BROWSER).
+    this.#browser ??= await chromium.launch({ channel: (process.env.FEEL_BROWSER ?? process.env.GALLERY_BROWSER) === 'chromium' ? undefined : 'chrome', headless: true })
     const page = await this.#browser.newPage({ viewport: { width: STRIP_COLUMNS * (TILE_WIDTH + 8) + 24, height: 800 } })
     await page.route(`${ORIGIN}/**`, async (route) => {
       const path = new URL(route.request().url()).pathname

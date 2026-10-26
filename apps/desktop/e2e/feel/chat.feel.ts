@@ -27,14 +27,15 @@ const test = agentTest.extend<{ feel: Feel }, { studio: Studio }>({
   },
 })
 
+// Starts signed in and synced (README, "Synced start"); the agent still starts with each launch.
+test.use({ synced: true })
+
 const POSTGRES = 'Draft plan is in the doc'
 const TAB = 'main [data-juno-chat]'
 const PANEL = 'aside[data-juno-panel]'
 
-test('open the Juno tab, send, and the first bubble arrives', async ({ juno, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+test('open the Juno tab, send, and the first bubble arrives', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 
   await feel.run(
     {
@@ -90,10 +91,8 @@ test('open the Juno tab, send, and the first bubble arrives', async ({ juno, fee
 
 })
 
-test('react to a Juno bubble in the Juno tab', async ({ juno, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+test('react to a Juno bubble in the Juno tab', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const composer = juno.win.locator(`${TAB} textarea`)
   await composer.fill('what is on today?')
@@ -132,10 +131,8 @@ test('react to a Juno bubble in the Juno tab', async ({ juno, feel }) => {
   )
 })
 
-test('open the Juno panel beside a topic with ⌘J', async ({ juno, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
+test('open the Juno panel beside a topic with ⌘J', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+  await juno.setWindowSize(1400, 900)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectAtBottom()
 
@@ -173,10 +170,8 @@ test('open the Juno panel beside a topic with ⌘J', async ({ juno, feel }) => {
   )
 })
 
-test('attach an image in the Juno tab and send it: the chip and the thumbnail keep their boxes', async ({ juno, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+test('attach an image in the Juno tab and send it: the chip and the thumbnail keep their boxes', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const composer = juno.win.locator(`${TAB} [data-juno-composer]`)
   await composer.locator('textarea').waitFor()
@@ -288,11 +283,9 @@ const longTest = test.extend({
   },
 })
 
-longTest('a long chat: jump to the bottom, then scroll up through it', async ({ juno, feel }) => {
+longTest('a long chat: jump to the bottom, then scroll up through it', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
   longTest.setTimeout(240_000)
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const composer = juno.win.locator(`${TAB} textarea`)
   const scroller = juno.win.locator(`${TAB} [data-scroll]`)

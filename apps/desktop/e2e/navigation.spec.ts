@@ -9,8 +9,7 @@ import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
 
-// @mac: on Linux the width is not restored after the relaunch at the end (macOS quit and menu path); the Mac runs it.
-syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', { tag: ['@mac', '@electron'] }, async ({ juno, running, userData, fake, slackApp }) => {
+syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', async ({ juno, running, userData, fake, slackApp }) => {
   const { frame, nav, sidebar } = juno
 
   await frame.expectWidth(384)

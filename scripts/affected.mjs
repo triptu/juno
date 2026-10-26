@@ -28,7 +28,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ImportGraph } from './import-graph.mjs'
 import { galleryComponents, GALLERY_BUDGET_SECONDS, rankComponents, reachSpecs } from './affected-select.mjs'
-import { guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, NIGHTLY_AREAS, nightlyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
+import { feelScenarios, guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, NIGHTLY_AREAS, nightlyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { bunTestScripts, unitTestItems } from './affected-tests.mjs'
 import { isDomTest } from './dom-tests.mjs'
@@ -344,10 +344,12 @@ if (specs.length > 0) {
 for (const { script, reached } of bunTestScripts(root, changed))
   if (everythingChanged.length > 0 || toolChanged.length > 0 || reached.length > 0)
     plan.push({ script, args: [], local: false, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
-
-// perf and feel are suggested only for an interaction with a budget whose own files changed.
+// An interaction with a budget whose own files changed: perf is suggested, and its feel scenario runs (feelScenarios; --wide, every one reached).
 const interactions = batch ? [] : perfInteractionsChanged(changed)
-
+const feel = pending(feelScenarios(batch ? [] : [...files], changed, interactions).map(({ file, own }) => ({ suite: 'desktop', id: file, own, inputs: new Set([...app, ...support, ...closure(file)]) })).filter((item) => wide || item.own))
+// A desktop step over every spec runs every project, so it already runs the feel scenarios unless their tag is skipped.
+const everyFeel = plan.some((step) => step.script === 'test:desktop' && step.args.length === 0) && !skipTags.includes('@nightly-feel')
+if (feel.length > 0 && !everyFeel) plan.push({ script: 'test:desktop', args: ['--project=feel', ...feel.map((item) => item.id.replace('apps/desktop/', ''))], local: false, items: feel, why: `${feel.length} feel scenario file(s): ${wide ? 'the change reaches them' : 'changed, their harness changed, or the scenario of a changed interaction'}` })
 // --plan --json prints the plan for tools (a replay of past merges, for one).
 if (flag('--json')) {
   writeFileSync(1, JSON.stringify({ changed, steps: plan.map((step) => ({ script: step.script, args: step.args, env: step.env, local: step.local === true, items: step.items.map((item) => item.id), why: step.why })), notes: desktopNotes, heavySkipped: skipTags }) + '\n')
@@ -367,7 +369,7 @@ if (!batch && skipTags.some((tag) => tag.startsWith('@heavy')) && plan.some((ste
 if (!batch && nightlySkipped.length > 0 && plan.some((step) => step.script === 'test:desktop' || step.script === 'test:dom')) console.log(`  (@nightly tests skipped: ${nightlySkipped.map((area) => area.area).join(', ')}; no changed file is in their area. --wide, a nightly run (verify:main --nightly) and a release run them)`)
 if (plan.length === 0) console.log('  nothing to run')
 for (const entry of interactions)
-  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, bun run perf -g "${entry.perf}"${entry.feel ? ` and bun run test:feel ${entry.feel}` : ''})`)
+  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, bun run perf -g "${entry.perf}" when Tushar asks)`)
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
 const results = await runPlan(plan, { root, local: flag('--local') })

@@ -7,8 +7,8 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID, type FakeSlack } from '@juno/fake-slack'
-import { expect, launchApp } from '../fixtures'
-import { Juno, pointAt, press, ReviewSheetPane, type HomeItemKind } from '../driver/juno'
+import { expect } from '../fixtures'
+import { pointAt, press, ReviewSheetPane, type HomeItemKind, type Juno } from '../driver/juno'
 import { answersWithin } from './answers'
 import { feedbackInOneFrame, firstFrameRight, landsAndStays, noFlicker, noLayoutShift, opensWhole, switchesOnce } from './checks'
 import { Feel, test } from './feel'
@@ -108,7 +108,7 @@ async function actOnRow(feel: Feel, juno: Juno, card: Card): Promise<void> {
       ],
       regions: { sheet: SHEET, list: `${SHEET} ul[data-review-list]`, sidebar: 'aside[aria-label="Sidebar"]' },
       checks: [
-        feedbackInOneFrame('look', 'pointerdown', 'the button press', { from: 'press' }),
+        // Buttons keep their look while pressed (10-21, no press scale): the row's answer is the feedback.
         // The row is the user's own action: it says so at once, before the engine answers.
         answersWithin('handled', 'pointerup', 'the row', { from: 'press', frames: 2 }),
         landsAndStays('outcome', 'the outcome'),
@@ -154,10 +154,11 @@ async function closeSheet(feel: Feel, juno: Juno, card: Card): Promise<void> {
   )
 }
 
+// Each card's sheet is opened, acted on and closed; cards that can show together share a launch.
 test.describe('cards from the AI jobs', () => {
   test.use({ aiJobs: true })
 
-  test('Tidy up: the sheet opens whole and a Resolve moves no row', async ({ juno, fake, win, feel }) => {
+  test('Tidy up and follow-ups that look done: each sheet opens whole, and Resolve and Mark done move no row', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, win, feel }) => {
     const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
     fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
     fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
@@ -168,14 +169,10 @@ test.describe('cards from the AI jobs', () => {
     await juno.tabs.close('Settings')
     await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toContain('tidyUp')
     await reviewSheet(feel, juno, { name: 'review-tidy-up', kind: 'tidyUp', sheet: 'settled', row: 'The staging deploy keys need rotating' })
-  })
 
-  test('follow-ups that look done: the sheet opens whole and Mark done moves no row', async ({ juno, fake, feel }) => {
-    await juno.signIn()
-    await juno.waitForSync()
     await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toContain('followUp')
-    const root = fake.workspace.main('D0SAM')[0]!
-    fake.workspace.post({ channel: 'D0SAM', threadTs: root.ts, user: SELF_ID, text: 'Left my notes on the packet: https://docs.example.com/packet-review' })
+    const dm = fake.workspace.main('D0SAM')[0]!
+    fake.workspace.post({ channel: 'D0SAM', threadTs: dm.ts, user: SELF_ID, text: 'Left my notes on the packet: https://docs.example.com/packet-review' })
     await expect.poll(() => freshHome(juno), { timeout: 30_000 }).toContain('doneFollowUps')
     await reviewSheet(feel, juno, { name: 'review-follow-ups', kind: 'doneFollowUps', sheet: 'doneFollowUps', row: "You said you'd review Dev's packet this week" })
   })
@@ -190,54 +187,45 @@ function followedUnread(fake: FakeSlack, text: string): void {
   fake.followThread({ channel: 'C0PLATFORM', threadTs: root.ts })
 }
 
-test('threads you never open: the sheet opens whole and Unfollow moves no row', async ({ juno, fake, feel }) => {
+// Home shows three rows (SPEC 12), and the seed's waiting question is one, so two cards share a launch.
+test('threads you never open and channels you never read: each sheet opens whole, and Unfollow and Ignore move no row', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, feel }) => {
   followedUnread(fake, 'Billing queue rollout')
   followedUnread(fake, 'Pricing page copy')
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toContain('unfollow')
-  await reviewSheet(feel, juno, { name: 'review-unfollow', kind: 'unfollow', sheet: 'unfollow', row: 'Billing queue rollout' })
-})
-
-test('channels you never read: the sheet opens whole and Ignore moves no row', async ({ juno, fake, feel }) => {
   fake.addChannel({ id: 'C0BUILDS', name: 'build-chatter', messages: [{ user: 'U0LEO', text: 'Nightly builds move to 2am', ago: 40 * 24 * 60 }] })
   for (let i = 0; i < 55; i++) {
     fake.workspace.post({ channel: 'C0BUILDS', user: i % 2 === 0 ? 'U0LEO' : 'U0SAM', text: `Build ${i} is green`, at: fake.now() - 6 * DAY + i * 2 * 60 * 60_000, silent: true })
   }
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toContain('ignore')
+  await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toEqual(expect.arrayContaining(['unfollow', 'ignore']))
+  await reviewSheet(feel, juno, { name: 'review-unfollow', kind: 'unfollow', sheet: 'unfollow', row: 'Billing queue rollout' })
   await reviewSheet(feel, juno, { name: 'review-ignore', kind: 'ignore', sheet: 'ignore', row: '#build-chatter' })
 })
 
-test('old drafts: the sheet opens whole and Delete moves no row', async ({ juno, fake, slackApp, userData, running, studio }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await running.close()
-  const root = fake.workspace.main('C0ENG').find((message) => message.text?.startsWith(POSTGRES) === true)!
-  const old = String(Date.now() - 15 * DAY)
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-  const insert = db.prepare('INSERT INTO drafts (topic_id, text, updated_at) VALUES (?, ?, ?)')
-  insert.run('m:C0ENG', 'Before the window we should', old)
-  insert.run(`t:C0ENG:${root.ts}`, 'Can we move the cutover to', old)
-  db.close()
-  const relaunched = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const app = new Juno(relaunched.app, relaunched.win)
-    await expect(app.home.navItem).toBeVisible({ timeout: 30_000 })
-    await expect.poll(() => freshHome(app), { timeout: 30_000 }).toContain('oldDrafts')
-    await reviewSheet(new Feel(relaunched.win, studio, 'old drafts'), app, { name: 'review-old-drafts', kind: 'oldDrafts', sheet: 'oldDrafts', row: '#eng' })
-  } finally {
-    await relaunched.close()
-  }
-})
-
-test("Automated's record: the sheet opens whole and Move back moves no row", async ({ juno, fake, feel }) => {
+test("Automated's record, then old drafts after a relaunch: each sheet opens whole, and Move back and Delete move no row", { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, userData, relaunch, studio, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
   fake.workspace.addConversation({ id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: fake.now(), topic: '', purpose: '', isOpen: true, archived: false })
   fake.joinChannel({ channel: 'C0CIBUILDS' })
   for (let n = 1; n <= 6; n++) fake.injectMessage({ channel: 'C0CIBUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
-  await expect.poll(() => freshHome(juno), { timeout: 30_000 }).toContain('automatedMoves')
+  // The card shows once a day, and a visit spends it: stay on Home (dom/automated-record.test.ts).
+  await juno.home.open()
+  await expect.poll(() => juno.home.kinds(), { timeout: 30_000 }).toContain('automatedMoves')
   await reviewSheet(feel, juno, { name: 'review-automated', kind: 'automatedMoves', sheet: 'automated', row: '#ci-builds' })
+
+  // Two old drafts, written while the app is closed, as a launch weeks later finds them.
+  const root = fake.workspace.main('C0ENG').find((message) => message.text?.startsWith(POSTGRES) === true)!
+  const old = String(Date.now() - 15 * DAY)
+  const app = await relaunch({
+    whileClosed: async () => {
+      const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+      const insert = db.prepare('INSERT INTO drafts (topic_id, text, updated_at) VALUES (?, ?, ?)')
+      insert.run('m:C0ENG', 'Before the window we should', old)
+      insert.run(`t:C0ENG:${root.ts}`, 'Can we move the cutover to', old)
+      db.close()
+    },
+  })
+  await expect(app.home.navItem).toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => freshHome(app), { timeout: 30_000 }).toContain('oldDrafts')
+  await reviewSheet(new Feel(app.win, studio, 'old drafts'), app, { name: 'review-old-drafts', kind: 'oldDrafts', sheet: 'oldDrafts', row: '#eng' })
 })
