@@ -13,8 +13,8 @@
 //   and the files each one owns. The plan suggests perf and feel on the Mac only
 //   when one of these changed.
 // - GUARD_SPECS: desktop specs that guard the most frequent paths. A plan
-//   always runs one when a changed file is in its area, whatever the coverage
-//   map ranks or the time budget leaves. None now: the instant paths check is
+//   always runs one when a changed file is in its area, whatever the time
+//   budget leaves. None now: the instant paths check is
 //   a DOM lane file (dom/instant-paths.test.ts), and every change to the
 //   renderer, the host or what they import reaches every DOM file.
 //
