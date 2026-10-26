@@ -202,13 +202,15 @@ test('threads you never open and channels you never read: each sheet opens whole
   await reviewSheet(feel, juno, { name: 'review-ignore', kind: 'ignore', sheet: 'ignore', row: '#build-chatter' })
 })
 
-test("Automated's record and old drafts: each sheet opens whole, and Move back and Delete move no row", { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, userData, relaunch, studio, feel }) => {
+test("Automated's record, then old drafts after a relaunch: each sheet opens whole, and Move back and Delete move no row", { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, userData, relaunch, studio, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
   fake.workspace.addConversation({ id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: fake.now(), topic: '', purpose: '', isOpen: true, archived: false })
   fake.joinChannel({ channel: 'C0CIBUILDS' })
   for (let n = 1; n <= 6; n++) fake.injectMessage({ channel: 'C0CIBUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
-  await expect.poll(() => freshHome(juno), { timeout: 30_000 }).toContain('automatedMoves')
+  // The card shows once a day, and a visit spends it: stay on Home (dom/automated-record.test.ts).
+  await juno.home.open()
+  await expect.poll(() => juno.home.kinds(), { timeout: 30_000 }).toContain('automatedMoves')
   await reviewSheet(feel, juno, { name: 'review-automated', kind: 'automatedMoves', sheet: 'automated', row: '#ci-builds' })
 
   // Two old drafts, written while the app is closed, as a launch weeks later finds them.
