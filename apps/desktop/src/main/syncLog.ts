@@ -12,7 +12,8 @@ import { lastLines, warningLines } from '../logging'
 /** How many engine.log lines the block carries. */
 export const SYNC_LOG_LINES = 200
 
-export const osVersion = (): string => process.platform === 'darwin' ? `macOS ${process.getSystemVersion()}` : `${process.platform} ${release()}`
+// The web shell's host runs this in Node, which has no `getSystemVersion`, on a Mac too.
+export const osVersion = (): string => process.platform === 'darwin' && typeof process.getSystemVersion === 'function' ? `macOS ${process.getSystemVersion()}` : `${process.platform} ${release()}`
 
 export async function syncLogText(version: string, { phase, reason }: SyncLogInput, at = new Date(), folder?: string): Promise<string> {
   const why = reason === undefined ? '' : ` (${[reason.error, reason.method, reason.detail].filter((part) => part !== undefined).join(', ')})`
