@@ -4,7 +4,7 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed with full sampling and every solver check, full gallery walks and Mac suites
+//   bun run verify:main --nightly         every check uncached, a fresh Quint seed, full gallery walks; laptop only
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
@@ -25,8 +25,9 @@
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
 // suite failed. perf and test:feel time the Mac, so they run only with
-// --with-mac, one after the other, each holding the whole machine; the feel
-// contact sheet is copied next to the logs.
+// --with-mac, after the @mac tests, each holding the whole machine; with the
+// plan on the laptop they start when it does. The feel contact sheet is
+// copied next to the logs.
 
 import { spawn, spawnSync } from 'node:child_process'
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
@@ -51,7 +52,7 @@ import { checkoutReach } from './nightly-reach.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
-const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
+const withMac = argv.includes('--with-mac')
 const nightly = argv.includes('--nightly')
 const smoke = argv.includes('--smoke')
 const reachOnly = argv.includes('--nightly-reach-only')
@@ -59,7 +60,8 @@ const reach = reachOnly || argv.includes('--release')
 if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
 if (reach && ['--smoke', '--repair', '--nightly'].some((flag) => argv.includes(flag))) throw new Error('--release and --nightly-reach-only cannot be combined with --smoke, --repair or --nightly (which runs every nightly test)')
 const noCache = argv.includes('--no-cache')
-const seed = process.env.SPECS_SEED ?? (nightly ? String(randomInt(1, 2 ** 32)) : undefined)
+// Every spec simulation that runs takes a fresh seed, kept in the record: `bun run specs:check --seed <n>` repeats it.
+const seed = process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
 // The unit tests' shuffled order, kept in the record: `bun run test --seed <n>` repeats it.
 const testSeed = process.env.JUNO_TEST_SEED || String(randomInt(1, 2 ** 32))
 
@@ -103,8 +105,8 @@ const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
 let suites = required.filter((suite) => {
-  // A nightly run reuses no suite from an earlier run: it runs everything.
-  if (baseline || nightly || !protocolRoots[suite.name] || noCache || (seed !== undefined && suite.name === 'specs:check')) return true
+  // A nightly run reuses no suite from an earlier run: it runs everything. The spec seed is always set, and not part of any key.
+  if (baseline || !protocolRoots[suite.name] || noCache || nightly) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
     if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
@@ -244,7 +246,10 @@ if (withMac) {
       if (cancelled) return [{ suite: 'test:desktop @mac', code: 130, seconds: 0, log: '' }]
       const install = local ? { status: installed ? 0 : 1 } : spawnSync('bun', ['install', '--frozen-lockfile', '--silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
-      return [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
+      const mac = [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
+      // perf and feel time this Mac, so they follow its @mac tests; with the plan on the laptop they need not wait for it.
+      if (!local) for (const suite of ['perf', 'test:feel']) mac.push(await run(suite, 'bun', ['run', suite], checkout))
+      return mac
     })(),
   )
 }
@@ -253,8 +258,8 @@ const readLog = (result) => result.log && existsSync(result.log) ? readFileSync(
 const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local || suites.length === 0 ? identity : undefined, reused.map((suite) => suite.identity), baseline?.identity)
 
 if (withMac && !cancelled) {
-  // After the rest, so they do not time a machine the other suites are using.
-  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, local ? localVerifyEnv : {})]
+  // A local plan ran on this Mac too: they wait for it, so they do not time a machine the other suites are using.
+  if (local) for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, localVerifyEnv)]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }
@@ -313,7 +318,7 @@ const summary = {
   nightly, nightlyReach, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
-  allocation: Object.fromEntries(['DESKTOP', 'UNIT'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
+  allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'GALLERY'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
   reports: keepReports(checkout, logDir, planStarted).map((file) => join('.juno-status', relative(statusDir, file))),
 }
 writeRecord(statusDir, runId, summary)
