@@ -67,10 +67,15 @@ test('typing a mention', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, win,
       ],
     },
     async (rec) => {
+      // One key a frame, the fastest typing the checks can tell apart: two keys in one frame would narrow the list
+      // from every person to one at once, which the flicker check reads as the list coming and going.
+      const painted = () => win.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
       await rec.mark('at')
       await win.keyboard.press('@')
+      await painted()
       await rec.mark('m')
       await win.keyboard.press('m')
+      await painted()
       await rec.mark('a')
       await win.keyboard.press('a')
       await expect(juno.topic.suggestion('Maya')).toBeVisible()
