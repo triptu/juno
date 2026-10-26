@@ -1,12 +1,12 @@
-// The perf budgets, on the laptop (baseline checks) or the Mac (absolute budgets), under the exclusive heavy
-// lock (docs/performance.md 7.3). A grep keeps the desktop-only workflow; --with-unit adds the package budgets.
+// The perf budgets, on the Mac (absolute budgets) or the laptop (its small set against the baseline), under the
+// exclusive heavy lock (docs/performance.md 7.3). A grep keeps the desktop-only workflow; --with-unit adds the
+// package budgets. The package budgets run on the Mac only: their p95s of a few milliseconds are not steady on
+// the laptop, and the warm start and topic opens there cover the same queries end to end.
 //
-//   bun run perf                          the package budgets, then every desktop scenario
-//   bun run perf --unit                   the package budgets only
+//   bun run perf                          the package budgets (Mac), then every desktop scenario (the laptop's set there)
+//   bun run perf --unit                   the package budgets only (Mac)
 //   bun run perf -g "<scenario>"          matching desktop scenarios only
-//   bun run perf --with-unit -g "..."     both
-//   bun run perf --part 1                 a nightly's first perf job: the package budgets, the large workspace and the Juno chat
-//   bun run perf --part 2                 its second: every other desktop scenario
+//   bun run perf --with-unit -g "..."     both (Mac)
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -20,15 +20,9 @@ const flag = (name) => {
 }
 const unitsOnly = flag('--unit')
 const withUnit = flag('--with-unit')
-const partAt = args.indexOf('--part')
-const part = partAt === -1 ? undefined : args.splice(partAt, 2)[1]
-if (part !== undefined && part !== '1' && part !== '2') throw new Error('--part is 1 or 2')
 if (unitsOnly && args.length > 0) throw new Error('Use bun run perf --unit, or bun run perf -g <desktop scenario>')
-if (part !== undefined && (unitsOnly || withUnit || args.length > 0)) throw new Error('--part takes no other arguments')
-// A nightly runs perf as two jobs of two cores, one worker each (docs/performance.md 7.3), of about the same
-// time: the package budgets and the two longest scenario groups, then the rest. A new scenario lands in part 2.
-const partOne = 'perf\\.spec\\.ts (large workspace|Juno chat) '
-if (part !== undefined) args.push(part === '1' ? '--grep' : '--grep-invert', partOne)
+const mac = process.platform === 'darwin' || process.env['JUNO_PERF_ABSOLUTE'] === '1'
+if (!mac && (unitsOnly || withUnit)) throw new Error('The package budgets run on the Mac only (docs/performance.md 7.3)')
 
 /**
  * The package budgets: the agent's and the engine's `*.perf.ts` files, which bun test's default pattern skips,
@@ -42,7 +36,7 @@ function unitPerfFiles() {
 
 const env = { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1' }
 let failed = 0
-if (part === undefined ? unitsOnly || withUnit || args.length === 0 : part === '1') {
+if (mac && (unitsOnly || withUnit || args.length === 0)) {
   const chosen = unitPerfFiles()
   // The large-seed budgets share one boot (packages/engine/test/perf/largeSeedEngine.ts), so they run in one process,
   // in bun's shuffled order; every other file runs alone.

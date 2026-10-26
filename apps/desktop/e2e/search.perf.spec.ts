@@ -9,7 +9,7 @@ const READER_BUDGET = 50
 /** ⌘K's keystroke budget, which the Search field shares (performance.md 1). */
 const RESULTS_BUDGET = 100
 
-test('search: arrow to reader and keystroke to results', async ({ juno, slack }) => {
+if (absolute) test('search: arrow to reader and keystroke to results', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const channels = ['eng', 'product', 'platform', 'incidents', 'design-review']
@@ -23,8 +23,8 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
   await field.pressSequentially('albatross', { delay: 60 })
   await expect(rows).toHaveCount(30)
   const resultSamples = await juno.measures('juno.search-results')
-  // Deferred renders fold fast keys into one: the laptop gave 4 or 5 of the 9 on 10-26.
-  expect(resultSamples.length).toBeGreaterThanOrEqual(absolute ? 7 : 3)
+  // Deferred renders fold fast keys into one.
+  expect(resultSamples.length).toBeGreaterThanOrEqual(7)
   budget(stats('search keystroke to rows painted', resultSamples.slice(2)), RESULTS_BUDGET)
 
   for (let i = 0; i < 20; i++) {

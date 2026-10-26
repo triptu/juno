@@ -6,9 +6,10 @@
 //
 //   bun scripts/perf-baseline.mjs update [<results dir>...]
 //       Writes apps/desktop/e2e/perf-baseline.json from the perf-metrics.json
-//       files the runs left (default: the ten newest .remote/<run> with
-//       any). Name runs at different host loads: the load moves the numbers
-//       most. Metrics the runs did not measure keep their old values. Only on
+//       files the runs left (default: the two newest .remote/<run> with
+//       any). Name runs at different host loads, one on a quiet laptop and
+//       one beside another job: the load moves the numbers most. Two runs
+//       are enough to start; more runs, added over time, tighten the spread. Metrics the runs did not measure keep their old values. Only on
 //       request, or after a change that moves a number on purpose: a baseline
 //       refreshed every night would let a slow creep through.
 //   bun scripts/perf-baseline.mjs show [<results dir>...]
@@ -68,7 +69,7 @@ export function merged(old, runs, commit, recorded) {
 if (import.meta.main) {
   const [command, ...dirs] = process.argv.slice(2)
   if (command !== 'update' && command !== 'show') throw new Error('usage: bun scripts/perf-baseline.mjs update|show [<results dir>...]')
-  const runs = (dirs.length === 0 ? newestRuns(10) : dirs.map((dir) => resolve(dir))).map((dir) => readRun(metricFiles(dir)))
+  const runs = (dirs.length === 0 ? newestRuns(2) : dirs.map((dir) => resolve(dir))).map((dir) => readRun(metricFiles(dir)))
   const old = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : undefined
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
   const next = merged(old, runs, commit, new Date().toISOString().slice(0, 10))

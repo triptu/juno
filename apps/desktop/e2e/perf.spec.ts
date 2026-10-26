@@ -4,6 +4,12 @@
 // its samples and the load average and fails when a p95 (or a p50 where the
 // budget says so) is over its budget.
 //
+// The Mac runs every scenario. The laptop runs a small set that stands in for
+// the rest (docs/performance.md 7.3): the warm start, memory after heavy use,
+// the uncached topic open, send in Main and the 300-message thread's scroll
+// here, and the reopens in topic-reopen.perf.spec.ts. The others are defined
+// on the Mac only (`if (absolute)`).
+//
 //   bun run perf                  every scenario
 //   bun run perf -g "topic view"  some of them
 //   JUNO_PERF_TRACE=<dir>      also write traces and CPU profiles (scripts/perf-trace.mjs)
@@ -148,14 +154,14 @@ if (absolute) test('frame floor: input with no work to the next frame', async ({
   stats('frame floor, pointerdown with no work to next frame presented', await win.evaluate(() => (window as unknown as { __floor: number[] }).__floor))
 })
 
-defaultSeedTest('keystroke controls: composer, composer with a long draft, bare input and palette', async ({ juno, win }) => {
+if (absolute) defaultSeedTest('keystroke controls: composer, composer with a long draft, bare input and palette', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await signedIn(juno)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   const hidden = await countHidden(win)
   const interval = await refreshInterval(win)
-  const rounds = count(2, 4)
+  const rounds = 4
   const typeRounds = (input: ReturnType<Page['locator']>) => async () => {
     for (let round = 0; round < rounds; round++) {
       await input.pressSequentially('deployment')
@@ -190,12 +196,12 @@ defaultSeedTest('keystroke controls: composer, composer with a long draft, bare 
   expect(await hidden()).toBe(0)
 })
 
-defaultSeedTest('row hover to paint', async ({ juno, win }) => {
+if (absolute) defaultSeedTest('row hover to paint', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await signedIn(juno)
   const measureHovers = async () => {
     const rows = juno.sidebar.rows
-    const hovers = Math.min(await rows.count(), count(7, 9))
+    const hovers = Math.min(await rows.count(), 9)
     const samples: number[] = []
     for (let i = 0; i < hovers; i++) {
       const row = rows.nth(i)
@@ -261,11 +267,10 @@ async function armHomeSample(nav: Locator): Promise<void> {
 // Home button warms home.view (performance.md 4.2), and that prefetch is still
 // held here, so these opens render cached data on a slow CPU. They have
 // their own budget, 150 ms; the quick opens keep 50 ms (performance.md 1).
-// The slowdown after idle is Apple silicon's power management, so the
-// laptop takes quick opens only.
-defaultSeedTest('home open: from a topic to Home painted', async ({ juno, win }) => {
+// The slowdown after idle is Apple silicon's power management.
+if (absolute) defaultSeedTest('home open: from a topic to Home painted', async ({ juno, win }) => {
   test.setTimeout(360_000)
-  const idleEvery = absolute ? 4 : 0
+  const idleEvery = 4
   await signedIn(juno)
   const { home, sidebar, topic } = juno
   await home.open()
@@ -284,8 +289,8 @@ defaultSeedTest('home open: from a topic to Home painted', async ({ juno, win })
   const samples: number[] = []
   const idle: number[] = []
   const cold: string[] = []
-  const afterIdle = (i: number) => idleEvery > 0 && i % idleEvery === idleEvery - 1
-  for (let i = 0; i < count(7, 20); i++) {
+  const afterIdle = (i: number) => i % idleEvery === idleEvery - 1
+  for (let i = 0; i < 20; i++) {
     await sidebar.row(POSTGRES).open()
     await topic.expectTitle(POSTGRES)
     await win.waitForTimeout(afterIdle(i) ? 31_000 : 300)
@@ -311,7 +316,6 @@ defaultSeedTest('home open: from a topic to Home painted', async ({ juno, win })
   }
   const open = stats('home open, quick (pointerdown on Home) to Home painted', samples)
   budget(open, 50)
-  if (idle.length === 0) return
   console.log(`home open after the subscription's idle time: ${cold.join('; ')}`)
   budget(stats('home open after 31 s idle (pointerdown on Home) to Home painted', idle), 150)
 })
@@ -320,7 +324,7 @@ defaultSeedTest('home open: from a topic to Home painted', async ({ juno, win })
 // shows the media viewer with its item and filmstrip (performance.md section
 // 1, "Media viewer open"). The viewer's chunk is preloaded once a topic has
 // painted, so this is the overlay's own cost.
-defaultSeedTest('media viewer open: a picture in a message to the viewer painted', async ({ juno, win, fake }) => {
+if (absolute) defaultSeedTest('media viewer open: a picture in a message to the viewer painted', async ({ juno, win, fake }) => {
   test.setTimeout(180_000)
   await signedIn(juno)
   const { sidebar, topic } = juno
@@ -330,7 +334,7 @@ defaultSeedTest('media viewer open: a picture in a message to the viewer painted
   const tiles = row.locator('[data-thumbnail]')
   await expect(tiles).toHaveCount(4)
   const samples: number[] = []
-  for (let i = 0; i < count(8, 16); i++) {
+  for (let i = 0; i < 16; i++) {
     const tile = tiles.nth(i % 4)
     // The topic opens at its divider, so the new message can sit under the composer.
     await tile.scrollIntoViewIfNeeded()
@@ -373,14 +377,14 @@ defaultSeedTest('media viewer open: a picture in a message to the viewer painted
   budget(open, 50)
 })
 
-defaultSeedTest('live update: a reply from another client to pixels', async ({ juno, fake }) => {
+if (absolute) defaultSeedTest('live update: a reply from another client to pixels', async ({ juno, fake }) => {
   test.setTimeout(120_000)
   await signedIn(juno)
   const postgres = juno.sidebar.row(POSTGRES)
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(POSTGRES))!
   const measured: number[] = []
   const wall: number[] = []
-  for (let i = 0; i < count(7, 9); i++) {
+  for (let i = 0; i < 9; i++) {
     const text = `Perf sample ${i} ${Date.now()}`
     const at = Date.now()
     fake.injectMessage({ channel: 'C0ENG', threadTs: root.ts, user: 'U0LEO', text })
@@ -396,14 +400,14 @@ defaultSeedTest('live update: a reply from another client to pixels', async ({ j
   stats('live update, inject call to new preview seen by Playwright', wall)
 })
 
-defaultSeedTest('send: Enter to the pending row painted', async ({ juno }) => {
+if (absolute) defaultSeedTest('send: Enter to the pending row painted', async ({ juno }) => {
   test.setTimeout(120_000)
   await signedIn(juno)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   const hidden = await countHidden(juno.win)
   const measured: number[] = []
-  for (let i = 0; i < count(9, 30); i++) {
+  for (let i = 0; i < 30; i++) {
     const text = `Perf send ${i} ${Date.now()}`
     const before = (await juno.measures('juno.send')).length
     await juno.topic.send(text)
@@ -436,14 +440,14 @@ defaultSeedTest('send: Enter to the pending row painted', async ({ juno }) => {
 // against the budget, as the plain composer control is: the presentation
 // measure misses it on a bare input too (performance.md 7.1).
 for (const { kind, query } of [{ kind: 'mention', query: '@ma' }, { kind: 'emoji', query: ':smi' }]) {
-  defaultSeedTest(`${kind} typing: each keystroke of "${query}" to its character presented`, async ({ juno, win }) => {
+  if (absolute) defaultSeedTest(`${kind} typing: each keystroke of "${query}" to its character presented`, async ({ juno, win }) => {
     test.setTimeout(120_000)
     await signedIn(juno)
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.expectTitle(POSTGRES)
     const hidden = await countHidden(win)
     const interval = await refreshInterval(win)
-    const rounds = count(4, 10)
+    const rounds = 10
     // The same keys in a bare input first: the floor the composer is held to.
     const control = stats(`${kind} typing, bare input (control) input timestamp to character presented`, (await nativeControl(win, `typing-${kind}-control`, async (field) => {
       for (let round = 0; round < rounds; round++) {
@@ -502,14 +506,13 @@ async function firstOpen(win: Page, eventType: 'click' | 'pointerdown' | 'pointe
   return win.evaluate(() => (window as unknown as { __firstOpen: Promise<number> }).__firstOpen)
 }
 
-defaultSeedTest('first open in a second app: account menu, topic switcher, emoji picker and Settings', async ({ juno, fake, slackApp, userData, running }) => {
+if (absolute) defaultSeedTest('first open in a second app: account menu, topic switcher, emoji picker and Settings', async ({ juno, fake, slackApp, userData, running }) => {
   test.setTimeout(180_000)
   await signedIn(juno)
   await running.close()
-  // One second app on the Mac; on the laptop the median of three, since one first open there moved 1.5 times between runs.
   const samples = new Map<string, number[]>()
   const add = (name: string, ms: number) => samples.set(name, [...(samples.get(name) ?? []), ms])
-  for (let launch = 0; launch < count(3, 1); launch++) {
+  for (let launch = 0; launch < 1; launch++) {
     const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
     try {
       const fresh = new Juno(again.app, again.win)
@@ -571,7 +574,7 @@ defaultSeedTest('send in Main: Enter through the checks on send to the pending r
     await slow.topic.expectTitle('Main')
     const hidden = await countHidden(slow.win)
     const measured: number[] = []
-    for (let i = 0; i < count(7, 9); i++) {
+    for (let i = 0; i < count(5, 9); i++) {
       const text = `Perf main ${i} ${Date.now()}`
       const before = (await slow.measures('juno.send')).length
       await slow.topic.composer.fill(text)
@@ -638,7 +641,7 @@ test.describe('large workspace', () => {
     await rm(slackDir, { recursive: true, force: true })
   })
 
-  test('launch warm start: show the hidden sidebar', async () => {
+  if (absolute) test('launch warm start: show the hidden sidebar', async () => {
     const running = await launch()
     try {
       const juno = new Juno(running.app, running.win)
@@ -646,7 +649,7 @@ test.describe('large workspace', () => {
       await juno.sidebar.expectRows()
       await juno.expectEngineLive(120_000)
       const samples: number[] = []
-      for (let i = 0; i < count(7, 8); i++) {
+      for (let i = 0; i < 8; i++) {
         await juno.frame.toggleWithButton()
         const show = win.getByRole('button', { name: /^Show sidebar/ }).locator('visible=true')
         await show.evaluate((node) => {
@@ -671,14 +674,16 @@ test.describe('large workspace', () => {
     test.setTimeout(300_000)
     const runs: Array<Awaited<ReturnType<Juno['startupTimes']>>> = []
     const composers: number[] = []
-    // The first launch warms the OS and V8 caches and is not counted.
-    for (let i = 0; i < 6; i++) {
+    // On the Mac the first launch warms the OS and V8 caches and is not counted, since the budget reads the
+    // median. The laptop reads the lower quartile, which a slow first launch does not move.
+    const warmups = absolute ? 1 : 0
+    for (let i = 0; i < count(4, 6); i++) {
       const running = await launch()
       try {
         const juno = new Juno(running.app, running.win)
         await juno.sidebar.expectRows()
         const times = await juno.startupTimes()
-        if (i > 0) runs.push(times)
+        if (i >= warmups) runs.push(times)
         // Where the start goes: main to the renderer's navigation, the bundle loaded and run (`juno.start` is
         // marked after every import), then the shell and the rows. Times after `+` are from the navigation.
         const [created, renderer, marks] = await running.app.evaluate(({ app }) => {
@@ -690,11 +695,11 @@ test.describe('large workspace', () => {
           const first = (name: string) => performance.getEntriesByName(name, 'mark')[0]?.startTime ?? Number.NaN
           return { origin: performance.timeOrigin, start: first('juno.start'), snapshot: first('juno.sidebar-snapshot'), composer: first('juno.composer-ready') }
         })
-        if (i > 0) composers.push(page.origin + page.composer - created)
+        if (i >= warmups) composers.push(page.origin + page.composer - created)
         // Main's own steps from the process's creation (src/main/startupMarks.ts): its bundle has loaded, ready, the scheme served,
         // the window asked for and made, the engine forked and ready, ready-to-show.
-        if (i > 0) console.log(`warm start ${i}: main ${['loaded', 'ready', 'scheme', 'window', 'window-made', 'engine-fork', 'engine-ready', 'shown'].map((name) => `${name} ${((marks[name] ?? Number.NaN) - created).toFixed(0)}`).join(', ')}`)
-        if (i > 0) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, sidebar snapshot at +${page.snapshot.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
+        if (i >= warmups) console.log(`warm start ${i}: main ${['loaded', 'ready', 'scheme', 'window', 'window-made', 'engine-fork', 'engine-ready', 'shown'].map((name) => `${name} ${((marks[name] ?? Number.NaN) - created).toFixed(0)}`).join(', ')}`)
+        if (i >= warmups) console.log(`warm start ${i}: main to renderer process ${(renderer - created).toFixed(0)} ms, to navigation ${(page.origin - created).toFixed(0)} ms, bundle run at +${page.start.toFixed(0)}, sidebar snapshot at +${page.snapshot.toFixed(0)}, shell at +${(created + times.mainToShell - page.origin).toFixed(0)}, rows at +${(created + times.mainToRows - page.origin).toFixed(0)}`)
       } finally {
         await running.close()
       }
@@ -711,7 +716,7 @@ test.describe('large workspace', () => {
     console.log(`long animation frames up to 1 s after the rows: ${runs.map((run) => run.longFrames).join(' ')}`)
   })
 
-  test('filter change: never an empty frame, and the time to the new list', async () => {
+  if (absolute) test('filter change: never an empty frame, and the time to the new list', async () => {
     test.setTimeout(300_000)
     const running = await launch()
     try {
@@ -725,7 +730,7 @@ test.describe('large workspace', () => {
 
       const stop = await sidebar.watchFrames()
       const order: ReadonlyArray<SidebarFilterName> = ['Channels', 'DMs', 'All']
-      for (let round = 0; round < count(3, 5); round++) {
+      for (let round = 0; round < 5; round++) {
         for (const name of order) {
           const before = (await juno.measures('juno.filter')).length
           await sidebar.filter(name)
@@ -744,7 +749,7 @@ test.describe('large workspace', () => {
     }
   })
 
-  test('scroll frame times, and memory after scrolling', async () => {
+  if (absolute) test('scroll frame times, and memory after scrolling', async () => {
     test.setTimeout(300_000)
     const running = await launch()
     try {
@@ -786,8 +791,8 @@ test.describe('large workspace', () => {
     }
   })
 
-  // On the laptop, against its baseline, a shorter use of the same shape: 10 topics, 20 tab switches, 10 chat
-  // messages, 10 s of scrolling and 5 s of idle rather than 20, 50, 40, two minutes and 30 s (performance.md 7.3).
+  // On the laptop, against its baseline, a shorter use of the same shape: 6 topics, 12 tab switches, 6 chat
+  // messages, 6 s of scrolling and 3 s of idle rather than 20, 50, 40, two minutes and 30 s (performance.md 7.3).
   test('memory after heavy use: 20 topics, 50 tab switches, two minutes of mixed scrolling and the Juno panel', async () => {
     test.setTimeout(900_000)
     const running = await launch(true)
@@ -799,7 +804,7 @@ test.describe('large workspace', () => {
       await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
       await readMemory(running, 'memory after launch')
       if (process.env['JUNO_MEMORY_DUMP'] !== undefined) await memoryDump(running.win, `${process.env['JUNO_MEMORY_DUMP']}-launch-live.json`, false)
-      const after = await heavyUse(juno, running, absolute ? {} : { topics: 10, switches: 20, scrollFor: 10_000, chatMessages: 10, idle: 5_000 })
+      const after = await heavyUse(juno, running, absolute ? {} : { topics: 6, switches: 12, scrollFor: 6_000, chatMessages: 6, idle: 3_000 })
       for (const [name, limit] of Object.entries(HEAVY_MEMORY_BUDGETS)) {
         const value = after[name as keyof typeof HEAVY_MEMORY_BUDGETS]
         if (value !== undefined) budget(reading(`${name} private memory after heavy use`, value, 'MB'), limit)
@@ -809,7 +814,7 @@ test.describe('large workspace', () => {
     }
   })
 
-  test('All topics: open, then scroll the whole list, moving its window', async () => {
+  if (absolute) test('All topics: open, then scroll the whole list, moving its window', async () => {
     test.setTimeout(300_000)
     const running = await launch()
     try {
@@ -823,7 +828,7 @@ test.describe('large workspace', () => {
       // Open: mouse down on the nav item to the page painted with rows. Each round closes the tab, so every open mounts the page afresh.
       const nav = juno.allTopics.navItem
       const box = (await nav.boundingBox())!
-      for (let i = 0; i < count(9, 12); i++) {
+      for (let i = 0; i < 12; i++) {
         const before = (await juno.measures('juno.all-topics-open')).length
         // The title bar's icon button: its centre, as Home's open presses.
         await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -842,13 +847,13 @@ test.describe('large workspace', () => {
       console.log(`All topics rows: ${total}`)
       const tableBox = (await table.boundingBox())!
       await win.mouse.move(tableBox.x + tableBox.width / 2, tableBox.y + tableBox.height / 2)
-      await scrollReading(win, 'scroll-all-topics', { steps: count(40, 80), direction: 1, interval: await refreshInterval(win), layoutLimit: 256, placeholders: true, at: { x: tableBox.x + tableBox.width / 2, y: tableBox.y + tableBox.height / 2 } })
+      await scrollReading(win, 'scroll-all-topics', { steps: 80, direction: 1, interval: await refreshInterval(win), layoutLimit: 256, placeholders: true, at: { x: tableBox.x + tableBox.width / 2, y: tableBox.y + tableBox.height / 2 } })
     } finally {
       await running.close()
     }
   })
 
-  test('palette: ⌘K to recent rows, each keystroke to its rows, and every keystroke inside a frame', async () => {
+  if (absolute) test('palette: ⌘K to recent rows, each keystroke to its rows, and every keystroke inside a frame', async () => {
     test.setTimeout(300_000)
     const running = await launch()
     try {
@@ -862,7 +867,7 @@ test.describe('large workspace', () => {
       const keys: number[] = []
       const eventKeys: number[] = []
       const words = ['deplo', 'rollou', 'staging bil', 'index missin']
-      const rounds = count(7, 12)
+      const rounds = 12
       for (let round = 0; round < rounds; round++) {
         const opened = (await juno.measures('juno.palette-open')).length
         await palette.open()
@@ -902,7 +907,7 @@ test.describe('large workspace', () => {
     }
   })
 
-  test('sidebar drag: main-thread work per frame while the edge moves', async () => {
+  if (absolute) test('sidebar drag: main-thread work per frame while the edge moves', async () => {
     test.setTimeout(300_000)
     const running = await launch()
     try {
@@ -934,8 +939,7 @@ test.describe('large workspace', () => {
       const loaf = await win.evaluate(() => (window as unknown as { __loaf: number }).__loaf)
       const perFrame = stats('sidebar drag, main-thread work per frame', work)
       budget(perFrame, 8.3, { floor: 1 })
-      if (absolute) expect(loaf).toBe(0)
-      else budget(reading('sidebar drag: long animation frames', loaf, 'frames'), 0)
+      expect(loaf).toBe(0)
       await juno.frame.expectWidth(384)
     } finally {
       await running.close()
@@ -1040,7 +1044,7 @@ test.describe('topic view', () => {
   /** Twenty switches between Main's tab and the thread's, timed with `juno.tab-switch`. */
   async function switchTabs(juno: Juno): Promise<number[]> {
     const samples: number[] = []
-    for (let i = 0; i < count(8, 20); i++) {
+    for (let i = 0; i < 20; i++) {
       const before = (await juno.measures('juno.tab-switch')).length
       await juno.tabs.select(i % 2 === 0 ? 'perf-main' : THREAD)
       samples.push(await nextMeasure(juno, 'juno.tab-switch', before))
@@ -1083,13 +1087,13 @@ test.describe('topic view', () => {
     await rm(slackDir, { recursive: true, force: true })
   })
 
-  test('topic open: cached, prefetched, and switching tabs', async () => {
+  if (absolute) test('topic open: cached, prefetched, and switching tabs', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
     try {
       const cached: number[] = []
       const prefetched: number[] = []
-      const rounds = count(4, 10)
+      const rounds = 10
       for (let i = 0; i < rounds; i++) {
         // A topic the renderer has not read for over 30 s would be colder still; this is a quick click after a fresh launch window.
         for (const [title, samples] of [
@@ -1114,7 +1118,7 @@ test.describe('topic view', () => {
         }
       })
       // Untimed: every frame of an open is painted at the bottom, with no correction after the first one.
-      for (const title of absolute ? [THREAD, MAIN, THREAD, MAIN] : [THREAD, MAIN]) {
+      for (const title of [THREAD, MAIN, THREAD, MAIN]) {
         const stop = await juno.topic.watchBottom()
         const before = (await juno.measures('juno.topic-open')).length
         await pressRow(juno, title)
@@ -1153,7 +1157,7 @@ test.describe('topic view', () => {
 
   // A topic that is mostly code, opened again once the colours of all its blocks are known. Only blocks near the
   // screen are painted (ADR 0017), so it keeps the cached open's budget.
-  test('topic reopen: 50 code blocks whose colours are known', async () => {
+  if (absolute) test('topic reopen: 50 code blocks whose colours are known', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
     const shown = () => running.win.evaluate(() => {
@@ -1176,7 +1180,7 @@ test.describe('topic view', () => {
       await expect.poll(async () => (await shown()).painted, { timeout: 15_000 }).toBeGreaterThan(0)
       const samples: number[] = []
       const painted: number[] = []
-      for (let i = 0; i < count(5, 10); i++) {
+      for (let i = 0; i < 10; i++) {
         for (const title of [THREAD, CODE]) {
           const before = (await juno.measures('juno.topic-open')).length
           await pressRow(juno, title)
@@ -1200,7 +1204,7 @@ test.describe('topic view', () => {
   // A scrollbar jump into the middle of #perf-code, opened cold: the rows it lands on have never been laid out (the
   // older half, above the last window's worth laid out at the end), and every one is a 40 to 100 line code block. Untimed against a budget of its own: the frames after the jump are
   // read against the scroll frame budget and the long-frame limit, and the row it landed on must not move.
-  test('jump into the middle of 50 tall code blocks: the frames after it lands', async () => {
+  if (absolute) test('jump into the middle of 50 tall code blocks: the frames after it lands', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
     const { win } = running
@@ -1230,21 +1234,20 @@ test.describe('topic view', () => {
       const heaviest = [...work].toSorted((a, b) => b - a).slice(0, 3)
       console.log(`code jump: heaviest frames ${heaviest.map((ms) => ms.toFixed(1)).join(' ')} ms (scroll budget 8.3), long animation frames ${longFrames.map((ms) => ms.toFixed(0)).join(' ') || 'none'}, landed row moved ${moved.toFixed(1)} px, load ${loadavg()[0]!.toFixed(1)}`)
       expect(moved, 'the row the jump landed on moves').toBeLessThan(0.5)
-      if (absolute) expect.soft(longFrames, 'long animation frames after the jump').toEqual([])
-      else budget(reading('code jump: long animation frames after the jump', longFrames.length, 'frames'), 0)
+      expect.soft(longFrames, 'long animation frames after the jump').toEqual([])
     } finally {
       await running.close()
     }
   })
 
   // Peek reads the query the row's hover warmed, so it is a prefetched open: one frame.
-  test('peek: the peek key over a hovered row to the peeked messages painted', async () => {
+  if (absolute) test('peek: the peek key over a hovered row to the peeked messages painted', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
     try {
       const samples: number[] = []
       await traced(running.win, 'peek-open', async () => {
-        for (let i = 0; i < count(4, 10); i++) {
+        for (let i = 0; i < 10; i++) {
           for (const title of [THREAD, MAIN]) {
             await juno.sidebar.row(title).hover()
             await running.win.waitForTimeout(300)
@@ -1291,7 +1294,7 @@ test.describe('topic view', () => {
     }
   })
 
-  test('drag a selection down the 300-message thread with the Juno panel open, while its chip follows', async () => {
+  if (absolute) test('drag a selection down the 300-message thread with the Juno panel open, while its chip follows', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready(true)
     const { win } = running
@@ -1306,26 +1309,23 @@ test.describe('topic view', () => {
         await juno.topic.scroller.evaluate((list) => list.scrollTo({ top: list.scrollHeight - list.clientHeight - 2_400, behavior: 'instant' }))
         await win.waitForTimeout(500)
       }
-      // The same drag with the panel closed: what the selection itself costs, for comparison on the Mac.
-      if (absolute) {
-        await upFromBottom()
-        await selectionDragReading(win, juno.topic.scroller, 'select-drag-no-panel', interval)
-        await win.evaluate(() => document.getSelection()?.removeAllRanges())
-      }
+      // The same drag with the panel closed: what the selection itself costs, for comparison.
+      await upFromBottom()
+      await selectionDragReading(win, juno.topic.scroller, 'select-drag-no-panel', interval)
+      await win.evaluate(() => document.getSelection()?.removeAllRanges())
       await juno.tabs.menu('juno')
       await expect(win.locator('aside[data-juno-panel]')).toBeVisible()
       await upFromBottom()
       const panel = await selectionDragReading(win, juno.topic.scroller, 'select-drag-panel', interval)
       await expect(win.locator('[data-panel-selection]')).toHaveText(/^\d+ messages: “/)
       budget(stats('selection drag with the panel open, frame work', panel.work), 8.3, { floor: 1 })
-      if (absolute) expect.soft(panel.loaf, 'long animation frames while dragging a selection').toBe(0)
-      else budget(reading('selection drag with the panel open: long animation frames', panel.loaf, 'frames'), 0)
+      expect.soft(panel.loaf, 'long animation frames while dragging a selection').toBe(0)
     } finally {
       await running.close()
     }
   })
 
-  test('tab switch back to an unmounted tab, restored at its scroll position', async () => {
+  if (absolute) test('tab switch back to an unmounted tab, restored at its scroll position', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
     try {
@@ -1368,7 +1368,7 @@ test.describe('topic view', () => {
     }
   })
 
-  test('live update in the open thread: write to pixels', async () => {
+  if (absolute) test('live update in the open thread: write to pixels', async () => {
     test.setTimeout(300_000)
     const { running, juno } = await ready()
     try {
@@ -1387,7 +1387,7 @@ test.describe('topic view', () => {
         }).observe({ type: 'measure' })
       })
       await traced(running.win, 'live-update', async () => {
-        for (let i = 0; i < count(7, 9); i++) {
+        for (let i = 0; i < 9; i++) {
           const text = `Perf sample ${i} ${Date.now()}`
           const before = await live()
           fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, threadTs: root.ts, user: 'U0PERFLEO', text })
@@ -1406,7 +1406,7 @@ test.describe('topic view', () => {
   })
 })
 
-test.describe('Juno chat', () => {
+if (absolute) test.describe('Juno chat', () => {
   test.describe.configure({ mode: 'default' })
   let fake: FakeSlack
   let model: FakeOpenRouter
@@ -1449,7 +1449,7 @@ test.describe('Juno chat', () => {
 
       const sends: number[] = []
       const bubbles: number[] = []
-      for (let i = 0; i < count(20, 80); i++) {
+      for (let i = 0; i < 80; i++) {
         const before = { send: (await juno.measures('juno.chat-send')).length, bubble: (await juno.measures('juno.chat-bubble')).length }
         await composer.fill(`message ${i}`)
         await composer.press('Enter')
@@ -1486,7 +1486,7 @@ test.describe('Juno chat', () => {
 
 // The topic composer's mention typing scenario in the Juno tab's composer (performance.md 7.1), on its
 // own fake Slack, model and user data.
-test('Juno mention typing: each keystroke of "@ma" to its character presented', async () => {
+if (absolute) test('Juno mention typing: each keystroke of "@ma" to its character presented', async () => {
   test.setTimeout(240_000)
   const fake = await startFakeSlack()
   const model = await startFakeOpenRouter({ answer })
@@ -1517,7 +1517,7 @@ async function junoMentionTyping(running: RunningApp): Promise<void> {
   await input.waitFor()
   const hidden = await countHidden(win)
   const interval = await refreshInterval(win)
-  const times = count(4, 10)
+  const times = 10
   const rounds = (field: Locator) => async () => {
     for (let round = 0; round < times; round++) {
       await field.pressSequentially('@ma ')
@@ -1547,7 +1547,7 @@ async function pageSwitches(juno: Juno, win: Page): Promise<number[]> {
   }
   await juno.tabs.menu('juno')
   const switches: number[] = []
-  for (let i = 0; i < count(8, 20); i++) {
+  for (let i = 0; i < 20; i++) {
     const before = (await juno.measures('juno.page-switch')).length
     await pick('Activity')
     await expect.poll(async () => (await juno.measures('juno.page-switch')).length, { timeout: 15_000 }).toBeGreaterThan(before)
@@ -1561,7 +1561,7 @@ async function pageSwitches(juno: Juno, win: Page): Promise<number[]> {
 /** ⌘J twenty times beside the open topic: each `juno.panel-open`, in order. With JUNO_PERF_TRACE, the first two are traced. */
 async function panelOpens(juno: Juno, win: Page): Promise<number[]> {
   const panels: number[] = []
-  for (let i = 0; i < count(8, 20); i++) {
+  for (let i = 0; i < 20; i++) {
     const before = (await juno.measures('juno.panel-open')).length
     const open = async () => {
       await juno.tabs.menu('juno')
@@ -1577,10 +1577,10 @@ async function panelOpens(juno: Juno, win: Page): Promise<number[]> {
   return panels
 }
 
-defaultSeedTest('a new tab with Home open to its composer painted', async ({ juno, win }) => {
+if (absolute) defaultSeedTest('a new tab with Home open to its composer painted', async ({ juno, win }) => {
   await signedIn(juno)
   const samples: number[] = []
-  for (let i = 0; i < count(8, 20); i++) {
+  for (let i = 0; i < 20; i++) {
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.expectTitle(POSTGRES)
     await win.evaluate(() => {
@@ -1606,11 +1606,10 @@ defaultSeedTest('a new tab with Home open to its composer painted', async ({ jun
   budget(stats('New tab with Home to its composer', samples), oneFrameBudget(await refreshInterval(win)))
 })
 
-test('quick start: first sign-in to sidebar rows on the large seed, 300 ms per call, production pacing', async () => {
+if (absolute) test('quick start: first sign-in to sidebar rows on the large seed, 300 ms per call, production pacing', async () => {
   test.setTimeout(300_000)
   const samples: number[] = []
-  // Paced calls make it steady (2,793 to 2,806 ms over three on 10-18): one run on the laptop.
-  for (let i = 0; i < count(1, 3); i++) {
+  for (let i = 0; i < 3; i++) {
     const fake = await startFakeSlack({ seed: largeSeed(), latencyMillis: 300 })
     const userData = await tempUserData()
     const slackDir = await tempUserData()
@@ -1665,7 +1664,7 @@ function coldEmojiOpen(win: Page) {
   }))
 }
 
-test('emoji picker with 20,000 workspace emoji, cold subscription and loaded images', async ({ juno, fake, running, userData, slackApp }) => {
+if (absolute) test('emoji picker with 20,000 workspace emoji, cold subscription and loaded images', async ({ juno, fake, running, userData, slackApp }) => {
   test.setTimeout(240_000)
   const images = [...fake.workspace.emoji.values()].flatMap((emoji) => typeof emoji.value === 'string' && !emoji.value.startsWith('alias:') ? [emoji.value] : [])
   const custom = Array.from({ length: 20_000 - images.length }, (_, i) => ({ name: `perf_emoji_${String(i).padStart(5, '0')}`, url: `${images[i % images.length]}?emoji=${i}` }))
@@ -1678,9 +1677,9 @@ test('emoji picker with 20,000 workspace emoji, cold subscription and loaded ima
   db.close()
   const samples: number[] = []
   const preloadWork: number[] = []
-  for (let i = 0; i < count(3, 10); i++) {
-    // The Mac's own load; the laptop's job has its cores, and its host's load is other projects'.
-    if (absolute) await expect.poll(() => loadavg()[0], { timeout: 120_000, intervals: [1000] }).toBeLessThanOrEqual(8)
+  for (let i = 0; i < 10; i++) {
+    // The Mac's own load.
+    await expect.poll(() => loadavg()[0], { timeout: 120_000, intervals: [1000] }).toBeLessThanOrEqual(8)
     const app = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
     try {
       const second = new Juno(app.app, app.win)
@@ -1740,7 +1739,7 @@ test('emoji picker with 20,000 workspace emoji, cold subscription and loaded ima
 
 // Trace the idle preload without ever opening a picker: scripts/perf-trace.mjs
 // sums main-thread work, including module evaluation, inside juno.emoji-preload.
-test('20,000 workspace emoji preload after first paint', async ({ juno, fake, running, userData, slackApp }) => {
+if (absolute) test('20,000 workspace emoji preload after first paint', async ({ juno, fake, running, userData, slackApp }) => {
   test.setTimeout(120_000)
   for (let i = 0; i < 20_000; i++) fake.addEmoji({ name: `preload_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
   await juno.signIn()

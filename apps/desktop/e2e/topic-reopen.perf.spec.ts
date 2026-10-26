@@ -78,14 +78,17 @@ test('topic reopen: Main, a thread and a 600-reply thread from the sidebar, and 
 
   const samples = new Map<string, number[]>()
   const add = (name: string, ms: number) => samples.set(name, [...(samples.get(name) ?? []), ms])
+  // The laptop times Main and the long thread only (performance.md 7.3): the short thread reads like them, and the
+  // link's open moved up to eight times between runs there.
   for (let i = 0; i < (absolute ? 10 : 4); i++) {
-    for (const title of [ENG, POSTGRES, LONG]) {
+    for (const title of absolute ? [ENG, POSTGRES, LONG] : [ENG, LONG]) {
       // From Home, so each open is fresh.
       await juno.home.open()
       const box = (await juno.sidebar.row(title).root.boundingBox())!
       add(title, await rowsAfterPress(juno.win, () => pressAt(juno, box)))
       await juno.topic.expectAtBottom()
     }
+    if (!absolute) continue
     await juno.sidebar.row(ENG).open()
     const anchor = juno.topic.message('Look at the middle step').getByRole('link', { name: 'the middle step' })
     const box = (await anchor.boundingBox())!

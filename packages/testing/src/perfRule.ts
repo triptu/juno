@@ -1,6 +1,6 @@
 /**
  * The laptop's perf rule (docs/performance.md 7.3), for the desktop scenarios
- * (`apps/desktop/e2e/perfBaseline.ts`) and the package budgets (`perfBudget.ts`).
+ * (`apps/desktop/e2e/perfBaseline.ts`).
  *
  * Load on a shared host only adds time, so a metric is a scenario's lower
  * quartile, which its slow samples do not move. A metric is checked only when
