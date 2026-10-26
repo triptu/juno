@@ -818,7 +818,7 @@ The headless shell keeps its 60 Hz frame clock with those flags, so the guard's 
 
 ### Gallery nightly fast sweep, 2026-10-26
 
-Single runs on the laptop, four physical cores. The nightly comparison uses ten workers; the normal comparison uses the default four cached-run workers, with records warmed by a preceding successful walk. CPU and wall cover the Playwright phase (job cgroup), not allocation, build or cache unit tests. Before is `8738adee7`; after is the fast-sweep change. This is a gallery-job comparison, not a full nightly pipeline benchmark.
+Single runs on the laptop, four physical cores. The nightly comparison uses ten workers; the normal comparison uses the default four cached-run workers, with records warmed by a preceding successful walk. CPU and wall cover the Playwright phase (job cgroup), not allocation, build or cache unit tests. Before is `8738adee7`; after is the fast-sweep change. The whole gallery script (including build/cache checks, excluding allocation) took 245 → 81 seconds nightly and 17 → 17 seconds normally. This is a gallery-job comparison, not a full nightly pipeline benchmark.
 
 | Run | Before wall | After wall | Before CPU | After CPU |
 | --- | ---: | ---: | ---: | ---: |
