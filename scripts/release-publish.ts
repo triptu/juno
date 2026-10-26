@@ -147,13 +147,18 @@ if (!urgent) {
 const assetDigest = createHash('sha256').update(JSON.stringify(files.toSorted().map((name) => [name,
   createHash('sha256').update(readFileSync(join(dir, name))).digest('hex'),
 ]))).digest('hex')
-if (draft && (!draft.body.includes(`<!-- juno-assets: ${assetDigest} -->`) || draft.assets.length !== files.length
-  || files.some((name) => !draft.assets.some((asset) => asset.name === name && asset.size === statSync(join(dir, name)).size)))) {
-  if (!values.stage) fail(`${tag} has incomplete or mismatched draft assets; discard the draft and stage it again`)
-  // Rebuilding the same commit can change DMG timestamps. Restage our own draft.
-  if (!dry) measured('discard draft', () => gh(['release', 'delete', tag, '--repo', repo, '--yes']))
-  draft = undefined
+if (draft) {
+  const { body, assets } = draft
+  const matches = body.includes(`<!-- juno-assets: ${assetDigest} -->`) && assets.length === files.length
+    && files.every((name) => assets.some((asset) => asset.name === name && asset.size === statSync(join(dir, name)).size))
+  if (!matches) {
+    if (!values.stage) fail(`${tag} has incomplete or mismatched draft assets; discard the draft and stage it again`)
+    // Rebuilding the same commit can change DMG timestamps. Restage our own draft.
+    if (!dry) measured('discard draft', () => gh(['release', 'delete', tag, '--repo', repo, '--yes']))
+    draft = undefined
+  }
 }
+
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
   .map((release) => normalizeVersion(release.tagName)).toSorted(compareVersions).at(-1)
 if (newest !== undefined && compareVersions(version, newest) <= 0) fail(`${version} is not newer than the published ${newest}`)
