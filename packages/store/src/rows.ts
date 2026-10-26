@@ -36,6 +36,10 @@ export interface MessageRow {
   /** 1 when the content came from a search match: no reactions, files or blocks yet (`@juno/sync` merge rules). */
   readonly partial: Flag
   readonly version: number
+  /** 1 for a message shown only to the signed-in user, which Slack sends only on the socket. Absent means 0. */
+  readonly ephemeral?: Flag
+  /** The app's `bot_id`, for a message an app sent. Absent means unknown. */
+  readonly bot_id?: string | null
 }
 
 export interface ConversationRow {

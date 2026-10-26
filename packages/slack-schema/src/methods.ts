@@ -18,6 +18,8 @@ import {
   UsersPrefsSetFields,
 } from './boot.ts'
 import {
+  ChatAttachmentActionArgs,
+  ChatAttachmentActionFields,
   ChatDeleteArgs,
   ChatDeleteFields,
   ChatPostMessageArgs,
@@ -108,6 +110,7 @@ export const Methods = {
   'chat.shareMessage': method(ChatShareMessageArgs, ChatShareMessageFields),
   'chat.update': method(ChatUpdateArgs, ChatUpdateFields),
   'chat.delete': method(ChatDeleteArgs, ChatDeleteFields),
+  'chat.attachmentAction': method(ChatAttachmentActionArgs, ChatAttachmentActionFields),
   'reactions.add': method(ReactionArgs, ReactionFields),
   'reactions.remove': method(ReactionArgs, ReactionFields),
   'reactions.get': method(ReactionsGetArgs, ReactionsGetFields),
