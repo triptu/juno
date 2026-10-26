@@ -1,6 +1,6 @@
 // The Juno tab against the fake Slack and a fake OpenRouter. A question written on Home, the @ and
 // # picks (they insert with execCommand) and an answer read as it arrives (an IntersectionObserver)
-// are in `e2e/juno-agent/chat.spec.ts`; the panel beside a topic is in panel.test.ts.
+// are in `e2e/juno-agent/panel.spec.ts`; the panel beside a topic is in panel.test.ts.
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { answer } from '../../e2e/juno-agent/model'
 import { JunoChatPane, readySynced } from '../driver/agent'

@@ -3,7 +3,7 @@
 // Slack mentions and channel links, the arrows and Esc, a draft that keeps
 // its mentions, and Home's composer, in a question for Juno and once a
 // person or channel is chosen. A picked person, Backspace and ⌘Z on it, and
-// where the list sits, are in the browser lane (`e2e/mentions.spec.ts`).
+// where the list sits, are in the browser lane (`e2e/composer.spec.ts`).
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'

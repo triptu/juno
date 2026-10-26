@@ -127,7 +127,7 @@ async function moveSelection(juno: Juno, fake: FakeSlack): Promise<void> {
   await expect(topic.message('Looking now')).toBeFocused()
   await juno.win.keyboard.press('Escape')
   await expect(topic.composer).toBeFocused()
-  // ↑ with a draft: composer-up.spec.ts.
+  // ↑ with a draft: composer.spec.ts.
 }
 
 async function reactToMessage({ juno, fake }: Context): Promise<void> {

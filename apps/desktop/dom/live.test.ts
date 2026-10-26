@@ -1,7 +1,7 @@
 // Live messages in an open topic (spec section 7): a reply that arrives while
 // the topic is open at the bottom shows and counts as read, unless the window
 // is in the background. Scrolled up, behind "N new messages", is the browser
-// lane's (live.spec.ts).
+// lane's (topic.spec.ts).
 import { expect } from './expect'
 import { domTest } from './test'
 

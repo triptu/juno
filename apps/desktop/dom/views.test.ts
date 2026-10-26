@@ -4,7 +4,7 @@
 // colour across a relaunch and an empty view. The built-in Automated view is
 // deleted first where a test needs the bot channels in All or only its own
 // views. Dragging a pill and the pill row's sideways scroll are the browser
-// lane's (views.spec.ts).
+// lane's (sidebar-hold.spec.ts).
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { Juno } from './driver/juno'
@@ -136,7 +136,7 @@ async function namedView({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
   expect(labels).toContain('(Move left)')
   await expect.poll(() => sidebar.viewNames()).toEqual(['Hiring', 'Eng team'])
 
-  // And back by the menu. Dragging a pill is in views.spec.ts.
+  // And back by the menu. Dragging a pill is in sidebar-hold.spec.ts.
   await sidebar.viewMenu('Eng team', 'view-left')
   await expect.poll(() => sidebar.viewNames()).toEqual(['Eng team', 'Hiring'])
 

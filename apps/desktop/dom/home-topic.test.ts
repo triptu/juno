@@ -40,7 +40,7 @@ async function sendToThread({ juno, fake }: Context): Promise<void> {
   await expect(write.composer).toBeFocused()
 
   // ↓ opens the list on the chip: Main first, then the channel's threads. Esc back to the chip and a key typed on it are
-  // in the browser lane (`e2e/break-pass-1017b.spec.ts`).
+  // in the browser lane (`e2e/break-pass-1017.spec.ts`).
   await write.composer.press('Shift+Tab')
   await write.topicChip.press('ArrowDown')
   await expect(write.topicSearch).toBeFocused()

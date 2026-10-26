@@ -1,7 +1,7 @@
 // The sidebar from a first sign-in: the list while the first sync runs. Row
 // previews and group DMs that need data in the fake before sign-in are in
 // packages/engine/test/flows/sidebar.flow.test.ts. The signed-in sidebar is
-// in sidebar.spec.ts.
+// in sidebar-hold.spec.ts and the DOM lane.
 import { expect, test } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 

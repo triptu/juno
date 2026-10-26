@@ -184,7 +184,7 @@ syncedTest('a partial thread paints what it holds at the bottom and grows above 
 })
 
 // The quick start paints rows before history lands, and a clear bot channel leaves for Automated when its history
-// does (decision 10-16 16:56, sidebar.spec.ts "during the first sync"): #alerts-prod and #deploys were in 2 of 20
+// does (decision 10-16 16:56, sidebar-first-sync.spec.ts): #alerts-prod and #deploys were in 2 of 20
 // first paints at 16 workers, and left 150 to 330 ms later. Once they have left, the rest of the sync fills in the
 // remaining topics below and the card at the foot goes, and no row on screen moves.
 test('sidebar rows stay fixed while sync fills the remaining topics', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {

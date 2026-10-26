@@ -4,7 +4,7 @@
 // their shortcodes, and the Juno panel's composer suggests emoji. Which emoji
 // match and in what order are domain rules
 // (packages/domain/test/composer-emoji.test.ts). Where the edit field's list
-// sits is in the browser lane (`e2e/emoji-colon.spec.ts`).
+// sits is in the browser lane (`e2e/composer.spec.ts`).
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { FakeSlack } from '@juno/fake-slack'
 import { answer } from '../e2e/juno-agent/model'

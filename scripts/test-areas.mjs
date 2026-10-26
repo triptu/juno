@@ -99,7 +99,7 @@ export const NIGHTLY_AREAS = [
   {
     area: 'scroll',
     tag: '@nightly-scroll',
-    tests: 'the extra variants in stick-bottom.spec.ts, layout-shift.spec.ts and tab-scroll.spec.ts; one test per rule stays on every run',
+    tests: 'the mid-topic tab in tab-scroll.spec.ts; every other scroll and shift rule runs every time',
     paths: [
       'packages/ui/src/ScrollArea.tsx',
       'packages/views/src/MessageList.tsx',
@@ -150,7 +150,7 @@ export const NIGHTLY_AREAS = [
   {
     area: 'sync',
     tag: '@nightly-sync',
-    tests: 'the cold-sync shift checks of All topics and Home in layout-shift.spec.ts; the sidebar one stays @heavy',
+    tests: 'the cold-sync shift check of Home in layout-shift.spec.ts; the sidebar one stays @heavy',
     paths: [...SYNC_PATHS, 'apps/desktop/e2e/homeSyncProbe.ts'],
   },
 ]
