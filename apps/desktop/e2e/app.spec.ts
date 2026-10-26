@@ -4,6 +4,7 @@ import { promisify } from 'node:util'
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
+import { expectStableAnchor } from './shiftProbe'
 
 /** Resolves a CSS custom property to the colour Chromium computes for it. */
 async function resolveColorVar(win: Page, name: string): Promise<string> {
@@ -22,10 +23,23 @@ function brightness(rgb: string): number {
   return (r + g + b) / 3
 }
 
-// Signed out, on the sign-in page. The theme switch goes last, so the other steps see the light theme.
-test('the signed-out shell uses bundled fonts, token colours and the chosen theme', async ({ win }) => {
+// Signed out, on the sign-in page. The theme switch goes after the fonts, so they see the light theme. The shift
+// probe's own check replaces the page, so it goes last.
+test('the signed-out shell uses bundled fonts, token colours and the chosen theme, and the shift probe sees a one-pixel move', async ({ win }) => {
   await test.step('renders the shell with bundled fonts and token colours', () => shellFontsAndColours(win))
   await test.step('switches to the dark theme in place', () => darkThemeInPlace(win))
+  // Every layout check in this lane trusts the probe: one that missed a move would pass them all.
+  await test.step('the shift probe rejects a one-pixel movement that returns before the action ends', async () => {
+    await win.setContent('<div id="anchor">Anchor</div>')
+    await expect(expectStableAnchor(win, '#anchor', async () => {
+      await win.evaluate(async () => {
+        const anchor = document.getElementById('anchor')!
+        anchor.style.transform = 'translateY(1px)'
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+        anchor.style.transform = ''
+      })
+    })).rejects.toThrow('anchor must move by exactly 0 px')
+  })
 })
 
 async function shellFontsAndColours(win: Page): Promise<void> {
