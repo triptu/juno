@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
 import { createDockBadge, createDockBounce } from './dockBadge'
@@ -222,6 +222,8 @@ const sessionHost = new SessionHost({
 
 app.whenReady().then(() => {
   processLog.log('INFO', 'process ready')
+  // Tests see a light system appearance whatever the Mac's, as the browser lane's emulated colour scheme is.
+  if (e2e) nativeTheme.themeSource = 'light'
   // A packaged app gets its icon from the bundle. In dev the Dock would show Electron's. Not under
   // tests: decoding the 1,024 px icon holds main for about 80 ms before the window opens, a cost the
   // packaged app does not have, so the start-up scenarios would measure something that never ships.
