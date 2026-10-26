@@ -7,6 +7,9 @@ import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -14,32 +17,20 @@ const DOC = 'https://docs.google.com/document/d/1fakeDocId/edit'
 
 const page = (fake: FakeSlack) => `${fake.url}/web/page`
 
-/** Seeds a reply in the Postgres thread with a link to the fake page and one to a Google doc. */
-function seedLinks(fake: FakeSlack): void {
-  const root = fake.messages('C0ENG').find((message) => message.text?.includes(POSTGRES))!
-  fake.workspace.post({
-    channel: 'C0ENG',
-    user: 'U0MAYA',
-    threadTs: root.ts,
-    text: `Have a look at <${page(fake)}|the fake page> and <${DOC}|the doc>.`,
-    silent: true,
-  })
-}
-
-/** Signs in, opens the Postgres thread and returns its links by their words. */
-async function openLinks(juno: Juno) {
-  await juno.signIn()
-  await juno.waitForSync()
+/** Opens the Postgres thread, has Maya reply with a link to the fake page and one to a Google doc, and returns its links by their words. */
+async function openLinks(juno: Juno, fake: FakeSlack) {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
+  const root = fake.messages('C0ENG').find((message) => message.text?.includes(POSTGRES))!
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', threadTs: root.ts, text: `Have a look at <${page(fake)}|the fake page> and <${DOC}|the doc>.` })
   const links = juno.topic.message('Have a look at').locator('[data-msg-text] a')
+  await expect(links).toHaveCount(2)
   return (text: string) => links.filter({ hasText: text })
 }
 
 // One launch: the panel's life in a wide window, then the narrow window, then Open links in Juno off.
 test('a click opens a link in the web panel; ⌘-click, Google apps, a narrow window and Open links in Juno off open the browser; ⌘K hides the page; close ends it', async ({ juno, fake }) => {
-  seedLinks(fake)
-  const link = await openLinks(juno)
+  const link = await openLinks(juno, fake)
   const setSize = (width: number, height: number) => juno.app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0]!.setSize(size.width, size.height), { width, height })
   // Wide enough that the panel sits beside the topic and leaves its links clickable.
   await setSize(1440, 900)

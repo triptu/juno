@@ -1,5 +1,5 @@
 // Plan flow 14: move between two Macs through Settings, then review the restored chat. The same
-// move with a crash during the restore is in `e2e/juno-agent/transfer.spec.ts`, in Electron.
+// move with a crash during the restore is in `e2e/juno-agent/backup.spec.ts`, in Electron.
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

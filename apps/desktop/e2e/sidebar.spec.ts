@@ -1,6 +1,6 @@
 // The sidebar in the browser: rows that scroll under a still pointer are not
 // warmed. Zooming, which keeps the sidebar in the window, is main's
-// (`break-pass.spec.ts`). What it shows after
+// (the window journey in `app.spec.ts`). What it shows after
 // sign-in, live updates, the filters, the keyboard and the Unread hold are in
 // the DOM lane (`dom/sidebar.test.ts`).
 import { expect, syncedTest, test } from './fixtures'

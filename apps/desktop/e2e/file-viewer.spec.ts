@@ -1,5 +1,9 @@
 // What main does for files and menus in #eng, in one launch.
 //
+// A pasted image is staged by main (`juno://uploads`) and sent once with the
+// message. Its sizes, drops, the picker and Retry are in the browser and DOM
+// lanes (`attachments.spec.ts`, `dom/attachments.test.ts`).
+//
 // Files other than pictures in the media viewer (SPEC section 8, "Other
 // files"; architecture 9): a PDF and an HTML page open from their cards in
 // the viewer, read from main's `juno://files/<id>/content` on the Slack
@@ -15,7 +19,8 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
 import { expect, test, type Fixtures } from './fixtures'
-import type { Juno } from './driver/juno'
+import { schemeSrc, type Juno } from './driver/juno'
+import { chart, chip, chips, paste } from './attach'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -60,7 +65,29 @@ async function openCard({ juno }: Pick<Fixtures, 'juno'>, row: ReturnType<Fixtur
 
 // Main serves the PDF, sees Esc pressed inside a frame, shows Quick Look and opens the image and text menus: Electron only.
 // The viewers go first: the Quick Look step counts downloads, and the image menu downloads a file.
-test('in #eng: a PDF opens in Chromium’s PDF viewer and an HTML file in a sandboxed frame, Quick Look leaves Downloads alone, then the image menus and the text menu', { tag: '@electron' }, async ({ juno, fake }) => {
+test('in #eng: a pasted image is sent once, a PDF opens in Chromium’s PDF viewer and an HTML file in a sandboxed frame, Quick Look leaves Downloads alone, then the image menus and the text menu', { tag: '@electron' }, async ({ juno, fake }) => {
+  await test.step('a pasted image is staged by main and goes with the message, once', async () => {
+    const { topic } = juno
+    await juno.sidebar.row(ENG_MAIN).open()
+    await topic.expectTitle('Main')
+    await paste(topic.composer, [chart()])
+    await expect(chip(topic, 'chart.png')).toBeVisible()
+    // Main serves the staged copy from the engine's uploads folder.
+    const staged = topic.root.locator(`[data-composer] img${schemeSrc('uploads')}`)
+    await expect(staged).toHaveCount(1)
+    await expect.poll(() => staged.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(640)
+    await topic.send('The chart for Thursday')
+    await expect(chips(topic)).toHaveCount(0)
+    await topic.expectSent('The chart for Thursday')
+    const row = topic.message('The chart for Thursday')
+    await expect(row.getByRole('button', { name: 'Open chart.png' }).locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
+    const shares = fake.calls.filter((call) => call.method === 'files.share')
+    expect(shares).toHaveLength(1)
+    const posted = fake.messages('C0ENG').filter((m) => m.client_msg_id === shares[0]!.args['client_msg_id'])
+    expect(posted.map((m) => m.files?.map((f) => f.name))).toEqual([['chart.png']])
+    expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
+  })
+
   await test.step('a PDF opens in Chromium’s PDF viewer from the content main serves as a PDF', async () => {
     const row = await postFiles({ juno, fake }, 'The capacity review', ['pdf'])
     // The card keeps Download.

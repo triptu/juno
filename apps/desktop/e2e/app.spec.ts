@@ -1,9 +1,8 @@
-import type { Locator, Page } from '@playwright/test'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
+import type { ElectronApplication, Locator, Page } from '@playwright/test'
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
+import { longerThanView } from './stickBottomLists'
 
 /** Resolves a CSS custom property to the colour Chromium computes for it. */
 async function resolveColorVar(win: Page, name: string): Promise<string> {
@@ -54,30 +53,6 @@ async function shellFontsAndColours(win: Page): Promise<void> {
   await expect(button).toHaveCSS('cursor', 'default')
 }
 
-/** Names that would hand the page Electron's raw IPC rather than one route of the bridge. */
-const RAW_IPC = ['ipcRenderer', 'send', 'sendSync', 'invoke', 'on', 'once', 'postMessage', 'removeAllListeners']
-
-// The method names are JunoBridge's, which the compiler checks; this checks what
-// only a running preload shows: no Node globals, and only functions cross.
-async function onlyTheBridge(win: Page): Promise<void> {
-  await expect(win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible()
-  const exposed = await win.evaluate(() => {
-    const globals = window as unknown as Record<string, unknown>
-    const members = Object.entries(window.juno as unknown as Record<string, unknown>).flatMap(([group, value]) =>
-      typeof value === 'object' && value !== null
-        ? Object.entries(value).map(([name, member]) => ({ group, name, type: typeof member }))
-        : [{ group, name: '', type: typeof value }])
-    return { require: typeof globals['require'], process: typeof globals['process'], ipcRenderer: typeof globals['ipcRenderer'], members }
-  })
-  expect(exposed.require).toBe('undefined')
-  expect(exposed.process).toBe('undefined')
-  expect(exposed.ipcRenderer).toBe('undefined')
-  expect(exposed.members.length).toBeGreaterThan(0)
-  // Each group holds functions only: no nested object, such as ipcRenderer itself, and no value.
-  expect(exposed.members.filter((member) => member.type !== 'function')).toEqual([])
-  expect(exposed.members.filter((member) => RAW_IPC.includes(member.name))).toEqual([])
-}
-
 async function darkThemeInPlace(win: Page): Promise<void> {
   const main = win.getByRole('main')
   const lightBackground = await resolveColorVar(win, '--background')
@@ -118,7 +93,8 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 }
 
 // Signed in. The drag regions are counted first, before any surface has opened.
-syncedTest('the signed-in shell: its image policy, drag regions, surfaces over the title bars, the build line with updates off, and the title bars in full screen', { tag: '@electron' }, async ({ juno, fake }) => {
+test.describe.configure({ timeout: 120_000 })
+syncedTest('the window: its image policy, drag regions, surfaces over the title bars, the build line with updates off, the test notification and permission line, swipes, minimize, the bottom at 2x, full screen and zoom', { tag: '@electron' }, async ({ juno, fake, app, win }) => {
   await test.step('images load only from the app and Slack; unfurls go through main (src/main/publicImage.ts)', async () => {
     const policy = await juno.win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
     expect(policy).toContain("img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:")
@@ -129,9 +105,149 @@ syncedTest('the signed-in shell: its image policy, drag regions, surfaces over t
   await test.step('every surface that can open over a title bar opts out of its drag region', () => surfacesOptOut(juno, fake))
   await test.step('answers app.getInfo over the typed IPC bridge', () => buildLine(juno))
   await test.step('Settings › About keeps updates off in tests', () => updatesOff(juno))
+  await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
+  await test.step('window swipe events move back and forward', () => swipes(juno))
+  await test.step('repeated window minimize and restore keeps the draft', () => minimizeKeepsDraft(juno, app))
+  await test.step('the bottom survives shrinking content and fractional offsets at 2x', () => bottomAt2x(juno, fake, app, win))
+  // Zoom leaves the window at its minimum size, and full screen hides the sidebar: both go last.
+  await test.step('zooming in from the View menu keeps the whole sidebar inside the window', () => zoom(juno, app, win))
   // Settings is a tab: the title bars stay as they are.
   await test.step('in full screen the title bars drop the traffic lights’ room, and keep it again after', () => fullScreenInsets(juno))
 })
+
+// Main posts the test notification and reads macOS's permission (`junoTest.notificationPermission` fakes it).
+async function testNotificationAndPermission(juno: Juno): Promise<void> {
+  await juno.openNotifications()
+  const page = juno.notifications
+  const line = page.root.getByRole('status', { name: 'Notification permission' })
+  const sample = { title: 'Juno', body: 'Notifications from Juno look like this.' }
+
+  // Allowed: no line, and the button posts one notification the way a message's is posted.
+  await expect(line).toHaveCount(0)
+  await page.root.getByRole('button', { name: 'Send test notification' }).click()
+  await expect.poll(async () => (await juno.osNotifications()).filter((shown) => shown.title === sample.title && shown.body === sample.body)).toHaveLength(1)
+
+  // Denied: the line and Open Notification Settings, read again when the window regains focus.
+  await juno.setNotificationPermission({ authorization: 'denied', badges: 'disabled' })
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await line.getByRole('button', { name: 'Open Notification Settings' }).click()
+  await expect.poll(() => juno.notificationSettingsOpened()).toBe(1)
+
+  // Alerts may be allowed while app icon badges alone are off.
+  await juno.setNotificationPermission({ authorization: 'allowed', badges: 'disabled' })
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await line.getByRole('button', { name: 'Open Notification Settings' }).click()
+  await expect.poll(() => juno.notificationSettingsOpened()).toBe(2)
+
+  // Turned on in System Settings: back in Juno, the line goes.
+  await juno.setNotificationPermission({ authorization: 'allowed', badges: 'enabled' })
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(line).toHaveCount(0)
+
+  // Not asked yet: the action asks macOS instead, and the line goes once allowed.
+  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await line.getByRole('button', { name: 'Allow notifications' }).click()
+  await expect(line).toHaveCount(0)
+  expect(await juno.notificationSettingsOpened()).toBe(2)
+  await juno.tabs.close('Settings')
+}
+
+// Titles are the first six words of the root message, so a prefix is enough.
+const POSTGRES = 'Draft plan is in the doc'
+const RINA = 'Rina finished the onsite'
+const ROADMAP = 'Proposal: cut offline mode and public'
+
+async function swipes(juno: Juno): Promise<void> {
+  await juno.sidebar.row(RINA).open()
+  await juno.sidebar.row(ROADMAP).open()
+  await juno.nav.swipe('left')
+  await juno.topic.expectTitle(RINA)
+  await juno.nav.swipe('right')
+  await juno.topic.expectTitle(ROADMAP)
+}
+
+async function minimizeKeepsDraft(juno: Juno, app: ElectronApplication): Promise<void> {
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.expectTitle('Main')
+  await juno.topic.composer.fill('Draft through window changes')
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0]!
+    for (let i = 0; i < 5; i++) {
+      window.minimize()
+      window.restore()
+    }
+    window.show()
+    window.focus()
+  })
+  await expect(juno.topic.composer).toHaveValue('Draft through window changes')
+  await juno.topic.composer.press('Enter')
+  await juno.topic.expectSent('Draft through window changes')
+}
+
+// Real Electron zoom: a device scale factor alone does not exercise it (README, "Electron tests in a browser file").
+async function bottomAt2x(juno: Juno, fake: FakeSlack, app: ElectronApplication, win: Page): Promise<void> {
+  for (let i = 0; i < 30; i++) fake.injectMessage({ channel: 'C0ENG', user: i % 2 === 0 ? 'U0MAYA' : 'U0LEO', text: `Earlier message ${i}` })
+  await juno.topic.expectMessage('Earlier message 29')
+  // The draft step's send left the list at the end; it follows the new messages there.
+  await juno.topic.scroller.evaluate((node) => { node.scrollTop = node.scrollHeight })
+  await juno.topic.expectAtBottom()
+  expect(await longerThanView(juno.topic.scroller)).toBe(true)
+  const zoom = 2 / await win.evaluate(() => devicePixelRatio)
+  await app.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]!.webContents.setZoomFactor(zoom), zoom)
+  expect(await win.evaluate(() => devicePixelRatio)).toBe(2)
+  const result = await juno.topic.scroller.evaluate(async (node) => {
+    const row = [...node.querySelectorAll<HTMLElement>('[data-message-row]')].at(-1)!
+    const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+    row.style.paddingBottom = '160px'
+    await frame()
+    await frame()
+    node.scrollTop = Math.floor(node.scrollTop) - 0.5
+    const fractional = node.scrollTop % 1
+    row.style.paddingBottom = '80px'
+    await frame()
+    await frame()
+    const shrunk = node.scrollHeight - node.scrollTop - node.clientHeight
+    row.style.paddingBottom = '160px'
+    await frame()
+    await frame()
+    const grown = node.scrollHeight - node.scrollTop - node.clientHeight
+    row.style.paddingBottom = ''
+    return { fractional, shrunk, grown }
+  })
+  expect(result.fractional).toBe(0.5)
+  expect(result.shrunk).toBeLessThanOrEqual(1)
+  expect(result.grown).toBeLessThanOrEqual(1)
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.setZoomFactor(1))
+}
+
+// Zoom is main's: the View menu's items and the window's minimum size.
+async function zoom(juno: Juno, app: ElectronApplication, win: Page): Promise<void> {
+  await juno.sidebar.row(POSTGRES).expectVisible()
+
+  // The smallest window, then View > Zoom In eight times (about 200%).
+  await app.evaluate(({ BrowserWindow, Menu }) => {
+    const window = BrowserWindow.getAllWindows()[0]!
+    window.setSize(720, 480)
+    const zoomIn = Menu.getApplicationMenu()!.getMenuItemById('zoom-in')!
+    for (let step = 0; step < 8; step++) zoomIn.click(undefined, window)
+  })
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor())).toBeGreaterThan(1.9)
+  const right = (selector: string) => win.evaluate((query) => ({ right: document.querySelector(query)!.getBoundingClientRect().right, width: window.innerWidth }), selector)
+  await expect.poll(async () => { const { right: edge, width } = await right('aside'); return edge <= width }).toBe(true)
+  const account = await right('aside [aria-label="Account and settings"]')
+  expect(account.right).toBeLessThanOrEqual(account.width)
+
+  // The account menu ends inside the window; what does not fit scrolls inside it.
+  await win.evaluate(() => document.querySelector<HTMLElement>('aside [aria-label="Account and settings"]')!.click())
+  const menu = () => win.evaluate(() => ({ bottom: document.querySelector('[role="dialog"][aria-label="Account"]')?.getBoundingClientRect().bottom ?? Infinity, height: window.innerHeight }))
+  await expect.poll(async () => { const { bottom, height } = await menu(); return bottom <= height }).toBe(true)
+  await win.keyboard.press('Escape')
+
+  // Actual Size brings the 720 × 480 minimum back.
+  await app.evaluate(({ BrowserWindow, Menu }) => Menu.getApplicationMenu()!.getMenuItemById('zoom-reset')!.click(undefined, BrowserWindow.getAllWindows()[0]!))
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getMinimumSize())).toEqual([720, 480])
+}
 
 async function dragRegions(juno: Juno): Promise<void> {
   const { win } = juno
@@ -253,37 +369,3 @@ async function fullScreenInsets(juno: Juno): Promise<void> {
   await fullScreen(false)
   await expect.poll(show).toBe(78)
 }
-
-test('the preload exposes only the isolated bridge, and a second launch on the same data hands over to the open window', { tag: '@electron' }, async ({ app: electronApp, win, userData }, testInfo) => {
-  // Two process launches can take longer on the shared Mac.
-  test.slow()
-  await test.step('the preload exposes only the isolated bridge', () => onlyTheBridge(win))
-  await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
-  const launch = await electronApp.evaluate(({ app }) => ({ executable: process.execPath, path: app.getAppPath(), userData: app.getPath('userData') }))
-  expect(launch.userData).toBe(userData)
-  const handover = await electronApp.evaluateHandle(({ app }) => {
-    const received = { count: 0 }
-    app.on('second-instance', () => { received.count += 1 })
-    return received
-  })
-  const mainWindow = await electronApp.browserWindow(win)
-  // Xvfb has no window manager to handle minimize on the Linux runner.
-  if (process.platform === 'darwin') {
-    await mainWindow.evaluate((window) => window.minimize())
-    await expect.poll(() => mainWindow.evaluate((window) => window.isMinimized())).toBe(true)
-  }
-
-  // This process should exit before opening a window. Playwright's launcher
-  // waits for debugging endpoints, so use a normal launch and require exit 0.
-  const env: NodeJS.ProcessEnv = { ...process.env, JUNO_USER_DATA: userData, JUNO_E2E: '1' }
-  delete env.ELECTRON_RUN_AS_NODE
-  delete env.NODE_OPTIONS
-  // Match Playwright's Linux launch flags for the remote container.
-  const args = process.platform === 'linux' ? ['--no-sandbox', launch.path] : [launch.path]
-  const result = await promisify(execFile)(launch.executable, args, { env, timeout: 30_000 })
-  await testInfo.attach('second-launch.log', { body: result.stdout + result.stderr, contentType: 'text/plain' })
-  await expect.poll(() => handover.evaluate((received) => received.count)).toBe(1)
-  await expect.poll(() => mainWindow.evaluate((window) => window.isMinimized())).toBe(false)
-  expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
-  await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
-})
