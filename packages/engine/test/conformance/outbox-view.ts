@@ -5,7 +5,7 @@
  */
 import type { GatedCall } from '@juno/fake-slack'
 import type { EngineOptions, RunningEngine } from '../harness'
-import { readDb } from '../scenario'
+import type { outboxReader } from './outbox-store'
 import type { TraceState } from './itf'
 
 export const DRAFTS = [1, 2] as const
@@ -144,6 +144,7 @@ export function expectedDraft(states: ReadonlyArray<TraceState>, index: number, 
 
 export interface World {
   engine: RunningEngine
+  reader: ReturnType<typeof outboxReader>
   readonly options: EngineOptions
   readonly ids: Record<Draft, string>
   /** Each draft's channel: its own, or its root's for a reply (`sendReply`). */
@@ -190,50 +191,8 @@ export const isLookup = (method: string, args: Readonly<Record<string, string>>)
 export const isAction = (method: string, args: Readonly<Record<string, string>>) =>
   ['chat.update', 'chat.delete', 'reactions.add', 'reactions.remove'].includes(method) && draftOfChannel(args['channel']) !== undefined
 
-interface Stored {
-  readonly ts: string
-  readonly deleted: number
-}
-interface Store {
-  readonly row: string | undefined
-  readonly due: boolean
-  readonly sentTs: string | null | undefined
-  readonly messages: ReadonlyArray<Stored>
-  readonly keptCopies: ReadonlyArray<{ readonly ts: string; readonly hidden: number }>
-  readonly copyDeletes: ReadonlyArray<string>
-  readonly actions: ReadonlyArray<string>
-  /** The ts the user's own deletes name. */
-  readonly userDeletes: ReadonlyArray<string>
-}
-
-export function readStore(world: World, k: Draft): Store {
-  const id = world.ids[k]
-  const channel = world.channel[k]
-  return readDb(world.engine, 'user.db', (db) => {
-    const pending = db.prepare('SELECT state, next_at FROM pending_messages WHERE client_msg_id = ?').get(id) as { state: string; next_at: number } | undefined
-    const row = pending?.state
-    const due = pending === undefined ? false : pending.next_at <= Date.now()
-    const sentTs = (db.prepare('SELECT ts FROM sent_posts WHERE client_msg_id = ?').get(id) as { ts: string | null } | undefined)?.ts
-    const keptCopies = db.prepare('SELECT ts, hidden FROM kept_copies WHERE channel = ? AND client_msg_id = ?').all(channel, id) as Array<{ ts: string; hidden: number }>
-    const outbox = db.prepare('SELECT kind, depends_on, payload_json FROM outbox WHERE target_key = ? ORDER BY id').all(channel) as Array<{ kind: string; depends_on: string | null; payload_json: string }>
-    const copyDeletes: Array<string> = []
-    const actions: Array<string> = []
-    const userDeletes: Array<string> = []
-    for (const action of outbox) {
-      const payload = JSON.parse(action.payload_json) as { ts: string | null; clientMsgId: string | null }
-      if (action.kind === 'delete' && action.depends_on === null && payload.clientMsgId === null && payload.ts !== null) copyDeletes.push(payload.ts)
-      else if (payload.clientMsgId === id || action.depends_on === id) {
-        actions.push(action.kind === 'delete' ? 'delete' : 'change')
-        if (action.kind === 'delete' && payload.ts !== null) userDeletes.push(payload.ts)
-      }
-    }
-    return { row, due, sentTs, keptCopies, copyDeletes, actions, userDeletes, messages: [] }
-  }) satisfies Store
-}
-
-export function storedMessages(world: World, k: Draft): ReadonlyArray<Stored> {
-  return readDb(world.engine, 'cache.db', (db) => db.prepare('SELECT ts, deleted FROM messages WHERE channel = ? AND client_msg_id = ?').all(world.channel[k], world.ids[k]) as Array<{ ts: string; deleted: number }>)
-}
+export const readStore = (world: World, k: Draft) => world.reader.store(world.channel[k], world.ids[k])
+export const storedMessages = (world: World, k: Draft) => world.reader.messages(world.channel[k], world.ids[k])
 
 export const inSlack = (world: World, k: Draft) => world.engine.fake.messages(world.channel[k]).filter((m) => m.client_msg_id === world.ids[k])
 
@@ -248,12 +207,15 @@ export const copyInSlack = (world: World, k: Draft) => {
  * message with the draft's id that is not the one Juno keeps. Read by ts,
  * not by the outbox row, which a reply can drop while the call is out.
  */
+const copyDelete = (call: GatedCall, store: ReturnType<typeof readStore>, messages: ReturnType<typeof storedMessages>) => {
+  const ts = call.args['ts'] ?? ''
+  return call.method === 'chat.delete' && ts !== store.sentTs && !store.userDeletes.includes(ts) && messages.some((m) => m.ts === ts)
+}
+
 export const isCopyDelete = (world: World, call: GatedCall) => {
   const k = draftOfChannel(call.args['channel'])
   if (call.method !== 'chat.delete' || k === undefined) return false
-  const ts = call.args['ts'] ?? ''
-  const store = readStore(world, k)
-  return ts !== store.sentTs && !store.userDeletes.includes(ts) && storedMessages(world, k).some((m) => m.ts === ts)
+  return copyDelete(call, readStore(world, k), storedMessages(world, k))
 }
 
 export function observeDraft(world: World, k: Draft): DraftView {
@@ -288,7 +250,7 @@ export function observeDraft(world: World, k: Draft): DraftView {
         : store.copyDeletes.includes(other.ts)
           ? 'hidden'
           : 'shown'
-  const calls = gated.filter((call) => isAction(call.method, call.args) && draftOfChannel(call.args['channel']) === k && !isCopyDelete(world, call))
+  const calls = gated.filter((call) => isAction(call.method, call.args) && draftOfChannel(call.args['channel']) === k && !copyDelete(call, store, messages))
   const act =
     store.actions.length === 0
       ? 'idle'

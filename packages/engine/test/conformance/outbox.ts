@@ -50,6 +50,7 @@ import {
   type World,
 } from './outbox-view'
 import type { Spec } from './replay'
+import { outboxReader } from './outbox-store'
 
 const STEP_MS = 15_000
 
@@ -122,10 +123,12 @@ function gate(world: World) {
 async function startEngine(world: World) {
   const { fake, userData } = world.engine
   const credentials = fake.credentials()
+  world.reader.close()
   world.engine = await startTestEngine({ ...world.options, reuse: { userData, fake, credentials }, initial: () => credentials })
   world.engine.main.network.offline = world.offline
-  world.closed = false
   await world.engine.status('ready')
+  world.reader = outboxReader(world.engine)
+  world.closed = false
 }
 
 async function stopEngine(world: World) {
@@ -341,8 +344,10 @@ export const outboxSpec: Spec<World, View> = {
     // This model schedule has neither a fallback read nor any observation of the deleted original.
     const covers = trace.states.every((state) => sOf(state).label !== 'catchUp' || sOf(state).rechecked.size > 0)
     const options: EngineOptions = covers ? {} : { recheckTopics: 0 }
+    const engine = await bootedEngine([], options)
     const world: World = {
-      engine: await bootedEngine([], options),
+      engine,
+      reader: outboxReader(engine),
       options,
       ids: { 1: crypto.randomUUID(), 2: crypto.randomUUID() },
       ...channelsOf(trace),
@@ -374,6 +379,7 @@ export const outboxSpec: Spec<World, View> = {
     fake.gate(undefined)
     fake.releaseFramesWhere(() => true, true)
     if (!world.closed) await stopEngine(world)
+    world.reader.close()
     await fake.close()
     await rm(userData, { recursive: true, force: true })
   },

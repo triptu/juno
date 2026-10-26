@@ -90,9 +90,13 @@ export async function quiet(engine: RunningEngine): Promise<void> {
   }
 }
 
+/** The caller owns this connection and must close it before replacing the workspace files. */
+export const openDb = (engine: RunningEngine, file: 'cache.db' | 'user.db', workspaceId = engine.fake.teamId): DatabaseSync =>
+  new DatabaseSync(join(engine.userData, 'workspaces', workspaceId, file), { readOnly: true })
+
 /** Opens a workspace file read-only, runs `f`, closes it. */
 export function readDb<A>(engine: RunningEngine, file: 'cache.db' | 'user.db', f: (db: DatabaseSync) => A, workspaceId = engine.fake.teamId): A {
-  const db = new DatabaseSync(join(engine.userData, 'workspaces', workspaceId, file), { readOnly: true })
+  const db = openDb(engine, file, workspaceId)
   try {
     return f(db)
   } finally {

@@ -65,6 +65,8 @@ CONFORMANCE_ONLY=copy-7 bun run specs:conformance          # only the traces who
 - The files are not `*.test.ts`, so `bun run test` does not run them: they need the generated traces. `specs/conformance.mjs` passes them to `bun test` by path, with up to `JUNO_CONFORMANCE_CONCURRENCY` traces at once in each file (default 6); each boots its own engine and fake.
 - A divergence is a finding. Fix the code or the spec, or record why the trace cannot be replayed. Do not loosen the projection to make a trace pass.
 
+Each replay owns two read-only SQLite connections and five prepared projection queries. Reads stay in autocommit; connections close before a restart and reopen against the new engine, then close at replay teardown. Each draft observation reads its store rows once, including when classifying gated deletes.
+
 Replays use the same fast timing profile. Their projection is checked again after the socket barrier and sync completion, instead of waiting 300 ms per round. Deliberately broken traces get a 2.5 s divergence bound. No trace step depends on a wall-clock duration: retry refusals are stutters and the trace gates the successful operation. The projections, traces and pre-existing skips are unchanged.
 
 ## Timing diagnostics
