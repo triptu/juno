@@ -97,6 +97,17 @@ test('split plans allow queued jobs to wait and keep an explicit wait override',
   assert.ok(f.calls().filter((call) => call.sub === 'run').at(-1).args.includes('wait=60'))
 })
 
+test('high priority from the flag or the environment reaches every job of a plan', (t) => {
+  const f = fixture(t)
+  const args = ['test:plan', 'test:gallery', '+', 'test:desktop']
+  assert.equal(f.run(args).status, 0)
+  assert.equal(f.run(args, { JUNO_PRIORITY: 'high' }).status, 0)
+  assert.equal(f.run(['--priority', 'high', 'test']).status, 0)
+  const jobs = f.calls().filter((call) => call.sub === 'run')
+  assert.deepEqual(jobs.map((job) => job.args.includes('priority=high')), [false, false, true, true, true])
+  assert.equal(f.run(['--priority', 'urgent', 'test']).status, 2)
+})
+
 test('a serial plan from the environment reaches the laptop and an explicit override wins', (t) => {
   const f = fixture(t)
   const args = ['test:plan', 'test:gallery', '+', 'test:desktop']

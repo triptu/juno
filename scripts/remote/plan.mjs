@@ -61,6 +61,7 @@ export async function runRunnerPlan(jobs, { self, root, options, log, env = {} }
     const flags = [
       ...(cores !== undefined ? ['--cores', String(cores)] : []),
       '--wait', String(options.wait ?? 60),
+      '--priority', options.priority ?? 'normal',
       ...options.env.flatMap((pair) => ['--env', pair]),
       // A full run keeps each job's steps in order, as its job sizes were measured. Elsewhere a job's
       // lanes run at once with their own workers: the gallery mostly waits for frames, and the unit

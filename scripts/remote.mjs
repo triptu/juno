@@ -1,5 +1,5 @@
 // Runs Juno's Linux-safe suites through tstack's shared SSH host allocator.
-// bun run remote [--cores n] [--memory 4g] [--wait seconds] [--env KEY=value] <script> [args...]
+// bun run remote [--cores n] [--memory 4g] [--wait seconds] [--priority high] [--env KEY=value] <script> [args...]
 // bun run remote --local <script> [args...] uses the Mac's heavy-job queue.
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
@@ -22,7 +22,7 @@ const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'perf', 'test', 'sp
 const localOnly = { 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
 function parse(argv) {
-  const options = { env: [], wait: Number(process.env.JUNO_RUNNER_WAIT ?? 60) }
+  const options = { env: [], wait: Number(process.env.JUNO_RUNNER_WAIT ?? 60), priority: process.env.JUNO_PRIORITY || 'normal' }
   let index = 0
   for (; index < argv.length && argv[index].startsWith('--'); index++) {
     const flag = argv[index]
@@ -30,6 +30,8 @@ function parse(argv) {
     else if (flag === '--local') options.local = true
     else if (flag === '--cores') options.cores = Number(argv[++index])
     else if (flag === '--wait') options.wait = Number(argv[++index])
+    // A high job takes the laptop's cores before every waiting normal one (docs/development.md, "Remote runs").
+    else if (flag === '--priority') options.priority = argv[++index]
     // A memory cap below the default (3 GiB a core), to prove a run fits a budget (docs/development.md, "Memory").
     else if (flag === '--memory') options.memory = argv[++index]
     else if (flag === '--shards') options.shards = Number(argv[++index])
@@ -48,6 +50,7 @@ function parse(argv) {
   if (options.cores !== undefined && (!Number.isSafeInteger(options.cores) || options.cores < 1)) throw new Error('--cores must be a positive integer')
   if (options.memory !== undefined && !/^\d+(?:\.\d+)?g$/.test(options.memory)) throw new Error('--memory takes gigabytes, such as 4g')
   if (!Number.isSafeInteger(options.wait) || options.wait < 0) throw new Error('--wait must be a non-negative number of seconds')
+  if (!['normal', 'high'].includes(options.priority)) throw new Error('--priority and JUNO_PRIORITY take normal or high')
   for (const pair of options.env) if (!/^[A-Za-z_][A-Za-z0-9_]*=[^\n\r]*$/.test(pair ?? '')) throw new Error('--env takes NAME=value on one line')
   if (process.env.JUNO_PLAN_SERIAL === '1' && !options.env.some((pair) => pair.startsWith('JUNO_PLAN_SERIAL='))) options.env.push('JUNO_PLAN_SERIAL=1')
   const [script, ...args] = argv.slice(index)
@@ -97,7 +100,7 @@ try {
   const runner = runnerConfig()
   const jobs = runnerPlanJobs(options)
   if (options.dryRun) {
-    log(`remote: tstack SSH runner; ${jobs.length ? jobs.map((job) => job.kind).join(', ') + ' jobs' : options.script}; wait ${options.wait} s; image ${runner.image}`)
+    log(`remote: tstack SSH runner; ${jobs.length ? jobs.map((job) => job.kind).join(', ') + ' jobs' : options.script}; wait ${options.wait} s; ${options.priority} priority; image ${runner.image}`)
     process.exit(0)
   }
   mkdirSync(reportDir, { recursive: true })
@@ -138,8 +141,8 @@ try {
     reserved = size.reserved
     await image
     if (cancelled) throw new Error('run cancelled')
-    const args = [`id=${runId}`, `cores=${reserved}`, `memory=${options.memory ?? `${reserved * 3}g`}`, `image=${runner.image}`, 'project=juno', `wait=${options.wait}`, `command=bash scripts/remote/run.sh ${[options.script, ...options.args].map(quote).join(' ')}`, 'artifact=.remote/reports.tgz', ...options.env.map((pair) => `env=${pair}`), `env=JUNO_RUNNER_WIDE_UNIT=${size.wideUnit ? 1 : 0}`, `env=JUNO_RUNNER_PINNED=${health.pinned ? 1 : 0}`]
-    log(`remote: SSH job ${runId}, ${reserved} ${health.pinned ? 'physical cores' : 'CPUs'}`)
+    const args = [`id=${runId}`, `cores=${reserved}`, `memory=${options.memory ?? `${reserved * 3}g`}`, `image=${runner.image}`, 'project=juno', `wait=${options.wait}`, ...(options.priority === 'high' ? ['priority=high'] : []), `command=bash scripts/remote/run.sh ${[options.script, ...options.args].map(quote).join(' ')}`, 'artifact=.remote/reports.tgz', ...options.env.map((pair) => `env=${pair}`), `env=JUNO_RUNNER_WIDE_UNIT=${size.wideUnit ? 1 : 0}`, `env=JUNO_RUNNER_PINNED=${health.pinned ? 1 : 0}`]
+    log(`remote: SSH job ${runId}, ${reserved} ${health.pinned ? 'physical cores' : 'CPUs'}${options.priority === 'high' ? ', high priority' : ''}`)
     const result = await streamJob(runner, args, tarball, log)
     code = result.code
     if (code !== 0 && !cancelled && !jobStarted && options.env.includes('JUNO_VERIFY_POLICY=1'))

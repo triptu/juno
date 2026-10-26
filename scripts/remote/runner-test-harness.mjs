@@ -44,6 +44,6 @@ else if(sub==='build') {
   writeFileSync(join(dir, 'git'), "#!/bin/sh\nif [ \"$1\" = rev-parse ]; then printf '%s\\n' \"$TMPDIR/repo.git\"; else printf 'package.json\\0scripts/remote.mjs\\0scripts/remote/run.sh\\0'; fi\n")
   writeFileSync(join(dir, 'bun'), '#!/bin/sh\nif [ "$1" = run ]; then shift; fi\nprintf "local: %s\\n" "$*"\n')
   for (const name of ['ssh', 'git', 'bun']) chmodSync(join(dir, name), 0o755)
-  const env = { ...process.env, HOME: dir, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TSTACK_HOME: dir, TEST_HOST_JS: join(dir, 'host.cjs'), TEST_CALLS: calls, JUNO_RUNNER_HOST: 'runner-test', JUNO_RUNNER_IMAGE: 'test/image:tag', JUNO_RUNNER_PARENT: undefined, JUNO_RUNNER_PLAN: undefined, JUNO_PLAN_SERIAL: undefined, JUNO_REMOTE_MACHINE: undefined }
+  const env = { ...process.env, HOME: dir, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TSTACK_HOME: dir, TEST_HOST_JS: join(dir, 'host.cjs'), TEST_CALLS: calls, JUNO_RUNNER_HOST: 'runner-test', JUNO_RUNNER_IMAGE: 'test/image:tag', JUNO_RUNNER_PARENT: undefined, JUNO_RUNNER_PLAN: undefined, JUNO_PLAN_SERIAL: undefined, JUNO_PRIORITY: undefined, JUNO_REMOTE_MACHINE: undefined }
   return { dir, calls, env }
 }
