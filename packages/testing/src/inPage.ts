@@ -212,11 +212,14 @@ function shiftEntries(rootEl: HTMLElement, startedAt: number, describe: (node: N
       inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5 && inner.top >= outer.top - 0.5 && inner.bottom <= outer.bottom + 0.5
     const inControls = (source: { node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }) =>
       source.node === null && videos.some((box) => inside(box, source.previousRect) && inside(box, source.currentRect))
-    const all = shift.sources ?? []
+    // A shift outside the watched region is another region's (a sidebar sorting while Home is checked); only sources
+    // under the root count. A source without a node cannot be placed and stays.
+    const outside = (source: { node: Node | null }) => rootEl !== document.body && source.node !== null && !rootEl.contains(source.node)
+    const all = (shift.sources ?? []).filter((source) => !outside(source))
     const kept = all.filter((source) => !inControls(source))
     const unattributed = all.length === 0 && (hadVideo || rootEl.querySelector('video[controls]') !== null)
     return {
-      value: (all.length > 0 && kept.length === 0) || unattributed ? 0 : shift.value,
+      value: ((shift.sources ?? []).length > 0 && kept.length === 0) || unattributed ? 0 : shift.value,
       hadRecentInput: shift.hadRecentInput,
       at: Math.round(shift.startTime - startedAt),
       sources: kept.map((source) => ({
