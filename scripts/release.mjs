@@ -130,7 +130,7 @@ async function fullRun(tip) {
 async function fullSuites(tip) {
   const records = readRecords(status)
   const newest = records.find((record) => record.smoke !== true && !record.reachOnly && isAncestor(root, record.commit, tip))
-  const repairable = newest && !assessRecord(newest) && newest.version === 2 && newest.identity && newest.required && !newest.required.some((suite) => ['test:desktop @mac', 'perf', 'test:feel'].includes(suite))
+  const repairable = newest && !assessRecord(newest) && newest.version === 2 && newest.identity && newest.required && !newest.required.some((suite) => ['test:desktop @mac', 'perf @mac', 'test:feel'].includes(suite))
   if (repairable && newest.commit === tip) {
     report(newest, recordFile(newest))
     throw new Error('the newest full run at the tip failed and main has not changed since; fix the failures first')

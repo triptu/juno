@@ -1,4 +1,4 @@
-// First-sync timing ceilings run only on the Mac; correctness is in
+// First-sync timing ceilings, in the laptop perf run (docs/performance.md 7.3); correctness is in
 // packages/engine/test/flows/first-sync.flow.test.ts and quick-start.flow.test.ts. The quick start's own budget, sign-in to rows on the
 // large seed, is `quick start` in perf.spec.ts.
 import { mkdtemp, rm } from 'node:fs/promises'

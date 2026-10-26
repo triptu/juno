@@ -1,9 +1,10 @@
 // The Activity page's read time against the Juno switcher budget (docs/performance.md), alone under bun run perf --unit:
 // beside the other packages' tests, one cold read measured the machine, not the query.
-import { afterEach, expect, it } from 'bun:test'
+import { afterEach, it } from 'bun:test'
 import { activityPage } from '../src/serve/pages'
 import { seedRuns } from './activity-seed'
 import { fakeHost, turnsHarness } from './turns-harness'
+import { perfBudget } from '@juno/testing/perf-budget'
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -26,6 +27,6 @@ it('500 runs: the newest window is built within the agent\'s share of the switch
   }
   const median = times.toSorted((a, b) => a - b)[4]!
   // The agent's share of the switch budget (docs/performance.md, "Juno switcher"), with room for a slow machine.
-  expect(cold).toBeLessThan(40)
-  expect(median).toBeLessThan(40)
+  perfBudget('activity: newest window, cold', cold, 40)
+  perfBudget('activity: newest window, median', median, 40)
 })

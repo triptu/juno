@@ -17,7 +17,18 @@ The box comparison reads `offsetLeft`, `offsetTop`, `offsetWidth` and `offsetHei
 
 Options: `root` (default the gallery's `[data-fixture-frame]`, else `body`), `settleMs` (extra wait), `tolerance` (px, default 0.5; offsets are whole pixels, so any change counts) and `motion`. `motion: 'layout'` waits only for transitions and animations of a property that can move a box; a colour, opacity, shadow, filter or transform change cannot, so a hover's colour fade or the press scale is not waited out. The gallery uses it, where every touch starts such fades and nothing else lands while they run. The default, `all`, waits for every one, which also gives late data in the app time to land.
 
-`measureLayoutShift` returns the report without throwing; `formatLayoutShiftReport` renders it.
+`measureLayoutShift` returns the report without throwing; `formatLayoutShiftReport` renders it, and `layoutShiftError` turns a report into the error `expectNoLayoutShift` throws.
+
+## `watchLayoutShift(page, options?)`
+
+```ts
+const watch = await watchLayoutShift(page, { motion: 'layout' })
+const hover = await watch.check(() => page.mouse.move(x, y), { pending: '[data-chunk-pending]' })
+const press = await watch.check(() => page.mouse.down())
+await watch.stop()
+```
+
+The same guard over a sequence of actions. Each `check` runs its action, waits as `expectNoLayoutShift` does and reports what shifted since the previous check (or since the watch started). The observer stays connected, and a check's last box snapshot is the next one's first, so N actions take N + 1 snapshots and one page call each besides the action, where separate guards take 2N snapshots and three calls. Anything that moves between two checks is charged to the second, so nothing is missed between them. `pending` is a selector of a marker for code still loading: the check first waits, up to 15 s, until none is left. `rebase` measures from now, after something that is allowed to move the layout (a scroll that lays out rows). A new watch, or `measureLayoutShift`, replaces the page's current watch.
 
 Chromium only (the `layout-shift` entry type); the box comparison runs anywhere.
 

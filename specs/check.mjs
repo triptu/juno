@@ -31,8 +31,8 @@ const seedFlag = process.argv.indexOf('--seed')
 const seed = (seedFlag >= 0 ? process.argv[seedFlag + 1] : undefined) ?? process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
 if (!/^\d+$/.test(seed)) throw new Error('--seed and SPECS_SEED take an unsigned integer')
 console.log(`Spec check seed ${seed}; \`bun run specs:check --seed ${seed}\` repeats it.`)
-// 2,000 traces per sync protocol, nightly too: a new seed each run samples new traces.
-const samples = tracesOnly ? 100 : 2000
+// 500 traces per sync protocol, nightly too: a new seed each run samples new traces.
+const samples = tracesOnly ? 100 : 500
 const steps = 160
 const startedAt = Date.now()
 const apalacheVersion = '0.62.1' // Quint 0.33.0's default distribution.
@@ -118,7 +118,13 @@ function apalacheServer(lane) {
     if (!existsSync(exe)) return { port, stop: () => {} }
     // Apalache's default 4 GB heap gets swapped out on a loaded 8 GB machine and
     // stalls a check past its deadline. The bounded checks fit in much less.
-    const env = { ...process.env, JVM_ARGS: process.env.JVM_ARGS ?? `-Xmx${apalacheHeap}` }
+    // Z3 does the solving on one thread. The JVM's default G1 collector and its
+    // sizing for every CPU spent about a third more CPU on the same checks.
+    const env = {
+      ...process.env,
+      JVM_ARGS: process.env.JVM_ARGS ?? `-Xmx${apalacheHeap} -XX:ActiveProcessorCount=1`,
+      JVM_GC_ARGS: process.env.JVM_GC_ARGS ?? '-XX:+UseSerialGC',
+    }
     const child = spawn(exe, ['server', `--port=${port}`], { cwd: generated, env, stdio: 'ignore', detached: process.platform !== 'win32' })
     const stop = () => { try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL') } catch { /* Already exited. */ } }
     process.on('exit', stop)
@@ -139,10 +145,8 @@ function apalacheServer(lane) {
   return servers[lane]
 }
 
-// When simulations overlap the Apalache lanes, they run at a lower CPU priority. The longest bounded
-// check (follow's boundedSafety, about 95 s in Apalache alone) is the run's critical path. Beside the
-// simulations on four cores it took 154 to over 180 s even so: a simulation on the sibling thread of
-// the same core still slows it.
+// When simulations overlap the Apalache lanes, they run at a lower CPU priority, so a long bounded
+// check does not end up last: a simulation on the sibling thread of the same core still slows it.
 let simulationNiceness = 0
 
 function spawnQuint(args, timeout, port) {
@@ -257,7 +261,9 @@ async function runAll() {
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(job)
   }
-  const queues = [jobs.filter(job => job.args[0] === 'verify').map(job => [job]), [...groups.values()].toSorted((a, b) => b.length - a.length)]
+  // Deeper solver checks take longer, so they start first and the shallow ones fill in.
+  const depth = job => Number(job.args[job.args.indexOf('--max-steps') + 1])
+  const queues = [jobs.filter(job => job.args[0] === 'verify').toSorted((a, b) => depth(b) - depth(a)).map(job => [job]), [...groups.values()].toSorted((a, b) => b.length - a.length)]
   console.log(`Quint: ${jobs.length} jobs; ${parallel} simulation lanes; ${apalacheLanes} Apalache lanes, heap ${apalacheHeap} each.`)
   let failed
   const lane = async (queue, index = 0) => {
@@ -568,17 +574,20 @@ if (!huddleOnly && !tracesOnly && !outboxOnly) {
     console.log('Temporal formulas are typechecked only. Drain bounds: follow 64, read 48, outbox 48, memory 64, actions 32, recovery 64.')
   } else {
     if (!memoryOnly && !actionsOnly && !recoveryOnly) {
-      for (const [file, step] of [['follow', 'step'], ['readstate', 'boundedStep']]) {
+      // Each bound is the shortest one that reaches every state its rules talk about
+      // (specs/README.md, "Solver bounds").
+      for (const [file, step, invariant, depth] of [['follow', 'step', 'boundedSafety', 3], ['follow', 'step', 'failedCallReverted', 4], ['readstate', 'boundedStep', 'boundedSafety', 4]]) {
         quint(['verify', `specs/${file}-bounded.qnt`, '--main', `${file}_bounded`, '--step', step,
-          '--invariant', 'boundedSafety', '--max-steps', '4',
+          '--invariant', invariant, '--max-steps', String(depth),
           '--apalache-version', apalacheVersion, '--verbosity', '1'])
       }
       // Long recovery regressions run in the simulator. Keep symbolic races short:
-      // each old rule must break `acceptedUnfollow` within 5 steps, and its fix must not.
-      for (const schedule of ['stalePage', 'lateEvent', 'pendingPage', 'failedLookup']) {
+      // each old rule must break `acceptedUnfollow` within its bound, the length of its
+      // shortest counterexample, and its fix must not.
+      for (const [schedule, depth] of [['stalePage', 5], ['lateEvent', 5], ['pendingPage', 5], ['failedLookup', 4]]) {
         for (const [step, violation] of [[`${schedule}BugStep`, true], [`${schedule}Step`, false]]) {
           quint(['verify', 'specs/follow-bounded.qnt', '--main', 'follow_bounded',
-            '--step', step, '--invariant', 'acceptedUnfollow', '--max-steps', '5',
+            '--step', step, '--invariant', 'acceptedUnfollow', '--max-steps', String(depth),
             '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
         }
       }

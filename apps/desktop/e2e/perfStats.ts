@@ -1,7 +1,9 @@
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { loadavg } from 'node:os'
 import { resolve } from 'node:path'
 import { Worker } from 'node:worker_threads'
+import type { Metric } from './perfBaseline'
 
 const ROOT = resolve(__dirname, '../../..')
 
@@ -33,7 +35,7 @@ export function contention(): string {
   return others.size === 0 ? '' : `, contended by ${[...others].join(', ')}`
 }
 
-export function stats(name: string, samples: ReadonlyArray<number>): { readonly median: number; readonly p95: number } {
+export function stats(name: string, samples: ReadonlyArray<number>): Metric {
   if (samples.length === 0) throw new Error(`${name}: no performance samples`)
   const sorted = samples.toSorted((a, b) => a - b)
   // Nearest rank: the p95 of 20 samples is the 19th, not the largest.
@@ -43,7 +45,7 @@ export function stats(name: string, samples: ReadonlyArray<number>): { readonly 
   const load = loadavg()[0]!.toFixed(1)
   const shown = sorted.length <= 60 ? `, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}` : ''
   console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}${contention()}${shown}`)
-  return { median, p95 }
+  return { name, median, p95, n: samples.length, unit: 'ms' }
 }
 
 /**
@@ -69,13 +71,24 @@ export async function holdClock(): Promise<() => Promise<void>> {
 }
 
 /**
- * A process's private memory in MB: macOS's physical footprint, which is
+ * A process's private memory in MB. On macOS, the physical footprint, which is
  * what `process.getProcessMemoryInfo().private` reports inside the process
  * on macOS (107,409 KB against a footprint of 105 MB on 10-18), the metric
- * of the memory budgets (performance.md 1). Read from outside, so no
- * process needs a hook for it. Undefined off macOS.
+ * of the memory budgets (performance.md 1). On Linux, the private clean and
+ * dirty pages from /proc, comparable only with other Linux runs. Read from
+ * outside, so no process needs a hook for it.
  */
 export function privateMemory(pid: number): number | undefined {
+  if (process.platform === 'linux') {
+    let rollup = ''
+    try {
+      rollup = readFileSync(`/proc/${pid}/smaps_rollup`, 'utf8')
+    } catch {
+      return undefined
+    }
+    const kb = (field: string) => Number(new RegExp(`^${field}:\\s+(\\d+) kB`, 'm').exec(rollup)?.[1] ?? 0)
+    return (kb('Private_Clean') + kb('Private_Dirty')) / 1024
+  }
   if (process.platform !== 'darwin') return undefined
   const out = execFileSync('/usr/bin/footprint', ['--noCategories', '-f', 'bytes', '-p', String(pid)], { encoding: 'utf8' })
   const bytes = /phys_footprint:\s+(\d+) B/.exec(out)?.[1]

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test'
-import { withHelpers, type Box, type MovedElement, type ShiftEntry, type Snapshot } from './inPage'
+import { withHelpers, type Box, type Helpers, type MovedElement, type ShiftEntry, type Snapshot } from './inPage'
 
 export type { MovedElement, ShiftEntry } from './inPage'
 
@@ -83,12 +83,14 @@ interface PageState {
   entries: ShiftEntry[]
   observer: PerformanceObserver | null
   observerSupported: boolean
-  startedAt: number
   root: HTMLElement
   before: Snapshot[]
-  describe: (node: Node | null) => string
+  /** Starts the next window: the boxes, motion and video seen now are what the next action is measured from. */
+  baseline: (boxes: Snapshot[]) => void
   toEntry: (entry: PerformanceEntry) => ShiftEntry
   snapshot: () => Snapshot[]
+  /** Elements whose box moved or resized between two snapshots, by the watch's tolerance and `grows`. */
+  compare: (before: Snapshot[], after: Snapshot[]) => MovedElement[]
   runningMs: (endless: boolean, layoutOnly: boolean) => number
 }
 
@@ -104,98 +106,151 @@ export async function waitForLayoutReady(page: Page): Promise<void> {
   })
 }
 
+export interface LayoutShiftCheckOptions {
+  /**
+   * CSS selector of a marker for code still loading (the gallery's `[data-chunk-pending]`). The check
+   * first waits, up to 15 s, until none is left, so what the loaded code draws is measured too.
+   */
+  readonly pending?: string
+}
+
+/**
+ * Several actions measured one after another, each as `measureLayoutShift` measures one. The observer
+ * stays connected and each check's last box snapshot is the next one's first, so a sequence of N actions
+ * takes N + 1 snapshots and N + 1 round trips to the page besides the actions, not 2N and 3N. Anything
+ * that moves between two checks is charged to the second.
+ */
+export interface LayoutShiftWatch {
+  /** Runs `action`, waits for it to settle and reports what shifted since the previous check, or since the watch started. */
+  readonly check: (action: () => Promise<unknown>, options?: LayoutShiftCheckOptions) => Promise<LayoutShiftReport>
+  /** Measures the next check from now: what moved since the last check (a scroll that settled) is not charged to it. */
+  readonly rebase: () => Promise<void>
+  /** Stops the observer. A new watch, or `measureLayoutShift`, also replaces this one. */
+  readonly stop: () => Promise<void>
+}
+
+// The two functions below run in the page, through `toString()`: each uses nothing outside its own body.
+
+/** Starts a watch in the page: one observer, and the boxes, motion and video seen now as the first baseline. */
+function startWatch({ root: rootSelector, key, tolerance: epsilon, grows: growsSelector }: { root: string; key: string; tolerance: number; grows: string | null }, helpers: Helpers): void {
+  const w = window as unknown as Record<string, PageState | undefined>
+  w[key]?.observer?.disconnect()
+
+  const found = document.querySelector(rootSelector)
+  const rootEl = found instanceof HTMLElement ? found : document.body
+  const snapshot = () => helpers.layoutBoxes(rootEl)
+
+  const state: PageState = {
+    entries: [],
+    observer: null,
+    observerSupported: PerformanceObserver.supportedEntryTypes?.includes('layout-shift') ?? false,
+    root: rootEl,
+    before: [],
+    baseline: (boxes) => {
+      state.before = boxes
+      state.entries = []
+      state.runningMs = helpers.motionClock(rootEl)
+      state.toEntry = helpers.shiftEntries(rootEl, performance.now(), helpers.describeNode)
+    },
+    toEntry: () => { throw new Error('Layout-shift guard has no baseline') },
+    snapshot,
+    compare: (before, after) => helpers.changedBoxes(before, after, epsilon, growsSelector, helpers.describeNode),
+    runningMs: () => 0,
+  }
+  state.baseline(snapshot())
+
+  if (state.observerSupported) {
+    state.observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) state.entries.push(state.toEntry(entry))
+    })
+    // No `buffered`: only shifts from here on count.
+    state.observer.observe({ type: 'layout-shift' })
+  }
+  w[key] = state
+}
+
+/**
+ * After an action: waits for pending code, two frames and the motion, then reports what shifted since the baseline
+ * and makes now the next baseline. The helpers come through the closures the watch made when it started.
+ */
+async function settleAndCompare({ key, settle, layoutOnly, pending }: { key: string; settle: number; layoutOnly: boolean; pending: string | null }): Promise<LayoutShiftReport> {
+  const state = (window as unknown as Record<string, PageState | undefined>)[key]
+  if (!state) throw new Error('Layout-shift guard was not started, or another watch replaced it')
+
+  const started = performance.now()
+  if (pending !== null && document.querySelector(pending) !== null) {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        observer.disconnect()
+        reject(new Error('Code a touch started loading did not load within 15 s'))
+      }, 15_000)
+      const observer = new MutationObserver(() => {
+        if (document.querySelector(pending) !== null) return
+        clearTimeout(timer)
+        observer.disconnect()
+        resolve()
+      })
+      observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true })
+    })
+  }
+  const frames = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  await frames()
+  // A transition can start another when it ends, so look again after each wait.
+  for (let round = 0; round < 4; round++) {
+    const wait = state.runningMs(round === 0, layoutOnly)
+    if (wait <= 0) break
+    await new Promise((resolve) => setTimeout(resolve, wait))
+    await frames()
+  }
+  if (settle > 0) {
+    await new Promise((resolve) => setTimeout(resolve, settle))
+    await frames()
+  }
+
+  // Entries the browser queued but has not delivered to the callback yet.
+  for (const entry of state.observer?.takeRecords() ?? []) state.entries.push(state.toEntry(entry))
+  const shifts = state.entries
+  const after = state.snapshot()
+  const moved = state.compare(state.before, after)
+  state.baseline(after)
+  return { shifts, moved, observerSupported: state.observerSupported, waitedMs: Math.round(performance.now() - started) }
+}
+
+/** Starts watching the page: the next `check` measures from now. */
+export async function watchLayoutShift(page: Page, options: LayoutShiftOptions = {}): Promise<LayoutShiftWatch> {
+  const settle = options.settleMs ?? defaults.settleMs
+  const layoutOnly = (options.motion ?? defaults.motion) === 'layout'
+  await withHelpers(page, startWatch, { root: options.root ?? defaults.root, key: stateKey, tolerance: options.tolerance ?? defaults.tolerance, grows: options.grows ?? null })
+
+  const check = async (action: () => Promise<unknown>, { pending }: LayoutShiftCheckOptions = {}): Promise<LayoutShiftReport> => {
+    await action()
+    return await page.evaluate(settleAndCompare, { key: stateKey, settle, layoutOnly, pending: pending ?? null })
+  }
+
+  const rebase = () => page.evaluate((key) => {
+    const state = (window as unknown as Record<string, PageState | undefined>)[key]
+    if (!state) throw new Error('Layout-shift guard was not started, or another watch replaced it')
+    state.observer?.takeRecords()
+    state.baseline(state.snapshot())
+  }, stateKey)
+
+  const stop = () => page.evaluate((key) => {
+    const w = window as unknown as Record<string, PageState | undefined>
+    w[key]?.observer?.disconnect()
+    delete w[key]
+  }, stateKey)
+
+  return { check, rebase, stop }
+}
+
 /** Runs `action` and returns what shifted. Use `expectNoLayoutShift` in tests. */
 export async function measureLayoutShift(page: Page, action: () => Promise<unknown>, options: LayoutShiftOptions = {}): Promise<LayoutShiftReport> {
-  const root = options.root ?? defaults.root
-  const settleMs = options.settleMs ?? defaults.settleMs
-  const tolerance = options.tolerance ?? defaults.tolerance
-  const layoutOnly = (options.motion ?? defaults.motion) === 'layout'
-  const grows = options.grows ?? null
-
-  await withHelpers(
-    page,
-    ({ root: rootSelector, key }: { root: string; key: string }, helpers) => {
-      const w = window as unknown as Record<string, PageState | undefined>
-      w[key]?.observer?.disconnect()
-
-      const found = document.querySelector(rootSelector)
-      const rootEl = found instanceof HTMLElement ? found : document.body
-
-      const describe = helpers.describeNode
-      const snapshot = () => helpers.layoutBoxes(rootEl)
-
-      const runningMs = helpers.motionClock(rootEl)
-      const startedAt = performance.now()
-      const toEntry = helpers.shiftEntries(rootEl, startedAt, describe)
-
-      const state: PageState = {
-        entries: [],
-        observer: null,
-        observerSupported: PerformanceObserver.supportedEntryTypes?.includes('layout-shift') ?? false,
-        startedAt,
-        root: rootEl,
-        before: snapshot(),
-        describe,
-        toEntry,
-        snapshot,
-        runningMs,
-      }
-
-      if (state.observerSupported) {
-        state.observer = new PerformanceObserver((list) => {
-          for (const entry of list.getEntries()) state.entries.push(state.toEntry(entry))
-        })
-        // No `buffered`: only shifts from here on count.
-        state.observer.observe({ type: 'layout-shift' })
-      }
-      w[key] = state
-    },
-    { root, key: stateKey },
-  )
-
-  await action()
-
-  return await withHelpers(
-    page,
-    async (
-      { key, settle, tolerance: epsilon, layoutOnly: onlyLayout, grows: growsSelector }: { key: string; settle: number; tolerance: number; layoutOnly: boolean; grows: string | null },
-      helpers,
-    ) => {
-      const w = window as unknown as Record<string, PageState | undefined>
-      const state = w[key]
-      if (!state) throw new Error('Layout-shift guard was not started')
-
-      const frames = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-      const started = performance.now()
-      await frames()
-      // A transition can start another when it ends, so look again after each wait.
-      for (let round = 0; round < 4; round++) {
-        const wait = state.runningMs(round === 0, onlyLayout)
-        if (wait <= 0) break
-        await new Promise((resolve) => setTimeout(resolve, wait))
-        await frames()
-      }
-      if (settle > 0) {
-        await new Promise((resolve) => setTimeout(resolve, settle))
-        await frames()
-      }
-
-      // Entries the browser queued but has not delivered to the callback yet.
-      for (const entry of state.observer?.takeRecords() ?? []) state.entries.push(state.toEntry(entry))
-      state.observer?.disconnect()
-
-      const moved = helpers.changedBoxes(state.before, state.snapshot(), epsilon, growsSelector, state.describe)
-
-      delete w[key]
-      return {
-        shifts: state.entries,
-        moved,
-        observerSupported: state.observerSupported,
-        waitedMs: Math.round(performance.now() - started),
-      } satisfies LayoutShiftReport
-    },
-    { key: stateKey, settle: settleMs, tolerance, layoutOnly, grows },
-  )
+  const watch = await watchLayoutShift(page, options)
+  try {
+    return await watch.check(action)
+  } finally {
+    await watch.stop()
+  }
 }
 
 const round = (n: number): string => String(Math.round(n * 100) / 100)
@@ -224,15 +279,19 @@ export function formatLayoutShiftReport(report: LayoutShiftReport): string {
   return lines.join('\n')
 }
 
+/** The guard's failure for a report, or undefined when nothing shifted. */
+export function layoutShiftError(report: LayoutShiftReport): Error | undefined {
+  const shifted = report.shifts.some((shift) => shift.value > 0)
+  if (!shifted && report.moved.length === 0) return undefined
+  return new Error(`Layout shifted during the action.\n${formatLayoutShiftReport(report)}`)
+}
+
 /**
  * Runs `action` and throws if the layout shifted: any `layout-shift` entry
  * with a value above 0 (recent input or not), or any element under the root
  * whose layout box moved or resized.
  */
 export async function expectNoLayoutShift(page: Page, action: () => Promise<unknown>, options: LayoutShiftOptions = {}): Promise<void> {
-  const report = await measureLayoutShift(page, action, options)
-  const shifted = report.shifts.some((shift) => shift.value > 0)
-  if (shifted || report.moved.length > 0) {
-    throw new Error(`Layout shifted during the action.\n${formatLayoutShiftReport(report)}`)
-  }
+  const error = layoutShiftError(await measureLayoutShift(page, action, options))
+  if (error) throw error
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
-import { expectNoLayoutShift, measureLayoutShift } from '@juno/testing/layout-shift'
+import { expectNoLayoutShift, measureLayoutShift, watchLayoutShift } from '@juno/testing/layout-shift'
 import { claimQueue, openState, readRoutes, stateCache, walkPages, type Route } from './support'
 import { touch, walkState, walkUse } from './shift-walk'
 
@@ -427,6 +427,25 @@ test.describe('the guard itself', () => {
     const box = (await page.locator('.b').boundingBox())!
     const report = await measureLayoutShift(page, () => page.mouse.move(box.x + 10, box.y + 10), { motion: 'layout' })
     expect(report.waitedMs).toBeLessThan(1000)
+  })
+})
+
+test.describe('a layout-shift watch', () => {
+  const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
+
+  test('a watch charges each shift to one check: its own action, or what moved since the last check', async ({ page }) => {
+    await page.setContent(frame('.b{display:block;width:100px;height:30px}.b:hover{height:60px}p{margin:0}', '<button class="b">Hover me</button><p id="below">Below</p>'))
+    const box = (await page.locator('.b').boundingBox())!
+    const watch = await watchLayoutShift(page)
+    const hover = await watch.check(() => page.mouse.move(box.x + 10, box.y + 10))
+    expect(hover.moved.find((item) => item.element.startsWith('p#below'))?.after.y).toBe(60)
+    // The hover's boxes are the next check's baseline, so nothing is counted twice.
+    expect((await watch.check(async () => {})).moved).toEqual([])
+    await page.evaluate(() => { document.querySelector<HTMLElement>('#below')!.style.marginTop = '5px' })
+    const between = await watch.check(async () => {})
+    expect(between.moved.find((item) => item.element.startsWith('p#below'))?.after.y).toBe(65)
+    expect((await watch.check(async () => {})).moved).toEqual([])
+    await watch.stop()
   })
 })
 
