@@ -54,6 +54,8 @@ export interface StartOptions {
   readonly aliases?: ReadonlyArray<string>
   /** The page's test clock, installed before the renderer runs; the engine's follows it. */
   readonly clock?: PageClock
+  /** The engine's frames reach the page one at a time, for counted budgets (`work.ts`). */
+  readonly counted?: boolean
 }
 
 /** The engine options every DOM test gets unless it asks for others, as the browser lane's defaults. */
@@ -71,6 +73,7 @@ export class DomApp {
     readonly fake: FakeSlack,
     readonly userData: string,
     readonly clock: PageClock | undefined,
+    readonly counted: boolean,
   ) {
     this.window = this.#open()
     this.dom = new Dom(this.window)
@@ -81,7 +84,7 @@ export class DomApp {
     const engine = { ...DEFAULT_ENGINE, ...options.engine, ...(options.clock === undefined ? {} : { clock: true }) }
     const host = await hostPool().start(fake, { userData, aliases: options.aliases ?? [], engine })
     try {
-      return new DomApp(host, fake, userData, options.clock)
+      return new DomApp(host, fake, userData, options.clock, options.counted === true)
     } catch (error) {
       await host.stop()
       throw error
@@ -96,7 +99,7 @@ export class DomApp {
     url.searchParams.set('e2e', '1')
     if (this.#tour) url.searchParams.set('tour', 'auto')
     if (ready !== undefined) url.searchParams.set('session', JSON.stringify(ready))
-    return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) }, storage)
+    return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) }, storage, this.counted)
   }
 
   /** Holds the engine's replies to the RPC `tags` the page asks for from now on; the returned function delivers them. */
@@ -115,14 +118,16 @@ export class DomApp {
    * window loads with the old one's localStorage, as the browser lane's
    * launch preferences stay: a test of what main keeps stays in Electron.
    * With `tour`, the new page shows the welcome card by itself, as outside tests.
+   * `beforeOpen` runs once the engine has started, before the page loads.
    */
-  async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly engine?: EngineOptions; readonly tour?: boolean } = {}): Promise<void> {
+  async relaunch(options: { readonly whileClosed?: () => Promise<void> | void; readonly beforeOpen?: () => Promise<void>; readonly engine?: EngineOptions; readonly tour?: boolean } = {}): Promise<void> {
     const local = this.window.localStorage
     const storage = Array.from({ length: local.length }, (_, at) => local.key(at)!).map((key) => [key, local.getItem(key)!] as const)
     await within(closeWindow(this.window), 3_000, 'closing the page')
     await this.host.quitEngine()
     await options.whileClosed?.()
     await this.host.startEngine(options.engine)
+    await options.beforeOpen?.()
     this.#tour = options.tour === true
     this.window = this.#open(storage)
     this.dom = new Dom(this.window)

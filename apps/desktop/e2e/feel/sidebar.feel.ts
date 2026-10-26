@@ -50,7 +50,7 @@ const botsStayOut: Check = (evidence) => {
   }
 }
 
-test('the sidebar fills during the first sync without dropping or lifting a painted row', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, fake, feel }) => {
+test('the sidebar fills during the first sync without dropping or lifting a painted row', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, win, fake, feel }) => {
   const method = 'conversations.history'
   const subscriptions = 'subscriptions.thread.getView'
   // The quick start waits for the first page of followed threads, so the recording starts before All has a row.

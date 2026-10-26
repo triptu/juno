@@ -19,7 +19,7 @@ chmod 700 "$XDG_RUNTIME_DIR"
 source scripts/remote/install.sh
 # Electron's first start on the container's layered filesystem copies the
 # binary up; parallel test workers starting it then fail with ETXTBSY. Only suites that start it pay for this.
-case " $* " in *" test:desktop "*|*" test:electron "*|*" test:e2e "*|*" test:nightly "*|*" test:gallery "*)
+case " $* " in *" test:desktop "*|*" test:electron "*|*" test:e2e "*|*" test:gallery "*)
   electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))" 2>/dev/null) && "$electron" --version >/dev/null 2>&1 ;;
 esac
 

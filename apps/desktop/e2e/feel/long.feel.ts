@@ -20,7 +20,7 @@ const DIVIDER_OFFSET = 148
 /** Images answer this late, well after the rows paint. */
 const FILE_DELAY_MS = 1_200
 
-test('a long thread with late images', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, slack, win, feel }) => {
+test('a long thread with late images', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, slack, win, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
   slack.fake.delayFiles({ ms: FILE_DELAY_MS })

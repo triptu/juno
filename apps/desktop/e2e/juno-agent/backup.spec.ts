@@ -43,7 +43,7 @@ const point = 'restore.swapped'
 
 const lastBackupAt = async (juno: Juno) => Number((await juno.win.locator('main [data-last-backup]').getAttribute('data-last-backup')) || 0)
 
-test(`backup to a shared folder, export the phrase, move to a second Mac whose agent dies at ${point}, review the restored chat and pending card, and the first Mac turns read-only`, { tag: ['@nightly', '@nightly-crash'] }, async ({ juno, fake, otherApp, shared }) => {
+test(`backup to a shared folder, export the phrase, move to a second Mac whose agent dies at ${point}, review the restored chat and pending card, and the first Mac turns read-only`, { tag: ['@heavy', '@heavy-crash'] }, async ({ juno, fake, otherApp, shared }) => {
   const { phrase, code } = await test.step('the first Mac backs up to the shared folder, exports the phrase and moves', () => backUpAndMove(juno, shared))
   const laptop = await otherApp({ deviceName: 'Laptop', backupIntervalMs: BACKUP_INTERVAL_MS })
   await test.step(`the second Mac restores, its agent dies at ${point}, and the chat and card come back for review`, () => restoreWithCrash(laptop, fake, shared, phrase, code))

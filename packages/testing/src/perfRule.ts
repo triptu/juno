@@ -31,7 +31,7 @@ export interface BaselineShape {
   readonly metrics: Readonly<Record<string, BaselineMetric>>
 }
 
-/** A nightly's perf parts run on jobs of different sizes, so the baseline holds one set of metrics per shape. */
+/** A perf run's parts can run on jobs of different sizes, so the baseline holds one set of metrics per shape. */
 export interface BaselineFile {
   readonly commit: string
   readonly recorded: string

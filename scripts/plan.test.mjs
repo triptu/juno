@@ -59,21 +59,20 @@ test('only complete successful job reports pass, including report collection', (
   ]) assert.equal(planOutcomes(lines, suites, { ...planned, code }).every((result) => result.code === 0), false)
 })
 
-test('the desktop and unit jobs take four cores in a full run and accept overrides', async () => {
-  const { planCores } = await import('./remote/plan.mjs')
-  const full = parsePlan(['test', '+', 'test:dom', '+', 'test:gallery'])
-  assert.equal(planCores('desktop', { env: [] }, {}, []), 4)
-  assert.equal(planCores('unit', { env: [] }, {}, full), 4)
-  assert.equal(planCores('unit', { env: [] }, {}, parsePlan(['test', 'a.test.ts'])), undefined)
-  assert.equal(planCores('unit', { env: ['JUNO_RUNNER_UNIT_CORES=3'] }, {}, full), 3)
-  assert.throws(() => planCores('desktop', { env: ['JUNO_RUNNER_DESKTOP_CORES=0'] }, {}), /positive whole number/)
-})
-
-test('nightly runs force fast gallery states while normal and no-cache runs retain changed-state real input', async () => {
+test('a full run splits into its measured jobs; other plans keep two four-core jobs; overrides win', async () => {
+  const { planCores, runnerPlanJobs } = await import('./remote/plan.mjs')
   const { fullSuites } = await import('./verify-plan.mjs')
-  const scripts = { 'test:gallery': '' }
-  const gallery = options => parsePlan(fullSuites(scripts, options).find(suite => suite.name === 'test:gallery').words)[0]
-  assert.deepEqual(gallery({ nightly: true }).env, { GALLERY_SHIFT_ALL: '1', GALLERY_REAL_WALK: '0' })
-  assert.deepEqual(gallery({ noCache: true }).env, { GALLERY_SHIFT_ALL: '1' })
-  assert.deepEqual(gallery({}).env, {})
+  const scripts = { 'test:dom': 'x', 'test:browser': 'x', 'test:electron': 'x' }
+  const full = runnerPlanJobs({ script: 'test:plan', env: [], args: fullSuites(scripts, { seed: 1, testSeed: 2 }).flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words]) }, {})
+  assert.deepEqual(full.map((job) => [job.kind, job.cores, job.steps.map((step) => step.script)]), [
+    ['unit', 2, ['test', 'test:dom', 'specs:check']],
+    ['gallery', 3, ['specs:conformance', 'test:gallery']],
+    ['desktop', 3, ['test:browser', 'test:electron']],
+  ])
+  assert.equal(full.reduce((sum, job) => sum + job.cores, 0), 8)
+  const affected = runnerPlanJobs({ script: 'test:plan', env: [], args: ['test', 'a.test.ts', '+', 'test:dom', '+', 'test:desktop'] }, {})
+  assert.deepEqual(affected.map((job) => [job.kind, planCores(job.kind, { env: [] }, {}, job.steps, job.cores)]), [['unit', 4], ['desktop', 4]])
+  assert.equal(planCores('unit', { env: [] }, {}, parsePlan(['test', 'a.test.ts'])), undefined)
+  assert.equal(planCores('unit', { env: ['JUNO_RUNNER_UNIT_CORES=5'] }, {}, [], 3), 5)
+  assert.throws(() => planCores('desktop', { env: ['JUNO_RUNNER_DESKTOP_CORES=0'] }, {}), /positive whole number/)
 })

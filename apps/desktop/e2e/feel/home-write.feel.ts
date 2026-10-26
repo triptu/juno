@@ -21,7 +21,7 @@ test('the chip and the composer stay in place when a first @ chooses a person', 
   })
 })
 
-test('a send from Home leaves the field where it was', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, feel }) => {
+test('a send from Home leaves the field where it was', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, fake, feel }) => {
   await juno.write.pickConversation('eng', 'eng')
   await juno.write.write('first')
   // The send button brightens over 150 ms once the field has text. Record from where it settled,

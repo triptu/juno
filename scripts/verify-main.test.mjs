@@ -60,15 +60,15 @@ console.error('Connection refused'); process.exit(255);
 
 test('local runs archive eligible records and preserve failed suites; an unreachable runner runs nothing', { timeout: 120_000 }, (t) => {
   const { root, commit, env, invoke } = verificationFixture(t)
-  const dry = invoke(['--local', '--dry-run', '--nightly'])
+  const dry = invoke(['--local', '--dry-run'])
   assert.equal(dry.status, 0, dry.stderr)
-  // A nightly reuses unchanged spec checks like any run, but replays conformance uncached.
+  // A full run reuses unchanged spec checks, but replays conformance uncached.
   assert.match(dry.stdout, /\+ SPECS_SEED=\d+ specs:check \+ SPECS_CACHE=off specs:conformance/)
   assert.doesNotMatch(dry.stdout, /@mac, then test:feel/)
   assert.match(invoke(['--local', '--dry-run', '--with-mac']).stdout, /test:desktop --grep @mac, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)
   assert.equal(existsSync(env.TEST_CALLS), false)
-  for (const [args, failing] of [[['--local'], false], [['--local', '--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {
+  for (const [args, failing, again] of [[['--local'], false, false], [['--local'], false, true], [['--local', '--with-mac', '--no-cache'], true, false]]) {
     writeFileSync(env.TEST_CALLS, '')
     const result = invoke(args, { TEST_FAIL_SUITE: failing ? 'specs:conformance' : '' })
     assert.equal(result.status, failing ? 1 : 0, result.stderr + result.stdout)
@@ -82,8 +82,8 @@ test('local runs archive eligible records and preserve failed suites; an unreach
     const desktop = calls.find((c) => c.suite === 'test:desktop')
     assert.equal(desktop.skip, '@mac')
     assert.equal(desktop.workers, '1')
-    if (args.includes('--nightly')) {
-      // A nightly run reuses no suite from the run before it except the unchanged spec check.
+    if (again) {
+      // A full run reuses no suite from the run before it except the unchanged spec check.
       assert.ok(!summary.suites.find((s) => s.suite === 'specs:conformance').reusedFrom)
       assert.ok(calls.some((c) => c.suite === 'specs:conformance'))
       assert.ok(summary.suites.find((s) => s.suite === 'specs:check').reusedFrom)
@@ -98,7 +98,7 @@ test('local runs archive eligible records and preserve failed suites; an unreach
     }
   }
   writeFileSync(env.TEST_CALLS, '')
-  const unreachable = invoke(['--nightly'])
+  const unreachable = invoke([])
   assert.notEqual(unreachable.status, 0)
   assert.match(unreachable.stderr, /unreachable.*do not fall back to this Mac/)
   assert.equal(readFileSync(env.TEST_CALLS, 'utf8'), '')
@@ -206,8 +206,8 @@ for (const [index, step] of parsePlan(process.argv.slice(process.argv.indexOf('t
   writeFileSync(env.TEST_CALLS, '')
   const second = run()
   assert.equal(second.status, 0, second.stderr + second.stdout)
-  assert.deepEqual(record().suites.filter((suite) => suite.reusedFrom).map((suite) => suite.suite), ['specs:check', 'specs:conformance'])
-  assert.doesNotMatch(readFileSync(env.TEST_CALLS, 'utf8'), /specs:/)
+  assert.deepEqual(record().suites.filter((suite) => suite.reusedFrom).map((suite) => suite.suite), ['specs:check'])
+  assert.doesNotMatch(readFileSync(env.TEST_CALLS, 'utf8'), /specs:check/)
   for (const extra of [{ TEST_PLATFORM: 'darwin' }, { TEST_MISMATCH: 'test:gallery' }, { TEST_MISSING: 'test:gallery' }]) {
     const failed = run(extra)
     assert.equal(failed.status, 1, failed.stderr + failed.stdout)

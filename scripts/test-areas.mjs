@@ -1,14 +1,9 @@
 // The code areas bun run affected reads to decide what a change needs beyond the
 // tests that reach it (docs/development.md, "Affected tests"):
 //
-// - HEAVY_AREAS: the tests tagged @heavy, and the code each one checks. A
-//   full run (bun run verify:main) always runs them. An affected plan runs an area's heavy
-//   tests only when a changed file is in that area.
-// - NIGHTLY_AREAS: the tests tagged @nightly, and the code each one checks. A
-//   normal full run skips them; a nightly run (verify:main --nightly) runs them,
-//   and a release runs those its changes reach since they last passed
-//   (scripts/nightly-reach.mjs). An affected plan runs an area's nightly tests
-//   only when a changed file is in that area, as for heavy tests.
+// - HEAVY_AREAS: the slow tests tagged @heavy, and the code each one checks. A
+//   full run (bun run verify:main) always runs them. An affected plan runs an
+//   area's heavy tests only when a changed file is in that area.
 // - PERF_INTERACTIONS: the interactions with a budget in docs/performance.md,
 //   and the files each one owns. When one of these changed, the plan runs its
 //   feel scenario in the browser and suggests perf on the Mac.
@@ -32,36 +27,31 @@ const SYNC_PATHS = [
   'apps/desktop/e2e/layout-shift.spec.ts',
 ]
 
-/** Each heavy test carries `@heavy` and its area's tag, as `{ tag: ['@heavy', '@heavy-sync'] }`. */
+/**
+ * Each heavy test carries `@heavy` and its area's tag, as `{ tag: ['@heavy', '@heavy-crash'] }`, in the desktop
+ * e2e specs, the DOM lane (`domTest`'s `tag` option) or the gallery. `suite` is where its tests are: `desktop`
+ * covers the desktop e2e specs and the DOM lane.
+ */
 export const HEAVY_AREAS = [
   {
     area: 'sync',
     suite: 'desktop',
     tag: '@heavy-sync',
-    tests: 'the sidebar first-sync case in layout-shift.spec.ts',
-    // Spec files whose every test is heavy: the plan drops them when the area did not change.
-    whole: [],
-    paths: SYNC_PATHS,
+    tests: 'the sidebar and Home first-sync cases in layout-shift.spec.ts and the quick-start preview',
+    paths: [...SYNC_PATHS, 'apps/desktop/e2e/homeSyncProbe.ts'],
   },
   {
     area: 'gallery',
     suite: 'gallery',
     tag: '@heavy-gallery',
     tests: 'the real and computed shift guards over every component (without GALLERY_SHIFT_ONLY)',
-    whole: [],
     // The gallery harness: the app and its shared helpers, the shift guard, @juno/testing.
     paths: [/^apps\/gallery\/(?!.*\.spec\.ts$)/, 'apps/gallery/shift.spec.ts', 'apps/gallery/computed-shift.spec.ts', 'packages/testing/'],
   },
-]
-
-/**
- * Each nightly test carries `@nightly` and its area's tag, as `{ tag: ['@nightly', '@nightly-crash'] }`, in the
- * desktop e2e specs and the DOM lane (`domTest`'s `tag` option). A file with a nightly test names its area's tag.
- */
-export const NIGHTLY_AREAS = [
   {
     area: 'crash',
-    tag: '@nightly-crash',
+    suite: 'desktop',
+    tag: '@heavy-crash',
     tests: 'the engine kill and inbox crash in juno-agent/crash.spec.ts, the backup and move in backup.spec.ts and the expired relaunch in session.spec.ts; the uncertain write in crash.spec.ts stays on every run',
     paths: [
       'apps/desktop/src/main/agent.ts',
@@ -90,21 +80,17 @@ export const NIGHTLY_AREAS = [
   },
   {
     area: 'huddle',
-    tag: '@nightly-huddle',
+    suite: 'desktop',
+    tag: '@heavy-huddle',
     tests: 'huddle.spec.ts, huddle-share.spec.ts and the DOM huddle tests that start or join a call',
     paths: [/^(apps|packages)\/.*huddle/i],
   },
   {
     area: 'feel',
-    tag: '@nightly-feel',
-    tests: 'the nightly subset of the feel scenarios (e2e/feel/*.feel.ts), filmed in the browser; affected plans also run a scenario whose interaction changed (PERF_INTERACTIONS). The rest are @on-demand',
+    suite: 'desktop',
+    tag: '@heavy-feel',
+    tests: 'six of the feel scenarios (e2e/feel/*.feel.ts), filmed in the browser; affected plans also run a scenario whose interaction changed (PERF_INTERACTIONS). The rest are @on-demand',
     paths: ['apps/desktop/e2e/feel/'],
-  },
-  {
-    area: 'sync',
-    tag: '@nightly-sync',
-    tests: 'the cold-sync shift check of Home in layout-shift.spec.ts; the sidebar one stays @heavy',
-    paths: [...SYNC_PATHS, 'apps/desktop/e2e/homeSyncProbe.ts'],
   },
 ]
 
@@ -193,25 +179,19 @@ export const inPaths = (paths, file) => paths.some((path) => (path instanceof Re
 /** The heavy areas a change reaches, by name. */
 export const heavyAreasChanged = (changed) => HEAVY_AREAS.filter((area) => changed.some((file) => inPaths(area.paths, file))).map((area) => area.area)
 
-/** The nightly areas a change reaches, by name. */
-export const nightlyAreasChanged = (changed) => NIGHTLY_AREAS.filter((area) => changed.some((file) => inPaths(area.paths, file))).map((area) => area.area)
-
-/** Whether a test file's text holds a nightly test: it names a nightly area's tag. */
-export const holdsNightly = (text) => NIGHTLY_AREAS.some((area) => text.includes(`'${area.tag}'`))
-
 /** The interactions a change reaches, each with the changed files it owns. */
 export const perfInteractionsChanged = (changed) =>
   PERF_INTERACTIONS.map((entry) => ({ ...entry, files: changed.filter((file) => inPaths(entry.paths, file)) })).filter((entry) => entry.files.length > 0)
 
 /**
- * The nightly feel scenarios among `files`: the feel project's files that hold a `@nightly-feel` test, read through
+ * The full run's feel scenarios among `files`: the feel project's files that hold a `@heavy-feel` test, read through
  * `read`; the others are `@on-demand`. `own` marks those an affected plan runs: a changed scenario, every one when
  * their harness changed, and the scenario of a changed interaction (`interactions`, from perfInteractionsChanged).
  */
 export function feelScenarios(files, changed, interactions, read) {
   const harness = changed.some((file) => file.startsWith('apps/desktop/e2e/feel/') && !file.endsWith('.feel.ts'))
   const named = new Set([...changed, ...interactions.flatMap((entry) => (entry.feel ? [`apps/desktop/e2e/feel/${entry.feel}`] : []))])
-  return files.filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file) && read(file).includes("'@nightly-feel'")).map((file) => ({ file, own: harness || named.has(file) }))
+  return files.filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file) && read(file).includes("'@heavy-feel'")).map((file) => ({ file, own: harness || named.has(file) }))
 }
 
 /** The guard specs a change reaches, each with the first changed file in its area. */

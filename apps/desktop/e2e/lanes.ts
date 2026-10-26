@@ -23,6 +23,7 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'quick-reactions.spec.ts',
   'emoji-frequents.spec.ts',
   'composer.spec.ts',
+  'counted-layout.spec.ts',
   'formatting.spec.ts',
   'home-pictures.spec.ts',
   'mark-unread.spec.ts',
