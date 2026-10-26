@@ -40,11 +40,25 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
 ]
 
 /**
- * Electron spec files that start before the rest, slowest first, so a long
- * test does not start last and hold the run open (`e2e/order.ts`). Every
+ * Spec files that start before the rest of their project, slowest first, so a
+ * long test does not start last and hold the run open (`e2e/order.ts`). Every
  * other file follows in Playwright's order. Take the order from a run's
  * `e2e-timing` lines (`bun scripts/e2e-timings.mjs <run.log>`).
  */
+export const BROWSER_FIRST: ReadonlyArray<string> = [
+  'juno-agent/panel.spec.ts',
+  'topic.spec.ts',
+  'stick-bottom.spec.ts',
+  'break-pass-1017.spec.ts',
+  'message-menu.spec.ts',
+  'composer.spec.ts',
+  'juno-agent/chat-reactions.spec.ts',
+  'search.spec.ts',
+]
+
+/** The feel scenarios, slowest first (`feel` is relative to its own folder). */
+export const FEEL_FIRST: ReadonlyArray<string> = ['long.feel.ts', 'tabs.feel.ts', 'sidebar-motion.feel.ts']
+
 export const ELECTRON_FIRST: ReadonlyArray<string> = [
   'juno-agent/crash.spec.ts',
   'juno-agent/backup.spec.ts',
