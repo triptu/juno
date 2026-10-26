@@ -16,6 +16,8 @@ test.describe.configure({ timeout: 150_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
+/** Home, where the card is: the layout checks measure it alone. */
+const HOME = '[data-home]'
 
 /** Apps that show the card by themselves, as outside tests. */
 const showsItself = test.extend({ tour: true })
@@ -42,18 +44,20 @@ showsItself('shows on Home after the first sign-in once the sidebar has rows, ti
   // The field and its chip stayed where they were when the card filled its room.
   expect(await boxes(composer)).toEqual(before)
 
-  // The first sync still runs: its card leaves the sidebar's foot when it ends, which is not the peek's doing.
+  // The first sync still runs. Let it end, so Home's rows are the ones it found.
   await juno.expectEngineLive()
   await sidebar.expectNoSyncStatus()
 
-  // Peek: hold ⌥ over a row. The tick moves nothing.
+  // Peek: hold ⌥ over a row. The tick moves nothing on Home. The sidebar is not measured: the first sync's last
+  // Automated sort (channels moved in, held ones let into All) reaches its rows through a query of their own, which
+  // can land after the sidebar says the sync is done.
   await expectNoLayoutShift(juno.win, async () => {
     await sidebar.row(RINA).peek()
     await juno.peek.expectShowing(RINA)
     await juno.peek.release()
     await juno.peek.expectClosed()
     await welcome.expectTicked('peek')
-  })
+  }, { root: HOME })
 
   // A topic in a new tab, by ⌘-click on its row.
   await sidebar.row(POSTGRES).openInNewTab()
@@ -81,7 +85,7 @@ showsItself('shows on Home after the first sign-in once the sidebar has rows, ti
   await expectNoLayoutShift(after.win, async () => {
     await after.welcome.close.click()
     await after.welcome.expectGone()
-  })
+  }, { root: HOME })
 
   // Never again by itself.
   await expectNoCardAfterLaunch(await relaunch({ tour: true }))
