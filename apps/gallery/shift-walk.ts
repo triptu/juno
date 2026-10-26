@@ -187,18 +187,20 @@ export interface StateResult {
 /** States one document opens before it is loaded again, so what fixtures leave behind stays small. */
 export const statesPerDocument = 150
 
+/** States each page has opened since its document was loaded, counted across the walk's tests in a worker. */
+const openedIn = new WeakMap<Page, number>()
+
 /** The walk opens its states in place in the test's page; the document is loaded again every `statesPerDocument` states. */
 export function walkPages(page: Page) {
-  let opened = 0
   return {
     page: () => page,
     next: async (): Promise<Page> => {
-      if (opened === statesPerDocument) {
+      if ((openedIn.get(page) ?? 0) >= statesPerDocument) {
         await page.evaluate(() => { location.hash = '#/~' })
         await page.reload()
-        opened = 0
+        openedIn.set(page, 0)
       }
-      opened++
+      openedIn.set(page, (openedIn.get(page) ?? 0) + 1)
       await page.mouse.move(0, 0)
       return page
     },

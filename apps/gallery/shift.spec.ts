@@ -24,31 +24,37 @@ test.use(walkUse)
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
 
-/** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (bun run remote uses one per worker). */
+/** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many at once (bun run remote uses one per worker). */
 const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
+// Playwright keeps a record of every call a test makes until the test ends, about 0.3 MB a state in this walk,
+// and a worker's heap is capped at 256 MB. So the walk is at least 16 tests, four per part, and each walks at
+// most its share of the selected states: together they always walk every one.
+const walkTests = Math.max(16, shards * 4)
+// Building the records' keys reads the source graph; once per worker is enough.
+const records = new Map<number, ReturnType<typeof stateCache>>()
 
 const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim())
 
-for (let part = 0; part < shards; part++) {
+for (let part = 0; part < walkTests; part++) {
   // The states come from the built gallery, so the list can only be read once a page is open.
   // Over every component the walk is @heavy (scripts/test-areas.mjs); limited with GALLERY_SHIFT_ONLY it is not.
-  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, page }) => {
+  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${walkTests})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, page }) => {
     test.skip(process.env.GALLERY_REAL_WALK === '0', 'A full run checks every state with the fast sweep; changed-state real input runs on commits')
     const pages = walkPages(page)
     // JUNO_SHARD=i/n (bun run remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
-    // Budget the whole queue for the workers that can actually walk it. Three seconds per state
-    // leaves room above the measured two-second average; each individual state still has a 30 s limit.
-    const parallelParts = Math.min(shards, test.info().config.workers)
-    test.setTimeout(Math.max((only ? 15 : 20) * 60_000, Math.ceil(routes.length * 3_000 / parallelParts)))
+    const limit = Math.ceil(routes.length / walkTests)
+    // Three seconds per state leaves room above the measured two-second average; each individual state still has a 30 s limit.
+    test.setTimeout(Math.max((only ? 15 : 20) * 60_000, limit * 3_000))
     const queue = claimQueue('shift')
-    const cache = stateCache('shift', browser)
+    const { retry } = test.info()
+    const cache = records.get(retry) ?? records.set(retry, stateCache('shift', browser)).get(retry)!
     const failures: string[] = []
     const cursors: string[] = []
     let states = 0, cached = 0, elements = 0, resets = 0
     try {
-      for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
+      for (let route = queue.next(routes); route !== undefined; route = states < limit ? queue.next(routes) : undefined) {
         if (cache.passed(route)) { cached++; continue }
         cache.forget(route)
         const started = Date.now()
