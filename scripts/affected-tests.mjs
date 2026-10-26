@@ -65,3 +65,27 @@ export function unitTestItems(root, files, changed, closure) {
       return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
     })
 }
+
+/** What the DOM lane's test files run against: its renderer bundle and engine host, and their build config. */
+export const domEntries = ['apps/desktop/web/page/main.ts', 'apps/desktop/web/host/testHost.ts', 'apps/desktop/dom/vite.config.ts', 'apps/desktop/renderer.vite.ts', 'apps/desktop/web/build-host.mjs']
+
+/** Every DOM lane file reaches the entries' closures, the desktop package and the scripts that build and run it. */
+export function domInputs(files, closure) {
+  return new Set([...domEntries.filter((file) => files.has(file)).flatMap((file) => [...closure(file)]), 'apps/desktop/package.json', 'scripts/dom-tests.mjs', 'scripts/build-cached.mjs'])
+}
+
+/**
+ * What every desktop e2e spec runs against: `app`, the closures of the app's entry points and every renderer file,
+ * and `support`, the fixtures, the driver, the build and Playwright configs and what they reach (the fake Slack)
+ * outside the app. `supportRoots` are the support files themselves.
+ */
+export function desktopInputs(files, closure) {
+  const entries = [...files].filter((file) => /^apps\/desktop\/src\/(main|preload|engine|agent)\/index\.ts$/.test(file) || file === 'apps/desktop/src/renderer/main.tsx')
+  const supportRoots = [...files].filter((file) => /^apps\/desktop\/e2e\/(fixtures\.ts|build\.ts|no-skips\.ts|driver\/)/.test(file) || ['apps/desktop/playwright.config.ts', 'apps/desktop/package.json', 'apps/desktop/electron.vite.config.ts', 'apps/desktop/src/renderer/index.html'].includes(file))
+  const support = new Set(supportRoots.flatMap((file) => [...closure(file)]))
+  const app = new Set(entries.flatMap((entry) => [...closure(entry)]))
+  for (const file of [...files].filter((path) => path.startsWith('apps/desktop/src/renderer/'))) app.add(file)
+  // The fake Slack's files the app also runs (the shared Slack schema) count as app files.
+  for (const file of app) if (!/^(apps\/desktop\/e2e|packages\/fake-slack|packages\/agent-testing)\//.test(file) && !supportRoots.includes(file)) support.delete(file)
+  return { app, support, supportRoots }
+}

@@ -60,7 +60,7 @@ const extensions = ['.jsx', '.json', '/index.mjs', '/index.js']
 // The specifiers of static imports, re-exports, literal import() and require(), and CSS @import, on one line each.
 const specifierPattern = /(?<![\w.$'"`])(?:(?:import|export)\s+(?:type\s+)?[\w*{}\s,$]*?\s*from\s*|import\s*\(?\s*|require\(\s*|@import\s+(?:url\()?)['"]([^'"\n]+)['"]/g
 
-class BuildGraph extends ImportGraph {
+export class BuildGraph extends ImportGraph {
   constructor(root, files) {
     super(root, files)
     this.widened = []
