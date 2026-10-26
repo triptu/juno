@@ -1,0 +1,1 @@
+- 10-26 12:15 · Opening Home's picture before the picture page's code has loaded keeps Home on screen until it has · The code loads on idle after Home paints; on a busy machine a click came first and the tab was empty for about 200 ms (the picture-open feel scenario, 1 of 4 laptop runs).

@@ -10,8 +10,8 @@
 //   (scripts/nightly-reach.mjs). An affected plan runs an area's nightly tests
 //   only when a changed file is in that area, as for heavy tests.
 // - PERF_INTERACTIONS: the interactions with a budget in docs/performance.md,
-//   and the files each one owns. The plan suggests perf and feel on the Mac only
-//   when one of these changed.
+//   and the files each one owns. When one of these changed, the plan runs its
+//   feel scenario in the browser and suggests perf on the Mac.
 // - GUARD_SPECS: desktop specs that guard the most frequent paths. A plan
 //   always runs one when a changed file is in its area, whatever the time
 //   budget leaves. None now: the instant paths check is
@@ -44,26 +44,6 @@ export const HEAVY_AREAS = [
     paths: SYNC_PATHS,
   },
   {
-    area: 'idle',
-    suite: 'desktop',
-    tag: '@heavy-idle',
-    tests: 'CPU and memory checks in idle-cpu.spec.ts, all @mac, so only Mac runs reach them',
-    whole: [],
-    paths: [
-      'apps/desktop/e2e/idle-cpu.spec.ts',
-      'apps/desktop/e2e/idleJourney.ts',
-      'apps/desktop/src/main/processes.ts',
-      'apps/desktop/src/main/processWatch.ts',
-      'apps/desktop/src/main/screenWatch.ts',
-      'packages/engine/src/send/',
-      'packages/engine/src/workerPasses.ts',
-      'packages/engine/src/markWorker.ts',
-      'packages/agent/src/schedule/scheduler.ts',
-      'packages/agent/src/compactor/scheduler.ts',
-      'packages/fake-slack/src/seeds/',
-    ],
-  },
-  {
     area: 'gallery',
     suite: 'gallery',
     tag: '@heavy-gallery',
@@ -82,7 +62,7 @@ export const NIGHTLY_AREAS = [
   {
     area: 'crash',
     tag: '@nightly-crash',
-    tests: 'the engine kill and inbox crash in juno-agent/crash.spec.ts, transfer.spec.ts, backup.spec.ts, engine.spec.ts and the relaunch tests in session.spec.ts; the uncertain write in crash.spec.ts stays on every run',
+    tests: 'the engine kill and inbox crash in juno-agent/crash.spec.ts, the backup and move in backup.spec.ts and the expired relaunch in session.spec.ts; the uncertain write in crash.spec.ts stays on every run',
     paths: [
       'apps/desktop/src/main/agent.ts',
       'apps/desktop/src/main/engine.ts',
@@ -104,9 +84,7 @@ export const NIGHTLY_AREAS = [
       'packages/engine/src/startEngine.ts',
       'packages/engine/src/status/',
       'apps/desktop/e2e/juno-agent/crash.spec.ts',
-      'apps/desktop/e2e/juno-agent/transfer.spec.ts',
       'apps/desktop/e2e/juno-agent/backup.spec.ts',
-      'apps/desktop/e2e/engine.spec.ts',
       'apps/desktop/e2e/session.spec.ts',
     ],
   },
@@ -117,36 +95,33 @@ export const NIGHTLY_AREAS = [
     paths: [/^(apps|packages)\/.*huddle/i],
   },
   {
-    area: 'scroll',
-    tag: '@nightly-scroll',
-    tests: 'the extra variants in stick-bottom.spec.ts, layout-shift.spec.ts and tab-scroll.spec.ts; one test per rule stays on every run',
+    area: 'idle',
+    tag: '@nightly-idle',
+    tests: 'the CPU and memory walk of every process in idle-cpu.spec.ts; its fine Mac walk is @mac and runs only by hand',
     paths: [
-      'packages/ui/src/ScrollArea.tsx',
-      'packages/views/src/MessageList.tsx',
-      'packages/views/src/TopicView.tsx',
-      'packages/state/src/messages.ts',
-      'packages/state/src/tabs.ts',
-      'packages/engine/src/messages/',
-      'apps/desktop/src/renderer/containers/TopicView.tsx',
-      'apps/desktop/src/renderer/containers/topic/',
-      'apps/desktop/src/renderer/containers/messageRows.ts',
-      'apps/desktop/src/renderer/containers/scrollInput.ts',
-      'apps/desktop/src/renderer/containers/scrollRest.ts',
-      'apps/desktop/src/renderer/containers/juno/chatScroll.ts',
-      'apps/desktop/src/renderer/containers/juno/chatWindow.ts',
-      'apps/desktop/e2e/stick-bottom.spec.ts',
-      'apps/desktop/e2e/stickBottomLists.ts',
-      'apps/desktop/e2e/stickBottomProbe.ts',
-      'apps/desktop/e2e/scrollGrowthProbe.ts',
-      'apps/desktop/e2e/shiftProbe.ts',
-      'apps/desktop/e2e/layout-shift.spec.ts',
-      'apps/desktop/e2e/tab-scroll.spec.ts',
+      'apps/desktop/e2e/idle-cpu.spec.ts',
+      'apps/desktop/e2e/idleJourney.ts',
+      'apps/desktop/src/main/processes.ts',
+      'apps/desktop/src/main/processWatch.ts',
+      'apps/desktop/src/main/screenWatch.ts',
+      'packages/engine/src/send/',
+      'packages/engine/src/workerPasses.ts',
+      'packages/engine/src/markWorker.ts',
+      'packages/agent/src/schedule/scheduler.ts',
+      'packages/agent/src/compactor/scheduler.ts',
+      'packages/fake-slack/src/seeds/',
     ],
+  },
+  {
+    area: 'feel',
+    tag: '@nightly-feel',
+    tests: 'the feel scenarios (e2e/feel/*.feel.ts), filmed in the browser; affected plans also run a scenario whose interaction changed (PERF_INTERACTIONS)',
+    paths: ['apps/desktop/e2e/feel/'],
   },
   {
     area: 'sync',
     tag: '@nightly-sync',
-    tests: 'the cold-sync shift checks of All topics and Home in layout-shift.spec.ts; the sidebar one stays @heavy',
+    tests: 'the cold-sync shift check of Home in layout-shift.spec.ts; the sidebar one stays @heavy',
     paths: [...SYNC_PATHS, 'apps/desktop/e2e/homeSyncProbe.ts'],
   },
 ]
@@ -162,7 +137,7 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'topic open, scroll and live updates',
     perf: 'topic open|scroll|live update',
-    feel: 'topic.feel.ts',
+    feel: 'after-idle.feel.ts',
     paths: ['apps/desktop/src/renderer/containers/TopicView.tsx', 'apps/desktop/src/renderer/containers/topic/', 'apps/desktop/src/renderer/containers/messageRows.ts', 'packages/views/src/TopicView.tsx', 'packages/views/src/MessageList.tsx', 'packages/views/src/Message.tsx', 'packages/views/src/MessageBody.tsx', 'packages/state/src/messages.ts', 'packages/state/src/topics.ts', 'packages/engine/src/messages/', 'packages/engine/src/protocol/'],
   },
   {
@@ -174,7 +149,7 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'Home open and a new tab with Home',
     perf: 'home open|a new tab with Home',
-    feel: 'home.feel.ts',
+    feel: 'after-idle.feel.ts',
     paths: ['apps/desktop/src/renderer/containers/Home.tsx', 'apps/desktop/src/renderer/containers/HomeComposer.tsx', /^packages\/views\/src\/Home[A-Za-z]*\.tsx$/, /^packages\/state\/src\/home[A-Za-z]*\.ts$/, 'packages/engine/src/home/'],
   },
   {
@@ -245,6 +220,17 @@ export const holdsNightly = (text) => NIGHTLY_AREAS.some((area) => text.includes
 /** The interactions a change reaches, each with the changed files it owns. */
 export const perfInteractionsChanged = (changed) =>
   PERF_INTERACTIONS.map((entry) => ({ ...entry, files: changed.filter((file) => inPaths(entry.paths, file)) })).filter((entry) => entry.files.length > 0)
+
+/**
+ * The feel scenarios among `files` (the e2e config's feel project, all @nightly-feel). `own` marks those an
+ * affected plan runs: a changed scenario, every scenario when their harness changed, and the scenario of a
+ * changed interaction (`interactions`, from perfInteractionsChanged).
+ */
+export function feelScenarios(files, changed, interactions) {
+  const harness = changed.some((file) => file.startsWith('apps/desktop/e2e/feel/') && !file.endsWith('.feel.ts'))
+  const named = new Set([...changed, ...interactions.flatMap((entry) => (entry.feel ? [`apps/desktop/e2e/feel/${entry.feel}`] : []))])
+  return files.filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file)).map((file) => ({ file, own: harness || named.has(file) }))
+}
 
 /** The guard specs a change reaches, each with the first changed file in its area. */
 export const guardSpecsChanged = (changed) =>

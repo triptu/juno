@@ -9,7 +9,22 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 - `verify:main --nightly` and `verify:main --no-cache` force the broad walk automatically.
 - `bun run gallery:shots`: review screenshots in both themes. `GALLERY_SHOTS_ONLY=Button` narrows them.
 
-Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency. Every test owns one context; long walks reset the document between states and recycle pages every 20 states. Screenshots remain review artifacts, not pixel baselines in the behavior gate.
+Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency; on the runner a run that does not walk every state uses `GALLERY_CACHED_WORKERS`, half a worker per thread. Every test in a worker runs on one loaded gallery page ([One page per worker](#one-page-per-worker)). Screenshots remain review artifacts, not pixel baselines in the behavior gate.
+
+## One page per worker
+
+A page load costs about 0.45 CPU-s (the 2.4 MB bundle); a state opened by its hash in an open document about 0.03 (both measured on the runner, 10-25). So every spec imports `test` from `support.ts` (or `layoutTest` and `paintTest`, which extend it), and each worker loads the gallery once. `page.goto('/#/…')` from that document is a hash change, as is `openState`; the frame is keyed by state, so the fixture mounts fresh.
+
+Between tests the fixture puts the page back to `#/~`, which draws nothing and applies the light theme, the default accent and Compact. It then fails the test if anything is left: focus, a node beside `#root` (a portal), a `<style>` element, a new window global or a registered fixture control. Then it clears focus, selection, window scroll, `localStorage` and `sessionStorage`, moves the mouse to the corner and presses there, so the next programmatic focus follows a pointer and not the last key. Each test sets the viewport and emulated media from its options (`test.use`).
+
+- `ownPageTest`, or `test.use({ ownPage: true })` in a describe, gives a test a context and page of its own: routes (late or held images), a clock, init scripts, exposed functions and injected style or script tags need one. On the shared page these calls throw, so a test cannot leave them for the next.
+- `test.use({ galleryDocument: '/?test-fixtures' })` shares a document that includes the gallery's own test fixtures.
+- A test that leaves the document (`about:blank`, `setContent`, another address, a reload) gets the worker a new one for the next test. A failed test restarts its worker.
+- The walks open each state in place too and load the document again every 150 states, which keeps the renderer's memory bounded (10-18, 24 parts on 16 GB ran out of memory when one page drew every component).
+
+What the components keep at module level and a document now carries from test to test: the topic art markup cache (strings by recipe), the pointer position `pointerMoved` compares against (rewritten by the reset's mouse move), lazy chunks once loaded, and keys held while a send is pending (released within a second). None changes what a state draws. The computed sweep has opened 150 states per document since 10-25.
+
+Measured before and after, with the worker counts, in [development notes](../../docs/development.md#gallery-one-loaded-page-per-worker-2026-10-26). Isolation is checked by running the suite in a shuffled order with different worker counts: `bun run remote --env GALLERY_SHIFT_ALL=1 --env GALLERY_WORKERS=<n> test:gallery --shuffle <seed>`. `shared-page.spec.ts` checks that the reset fails a test that leaves a node or a global.
 
 ## Fast sweep
 
@@ -21,13 +36,13 @@ Install the pinned headless shell with `bunx playwright install chromium --only-
 
 Only a completed successful state is recorded. Before rechecking a state its old record is removed, so failure or interruption cannot preserve a previous pass. Records are written atomically under `$JUNO_BUILD_CACHE_DIR/gallery-walk-v1`, or the shared system temp directory's `juno-cache/results/gallery-walk-v1`. The remote runner uses `/cache/builds/gallery-walk-v1`.
 
-`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass the cache. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its document reset, still has a 30-second limit. Playwright owns context teardown. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
+`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass the cache. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its reset, still has a 30-second limit. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
 
 ## Cached rendering tests
 
 A test that only reads what states draw uses `layoutTest` (boxes, text, attributes) or `paintTest` (colours too) from `support.ts` instead of `test`. Each records which components it opened, from the page's navigations (`#index` for the list of states). It is skipped while its title, its spec and what that imports, the runtime, and the keys of those components are unchanged since it last passed. Component keys are the walk's: `layoutTest` ignores colour tokens and paint-only CSS like the shift walk; `paintTest` counts the colour and shadow tokens the component's files read and every CSS declaration, so contrast checks rerun only when a colour they resolve, or the component, changes. `#index` keys on the registries and fixture code, so a state list built from a constant outside fixture code is missed until a full run. `GALLERY_SHIFT_ALL=1` (nightly and no-cache runs), repeats and retries run every cached test. Interaction timing, motion, delayed loads, keyboard flows and the guard's self-tests stay on plain `test` and run every time.
 
-Tests that open the same states share one test and one document: a page load costs about 0.45 CPU-s, a state opened by its hash in an open document about 0.03 (both measured on the runner, 10-25). Contrast is one test per theme over every accent.
+Tests that open the same states share one test. Contrast is one test per theme over every accent.
 
 `GALLERY_CPU=1` (Linux) prints CPU-seconds, summed test time and span per spec file (`scripts/gallery-cpu-reporter.mjs`).
 

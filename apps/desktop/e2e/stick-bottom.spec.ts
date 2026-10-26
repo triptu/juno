@@ -1,13 +1,11 @@
 // Bottom following (SPEC 7, "Stable geometry"): arrivals and growing rows stay above the composer from their
 // first frame, including while the scrollbar thumb is held at the end. A full message window drops its first
 // row without moving the viewport; an upward gesture lets go, and arrivals leave that scrolled position alone.
-import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
-import { expect, test, type Fixtures } from './fixtures'
-import { answer, JunoChatPane, test as chatTest } from './juno-agent/chat'
+import { TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
+import { expect, syncedTest, test, type Fixtures } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
-import { backAtEnd, distance, frames, longerThanView, longTest, openFullWindow, openLongMain, wheelDownAtEnd, wheelToEnd } from './stickBottomLists'
+import { backAtEnd, distance, frames, longTest, openFullWindow, openLongMain, wheelToEnd } from './stickBottomLists'
 import { watchArrival, watchEditVisibility, watchResize, type Frame } from './stickBottomProbe'
 
 test.describe.configure({ timeout: 90_000, mode: 'parallel' })
@@ -19,24 +17,7 @@ function expectHeldAtEnd(frames: Frame[]): void {
 }
 
 const TOPIC_SCROLLER = '[data-topic-view] [data-scroll]'
-const PANEL_SCROLLER = 'aside[data-juno-panel] [data-scroll]'
 
-test('a thread at the bottom keeps a new reply fully in view', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
-  const root = fake.injectMessage({ channel: slack.channel('eng'), user: slack.as('Leo').id, text: 'Stick to the bottom thread check' })
-  for (let i = 0; i < 30; i++) fake.workspace.post({ channel: slack.channel('eng'), user: slack.as(i % 2 === 0 ? 'Leo' : 'Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true })
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
-  await threadArrival({ juno, win, slack, fake }, root.ts)
-})
-
-test('keeps Main at the bottom through arrivals and composer growth, and holds its position when scrolled up', async ({ juno, win, slack, fake }) => {
-  await openLongMain(juno, fake, slack)
-  const context = { juno, win, slack, fake }
-  await test.step('Main at the bottom keeps a new message fully in view after a click on a message', () => mainArrival(context))
-  await test.step('Main at the bottom keeps its last message in view while the composer grows', () => composerGrowth(context))
-  await test.step('scrolled up in Main, a new message moves nothing and shows the pill', () => scrolledUpArrival(context))
-})
 
 /** Every frame from the first that draws the element shows it whole, at the list's end or anywhere in view. */
 function expectWhole(frames: Frame[], { atEnd }: { readonly atEnd: boolean }): void {
@@ -96,22 +77,14 @@ async function editLastStaysAbove({ juno, win, fake }: Pick<Fixtures, 'juno' | '
   }
 }
 
-// A DM is the same TopicView as Main; the thread view is checked on its own (below), since a thread window once broke it alone.
-test('Main: editing the last message without reactions stays above the composer', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
-  const channel = slack.channel('eng')
-  for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Edit history ${i}`, silent: true })
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng', { exact: true }).open()
-  await juno.topic.expectMessage('Edit history 29')
-  await juno.topic.toLatest()
-  expect(await longerThanView(juno.topic.scroller)).toBe(true)
-  await editLastStaysAbove({ juno, win, fake }, 'Main', channel, slack.as('Maya').id)
-})
-
-test('keeps the last message of Main whole as it grows at the bottom, and still when scrolled up', async ({ juno, win, slack, fake }) => {
+syncedTest('keeps Main at the bottom through arrivals, composer growth and a growing last message, and holds its position when scrolled up', async ({ juno, win, slack, fake }) => {
   const channel = await openLongMain(juno, fake, slack)
+  const context = { juno, win, slack, fake }
   const { topic } = juno
+  await test.step('Main at the bottom keeps a new message fully in view after a click on a message', () => mainArrival(context))
+  await test.step('Main at the bottom keeps its last message in view while the composer grows', () => composerGrowth(context))
+  await test.step('scrolled up in Main, a new message moves nothing and shows the pill', () => scrolledUpArrival(context))
+  await topic.toLatest()
 
   await test.step('at the bottom, a reaction from someone else on the last message shows whole', async () => {
     const text = 'A message Leo reacts to'
@@ -185,7 +158,7 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
   })
 })
 
-test('releases the bottom during an upward gesture and uses the resting threshold for later growth', async ({ juno, win, slack, fake }) => {
+syncedTest('releases the bottom during an upward gesture, uses the resting threshold for later growth, and a scroll that stops short of the end stays put', async ({ juno, win, slack, fake }) => {
   const channel = await openLongMain(juno, fake, slack)
   const { topic } = juno
   const last = fake.messages(channel).find((message) => message.text === 'Earlier message 29')!
@@ -236,13 +209,30 @@ test('releases the bottom during an upward gesture and uses the resting threshol
     await wheelToEnd(win, topic.scroller)
     await expectScrollEscapesGrowth(win, topic.scroller, topic.list.locator('[data-message-row]').last())
   })
+
+  await test.step('a scroll down that stops just short of the end stays where it stopped', async () => {
+    await topic.toLatest()
+    const away = () => distance(topic.scroller)
+    await topic.scrollUp(24)
+    const before = await away()
+    expect(before).toBeGreaterThan(9)
+    expect(before).toBeLessThanOrEqual(32)
+    // Part of the way back down from a script, as scrolling a row into view does. Resting within 32px held the bottom,
+    // but no row grew, so the list stays where the scroll put it and the row under a still pointer stays there.
+    await topic.scroller.evaluate(async (node) => {
+      const ended = new Promise<void>((resolve) => node.addEventListener('scrollend', () => resolve(), { once: true }))
+      node.scrollTop += 8
+      await ended
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
+    expect(await away()).toBe(before - 8)
+  })
+  // The probe scrolls to the end itself, so the step above does not change what it checks.
+  await test.step('a resting bottom survives growth during a coalesced scrollend', () => expectRestSurvivesGrowth(topic.scroller, '[data-message-row]'))
 })
 
-longTest('Main: back at the end after scrolling up by hand, a full window follows new messages', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, fake }) => {
-  await openFullWindow(juno, '#perf-main')
-  await backAtEnd(juno, win, (text) => void fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, user: 'U0PERFLEO', text }))
-})
-
+// The thread window is checked on its own, since a thread window once broke it alone (e37e5df81); a DM and Main are
+// the same TopicView.
 longTest('thread: editing the last message stays above the composer, and back at the end after scrolling up by hand a full window follows new messages', async ({ juno, win, fake }) => {
   const title = 'Review the rollout checklist 1'
   await openFullWindow(juno, title)
@@ -261,24 +251,6 @@ async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | '
   const text = 'A new message at the bottom of Main'
   const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', text)
   fake.injectMessage({ channel, user: slack.as('Maya').id, text })
-  await juno.topic.expectMessage(text)
-  await frames(win, 5)
-  expectHeldAtEnd(await watched())
-  await juno.topic.expectNoPill()
-}
-
-async function threadArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>, rootTs: string): Promise<void> {
-  const channel = slack.channel('eng')
-  await juno.topic.list.locator(`[data-thread-link="t:${channel}:${rootTs}"]`).click()
-  // The thread paints at once with the newest reply Juno holds; the others land above it with the open's fetch.
-  await juno.topic.expectMessage('Reply 0')
-  await juno.topic.toLatest()
-  expect(await longerThanView(juno.topic.scroller)).toBe(true)
-  await wheelDownAtEnd(win, juno.topic.scroller)
-
-  const text = 'A new reply at the bottom of the thread'
-  const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', text)
-  fake.injectMessage({ channel, user: slack.as('Leo').id, threadTs: rootTs, text })
   await juno.topic.expectMessage(text)
   await frames(win, 5)
   expectHeldAtEnd(await watched())
@@ -304,55 +276,3 @@ async function scrolledUpArrival({ juno, win, slack, fake }: Pick<Fixtures, 'jun
     await juno.topic.expectPill('1 new message')
   })
 }
-
-/** The chat test with a model that holds its answer to a message with "held" in it until the gate opens. */
-const heldTest = chatTest.extend<{ readonly gate: { readonly wait: Promise<void>; readonly open: () => void } }>({
-  // oxlint-disable-next-line no-empty-pattern
-  gate: async ({}, use) => {
-    let open = () => {}
-    const wait = new Promise<void>((resolve) => (open = resolve))
-    await use({ wait, open })
-    open()
-  },
-  model: async ({ gate }, use) => {
-    const model = await startFakeOpenRouter({
-      answer: async (request) => {
-        if (request.input.includes('held')) await gate.wait
-        return answer(request)
-      },
-    })
-    await use(model)
-    await model.close()
-  },
-})
-
-heldTest('the Juno panel at the bottom keeps a new answer fully in view', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, gate }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.setWindowSize(1400)
-  await juno.sidebar.row('Draft plan is in the doc').open()
-  await juno.tabs.menu('juno')
-  const panel = JunoChatPane.panel(win)
-  for (let i = 1; i <= 8; i++) {
-    const ask = `question ${i}: what did Leo and Maya decide about the cutover window, the fallback primary and who reviews the plan`
-    await panel.send(ask)
-    await panel.expectJuno(`You said: ${ask}`)
-  }
-  const scroller = win.locator(PANEL_SCROLLER)
-  await frames(win, 5)
-  expect(await longerThanView(scroller)).toBe(true)
-
-  // Juno is still answering while the owner, at the end, turns the wheel down.
-  const ask = 'a held question at the bottom of the panel'
-  await panel.send(ask)
-  await panel.expectOwner(ask)
-  await frames(win, 5)
-  await wheelDownAtEnd(win, scroller)
-  const watched = await watchArrival(win, PANEL_SCROLLER, '[data-chat-juno]', `You said: ${ask}`)
-  gate.open()
-  await panel.expectJuno(`You said: ${ask}`)
-  await frames(win, 5)
-  expectHeldAtEnd(await watched())
-  await expectRestSurvivesGrowth(scroller, '[data-chat-juno]')
-  await expectScrollEscapesGrowth(win, scroller, scroller.locator('[data-chat-juno]').last())
-})

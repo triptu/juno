@@ -7,8 +7,9 @@
 // environment. The app suites (test:desktop, test:gallery, test:e2e) run one
 // after another, each with the whole machine's workers. The other suites (unit
 // tests and spec checks) run in separate lanes beside them, at a lower CPU
-// priority, so the app suites keep their timing. JUNO_PLAN_SERIAL=1 runs every
-// step one after another instead.
+// priority, so the app suites keep their timing. The lanes share the workers
+// out (sideBySide below); JUNO_PLAN_OVERLAP=1 keeps each suite's own workers.
+// JUNO_PLAN_SERIAL=1 runs every step one after another instead.
 //
 // The plan owns the machine, so its steps skip the heavy-job queue
 // (scripts/heavy.mjs). Inside a remote container a build is reused by later
@@ -62,14 +63,15 @@ export function lanes(steps, serial) {
 /**
  * Split the CPU limit between app workers (half the cores), unit workers
  * and simulations (a quarter each), plus one uncached Apalache checker.
- * Gallery gets three quarters because its checks wait for the browser.
+ * Gallery gets three quarters because its checks wait for the browser, and a
+ * quarter when it walks only changed states (apps/gallery/playwright.config.ts).
  * Wide unit-only plans retain their inherited unit workers; app plans split them.
  * A step's own KEY=VALUE words still win.
  */
 export function sideBySide(cores, wideUnit = false) {
   const galleryWorkers = String(cores === 3 ? 3 : Math.max(1, Math.floor((cores * 3) / 4)))
   return {
-    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
+    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_CACHED_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
     rest: wideUnit ? {} : { JUNO_TEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
     specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
   }
@@ -104,7 +106,8 @@ if (import.meta.main) {
   const serial = process.env.JUNO_PLAN_SERIAL === '1'
   const planned = lanes(steps, serial)
   const cores = Number(process.env.JUNO_RUNNER_JOB_CORES) || availableParallelism()
-  const shared = planned.length > 1 ? sideBySide(cores, process.env.JUNO_RUNNER_WIDE_UNIT === '1') : undefined
+  // JUNO_PLAN_OVERLAP=1 (a split SSH job outside full runs) keeps every lane's own workers.
+  const shared = planned.length > 1 && process.env.JUNO_PLAN_OVERLAP !== '1' ? sideBySide(cores, process.env.JUNO_RUNNER_WIDE_UNIT === '1') : undefined
   const run = (step, low) =>
     new Promise((resolvePromise) => {
       const started = Date.now()

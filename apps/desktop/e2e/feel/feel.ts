@@ -4,13 +4,17 @@
  * result and the probe recording under `feel-report/<name>/`, and fails the test softly for each
  * failed check, so the other scenarios in the test still record.
  */
-import { writeFile } from 'node:fs/promises'
+import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, test as base } from '../fixtures'
 import type { Check, Verdict } from './checks'
 import { Recorder, type Probe } from './recorder'
 import { currentLoad, encodeVideo, REPORT_DIR, Studio, writeResult } from './studio'
+
+/** Set by the e2e config, which runs the scenarios on a shared machine (`playwright.config.ts`). */
+const FAILED_MEDIA_ONLY = process.env.JUNO_FEEL_MEDIA === 'failed'
+const LONG_FRAMES_WARN = process.env.JUNO_FEEL_LONG_FRAMES === 'warn'
 
 export interface Scenario {
   /** Folder name and id in the contact sheet. */
@@ -47,16 +51,20 @@ export class Feel {
     await writeFile(join(dir, 'recording.json'), JSON.stringify({ recording: { ...recording, shots: recording.shots.map((shot) => ({ number: shot.number, t: shot.t, deviceWidth: shot.deviceWidth, deviceHeight: shot.deviceHeight })) }, pixels }))
     const verdicts: Verdict[] = scenario.checks.map((check) => {
       try {
-        return check({ recording, pixels })
+        const verdict = check({ recording, pixels })
+        return LONG_FRAMES_WARN && verdict.status === 'fail' && verdict.name === 'no long animation frames' ? { ...verdict, status: 'warn' } : verdict
       } catch (error) {
         return { name: 'check could not run', status: 'fail', detail: String(error), shots: [] }
       }
     })
     if (failure !== undefined) verdicts.unshift({ name: 'the scripted steps ran', status: 'fail', detail: String(failure).split('\n')[0] ?? '', shots: [recording.shots.at(-1)?.number ?? 0] })
-    const filmstrip = await this.studio.filmstrip(dir, `${scenario.name}: ${scenario.title}`, recording, pixels, verdicts)
-    const video = await encodeVideo(dir, recording)
-    const t0 = recording.shots[0]?.t ?? 0
     const failed = verdicts.filter((v) => v.status === 'fail')
+    // On a shared machine a passing scenario keeps only its checks.
+    const media = !FAILED_MEDIA_ONLY || failed.length > 0
+    if (!media) await rm(join(dir, 'frames'), { recursive: true, force: true })
+    const filmstrip = media ? await this.studio.filmstrip(dir, `${scenario.name}: ${scenario.title}`, recording, pixels, verdicts) : null
+    const video = media ? await encodeVideo(dir, recording) : { file: null, note: 'Frames, filmstrip and video are kept only for a failed scenario in this run.' }
+    const t0 = recording.shots[0]?.t ?? 0
     await writeResult(dir, {
       name: scenario.name,
       title: scenario.title,

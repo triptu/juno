@@ -7,6 +7,9 @@ import { test } from './feel'
 import { tag } from './pane'
 import type { Probe, ProbeFrame } from './recorder'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 
@@ -38,9 +41,7 @@ const popover = (dialog: string, anchor: string, label: string) => ({
   ],
 })
 
-test('hover and press feedback', async ({ juno, win, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+test('hover and press feedback', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
 
   const row = await tag(juno.sidebar.row(POSTGRES).root, 'hover-row')
   await feel.run({ name: 'hover-row', title: 'Point at a sidebar row: its hover background shows in the next frame', probes: look(row), checks: feedback('pointerover', 'row hover') }, async (rec) => {
@@ -82,9 +83,7 @@ test('hover and press feedback', async ({ juno, win, feel }) => {
   })
 })
 
-test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+test('popovers open from their anchor, whole', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
 
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
@@ -116,10 +115,12 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
   })
 })
 
-test('palette opens with frequent conversations and holds still', async ({ juno, win, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+test('palette opens with frequent conversations and holds still', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
   const dialog = '[role="dialog"][aria-label="Search and commands"]'
+  // The app warms the palette's lists in its first idle moment after launch (Palette.tsx); a warm start can be
+  // here before that on a busy machine. Idle callbacks run in order, so this one runs after the warm-up's.
+  await win.evaluate(() => new Promise<void>((resolve) => requestIdleCallback(() => resolve(), { timeout: 5_000 })))
+  await win.waitForTimeout(300)
   await feel.run({
     name: 'palette-open',
     title: 'Open search with frequent conversations',

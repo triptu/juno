@@ -5,8 +5,7 @@
 // the real ones are, so it takes as long to decode.
 import { SELF_ID, startFakeSlack, TEAM, type FakeSlack, type Workspace } from '@juno/fake-slack'
 import type { Page } from '@playwright/test'
-import { Juno } from '../driver/juno'
-import { launchApp, type RunningApp } from '../fixtures'
+import type { Juno } from '../driver/juno'
 import { keepsSize } from './answers'
 import { happened, landsAndStays, neverBlank, noFlicker, switchesOnce } from './checks'
 import { expect, Feel, test as base, type Scenario } from './feel'
@@ -75,59 +74,55 @@ const stepping: Scenario = {
   ],
 }
 
-/** The first launch downloads Home's next picture with its large file held, so only the small one is on disk; returns its id. */
-async function prepareHomePicture({ juno, win, fake, running }: { readonly juno: Juno; readonly win: Page; readonly fake: FakeSlack; readonly running: RunningApp }): Promise<string> {
+/** The first launch downloads Home's next picture with its large file held, so only the small one is on disk; returns its id. Release the hold once the app is closed. */
+async function prepareHomePicture({ juno, win, fake }: { readonly juno: Juno; readonly win: Page; readonly fake: FakeSlack }): Promise<string> {
   fake.holdNext({ method: 'picture:large' })
   await juno.signIn()
   await juno.waitForSync()
   await juno.home.open()
   await expect(juno.home.greeting).toHaveText('All caught up.')
   await expect.poll(() => win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next?.id ?? null), { timeout: 30_000 }).not.toBeNull()
-  const id = await win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next.id as string)
-  await running.close()
-  fake.release({ method: 'picture:large' })
-  return id
+  return win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next.id as string)
 }
 
-test('the picture page opens with the picture Home showed, sharpens in one frame, and ← → never shows a blank picture', async ({ juno, win, fake, running, userData, slackApp, studio }) => {
-  const id = await prepareHomePicture({ juno, win, fake, running })
+test('the picture page opens with the picture Home showed, sharpens in one frame, and ← → never shows a blank picture', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, fake, relaunch, studio }) => {
+  const id = await prepareHomePicture({ juno, win, fake })
   // After a relaunch Home shows the picture, and nothing else has read which files are on disk. Its large file is held again.
   const held = `picture:${id}-large.webp`
-  fake.holdNext({ method: held })
-  const next = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const again = new Juno(next.app, next.win)
-    const feel = new Feel(next.win, studio, 'pictures')
-    await again.home.open()
-    const image = again.home.picture.locator('img')
-    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0), { timeout: 30_000 }).toBe(true)
-    const page = next.win.locator(PAGE).filter({ visible: true })
-    await next.win.waitForTimeout(500)
-    await feel.run(opening, async (rec) => {
-      await rec.mark('press')
-      await again.home.picture.getByRole('button').first().click()
-      await expect(page).toBeVisible()
-      await expect.poll(() => fake.heldCount({ method: held })).toBe(1)
-      await next.win.waitForTimeout(300)
-      await rec.mark('large')
-      fake.release({ method: held })
-      await expect(page.locator('[data-picture-image] img[src*="-large.webp"]')).toHaveCount(1)
-    })
+  const again = await relaunch({
+    whileClosed: async () => {
+      fake.release({ method: 'picture:large' })
+      fake.holdNext({ method: held })
+    },
+  })
+  const feel = new Feel(again.win, studio, 'pictures')
+  await again.home.open()
+  const image = again.home.picture.locator('img')
+  await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0), { timeout: 30_000 }).toBe(true)
+  const page = again.win.locator(PAGE).filter({ visible: true })
+  await again.win.waitForTimeout(500)
+  await feel.run(opening, async (rec) => {
+    await rec.mark('press')
+    await again.home.picture.getByRole('button').first().click()
+    await expect(page).toBeVisible()
+    await expect.poll(() => fake.heldCount({ method: held })).toBe(1)
+    await again.win.waitForTimeout(300)
+    await rec.mark('large')
+    fake.release({ method: held })
+    await expect(page.locator('[data-picture-image] img[src*="-large.webp"]')).toHaveCount(1)
+  })
 
-    await next.win.waitForTimeout(1000)
-    const title = page.getByRole('heading', { level: 1 })
-    await feel.run(stepping, async (rec) => {
-      const first = await title.textContent()
-      await rec.mark('step')
-      await next.win.keyboard.press('ArrowRight')
-      await expect(title).not.toHaveText(first ?? '')
-      await next.win.waitForTimeout(800)
-      const second = await title.textContent()
-      await rec.mark('second step')
-      await next.win.keyboard.press('ArrowRight')
-      await expect(title).not.toHaveText(second ?? '')
-    })
-  } finally {
-    await next.close()
-  }
+  await again.win.waitForTimeout(1000)
+  const title = page.getByRole('heading', { level: 1 })
+  await feel.run(stepping, async (rec) => {
+    const first = await title.textContent()
+    await rec.mark('step')
+    await again.win.keyboard.press('ArrowRight')
+    await expect(title).not.toHaveText(first ?? '')
+    await again.win.waitForTimeout(800)
+    const second = await title.textContent()
+    await rec.mark('second step')
+    await again.win.keyboard.press('ArrowRight')
+    await expect(title).not.toHaveText(second ?? '')
+  })
 })

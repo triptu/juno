@@ -35,7 +35,7 @@ const deadline=Date.now()+5000; const timer=setInterval(()=>{if (readFileSync(${
     for (const call of calls.filter((c) => c.event === 'start')) {
       assert.equal(call.parent, '1')
       assert.ok(call.args.includes('CUSTOM=space value'))
-      assert.ok(call.args.includes('JUNO_PLAN_SERIAL=1'))
+      assert.ok(call.args.includes('JUNO_PLAN_OVERLAP=1'))
       assert.ok(call.args.includes('--cores'))
       assert.ok(call.args.includes('2'))
     }

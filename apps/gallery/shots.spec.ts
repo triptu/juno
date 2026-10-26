@@ -1,7 +1,7 @@
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { expect, test, type Page } from '@playwright/test'
-import { openState, readRoutes, type Route } from './support'
+import { expect, type Page } from '@playwright/test'
+import { openState, readRoutes, test, type Route } from './support'
 
 const shotsDir = join(import.meta.dirname, 'shots')
 const themes = ['light', 'dark'] as const

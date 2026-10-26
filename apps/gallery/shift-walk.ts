@@ -184,38 +184,72 @@ export interface StateResult {
   readonly resets: number
 }
 
+/** States one document opens before it is loaded again, so what fixtures leave behind stays small. */
+export const statesPerDocument = 150
+
+/** The walk opens its states in place in the test's page; the document is loaded again every `statesPerDocument` states. */
+export function walkPages(page: Page) {
+  let opened = 0
+  return {
+    page: () => page,
+    next: async (): Promise<Page> => {
+      if (opened === statesPerDocument) {
+        await page.evaluate(() => { location.hash = '#/~' })
+        await page.reload()
+        opened = 0
+      }
+      opened++
+      await page.mouse.move(0, 0)
+      return page
+    },
+  }
+}
+
 /** Opens one state, checks the cursor rule, and touches each target every way a person can. */
 export async function walkState(pages: { readonly next: () => Promise<Page> }, route: Route): Promise<StateResult> {
   const failures: string[] = []
   const cursors: string[] = []
   let elements = 0, resets = 0
-  await checkStateWithin(route, async () => {
-    const page = await pages.next()
-    await openState(page, route)
-    for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
-    await rememberMarkup(page, route)
-    // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
-    // after it would be gone or different: open the state again whenever a touch changed what it draws.
-    const count = await findTargets(page, route)
-    let watch = await watchLayoutShift(page, walkGuard)
-    for (let index = 0; index < count; index++) {
-      if (await markupChanged(page, route)) {
-        // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
-        resets++
-        await page.goto('about:blank')
-        await openState(page, route)
-        await rememberMarkup(page, route)
-        // The new document draws the same state, so the same sample keeps its places.
-        if (index >= await findTargets(page, route)) {
-          failures.push(`${route.route}: opened again, it drew fewer elements to touch`)
-          break
+  let walked: Page | undefined
+  let watch: LayoutShiftWatch | undefined
+  try {
+    await checkStateWithin(route, async () => {
+      const page = await pages.next()
+      walked = page
+      await openState(page, route, 'light', undefined, { inPlace: true })
+      for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
+      await rememberMarkup(page, route)
+      // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
+      // after it would be gone or different: open the state again whenever a touch changed what it draws.
+      const count = await findTargets(page, route)
+      watch = await watchLayoutShift(page, walkGuard)
+      for (let index = 0; index < count; index++) {
+        if (await markupChanged(page, route)) {
+          // In place, the same state again passes through a page that draws no frame, so the fixture mounts fresh.
+          resets++
+          await openState(page, route, 'light', undefined, { inPlace: true })
+          await rememberMarkup(page, route)
+          // The state drawn again is the same, so the same sample keeps its places.
+          if (index >= await findTargets(page, route)) {
+            failures.push(`${route.route}: opened again, it drew fewer elements to touch`)
+            break
+          }
+          watch = await watchLayoutShift(page, walkGuard)
         }
-        watch = await watchLayoutShift(page, walkGuard)
+        elements++
+        for (const failure of await touch(page, ofWalkTarget(page, index), watch)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
       }
-      elements++
-      for (const failure of await touch(page, ofWalkTarget(page, index), watch)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
-    }
-    await watch.stop()
-  })
+    })
+  } finally {
+    // The page is shared with the next test, so a state that failed or ran out of time also takes its watch,
+    // observer and targets away.
+    await watch?.stop()
+    await walked?.evaluate(() => {
+      const scope = globalThis as { __junoShiftMarkup?: { observer: MutationObserver }; __junoWalkTargets?: unknown }
+      scope.__junoShiftMarkup?.observer.disconnect()
+      delete scope.__junoShiftMarkup
+      delete scope.__junoWalkTargets
+    })
+  }
   return { failures, cursors, elements, resets }
 }

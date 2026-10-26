@@ -1,0 +1,1 @@
+- 10-26 11:20 · The idle walk's hidden state settles 10 s instead of 1 s · On the laptop it read the window at 5.7 to 6.2 % in 3 of 3 runs, with the engine, agent and main up too while every process gave back 10 to 40 MB: V8's garbage collection about 8 s after the Juno reply, not a spin. The other states read 0 to 0.5 %.

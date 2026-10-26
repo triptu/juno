@@ -13,8 +13,9 @@ import { domTest } from '../test'
 /** Exports every second instead of every minute, so each Mac sees the other's backup quickly. */
 const BACKUP_INTERVAL_MS = 1_000
 
-async function ready(juno: Juno): Promise<void> {
-  await juno.signIn()
+/** The first Mac starts synced; another Mac (`otherApp`) signs in first. */
+async function ready(juno: Juno, signIn = false): Promise<void> {
+  if (signIn) await juno.signIn()
   await juno.waitForSync()
   await agentReady(juno)
   await openChat(juno)
@@ -92,7 +93,7 @@ async function firstMac(juno: Juno, shared: string): Promise<string> {
 async function secondMac(juno: Juno, laptop: Juno, shared: string, phrase: string): Promise<void> {
   const studio = juno.win.locator('main')
   // The second Mac: its own profile, the same Slack, the shared folder.
-  await ready(laptop)
+  await ready(laptop, true)
   await openSettings(laptop)
   const page = laptop.win.locator('main')
 
@@ -139,4 +140,4 @@ domTest('backup to a shared folder, export the phrase, restore on a second Mac, 
   } finally {
     await rm(shared, { recursive: true, force: true })
   }
-}, { synced: false, model: () => startFakeOpenRouter({ answer }), engine: { deviceName: 'Studio', backupIntervalMs: BACKUP_INTERVAL_MS }, timeout: 180_000 })
+}, { model: () => startFakeOpenRouter({ answer }), engine: { deviceName: 'Studio', backupIntervalMs: BACKUP_INTERVAL_MS }, timeout: 180_000 })

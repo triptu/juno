@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { layoutTest, openState, readRoutes } from './support'
+import { expect, type Page } from '@playwright/test'
+import { layoutTest, openState, readRoutes, test } from './support'
 
 /**
  * Behaviour that a screenshot cannot show, checked against the built gallery
@@ -196,6 +196,7 @@ layoutTest('the gallery chrome keeps the arrow cursor too', async ({ page }) => 
  * `__state` search param, and keyboard driven.
  */
 test.describe('state switcher', () => {
+  test.use({ galleryDocument: '/?test-fixtures' })
   const stateParam = (page: Page) => new URLSearchParams(new URL(page.url()).hash.split('?')[1] ?? '').get('__state')
   /** The address that adds the gallery's own test fixtures (see src/testFixtures.tsx). */
   const testGallery = '/?test-fixtures'

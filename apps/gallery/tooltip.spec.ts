@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { ownPageTest, test } from './support'
 
 /**
  * The tooltip (primitives, Tooltip) in a real browser: the hover delay and
@@ -19,7 +20,8 @@ async function openToolbar(page: Page) {
   await expect(page.getByRole('button', { name: BACK })).toBeVisible()
 }
 
-test('tooltip delay, warm navigation, keyboard focus and dismissal preserve the controls', async ({ page }) => {
+// The clock stays on the context, so this test has its own.
+ownPageTest('tooltip delay, warm navigation, keyboard focus and dismissal preserve the controls', async ({ page }) => {
   await openToolbar(page)
   await page.clock.install()
   await page.clock.pauseAt(new Date())

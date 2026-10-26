@@ -49,9 +49,15 @@ export const playing = (video: Locator) =>
     await new Promise((resolve) => setTimeout(resolve, 300))
     return frames() > before
   })
-export async function openEngMain(juno: Juno): Promise<void> {
-  await juno.signIn()
+/** Signs in, unless the test starts synced (`signedIn`), and opens #eng's Main. */
+export async function openEngMain(juno: Juno, { signedIn = false }: { readonly signedIn?: boolean } = {}): Promise<void> {
+  if (!signedIn) await juno.signIn()
   await juno.waitForSync()
+  await openEng(juno)
+}
+
+/** Opens #eng's Main on an app that is already signed in, as a synced start is. */
+export async function openEng(juno: Juno): Promise<void> {
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
   await juno.sidebar.leave()

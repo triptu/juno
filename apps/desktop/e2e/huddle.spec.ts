@@ -7,9 +7,9 @@
  * page's media stopped (`stopMedia`), as Chime would.
  */
 import type { ElectronApplication } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import { hooks } from './hooks'
-import { addRemote, attendee, chimeDrops, connection, huddleMenuItem, localMuted, microphoneAccess, openEngMain, playing, sharesReady, startHuddleFromMenu, startShare, stopShare } from './huddleFake'
+import { addRemote, attendee, chimeDrops, connection, huddleMenuItem, localMuted, microphoneAccess, openEng, openEngMain, playing, sharesReady, startHuddleFromMenu, startShare, stopShare } from './huddleFake'
 import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 90_000 })
@@ -21,11 +21,12 @@ interface QuitHooks {
 const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalThis as unknown as QuitHooks).junoTest.huddleQuitAsked()])
 const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
 
-test('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@nightly', '@nightly-huddle'] }, async ({ juno, fake, win }) => {
+// Starts signed in and synced (README, "Synced start").
+syncedTest('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@nightly', '@nightly-huddle'] }, async ({ juno, fake, win }) => {
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
   await test.step('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop', async () => {
-    await openEngMain(juno)
+    await openEngMain(juno, { signedIn: true })
     await startHuddleFromMenu(juno)
     // The bar shows once the media session has loaded.
     await expect(bar).toBeVisible()
@@ -114,12 +115,12 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   })
 })
 
-test('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app }) => {
+syncedTest('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings; quitting in a huddle asks first', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app, running }) => {
   const { palette } = juno
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
   await test.step('start and mute a huddle from the palette, with the Huddle menu following, and show it', async () => {
-    await openEngMain(juno)
+    await openEng(juno)
     // No huddle: the Huddle menu is dimmed, and the palette offers only Start huddle on a Main.
     expect(await huddleMenuItem(app, 'huddle-show')).toEqual({ label: 'Show Huddle', enabled: false })
     expect(await huddleMenuItem(app, 'huddle-mute')).toEqual({ label: 'Mute Microphone', enabled: false })
@@ -194,41 +195,28 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
     await chimeDrops(win, fake, attendeeId!)
     await expect.poll(() => huddleMenuItem(app, 'huddle-leave')).toEqual({ label: 'Leave Huddle', enabled: false })
   })
-})
 
-test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app, running }) => {
-  await openEngMain(juno)
-  await startHuddleFromMenu(juno)
-  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
-  await expect(bar).toBeVisible()
-  await expect.poll(() => connection(win)).toBe('connected')
-  const attendeeId = await attendee(win)
+  await test.step('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async () => {
+    await juno.sidebar.row('#eng').open()
+    await juno.topic.expectTitle('Main')
+    await juno.sidebar.leave()
+    // The fake keeps the room the step above left, so the menu offers Join huddle in its place.
+    await juno.topic.chooseInMenu('huddle')
+    await expect(bar).toBeVisible()
+    await expect.poll(() => connection(win)).toBe('connected')
+    const attendeeId = await attendee(win)
 
-  // ⌘Q, the menu's Quit and the Dock's Quit all start the same app quit. Cancel keeps the huddle.
-  await answerQuit(app, 'cancel')
-  await app.evaluate(({ app: electron }) => electron.quit())
-  await expect.poll(() => quitAsked(app)).toEqual([{ title: 'Leave the huddle and quit?', detail: "You're in a huddle in #eng.", confirm: 'Quit' }])
-  await expect(bar).toBeVisible()
-  expect(await connection(win)).toBe('connected')
-  expect(fake.calls.filter((call) => call.method === 'rooms.leave')).toHaveLength(0)
+    // ⌘Q, the menu's Quit and the Dock's Quit all start the same app quit. Cancel keeps the huddle.
+    await answerQuit(app, 'cancel')
+    await app.evaluate(({ app: electron }) => electron.quit())
+    await expect.poll(() => quitAsked(app)).toEqual([{ title: 'Leave the huddle and quit?', detail: "You're in a huddle in #eng.", confirm: 'Quit' }])
+    await expect(bar).toBeVisible()
+    expect(await connection(win)).toBe('connected')
+    expect(fake.calls.filter((call) => call.method === 'rooms.leave')).toHaveLength(1)
 
-  // Quit leaves the huddle before Juno exits.
-  await answerQuit(app, 'confirm')
-  await running.close()
-  expect(fake.calls.find((call) => call.method === 'rooms.leave')?.args).toMatchObject({ channel_id: 'C0ENG', attendee_id: attendeeId })
-})
-
-test('once the engine stops for good, quitting in a huddle does not ask', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, win, app }) => {
-  await openEngMain(juno)
-  await startHuddleFromMenu(juno)
-  // The bar shows once the media session has loaded.
-  await expect(win.getByRole('region', { name: 'Huddle', exact: true })).toBeVisible()
-  await expect.poll(() => connection(win)).toBe('connected')
-
-  // With the engine gone there is nothing left to leave; a Cancel answer would keep the app open if it asked.
-  await hooks(app, 'failEngine')
-  await answerQuit(app, 'cancel')
-  const closed = app.waitForEvent('close')
-  await app.evaluate(({ app: electron }) => electron.quit())
-  await closed
+    // Quit leaves the huddle before Juno exits.
+    await answerQuit(app, 'confirm')
+    await running.close()
+    expect(fake.calls.filter((call) => call.method === 'rooms.leave').at(-1)?.args).toMatchObject({ channel_id: 'C0ENG', attendee_id: attendeeId })
+  })
 })

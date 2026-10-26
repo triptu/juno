@@ -174,6 +174,8 @@ export class Recorder {
   ) {}
 
   static async start(page: Page, options: RecordOptions): Promise<Recorder> {
+    // A font that finishes loading during a recording redraws text at a new width, which is not the scenario's doing.
+    await page.evaluate(() => document.fonts.ready.then(() => undefined))
     const cdp = await page.context().newCDPSession(page)
     const recorder = new Recorder(page, cdp, options)
     recorder.#timeOrigin = await page.evaluate(() => performance.timeOrigin)

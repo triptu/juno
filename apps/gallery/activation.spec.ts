@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { test } from './support'
 
 const log = (page: Page) => page.locator('[data-activation-log]')
 const row = (page: Page) => page.getByRole('button', { name: /Postgres 16 migration plan/ })

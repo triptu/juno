@@ -4,6 +4,9 @@ import { fail, firstFrameRight, framesIn, happened, landsAndStays, noFlicker, pa
 import { test } from './feel'
 import type { Probe, ProbeFrame } from './recorder'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 const SCENE = '[data-home] [data-home-scene]'
 const GREETING = '[data-home] h2'
 const ROWS = '[data-home] ul'
@@ -53,9 +56,7 @@ const stillChecks = (from: string) => [
   noFlicker('window', 'the window', { from }),
 ]
 
-test('a new tab from + shows Home whole in its first frame', async ({ juno, win, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+test('a new tab from + shows Home whole in its first frame', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
   await juno.sidebar.row('Draft plan is in the doc').open()
   await juno.topic.expectTitle('Draft plan is in the doc')
   await juno.tabs.newTabButton.hover()
@@ -75,9 +76,7 @@ test('a new tab from + shows Home whole in its first frame', async ({ juno, win,
   })
 })
 
-test("pointing at Home's rows leaves the scene and the greeting as they are", async ({ juno, slack, win, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+test("pointing at Home's rows leaves the scene and the greeting as they are", { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, slack, win, feel }) => {
   // Rows of each tile: Maya's DM with her photo (waiting on you) and a thread with its art (moved a lot).
   slack.as('Maya').dm('Can you look at the hiring plan today?')
   for (let n = 1; n <= 9; n++) slack.as('Leo').replyIn(STAGING, `Cost update ${n}.`)

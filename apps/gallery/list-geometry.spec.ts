@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { openState } from './support'
+import { expect, type Page } from '@playwright/test'
+import { openState, test } from './support'
 
 const open = (page: Page, component: string, id: string) =>
   openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })

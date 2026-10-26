@@ -16,8 +16,8 @@ import { holdsNightly } from './test-areas.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Whether a repo path is a desktop e2e spec the browser or Electron project runs. */
-export const isDesktopSpec = (file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|\/screens\//.test(file)
+/** Whether a repo path is a desktop e2e spec the browser, feel or Electron project runs. */
+export const isDesktopSpec = (file) => (/^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|\/screens\//.test(file)) || /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file)
 
 /** The repo paths of the test files that hold a nightly test, read through `read`. */
 export function nightlyFiles(files, read) {

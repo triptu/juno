@@ -1,6 +1,6 @@
 // The chat's states (plan v3 §16 flows 2, 12, 13 and 15, SPEC 13.2, 13.5 and 13.7): a run while it
-// works and when it fails, steering it, and every other state a user can reach against the fakes.
-// Pause and the model picker are on the pages walk (pages.test.ts). The gallery shows each state
+// works and when it fails, steering it, Pause, and every other state a user can reach against the fakes,
+// and the Connections page's rules for when Juno asks first. The model picker's list is the gallery's. The gallery shows each state
 // from fixtures (`packages/views/src/juno-chat/*.fixtures.tsx`).
 import { readdirSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
@@ -115,6 +115,57 @@ async function offline({ chat, fake, model }: States): Promise<void> {
   expect(model.inputs()).toHaveLength(before + 1)
 }
 
+async function rules({ juno }: States): Promise<void> {
+  await openChat(juno)
+  await openMenuPage(juno, 'Connections')
+  const page = juno.win.locator('main')
+  await expect(page.getByRole('heading', { name: 'When Juno asks first' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Servers' })).toBeVisible()
+  // A rule is saved when its field loses focus, and a removed one goes at once.
+  await page.getByRole('button', { name: 'Add a rule' }).click()
+  await page.getByLabel('Rule', { exact: true }).fill('Ask me before anything goes to #hiring')
+  await page.getByLabel('Rule', { exact: true }).press('Enter')
+  await page.getByRole('button', { name: 'Add a rule' }).click()
+  await page.getByLabel('Rule', { exact: true }).nth(1).fill('Never post in #general without asking')
+  await page.getByLabel('Rule', { exact: true }).nth(1).blur()
+  await page.getByRole('button', { name: 'Remove rule' }).first().click()
+  await expect(page.getByLabel('Rule', { exact: true })).toHaveCount(1)
+  // What the agent kept: the page opened again shows only its served list.
+  await juno.nav.back()
+  await openMenuPage(juno, 'Connections')
+  await expect.poll(() => ruleFields(juno)).toEqual(['Never post in #general without asking'])
+}
+
+async function pause({ juno, model }: States): Promise<void> {
+  await openChat(juno)
+  await openMenuPage(juno, 'Settings')
+  const page = juno.win.locator('main')
+  await expect(page.getByRole('heading', { name: 'Juno', exact: true })).toBeVisible()
+  // Pause shows in the chat's header; a message waits for Resume, then runs.
+  await page.getByLabel('Pause Juno').check()
+  // A page opens in the tab it was asked from; Back returns to the chat.
+  await juno.nav.back()
+  const chip = juno.win.locator('main [data-banner="paused"]')
+  await expect(chip).toHaveText(`${chatCopy.banner.paused.chip} · ${chatCopy.banner.paused.resume}`)
+  const chat = JunoChatPane.tab(juno.win)
+  const before = model.inputs().length
+  await chat.send('anything new?')
+  await expect(chat.ownerBubble('anything new?').locator('[data-delivery="waiting"]')).toHaveText(chatCopy.delivery.waiting.resume)
+  expect(model.inputs()).toHaveLength(before)
+  await chip.getByRole('button', { name: 'Resume' }).click()
+  await expect(chip).toHaveCount(0)
+  await chat.expectJuno('You said: anything new?')
+  await expect(chat.ownerBubble('anything new?').locator('[data-delivery]')).toHaveCount(0)
+}
+
+async function openMenuPage(juno: Juno, label: string): Promise<void> {
+  await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
+  await juno.win.getByRole('menuitem', { name: label }).click()
+  await juno.tabs.expectActive(label === 'Settings' || label === 'Connections' ? 'Settings' : label)
+}
+
+const ruleFields = (juno: Juno) => juno.win.locator('main').getByLabel('Rule', { exact: true }).all().map((field) => (field as HTMLInputElement).value)
+
 async function overLimit({ chat, model }: States): Promise<void> {
   const before = model.inputs().length
   // Earlier steps left failed messages and endings of their own: count from here, and read the newest.
@@ -135,7 +186,7 @@ async function overLimit({ chat, model }: States): Promise<void> {
 
 // One launch walks the states that need no relaunch. The run that fails comes first, so Activity counts
 // only its runs, and the message too large for its request comes last, so no later run carries it.
-domTest('the chat while Juno works, when a run fails, when storage fails, offline, and for messages over the limit', async ({ juno, fake, model, userData, step }) => {
+domTest('the chat while Juno works, when a run fails, when storage fails, offline, paused, and for messages over the limit, and the rules Juno asks by', async ({ juno, fake, model, userData, step }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await expect(chat.root.getByText(chatCopy.empty.title)).toBeVisible()
@@ -146,6 +197,10 @@ domTest('the chat while Juno works, when a run fails, when storage fails, offlin
   await step('a storage failure keeps the message as Not delivered, and Try again stores it once', () => storageFailure(states))
 
   await step('offline, the chat shows the chip, a message waits for the network, and both clear once back with one model request', () => offline(states))
+
+  await step('Connections starts with when Juno asks first, and saves your rules', () => rules(states))
+
+  await step('Pause in Settings › Juno holds a message until Resume', () => pause(states))
 
   await step('a message over the size limit is marked too long, one at the limit is kept when request framing makes it too large, and neither reaches the model', () => overLimit(states))
 }, { model, timeout: 180_000 })

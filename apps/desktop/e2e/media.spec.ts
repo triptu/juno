@@ -1,10 +1,13 @@
-// Images and videos other people post (SPEC 8, "Images and the media viewer"; architecture 9, "Late
-// thumbnails"). Live, a fresh image reaches the socket before Slack has made its thumbnails, and a socket
-// message can carry a partial file (`file_access: "check_file_info"`); nothing in the message changes
-// later, so Juno re-reads the message and the card becomes the picture in place.
+// Pictures in a topic keep their box (SPEC 8, "Images and the media viewer"; architecture 9, "Late
+// thumbnails"): an image the user sends, and images and videos other people post. Live, a fresh image reaches
+// the socket before Slack has made its thumbnails, and a socket message can carry a partial file
+// (`file_access: "check_file_info"`); nothing in the message changes later, so Juno re-reads the message and
+// the card becomes the picture in place. The viewer's keys are in the DOM lane (`dom/attachments.test.ts`).
 import type { Page } from '@playwright/test'
 import { schemeSrc } from './driver/juno'
 import { expect, syncedTest, test, type Fixtures } from './fixtures'
+import { chart, paste, staged } from './attach'
+import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -34,10 +37,11 @@ async function heldToCardHeight({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>)
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 }
 
-syncedTest('images and videos in #eng show inline and open full screen, a 4:3 picture is held to the card height, a partial file becomes the picture, and the viewer zooms and pans', async ({ juno, win, fake }) => {
+syncedTest('pictures keep their box: a sent image before and after Slack\'s thumbnails, a 4:3 picture, a video, a partial file, late bytes; the viewer zooms and pans', async ({ juno, win, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
+  await test.step('a sent image Slack has no thumbnails for yet shows at once from the local copy, then takes Slack\'s in the same box', () => beforeThumbnails({ juno, win, fake }))
   await test.step('a 4:3 picture shows in a box held to the card height', () => heldToCardHeight({ juno, fake }))
   await test.step('a video plays inline with its poster, and opens full screen', async () => {
     fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Recording of the demo', media: [{ name: 'demo.mp4', width: 1280, height: 720, kind: 'video' }] })
@@ -62,27 +66,6 @@ syncedTest('images and videos in #eng show inline and open full screen, a 4:3 pi
     await expect(viewer).toHaveCount(0)
     await expect(open).toBeFocused()
   })
-  await test.step('images and a video from the socket open full screen, and the arrow keys and Esc move through and close it', async () => {
-    const media = [{ name: 'before.png', width: 900, height: 600 }, { name: 'after.png', width: 900, height: 600 }, { name: 'walkthrough.mp4', width: 1280, height: 720, kind: 'video' as const }]
-    fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Before and after the fix', media })
-    const row = topic.message('Before and after the fix')
-    await expect(row.locator('[data-thumbnail-grid]')).toHaveAttribute('data-count', '3')
-    const first = row.getByRole('button', { name: 'Open before.png' })
-    await first.click()
-    const viewer = win.getByRole('dialog')
-    const current = viewer.locator('[data-viewer-item]')
-    await expect(current).toHaveAttribute('data-viewer-item', '1')
-    await win.keyboard.press('ArrowRight')
-    await expect(current).toHaveAttribute('data-viewer-item', '2')
-    await win.keyboard.press('ArrowRight')
-    await expect(current).toHaveAttribute('data-viewer-item', '3')
-    await expect(current.locator('video')).toHaveCount(1)
-    await win.keyboard.press('ArrowLeft')
-    await expect(current).toHaveAttribute('data-viewer-item', '2')
-    await win.keyboard.press('Escape')
-    await expect(viewer).toHaveCount(0)
-    await expect(first).toBeFocused()
-  })
   await test.step('an image that arrives as a partial file on the socket becomes the picture once Slack fills it in', async () => {
     // The first look at the file waits, so the partial copy is on screen first.
     fake.holdNext({ method: 'files.info', before: true })
@@ -100,7 +83,50 @@ syncedTest('images and videos in #eng show inline and open full screen, a 4:3 pi
     await expect(row.locator('[data-file-card]')).toHaveCount(0)
   })
   await test.step('a picture in the viewer zooms with a double-click and a pinch, and pans with a drag', () => zoomAndPan({ juno, win, fake }))
+  // Last: the held bytes rule outlives the step.
+  await test.step('delayed image bytes keep the reserved thumbnail box', async () => {
+    fake.holdNext({ method: 'file:bytes', times: 100 })
+    await juno.sidebar.row('Proposal: cut offline mode').open()
+    const image = juno.topic.list.locator('[data-thumbnail] img').last()
+    await expect(image).toBeVisible()
+    await expect.poll(() => fake.heldCount({ method: 'file:bytes' })).toBeGreaterThan(0)
+    expect(await image.evaluate((node) => node instanceof HTMLImageElement && node.complete)).toBe(false)
+    await expectStableAnchor(win, '[data-thumbnail]', async () => {
+      fake.release({ method: 'file:bytes' })
+      await expect.poll(() => image.evaluate((node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0)).toBe(true)
+    })
+  })
 })
+
+// Live, Slack shares a fresh image before it has made thumbnails: the echo has no `thumb_*` and no size, and
+// `file_thumbnail_generated` follows (research section 3, "Files"). The sent image shows its staged copy at its
+// final size from the first frame, then Slack's thumbnail in the same box.
+async function beforeThumbnails({ juno, win, fake }: Pick<Fixtures, 'juno' | 'win' | 'fake'>): Promise<void> {
+  const { topic } = juno
+  fake.holdThumbnails()
+  await paste(topic.composer, [chart()])
+  await staged(topic, 1)
+  fake.holdNext({ method: 'files.share', before: true })
+  await topic.send('Before the thumbnails')
+  const row = topic.message('Before the thumbnails')
+  const image = row.locator('[data-thumbnail][title="chart.png"]')
+  await expect(image).toBeVisible()
+  expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
+
+  await expectStableAnchor(win, '[data-message-row] [data-thumbnail][title="chart.png"]', async () => {
+    fake.release()
+    await topic.expectSent('Before the thumbnails')
+    // Stored without thumbnails: still the staged copy, still an image.
+    await expect(image.locator(`img${schemeSrc('uploads')}`)).toHaveCount(1)
+    await expect(row.getByRole('button', { name: 'Download chart.png' })).toHaveCount(0)
+    // After the first background try Slack makes them, and file_created follows.
+    await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
+    fake.releaseThumbnails({ event: 'file_created' })
+    await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
+    await expect.poll(() => image.locator(`img${schemeSrc('files')}`).evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
+  }, { within: '[data-topic-view]' })
+  expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
+}
 
 // An image zooms inside its box (SPEC 8, "Zoom"): a double-click goes to 2.5x and back, a pinch zooms, and a drag pans
 // without closing the viewer, even when it ends over the backdrop.

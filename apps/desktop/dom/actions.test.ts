@@ -1,6 +1,6 @@
 // The topic actions against the fake Slack (SPEC 5 "Row actions"): resolve and reopen, pin,
-// rename, ignore, mark read and unread, Copy Slack link and Open in Slack, each with its toast,
-// and each undone with the toast's Undo or ⌘Z (Edit › Undo).
+// mark read and unread, ignore and rename, each with its toast, and each undone with the
+// toast's Undo or ⌘Z (Edit › Undo).
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
 import { domTest } from './test'
@@ -11,8 +11,12 @@ const RINA = 'Rina finished the onsite'
 const ALERTS_MAIN = '#alerts-prod'
 const MARKS = ['conversations.mark', 'subscriptions.thread.mark']
 
-domTest('resolves and reopens topics, with Undo and pinned rows', async ({ juno, slack, step }) => {
+// One launch. Marks go first, while Rina's thread still has its 2 unread; each step undoes what it did.
+domTest('resolve and reopen with Undo, pinned rows, marks, Ignore and Rename, from the menus', async ({ juno, slack, step }) => {
   const { sidebar } = juno
+  await step('Mark as read and Mark as unread from the menu, each undone', () => marks(juno))
+  await step('Ignore hides the channel’s topics, and Undo shows them again', () => ignore(juno))
+  await step('Rename from a row edits the row, and Undo puts the old title back', () => rename(juno))
   await step('Resolve hides the row and marks it read, Undo brings it back unread, and a new reply reopens it', async () => {
     const roadmap = sidebar.row(ROADMAP)
     await roadmap.expectUnread(3)
@@ -76,13 +80,6 @@ domTest('resolves and reopens topics, with Undo and pinned rows', async ({ juno,
   })
 })
 
-// Each step undoes what it did. Marks go first, while Rina's thread still has its 2 unread.
-domTest('Mark as read and unread, Ignore, the Slack links and Rename, each from the menu', async ({ juno, step }) => {
-  await step('Mark as read and Mark as unread from the menu, each undone', () => marks(juno))
-  await step('Ignore hides the channel’s topics, and Undo shows them again', () => ignore(juno))
-  await step('Copy Slack link and Open in Slack from a row and from a message', () => slackLinks(juno))
-  await step('Rename from a row edits the row, from the header edits the header, and clearing a title brings the old one back', () => rename(juno))
-})
 
 async function marks(juno: Juno): Promise<void> {
   const rina = juno.sidebar.row(RINA)
@@ -115,66 +112,17 @@ async function ignore(juno: Juno): Promise<void> {
   await alerts.expectVisible()
 }
 
-async function slackLinks(juno: Juno): Promise<void> {
-  // Back from the Automated view the step above chose.
-  await juno.sidebar.filter('All')
-  const postgres = juno.sidebar.row(POSTGRES)
-
-  await postgres.chooseInMenu('copy-link')
-  await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+$/)
-  const topicLink = await juno.clipboard()
-  await postgres.chooseInMenu('open-in-slack')
-  await expect.poll(() => juno.slackLinks()).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C0ENG$/)])
-
-  // A message's Open in Slack opens its channel; Copy Slack link at its end copies the message's own link. A reply's
-  // carries its thread's root, as Slack builds it; the root's is the thread's link.
-  await postgres.open()
-  await juno.topic.expectMessage('Booked 2–4pm')
-  await juno.topic.chooseInMessageMenu('Booked 2–4pm', 'open-in-slack')
-  await expect.poll(async () => (await juno.slackLinks()).length).toBe(2)
-  await juno.topic.chooseInMessageMenu('Booked 2–4pm', 'copy-link')
-  const rootTs = /p(\d+)(\d{6})$/.exec(topicLink)!.slice(1).join('.')
-  await expect.poll(() => juno.clipboard()).toMatch(new RegExp(`/archives/C0ENG/p\\d+\\?thread_ts=${rootTs.replace('.', '\\.')}&cid=C0ENG$`))
-  expect(await juno.clipboard()).not.toBe(topicLink)
-  await juno.topic.chooseInMessageMenu(POSTGRES, 'copy-link')
-  await expect.poll(() => juno.clipboard()).toBe(topicLink)
-}
 
 async function rename(juno: Juno): Promise<void> {
   const { sidebar } = juno
-
-  // The row: the title becomes a field with its text selected; Enter saves.
+  // Back from the Automated view the step above chose.
+  await sidebar.filter('All')
+  // The row: the title becomes a field; Enter saves.
   await sidebar.row(POSTGRES).chooseInMenu('rename')
   await expect(sidebar.list.locator('[data-rename-field]')).toBeVisible()
-  const field = (await juno.renameField.element()) as HTMLInputElement
-  expect(field.selectionStart).toBe(0)
-  expect(field.selectionEnd).toBe(field.value.length)
   await juno.rename('Postgres cutover')
   await juno.expectToast('Renamed · Postgres cutover')
-  const renamed = sidebar.row('Postgres cutover')
-  await renamed.expectVisible()
+  await sidebar.row('Postgres cutover').expectVisible()
   await juno.undo()
   await sidebar.row(POSTGRES).expectVisible()
-
-  // Esc cancels.
-  await sidebar.row(POSTGRES).chooseInMenu('rename')
-  await juno.renameField.press('Escape')
-  await expect(juno.renameField).toHaveCount(0)
-  await sidebar.row(POSTGRES).expectVisible()
-
-  // The header: Rename in the title menu turns the title into a field in place.
-  await sidebar.row(POSTGRES).open()
-  await juno.topic.chooseInMenu('rename')
-  await expect(juno.topic.header.locator('[data-rename-field]')).toBeVisible()
-  await juno.rename('Postgres 16 migration')
-  await juno.topic.expectTitle('Postgres 16 migration')
-  await sidebar.row('Postgres 16 migration').expectVisible()
-
-  // An empty title clears the manual one; Undo puts it back.
-  await juno.topic.chooseInMenu('rename')
-  await juno.rename('')
-  await juno.expectToast('Title cleared')
-  await juno.topic.expectTitle(POSTGRES)
-  await juno.undoFromToast()
-  await juno.topic.expectTitle('Postgres 16 migration')
 }

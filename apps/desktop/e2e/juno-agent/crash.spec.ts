@@ -1,6 +1,8 @@
 // Electron supervises a killed agent or engine and links the new process to the others: main
 // brokers each port. Keep that, in the one engine-restart journey, and one durable input and one
-// uncertain write here. The full point
+// uncertain write here. The uncertain write's clean relaunch also runs what else needs main's
+// processes: a codemode script in the agent's utility process, and About's process table, the
+// content-free diagnostics, log rotation and an unhandled rejection in main. The full point
 // matrix runs in packages/agent/test/{actions,backup,redaction,turns}-crash.test.ts and recovery.test.ts.
 import type { FakeLittlebird } from '@juno/agent-testing/mcp'
 import type { Locator } from '@playwright/test'
@@ -10,7 +12,8 @@ import type { CrashPoint } from '@juno/agent/crash'
 import { caughtUpSeed } from '../caughtUpSeed'
 import { Juno } from '../driver/juno'
 import { hooks, launchApp, type LaunchOptions, type RunningApp } from '../fixtures'
-import { addServer, agentReady, card, expectKilled, launchArmed, openChat, ready } from './agent'
+import { addServer, agentReady, card, expectKilled, launchArmed, openChat, ready, readySynced } from './agent'
+import { codemode, codemodeAnswer, diagnostics, rejectionInMain, SCRIPT, seedFullLogs } from './processes'
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -26,6 +29,7 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
     if (request.toolResult === undefined) return { toolCall: { name: 'slack_history', arguments: { channel: 'C0ENG' } } }
     return `<say>Read eng ${read}: ${request.toolResult.includes('(C0ENG)') ? 'found messages' : 'nothing'}</say>`
   }
+  if (request.input.includes(SCRIPT)) return codemodeAnswer(request)
   if (request.toolResult !== undefined) {
     if (request.toolResult.includes('Proposed Change card')) return '<say>The note is ready for you to review.</say>'
     return `<say>Tool said: ${request.toolResult}</say>`
@@ -202,9 +206,9 @@ async function removeKey({ juno, post, calls, missing }: Journey): Promise<void>
 
 // The engine is killed once, and everything main must carry to the new one is checked after it: the AI key
 // it reads from the keychain, the agent's and the window's ports, the window's own state and the dock dot.
-// The engine's AI answers only with the key saved in Settings › Juno, as the live provider does. The
-// supervisor giving up after repeated crashes is in engine.spec.ts.
-restartTest('after one engine kill, main gives the new engine the AI key and its ports, the window keeps its topic and draft, and the dock dot comes back', { tag: ['@nightly', '@nightly-crash'] }, async ({ userData, fake, slackApp, model }) => {
+// The engine's AI answers only with the key saved in Settings › Juno, as the live provider does. At the
+// end main gives up on the engine twice: once undone by Restart in the sidebar, once for good.
+restartTest('after one engine kill, main gives the new engine the AI key and its ports, the window keeps its topic and draft, and the dock dot comes back; Restart brings back an engine main gave up on', { tag: ['@nightly', '@nightly-crash'] }, async ({ userData, fake, slackApp, model }) => {
   const options = { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeOpenRouterUrl: model.origin, fakeAiRequiresKey: true, aiJobs: true }
   await using(launchApp(userData, options), async (juno, { app }) => {
     const run = journey(juno, app, fake)
@@ -243,10 +247,34 @@ restartTest('after one engine kill, main gives the new engine the AI key and its
       await run.badge('•')
     })
     await test.step('removing the key stops new AI calls at once', () => removeKey(run))
-    await test.step('an engine main gives up on clears the dot', async () => {
+    await test.step('the app is served from the juno: scheme, and nothing outside the renderer folder', async () => {
+      expect(await juno.win.evaluate(() => `${location.protocol}//${location.host}${location.pathname}`)).toBe('juno://app/index.html')
+      // A traversal attempt ends as a 404 (Chromium normalises the path; main refuses what is left).
+      expect(await juno.win.evaluate(() => fetch('juno://app/../../package.json').then((r) => r.status, () => 'failed'))).toBe(404)
+    })
+    await test.step('an engine main gives up on clears the dot; the sidebar says so, and Restart brings it back', async () => {
       await run.badge('•')
+      await juno.sidebar.expectNoSyncStatus()
       await hooks(app, 'failEngine')
       await run.badge('')
+      // The rows stay; the line under the filters says what happened and offers the one action.
+      await juno.sidebar.expectSyncStatus('Sync stopped')
+      await juno.sidebar.expectRows()
+      expect(await hooks(app, 'engineState')).toBe('failed')
+      await juno.sidebar.restartButton.click()
+      await juno.sidebar.expectNoSyncStatus(30_000)
+      await expect.poll(() => hooks(app, 'engineState'), { timeout: 30_000 }).toBe('ready')
+      await juno.expectEngineLive()
+      await juno.sidebar.expectRows()
+    })
+    await test.step('About says so when the supervisor gives up again, and no restart is attempted', async () => {
+      await juno.openSettings('About')
+      await expect(juno.settings.engineStatus).toHaveText('Engine live')
+      await hooks(app, 'failEngine')
+      // The port closes; the renderer asks for a new one and is told there will be none.
+      await expect(juno.settings.engineStatus).toHaveText('Engine failed', { timeout: 15_000 })
+      expect(await hooks(app, 'engineState')).toBe('failed')
+      expect(await hooks(app, 'enginePid')).toBeUndefined()
     })
   })
 })
@@ -281,7 +309,7 @@ for (const point of MESSAGE_POINTS) {
 
 /** Connects the fake Littlebird, has Juno propose a note, and clicks Add material with `point` armed. */
 async function applyNote(juno: Juno, mcp: FakeLittlebird, app: RunningApp['app']): Promise<{ readonly pid: number | undefined }> {
-  await ready(juno)
+  await readySynced(juno)
   const { id } = await addServer(juno, 'Notes', mcp.url)
   const chat = await openChat(juno)
   await chat.send(`${NOTE} on ${id}`)
@@ -305,7 +333,9 @@ async function expectChatIntact(juno: Juno, status: 'done' | 'failed'): Promise<
   await expect(card(chat, 'change')).toHaveAttribute('data-card-status', status)
 }
 
-test('a write that reached the server before the agent died is not sent again', async ({ userData, options, mcp }) => {
+// Starts from the synced workspace (README, "Synced start"): sign-in is not what it checks.
+test.extend({ synced: true })('a write that reached the server before the agent died is not sent again; after a clean relaunch a codemode script runs, and About shows every process and copies content-free diagnostics', async ({ userData, options, mcp, fake }) => {
+  await seedFullLogs(userData)
   await using(launchArmed(userData, options, 'attempt.beforeReceipt'), async (juno, { app }) => {
     const { pid } = await applyNote(juno, mcp, app)
     await expectKilled(app, pid)
@@ -316,6 +346,11 @@ test('a write that reached the server before the agent died is not sent again', 
     await expect(card(chat, 'change')).toHaveAttribute('data-card-status', 'failed', { timeout: 20_000 })
     await expect(card(chat, 'change').getByRole('button')).toHaveCount(0)
   })
-  await using(launchApp(userData, options), (juno) => expectChatIntact(juno, 'failed'))
+  await using(launchApp(userData, { ...options, codemode: true }), async (juno, { app }) => {
+    await expectChatIntact(juno, 'failed')
+    await test.step('a read-only script runs in the agent process, its answer cites what it read, and Activity lists the read', () => codemode(juno, userData))
+    await test.step('About shows every process, copies content-free diagnostics and rotates each process log', () => diagnostics(juno, app, fake, userData))
+    await test.step('an unhandled rejection in main is logged with its stack, and the app keeps running', () => rejectionInMain(juno, app, userData))
+  })
   expect(mcp.materials()).toHaveLength(1)
 })

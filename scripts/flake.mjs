@@ -2,7 +2,7 @@
 // often it fails, and keeps the traces of the failures.
 //
 //   bun run flake <spec...> [-g <title>] [--repeat 40] [--machines 2] [--workers n]
-//   bun run flake apps/desktop/e2e/sidebar.spec.ts -g scrollbar
+//   bun run flake apps/desktop/e2e/sidebar-hold.spec.ts -g "order holds"
 //   bun run flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 50
 //   bun run flake packages/engine/test/flows/follow-races.flow.test.ts -g "getView page" --repeat 200
 //

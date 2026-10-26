@@ -1,6 +1,7 @@
 // Run affected steps and retain a result even when installation or SSH fails.
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { availableParallelism, loadavg } from 'node:os'
 import { join } from 'node:path'
 import { forwardSignals } from './remote/children.mjs'
 import { failureCause, testResults } from './test-results-reporter.mjs'
@@ -30,6 +31,23 @@ const spawnStep = ({ root, children }, command, env, onLine) => new Promise((don
       done({ code: code ?? (signal ? 130 : 1), signal, seconds: (Date.now() - started) / 1000, text })
     })
   })
+
+/** Most unit files a step can name and still run on this Mac. */
+export const LIGHT_UNIT_FILES = 6
+/**
+ * Whether a remote step is light enough to run on this Mac: a few unit files, or the two small tool
+ * suites. Each takes a few seconds here; a remote job costs about 4 s of setup plus any wait for cores.
+ */
+export function lightStep(step) {
+  if (step.env && Object.keys(step.env).length > 0) return false
+  if (step.script === 'test:health' || step.script === 'test:runner') return true
+  if (step.script !== 'test') return false
+  const at = step.args.indexOf('--files')
+  return at !== -1 && step.args.length - at - 1 <= LIGHT_UNIT_FILES
+}
+
+/** Whether this Mac has room for light steps: its load is under its thread count. */
+const macHasRoom = () => process.platform === 'darwin' && loadavg()[0] < availableParallelism()
 
 export async function runPlan(plan, { root, local: localAll }) {
   const children = new Set()
@@ -77,10 +95,12 @@ export async function runPlan(plan, { root, local: localAll }) {
     if (localAll) {
       for (const step of remaining) { if (cancelled) break; results.push(await run(step)) }
     } else {
-      const remote = remaining.filter((step) => !step.local)
+      // Light steps skip the SSH job when this Mac has room (JUNO_AFFECTED_LIGHT=remote keeps them remote).
+      const here = (step) => step.local || (process.env.JUNO_AFFECTED_LIGHT !== 'remote' && lightStep(step) && macHasRoom())
+      const remote = remaining.filter((step) => !here(step))
       const local = (async () => {
         const done = []
-        for (const step of remaining.filter((item) => item.local)) { if (cancelled) break; done.push(await run(step)) }
+        for (const step of remaining.filter(here)) { if (cancelled) break; done.push(await run(step)) }
         return done
       })()
       const [localResults, remoteResults] = await Promise.all([local, remote.length ? runRemote(remote) : []])

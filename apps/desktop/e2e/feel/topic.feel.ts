@@ -1,70 +1,14 @@
-// Opening topics, and what arrives while one is open, on the default seed.
-import { contentHoldsStill, happened, landsAndStays, neverBlank, noFlicker, noLayoutShift, staysAtBottom, switchesOnce } from './checks'
+// What arrives while a topic is open, on the default seed. Opening topics is in after-idle.feel.ts.
+import { happened, noFlicker, noLayoutShift, staysAtBottom } from './checks'
 import { expect, test } from './feel'
-import { count, edgeKey, header, paneRegions, sidebarReorder, topicProbes } from './pane'
+import { count, paneRegions, sidebarReorder, topicProbes } from './pane'
+
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
 
 const POSTGRES = 'Draft plan is in the doc'
-const RINA = 'Rina finished the onsite'
 
-test('open a topic at its divider, then another at its bottom', async ({ juno, win, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  // After sign-in the thread's replies are search matches, which do not cover its window (performance.md 3.3);
-  // the first open brings them in full. Its subscription then expires, so the recorded open reads the cache.
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.expectMessage('Booked 2–4pm')
-  await juno.home.open()
-  await win.waitForTimeout(31_000)
-
-  await feel.run(
-    {
-      name: 'open-at-divider',
-      title: 'Open a thread with 2 unread replies: it lands at the "2 new" divider and does not move after',
-      probes: topicProbes,
-      regions: paneRegions,
-      checks: [
-        happened('the divider showed', (r) => r.frames.some((f) => f.values['divider'] !== null)),
-        landsAndStays('divider', 'the "2 new" divider', { from: 'press' }),
-        contentHoldsStill('top', { from: 'press' }),
-        switchesOnce('the header', header, { from: 'press' }),
-        noLayoutShift({ from: 'press' }),
-        noFlicker('pane', 'the message list', { from: 'press' }),
-      ],
-    },
-    async (rec) => {
-      await rec.mark('press')
-      await juno.sidebar.row(RINA).open()
-      await juno.topic.expectDividerBefore('Strong systems design')
-    },
-  )
-
-  await feel.run(
-    {
-      name: 'open-at-bottom',
-      title: 'Open a read thread in the same tab: the old topic gives way to the new one at its bottom in one step',
-      probes: topicProbes,
-      regions: paneRegions,
-      checks: [
-        switchesOnce('header and rows together', (v) => `${header(v)} / ${edgeKey(v, 'bottom')}`, { from: 'press' }),
-        staysAtBottom('scroll', { from: 'press', where: (v) => header(v).includes(POSTGRES) }),
-        contentHoldsStill('bottom', { from: 'press', where: (v) => header(v).includes(POSTGRES) }),
-        noLayoutShift({ from: 'press' }),
-        neverBlank('pane', 'the message list'),
-        noFlicker('pane', 'the message list'),
-      ],
-    },
-    async (rec) => {
-      await rec.mark('press')
-      await juno.sidebar.row(POSTGRES).open()
-      await juno.topic.expectMessage('Booked 2–4pm')
-      await juno.topic.expectAtBottom()
-    },
-  )
-})
-
-test('a reaction and a live reply arrive while reading at the bottom', async ({ juno, slack, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+test('a reaction and a live reply arrive while reading at the bottom', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, slack, feel }) => {
   await juno.sidebar.row(POSTGRES).open()
   // Enough replies that the list scrolls, in Compact density too: in a list that fits, staying at the bottom proves nothing.
   for (let i = 1; i <= 14; i++) slack.as('Leo').replyIn(POSTGRES, `Notes from the dry run, part ${i}.`)

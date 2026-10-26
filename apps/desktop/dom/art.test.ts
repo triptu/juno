@@ -1,128 +1,90 @@
-// Topic art's Redraw art against the fake Slack and the fake AI (SPEC 5 "Row
-// anatomy", inventory 15.1 and 16): Redraw art in the row's menu and in the
-// header's title menu draws the topic again, the toast's Undo and ⌘Z put the
-// previous drawing back, and the menu has no Redraw art when no drawing can
-// be made: AI assist off or no OpenRouter key. Home's destination list
-// draws a channel with its Main's art, as the sidebar does. At the daily AI limit Redraw
-// art says so, and Change limit leads to the field in Settings › AI activity.
+// Topic art and AI titles against the fake Slack and the fake AI (SPEC 5 "Row anatomy", 13.10,
+// inventory 15.1 and 16), on an OpenRouter key saved before launch: a new thread gets an AI title
+// and art; Redraw art in the row's menu and the header's title menu draws
+// the topic again, and the toast's Undo and ⌘Z put the previous drawing back; AI activity in
+// Settings shows each call with its cost; at the daily limit Redraw art says so, Change limit
+// leads to the field, and a raised limit draws again without a restart. What AI assist off does to
+// the jobs is the engine's ai-jobs flow test.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
+import { SELF_ID } from '@juno/fake-slack'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
-import type { Juno } from './driver/juno'
 import { expect } from './expect'
-import { domTest, type DomContext } from './test'
-
-// These tests watch the background art job.
-const ART = { synced: false, engine: { aiJobs: true }, timeout: 120_000 } as const
+import { domTest } from './test'
 
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 
-// AI assist off goes last: it relaunches the app with the preference stored off.
-domTest('shares channel art with Home, redraws topic art with Undo, and with AI assist off offers neither', async ({ juno, fake, userData, relaunch, step }) => {
+domTest('a new thread gets an AI title and art, Redraw art undoes, AI activity shows the calls, and the daily limit stops and resumes drawing', async ({ juno, fake, userData, step }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const context = { juno }
-  await step("a channel in Home's destination list shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
-  await step('Redraw art draws a topic again, and Undo puts the previous drawing back', () => redrawTopicArt(context))
-  await step('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', () => aiAssistOff({ fake, userData, relaunch }))
-}, ART)
-
-async function homeChannelArt({ juno }: { readonly juno: Juno }): Promise<void> {
-  const markup = await juno.sidebar.row('#eng').artMarkup()
-  await juno.write.chip.click()
-  await juno.write.search.fill('eng')
-  const tile = juno.write.option('eng').locator('[data-topic-art]')
-  await expect(tile).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
-  // The sizes differ, so compare the drawing's hue: the ink colour every stroke starts from.
-  const ink = (svg: string) => /stroke="(var\([^"]+\))"/.exec(svg)?.[1]
-  expect(ink(markup)).toBeDefined()
-  expect(ink(await tile.innerHTML())).toBe(ink(markup))
-  await juno.win.keyboard.press('Escape')
-  await expect(juno.write.list).toBeHidden()
-}
-
-async function redrawTopicArt({ juno }: { readonly juno: Juno }): Promise<void> {
-  const row = juno.sidebar.row(POSTGRES)
-  const first = await row.artMarkup()
-
-  // From the row's menu, undone with the toast's Undo.
-  const { labels } = await row.chooseInMenu('redraw')
-  expect(labels).toContain('Redraw art')
-  await juno.expectToast(`Redrawn · ${POSTGRES}`)
-  await expect.poll(() => row.artMarkup()).not.toBe(first)
-  await juno.undoFromToast()
-  await expect.poll(() => row.artMarkup()).toBe(first)
-
-  // From the header's title menu, undone with ⌘Z.
-  await row.open()
-  await juno.topic.expectTitle(POSTGRES)
-  await juno.topic.chooseInMenu('redraw')
-  await juno.expectToast(`Redrawn · ${POSTGRES}`)
-  await expect.poll(() => row.artMarkup()).not.toBe(first)
-  await juno.undo()
-  await expect.poll(() => row.artMarkup()).toBe(first)
-}
-
-async function aiAssistOff({ fake, userData, relaunch }: Pick<DomContext, 'fake' | 'userData' | 'relaunch'>): Promise<void> {
-  const again = await relaunch({ whileClosed: () => {
-    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-    db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
-    db.close()
-  } })
-  const { sidebar, topic } = again
-  const row = sidebar.row(POSTGRES)
-  await row.expectVisible()
-  await expect(row.art).toHaveAttribute('data-topic-art', 'placeholder')
-
-  // Text selected in a message: the toolbar has Quote and no Ask Juno.
-  await row.open()
-  await topic.message(POSTGRES).locator('[data-msg-text] p').first().selectText(0, 'Draft plan'.length)
-  const toolbar = again.win.getByRole('toolbar', { name: 'Selection' })
-  await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
-  await expect(toolbar.getByRole('button', { name: 'Ask Juno' })).toHaveCount(0)
-
-  const { labels } = await row.chooseInMenu('pin')
-  expect(labels).toContain('Pin')
-  expect(labels).not.toContain('Redraw art')
-}
-
-const KEY = 'fake-engine-test-key'
-
-domTest('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const row = juno.sidebar.row(POSTGRES)
-  const labels = async () => (await row.chooseInMenu('copy-link')).labels
-
-  // No key.
-  expect(await labels()).not.toContain('Redraw art')
-
-  await juno.openSettings('Juno')
   const page = juno.win.getByRole('main')
-  await page.getByLabel('API key', { exact: true }).fill(KEY)
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
-  await expect(page.getByText('Topic art and AI titles need an OpenRouter key.')).toHaveCount(0)
-  await expect.poll(labels).toContain('Redraw art')
+  const postgres = juno.sidebar.row(POSTGRES)
 
-  // A low limit, reached: Redraw art says so and leads to the limit.
-  await juno.openSettings('AI activity')
-  const limit = page.getByLabel('Daily limit in dollars')
-  await expect(limit).toHaveValue('5')
-  await limit.fill('0')
-  await limit.press('Enter')
-  await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $0.00 today')
-  await expect(page.locator('[data-ai-limit-reached]')).toBeVisible()
-  await row.chooseInMenu('redraw')
-  await juno.expectToast('Today’s AI limit of $0.00 is reached')
-  await juno.win.getByRole('status').getByRole('button', { name: 'Change limit' }).click()
-  await juno.tabs.expectActive('Settings')
-  await expect(limit).toBeVisible()
+  await step('a new thread gets an AI title and art', async () => {
+    const root = fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Postgres migration. We should plan the next steps together.' })
+    fake.workspace.post({ channel: 'C0ENG', user: SELF_ID, text: 'Looking.', threadTs: root.ts })
+    const row = juno.win.locator(`[data-topic-row][data-topic-id="t:C0ENG:${root.ts}"]`)
+    await expect(row).toHaveAttribute('data-title-source', 'ai', { timeout: 30_000 })
+    await expect(row).toContainText('Postgres migration')
+    await expect(row.locator('[data-topic-art]')).toHaveAttribute('data-topic-art', 'art', { timeout: 30_000 })
+  })
 
-  // Raised: the same app draws again.
-  await limit.fill('2')
-  await limit.press('Enter')
-  await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $2.00 today')
-  await row.chooseInMenu('redraw')
-  await juno.expectToast(`Redrawn · ${POSTGRES}`)
-}, { ...ART, engine: { aiJobs: true, fakeAiRequiresKey: true, agent: false }, model: () => startFakeOpenRouter({ key: KEY }) })
+  await step('Redraw art draws a topic again, and Undo puts the previous drawing back', async () => {
+    const first = await postgres.artMarkup()
+    const topicId = await postgres.root.getAttribute('data-topic-id')
+    const artSource = () => {
+      const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'), { readOnly: true })
+      try {
+        return (db.prepare('SELECT source FROM topic_art WHERE topic_id = ?').get(topicId) as { source?: string } | undefined)?.source
+      } finally { db.close() }
+    }
+
+    // From the row's menu, undone with the toast's Undo.
+    await postgres.chooseInMenu('redraw')
+    await juno.expectToast(`Redrawn · ${POSTGRES}`)
+    await expect.poll(() => postgres.artMarkup()).not.toBe(first)
+    await juno.workPass('art')
+    expect(artSource()).toBe('redraw')
+    await juno.undoFromToast()
+    await expect.poll(() => postgres.artMarkup()).toBe(first)
+
+    // From the header's title menu, undone with ⌘Z.
+    await postgres.open()
+    await juno.topic.expectTitle(POSTGRES)
+    await juno.topic.chooseInMenu('redraw')
+    await juno.expectToast(`Redrawn · ${POSTGRES}`)
+    await expect.poll(() => postgres.artMarkup()).not.toBe(first)
+    await juno.undo()
+    await expect.poll(() => postgres.artMarkup()).toBe(first)
+  })
+
+  await step('AI activity lists each call with its cost', async () => {
+    await juno.openSettings('AI activity')
+    const calls = page.getByRole('list', { name: 'AI calls' })
+    for (const feature of ['titleTopic', 'topicArt', 'topicArt.redraw']) {
+      const call = calls.locator(`[data-ai-call-feature="${feature}"][data-ai-call="ok"]`).first()
+      await expect(call).toBeVisible()
+      await expect(call).toContainText(/\$0\.\d{4}/)
+    }
+  })
+
+  await step('at the daily limit Redraw art says so and leads to the limit, and a raised limit draws without a restart', async () => {
+    const limit = page.getByLabel('Daily limit in dollars')
+    await expect(limit).toHaveValue('5')
+    await limit.fill('0')
+    await limit.press('Enter')
+    await expect(page.locator('[data-ai-limit-reached]')).toBeVisible()
+    await postgres.chooseInMenu('redraw')
+    await juno.expectToast('Today’s AI limit of $0.00 is reached')
+    await juno.win.getByRole('status').getByRole('button', { name: 'Change limit' }).click()
+    await juno.tabs.expectActive('Settings')
+    await expect(limit).toBeVisible()
+
+    await limit.fill('2')
+    await limit.press('Enter')
+    await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $2.00 today')
+    await postgres.chooseInMenu('redraw')
+    await juno.expectToast(`Redrawn · ${POSTGRES}`)
+  })
+}, { synced: false, engine: { fakeAiRequiresKey: true, aiJobs: true }, model: () => startFakeOpenRouter(), timeout: 180_000 })

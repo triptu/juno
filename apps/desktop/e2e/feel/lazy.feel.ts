@@ -6,14 +6,17 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
-import { expect, launchApp } from '../fixtures'
-import { Juno } from '../driver/juno'
+import { expect } from '../fixtures'
+import type { Juno } from '../driver/juno'
 import { answersWithin } from './answers'
 import { happened, landsAndStays, noFlicker, noLayoutShift, opensWhole, staysDrawn } from './checks'
 import { Feel, test } from './feel'
 import { tag } from './pane'
 
 test.describe.configure({ timeout: 240_000 })
+
+// Starts signed in and synced (README, "Synced start"), but for the sync card, which needs the first sync.
+const syncedTest = test.extend({ synced: true })
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
@@ -218,32 +221,24 @@ async function sendCheck(feel: Feel, app: Juno, userData: string, teamId: string
   )
 }
 
-test('each lazy part opens whole and on time the first time after a launch', async ({ juno, fake, running, userData, slackApp, studio }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('each lazy part opens whole and on time the first time after a launch', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, relaunch, userData, studio }) => {
   // Your own message in #eng, for the edit field.
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.send('Shiping the fix today')
   await juno.topic.expectSent('Shiping the fix today')
-  await running.close()
 
-  const next = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const app = new Juno(next.app, next.win)
-    const feel = new Feel(next.win, studio, 'lazy parts')
-    await app.sidebar.expectRows()
+  const app = await relaunch()
+  const feel = new Feel(app.win, studio, 'lazy parts')
+  await app.sidebar.expectRows()
 
-    await peek(feel, app)
-    await suggestions(feel, app)
-    await linkEditor(feel, app)
-    await editField(feel, app)
-    await sendCheck(feel, app, userData, fake.teamId)
-  } finally {
-    await next.close()
-  }
+  await peek(feel, app)
+  await suggestions(feel, app)
+  await linkEditor(feel, app)
+  await editField(feel, app)
+  await sendCheck(feel, app, userData, fake.teamId)
 })
 
-test('the sync card shows whole with the first sync and stays put', async ({ juno, fake, feel }) => {
+test('the sync card shows whole with the first sync and stays put', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, feel }) => {
   fake.holdNext({ method: 'client.userBoot', before: true })
   fake.holdNext({ method: 'conversations.history', before: true })
   await juno.signIn()

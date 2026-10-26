@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { openState, readRoutes } from './support'
+import { expect } from '@playwright/test'
+import { openState, readRoutes, test } from './support'
 
 test.use({ reducedMotion: 'no-preference' })
 

@@ -1,7 +1,7 @@
-import { expect, test, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
+import { expect, type Locator, type Page, type Route as NetworkRoute } from '@playwright/test'
 import { expectNoLayoutShift, measureLayoutShift, watchLayoutShift } from '@juno/testing/layout-shift'
-import { claimQueue, openState, readRoutes, stateCache, walkPages, type Route } from './support'
-import { touch, walkState, walkUse } from './shift-walk'
+import { claimQueue, openState, ownPageTest, readRoutes, stateCache, test, type Route } from './support'
+import { touch, walkPages, walkState, walkUse } from './shift-walk'
 
 /**
  * Nothing in the product may move when the pointer or the keyboard touches
@@ -32,8 +32,8 @@ const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim(
 for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once a page is open.
   // Over every component the walk is @heavy (scripts/test-areas.mjs); limited with GALLERY_SHIFT_ONLY it is not.
-  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, context }) => {
-    const pages = await walkPages(context)
+  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, page }) => {
+    const pages = walkPages(page)
     // JUNO_SHARD=i/n (bun run remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
@@ -83,6 +83,8 @@ async function holdPhoto(page: Page, answer: (route: NetworkRoute) => Promise<vo
 }
 
 test.describe('Avatar photo', () => {
+  // Routes hold the photo request: they need a page of their own.
+  test.use({ ownPage: true })
   const photo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#8EB5C9"/></svg>`
   const arrive = (route: NetworkRoute) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: photo })
 
@@ -121,6 +123,8 @@ test.describe('Avatar photo', () => {
 })
 
 test.describe('Message thumbnail', () => {
+  // Routes hold the photo request: they need a page of their own.
+  test.use({ ownPage: true })
   const picture = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><rect width="1200" height="800" fill="#8EB5C9"/></svg>`
   const arrive = (route: NetworkRoute) => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: picture })
 
@@ -324,7 +328,8 @@ test.describe('Message actions', () => {
 })
 
 for (const injection of ['hover rule', 'loaded chunk'] as const) {
-  test(`the broad walk catches an injected shift in a gallery button (${injection})`, async ({ page }) => {
+  // The hover rule is an injected style tag, so these tests have their own page.
+  ownPageTest(`the broad walk catches an injected shift in a gallery button (${injection})`, async ({ page }) => {
     const route = (await readRoutes(page)).find((route) => route.component === 'Button' && route.id === 'variant/primary')
     expect(route, 'the primary button fixture exists').toBeDefined()
     if (!route) throw new Error('Missing primary button fixture')
@@ -353,6 +358,8 @@ for (const injection of ['hover rule', 'loaded chunk'] as const) {
 }
 
 test.describe('the guard itself', () => {
+  // setContent pages: no gallery to share.
+  test.use({ ownPage: true })
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
 
   test('fails when hovering grows an element and pushes the next one down', async ({ page }) => {
@@ -431,6 +438,8 @@ test.describe('the guard itself', () => {
 })
 
 test.describe('a layout-shift watch', () => {
+  // setContent pages: no gallery to share.
+  test.use({ ownPage: true })
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
 
   test('a watch charges each shift to one check: its own action, or what moved since the last check', async ({ page }) => {
