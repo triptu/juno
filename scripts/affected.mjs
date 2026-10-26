@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url'
 import { MAP_PATH } from './coverage-map.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, graphCandidates, mapProblem, COVERAGE_BUDGET_SECONDS, rankComponents, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
-import { guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, NIGHTLY_AREAS, nightlyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
+import { feelScenarios, guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, NIGHTLY_AREAS, nightlyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { bunTestScripts, unitTestItems } from './affected-tests.mjs'
 import { isDomTest } from './dom-tests.mjs'
@@ -365,20 +365,10 @@ if (specs.length > 0) {
 for (const { script, reached } of bunTestScripts(root, changed))
   if (everythingChanged.length > 0 || toolChanged.length > 0 || reached.length > 0)
     plan.push({ script, args: [], local: false, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
-
-// perf is suggested only for an interaction with a budget whose own files changed.
+// An interaction with a budget whose own files changed: perf is suggested, and its feel scenario runs (feelScenarios; --wide, every one reached).
 const interactions = batch ? [] : perfInteractionsChanged(changed)
-// The feel scenarios (the e2e config's feel project, all @nightly-feel): a changed scenario, every scenario when
-// their harness changed, and the scenario of a changed interaction; --wide, every scenario the change reaches.
-const feelItems = batch ? [] : [...files]
-  .filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file))
-  .map((file) => ({ suite: 'desktop', id: file, inputs: new Set([...app, ...support, ...closure(file)]) }))
-const feelHarness = changed.some((file) => file.startsWith('apps/desktop/e2e/feel/') && !file.endsWith('.feel.ts'))
-const feelNamed = new Set([...changed, ...interactions.flatMap((entry) => (entry.feel ? [`apps/desktop/e2e/feel/${entry.feel}`] : []))])
-for (const item of feelItems) if (feelHarness || feelNamed.has(item.id)) item.own = true
-const feel = pending(wide ? feelItems : feelItems.filter((item) => item.own))
+const feel = pending(feelScenarios(batch ? [] : [...files], changed, interactions).map(({ file, own }) => ({ suite: 'desktop', id: file, own, inputs: new Set([...app, ...support, ...closure(file)]) })).filter((item) => wide || item.own))
 if (feel.length > 0) plan.push({ script: 'test:desktop', args: ['--project=feel', ...feel.map((item) => item.id.replace('apps/desktop/', ''))], local: false, items: feel, why: `${feel.length} feel scenario file(s): ${wide ? 'the change reaches them' : 'changed, their harness changed, or the scenario of a changed interaction'}` })
-
 // --plan --json prints the plan for tools (a replay of past merges, for one).
 if (flag('--json')) {
   writeFileSync(1, JSON.stringify({ changed, steps: plan.map((step) => ({ script: step.script, args: step.args, env: step.env, local: step.local === true, items: step.items.map((item) => item.id), why: step.why })), desktopDropped, notes: desktopNotes, heavySkipped: skipTags }) + '\n')

@@ -250,6 +250,17 @@ export const holdsNightly = (text) => NIGHTLY_AREAS.some((area) => text.includes
 export const perfInteractionsChanged = (changed) =>
   PERF_INTERACTIONS.map((entry) => ({ ...entry, files: changed.filter((file) => inPaths(entry.paths, file)) })).filter((entry) => entry.files.length > 0)
 
+/**
+ * The feel scenarios among `files` (the e2e config's feel project, all @nightly-feel). `own` marks those an
+ * affected plan runs: a changed scenario, every scenario when their harness changed, and the scenario of a
+ * changed interaction (`interactions`, from perfInteractionsChanged).
+ */
+export function feelScenarios(files, changed, interactions) {
+  const harness = changed.some((file) => file.startsWith('apps/desktop/e2e/feel/') && !file.endsWith('.feel.ts'))
+  const named = new Set([...changed, ...interactions.flatMap((entry) => (entry.feel ? [`apps/desktop/e2e/feel/${entry.feel}`] : []))])
+  return files.filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file)).map((file) => ({ file, own: harness || named.has(file) }))
+}
+
 /** The guard specs a change reaches, each with the first changed file in its area. */
 export const guardSpecsChanged = (changed) =>
   GUARD_SPECS.flatMap((entry) => {
