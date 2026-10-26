@@ -3,12 +3,15 @@
 //
 //   JUNO_UPDATE_TOKEN="$(security …)" bun run release [--notes <file>]
 //   bun run release --dry-run [--notes <file>]
+//   bun run release --local      the full run on this Mac, only when Tushar asks (the laptop is off)
 //
 // 1. Fetches main and takes its tip. Stops if the tip is already released, has
 //    no user-facing change since the last release, or does not descend from it.
 // 2. Prints the commits since the last release and the highlights file to write.
 // 3. Bumps the patch version in a release worktree. Runs the full run on that
-//    commit on the laptop while packaging and smoking it on the Mac.
+//    commit on the laptop while packaging and smoking it on the Mac. With --local
+//    it packages and smokes first, then runs the full run on this Mac while the
+//    draft uploads: every step needs the whole Mac, and the upload does not.
 // 4. Requires both to pass, then waits for valid highlights and publishes.
 //    A failed run discards the package and prints its failures and repair command.
 // 5. Checks main's version and removes the worktree. The publisher checks GitHub.
@@ -31,6 +34,7 @@ import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 const { values } = parseArgs({
   options: {
     'dry-run': { type: 'boolean', default: false },
+    local: { type: 'boolean', default: false },
     notes: { type: 'string' },
     'notes-timeout': { type: 'string', default: '60' },
     repo: { type: 'string', default: 'triptu/juno-releases' },
@@ -38,6 +42,8 @@ const { values } = parseArgs({
 })
 if (!Number.isFinite(Number(values['notes-timeout'])) || Number(values['notes-timeout']) <= 0) throw new Error('--notes-timeout must be a positive number')
 const dry = values['dry-run']
+const local = values.local
+const where = local ? 'on this Mac' : 'on the laptop'
 const repo = values.repo
 const here = import.meta.dirname
 const root = git(process.cwd(), 'rev-parse', '--show-toplevel')
@@ -99,22 +105,36 @@ async function release() {
     if (existsSync(notes)) {
       try { printHighlights(highlightLines(readFileSync(notes, 'utf8'))) } catch (error) { say(`${notes}: ${error.message}`) }
     } else say(`no highlights at ${notes} yet`)
-    say(`prepare the version commit first; ${ready ? 'reuse its covering full run' : 'verify that commit on the laptop'} while packaging, smoking and uploading a draft on the Mac; then wait for highlights, publish to ${repo}, check the release and main`)
+    say(local
+      ? `prepare the version commit first; package and smoke it, then ${ready ? 'reuse its covering full run' : 'verify that commit on this Mac'} while uploading a draft; then wait for highlights, publish to ${repo}, check the release and main`
+      : `prepare the version commit first; ${ready ? 'reuse its covering full run' : 'verify that commit on the laptop'} while packaging, smoking and uploading a draft on the Mac; then wait for highlights, publish to ${repo}, check the release and main`)
     return
   }
   const checkout = prepare(tip, version)
   const build = git(checkout, 'rev-parse', 'HEAD')
   const detail = { version, source: tip, build }
-  // Start the laptop first; its preflight may refuse an unchanged failed commit.
-  let verificationFailed = false
-  const verification = Promise.resolve(fullRun(build)).catch((error) => { verificationFailed = true; throw error })
   const publisher = async (args) => {
     const code = await runAsync(process.execPath, [join(here, 'release-publish.ts'), '--checkout', checkout, '--source', tip, '--repo', repo, ...args], checkout)
     if (code !== 0) throw new Error(`release:publish ${args.join(' ')} failed (${code})`)
   }
-  const outcomes = await Promise.allSettled([verification, packageRelease(checkout, detail).then(async () => {
-    if (!verificationFailed) await timed('stage draft', detail, () => publisher(['--stage']))
-  })])
+  // Its preflight may refuse an unchanged failed commit, before anything is built.
+  const verify = fullRun(build)
+  const verifying = () => Promise.resolve(verify === true || verify())
+  let outcomes
+  if (local) {
+    // On the Mac the package, its smoke test and the full run each take the whole machine (the exclusive heavy lock),
+    // so they run one after another. Packaging first lets the draft upload, which needs only the network, run beside
+    // the full run instead of after it.
+    const packaged = await Promise.allSettled([packageRelease(checkout, detail)])
+    outcomes = packaged[0].status === 'rejected' ? packaged
+      : await Promise.allSettled([verifying(), timed('stage draft', detail, () => publisher(['--stage']))])
+  } else {
+    let verificationFailed = false
+    const verification = verifying().catch((error) => { verificationFailed = true; throw error })
+    outcomes = await Promise.allSettled([verification, packageRelease(checkout, detail).then(async () => {
+      if (!verificationFailed) await timed('stage draft', detail, () => publisher(['--stage']))
+    })])
+  }
   const failed = outcomes.find((outcome) => outcome.status === 'rejected')
   if (failed) {
     try { await publisher(['--discard-draft']) } catch (error) { say(`draft cleanup failed: ${error.message}; inspect the draft before rerunning`) }
@@ -128,32 +148,38 @@ async function release() {
   say(`released ${version} from ${tip} in ${Math.round((Date.now() - started) / 1000)} s`)
 }
 
-/** Makes sure a green full run covers the tip, running one on the laptop if needed. False on a dry run that would need one. */
+/**
+ * Whether a green full run covers the tip: true, false on a dry run that would need one, or else a function that runs
+ * one on the laptop (with --local, on this Mac). Only a run on the same kind of machine is repaired, since a repair
+ * keeps its baseline's runtime.
+ */
 function fullRun(tip) {
   const covered = releaseGate(root, tip, readRecords(status))
   if (covered) { printGate(covered); return true }
   const records = readRecords(status)
-  const newest = records.find((record) => record.smoke !== true && !record.reachOnly && isAncestor(root, record.commit, tip))
+  const newest = records.find((record) => record.smoke !== true && !record.reachOnly && (record.execution?.mode ?? 'remote') === (local ? 'local' : 'remote') && isAncestor(root, record.commit, tip))
   const repairable = newest && !assessRecord(newest) && !skippedTests(newest) && newest.version === 2 && newest.identity && newest.required && !newest.required.some((suite) => ['test:desktop @mac', 'perf @mac', 'test:feel'].includes(suite))
   if (repairable && newest.commit === tip) {
     report(newest, recordFile(newest))
     throw new Error('the newest full run at the tip failed and main has not changed since; fix the failures first')
   }
-  const args = [...(repairable ? ['--ref', tip, '--repair', recordFile(newest)] : ['--ref', tip]), '--require-remote']
+  const args = [...(repairable ? ['--ref', tip, '--repair', recordFile(newest)] : ['--ref', tip]), local ? '--local' : '--require-remote']
   const command = `bun run verify:main ${args.join(' ')}`
-  if (dry) { say(`no green full run covers ${tip}; would run ${command} on the laptop`); return false }
-  say(`no green full run covers ${tip}; running ${command} on the laptop. Write the highlights meanwhile.`)
-  const begun = new Date().toISOString()
-  const begunAt = Date.now()
-  return runAsync('bun', ['run', 'verify:main', ...args]).then((exit) => {
-    recordReleaseTiming('full run', begunAt, { source: tip, status: exit === 0 ? 'passed' : 'failed' }, root)
-    const gate = exit === 0 ? releaseGate(root, tip) : null
-    if (gate) { printGate(gate); return true }
-    const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
-    if (record) report(record, recordFile(record))
-    else say(`the full run exited with ${exit} and wrote no record; see its output above`)
-    throw new Error('the full run failed; discarding the package; nothing was published')
-  })
+  if (dry) { say(`no green full run covers ${tip}; would run ${command} ${where}`); return false }
+  return () => {
+    say(`no green full run covers ${tip}; running ${command} ${where}. Write the highlights meanwhile.`)
+    const begun = new Date().toISOString()
+    const begunAt = Date.now()
+    return runAsync('bun', ['run', 'verify:main', ...args]).then((exit) => {
+      recordReleaseTiming('full run', begunAt, { source: tip, status: exit === 0 ? 'passed' : 'failed', ...(local ? { local } : {}) }, root)
+      const gate = exit === 0 ? releaseGate(root, tip) : null
+      if (gate) { printGate(gate); return true }
+      const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
+      if (record) report(record, recordFile(record))
+      else say(`the full run exited with ${exit} and wrote no record; see its output above`)
+      throw new Error('the full run failed; discarding the package; nothing was published')
+    })
+  }
 }
 
 /** The failed suites of a full-run record, their causes and the way on. */
