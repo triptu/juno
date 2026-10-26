@@ -17,7 +17,7 @@ export function repairPlan({ baseline, identity, suites, affected: selected }) {
     throw new Error('Repair of a Mac timing run needs a fresh --with-mac full run')
   const coordinatorFailed = baseline.suites.some((suite) => ['plan', 'setup'].includes(suite.suite) && !suitePassed(suite))
   // The laptop perf job is not part of a repair: the next nightly measures what changed.
-  const all = [...suites, ...baseline.suites.filter((previous) => !['plan', 'setup', 'perf'].includes(previous.suite) && !suites.some((suite) => suite.name === previous.suite))
+  const all = [...suites, ...baseline.suites.filter((previous) => !['plan', 'setup', 'perf', 'perf:part1', 'perf:part2'].includes(previous.suite) && !suites.some((suite) => suite.name === previous.suite))
     .map((previous) => ({ name: previous.suite, words: [previous.suite] }))]
   const planned = []
   const reused = []
