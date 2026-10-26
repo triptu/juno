@@ -69,6 +69,8 @@ domTest('adds, removes and resets quick reactions, then enforces the eleven-reac
 
   await step('at eleven, Add stays focusable, says "Up to 11" and opens nothing', async () => {
     await juno.openSettings('Appearance')
+    // Settings opens again on the saved list, which shows the reset once its save has come back.
+    await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
     for (const name of ['tada', 'pray', 'rocket', 'fire', '100', 'heart', 'joy', 'sparkles']) await add(juno, name)
     await expect.poll(() => pillNames(juno)).toHaveLength(11)
     const full = juno.settings.root.getByRole('button', { name: 'Up to 11' })

@@ -96,6 +96,9 @@ export interface Landing {
   readonly tops: ReadonlyArray<number>
 }
 
+/** The message list while `watchLanding` waits: the landing, and what a script calls just before it scrolls the list. */
+type Watched = HTMLElement & { landed?: Promise<Landing>; startLanding?: () => void }
+
 /**
  * A selector for an element loading from main's `juno://<host>/` scheme. The
  * browser lane's page loads the same addresses from `/__juno/<host>/` on its
@@ -1975,7 +1978,10 @@ export class TopicPane implements TopicVerbs {
       throw new Error('No gap between groups in view')
     })
     const landed = await this.watchLanding(frames)
-    await this.scroller.evaluate((scroller, by) => void (scroller.scrollTop += by), by)
+    await this.scroller.evaluate((scroller: Watched, by) => {
+      scroller.startLanding!()
+      scroller.scrollTop += by
+    }, by)
     return await landed()
   }
 
@@ -1985,7 +1991,10 @@ export class TopicPane implements TopicVerbs {
    */
   async jumpTo(fraction: number, frames = 0): Promise<Landing> {
     const landed = await this.watchLanding(frames)
-    await this.scroller.evaluate((scroller, fraction) => void (scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * fraction), fraction)
+    await this.scroller.evaluate((scroller: Watched, fraction) => {
+      scroller.startLanding!()
+      scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * fraction
+    }, fraction)
     return await landed()
   }
 
@@ -1993,13 +2002,19 @@ export class TopicPane implements TopicVerbs {
    * Watches for the next `scrollend` and answers with the first row in view then, read in `scrollend` itself, and
    * that row's top on each of the `frames` frames after it. A jump lands on rows still at their size estimate, and a
    * read from a later task can fall after they reached their real height. The listener is in place before the scroll
-   * starts: a wheel reaches the page by another path than evaluate.
+   * starts: a wheel reaches the page by another path than evaluate. Only the scroll the caller starts counts, by a
+   * wheel over the list or `startLanding` just before a script sets it: the list can end a scroll of its own (the
+   * bottom hold settling) after the listener is in place, and that landing is the row before the caller's scroll.
    */
   private async watchLanding(frames: number): Promise<() => Promise<Landing>> {
-    type Watched = HTMLElement & { landed?: Promise<Landing> }
     await this.scroller.evaluate((scroller: Watched, frames) => {
-      scroller.landed = new Promise((resolve) =>
-        scroller.addEventListener('scrollend', () => {
+      let started = false
+      scroller.startLanding = () => { started = true }
+      scroller.addEventListener('wheel', scroller.startLanding, { once: true, passive: true })
+      scroller.landed = new Promise((resolve) => {
+        const landed = () => {
+          if (!started) return
+          scroller.removeEventListener('scrollend', landed)
           const box = scroller.getBoundingClientRect()
           const row = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => node.getBoundingClientRect().top >= box.top)
           const tops: number[] = []
@@ -2012,8 +2027,9 @@ export class TopicPane implements TopicVerbs {
           }
           if (frames === 0) resolve(landing)
           else requestAnimationFrame(tick)
-        }, { once: true }),
-      )
+        }
+        scroller.addEventListener('scrollend', landed)
+      })
     }, frames)
     return () => this.scroller.evaluate((scroller: Watched) => scroller.landed!)
   }
