@@ -1,0 +1,1 @@
+- 10-26 10:20 · In the emoji pickers, an Enter on a search that matches nothing while the workspace's emoji are still loading is held and picks once they arrive, if the search is unchanged · The picker opens on the standard emoji at once, so a custom name typed right after opening found nothing and the Enter was lost (the quick-reactions alias test, under load).

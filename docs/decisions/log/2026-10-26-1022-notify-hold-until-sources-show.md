@@ -1,0 +1,1 @@
+- 10-26 10:22 · A Notify me choice is held for the menus until the settings and, on a thread, the follow flag its header or row reads both show it, at most 10 s; it was a one-second wait on the settings alone · Under load the menu showed the old level right after the toast (the topic follow test, 2 of 40).
