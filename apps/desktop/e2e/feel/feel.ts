@@ -37,7 +37,9 @@ export class Feel {
   ) {}
 
   async run(scenario: Scenario, action: (recorder: Recorder) => Promise<void>): Promise<ReadonlyArray<Verdict>> {
-    const dir = join(REPORT_DIR, scenario.name)
+    // `--repeat-each` runs a scenario in parallel with itself: each repeat writes a folder of its own.
+    const repeat = base.info().repeatEachIndex
+    const dir = join(REPORT_DIR, repeat === 0 ? scenario.name : `${scenario.name}-repeat${repeat}`)
     const recorder = await Recorder.start(this.win, { probes: scenario.probes, regions: scenario.regions ?? {} })
     let failure: unknown
     try {
