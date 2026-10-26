@@ -105,6 +105,7 @@ function bodyText(body: MessageBody, options: TextOptions): string {
         parts.push(block.items.map((item) => inlineText(item)).join('\n'))
         break
       case 'divider':
+      case 'buttons':
         break
     }
   }

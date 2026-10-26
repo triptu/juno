@@ -65,6 +65,8 @@ export type ContentBlock =
    * when Slack sent any. `caption` names the table; `showCaption` when Slack
    * shows it above the table.
    */
+  /** An attachment's buttons, in Slack's order; `attachment` is its `id`. A button with a link is a link instead. */
+  | { readonly kind: 'buttons'; readonly attachment: string; readonly items: ReadonlyArray<AttachmentButton> }
   | {
       readonly kind: 'table'
       readonly rows: ReadonlyArray<ReadonlyArray<ReadonlyArray<Inline>>>
@@ -72,6 +74,17 @@ export type ContentBlock =
       readonly caption?: string
       readonly showCaption?: true
     }
+
+/**
+ * A legacy attachment's button that goes back to its app. `id` names it in
+ * its attachment; `confirm` is the question Slack asks before sending it.
+ */
+export interface AttachmentButton {
+  readonly id: string
+  readonly text: string
+  readonly style?: 'primary' | 'danger'
+  readonly confirm?: { readonly title?: string; readonly text: string; readonly ok: string; readonly dismiss: string }
+}
 
 export type PlaceKind = 'public' | 'private' | 'im' | 'mpim'
 
@@ -167,6 +180,7 @@ export function inlinesOf(body: MessageBody): ReadonlyArray<Inline> {
         out.push({ kind: 'text', text: block.text, style: { code: true } })
         break
       case 'divider':
+      case 'buttons':
         break
       case 'file':
         out.push({ kind: 'text', text: block.name })

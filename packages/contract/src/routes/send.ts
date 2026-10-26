@@ -24,6 +24,10 @@
  * - `messages.broadcast`: also sends the user's own thread reply to the
  *   channel (Slack's "also send to the channel"), the same way: Main shows
  *   the reply at once and the outbox sends it with `chat.update`.
+ * - `messages.attachmentAction`: presses a button in a message, such as
+ *   Slackbot's Add them or Dismiss. Unlike the commands above it calls Slack
+ *   before it answers, once, and writes nothing locally: Slack sends what
+ *   the press changed on the socket.
  * - `messages.precheck`: while typing pauses in Main, asks the route model
  *   whether the draft reads like a reply to one of the channel's latest
  *   topics (`routeCheck`) and stores the answer. Nothing else is asked while
@@ -139,6 +143,18 @@ export const messagesReact = Rpc.make('messages.react', {
  */
 export const messagesBroadcast = Rpc.make('messages.broadcast', { payload: { message: MessageRef }, success: Schema.Void, error: MessageActionError })
 
+/**
+ * Press a button in a message's body (a `buttons` block's `attachment` and
+ * button `id`). Sent to Slack once, as the official client sends it; what
+ * Slack does with the message (replaces or removes it) comes on the socket.
+ * `NotFound` when the message or the button is gone.
+ */
+export const messagesAttachmentAction = Rpc.make('messages.attachmentAction', {
+  payload: { message: MessageRef, attachment: Schema.String, button: Schema.String },
+  success: Schema.Void,
+  error: SendError,
+})
+
 /** Retry or dismiss a failed edit, delete or broadcast without rebuilding its saved intent. */
 export const messagesResolveAction = Rpc.make('messages.resolveAction', {
   payload: { id: Schema.Int, retry: Schema.Boolean }, success: Schema.Void, error: NotSignedIn,
@@ -203,4 +219,4 @@ export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Sche
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesSend, messagesForward, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesBroadcast, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesAttachmentAction, messagesSend, messagesForward, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesBroadcast, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)
