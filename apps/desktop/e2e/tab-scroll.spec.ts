@@ -1,7 +1,7 @@
-// Each tab keeps its own scroll position (SPEC section 6): one topic open in two tabs scrolls apart, the row a
-// scroll lands on stays put as the rows around it reach their real height, and a tab left in the middle of a long
-// topic comes back there after messages arrive while it is hidden: after a wheel jump, with a gap between groups at
-// the top edge, and after a click that scrolled nothing. The topic300 seed mixes row heights.
+// Each tab keeps its own scroll position (SPEC section 6): a tab left in the middle of a long topic comes back there
+// after messages arrive while it is hidden, with a gap between groups at the top edge, and after a click that
+// scrolled nothing. The topic300 seed mixes row heights. One topic in two tabs after a wheel jump is a step of the
+// long thread journey in topic.spec.ts.
 import { startFakeSlack, topic300Seed, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import type { Juno, Landing } from './driver/juno'
 import { expect, test } from './fixtures'
@@ -79,32 +79,6 @@ function textInMiddle(juno: Juno): Promise<{ readonly x: number; readonly y: num
 }
 
 test.describe('one topic in two tabs', () => {
-  longTest('each tab keeps its own scroll position, and comes back there after messages arrive while it is hidden', async ({ juno, fake }) => {
-    await openTwice(juno)
-    const { sidebar, tabs, topic } = juno
-    // The wheel jumps onto rows still at their size estimate; they reach their real height without moving the row in view.
-    const up = await topic.scrollUp(2400, FRAMES)
-    expectStill(up)
-
-    // The first tab is still at the bottom; the second is where it was left.
-    await tabs.selectAt(THREAD, 0)
-    await tabs.expectActiveAt(THREAD, 0)
-    await topic.expectAtBottom()
-    await tabs.selectAt(THREAD, 1)
-    await tabs.expectActiveAt(THREAD, 1)
-    // The row that was first in view is back where it was. Which row counts as first can flip on a
-    // sub-pixel when a row edge sits on the list's top, so the same row is followed instead.
-    expect(await topic.rowTop(up.ts)).toBeCloseTo(up.top, 0)
-    await hideWhileRepliesArrive(juno, fake, 1, up)
-
-    // A plain open focuses the tab that was active last, without moving it.
-    await tabs.selectAt(THREAD, 0)
-    await sidebar.row(THREAD).open()
-    await tabs.expectActiveAt(THREAD, 0)
-    await topic.expectAtBottom()
-    await expect(tabs.tab(THREAD)).toHaveCount(2)
-  })
-
   longTest('a tab left in the middle of a long topic comes back there after messages arrive while it is hidden: at a gap between groups, and after a click that scrolled nothing', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, fake }) => {
     await openTwice(juno)
     const { topic, win } = juno
