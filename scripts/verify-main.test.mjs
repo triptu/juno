@@ -62,8 +62,9 @@ test('local runs archive eligible records and preserve failed suites; an unreach
   const { root, commit, env, invoke } = verificationFixture(t)
   const dry = invoke(['--local', '--dry-run'])
   assert.equal(dry.status, 0, dry.stderr)
-  // A full run reuses unchanged spec checks, but replays conformance uncached.
-  assert.match(dry.stdout, /\+ SPECS_SEED=\d+ specs:check \+ SPECS_CACHE=off specs:conformance/)
+  // A full run reuses unchanged spec checks and conformance traces; --no-cache regenerates the traces.
+  assert.match(dry.stdout, /\+ SPECS_SEED=\d+ specs:check \+ specs:conformance/)
+  assert.match(invoke(['--local', '--dry-run', '--no-cache']).stdout, /SPECS_CACHE=off specs:conformance/)
   assert.doesNotMatch(dry.stdout, /@mac, then test:feel/)
   assert.match(invoke(['--local', '--dry-run', '--with-mac']).stdout, /test:desktop --grep @mac, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)

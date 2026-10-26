@@ -5,14 +5,15 @@
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
 //   bun run verify:main --repair latest   repair a failed ancestor record
-//   bun run verify:main --no-cache        also rerun every spec check
+//   bun run verify:main --no-cache        also rerun every spec check and regenerate the conformance traces
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
 //                                    then `test:feel`
 //
 // A full run runs every test, the @heavy ones included (scripts/test-areas.mjs),
 // and is what a release needs. It checks main out into a temporary detached
 // worktree, so nothing local is sent, and runs `test`, `test:dom`, `specs:check`
-// (each check reused while its inputs match), `specs:conformance` (uncached),
+// (each check reused while its inputs match), `specs:conformance` (traces reused
+// while their spec, seed and Quint version match; the replay always runs),
 // `test:gallery` (the fast check over every state) and the browser and Electron
 // lanes as one plan with independent SSH jobs
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to

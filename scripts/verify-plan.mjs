@@ -10,8 +10,9 @@ export function planOutcomes(lines, suites, planned) {
 
 /**
  * The suites of a full run: every test, including the @heavy ones (scripts/test-areas.mjs). Conformance replays its
- * traces uncached and the gallery checks every state with the fast check; the spec check reuses unchanged checks, as
- * it proves the models, not Juno's code. `noCache` reruns every spec check too. `skipTags` are skipped (`@mac` on a
+ * traces against the engine every time but reuses the traces while outbox.qnt, its imports, the seed and the Quint
+ * version are unchanged; the gallery checks every state with the fast check; the spec check reuses unchanged checks, as
+ * it proves the models, not Juno's code. `noCache` regenerates the traces and reruns every spec check too. `skipTags` are skipped (`@mac` on a
  * local run).
  */
 export function fullSuites(scripts, { noCache = false, seed, testSeed, skipTags = [] } = {}) {
@@ -23,7 +24,7 @@ export function fullSuites(scripts, { noCache = false, seed, testSeed, skipTags 
     // The DOM lane (apps/desktop/dom), in the unit job; a commit from before it has no test:dom.
     ...(scripts['test:dom'] ? [{ name: 'test:dom', words: [...skip, 'test:dom', ...order] }] : []),
     { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
-    { name: 'specs:conformance', words: ['SPECS_CACHE=off', 'specs:conformance'] },
+    { name: 'specs:conformance', words: [...(noCache ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
     // The real-input walk runs on changed states in affected plans; GALLERY_REAL_WALK=1 forces it by hand.
     { name: 'test:gallery', words: ['GALLERY_SHIFT_ALL=1', 'GALLERY_REAL_WALK=0', 'test:gallery'] },
     ...apps.map((name) => ({ name, words: [...skip, name] })),
