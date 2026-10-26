@@ -25,7 +25,13 @@ export function readRecords(status) {
  */
 export const skippedTests = (record) => record.suites.some((suite) => (suite.command ?? []).some((word) => /^JUNO_SKIP_TAGS=.*@nightly/.test(word)))
 
-/** A full run passes only when every required suite ran, skipped no tests and passed. */
+/** A gallery that reused walk records must have counted what it walked, reused and sampled, under its own seed. */
+const galleryCounted = (suite) => {
+  const seed = (suite.command ?? []).find((word) => word.startsWith('GALLERY_SAMPLE='))?.slice('GALLERY_SAMPLE='.length)
+  return seed === undefined || suite.walks?.sample?.seed === seed
+}
+
+/** A full run passes only when every required suite ran, skipped no tests, passed and, in the gallery, counted its sample. */
 export function assessRecord(record) {
   const required = record.version === 2 ? ['test', 'specs:check', 'specs:conformance', 'test:gallery',
     ...(record.required?.includes('test:browser') ? ['test:browser', 'test:electron'] : ['test:desktop'])] : ['test', 'specs:check', 'test:gallery', 'test:desktop']
@@ -33,6 +39,7 @@ export function assessRecord(record) {
     && !skippedTests(record)
     && required.every((name) => record.suites.some((suite) => suite.suite === name))
     && record.suites.every(suitePassed)
+    && record.suites.every(galleryCounted)
     && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'perf @mac', 'test:feel'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
     && (record.version !== 2 || (record.identity && record.required?.every((name) => record.suites.some((suite) => suite.suite === name))))
 }

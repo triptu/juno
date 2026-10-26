@@ -33,10 +33,12 @@ const fs = require('node:fs');
 const argv = process.argv.slice(2);
 if (argv[0] === '--version' || argv[0] === '--revision') { console.log('1.4.4'); process.exit(0); }
 const [suite, ...args] = argv[0] === 'run' ? argv.slice(1) : argv;
-fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:process.env.JUNO_HEAVY_HELD,skip:process.env.JUNO_SKIP_TAGS,workers:process.env.JUNO_E2E_WORKERS})+'\\n');
+fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:process.env.JUNO_HEAVY_HELD,skip:process.env.JUNO_SKIP_TAGS,workers:process.env.JUNO_E2E_WORKERS,gallery:process.env.GALLERY_SAMPLE ? 'sample' : process.env.GALLERY_SHIFT_ALL ? 'all' : undefined})+'\\n');
 if (suite === 'install') { fs.writeFileSync('installed', 'yes'); if (!fs.existsSync('node_modules')) fs.symlinkSync(${JSON.stringify(resolve(import.meta.dirname, '../node_modules'))}, 'node_modules', 'dir'); process.exit(0); }
 if (!fs.existsSync('installed')) process.exit(9);
 console.log('fixture '+suite);
+const counts = { walked: 1, reused: { 'an earlier run': 1 }, sampled: 0, missed: [] };
+if (suite === 'test:gallery') console.log('juno-gallery-walk: ' + JSON.stringify({ uncached: process.env.GALLERY_SHIFT_ALL === '1', sample: process.env.GALLERY_SAMPLE ? { seed: process.env.GALLERY_SAMPLE, share: 0.05 } : null, states: counts, tests: counts }));
 if (process.env.JUNO_VERIFY_POLICY === '1') console.log('juno-test: ' + JSON.stringify({failure: suite === process.env.TEST_FAIL_SUITE}));
 process.exit(suite === process.env.TEST_FAIL_SUITE ? 7 : 0);
 `)
@@ -83,7 +85,15 @@ test('local runs archive eligible records and preserve failed suites; an unreach
     const desktop = calls.find((c) => c.suite === 'test:desktop')
     assert.equal(desktop.skip, '@mac')
     assert.equal(desktop.workers, localVerifyEnv.JUNO_E2E_WORKERS)
+    // The gallery walks every state when no uncached walk is on record or with --no-cache, else a sample of the reused ones.
+    assert.equal(calls.find((c) => c.suite === 'test:gallery').gallery, again ? 'sample' : 'all')
+    assert.equal(summary.suites.find((s) => s.suite === 'test:gallery').walks.states.walked, 1)
     if (again) {
+      assert.match(summary.gallerySample, /^\d+$/)
+      assert.match(readFileSync(join(root, '.juno-status/verify-main.md'), 'utf8'), new RegExp(`Gallery \\(sample seed ${summary.gallerySample}, 5% of reused records\\)\\. States: 1 without a record, 0 sampled, 1 reused \\(1 from an earlier run\\)`))
+      // The record must show the sample ran under its seed.
+      const gallery = summary.suites.find((s) => s.suite === 'test:gallery')
+      assert.equal(assessRecord({ ...summary, suites: summary.suites.map((s) => s === gallery ? { ...s, walks: undefined } : s) }), false)
       // A full run reuses no suite from the run before it except the unchanged spec check.
       assert.ok(!summary.suites.find((s) => s.suite === 'specs:conformance').reusedFrom)
       assert.ok(calls.some((c) => c.suite === 'specs:conformance'))

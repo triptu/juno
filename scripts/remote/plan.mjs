@@ -8,7 +8,7 @@ import { forwardSignals } from './children.mjs'
 // spec checks; and the unit tests, the DOM lane and the gallery.
 const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'specs:check', 'specs:conformance']
 
-// A full run (its gallery checks every state) splits Juno's eight cores by each step's measured CPU
+// A full run (its gallery walks every state or a sample, GALLERY_SHIFT_ALL or GALLERY_SAMPLE) splits Juno's eight cores by each step's measured CPU
 // (docs/development.md, "Job sizes"). A step not named here joins the unit job. The desktop job runs
 // Electron beside the browser lane, with three and two workers on its six threads (sideBySide in
 // scripts/plan.mjs); the others run their steps in order.
@@ -22,7 +22,7 @@ export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
   if (options.script !== 'test:plan' || setting('JUNO_RUNNER_PLAN') === 'single' || setting('JUNO_PLAN_SERIAL') === '1') return []
   const steps = parsePlan(options.args)
-  const fullRun = steps.some((step) => step.script === 'test:gallery' && step.env.GALLERY_SHIFT_ALL === '1')
+  const fullRun = steps.some((step) => step.script === 'test:gallery' && (step.env.GALLERY_SHIFT_ALL === '1' || step.env.GALLERY_SAMPLE !== undefined))
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
     const kind = fullRun ? fullRunJobs.find((job) => job.scripts.includes(step.script))?.kind ?? 'unit'

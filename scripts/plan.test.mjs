@@ -2,7 +2,7 @@ import { toolFixture } from './tool-test-fixture.mjs'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { parsePlan } from './plan.mjs'
-import { planOutcomes } from './verify-plan.mjs'
+import { galleryWalk, planOutcomes } from './verify-plan.mjs'
 
 test('a plan splits on + and reads KEY=VALUE before each script', () => {
   const steps = parsePlan(['test', '--passWithNoTests', 'a.test.ts', '+', 'GALLERY_SHIFT_ONLY=Chip,Tab', 'test:gallery', '+', 'test:desktop', 'e2e/topic.spec.ts', 'X=1'])
@@ -93,4 +93,22 @@ test('a full run runs Electron beside the browser lane and keeps the other jobs 
   assert.equal(serial('test:browser'), false)
   assert.equal(serial('test:dom'), true)
   assert.equal(serial('test:gallery'), true)
+})
+
+test('a full run walks every gallery state once the last uncached walk on record is a week old', () => {
+  const now = Date.parse('2026-10-27T12:00:00Z')
+  const gallery = (command, extra = {}) => ({ suite: 'test:gallery', code: 0, command: [...command, 'test:gallery'], ...extra })
+  const record = (finishedAt, suites, extra = {}) => ({ finishedAt, suites, ...extra })
+  const uncached = gallery(['GALLERY_SHIFT_ALL=1'])
+  assert.equal(galleryWalk([], { now }).uncached, true)
+  assert.equal(galleryWalk([record('2026-10-21T12:00:00Z', [uncached])], { now }).uncached, false)
+  assert.equal(galleryWalk([record('2026-10-21T12:00:00Z', [uncached])], { now, noCache: true }).uncached, true)
+  // Sampled runs, failed and smoke runs do not count; a repair that kept the walk counts from when it ran.
+  assert.equal(galleryWalk([
+    record('2026-10-26T12:00:00Z', [gallery(['GALLERY_SAMPLE=7'])]),
+    record('2026-10-26T12:00:00Z', [{ ...uncached, code: 1 }]),
+    record('2026-10-26T12:00:00Z', [uncached], { smoke: true }),
+    record('2026-10-26T12:00:00Z', [{ ...uncached, reusedFrom: { finishedAt: '2026-10-19T12:00:00Z' } }]),
+    record('2026-10-20T11:00:00Z', [uncached]),
+  ], { now }).uncached, true)
 })

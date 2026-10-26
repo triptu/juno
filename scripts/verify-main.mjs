@@ -5,7 +5,7 @@
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
 //   bun run verify:main --repair latest   repair a failed ancestor record
-//   bun run verify:main --no-cache        also rerun every spec check and regenerate the conformance traces
+//   bun run verify:main --no-cache        also rerun every spec check, regenerate the conformance traces and walk every gallery state
 //   bun run verify:main --priority high   take laptop cores before waiting normal jobs (a release does this)
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
 //                                    then `test:feel`
@@ -15,7 +15,8 @@
 // worktree, so nothing local is sent, and runs `test`, `test:dom`, `specs:check`
 // (each check reused while its inputs match), `specs:conformance` (traces reused
 // while their spec, seed and Quint version match; the replay always runs),
-// `test:gallery` (the fast check over every state) and the browser and Electron
+// `test:gallery` (the fast check over the states whose walk-cache key changed and a fresh 5% sample of the
+// rest, or over every state when the last uncached walk is a week old or with --no-cache) and the browser and Electron
 // lanes as one plan with independent SSH jobs
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // shared .juno-status/verify-main.md and .json, each suite's lines
@@ -35,7 +36,7 @@ import { hostname } from 'node:os'
 import { reportedRuntime, writeRecord } from './verify-records.mjs'
 import { assessRecord, isAncestor, readRecords, skippedTests, statusFolder } from './release-gate.mjs'
 import { failureCause, testResults } from './test-results-reporter.mjs'
-import { fullSuites, planOutcomes } from './verify-plan.mjs'
+import { describeGalleryCounts, fullSuites, galleryCounts, galleryWalk, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
 import { committedInputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
@@ -85,8 +86,14 @@ if (local && argv.includes('--require-remote')) throw new Error('This run requir
 const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
+// The gallery reuses the walk records of unchanged states and walks this seed's sample of them again, unless the
+// last uncached walk is over a week old or --no-cache asks for one (galleryWalk).
+const gallery = galleryWalk(records, { noCache })
+const gallerySample = gallery.uncached ? undefined : process.env.GALLERY_SAMPLE || String(randomInt(1, 2 ** 32))
 const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }]
-  : fullSuites(scripts, { noCache, seed, testSeed, skipTags: local ? ['@mac'] : [] })
+  : fullSuites(scripts, { noCache, seed, testSeed, skipTags: local ? ['@mac'] : [], gallerySample, gallerySource: `full-run:${commit.slice(0, 10)}:${runId}` })
+const galleryPlan = gallery.uncached ? `every state uncached (${gallery.reason})`
+  : `states whose walk-cache key changed, plus sample seed ${gallerySample} of the rest (last uncached walk ${gallery.last})`
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
 const baseline = repairArg === 'latest' ? records[0] : repairArg ? JSON.parse(readFileSync(resolve(repairArg), 'utf8')) : undefined
 if (repairArg && (!baseline || baseline.version !== 2 || !isAncestor(root, baseline.commit, commit)))
@@ -120,6 +127,7 @@ if (argv.includes('--dry-run')) {
   if (local) console.log(JSON.stringify(localVerifyEnv))
   console.log(`test:plan ${words.join(' ')}`)
   for (const suite of reused) console.log(`Reuse ${suite.suite}: unchanged inputs and runtime (${suite.reusedFrom.commit})`)
+  if (!smoke && !baseline) console.log(`Gallery: ${galleryPlan}`)
   if (baseline) console.log(`Repair ${baseline.commit}: failed/unfinished files plus uncapped import-graph selection (resolved in the target checkout)` )
   if (withMac) console.log('On this Mac: test:desktop --grep @mac, then test:feel (exclusive heavy lock)')
   process.exit(0)
@@ -190,6 +198,7 @@ function splitPlan(planned) {
 }
 
 console.log(`verify:main: ${commit.slice(0, 10)} ${subject}; ${execution.mode} on ${execution.host}`)
+if (!smoke && !baseline) console.log(`verify:main: gallery walks ${galleryPlan}`)
 const heavy = join(checkout, 'scripts/heavy.mjs')
 const planStarted = Date.now()
 let installed = true
@@ -276,12 +285,15 @@ const measured = results.map((result) => {
   let tests = testResults(log)
   if (baseline && tests) tests = mergeRepairTests(baseline.suites.find((suite) => suite.suite === result.suite)?.tests, tests)
   if (!suitePassed({ ...result, code, tests })) code ||= 1
+  const walks = result.suite === 'test:gallery' ? galleryCounts(log) : undefined
+  const missed = [...walks?.states.missed ?? [], ...walks?.tests.missed ?? []]
   const inputs = protocols[result.suite]
   const override = argv.filter((word, index) => argv[index - 1] === '--cause').map((word) => word.split('=')).find(([suite]) => suite === result.suite)?.[1]
   return { ...result, code, stop, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs && actual ? committedInputKey(root, commit, inputs, actual) : undefined,
     host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' || result.suite === 'perf' ? execution.host : hostname(),
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
-    failures: code === 0 ? [] : stop ? [`${stop.rule}: ${stop.signature ?? `${stop.failed}/${stop.completed} tests failed`}`] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused'] : failures(result.log), tests,
+    failures: code === 0 ? [] : stop ? [`${stop.rule}: ${stop.signature ?? `${stop.failed}/${stop.completed} tests failed`}`] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused']
+      : [...missed.length ? [`Sampled gallery records failed, so the walk-cache key missed an input: ${missed.join(', ')}`] : [], ...failures(result.log)], tests, walks,
     cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch || stop ? 'infrastructure' : undefined), note: stop ? JSON.stringify(stop) : mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
   }
 })
@@ -293,7 +305,7 @@ const summary = {
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
-  seed, testSeed,
+  seed, testSeed, gallerySample,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
   allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'GALLERY'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
@@ -309,6 +321,7 @@ const markdown = [
   '',
   `Unit test order seed ${testSeed}; \`bun run test --seed ${testSeed}\` repeats it.`,
   '',
+  ...summary.suites.filter((suite) => suite.suite === 'test:gallery' && suite.walks).flatMap((suite) => [`${describeGalleryCounts(suite.walks)}${suite.reusedFrom ? ` Kept from ${suite.reusedFrom.commit.slice(0, 10)}.` : ''}`, '']),
   '| Suite | Result | Time | Log |',
   '| --- | --- | --- | --- |',
   ...summary.suites.map((suite) => `| \`${suite.suite}\` | ${suite.code === 0 ? 'passed' : `failed (${suite.code})`} | ${suite.seconds} s | \`${suite.log}\` |`),
