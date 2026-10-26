@@ -20,8 +20,11 @@ test('frequently used emoji survive a restart and an update from their first pic
   await expect.poll(() => frequents().evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-emoji')))).toEqual([
     'juno_wave', '+1', 'tada', 'eyes', 'white_check_mark',
   ])
-  // Socket updates change the next picker, while the open picker keeps its cells still.
-  fake.emitFrame({ type: 'pref_change', name: 'emoji_use', value: JSON.stringify({ tada: 40, eyes: 3 }) })
+  // Socket updates change the next picker, while the open picker keeps its cells still. The fake holds what the frame
+  // says, as Slack does: a reconnect's boot reads the prefs again and would bring back the old counts.
+  const updated = JSON.stringify({ tada: 40, eyes: 3 })
+  fake.workspace.prefs = { ...fake.workspace.prefs, emoji_use: updated }
+  fake.emitFrame({ type: 'pref_change', name: 'emoji_use', value: updated })
   const search = juno.win.getByRole('textbox', { name: 'Search emoji' })
   await search.fill('rocket')
   await search.press('Enter')
