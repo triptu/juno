@@ -1,10 +1,13 @@
 // Peek (spec section 5): hold ⌥ (or Space, set in Settings › General) over a
 // sidebar row, or over a Main message that has a thread, to read the topic
 // in a popover. A peek marks nothing read, opens no tab and moves no focus;
-// letting go or moving off the rows closes it.
+// letting go or moving off the rows closes it. A thread link whose first
+// reply is unknown fills in place when the peek's fetch lands. Space as the
+// peek key is in the DOM lane (`dom/peek.test.ts`).
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
+import { expectStableAnchor } from './shiftProbe'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -30,7 +33,13 @@ async function focusTextField(win: Page) {
   return field
 }
 
-test('holding ⌥ over a row peeks at the topic without marking it, opening it or moving focus; moving off the rows closes it, and a text field keeps its focus', async ({ juno, slack }) => {
+test('holding ⌥ over a row or a thread in a Main peeks without marking it, opening it or moving focus, a person in it opens their DM, and a thread link fills in place', async ({ juno, slack, fake, win }) => {
+  await test.step('over a row: no mark, no open, no focus move; moving off the rows closes it, and a text field keeps its focus', () => overRow({ juno, slack }))
+  await test.step('over a thread in a Main: its replies without opening it, and a person in it opens their DM', () => threadInMain({ juno, slack }))
+  await test.step('unknown first replies show only the count and fill in place when a peek fetch lands', () => linkFillsInPlace({ juno, fake, slack, win }))
+})
+
+async function overRow({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
   await test.step('moving off the rows closes the peek', async () => {
     await juno.sidebar.row(RINA).peek()
     await juno.peek.expectShowing(RINA)
@@ -79,9 +88,9 @@ test('holding ⌥ over a row peeks at the topic without marking it, opening it o
   await rina.expectUnread(2)
   await tabs.expectActive(POSTGRES)
   await slack.expectNoMarks()
-})
+}
 
-test('holding ⌥ over a thread in a Main peeks at its replies without opening it, and a person in it opens their DM', async ({ juno, slack }) => {
+async function threadInMain({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
   const { peek, tabs, topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -146,4 +155,32 @@ test('holding ⌥ over a thread in a Main peeks at its replies without opening i
     await tabs.expectActive('Maya')
     await tabs.expectCount(2)
   })
-})
+}
+
+const CHECKOUT = 'checkout.spec failed again on main.'
+const FIRST_REPLY = 'Sam: Quarantining it. Ticket filed.'
+
+// That the link draws its first reply and repliers is in the DOM lane (`dom/thread-link-preview.test.ts`); here, it fills in place.
+async function linkFillsInPlace({ juno, fake, slack, win }: Pick<Fixtures, 'juno' | 'fake' | 'slack' | 'win'>): Promise<void> {
+  await juno.sidebar.row(ENG_MAIN).open()
+  const link = juno.topic.threadLinkUnder(CHECKOUT)
+  await expect(link.root).toContainText('5 replies')
+  await expect(link.root).not.toContainText(FIRST_REPLY)
+  await expect(link.root).not.toContainText(CHECKOUT)
+  slack.resetCalls()
+  // Local warming and the list do not fetch replies.
+  await link.root.hover()
+  expect(fake.calls.filter(call => call.method === 'conversations.replies' && call.args['limit'] !== '1')).toEqual([])
+
+  fake.holdNext({ method: 'conversations.replies', reason: 'open' })
+  await link.peek()
+  await expect.poll(() => fake.heldCount({ method: 'conversations.replies' })).toBe(1)
+  await expect(link.root).not.toContainText(FIRST_REPLY)
+  const root = slack.root(CHECKOUT)
+  await expectStableAnchor(win, `[data-topic-view] [data-message-row="${root.ts}"]`, async () => {
+    fake.release({ method: 'conversations.replies' })
+    await expect(link.root).toContainText(FIRST_REPLY)
+    await juno.peek.expectMessage('Quarantining it. Ticket filed.')
+  })
+  await juno.peek.release()
+}
