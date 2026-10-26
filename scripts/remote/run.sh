@@ -47,10 +47,15 @@ script_started=$SECONDS
     echo "$(( SECONDS - script_started )) ${running:-0} ${pressure:-0}" >> /out/load.txt
   done ) &
 sampler=$!
+# JUNO_MEMORY_PROFILE=1 records each process's memory (scripts/remote/memory-profile.mjs).
+if [ "${JUNO_MEMORY_PROFILE:-}" = 1 ]; then
+  bun scripts/remote/memory-profile.mjs "memory-profile/${1//[^a-z0-9]/-}-$$.json" & profiler=$!
+fi
 xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' bun run "$@"
 code=$?
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
+[ -n "${profiler:-}" ] && kill $profiler 2>/dev/null && wait $profiler 2>/dev/null
 if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ] && [ -r /sys/fs/cgroup/memory.peak ]; then
   awk '{ printf "remote: peak container memory %.2f GB (includes file cache)\n", $1 / 1073741824 }' /sys/fs/cgroup/memory.peak >&2
 fi
@@ -74,7 +79,7 @@ if [ -s /out/load.txt ]; then
 fi
 
 reports=()
-for path in specs/traces apps/desktop/test-results apps/desktop/playwright-report apps/desktop/blob-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
+for path in specs/traces apps/desktop/test-results apps/desktop/playwright-report apps/desktop/blob-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots memory-profile; do
   [ -e "$path" ] && reports+=("$path")
 done
 [ -n "${JUNO_TYPECHECK_CACHE_DIR:-}" ] && [ -d "$JUNO_TYPECHECK_CACHE_DIR" ] && reports+=("${JUNO_TYPECHECK_CACHE_DIR#/work/}")
