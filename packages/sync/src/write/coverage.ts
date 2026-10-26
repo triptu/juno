@@ -22,12 +22,16 @@ export const addThreadRange = (channel: string, threadTs: string, range: ThreadR
     if (addsNothing(current, range)) return
     // What the socket delivered after a range it joins stays heard until a page reaches past it (`mergeRange`).
     const { range: merged, replaced } = mergeRange(current, range)
-    if (replaced.length > 0) {
+    const gone = replaced.filter((r) => r.from_ts !== merged.from_ts)
+    if (gone.length > 0) {
       yield* sql`DELETE FROM thread_ranges WHERE channel = ${channel} AND thread_ts = ${threadTs} AND kind = ${range.kind}
-        AND from_ts IN ${sql.in(replaced.map((r) => r.from_ts))}`
+        AND from_ts IN ${sql.in(gone.map((r) => r.from_ts))}`
     }
+    // The range that starts where the merged one does is updated in place, so a tail that only moves between
+    // `live` and `held` (which count the same) keeps the topic's index up to date (`topic_inputs`).
     yield* sql`INSERT INTO thread_ranges (channel, thread_ts, kind, from_ts, to_ts, tail, heard_ts)
-      VALUES (${channel}, ${threadTs}, ${merged.kind}, ${merged.from_ts}, ${merged.to_ts}, ${merged.tail}, ${merged.heard_ts ?? null})`
+      VALUES (${channel}, ${threadTs}, ${merged.kind}, ${merged.from_ts}, ${merged.to_ts}, ${merged.tail}, ${merged.heard_ts ?? null})
+      ON CONFLICT (channel, thread_ts, kind, from_ts) DO UPDATE SET to_ts = excluded.to_ts, tail = excluded.tail, heard_ts = excluded.heard_ts`
     yield* invalidate({ thread_ranges: [threadTopicId(channel as ChannelId, threadTs as Ts)] })
   })
 
