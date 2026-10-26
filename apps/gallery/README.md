@@ -10,7 +10,7 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 - `verify:main` uses the full run's gallery job. Affected runs check changed states with both guards.
 - `bun run gallery:shots`: review screenshots in both themes. `GALLERY_SHOTS_ONLY=Button` narrows them.
 
-Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency; on the runner a run that does not walk every state uses `GALLERY_CACHED_WORKERS`, half a worker per thread. Real-input tests in a worker run on one loaded gallery page ([One page per worker](#one-page-per-worker)). Screenshots remain review artifacts, not pixel baselines in the behavior gate.
+Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` overrides concurrency. On the runner, full fast-only runs use `GALLERY_FAST_WORKERS`, one worker per allocated thread; runs that do not force either walk use `GALLERY_CACHED_WORKERS`, half a worker per thread. Real-input full walks keep four workers per three threads. An explicit `GALLERY_WORKERS` sets all three unless their own override is given. Real-input tests in a worker run on one loaded gallery page ([One page per worker](#one-page-per-worker)). Screenshots remain review artifacts, not pixel baselines in the behavior gate.
 
 ## One page per worker
 
@@ -49,7 +49,7 @@ A test that only reads what states draw uses `layoutTest` (boxes, text, attribut
 
 Tests that open the same states share one test. Contrast is one test per theme over every accent.
 
-`GALLERY_CPU=1` (Linux) prints CPU-seconds, summed test time and span per spec file (`scripts/gallery-cpu-reporter.mjs`).
+`GALLERY_CPU=1` (Linux) prints CPU-seconds, summed test time and span per spec file (`scripts/gallery-cpu-reporter.mjs`). `GALLERY_PROFILE=1` adds a `gallery-state:` JSON line to each fast state’s Playwright report stdout: opening, drawn rules, reloads, event dispatch, settling, snapshots, diffs, stylesheet rewriting and total browser-call time. The [cost profile](../../docs/reviews/2026-10-26-gallery-cost.md) records every state and the worker comparison.
 
 Measured full and cached timings, including the interrupted Mac comparison, are in [development notes](../../docs/development.md#gallery-measurements-2026-10-24); the cached rendering tests in [Gallery CPU per spec](../../docs/development.md#gallery-cpu-per-spec-2026-10-26).
 
