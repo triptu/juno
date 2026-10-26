@@ -17,10 +17,11 @@
 // steps (scripts/build-cached.mjs), so the desktop app is built once per run.
 // Each output line starts with `[<script>] `. After each step a line
 // `plan: step <index> <script> exited with <code> after <seconds> s` gives its
-// result; the exit code is 1 if any step failed.
+// result (in a remote container, after a line with the CPU its processes used);
+// the exit code is 1 if any step failed.
 
 import { spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { availableParallelism, loadavg } from 'node:os'
 import { createInterface } from 'node:readline'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -50,6 +51,47 @@ export function parsePlan(argv) {
 const cgroupRead = (file, pick) => { try { return pick(readFileSync(`/sys/fs/cgroup/${file}`, 'utf8')) } catch { return undefined } }
 const cpuMicros = () => cgroupRead('cpu.stat', (text) => Number(/^usage_usec (\d+)$/m.exec(text)?.[1]))
 const memoryBytes = () => cgroupRead('memory.current', Number)
+
+/**
+ * Linux: the CPU each step's processes used, sampled each second and found by the JUNO_PLAN_STEP they inherit. A
+ * process without it (Chromium's zygote and renderers start with a cleared environment) counts for its parent's step.
+ * Processes a step leaves to the container's init (the DOM lane's pooled hosts) count too, which a process tree's
+ * accounting misses; a process's last second and processes shorter than a second do not.
+ */
+function processCpu() {
+  if (process.platform !== 'linux') return undefined
+  const seen = new Map()
+  const sample = () => {
+    const running = new Map()
+    for (const pid of readdirSync('/proc')) {
+      if (!/^\d+$/.test(pid)) continue
+      try {
+        const stat = readFileSync(`/proc/${pid}/stat`, 'latin1')
+        // After the command's closing parenthesis: ppid is field 1, utime 11, stime 12, start time 19 (clock ticks).
+        const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
+        running.set(pid, { key: `${pid} ${fields[19]}`, parent: fields[1], ticks: Number(fields[11]) + Number(fields[12]) })
+      } catch { /* the process ended */ }
+    }
+    const stepOf = (pid, depth = 0) => {
+      const entry = running.get(pid)
+      if (!entry || depth > 32) return null
+      if (!seen.has(entry.key)) {
+        let step
+        try { step = /(?:^|\0)JUNO_PLAN_STEP=(\d+)\0/.exec(readFileSync(`/proc/${pid}/environ`, 'latin1'))?.[1] } catch { /* hidden */ }
+        seen.set(entry.key, { step: step ?? stepOf(entry.parent, depth + 1), ticks: 0 })
+      }
+      return seen.get(entry.key).step
+    }
+    for (const [pid, entry] of running) {
+      stepOf(pid)
+      seen.get(entry.key).ticks = entry.ticks
+    }
+  }
+  sample()
+  // Linux reports CPU in USER_HZ, 100 a second on the runner's architectures.
+  const used = (index) => [...seen.values()].reduce((sum, entry) => entry.step === String(index) ? sum + entry.ticks : sum, 0) / 100
+  return { sample, used }
+}
 
 export const appSuites = ['test:desktop', 'test:browser', 'test:electron', 'test:gallery', 'test:e2e']
 /** The steps in lanes that run at the same time; each lane runs its steps in order. */
@@ -116,20 +158,31 @@ if (import.meta.main) {
   const cores = Number(process.env.JUNO_RUNNER_JOB_CORES) || availableParallelism()
   // JUNO_PLAN_OVERLAP=1 (a split SSH job outside full runs) keeps every lane's own workers.
   const shared = planned.length > 1 && process.env.JUNO_PLAN_OVERLAP !== '1' ? sideBySide(cores, process.env.JUNO_RUNNER_WIDE_UNIT === '1') : undefined
+  console.log(`plan: ${steps.length} step(s) in ${planned.length} lane(s): ${planned.map((lane) => lane.map((step) => step.script).join(', ')).join(' | ')}`)
+  // CPU and memory for sizing jobs (docs/development.md, "Job sizes"): each step's from its processes, the job's
+  // from its cgroup, so the gap shows what no step's processes accounted for.
+  const planCpuStart = cpuMicros()
+  const processes = processCpu()
+  const memory = { job: memoryBytes() ?? 0, steps: new Map() }
+  const sampler = planCpuStart === undefined ? undefined : setInterval(() => {
+    processes?.sample()
+    const now = memoryBytes() ?? 0
+    memory.job = Math.max(memory.job, now)
+    for (const [step, peak] of memory.steps) memory.steps.set(step, Math.max(peak, now))
+  }, 1000)
+  const gigabytes = (bytes) => (bytes / 2 ** 30).toFixed(1)
   const run = (step, low) =>
     new Promise((resolvePromise) => {
       const started = Date.now()
-      // Per-step CPU and memory, for sizing jobs (docs/development.md, "Full runs"). Steps in one lane
-      // run alone, so the job's cgroup counts only this step.
-      const cpuStart = planned.length === 1 ? cpuMicros() : undefined
-      let peak = memoryBytes() ?? 0
-      const sampler = cpuStart === undefined ? undefined : setInterval(() => { peak = Math.max(peak, memoryBytes() ?? 0) }, 1000)
+      const index = steps.indexOf(step)
+      memory.steps.set(index, memoryBytes() ?? 0)
       const monitor = failureMonitor()
       let stopped
       const command = low ? ['nice', ['-n', '10', 'bun', 'run', step.script, ...step.args]] : ['bun', ['run', step.script, ...step.args]]
       const desktopBeside = planned.some((lane) => lane[0]?.script === 'test:electron') && ['test:browser', 'test:electron'].includes(step.script)
       const laneEnv = appSuites.includes(step.script) ? { ...shared?.app, ...(desktopBeside ? shared?.desktop : {}) } : step.script === 'specs:check' ? shared?.specs : shared?.rest
-      const child = spawn(command[0], command[1], { detached: guarded && process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(steps.indexOf(step)) } })
+      // JUNO_PLAN_STEP marks the step's processes for processCpu.
+      const child = spawn(command[0], command[1], { detached: guarded && process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(index) } })
       children.add(child)
       const prefix = `[${step.script}] `
       console.log(`${prefix}juno-runtime: ${JSON.stringify(identity)}`)
@@ -148,17 +201,17 @@ if (import.meta.main) {
       child.on('error', () => {})
       child.on('close', (code) => {
         children.delete(child)
-        clearInterval(sampler)
-        if (cpuStart !== undefined) console.log(`plan: step ${steps.indexOf(step)} ${step.script} used ${Math.round((cpuMicros() - cpuStart) / 1e6)} CPU-s, peak memory ${(peak / 2 ** 30).toFixed(1)} GB (includes file cache)`)
+        if (processes) {
+          processes.sample()
+          console.log(`plan: step ${index} ${step.script} used ${Math.round(processes.used(index))} CPU-s, job memory peaked at ${gigabytes(memory.steps.get(index))} GB while it ran (includes file cache)`)
+        }
+        memory.steps.delete(index)
         if (guarded && code !== 0 && !stopped && monitor.completed === 0 && /^test(?::|$)/.test(step.script)) stop({ scope: 'run', rule: 'setup', signature: `${step.script} exited before any tests completed`, completed: 0, failed: 0 })
         const result = stopped ? 1 : code ?? 1
-        console.log(`plan: step ${steps.indexOf(step)} ${step.script} exited with ${result} after ${Math.round((Date.now() - started) / 1000)} s`)
+        console.log(`plan: step ${index} ${step.script} exited with ${result} after ${Math.round((Date.now() - started) / 1000)} s`)
         resolvePromise(result)
       })
     })
-  console.log(`plan: ${steps.length} step(s) in ${planned.length} lane(s): ${planned.map((lane) => lane.map((step) => step.script).join(', ')).join(' | ')}`)
-  // Steps that run side by side share the cgroup, so only the whole plan's CPU is known.
-  const planCpuStart = planned.length > 1 ? cpuMicros() : undefined
   const codes = (await Promise.all(planned.map(async (lane, index) => {
     const results = []
     // The unit and spec lanes give priority to the app lane.
@@ -175,6 +228,11 @@ if (import.meta.main) {
     }
     return results
   }))).flat()
-  if (planCpuStart !== undefined) console.log(`plan: ${planned.length} lanes used ${Math.round((cpuMicros() - planCpuStart) / 1e6)} CPU-s`)
+  clearInterval(sampler)
+  if (planCpuStart !== undefined) {
+    const used = Math.round((cpuMicros() - planCpuStart) / 1e6)
+    const counted = processes ? `, ${used - Math.round(steps.reduce((sum, _, index) => sum + processes.used(index), 0))} of them outside its steps' processes` : ''
+    console.log(`plan: the job used ${used} CPU-s${counted}, peak memory ${gigabytes(memory.job)} GB (includes file cache)`)
+  }
   process.exit(codes.every((code) => code === 0) ? 0 : 1)
 }
