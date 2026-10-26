@@ -1,0 +1,1 @@
+- 10-27 01:15 · agent · The gallery's real-input walk is at least 16 tests, four per part, each walking at most its share of the states, so together they walk every one. Why: Playwright keeps every call's record until a test ends, about 0.3 MB a state, and a walk part over about 460 states passed the 256 MB worker heap cap and aborted. The heap cap stays.

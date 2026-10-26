@@ -59,3 +59,13 @@ About 64 CPU-s (15%) and 9 to 11 s of job wall less per round. Every run checked
 ## Guard checks
 
 With the [mutation patch](2026-10-26-gallery-shift-mutations.patch) applied, `bun run remote --cores 3 test:gallery /history-probe.spec.ts /shift.spec.ts /computed-shift.spec.ts /shared-page.spec.ts --grep-invert "in any state of any component"` passed 71 tests: the computed tier's 12 self-tests, the real guard's self-tests and targeted regressions, the shared-page reset checks and all 11 history probes with their recorded outcomes (the forced check still reports the six transplanted rules and the focused Show result probe; the task-footer probe still does not reproduce its old shrink). The temporary probe spec was removed afterward.
+
+## The real-input walk over every state
+
+`bun run affected` on this change re-keyed every real-input state, and all four workers of that walk aborted with SIGABRT about 600 s in. It is not the guard change: a four-worker walk on main at `dd5e712c1` showed the same worker heap growth, from about 150 MB to 175–183 MB over the first 100 states, and passed only just (571 s); this branch showed 145–152 to 169–182 MB. Playwright's worker keeps a record of every call a test makes (`_steps` and `_stepMap` in its `TestInfo`) until that test ends, and one walk part made tens of thousands of calls over about 460 states, past the 256 MB heap cap from `1809ff1f7`.
+
+The walk is now at least 16 tests, four per part, each walking at most `ceil(states / tests)` of the selected states. Every test runs to its limit or an empty queue, so together they always walk every state. The record keys are built once per worker, and the shared page still reloads every 150 states, counted across the walk's tests. A four-worker walk over every state then passed (`1793043423627-53531-339f3d9c`, 630 s): 16 tests walked 1,835 states, 7,566 elements and 547 remounts, the same counts as the last recorded full real-input walk, and each worker's used heap stayed under 150 MB. The computed walk makes about five calls a state, not about 80, and keeps one test per part.
+
+## The CPU reporter's NaN
+
+`scripts/gallery-cpu-reporter.mjs` looked for the worker by `TEST_WORKER_INDEX` in `/proc/<pid>/environ`. Playwright sets that variable inside the worker once it runs, so only the browser the worker launches shows it: the reporter charged the browser and not the worker's own Node process, and found nothing for a worker's first test (no browser yet), which made its spec and the total `NaN`. It now notes every child of the runner when a test begins and finds the worker as the runner's child above that browser when the test ends. In the run above it charged 988.7 of the job's 1,015.4 CPU-s, with no `NaN`.
