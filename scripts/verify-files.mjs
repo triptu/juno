@@ -201,10 +201,10 @@ export function planFiles({ keys, sources, fresh, seed, source }) {
     const reusable = []
     for (const [file, key] of laneKeys) {
       const found = fresh ? undefined : sources.map((record) => record.suites.find((suite) => suite.suite === lane)?.files?.entries?.[file]).find((entry) => entry?.key === key)
-      entries[file] = found ? { key, ran: 'reused', from: found.from } : { key, ran: fresh ? 'fresh' : 'changed', from: source }
+      entries[file] = found ? { key, ran: 'reused', from: found.from, ...(found.seconds === undefined ? {} : { seconds: found.seconds }) } : { key, ran: fresh ? 'fresh' : 'changed', from: source }
       if (found) reusable.push(file)
     }
-    for (const file of fresh ? [] : samplePick(seed, lane, reusable)) entries[file] = { ...entries[file], ran: 'sampled', from: source }
+    for (const file of fresh ? [] : samplePick(seed, lane, reusable)) entries[file] = { key: entries[file].key, ran: 'sampled', from: source, seconds: entries[file].seconds }
     return [lane, { ...(fresh ? {} : { sample: seed }), ...countFiles(entries), entries }]
   }))
 }
@@ -243,22 +243,22 @@ export function commandFiles(lane, words = []) {
   return at === -1 ? undefined : words.slice(at + 1)
 }
 
-/** The share of a lane's work its running files make up: by their recorded test time in Playwright lanes, else by count. */
+/**
+ * The share of a lane's work its running files make up, by each file's newest recorded test seconds (`fileSeconds`);
+ * a file never timed counts as the mean, and by file count while fewer than half are timed.
+ */
 export function runShare(lane, files, records) {
-  const ran = new Set(ranFiles(files))
-  const total = Object.keys(files.entries).length
-  if (total === 0) return 0
-  if (!playwrightLanes.has(lane)) return ran.size / total
-  // Each file's newest measured time in this lane; a run that ran only some files measured only those.
+  const all = Object.keys(files.entries)
+  if (all.length === 0) return 0
   const seconds = new Map()
-  for (const record of records) {
-    const measured = new Map()
-    for (const test of record.suites.find((suite) => suite.suite === lane && !suite.reusedFrom)?.tests?.cases ?? [])
-      if (test.file in files.entries && !seconds.has(test.file)) measured.set(test.file, (measured.get(test.file) ?? 0) + test.durationMs)
-    for (const [file, value] of measured) seconds.set(file, value)
-  }
-  const all = [...seconds.values()].reduce((sum, value) => sum + value, 0)
-  return all > 0 ? [...ran].reduce((sum, file) => sum + (seconds.get(file) ?? 0), 0) / all : ran.size / total
+  for (const [file, entry] of Object.entries(files.entries)) if (entry.seconds !== undefined) seconds.set(file, entry.seconds)
+  for (const record of records) for (const [file, entry] of Object.entries(record.suites.find((suite) => suite.suite === lane && suite.files)?.files.entries ?? {}))
+    if (file in files.entries && !seconds.has(file) && entry.seconds !== undefined) seconds.set(file, entry.seconds)
+  const ran = ranFiles(files)
+  if (seconds.size < all.length / 2) return ran.length / all.length
+  const mean = [...seconds.values()].reduce((sum, value) => sum + value, 0) / seconds.size
+  const time = (list) => list.reduce((sum, file) => sum + (seconds.get(file) ?? mean), 0)
+  return time(all) > 0 ? time(ran) / time(all) : ran.length / all.length
 }
 
 /**
@@ -274,19 +274,41 @@ export function checkToolchain(line, { live, expected, reused }) {
   return { live: reported }
 }
 
-/** The test files a lane's log or structured results name as failing. */
-export function failingFiles(lane, log, tests) {
-  if (tests?.cases) return new Set(tests.cases.filter((test) => test.outcome === 'unexpected' || test.attempts?.some((run) => run.status === 'interrupted')).map((test) => test.file).filter(Boolean))
-  // bun test prints `<file>:` before each file's results and `(fail) <name>` for a failure, then the failures again under `N tests failed:`.
+/**
+ * What a lane's run says of each test file: `failing`, the files with a failed or interrupted test, and `seconds`,
+ * each file's summed test time. Playwright's come from its structured results. bun test prints `<file>:` before each
+ * file's results and `(pass) <name> [12.34ms]` or `(fail) ...` for each test, then the failures again under
+ * `N tests failed:`.
+ */
+export function fileResults(log, tests) {
   const failing = new Set()
+  const seconds = {}
+  const add = (file, value) => { seconds[file] = (seconds[file] ?? 0) + value }
+  if (tests?.cases) {
+    for (const test of tests.cases.filter((item) => item.file)) {
+      add(test.file, (test.durationMs ?? 0) / 1000)
+      if (test.outcome === 'unexpected' || test.attempts?.some((run) => run.status === 'interrupted')) failing.add(test.file)
+    }
+    return { failing, seconds }
+  }
   let current
   for (const line of log.split('\n')) {
     if (/^\d+ tests? failed:$/.test(line)) break
     const header = /^(?:\.\/)?((?:apps|packages|dom)\/\S+\.test\.[cm]?[jt]sx?):$/.exec(line)
     if (header) current = header[1].startsWith('dom/') ? `apps/desktop/${header[1]}` : header[1]
-    else if (line.startsWith('(fail) ') && current) failing.add(current)
+    const result = current && /^\((pass|fail)\) .*?(?: \[([\d.]+)(ms|s)\])?$/.exec(line)
+    if (!result) continue
+    if (result[1] === 'fail') failing.add(current)
+    add(current, result[2] ? Number(result[2]) / (result[3] === 'ms' ? 1000 : 1) : 0)
   }
-  return failing
+  return { failing, seconds }
+}
+
+/** A lane's files with each file that ran timed, for sizing later runs (`runShare`). */
+export function timedFiles(files, seconds) {
+  if (!files) return undefined
+  const entries = Object.fromEntries(Object.entries(files.entries).map(([file, entry]) => [file, entry.ran !== 'reused' && seconds[file] !== undefined ? { ...entry, seconds: Math.round(seconds[file] * 100) / 100 } : entry]))
+  return { ...files, entries }
 }
 
 /** One line per lane for the summary: what ran because it changed or was sampled, and what was reused from where. */

@@ -42,7 +42,7 @@ import { describeGalleryCounts, fullSuites, galleryCounts, galleryWalk, planOutc
 import { scratchFolder } from './worktree-folder.mjs'
 import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
 import { committedInputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
-import { checkToolchain, failingFiles, FILE_SAMPLE_SHARE, freshFileRun, laneFiles } from './verify-files.mjs'
+import { checkToolchain, fileResults, FILE_SAMPLE_SHARE, freshFileRun, laneFiles, timedFiles } from './verify-files.mjs'
 import { fullRunCores, fullRunJobs } from './remote/plan.mjs'
 import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
 import { ImportGraph } from './import-graph.mjs'
@@ -142,8 +142,8 @@ process.on('exit', removeCheckout)
 const runLabel = `${commit.slice(0, 10)}:${runId}`
 let toolchain = records.find((record) => record.toolchain && record.execution?.mode === execution.mode && record.execution.host === execution.host)?.toolchain
 const lanes = await laneFiles({ root, checkout, commit, tracked, suites: smoke || baseline ? [] : suites, records, identity, label: runLabel })
-const files = () => lanes.plan({ toolchain, fresh: filesFresh.fresh, seed: fileSample })
-files()
+const planLanes = () => lanes.plan({ toolchain, fresh: filesFresh.fresh, seed: fileSample })
+planLanes()
 const fileReused = () => lanes.reused()
 // Jobs shrink to the work left once files are reused (fullRunCores); a core count set by hand wins.
 const layout = local || smoke || baseline ? undefined : gallery.uncached ? fullRunJobs.everyState : fullRunJobs.sampled
@@ -274,7 +274,7 @@ const runPlan = async () => {
   toolchainChanged = undefined
   liveToolchain = undefined
   filesFresh = { fresh: true, reason: 'the toolchain changed since the reused passes' }
-  files()
+  planLanes()
   words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
   console.log(`verify:main: test files: ${filePlan()}`)
   return runOnce()
@@ -322,7 +322,8 @@ const measured = results.map((result) => {
   const walks = result.suite === 'test:gallery' ? galleryCounts(log) : undefined
   const missed = [...walks?.states.missed ?? [], ...walks?.tests.missed ?? []]
   const ownFiles = lanes.files[result.suite]
-  const missedFiles = ownFiles && code !== 0 ? [...failingFiles(result.suite, log, tests)].filter((file) => ownFiles.entries[file]?.ran === 'sampled') : []
+  const ran = ownFiles ? fileResults(log, tests) : undefined
+  const missedFiles = ownFiles && code !== 0 ? [...ran.failing].filter((file) => ownFiles.entries[file]?.ran === 'sampled') : []
   const inputs = protocols[result.suite]
   const override = argv.filter((word, index) => argv[index - 1] === '--cause').map((word) => word.split('=')).find(([suite]) => suite === result.suite)?.[1]
   return { ...result, code, stop, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs && actual ? committedInputKey(root, commit, inputs, actual) : undefined,
@@ -330,7 +331,7 @@ const measured = results.map((result) => {
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
     failures: code === 0 ? [] : stop ? [`${stop.rule}: ${stop.signature ?? `${stop.failed}/${stop.completed} tests failed`}`] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused']
       : [...missed.length ? [`Sampled gallery records failed, so the walk-cache key missed an input: ${missed.join(', ')}`] : [],
-        ...missedFiles.length ? [`Sampled reused test files failed, so the reuse key missed an input: ${missedFiles.join(', ')}`] : [], ...failures(result.log)], tests, walks, files: ownFiles,
+        ...missedFiles.length ? [`Sampled reused test files failed, so the reuse key missed an input: ${missedFiles.join(', ')}`] : [], ...failures(result.log)], tests, walks, files: timedFiles(ownFiles, ran?.seconds),
     cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch || stop ? 'infrastructure' : undefined), note: stop ? JSON.stringify(stop) : mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
   }
 })
