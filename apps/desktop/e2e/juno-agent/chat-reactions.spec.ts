@@ -79,11 +79,16 @@ async function scrollTo(chat: JunoChatPane, where: 'top' | 'bottom'): Promise<vo
   const scroller = chat.root.locator('[data-scroll]')
   const box = (await scroller.boundingBox())!
   const page = chat.root.page()
+  const atEnd = () => scroller.evaluate((el, at) => (at === 'top' ? el.scrollTop : el.scrollHeight - el.clientHeight - el.scrollTop) <= 1, where)
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await expect
     .poll(async () => {
+      if (await atEnd()) return true
+      // A wheel's scroll animates on macOS: wait for it to end, or it carries on past a row revealed after it.
+      await scroller.evaluate((el) => { (el as HTMLElement & { ended?: Promise<void> }).ended = new Promise((done) => el.addEventListener('scrollend', () => done(), { once: true })) })
       await page.mouse.wheel(0, where === 'top' ? -4000 : 4000)
-      return scroller.evaluate((el, at) => (at === 'top' ? el.scrollTop : el.scrollHeight - el.clientHeight - el.scrollTop) <= 1, where)
+      await scroller.evaluate((el) => Promise.race([(el as HTMLElement & { ended?: Promise<void> }).ended, new Promise((done) => setTimeout(done, 2000))]))
+      return atEnd()
     })
     .toBe(true)
 }
