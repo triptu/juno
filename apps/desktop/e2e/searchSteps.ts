@@ -47,8 +47,10 @@ export function topCard(page: ReturnType<typeof searchPage>): Promise<string> {
 
 export async function restoreWindow({ juno, fake, relaunch, userData }: Pick<Fixtures, 'juno' | 'fake' | 'relaunch' | 'userData'>) {
   const now = fake.now()
-  // Each older than the last post, which takes the fake clock's now: two posts at one time can preview either.
-  for (let i = 0; i < 280; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `restorationprobe message ${i}`, at: now - (i + 1) * 1000 })
+  // History Juno has not read: Slack sends no socket event for an older message, and 280 events took 3.4 s of the
+  // preview's 5 s under load. Each is older than the last post, which takes the fake clock's now: two posts at one
+  // time can preview either.
+  for (let i = 0; i < 280; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `restorationprobe message ${i}`, at: now - (i + 1) * 1000, silent: true })
   fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'restorationprobe ready' })
   await expect(juno.sidebar.row('#eng').preview).toContainText('restorationprobe ready')
   const page = searchPage(juno.win)
