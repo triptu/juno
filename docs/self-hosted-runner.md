@@ -63,10 +63,12 @@ At four allocated threads, units run four `bun test` processes, standalone deskt
 and a job of only the gallery uses five (four per three threads). Quint uses one simulation per two threads and
 one Apalache checker per four, at least one each. Explicit worker settings win.
 
-`test:plan` groups unit (with the spec checks), gallery and desktop steps into separate jobs.
-Conformance belongs to specs. Gallery and desktop overlap within the existing
-lent allocation and restore their own verified persistent builds. Each job has
-its own workspace, install, results and independently released core set.
+`test:plan` groups its steps into two jobs: a desktop job (the browser and Electron lanes,
+the spec checks and conformance) and a unit job (unit tests, the DOM lane, the gallery and the
+tool tests); "Remote runs" in `docs/development.md` has the detail. The coordinator checks the
+runner and its image and packs the workspace once; a job that carries the spec cache packs its
+own. Each job has its own install, results and independently released core set. In a full run
+each job runs its steps in order; elsewhere its lanes run at once with their own workers.
 `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also runs its steps
 in order. `--cores` and `--wait` apply to each job. `--shards n` is an explicit
 split into n jobs on the same shared allocator.
