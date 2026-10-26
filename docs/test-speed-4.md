@@ -148,7 +148,7 @@ Temporary fault injections were removed after their remote snapshots:
 | Main busy loop, 80 ms per 100 ms timer, 14:17 IST | 46.3%, 47.0%, 47.1%, 45.7% | All four 25% CPU checks failed |
 | Retain a touched 4 MiB buffer every 250 ms, 14:19 IST | Main 258 → 441 → 637 → 834 → 1,026 MB; CPU below 3% | Peak, end-growth and steady-growth checks failed |
 
-The fine Mac `@mac` walk retains its 60 s windows, large seed and per-process budgets for nightly
+The fine Mac `@mac` walk retains its 60 s windows, large seed and per-process budgets for runs by hand
 measurements. App diagnostics, especially sustained-CPU logging and Settings › About, remain the
 primary evidence for idle spins in the field. The synthetic walk did not catch the 10-18 outbox
 spin; it cannot substitute for inspecting the actual persisted queues and process stacks.

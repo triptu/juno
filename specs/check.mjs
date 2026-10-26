@@ -50,7 +50,7 @@ mkdirSync(generated, { recursive: true })
 // without the step bound, and a check that reruns reuses it: it does not depend on the run.
 // The cache is shared by every worktree. SPECS_RUN_CACHE=off reruns simulations while
 // retaining deterministic results; SPECS_CACHE=off or --no-cache runs everything.
-// A nightly uses the cache like any run: the checks prove the models, not Juno's code.
+// A full run uses the cache too: the checks prove the models, not Juno's code.
 // The seed is left out of every key.
 const jobs = []
 // SPECS_CACHE_DIR: on the runner, its persistent /cache/specs (scripts/remote/run.sh).
@@ -90,7 +90,7 @@ function specHash(file, seen = new Set()) {
 
 // Deadlines per Quint process, about four times the slowest run measured on a
 // loaded machine (docs/development.md, "Faster test runs"): threadranges' 4,000
-// samples took 41.5 s alone in a nightly on 10-26. A timeout is a failure.
+// samples took 41.5 s alone in a nightly full run on 10-26. A timeout is a failure.
 const deadlines = { verify: 360000, other: 180000 }
 
 function quint(args, { violation = false, timeout = args[0] === 'verify' ? deadlines.verify : deadlines.other, trace, check = () => {}, checks = '' } = {}) {
