@@ -1327,7 +1327,7 @@ Juno requests physical cores from the laptop's shared `4-11` allocation:
 
 | Job | Cores | Memory cap |
 | --- | ---: | ---: |
-| Narrow unit, agent tests, cached spec check | 1 | 3 GiB |
+| Narrow unit, agent tests, tool tests (`test:health`, `test:repo-tools`, `test:runner`), cached spec check | 1 | 3 GiB |
 | Wide unit, uncached spec check, conformance, standalone gallery or app | 2 | 6 GiB |
 | Desktop job of a split plan; unit job with the DOM lane or the gallery | 4 | 12 GiB |
 | Trace generation, other scripts | 4 | 12 GiB |
