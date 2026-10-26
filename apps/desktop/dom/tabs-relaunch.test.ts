@@ -35,6 +35,8 @@ function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray
 }
 
 domTest("a relaunch keeps every tab, pinned ones first, their topic drafts, each Home tab's draft and destination, the Search tab, and privacy mode", async ({ juno, relaunch, userData, fake, slack, step }) => {
+  // The account button shows Slack's active dot only inside both hours.
+  await juno.allHoursNow()
   slack.as('Tushar').postIn('eng', 'Pelican migration plan for the queue')
   for (const n of ['one', 'two', 'three']) slack.as('Leo').replyIn('Pelican migration plan', `pelican step ${n} is done`)
   await juno.sidebar.row('Pelican migration plan').expectVisible()

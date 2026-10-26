@@ -17,7 +17,7 @@ import type { Query } from '../query'
 import { HomePane, HomeWritePane, WelcomeCard } from './home'
 import { domSurface, Menus } from './menus'
 import { PaletteDriver } from './palette'
-import { AccountMenu, hoursRows, NotificationsPage, PrivacyMode, SettingsPage } from './settings'
+import { AccountMenu, hoursRows, NotificationsPage, PrivacyMode, SettingsPage, type HoursSection } from './settings'
 import { PeekPopover } from './peek'
 import { Sidebar, type PeekKeyName } from './sidebar'
 import { Navigation, TabStrip } from './tabs'
@@ -217,16 +217,29 @@ export class Juno implements JunoVerbs {
   }
 
   /** Notification hours around now (or, with `outside`, away from now) on every day, saved, as the Playwright driver's. */
-  async notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+  notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+    return this.#hoursNow(['Notifications'], options)
+  }
+
+  /**
+   * Notification and Active in Slack hours around now on every day, saved, and Settings closed: Slack shows the
+   * owner active and the account button its dot rather than the paused badge, whatever the time and day.
+   */
+  async allHoursNow(): Promise<void> {
+    await this.#hoursNow(['Notifications', 'Active in Slack'], {})
+    await this.tabs.close('Settings')
+  }
+
+  async #hoursNow(sections: ReadonlyArray<HoursSection>, options: { readonly outside?: boolean }): Promise<void> {
     await this.openNotifications()
     const now = new this.dom.window.Date()
     const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
     const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
     const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
-    for (const row of hoursRows) await this.notifications.setRow('Notifications', row, { from, to })
+    for (const section of sections) for (const row of hoursRows) await this.notifications.setRow(section, row, { from, to })
     await this.tabs.close('Settings')
     await this.openNotifications()
-    for (const row of hoursRows) await this.notifications.expectRow('Notifications', row, { from, to })
+    for (const section of sections) for (const row of hoursRows) await this.notifications.expectRow(section, row, { from, to })
   }
 
   /** The OS notifications the host's shell showed, oldest first. */

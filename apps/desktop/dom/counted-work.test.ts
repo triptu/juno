@@ -57,6 +57,8 @@ async function measured(app: () => DomApp, action: () => Promise<void>): Promise
 }
 
 domTest('startup, a topic opened and opened again, tabs, typing, a send and a live message stay within their counted budgets', async ({ juno, app, fake, slack, relaunch, step }) => {
+  // The account button shows Slack's active dot only inside both hours; the counts include it.
+  await juno.allHoursNow()
   await step('startup: a relaunch to the sidebar rows from the cache, at rest', async () => {
     juno = await relaunch({ beforeOpen: () => engineAtRest(fake) })
     await juno.sidebar.expectRows()
@@ -128,6 +130,7 @@ domTest('the sidebar of 300 conversations: its first rows from the cache, and on
   // The first sync of 300 conversations is setup, not counted: the app quits once signed in, and the engine
   // finishes the sync with no page open, which would draw every row as it came, before the page opens again.
   await juno.signIn()
+  await juno.allHoursNow()
 
   await step('startup: a relaunch to the first rows from the cache, at rest', async () => {
     juno = await relaunch({ beforeOpen: () => engineAtRest(fake) })
