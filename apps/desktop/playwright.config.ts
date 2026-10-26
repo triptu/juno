@@ -12,6 +12,10 @@ const excludedTags = [
 ]
 const tagPattern = (tags: ReadonlyArray<string>) => tags.map((tag) => `${tag}\\b`).join('|')
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// Every lane runs in one time zone and locale, whatever the machine's (UTC on the runner, IST on the Mac): the
+// workers, the browser, Electron and the engine host inherit TZ; the browser's contexts (`browser/pages.ts`) and
+// Electron (`launch.ts`) are pinned to en-US.
+process.env.TZ = 'UTC'
 // A stress run (JUNO_STRESS, scripts/remote/workers.sh) slows everything down and scales the default timeouts to match.
 const scale = Number(process.env.JUNO_STRESS_SCALE ?? 1)
 

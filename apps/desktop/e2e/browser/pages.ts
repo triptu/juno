@@ -2,6 +2,9 @@ import type { Browser, BrowserContext, Page } from '@playwright/test'
 
 type Options = Pick<Parameters<Browser['newContext']>[0] & object, 'viewport' | 'permissions'>
 
+/** Every context's locale and zone, whatever the machine's (playwright.config.ts sets TZ for the processes). */
+export const PINNED = { locale: 'en-US', timezoneId: 'UTC' } as const
+
 /** In a stress run (JUNO_STRESS, scripts/remote/workers.sh), the page's renderer runs JUNO_STRESS_CPU_RATE times slower than the engine host beside it. */
 export async function throttle(page: Page): Promise<void> {
   const rate = Number(process.env.JUNO_STRESS_CPU_RATE ?? 1)
@@ -20,7 +23,7 @@ export class WebPages {
   async open(options: Options): Promise<Page> {
     const key = JSON.stringify(options)
     if (this.#context !== undefined && this.#options !== key) await this.close()
-    this.#context ??= await this.browser.newContext(options)
+    this.#context ??= await this.browser.newContext({ ...options, ...PINNED })
     this.#options = key
     await this.#context.grantPermissions(options.permissions ?? [])
     const page = await this.#context.newPage()

@@ -146,7 +146,13 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   const app = await electron.launch({
     // Under xvfb (bun run remote) Chromium may find no pointing device and match
     // `(hover: none)`, which turns off every hover style. Say there is a mouse.
-    args: [...(process.platform === 'linux' ? ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4'] : []), resolve(__dirname, '..')],
+    // A window behind another test's, or without focus, keeps its frames and timers running, as Playwright's own
+    // Chromium does: on the Mac, several workers' windows overlap, and an occluded one stopped drawing frames.
+    args: [
+      ...(process.platform === 'linux' ? ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4'] : []),
+      '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--disable-background-timer-throttling', '--lang=en-US',
+      resolve(__dirname, '..'),
+    ],
     env,
     // The fake HTTP image origin stands in for Slack's HTTPS CDN. Only the test context bypasses CSP.
     bypassCSP: options.fakeSlackUrl !== undefined,

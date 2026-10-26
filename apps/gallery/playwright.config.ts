@@ -34,6 +34,8 @@ process.env.GALLERY_SHIFT_PARTS ??= String(workers)
 
 // The default Chromium headless shell is the same pinned browser locally and remotely.
 // `bunx playwright install chromium --only-shell` installs it.
+// One time zone and locale, whatever the machine's (UTC on the runner, IST on the Mac).
+process.env.TZ = 'UTC'
 // A stress run (JUNO_STRESS, scripts/remote/workers.sh) slows everything down and scales the default timeouts to match.
 const scale = Number(process.env.JUNO_STRESS_SCALE ?? 1)
 
@@ -54,6 +56,8 @@ export default defineConfig({
     deviceScaleFactor: 2,
     colorScheme: 'light',
     reducedMotion: 'reduce',
+    locale: 'en-US',
+    timezoneId: 'UTC',
   },
   ...(shardIndex > 0 ? { grep: /no (?:forced )?interaction shifts the layout, in any state of any component/ } : {}),
   ...(skipTags.length > 0 ? { grepInvert: new RegExp(skipTags.map((tag) => `${tag}\\b`).join('|')) } : {}),
