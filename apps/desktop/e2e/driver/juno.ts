@@ -1087,16 +1087,32 @@ export class Juno implements JunoVerbs {
    * depend on the hours hold whatever the runner's timezone or weekday.
    * Reopens the page to wait for the engine to have saved them.
    */
-  async notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+  notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+    return this.#hoursNow(['Notifications'], options)
+  }
+
+  /**
+   * Notification and Active in Slack hours around now on every day, saved, and Settings closed: Slack shows the
+   * owner active and the account button its dot rather than the paused badge, whatever the time and day. Outside
+   * the old hours the engine skipped main's last activity reading, so Slack hears at the next one, within main's
+   * 10 s poll (`src/main/activity.ts`).
+   */
+  async allHoursNow(): Promise<void> {
+    await this.#hoursNow(['Notifications', 'Active in Slack'], {})
+    await this.tabs.close('Settings')
+    await expect(this.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1, { timeout: 15_000 })
+  }
+
+  async #hoursNow(sections: ReadonlyArray<HoursSection>, options: { readonly outside?: boolean }): Promise<void> {
     await this.openNotifications()
     const minutes = await this.win.evaluate(() => new Date().getHours() * 60 + new Date().getMinutes())
     const half = Math.floor(minutes / 30) * 30
     const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
     const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
-    for (const row of hoursRows) await this.notifications.setRow('Notifications', row, { from, to })
+    for (const section of sections) for (const row of hoursRows) await this.notifications.setRow(section, row, { from, to })
     await this.tabs.close('Settings')
     await this.openNotifications()
-    for (const row of hoursRows) await this.notifications.expectRow('Notifications', row, { from, to })
+    for (const section of sections) for (const row of hoursRows) await this.notifications.expectRow(section, row, { from, to })
   }
 
   /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. `silent` only on one posted without a sound. */

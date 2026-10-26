@@ -143,10 +143,11 @@ export async function backAtEnd(juno: Juno, win: Page, post: (text: string) => v
   })
 }
 
-/** Opens `title` read to its end and then again, so it shows its newest 150 rows and each arrival drops the first. */
-export async function openFullWindow(juno: Juno, title: string): Promise<void> {
+/** Opens `title` read to its end and then again, so it shows its newest 150 rows and each arrival drops the first. `synced` runs once the first sync is done, before the topic opens. */
+export async function openFullWindow(juno: Juno, title: string, synced?: () => Promise<void>): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
+  await synced?.()
   // The first open reads the topic. Opened again, it shows its newest 150 rows, so each message that arrives drops
   // the first row, and scroll anchoring lowers scrollTop by that row's height.
   const row = juno.sidebar.row(title)
