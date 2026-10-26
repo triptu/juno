@@ -248,10 +248,15 @@ export function runShare(lane, files, records) {
   const ran = new Set(ranFiles(files))
   const total = Object.keys(files.entries).length
   if (total === 0) return 0
-  const cases = playwrightLanes.has(lane) ? records.map((record) => record.suites.find((suite) => suite.suite === lane && suite.tests?.cases?.length && !suite.reusedFrom)).find(Boolean)?.tests.cases : undefined
-  if (!cases) return ran.size / total
+  if (!playwrightLanes.has(lane)) return ran.size / total
+  // Each file's newest measured time in this lane; a run that ran only some files measured only those.
   const seconds = new Map()
-  for (const test of cases) if (test.file in files.entries) seconds.set(test.file, (seconds.get(test.file) ?? 0) + test.durationMs)
+  for (const record of records) {
+    const measured = new Map()
+    for (const test of record.suites.find((suite) => suite.suite === lane && !suite.reusedFrom)?.tests?.cases ?? [])
+      if (test.file in files.entries && !seconds.has(test.file)) measured.set(test.file, (measured.get(test.file) ?? 0) + test.durationMs)
+    for (const [file, value] of measured) seconds.set(file, value)
+  }
   const all = [...seconds.values()].reduce((sum, value) => sum + value, 0)
   return all > 0 ? [...ran].reduce((sum, file) => sum + (seconds.get(file) ?? 0), 0) / all : ran.size / total
 }
