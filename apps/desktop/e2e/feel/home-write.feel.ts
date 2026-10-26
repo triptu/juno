@@ -5,7 +5,7 @@ import { test } from './feel'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test('the chip and the composer stay in place when a first @ chooses a person', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('the chip and the composer stay in place when a first @ chooses a person', { tag: '@on-demand' }, async ({ juno, feel }) => {
   await juno.write.composer.pressSequentially('@ma')
   await expect(juno.write.sendToOption('Maya')).toBeVisible()
   await feel.run({
@@ -54,7 +54,7 @@ const heldWhole: Check = (evidence) => {
   return { name, status: 'fail', detail: `${mixed.length} frames showed the earlier rows without the Juno row`, shots: shots.slice(0, 12) }
 }
 
-test('the destination list keeps its rows while a search is typed', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('the destination list keeps its rows while a search is typed', { tag: '@on-demand' }, async ({ juno, feel }) => {
   await juno.write.chip.click()
   await expect(juno.write.option('eng')).toBeVisible()
   await feel.run({

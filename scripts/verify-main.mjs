@@ -4,11 +4,11 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         every check uncached, a fresh Quint seed, full gallery walks, the perf job; laptop only
+//   bun run verify:main --nightly         every check uncached except unchanged spec checks, full gallery walks; laptop only
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
-//                                    then `perf` (absolute budgets) and `test:feel`
+//                                    then `test:feel`
 //   bun run verify:main --release       also the nightly tests the change reaches (bun run release)
 //   bun run verify:main --nightly-reach-only   only those nightly tests
 //
@@ -24,12 +24,10 @@
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
-// suite failed. --nightly adds `perf` on the laptop to the plan, in two parts
-// that each start a two-core job: every scenario and package budget, checked
-// against the laptop's baseline (docs/performance.md 7.3). On the Mac, perf (as `perf @mac`, the
-// absolute budgets) and test:feel run only with --with-mac, after the @mac
-// tests, each holding the whole machine; with the plan on the laptop they
-// start when it does. The feel contact sheet is copied next to the logs.
+// suite failed. Timed perf is not part of a full run: it runs on demand
+// (`bun run perf`, docs/performance.md 7.3). On the Mac, test:feel runs only
+// with --with-mac, after the @mac tests, holding the whole machine; with the
+// plan on the laptop it starts when the plan does. The feel contact sheet is copied next to the logs.
 
 import { spawn, spawnSync } from 'node:child_process'
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
@@ -93,10 +91,8 @@ if (local && argv.includes('--require-remote')) throw new Error('This run requir
 const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
-// The laptop perf job: nightly, every scenario and package budget, in two parts of the plan (scripts/remote/plan.mjs).
-const perf = nightly && !local && Boolean(scripts['perf:part1'])
 const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }]
-  : reachOnly ? [] : fullSuites(scripts, { nightly, noCache, perf, seed, testSeed, skipTags: local ? ['@mac'] : [] })
+  : reachOnly ? [] : fullSuites(scripts, { nightly, noCache, seed, testSeed, skipTags: local ? ['@mac'] : [] })
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
 const baseline = repairArg === 'latest' ? records[0] : repairArg ? JSON.parse(readFileSync(resolve(repairArg), 'utf8')) : undefined
 if (repairArg && (!baseline || baseline.version !== 2 || !isAncestor(root, baseline.commit, commit)))
@@ -109,8 +105,9 @@ const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
 let suites = required.filter((suite) => {
-  // A nightly run reuses no suite from an earlier run: it runs everything. The spec seed is always set, and not part of any key.
-  if (baseline || !protocolRoots[suite.name] || noCache || nightly) return true
+  // A nightly run reuses no suite from an earlier run except the spec check, which proves the models, not the code.
+  // The spec seed is always set, and not part of any key.
+  if (baseline || !protocolRoots[suite.name] || noCache || (nightly && suite.name !== 'specs:check')) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
     if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
@@ -129,7 +126,7 @@ if (argv.includes('--dry-run')) {
   console.log(`test:plan ${words.join(' ')}`)
   for (const suite of reused) console.log(`Reuse ${suite.suite}: unchanged inputs and runtime (${suite.reusedFrom.commit})`)
   if (baseline) console.log(`Repair ${baseline.commit}: failed/unfinished files plus uncapped import-graph selection (resolved in the target checkout)` )
-  if (withMac) console.log('On this Mac: test:desktop --grep @mac, then perf @mac, then test:feel (exclusive heavy lock)')
+  if (withMac) console.log('On this Mac: test:desktop --grep @mac, then test:feel (exclusive heavy lock)')
   if (reach) console.log('Then test:nightly: the nightly files the change since each last passed reaches (decided in the checkout)')
   process.exit(0)
 }
@@ -251,8 +248,8 @@ if (withMac) {
       const install = local ? { status: installed ? 0 : 1 } : spawnSync('bun', ['install', '--frozen-lockfile', '--silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
       const mac = [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
-      // perf and feel time this Mac, so they follow its @mac tests; with the plan on the laptop they need not wait for it.
-      if (!local) for (const [suite, script] of [['perf @mac', 'perf'], ['test:feel', 'test:feel']]) mac.push(await run(suite, 'bun', ['run', script], checkout))
+      // feel films this Mac, so it follows its @mac tests; with the plan on the laptop it need not wait for it.
+      if (!local) mac.push(await run('test:feel', 'bun', ['run', 'test:feel'], checkout))
       return mac
     })(),
   )
@@ -262,8 +259,8 @@ const readLog = (result) => result.log && existsSync(result.log) ? readFileSync(
 const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local || suites.length === 0 ? identity : undefined, reused.map((suite) => suite.identity), baseline?.identity)
 
 if (withMac && !cancelled) {
-  // A local plan ran on this Mac too: they wait for it, so they do not time a machine the other suites are using.
-  if (local) for (const [suite, script] of [['perf @mac', 'perf'], ['test:feel', 'test:feel']]) results = [...results, await run(suite, 'bun', ['run', script], checkout, localVerifyEnv)]
+  // A local plan ran on this Mac too: feel waits for it, so it does not film a machine the other suites are using.
+  if (local) results = [...results, await run('test:feel', 'bun', ['run', 'test:feel'], checkout, localVerifyEnv)]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }

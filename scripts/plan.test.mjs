@@ -69,18 +69,11 @@ test('the desktop and unit jobs take four cores in a full run and accept overrid
   assert.throws(() => planCores('desktop', { env: ['JUNO_RUNNER_DESKTOP_CORES=0'] }, {}), /positive whole number/)
 })
 
-test('a nightly starts each perf part alone in a serial two-core job, as its baseline was measured', async () => {
-  const { runnerPlanJobs, planCores } = await import('./remote/plan.mjs')
+test('nightly runs force fast gallery states while normal and no-cache runs retain changed-state real input', async () => {
   const { fullSuites } = await import('./verify-plan.mjs')
-  const scripts = Object.fromEntries(['test:dom', 'test:browser', 'test:electron', 'test:nightly', 'perf:part1', 'perf:part2'].map((name) => [name, '']))
-  const args = fullSuites(scripts, { nightly: true, perf: true }).flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
-  const jobs = runnerPlanJobs({ script: 'test:plan', args, env: ['JUNO_VERIFY_POLICY=1'] }, {})
-  for (const part of ['perf:part1', 'perf:part2']) {
-    const job = jobs.find((candidate) => candidate.steps.some((step) => step.script === part))
-    assert.equal(job.steps[0].script, part)
-    assert.equal(job.overlap, false)
-    assert.equal(planCores(job.kind, { env: [] }, {}, job.steps, job.cores), 2)
-  }
-  assert.equal(jobs.reduce((sum, job) => sum + job.cores, 0), 8)
-  assert.deepEqual(jobs.flatMap((job) => job.steps.map((step) => step.script)).toSorted(), fullSuites(scripts, { nightly: true, perf: true }).map((suite) => suite.name).toSorted())
+  const scripts = { 'test:gallery': '' }
+  const gallery = options => parsePlan(fullSuites(scripts, options).find(suite => suite.name === 'test:gallery').words)[0]
+  assert.deepEqual(gallery({ nightly: true }).env, { GALLERY_SHIFT_ALL: '1', GALLERY_REAL_WALK: '0' })
+  assert.deepEqual(gallery({ noCache: true }).env, { GALLERY_SHIFT_ALL: '1' })
+  assert.deepEqual(gallery({}).env, {})
 })

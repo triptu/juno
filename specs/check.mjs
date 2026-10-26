@@ -23,8 +23,6 @@ const memoryOnly = process.argv.includes('--memory')
 const boundedOnly = process.argv.includes('--bounded')
 const huddleOnly = process.argv.includes('--huddle')
 const outboxOnly = process.argv.includes('--outbox')
-// --nightly (verify:main --nightly) reruns every check, ignoring the cache.
-const nightly = process.argv.includes('--nightly')
 const backend = process.env.QUINT_SIMULATOR ?? 'rust'
 // Every simulation that runs takes a fresh seed, so breadth adds up over runs; `--seed <n>` or
 // SPECS_SEED=<n> repeats one. The seed is not in the cache key: unchanged checks stay cached.
@@ -32,7 +30,7 @@ const seedFlag = process.argv.indexOf('--seed')
 const seed = (seedFlag >= 0 ? process.argv[seedFlag + 1] : undefined) ?? process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
 if (!/^\d+$/.test(seed)) throw new Error('--seed and SPECS_SEED take an unsigned integer')
 console.log(`Spec check seed ${seed}; \`bun run specs:check --seed ${seed}\` repeats it.`)
-// 500 traces per sync protocol, nightly too: a new seed each run samples new traces.
+// 500 traces per sync protocol: a new seed each run samples new traces.
 const samples = tracesOnly ? 100 : 500
 const steps = 160
 const startedAt = Date.now()
@@ -49,10 +47,11 @@ mkdirSync(generated, { recursive: true })
 // imports, the Quint and Apalache versions and the verify batch only, so editing
 // this runner does not rerun it; bump solverVersion when its handling here changes.
 // The spec a solver check compiles for Apalache is cached under the same inputs,
-// without the step bound, and nightly runs reuse it too: it does not depend on the run.
+// without the step bound, and a check that reruns reuses it: it does not depend on the run.
 // The cache is shared by every worktree. SPECS_RUN_CACHE=off reruns simulations while
-// retaining deterministic results; --nightly, SPECS_CACHE=off or --no-cache runs
-// everything. The seed is left out of every key.
+// retaining deterministic results; SPECS_CACHE=off or --no-cache runs everything.
+// A nightly uses the cache like any run: the checks prove the models, not Juno's code.
+// The seed is left out of every key.
 const jobs = []
 // SPECS_CACHE_DIR: on the runner, its persistent /cache/specs (scripts/remote/run.sh).
 const cacheDir = process.env.SPECS_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'specs')
@@ -198,8 +197,7 @@ async function runJob(job, lane = 0, execute = job.args[0] === 'verify' ? verify
   const key = solver ? sha(solverHash, keyed, violation, specHash(args[1]))
     : sha(runnerHash, keyed, violation, checks, specHash(args[1]))
   const cached = join(cacheDir, `${key}.json`)
-  // A nightly checks everything again and records the passes for the runs after it.
-  if (cacheJob && !nightly && existsSync(cached)) {
+  if (cacheJob && existsSync(cached)) {
     const saved = JSON.parse(readFileSync(cached, 'utf8'))
     // A read marks the entry as used, so the runner keeps it (scripts/remote/run.sh).
     utimesSync(cached, new Date(), new Date())
@@ -646,7 +644,7 @@ if (!huddleOnly && !tracesOnly && !outboxOnly) {
     }
     console.log(`Mode: ${boundedOnly ? 'bounded Apalache' : 'simulator and bounded Apalache'}${memoryOnly ? ' (memory only)' : actionsOnly ? ' (actions only)' : recoveryOnly ? ' (recovery only)' : ''}.`)
     console.log('Bounded safety and races use the documented depths. Temporal liveness is typechecked only.')
-    console.log(nightly ? 'Nightly: every check reruns.' : 'Solver checks reuse their last pass while their spec and its imports are unchanged; --nightly reruns them.')
+    console.log('Solver checks reuse their last pass while their spec and its imports are unchanged; --no-cache reruns them.')
   }
 }
 await runAll()

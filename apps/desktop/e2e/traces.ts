@@ -1,6 +1,21 @@
 import type { Page, TestInfo } from '@playwright/test'
 import type { FakeSlack } from '@juno/fake-slack'
 
+/**
+ * Counts the page's timer callbacks from its start (`__junoTimerFires`), for `juno.expectAtRest()`: an interval or a
+ * timeout that schedules itself again runs its callback many times a second. The browser lane installs it on every page.
+ */
+export const countTimers = () => {
+  const g = globalThis as unknown as { __junoTimerFires?: number; setTimeout: typeof setTimeout; setInterval: typeof setInterval }
+  if (g.__junoTimerFires !== undefined) return
+  g.__junoTimerFires = 0
+  const counted = (callback: unknown) => (typeof callback === 'function' ? (...args: unknown[]) => { g.__junoTimerFires!++; return (callback as (...a: unknown[]) => unknown)(...args) } : callback)
+  const timeout = g.setTimeout
+  const interval = g.setInterval
+  g.setTimeout = ((callback: unknown, ...rest: unknown[]) => timeout(counted(callback) as () => void, ...(rest as [number]))) as typeof setTimeout
+  g.setInterval = ((callback: unknown, ...rest: unknown[]) => interval(counted(callback) as () => void, ...(rest as [number]))) as typeof setInterval
+}
+
 /** Puts an empty sidebar trace on the window, which turns the recording on (`@juno/state`'s `sidebarTrace.ts`). */
 export const startSidebarTrace = () => {
   const g = globalThis as { __junoSidebarTrace?: unknown }

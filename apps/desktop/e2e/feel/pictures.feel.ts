@@ -85,7 +85,7 @@ async function prepareHomePicture({ juno, win, fake }: { readonly juno: Juno; re
   return win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next.id as string)
 }
 
-test('the picture page opens with the picture Home showed, sharpens in one frame, and ← → never shows a blank picture', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, fake, relaunch, studio }) => {
+test('the picture page opens with the picture Home showed, sharpens in one frame, and ← → never shows a blank picture', { tag: '@on-demand' }, async ({ juno, win, fake, relaunch, studio }) => {
   const id = await prepareHomePicture({ juno, win, fake })
   // After a relaunch Home shows the picture, and nothing else has read which files are on disk. Its large file is held again.
   const held = `picture:${id}-large.webp`

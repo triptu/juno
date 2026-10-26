@@ -160,27 +160,7 @@ test('a code block in the message list shows its thumb only while the pointer is
   await expect.poll(thumb).toBe(transparent)
 })
 
-/**
- * Message rows are a whole number of pixels tall (performance 3.3). A row
- * laid out for the first time above the view grows from its estimate, and
- * scroll anchoring moves the list by the difference; a fractional difference
- * leaves the rows in view a part of a pixel off, and their text jumps.
- */
-layoutTest('every message row is a whole number of pixels tall', async ({ page }) => {
-  const routes = (await readRoutes(page)).filter((route) => route.component === 'MessageList' || route.component === 'Message')
-  expect(routes.length).toBeGreaterThan(0)
-  const fractional: string[] = []
-  for (const route of routes) {
-    await openState(page, route)
-    const heights = await page
-      .locator('[data-fixture-frame] [data-message-row]')
-      .evaluateAll((rows) => rows.map((row) => ({ ts: (row as HTMLElement).dataset['messageRow'] ?? '', height: row.getBoundingClientRect().height })))
-    for (const { ts, height } of heights) if (Math.abs(height - Math.round(height)) > 0.001) fractional.push(`${route.route} ${ts}: ${height}px`)
-  }
-  expect(fractional).toEqual([])
-})
-
-// The cursor rule (SPEC section 16) is checked on every state by the shift guard's walk in shift.spec.ts, which opens each state anyway.
+// The fast sweep checks cursor rules and whole-pixel message rows in every selected state.
 
 layoutTest('the gallery chrome keeps the arrow cursor too', async ({ page }) => {
   await page.goto('/#/Button?__state=variant/primary')

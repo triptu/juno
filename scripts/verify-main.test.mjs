@@ -62,9 +62,10 @@ test('local runs archive eligible records and preserve failed suites; an unreach
   const { root, commit, env, invoke } = verificationFixture(t)
   const dry = invoke(['--local', '--dry-run', '--nightly'])
   assert.equal(dry.status, 0, dry.stderr)
-  assert.match(dry.stdout, /SPECS_SEED=\d+ specs:check --nightly/)
-  assert.doesNotMatch(dry.stdout, /@mac, then perf/)
-  assert.match(invoke(['--local', '--dry-run', '--with-mac']).stdout, /test:desktop --grep @mac, then perf @mac, then test:feel/)
+  // A nightly reuses unchanged spec checks like any run, but replays conformance uncached.
+  assert.match(dry.stdout, /\+ SPECS_SEED=\d+ specs:check \+ SPECS_CACHE=off specs:conformance/)
+  assert.doesNotMatch(dry.stdout, /@mac, then test:feel/)
+  assert.match(invoke(['--local', '--dry-run', '--with-mac']).stdout, /test:desktop --grep @mac, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)
   assert.equal(existsSync(env.TEST_CALLS), false)
   for (const [args, failing] of [[['--local'], false], [['--local', '--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {
@@ -82,14 +83,16 @@ test('local runs archive eligible records and preserve failed suites; an unreach
     assert.equal(desktop.skip, '@mac')
     assert.equal(desktop.workers, '1')
     if (args.includes('--nightly')) {
-      // A nightly run reuses no suite from the run before it.
+      // A nightly run reuses no suite from the run before it except the unchanged spec check.
       assert.ok(!summary.suites.find((s) => s.suite === 'specs:conformance').reusedFrom)
       assert.ok(calls.some((c) => c.suite === 'specs:conformance'))
+      assert.ok(summary.suites.find((s) => s.suite === 'specs:check').reusedFrom)
+      assert.ok(!calls.some((c) => c.suite === 'specs:check'))
     }
     if (failing) {
       assert.equal(summary.suites.find((s) => s.suite === 'specs:conformance').code, 7)
       assert.equal(summary.suites.find((s) => s.suite === 'specs:conformance').cause.category, 'test')
-      assert.deepEqual(calls.slice(6).map((c) => c.suite), ['test:desktop', 'perf', 'test:feel'])
+      assert.deepEqual(calls.slice(6).map((c) => c.suite), ['test:desktop', 'test:feel'])
       assert.deepEqual(calls[6].args, ['--grep', '@mac'])
       assert.equal(calls[6].skip, undefined)
     }

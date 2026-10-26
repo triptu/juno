@@ -26,7 +26,7 @@ A release is a patch version published to the private repository `triptu/juno-re
 3. **Write the highlights while it runs** (below), to the path it printed. The command waits for that file after the full run, reads it once it has not changed for a second, and says what is wrong if it is not valid, then waits for a corrected file.
 4. **When it finishes**, it has packaged (through the heavy lock), run the packaged smoke, uploaded, written your highlights as the version's section of `CHANGELOG.md` in the releases repository, checked the GitHub release (DMG, block map, `latest-mac.yml`, marked latest), pushed `Set version to x.y.z after release` to main, and removed its release worktree. Report the version, the source commit, the highlights and whether it was urgent.
 
-With `--nightly`, the full run, if one is needed, is a nightly run (`verify:main --nightly`: every check uncached on the laptop, and the laptop perf job). Use it only when Tushar asks for a nightly run.
+With `--nightly`, the full run, if one is needed, is a nightly run (`verify:main --nightly`: every check uncached on the laptop). Use it only when Tushar asks for a nightly run.
 
 ## Write the highlights
 

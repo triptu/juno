@@ -9,7 +9,7 @@ Juno should feel as stable as a native macOS app: nothing moves unless the user 
 
 ## Run it
 
-The scenarios are `@nightly`: they run in every nightly full run, a release's reach and `bun run affected` plans that reach them, on the laptop, in the browser lane (`test:desktop --project=feel`). There a passing scenario keeps only its checks, and a long frame only warns. A review needs every filmstrip and video, so it runs the suite in Electron on the Mac:
+Six scenarios, for the main surfaces (the sidebar's first sync and reorder, a long thread with late images, typing a mention, a send from Home, a tab restore), are `@nightly`: they run in every nightly full run, a release's reach and `bun run affected` plans that reach them, on the laptop, in the browser lane (`test:desktop --project=feel`). The rest are `@on-demand`; `bun run remote --env JUNO_ON_DEMAND=1 test:desktop --project=feel` checks every scenario there. A passing scenario on the laptop keeps only its checks, and a long frame only warns. A review needs every scenario's filmstrip and video, so it runs the whole suite in Electron on the Mac:
 
 1. `bun run test:feel` from the repository root, when Tushar asks for a review. It builds the app, then queues behind the machine-wide lock (`scripts/heavy.mjs`), so it may wait for other agents' runs before it starts. Do not run it twice at once and do not start other heavy jobs alongside it.
 2. It writes `apps/desktop/feel-report/`. A failed check fails the run, but every scenario still records.

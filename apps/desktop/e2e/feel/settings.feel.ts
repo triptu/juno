@@ -11,7 +11,7 @@ test.use({ synced: true })
 
 const title = (values: ProbeFrame['values']): string => (typeof values['title'] === 'string' ? values['title'] : 'no title')
 
-test('menu hover: the avatar menu highlights the item under the pointer in the next frame', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
+test('menu hover: the avatar menu highlights the item under the pointer in the next frame', { tag: '@on-demand' }, async ({ juno, win, feel }) => {
   await juno.accountMenu.open()
   const item = await tag(juno.accountMenu.item(/^Notifications/), 'menu-item')
   await juno.accountMenu.item(/^Set yourself/).hover()
@@ -31,7 +31,7 @@ test('menu hover: the avatar menu highlights the item under the pointer in the n
   await juno.accountMenu.close()
 })
 
-test('settings sections switch in place: the list holds still and the page changes once', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('settings sections switch in place: the list holds still and the page changes once', { tag: '@on-demand' }, async ({ juno, feel }) => {
   await juno.openSettings()
   const nav = '[data-settings-nav]'
   await feel.run(
@@ -61,7 +61,7 @@ const rowHeights = (values: ProbeFrame['values']): string => {
   return Array.isArray(rows) ? rows.map((row) => Math.round(row.height)).join(' ') : 'no rows'
 }
 
-test('switching density redraws the sidebar once, and the open topic keeps the row at its top', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
+test('switching density redraws the sidebar once, and the open topic keeps the row at its top', { tag: '@on-demand' }, async ({ juno, win, feel }) => {
   // The topic in a tab of its own, so Settings, which opens in the current tab, leaves it there.
   await juno.sidebar.row(POSTGRES).openInNewTab()
   await juno.tabs.expectActive(POSTGRES)

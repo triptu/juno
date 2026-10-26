@@ -6,11 +6,14 @@
 //
 //   bun scripts/perf-baseline.mjs update [<results dir>...]
 //       Writes apps/desktop/e2e/perf-baseline.json from the perf-metrics.json
-//       files the runs left (default: the ten newest .remote/<run> with
-//       any). Name runs at different host loads: the load moves the numbers
-//       most. Metrics the runs did not measure keep their old values. Only on
-//       request, or after a change that moves a number on purpose: a baseline
-//       refreshed every night would let a slow creep through.
+//       files the runs left, by runner shape (default: the two newest
+//       .remote/<run> with any). Name runs at different host loads, one on
+//       a quiet laptop and one beside another job: the load moves the
+//       numbers most. Two runs are enough to start; more, added over time,
+//       tighten the spread. Shapes and metrics the runs did not measure keep
+//       their old values. Only on request, or after a change that moves a
+//       number on purpose: a baseline refreshed every night would let a slow
+//       creep through.
 //   bun scripts/perf-baseline.mjs show [<results dir>...]
 //       Prints each metric against the baseline without writing.
 
@@ -37,48 +40,56 @@ function newestRuns(count) {
   return found
 }
 
-/** One run's metrics by name; a run has one runner identity. */
+/** One run's metrics by runner shape, then by name: a nightly's parts run on jobs of different sizes. */
 export function readRun(files) {
-  const entries = files.flatMap((file) => JSON.parse(readFileSync(file, 'utf8')))
-  const identities = new Set(entries.map((entry) => entry.identity))
-  if (identities.size > 1) throw new Error(`The results come from several runner shapes: ${[...identities].join('; ')}`)
-  return { identity: entries[0]?.identity, metrics: Object.fromEntries(entries.map((entry) => [entry.name, { low: entry.low, median: entry.median, p95: entry.p95, n: entry.n, unit: entry.unit }])) }
+  const shapes = {}
+  for (const entry of files.flatMap((file) => JSON.parse(readFileSync(file, 'utf8')))) {
+    shapes[entry.identity] = { ...shapes[entry.identity], [entry.name]: { low: entry.low, median: entry.median, p95: entry.p95, n: entry.n, unit: entry.unit } }
+  }
+  return shapes
 }
 
 const middle = (values) => values.toSorted((a, b) => a - b)[Math.floor((values.length - 1) / 2)]
 
 /**
- * The baseline after `runs` (readRun each, one shape), over the old metrics:
- * per metric the median, fastest and slowest of their lower quartiles, and
- * the median of their medians and p95s.
+ * The baseline after `runs` (readRun each), over the old one: per shape and
+ * metric the median, fastest and slowest of their lower quartiles, and the
+ * median of their medians and p95s. Shapes and metrics the runs did not
+ * measure keep their old values.
  */
 export function merged(old, runs, commit, recorded) {
-  const identity = runs[0].identity
-  if (runs.some((run) => run.identity !== identity)) throw new Error('The runs come from several runner shapes')
-  const names = [...new Set(runs.flatMap((run) => Object.keys(run.metrics)))]
-  const measured = Object.fromEntries(names.map((name) => {
-    const seen = runs.flatMap((run) => run.metrics[name] === undefined ? [] : [run.metrics[name]])
-    const lows = seen.map((metric) => metric.low)
-    return [name, { low: middle(lows), fastest: Math.min(...lows), slowest: Math.max(...lows), median: middle(seen.map((metric) => metric.median)), p95: middle(seen.map((metric) => metric.p95)), runs: seen.length, n: seen[0].n, unit: seen[0].unit }]
-  }))
-  const kept = old?.identity === identity ? old.metrics : {}
-  return { identity, commit, recorded, runs: runs.length, metrics: Object.fromEntries(Object.entries({ ...kept, ...measured }).toSorted(([a], [b]) => a.localeCompare(b))) }
+  const shapes = { ...old?.shapes }
+  for (const identity of new Set(runs.flatMap((run) => Object.keys(run)))) {
+    const seenIn = runs.flatMap((run) => run[identity] === undefined ? [] : [run[identity]])
+    const names = [...new Set(seenIn.flatMap((metrics) => Object.keys(metrics)))]
+    const measured = Object.fromEntries(names.map((name) => {
+      const seen = seenIn.flatMap((metrics) => metrics[name] === undefined ? [] : [metrics[name]])
+      const lows = seen.map((metric) => metric.low)
+      return [name, { low: middle(lows), fastest: Math.min(...lows), slowest: Math.max(...lows), median: middle(seen.map((metric) => metric.median)), p95: middle(seen.map((metric) => metric.p95)), runs: seen.length, n: seen[0].n, unit: seen[0].unit }]
+    }))
+    const metrics = Object.fromEntries(Object.entries({ ...shapes[identity]?.metrics, ...measured }).toSorted(([a], [b]) => a.localeCompare(b)))
+    shapes[identity] = { runs: seenIn.length, metrics }
+  }
+  return { commit, recorded, shapes: Object.fromEntries(Object.entries(shapes).toSorted(([a], [b]) => a.localeCompare(b))) }
 }
 
 if (import.meta.main) {
   const [command, ...dirs] = process.argv.slice(2)
   if (command !== 'update' && command !== 'show') throw new Error('usage: bun scripts/perf-baseline.mjs update|show [<results dir>...]')
-  const runs = (dirs.length === 0 ? newestRuns(10) : dirs.map((dir) => resolve(dir))).map((dir) => readRun(metricFiles(dir)))
+  const runs = (dirs.length === 0 ? newestRuns(2) : dirs.map((dir) => resolve(dir))).map((dir) => readRun(metricFiles(dir)))
   const old = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : undefined
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
   const next = merged(old, runs, commit, new Date().toISOString().slice(0, 10))
-  for (const [name, metric] of Object.entries(next.metrics)) {
-    const base = old?.identity === next.identity ? old.metrics[name] : undefined
-    const spread = metric.slowest / metric.fastest
-    console.log(`${name}: lower quartile ${metric.low.toFixed(1)} ${metric.unit} (${metric.fastest.toFixed(1)} to ${metric.slowest.toFixed(1)}${spread > STEADY ? ', not steady' : ''})${base?.low === undefined ? ', new' : `; was ${base.low.toFixed(1)}`}`)
+  for (const [identity, shape] of Object.entries(next.shapes)) {
+    console.log(`${identity}, ${shape.runs} runs:`)
+    for (const [name, metric] of Object.entries(shape.metrics)) {
+      const base = old?.shapes?.[identity]?.metrics[name]
+      const spread = metric.slowest / metric.fastest
+      console.log(`  ${name}: lower quartile ${metric.low.toFixed(1)} ${metric.unit} (${metric.fastest.toFixed(1)} to ${metric.slowest.toFixed(1)}${spread > STEADY ? ', not steady' : ''})${base?.low === undefined ? ', new' : `; was ${base.low.toFixed(1)}`}`)
+    }
   }
   if (command === 'update') {
     writeFileSync(BASELINE, `${JSON.stringify(next, null, 2)}\n`)
-    console.log(`perf-baseline: ${Object.keys(next.metrics).length} metrics from ${runs.length} runs for ${next.identity}; commit apps/desktop/e2e/perf-baseline.json`)
+    console.log(`perf-baseline: ${runs.length} results folders, ${Object.keys(next.shapes).length} runner shapes; commit apps/desktop/e2e/perf-baseline.json`)
   }
 }
