@@ -27,6 +27,7 @@ export const writeMessage = (message: MessageRow): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const row = yield* acknowledgeStartedThread(message)
+    // A page that brings a stored message unchanged writes nothing, so its topics keep their index (`topic_inputs`).
     yield* sql`INSERT INTO messages ${sql.insert(row as unknown as Record<string, unknown>)}
       ON CONFLICT (channel, ts) DO UPDATE SET
         thread_ts = excluded.thread_ts, user_id = excluded.user_id, bot_name = excluded.bot_name, bot_icon = excluded.bot_icon, subtype = excluded.subtype, text = excluded.text,
@@ -34,7 +35,15 @@ export const writeMessage = (message: MessageRow): Writer =>
         edited_ts = excluded.edited_ts, deleted = excluded.deleted, client_msg_id = excluded.client_msg_id,
         reply_count = excluded.reply_count, latest_reply = excluded.latest_reply, reply_users_json = excluded.reply_users_json,
         last_event_ts = excluded.last_event_ts, partial = excluded.partial, version = excluded.version,
-        ephemeral = MAX(messages.ephemeral, excluded.ephemeral), bot_id = COALESCE(excluded.bot_id, messages.bot_id)`
+        ephemeral = MAX(messages.ephemeral, excluded.ephemeral), bot_id = COALESCE(excluded.bot_id, messages.bot_id)
+      WHERE (messages.thread_ts, messages.user_id, messages.bot_name, messages.bot_icon, messages.subtype, messages.text,
+          messages.blocks_json, messages.files_json, messages.attachments_json, messages.edited_ts, messages.deleted, messages.client_msg_id,
+          messages.reply_count, messages.latest_reply, messages.reply_users_json, messages.last_event_ts, messages.partial, messages.version,
+          messages.ephemeral, messages.bot_id)
+        IS NOT (excluded.thread_ts, excluded.user_id, excluded.bot_name, excluded.bot_icon, excluded.subtype, excluded.text,
+          excluded.blocks_json, excluded.files_json, excluded.attachments_json, excluded.edited_ts, excluded.deleted, excluded.client_msg_id,
+          excluded.reply_count, excluded.latest_reply, excluded.reply_users_json, excluded.last_event_ts, excluded.partial, excluded.version,
+          MAX(messages.ephemeral, excluded.ephemeral), COALESCE(excluded.bot_id, messages.bot_id))`
     // Whichever of the answer, the echo or a page stores Juno's own message first ends its pending row (5.7).
     if (row.client_msg_id !== null) yield* reconcilePost(row.client_msg_id)
     // A second copy of a post the network sent twice is hidden and deleted (ADR 0014).
