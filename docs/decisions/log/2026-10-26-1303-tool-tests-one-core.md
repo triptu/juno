@@ -1,0 +1,1 @@
+- 10-26 13:03 · The tool tests (`test:health`, `test:repo-tools`, `test:runner`) take one core instead of four · They run one `bun test` file at a time (13% CPU on eight threads); asking for four cores made a job of them wait 148 s for 38 s of tests.
