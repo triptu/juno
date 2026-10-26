@@ -1,0 +1,1 @@
+- 10-26 20:42 · Engine tests keep the follow pass at its scaled cadence · At 0 every engine start in a unit test ran a second full follow pass right after the boot's own, which production skips for an hour; the engine files used 166 → 150 CPU-s on the laptop. Tests of the pass after a reconnect set `followPassMillis: 0` themselves (packages/engine/test/README.md).
