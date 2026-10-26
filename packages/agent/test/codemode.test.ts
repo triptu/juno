@@ -143,10 +143,14 @@ it('holds a script to its call limit and output size, and fails one that waits o
 
 it('stops a script that waits on a read past its wall time', async () => {
   const { host, searched } = slack(new Promise(() => {}))
-  const h = await harness({ host, codemode: { limits: { wallMs: 200 } } })
+  // The wall time ends once the read is waiting, however long the worker takes to start.
+  const wall = deferred()
+  const h = await harness({ host, codemode: { limits: { wallMs: 200 }, wallTime: () => wall.promise } })
   h.fake.script([script(`text(await tools.slack_search({ query: 'deploy' }))`), reply(say('Slack is slow.'))])
-  await h.ended(h.send('when is the deploy?'))
+  const op = h.send('when is the deploy?')
   await searched
+  wall.resolve()
+  await h.ended(op)
   expect(resultOf(h, 1)).toContain('timed out after 200 ms')
   expect(audit(h).map((row) => row.outcome)).toEqual(['failed'])
 })
