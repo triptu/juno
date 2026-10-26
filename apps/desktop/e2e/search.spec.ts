@@ -39,7 +39,7 @@ async function pickFrom(juno: Juno, name: string): Promise<void> {
 
 type Context = Pick<Fixtures, 'juno' | 'slack' | 'fake'>
 
-test('search: from: chip, local cards first, Slack merges below, Space shows the topic and it follows the arrows, it marks read only when used, Esc hides it, Enter and Back; hidden text blurs', async ({ juno, slack, fake }) => {
+test('search: from: chip, local cards first, Slack merges below, Space shows the topic and it follows the arrows, it marks read only when used, Esc hides it, Enter and Back; hidden text blurs; reader navigation beyond the message window', async ({ juno, slack, fake }) => {
   const context = { juno, slack, fake }
   await shotSize(juno)
   for (let i = 1; i <= 24; i++) slack.as('Maya').postIn('incidents', `Flamingo note ${i} on the pager`)
@@ -70,6 +70,9 @@ test('search: from: chip, local cards first, Slack merges below, Space shows the
   if (SHOTS) await test.step('shots: one column and dark', () => moreShots(context))
   // What the Search tab shows and finds is in the DOM lane (`dom/search.test.ts`); the blur is CSS.
   await test.step('with message text hidden, the field, its chips, the cards and the note blur', () => blurred(context))
+  // Last: its 650 replies in #eng are dated up to a second before the fake's now, where a later step's own could fall.
+  await juno.tabs.menu('close-tab')
+  await test.step('reader navigation applies the whole query beyond the message window', () => navigateMatches({ juno, fake }))
 })
 
 async function moreShots({ juno }: Context): Promise<void> {
@@ -240,10 +243,7 @@ async function blurred({ juno, slack }: Context): Promise<void> {
 
 // Each step searches for its own word in a Search tab of its own: the one before closes, with its query, chips and
 // the topic beside it.
-test('search: reader navigation applies the whole query beyond the message window; Tab from the field lands on a card and the topic’s edge moves with the keys; a long match folds in view and unfolds in place; Jump to latest only while newer messages are out of view', async ({ juno, slack, fake }) => {
-  // First: its 650 replies are dated before the fake's now, and a message a later step posts live takes a later time.
-  await test.step('reader navigation applies the whole query beyond the message window', () => navigateMatches({ juno, fake }))
-  await juno.tabs.menu('close-tab')
+test('search: Tab from the field lands on a card and the topic’s edge moves with the keys; a long match folds in view and unfolds in place; Jump to latest only while newer messages are out of view', async ({ juno, slack }) => {
   await test.step('Tab from the field lands on a card, Space shows its topic, and the topic’s edge moves with the keys', () => tabAndEdge({ juno, slack }))
   await juno.tabs.menu('close-tab')
   await test.step('a long message folds with its match in view, and Show more unfolds it in place without changing the selection', () => foldedMatch({ juno, slack }))
