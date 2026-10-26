@@ -47,9 +47,9 @@ script_started=$SECONDS
     echo "$(( SECONDS - script_started )) ${running:-0} ${pressure:-0}" >> /out/load.txt
   done ) &
 sampler=$!
-# JUNO_MEMORY_PROFILE=1 records each process's memory (scripts/remote/memory-profile.mjs).
+# JUNO_MEMORY_PROFILE=1 records each process's memory (scripts/memory-profile.mjs).
 if [ "${JUNO_MEMORY_PROFILE:-}" = 1 ]; then
-  bun scripts/remote/memory-profile.mjs "memory-profile/${1//[^a-z0-9]/-}-$$.json" & profiler=$!
+  bun scripts/memory-profile.mjs "memory-profile/${1//[^a-z0-9]/-}-$$.json" & profiler=$!
 fi
 xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' bun run "$@"
 code=$?

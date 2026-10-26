@@ -1,5 +1,5 @@
 // Summarizes the memory profiles a remote run with JUNO_MEMORY_PROFILE=1 brings back
-// (scripts/remote/memory-profile.mjs): `bun scripts/memory-report.mjs .remote/<run>/memory-profile/*.json`.
+// (scripts/memory-profile.mjs): `bun scripts/memory-report.mjs .remote/<run>/memory-profile/*.json`.
 // Prints each kind of process's peak resident, proportional and private memory, the peak of the
 // whole job, and processes that grew over their life.
 import { readFileSync } from 'node:fs'
@@ -65,7 +65,7 @@ for (const file of process.argv.slice(2)) {
   }
   console.log('| Kind | Processes | Largest RSS MB | Largest PSS MB | Largest private MB | Kind PSS peak MB | At job peak MB |')
   console.log('| --- | ---: | ---: | ---: | ---: | ---: | ---: |')
-  for (const entry of [...byKind.values()].sort((a, b) => b.sumPss - a.sumPss || b.pss - a.pss)) console.log(`| ${entry.kind} | ${entry.count} | ${mb(entry.rss)} | ${mb(entry.pss)} | ${mb(entry.private)} | ${mb(entry.sumPss)} | ${mb(entry.atPeak ?? 0)} |`)
+  for (const entry of [...byKind.values()].toSorted((a, b) => b.sumPss - a.sumPss || b.pss - a.pss)) console.log(`| ${entry.kind} | ${entry.count} | ${mb(entry.rss)} | ${mb(entry.pss)} | ${mb(entry.private)} | ${mb(entry.sumPss)} | ${mb(entry.atPeak ?? 0)} |`)
   // Growth: a process alive for 60 s or more whose resident memory at its end is well above its start.
   const grew = profile.processes.filter((process) => process.last - process.first >= 60 && process.series.length >= 3)
     .map((process) => ({ process, from: process.series[1]?.[1] ?? process.rssFirst, to: process.series.at(-1)[1] }))
