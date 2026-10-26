@@ -33,6 +33,8 @@ export interface MessageActions {
   readonly onSeeReactions?: (message: MessageView, name: string, chip: HTMLElement) => void
   readonly onConfirmDelete: (message: MessageView) => void
   readonly onCancelDelete: () => void
+  /** A press on a button in the message (Slackbot's Add Them): answers whether Slack took it. */
+  readonly onButton?: (message: MessageView, attachment: string, button: string) => Promise<boolean>
 }
 
 export interface MessageProps {
@@ -217,6 +219,8 @@ export const Message = memo(function Message({
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
   const seeReactions = actions?.onSeeReactions
   const seeAll = seeReactions === undefined ? undefined : (name: string, chip: HTMLElement) => seeReactions(message, name, chip)
+  const press = actions?.onButton
+  const onButton = press === undefined ? undefined : (attachment: string, button: string) => press(message, attachment, button)
   const openMedia =
     onOpenMedia === undefined
       ? undefined
@@ -300,7 +304,7 @@ export const Message = memo(function Message({
         {editor !== undefined ? (
           editor
         ) : message.kind === 'message' ? (
-          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabbable={tabbable} renderFiles={renderFiles} />
+          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabbable={tabbable} renderFiles={renderFiles} onButton={onButton} />
         ) : (
           <Text variant="body" tone="muted" as="p" sx={styles.placeholder}>
             {message.kind === 'deleted' ? 'This message was deleted.' : 'Loading message'}

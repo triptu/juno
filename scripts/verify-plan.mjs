@@ -20,8 +20,9 @@ export function fullSuites(scripts, { nightly = false, noCache = false, seed, te
     { name: 'test', words: ['test', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] },
     // The DOM lane (apps/desktop/dom), in the unit job; a commit from before it has no test:dom.
     ...(scripts['test:dom'] ? [{ name: 'test:dom', words: [...skip, 'test:dom', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] }] : []),
-    // A nightly run uses no cached result: every Quint run and conformance trace is fresh.
-    { name: 'specs:check', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : []), ...(nightly ? ['--nightly'] : [])] },
+    // The spec check proves the models, not Juno's code, so a nightly reuses its unchanged checks like any run;
+    // conformance replays traces against the engine, so a nightly runs it uncached.
+    { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
     { name: 'specs:conformance', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
     { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },
     ...apps.map((name) => ({ name, words: [...skip, name] })),

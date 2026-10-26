@@ -346,7 +346,7 @@ for (const { script, reached } of bunTestScripts(root, changed))
     plan.push({ script, args: [], local: false, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
 // An interaction with a budget whose own files changed: perf is suggested, and its feel scenario runs (feelScenarios; --wide, every one reached).
 const interactions = batch ? [] : perfInteractionsChanged(changed)
-const feel = pending(feelScenarios(batch ? [] : [...files], changed, interactions).map(({ file, own }) => ({ suite: 'desktop', id: file, own, inputs: new Set([...app, ...support, ...closure(file)]) })).filter((item) => wide || item.own))
+const feel = pending(feelScenarios(batch ? [] : [...files], changed, interactions, (file) => (existsSync(join(root, file)) ? readFileSync(join(root, file), 'utf8') : '')).map(({ file, own }) => ({ suite: 'desktop', id: file, own, inputs: new Set([...app, ...support, ...closure(file)]) })).filter((item) => wide || item.own))
 // A desktop step over every spec runs every project, so it already runs the feel scenarios unless their tag is skipped.
 const everyFeel = plan.some((step) => step.script === 'test:desktop' && step.args.length === 0) && !skipTags.includes('@nightly-feel')
 if (feel.length > 0 && !everyFeel) plan.push({ script: 'test:desktop', args: ['--project=feel', ...feel.map((item) => item.id.replace('apps/desktop/', ''))], local: false, items: feel, why: `${feel.length} feel scenario file(s): ${wide ? 'the change reaches them' : 'changed, their harness changed, or the scenario of a changed interaction'}` })

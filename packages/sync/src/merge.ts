@@ -78,6 +78,8 @@ export function toMessageRow(channel: string, message: Message): MessageRow {
     last_event_ts: null,
     partial: 0,
     version: 0,
+    ephemeral: flag(message.is_ephemeral === true),
+    bot_id: message.bot_id ?? null,
   }
 }
 
@@ -184,6 +186,9 @@ export function mergeMessage(existing: MessageRow | undefined, incoming: Message
     // A page or an event brings the whole message; a search match only fills a stub.
     partial: source.kind === 'partial' ? 1 : 0,
     version: existing.version,
+    // Slack replaces an ephemeral message with another at the same ts; neither is ever in history.
+    ephemeral: flag(existing.ephemeral === 1 || fresh.ephemeral === 1),
+    bot_id: fresh.bot_id ?? existing.bot_id ?? null,
   }
 
   // Reactions from a page apply only if no event touched the message after the request started.

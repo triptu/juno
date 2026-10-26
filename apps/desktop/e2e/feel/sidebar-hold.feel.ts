@@ -33,7 +33,7 @@ const reordersOnce: Check = (evidence) => {
   return { name, status: 'fail', detail: `${changes} order changes, ${between.length} frames in another order`, shots: [...new Set(between.map((frame) => shotOfFrame(evidence, frame.index)))].slice(0, 12) }
 }
 
-test('the sidebar holds its order under the pointer while replies land, and reorders once when the pointer leaves', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, fake, feel }) => {
+test('the sidebar holds its order under the pointer while replies land, and reorders once when the pointer leaves', { tag: '@on-demand' }, async ({ juno, win, fake, feel }) => {
   const recent = juno.sidebar.section('Recent').locator('[data-topic-row]')
   const ids = await recent.evaluateAll((rows) => rows.map((row) => row.getAttribute('data-topic-id') ?? ''))
   // The two oldest threads in Recent, below the row pointed at: replies in them would move them to the top.

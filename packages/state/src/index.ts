@@ -139,6 +139,7 @@ export {
   discardMessage,
   draftAtom,
   editMessage,
+  pressMessageButton,
   resolveMessageAction,
   precheckMessage,
   reactToMessage,

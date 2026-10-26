@@ -1,5 +1,6 @@
 /**
- * Writes: posting, forwarding, editing and deleting messages, and reactions.
+ * Writes: posting, forwarding, editing and deleting messages, reactions, and
+ * pressing a message's button.
  *
  * Source: docs/research/slack-data-access.md section 3 (Posting, Reactions),
  * docs/research/slack-forward.md (Forward).
@@ -8,7 +9,7 @@ import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
 import { FormBoolean, FormJson, RawObject } from './common.ts'
 import { Ts } from './ts.ts'
-import { Message, Reaction } from './message.ts'
+import { AttachmentAction, Message, Reaction } from './message.ts'
 
 const opt = S.optionalKey
 
@@ -90,6 +91,39 @@ export const ChatUpdateFields = { channel: S.String, ts: Ts, text: opt(S.String)
 export const ChatDeleteArgs = S.Struct({ channel: S.String, ts: Ts })
 export type ChatDeleteArgs = typeof ChatDeleteArgs.Type
 export const ChatDeleteFields = { channel: S.String, ts: Ts } as const
+
+// chat.attachmentAction
+
+/**
+ * A press on a legacy attachment's button, as the official client sends it
+ * for every app, Slackbot included: the action as it came, and where it was
+ * (research `integration-shapes.md`, "Buttons on a Slackbot message").
+ * Slack answers with the change on the socket: the message replaced, or
+ * `message_deleted`.
+ */
+export const AttachmentActionPayload = S.Struct({
+  actions: S.Array(AttachmentAction),
+  attachment_id: S.String,
+  callback_id: opt(S.String),
+  channel_id: S.String,
+  is_ephemeral: S.Boolean,
+  thread_ts: opt(Ts),
+  message_ts: Ts,
+  prompt_app_install: S.Boolean,
+})
+export type AttachmentActionPayload = typeof AttachmentActionPayload.Type
+
+export const ChatAttachmentActionArgs = S.Struct({
+  payload: FormJson(AttachmentActionPayload),
+  /** `web-<epoch ms>`, as the official client makes it. */
+  client_token: S.String,
+  /** The message's `bot_id`. */
+  service_id: opt(S.String),
+  /** The message's `user`. */
+  bot_user_id: opt(S.String),
+})
+export type ChatAttachmentActionArgs = typeof ChatAttachmentActionArgs.Type
+export const ChatAttachmentActionFields = { replaced: opt(S.Boolean), deleted: opt(S.Boolean) } as const
 
 // reactions.add / reactions.remove
 

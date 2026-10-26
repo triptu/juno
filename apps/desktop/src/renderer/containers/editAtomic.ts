@@ -4,7 +4,7 @@ function bodyInlines(body: MessageBody | undefined, take: (elements: ReadonlyArr
   const walk = (blocks: ReadonlyArray<BodyBlock>): void => {
     for (const block of blocks) {
       if ('children' in block) take(block.children)
-      else if ('items' in block) block.items.forEach(take)
+      else if (block.kind === 'list' || block.kind === 'fields') block.items.forEach(take)
       else if (block.kind === 'attachment') { take(block.title); walk(block.blocks); take(block.footer) }
     }
   }

@@ -4,7 +4,7 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         every check uncached, a fresh Quint seed, full gallery walks; laptop only
+//   bun run verify:main --nightly         every check uncached except unchanged spec checks, full gallery walks; laptop only
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
@@ -105,8 +105,9 @@ const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
 let suites = required.filter((suite) => {
-  // A nightly run reuses no suite from an earlier run: it runs everything. The spec seed is always set, and not part of any key.
-  if (baseline || !protocolRoots[suite.name] || noCache || nightly) return true
+  // A nightly run reuses no suite from an earlier run except the spec check, which proves the models, not the code.
+  // The spec seed is always set, and not part of any key.
+  if (baseline || !protocolRoots[suite.name] || noCache || (nightly && suite.name !== 'specs:check')) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
     if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
