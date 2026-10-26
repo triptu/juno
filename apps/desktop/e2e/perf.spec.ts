@@ -4,10 +4,10 @@
 // its samples and the load average and fails when a p95 (or a p50 where the
 // budget says so) is over its budget.
 //
-// A small set stands in for the rest and is what `bun run perf` and the
-// nightly run (docs/performance.md 7.3): the scenarios tagged `@proxy`, here
-// and in topic-reopen.perf.spec.ts. `bun run perf --full` runs every
-// scenario, `-g` or `--area` a focused subset.
+// A small set stands in for the rest and is what `bun run perf` runs
+// (docs/performance.md 7.3): the scenarios tagged `@proxy`, here and in
+// topic-reopen.perf.spec.ts. `bun run perf --full` runs every scenario, `-g`
+// or `--area` a focused subset. No full run includes them.
 //
 //   bun run perf                  the small set (@proxy)
 //   bun run perf --full           every scenario

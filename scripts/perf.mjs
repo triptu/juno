@@ -1,15 +1,14 @@
-// The perf budgets under the exclusive heavy lock (docs/performance.md 7.3): on the laptop against its baseline, on
-// the Mac (or with JUNO_PERF_ABSOLUTE=1) against the absolute budgets. By default only the small set that stands in
-// for the rest (the scenarios tagged @proxy); the full set and focused subsets run on demand.
+// The timed perf budgets, on demand, under the exclusive heavy lock (docs/performance.md 7.3): on the laptop
+// (`bun run remote --cores 2 perf ...`, one worker) against its baseline, on the Mac (or with JUNO_PERF_ABSOLUTE=1)
+// against the absolute budgets. No full run includes them. By default only the small set that stands in for the
+// rest (the scenarios tagged @proxy); the full set and focused subsets run when asked for.
 //
-//   bun run perf                          the small set (@proxy), as the nightly runs it
+//   bun run perf                          the small set (@proxy)
 //   bun run perf --full                   every desktop scenario and the package budgets
 //   bun run perf --area <area>            one area's scenarios and package budgets (AREAS below)
 //   bun run perf -g "<scenario>"          matching desktop scenarios only
 //   bun run perf --unit                   the package budgets only
 //   bun run perf --with-unit -g "..."     both
-//   bun run perf --part 1                 a nightly's one-core perf job: the small set's warm start and memory
-//   bun run perf --part 2                 its two-core perf job: the rest of the small set
 //
 // Outside the small set no metric has a laptop baseline: there it is printed and passes, and the Mac checks it.
 import { spawnSync } from 'node:child_process'
@@ -49,20 +48,11 @@ const unitsOnly = flag('--unit')
 const withUnit = flag('--with-unit')
 const full = flag('--full')
 const areaName = option('--area')
-const part = option('--part')
 const area = areaName === undefined ? undefined : AREAS[areaName]
 if (areaName !== undefined && area === undefined) throw new Error(`--area is one of ${Object.keys(AREAS).join(', ')}`)
-if (part !== undefined && part !== '1' && part !== '2') throw new Error('--part is 1 or 2')
-const chosenBy = [unitsOnly, full, areaName !== undefined, part !== undefined].filter(Boolean).length
-if (chosenBy > 1) throw new Error('Use one of --unit, --full, --area and --part')
-if ((unitsOnly || part !== undefined || full) && args.length > 0) throw new Error('--unit, --full and --part take no grep')
-// The small set (docs/performance.md 7.3). A nightly runs it in two jobs, one worker each: the scenarios whose lower
-// quartile holds on one core, then those that need two (the topic opens, the scroll and send). A new scenario in the
-// set lands in part 2, on two cores.
-const partOne = 'perf\\.spec\\.ts large workspace .*@proxy'
-if (part === '1') args.push('--grep', partOne)
-else if (part === '2') args.push('--grep', '@proxy', '--grep-invert', partOne)
-else if (area !== undefined) args.push('--grep', area.grep)
+if ([unitsOnly, full, areaName !== undefined].filter(Boolean).length > 1) throw new Error('Use one of --unit, --full and --area')
+if ((unitsOnly || full) && args.length > 0) throw new Error('--unit and --full take no grep')
+if (area !== undefined) args.push('--grep', area.grep)
 else if (!full && !unitsOnly && args.length === 0) args.push('--grep', '@proxy')
 const runUnits = unitsOnly || full || withUnit || (area !== undefined && area.unit.length > 0)
 
