@@ -23,6 +23,10 @@ The renderer runs in one VM context per worker, not in each window's own (`realm
 
 A list drawn as it scrolls (the emoji picker's cells, All topics' table) draws nothing here, since every box is zero: a test of its rows stays in Playwright.
 
+## What a test guards
+
+A test here guards something a person would notice breaking: sending, editing, deleting and reacting (and that a send goes once), reading and read marks, notifications, search, ⌘K, navigation and tabs, the Juno agent's actions and approvals, sign-in and the first sync, or a bug that happened. Copy, labels, counts and exact menu lists are not tested here. Tests that start on the same screen are one journey with `step`s: a start costs about 0.55 CPU-s, more than most steps. A step leaves the screen as the next one expects it, or the next one resets it (closing every tab leaves one Home). Each check compares with what the step itself did, not with totals since the start. Start synced and change the fake after the start; sign in cold (`synced: false`) only when sign-in or the first sync is what the test checks, or when the AI jobs need it. A check of engine logic with no screen in it belongs in an engine flow test. The list of what the strict pass of 10-26 cut and merged, and the break that shows each journey still fails, is in `/Volumes/AgentWork/juno-test-overhaul/strict-dom.md`.
+
 ## What runs
 
 - **The app.** `vite.config.ts` bundles the browser lane's page entry (`web/page/main.ts`) into one classic script; `bun web/build-host.mjs dom/dist` bundles the host (`web/host/testHost.ts`). Both go to `dom/dist/` through `build-cached` (`bun run build:dom` in `apps/desktop`). Each test gets a new window, a new fake Slack, a copy of the synced snapshot and a host from the worker's pool (`app.ts`). The renderer's module state is new for every window; its compiled code is the worker's (`realm.ts`, above).
@@ -68,7 +72,19 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 
 ## Measured
 
-10-26, SSH laptop, 2 physical cores (4 threads), one run each, builds cached, `JUNO_E2E_TIMINGS=1`. The whole lane (147 tests in 81 files, 4 workers), before and after the renderer's shared context and `expect.poll`'s back-off; after, three runs with different order seeds:
+10-26, the strict pass: 148 tests in 81 files became 50 in 40. SSH laptop, 2 physical cores (4 threads), 4 workers, builds cached, `JUNO_E2E_TIMINGS=1`, one run before and two after with different order seeds:
+
+| | Before | After |
+| --- | ---: | ---: |
+| Tests | 148 | 50 |
+| `bun test` wall | 81 s | 52 s, 55 s |
+| CPU per test, sum | 294 CPU-s | 191, 203 |
+| CPU in test starts, sum | 98 CPU-s | 42, 43 |
+| CPU per test, median | 1.8 s | 3.3, 3.8 s |
+
+The bodies are now most of the lane: the longest journeys (⌘K, the composer, a topic, the instant paths) take 7–9 CPU-s each.
+
+Earlier on 10-26, same machine and settings: the whole lane (147 tests in 81 files, 4 workers), before and after the renderer's shared context and `expect.poll`'s back-off; after, three runs with different order seeds:
 
 | | Before | After |
 | --- | ---: | ---: |
