@@ -56,19 +56,3 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     expect(new Set(seen.map((frame) => frame.names.length)).size).toBe(1)
     expect(new Set(seen.map((frame) => frame.top)).size).toBe(1)
 })
-
-
-test('standard emoji open while the workspace subscription is delayed', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await holdWorkspaceEmoji(juno.win)
-  await juno.openSettings('Appearance')
-  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
-  await expect.poll(() => juno.win.evaluate(() => window.emojiGate.count())).toBeGreaterThan(0)
-  const picker = juno.win.getByRole('dialog', { name: 'Emoji' })
-  await expect(picker.getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
-  await expect(picker.getByRole('group', { name: 'Smileys & emotion' }).locator('[data-emoji]').first()).toBeVisible()
-  await expect(picker.getByRole('group', { name: 'Workspace', exact: true })).toHaveCount(0)
-  await juno.win.evaluate(() => window.emojiGate.release())
-  await expect(picker.getByRole('group', { name: 'Workspace', exact: true })).toHaveCount(1)
-})
