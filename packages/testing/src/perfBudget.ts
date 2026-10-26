@@ -10,7 +10,8 @@ import { expect } from 'bun:test'
  * desktop scenarios check theirs (`apps/desktop/e2e/perfBaseline.ts`): on the
  * Mac, or with JUNO_PERF_ABSOLUTE=1, `value` must be within `limit`; on the
  * laptop it must be within 1.2 times the slowest of the baseline's runs in
- * `apps/desktop/e2e/perf-baseline.json` plus `floor`. Each reading is written
+ * `apps/desktop/e2e/perf-baseline.json` plus `floor` (the desktop scenarios'
+ * lower quartile; here the one value). Each reading is written
  * to `apps/desktop/perf-results`, which the laptop's job brings back (the
  * desktop run clears `test-results`), for `bun scripts/perf-baseline.mjs update`.
  */
@@ -23,15 +24,15 @@ export function perfBudget(name: string, value: number, limit: number, floor = 2
   const out = join(ROOT, 'apps/desktop/perf-results')
   mkdirSync(out, { recursive: true })
   const file = join(out, `${createHash('sha256').update(name).digest('hex').slice(0, 16)}.perf-metrics.json`)
-  writeFileSync(file, JSON.stringify([{ name, median: value, p95: value, n: 1, unit: 'ms', limit, at: 'p95', compare: 'median', identity }], null, 1))
-  const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) as { identity: string; metrics: Record<string, { median: number; highMedian: number }> } : undefined
+  writeFileSync(file, JSON.stringify([{ name, low: value, median: value, p95: value, n: 1, unit: 'ms', limit, at: 'p95', identity }], null, 1))
+  const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) as { identity: string; metrics: Record<string, { low: number; highLow: number }> } : undefined
   const base = baseline?.identity === identity ? baseline.metrics[name] : undefined
   if (base === undefined) {
     console.log(`${name}: no baseline for ${identity}; ${value.toFixed(2)} ms recorded`)
     return
   }
-  const ceiling = base.highMedian * 1.2 + floor
-  const line = `${name}: ${value.toFixed(2)} ms against a baseline of ${base.median.toFixed(2)}, slowest ${base.highMedian.toFixed(2)} (ceiling ${ceiling.toFixed(2)})`
+  const ceiling = base.highLow * 1.2 + floor
+  const line = `${name}: ${value.toFixed(2)} ms against a baseline of ${base.low.toFixed(2)}, slowest ${base.highLow.toFixed(2)} (ceiling ${ceiling.toFixed(2)})`
   console.log(line)
   expect(value, line).toBeLessThanOrEqual(ceiling)
 }

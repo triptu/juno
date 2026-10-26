@@ -1,8 +1,7 @@
 // The laptop's perf baseline (docs/performance.md 7.3): every budgeted
-// metric over a few laptop runs of the same code, which later runs are
-// checked against: the median of the runs, and the slowest of them, since
-// one run's number moves 16 % at the median and up to 1.9 times between two
-// runs of the same code on the shared laptop (10-26).
+// metric's lower quartile over a few laptop runs of the same code, which
+// later runs are checked against: the median of the runs, and the slowest of
+// them.
 //
 //   bun scripts/perf-baseline.mjs update [<results dir>...]
 //       Writes apps/desktop/e2e/perf-baseline.json from the perf-metrics.json
@@ -41,14 +40,15 @@ export function readRun(files) {
   const entries = files.flatMap((file) => JSON.parse(readFileSync(file, 'utf8')))
   const identities = new Set(entries.map((entry) => entry.identity))
   if (identities.size > 1) throw new Error(`The results come from several runner shapes: ${[...identities].join('; ')}`)
-  return { identity: entries[0]?.identity, metrics: Object.fromEntries(entries.map((entry) => [entry.name, { median: entry.median, p95: entry.p95, n: entry.n, unit: entry.unit }])) }
+  return { identity: entries[0]?.identity, metrics: Object.fromEntries(entries.map((entry) => [entry.name, { low: entry.low, median: entry.median, p95: entry.p95, n: entry.n, unit: entry.unit }])) }
 }
 
 const middle = (values) => values.toSorted((a, b) => a - b)[Math.floor((values.length - 1) / 2)]
 
 /**
  * The baseline after `runs` (readRun each, one shape): per metric the median
- * of their medians and p95s, and the slowest of each, over the old metrics.
+ * of their lower quartiles, medians and p95s, and the slowest lower quartile,
+ * over the old metrics.
  */
 export function merged(old, runs, commit, recorded) {
   const identity = runs[0].identity
@@ -56,9 +56,8 @@ export function merged(old, runs, commit, recorded) {
   const names = [...new Set(runs.flatMap((run) => Object.keys(run.metrics)))]
   const measured = Object.fromEntries(names.map((name) => {
     const seen = runs.flatMap((run) => run.metrics[name] === undefined ? [] : [run.metrics[name]])
-    const medians = seen.map((metric) => metric.median)
-    const p95s = seen.map((metric) => metric.p95)
-    return [name, { median: middle(medians), p95: middle(p95s), highMedian: Math.max(...medians), highP95: Math.max(...p95s), runs: seen.length, n: seen[0].n, unit: seen[0].unit }]
+    const lows = seen.map((metric) => metric.low)
+    return [name, { low: middle(lows), highLow: Math.max(...lows), median: middle(seen.map((metric) => metric.median)), p95: middle(seen.map((metric) => metric.p95)), runs: seen.length, n: seen[0].n, unit: seen[0].unit }]
   }))
   const kept = old?.identity === identity ? old.metrics : {}
   return { identity, commit, recorded, runs: runs.length, metrics: Object.fromEntries(Object.entries({ ...kept, ...measured }).toSorted(([a], [b]) => a.localeCompare(b))) }
@@ -73,7 +72,7 @@ if (import.meta.main) {
   const next = merged(old, runs, commit, new Date().toISOString().slice(0, 10))
   for (const [name, metric] of Object.entries(next.metrics)) {
     const base = old?.identity === next.identity ? old.metrics[name] : undefined
-    console.log(`${name}: median ${metric.median.toFixed(1)} (slowest ${metric.highMedian?.toFixed(1)}), p95 ${metric.p95.toFixed(1)} ${metric.unit}${base === undefined ? ', new' : `; was ${base.median.toFixed(1)}`}`)
+    console.log(`${name}: lower quartile ${metric.low.toFixed(1)} (slowest ${metric.highLow.toFixed(1)}), median ${metric.median.toFixed(1)}, p95 ${metric.p95.toFixed(1)} ${metric.unit}${base?.low === undefined ? ', new' : `; was ${base.low.toFixed(1)}`}`)
   }
   if (command === 'update') {
     writeFileSync(BASELINE, `${JSON.stringify(next, null, 2)}\n`)

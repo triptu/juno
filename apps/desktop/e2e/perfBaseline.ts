@@ -8,32 +8,35 @@ import { expect, test } from '@playwright/test'
  * performance.md section 1 are absolute: a p95 (or a median where the budget
  * says so) over its budget fails. On the laptop runner the same metrics are
  * regression checks, since Electron on Xvfb in a Linux container has numbers
- * of its own: the median fails when it is more than `RATIO` times the
- * slowest of the baseline's runs from the same runner shape, plus an
- * absolute floor. The baseline lives in `perf-baseline.json` and changes
- * only through `bun scripts/perf-baseline.mjs update`.
+ * of its own. Load from other jobs only ever adds time, so the laptop
+ * compares a scenario's lower quartile, which its slow samples do not move:
+ * it fails when more than `RATIO` times the slowest of the baseline runs'
+ * lower quartiles, plus an absolute floor. Counts of long and dropped frames
+ * are recorded there but not checked. The baseline lives in
+ * `perf-baseline.json` and changes only through `bun scripts/perf-baseline.mjs update`.
  */
 export const RATIO = 1.2
 
-/**
- * Absolute floors, so a 2 ms metric does not fail on 0.5 ms of noise: for a
- * count of long animation frames, 3; for a share of dropped frames, 5 points.
- */
+/** Absolute floors, so a 2 ms metric does not fail on 0.5 ms of noise. */
 const FLOORS = { ms: 5, MB: 20, frames: 3, '%': 5 } as const
 
 export interface Metric {
   readonly name: string
+  /** The lower quartile (nearest rank): the fastest sample of 3, the second of 5 to 8. */
+  readonly low: number
   readonly median: number
   readonly p95: number
   readonly n: number
   readonly unit: keyof typeof FLOORS
+  /** Every sample, sorted, for a later look at a run; omitted for long series. */
+  readonly samples?: ReadonlyArray<number>
 }
 
 export interface BaselineFile {
   readonly identity: string
   readonly commit: string
   readonly recorded: string
-  readonly metrics: Readonly<Record<string, { readonly median: number; readonly p95: number; readonly highMedian: number; readonly highP95: number; readonly n: number; readonly unit: string }>>
+  readonly metrics: Readonly<Record<string, { readonly low: number; readonly highLow: number; readonly median: number; readonly p95: number; readonly n: number; readonly unit: string }>>
 }
 
 export const BASELINE_PATH = resolve(__dirname, 'perf-baseline.json')
@@ -62,15 +65,13 @@ function record(entry: Record<string, unknown>): void {
 
 /**
  * Checks `metric` against its budget: `limit` at `at` on the Mac, the
- * baseline on the laptop. The laptop compares medians, or p95s with
- * `compare: 'p95'` for a metric of hundreds of samples, such as the work of
- * every frame of a scroll. `floor` overrides the unit's absolute floor, as for
+ * baseline on the laptop. `floor` overrides the unit's absolute floor, as for
  * a measure that ends on a presented frame and so moves in whole frames.
  */
-export function budget(metric: Metric, limit: number, options: { readonly at?: 'p95' | 'median'; readonly compare?: 'p95' | 'median'; readonly floor?: number } = {}): void {
+export function budget(metric: Metric, limit: number, options: { readonly at?: 'p95' | 'median'; readonly floor?: number } = {}): void {
   const at = options.at ?? 'p95'
-  const compare = options.compare ?? 'median'
-  record({ name: metric.name, median: metric.median, p95: metric.p95, n: metric.n, unit: metric.unit, limit, at, compare })
+  const { samples, ...summary } = metric
+  record({ ...summary, ...(samples !== undefined && samples.length <= 100 ? { samples } : {}), limit, at })
   if (absolute) {
     expect.soft(metric[at], `${metric.name}, ${at}: ${metric[at].toFixed(1)} ${metric.unit} against a budget of ${limit.toFixed(1)} ${metric.unit}`).toBeLessThanOrEqual(limit)
     return
@@ -78,17 +79,18 @@ export function budget(metric: Metric, limit: number, options: { readonly at?: '
   const file = stored()
   const base = file?.identity === runnerIdentity() ? file.metrics[metric.name] : undefined
   if (base === undefined) {
-    console.log(`${metric.name}: no baseline for ${runnerIdentity()}; ${compare} ${metric[compare].toFixed(1)} ${metric.unit} recorded`)
+    console.log(`${metric.name}: no baseline for ${runnerIdentity()}; lower quartile ${metric.low.toFixed(1)} ${metric.unit} recorded`)
     return
   }
-  const slowest = compare === 'p95' ? base.highP95 : base.highMedian
-  const ceiling = slowest * RATIO + (options.floor ?? FLOORS[metric.unit])
-  const line = `${metric.name}: ${compare} ${metric[compare].toFixed(1)} ${metric.unit} against a baseline of ${base[compare].toFixed(1)}, slowest ${slowest.toFixed(1)} (ceiling ${ceiling.toFixed(1)})`
+  const ceiling = base.highLow * RATIO + (options.floor ?? FLOORS[metric.unit])
+  const line = `${metric.name}: lower quartile ${metric.low.toFixed(1)} ${metric.unit} against a baseline of ${base.low.toFixed(1)}, slowest ${base.highLow.toFixed(1)} (ceiling ${ceiling.toFixed(1)})`
   console.log(line)
-  expect.soft(metric[compare], line).toBeLessThanOrEqual(ceiling)
+  // A count of missed frames says little on a shared host: the Mac checks it against zero.
+  if (metric.unit === 'frames' || metric.unit === '%') return
+  expect.soft(metric.low, line).toBeLessThanOrEqual(ceiling)
 }
 
 /** A single reading as a metric, for memory and other one-sample checks. */
 export function reading(name: string, value: number, unit: Metric['unit']): Metric {
-  return { name, median: value, p95: value, n: 1, unit }
+  return { name, low: value, median: value, p95: value, n: 1, unit }
 }

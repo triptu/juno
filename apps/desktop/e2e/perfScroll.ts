@@ -143,5 +143,5 @@ export async function scrollReading(win: Page, name: string, options: {
     budget(reading(`${name}: dropped frames, continuous`, dropped(gesture) * 100, '%'), 1)
   }
   const work = gesture.flatMap((s) => s.work)
-  budget({ name: `${name}: continuous scroll frame work`, median: percentile(work, 0.5), p95: p95(gesture), n: work.length, unit: 'ms' }, 8.3, { compare: 'p95', floor: 1 })
+  budget({ name: `${name}: continuous scroll frame work`, low: percentile(work, 0.25), median: percentile(work, 0.5), p95: p95(gesture), n: work.length, unit: 'ms' }, 8.3, { floor: 1 })
 }

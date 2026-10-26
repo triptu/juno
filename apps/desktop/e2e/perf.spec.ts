@@ -934,7 +934,7 @@ test.describe('large workspace', () => {
       })
       const loaf = await win.evaluate(() => (window as unknown as { __loaf: number }).__loaf)
       const perFrame = stats('sidebar drag, main-thread work per frame', work)
-      budget(perFrame, 8.3, { compare: 'p95', floor: 1 })
+      budget(perFrame, 8.3, { floor: 1 })
       if (absolute) expect(loaf).toBe(0)
       else budget(reading('sidebar drag: long animation frames', loaf, 'frames'), 0)
       await juno.frame.expectWidth(384)
@@ -1318,7 +1318,7 @@ test.describe('topic view', () => {
       await upFromBottom()
       const panel = await selectionDragReading(win, juno.topic.scroller, 'select-drag-panel', interval)
       await expect(win.locator('[data-panel-selection]')).toHaveText(/^\d+ messages: “/)
-      budget(stats('selection drag with the panel open, frame work', panel.work), 8.3, { compare: 'p95', floor: 1 })
+      budget(stats('selection drag with the panel open, frame work', panel.work), 8.3, { floor: 1 })
       if (absolute) expect.soft(panel.loaf, 'long animation frames while dragging a selection').toBe(0)
       else budget(reading('selection drag with the panel open: long animation frames', panel.loaf, 'frames'), 0)
     } finally {

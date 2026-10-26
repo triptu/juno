@@ -40,12 +40,13 @@ export function stats(name: string, samples: ReadonlyArray<number>): Metric {
   const sorted = samples.toSorted((a, b) => a - b)
   // Nearest rank: the p95 of 20 samples is the 19th, not the largest.
   const at = (q: number) => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? 0
+  const low = at(0.25)
   const median = at(0.5)
   const p95 = at(0.95)
   const load = loadavg()[0]!.toFixed(1)
   const shown = sorted.length <= 60 ? `, samples ${sorted.map((s) => s.toFixed(1)).join(' ')}` : ''
-  console.log(`${name}: median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}${contention()}${shown}`)
-  return { name, median, p95, n: samples.length, unit: 'ms' }
+  console.log(`${name}: lower quartile ${low.toFixed(1)} ms, median ${median.toFixed(1)} ms, p95 ${p95.toFixed(1)} ms, n=${samples.length}, load ${load}${contention()}${shown}`)
+  return { name, low, median, p95, n: samples.length, unit: 'ms', samples: sorted }
 }
 
 /**
