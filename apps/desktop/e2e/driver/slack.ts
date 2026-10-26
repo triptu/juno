@@ -68,7 +68,8 @@ export class Slack {
 
   /** Juno sent no read mark to Slack since the last `resetCalls`. */
   async expectNoMarks(): Promise<void> {
-    // Marks leave the engine in the background; give one a moment to show up.
+    // Fixed wait: a mark that must not be sent has no event to wait for. Marks leave the engine in the background,
+    // so give a wrong one a moment to show up. Wait for every mark you expect before `resetCalls`.
     await new Promise((resolve) => setTimeout(resolve, 1_000))
     const marks = this.fake.calls.filter((call) => MARK_METHODS.includes(call.method)).map((call) => call.method)
     if (marks.length > 0) throw new Error(`Slack: expected no read marks, got ${marks.join(', ')}`)

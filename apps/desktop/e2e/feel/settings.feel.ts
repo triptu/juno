@@ -66,10 +66,8 @@ test('switching density redraws the sidebar once, and the open topic keeps the r
   await juno.sidebar.row(POSTGRES).openInNewTab()
   await juno.tabs.expectActive(POSTGRES)
   await juno.topic.expectAtBottom()
-  // Up from the bottom, so the top row is one in the middle of the topic.
-  await juno.topic.scroller.hover()
-  await win.mouse.wheel(0, -400)
-  await win.waitForTimeout(400)
+  // Up from the bottom, so the top row is one in the middle of the topic. Waits for the scroll to end.
+  await juno.topic.scrollUp(400)
   const before = await topEdgeNow(juno.topic.scroller)
   await juno.tabs.select('Home')
   await juno.openSettings('Appearance')

@@ -36,8 +36,7 @@ test('a pasted image goes with the message and shows in it at its final size', a
   fake.release()
   await topic.expectSent('The chart for Thursday')
   await expect(row.getByRole('button', { name: 'Open chart.png' }).locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
-  const settled = await row.getByRole('button', { name: 'Open chart.png' }).boundingBox()
-  expect({ width: settled!.width, height: settled!.height }).toEqual({ width: 360, height: 225 })
+  await expect.poll(() => row.getByRole('button', { name: 'Open chart.png' }).boundingBox()).toMatchObject({ width: 360, height: 225 })
 
   const shares = fake.calls.filter((call) => call.method === 'files.share')
   expect(shares).toHaveLength(1)
@@ -49,5 +48,5 @@ test('a pasted image goes with the message and shows in it at its final size', a
   fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from today', media: [{ name: 'whiteboard.png', width: 800, height: 600 }] })
   const whiteboard = topic.message('Whiteboard from today').getByRole('button', { name: 'Open whiteboard.png' })
   await expect(whiteboard.locator(`img${schemeSrc('files')}`)).toHaveCount(1)
-  expect(await whiteboard.boundingBox()).toMatchObject({ width: 320, height: 240 })
+  await expect.poll(() => whiteboard.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })

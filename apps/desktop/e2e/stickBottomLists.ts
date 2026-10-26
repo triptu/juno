@@ -78,7 +78,7 @@ export async function openLongMain(juno: Juno, fake: FakeSlack, slack: Slack): P
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('Earlier message 29')
   await juno.topic.toLatest()
-  expect(await longerThanView(juno.topic.scroller)).toBe(true)
+  await expect.poll(() => longerThanView(juno.topic.scroller)).toBe(true)
   return channel
 }
 

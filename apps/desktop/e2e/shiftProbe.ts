@@ -109,7 +109,8 @@ export async function recordBoxes(page: Page, selector: string): Promise<() => P
       }))
       frame = requestAnimationFrame(tick)
     }
-    frame = requestAnimationFrame(tick)
+    // The first sample now, not at the next frame: a change committed before that frame would leave no frame before it.
+    tick()
     Object.assign(window, { [key]: { frames, stop: () => cancelAnimationFrame(frame) } })
   }, { selector, key })
   return () => page.evaluate((key) => {

@@ -81,7 +81,8 @@ test('the picker marks the chosen quick reactions and choosing one does not reco
     // The message moves #eng to the top. Clicking before it moves would land on the row that takes its place.
     await juno.sidebar.expectTop('#eng')
     const menu = await menuOf(juno, 'Release notes are ready for review')
-    expect((await menu.grid()).slice(0, 5)).toEqual(CHOSEN)
+    // The pills show the change before the saved list reaches the menu.
+    await expect.poll(async () => (await menu.grid()).slice(0, 5)).toEqual(CHOSEN)
     const row = juno.topic.message('Release notes are ready for review')
     const ts = fake.messages('C0ENG').find((m) => m.text === 'Release notes are ready for review')!.ts
     await menu.react('rocket')

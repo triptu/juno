@@ -136,8 +136,9 @@ async function saveKey({ juno, app, calls, missing }: Journey, first: Locator, e
   await expect(first).toHaveAttribute('data-title-source', 'ai', { timeout: 15_000 })
   await expect(first).toContainText('Postgres migration')
   await expect(first.locator('[data-topic-art]')).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
-  expect((await calls()).titleTopic).toBeGreaterThan(0)
-  expect((await calls()).topicArt).toBeGreaterThan(0)
+  // Main counts a call from the engine's own message, which can come after the page shows the result.
+  await expect.poll(async () => (await calls()).titleTopic ?? 0).toBeGreaterThan(0)
+  await expect.poll(async () => (await calls()).topicArt ?? 0).toBeGreaterThan(0)
   await agentReady(app)
   expect(await hooks(app, 'enginePid')).toBe(engine)
 }

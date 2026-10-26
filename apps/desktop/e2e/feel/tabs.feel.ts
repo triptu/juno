@@ -30,10 +30,15 @@ test('switching back to a scrolled tab restores it before the first paint', { ta
   await juno.topic.expectAtBottom()
   await juno.topic.scrollUp(2_500)
   // The tab records its position on scrollend. Rows that far up draw a few frames after the scroll lands, in place of the
-  // list's not-drawn room; on a busy machine that took longer than the wait.
-  await juno.win.waitForTimeout(400)
-  await expect.poll(() => topEdgeNow(juno.topic.scroller).then(() => true, () => false)).toBe(true)
-  const saved = await topEdgeNow(juno.topic.scroller)
+  // list's not-drawn room: read the top edge once two reads in a row agree.
+  const read: { last?: { readonly key: string; readonly at: number } } = {}
+  await expect.poll(async () => {
+    const now = await topEdgeNow(juno.topic.scroller).catch(() => undefined)
+    const held = now !== undefined && now.key === read.last?.key && now.at === read.last.at
+    read.last = now
+    return held
+  }).toBe(true)
+  const saved = read.last!
   await juno.sidebar.row('#perf-main').openInNewTab()
   await juno.tabs.expectActive('perf-main')
   // Main's oldest messages are the user's, so it opens at the "N new" divider after them.

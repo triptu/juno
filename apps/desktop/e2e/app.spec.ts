@@ -206,10 +206,10 @@ async function bottomAt2x(juno: Juno, fake: FakeSlack, app: ElectronApplication,
   // The draft step's send left the list at the end; it follows the new messages there.
   await juno.topic.scroller.evaluate((node) => { node.scrollTop = node.scrollHeight })
   await juno.topic.expectAtBottom()
-  expect(await longerThanView(juno.topic.scroller)).toBe(true)
+  await expect.poll(() => longerThanView(juno.topic.scroller)).toBe(true)
   const zoom = 2 / await win.evaluate(() => devicePixelRatio)
   await app.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]!.webContents.setZoomFactor(zoom), zoom)
-  expect(await win.evaluate(() => devicePixelRatio)).toBe(2)
+  await expect.poll(() => win.evaluate(() => devicePixelRatio)).toBe(2)
   const result = await juno.topic.scroller.evaluate(async (node) => {
     const row = [...node.querySelectorAll<HTMLElement>('[data-message-row]')].at(-1)!
     const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
@@ -368,7 +368,7 @@ async function fullScreenInsets(juno: Juno): Promise<void> {
   const show = () => leftOf('[data-tab-strip]', /^Show sidebar/)
 
   // The 78px after the lights, then the sidebar's 10px inset in full screen.
-  expect(await hide()).toBe(78)
+  await expect.poll(hide).toBe(78)
   await fullScreen(true)
   await expect.poll(hide).toBe(10)
   await fullScreen(false)
@@ -377,7 +377,7 @@ async function fullScreenInsets(juno: Juno): Promise<void> {
   // With the sidebar hidden, the tab strip does the same, from its own 10px padding.
   await juno.frame.toggleWithButton()
   await juno.frame.expectHidden()
-  expect(await show()).toBe(78)
+  await expect.poll(show).toBe(78)
   await fullScreen(true)
   await expect.poll(show).toBe(10)
   await fullScreen(false)

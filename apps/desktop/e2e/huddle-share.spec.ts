@@ -44,7 +44,7 @@ test('sharing your own screen or window: from the bar, the tab, ⌘K and the key
   await test.step('share a window from the bar, previewed in the tab; then a screen with the keys, not previewed; stop from the bar', async () => {
     const faces = '[data-huddle-bar] button [role="img"]'
     await expect(win.locator(faces)).toHaveAccessibleName('Maya')
-    expect(await huddleMenuItem(app, 'huddle-share')).toEqual({ label: 'Share Screen…', enabled: true })
+    await expect.poll(() => huddleMenuItem(app, 'huddle-share')).toEqual({ label: 'Share Screen…', enabled: true })
 
     // Share screen opens the sheet: the screens, then the windows, Juno's own left out, the first screen chosen.
     await bar.getByRole('button', { name: 'Share screen' }).click()
@@ -60,7 +60,7 @@ test('sharing your own screen or window: from the bar, the tab, ⌘K and the key
     })
     expect(await bar.boundingBox()).toEqual(before)
     await expect(sheet).toBeHidden()
-    expect(await ownShare(win)).toBe('window:101:0')
+    await expect.poll(() => ownShare(win)).toBe('window:101:0')
     await expect(bar.getByRole('button', { name: 'Stop sharing' })).toHaveAttribute('aria-pressed', 'true')
     await expect.poll(() => huddleMenuItem(app, 'huddle-share')).toEqual({ label: 'Stop Sharing', enabled: true })
 
