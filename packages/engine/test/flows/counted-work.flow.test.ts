@@ -104,25 +104,21 @@ it('the sidebar, a topic open and reopen, a send and a live message stay within 
     expectWork('sidebar first run', counts(sql), { statements: 10, rows: 35 }, detail(sql))
   })
 
-  const plan = rowsOf(engine).find((row) => row.title === 'Draft plan is in the doc')!
-  let thread: () => ListWindow<MessageView> | undefined = () => undefined
-
-  await step('opening a thread: its window, its header and the fetch of what the store lacks', async () => {
-    const sql = await measured(engine, time, async () => {
-      thread = windowOf(engine, plan.id)
-      valueOf(await openTopic(engine.registry, plan.id))
-    }, () => thread()?.meta.windowCovered === true)
-    expectWork('topic open, cold', counts(sql), { statements: 54, rows: 77 }, detail(sql))
-  })
-
-  await step('reopening it: the window is still mounted, the open asks only for what is newer', async () => {
-    const sql = await measured(engine, time, () => openTopic(engine.registry, plan.id), () => true)
-    expectWork('topic open, again', counts(sql), { statements: 42, rows: 59 }, detail(sql))
-  })
-
   const main = 'm:C0ENG'
   let eng: () => ListWindow<MessageView> | undefined = () => undefined
-  await measured(engine, time, async () => { eng = windowOf(engine, main) }, () => (eng()?.order.length ?? 0) > 0)
+
+  await step("opening #eng's Main: its window, its header and the fetch of what the store lacks", async () => {
+    const sql = await measured(engine, time, async () => {
+      eng = windowOf(engine, main)
+      valueOf(await openTopic(engine.registry, main))
+    }, () => eng()?.meta.windowCovered === true)
+    expectWork('topic open, cold', counts(sql), { statements: 36, rows: 50 }, detail(sql))
+  })
+
+  await step('opening it again: the window is still mounted, the open asks only for what is newer', async () => {
+    const sql = await measured(engine, time, () => openTopic(engine.registry, main), () => true)
+    expectWork('topic open, again', counts(sql), { statements: 35, rows: 44 }, detail(sql))
+  })
 
   await step('sending a message to Main: the pending row, the post and its echo', async () => {
     const sql = await measured(engine, time, async () => {
@@ -138,7 +134,14 @@ it('the sidebar, a topic open and reopen, a send and a live message stay within 
     expectWork('live message', counts(sql), { statements: 54, rows: 102 }, detail(sql))
   })
 
-  await step('a reply arriving in the open thread', async () => {
+  const plan = rowsOf(engine).find((row) => row.title === 'Draft plan is in the doc')!
+  let thread: () => ListWindow<MessageView> | undefined = () => undefined
+  await measured(engine, time, async () => {
+    thread = windowOf(engine, plan.id)
+    valueOf(await openTopic(engine.registry, plan.id))
+  }, () => thread()?.meta.windowCovered === true)
+
+  await step('a reply arriving in an open thread', async () => {
     const sql = await measured(engine, time, async () => {
       engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Counting a live reply', threadTs: tsOf(plan.id) })
     }, () => texts(thread()).includes('Counting a live reply'))
