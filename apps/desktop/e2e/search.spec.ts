@@ -39,7 +39,7 @@ async function pickFrom(juno: Juno, name: string): Promise<void> {
 
 type Context = Pick<Fixtures, 'juno' | 'slack' | 'fake'>
 
-test('search: from: chip, local cards first, Slack merges below, Space shows the topic and it follows the arrows, it marks read only when used, Esc hides it, Enter and Back', async ({ juno, slack, fake }) => {
+test('search: from: chip, local cards first, Slack merges below, Space shows the topic and it follows the arrows, it marks read only when used, Esc hides it, Enter and Back; hidden text blurs', async ({ juno, slack, fake }) => {
   const context = { juno, slack, fake }
   await shotSize(juno)
   for (let i = 1; i <= 24; i++) slack.as('Maya').postIn('incidents', `Flamingo note ${i} on the pager`)
@@ -68,6 +68,8 @@ test('search: from: chip, local cards first, Slack merges below, Space shows the
     await juno.surface.setWindowSize(1440, 900)
   })
   if (SHOTS) await test.step('shots: one column and dark', () => moreShots(context))
+  // What the Search tab shows and finds is in the DOM lane (`dom/search.test.ts`); the blur is CSS.
+  await test.step('with message text hidden, the field, its chips, the cards and the note blur', () => blurred(context))
 })
 
 async function moreShots({ juno }: Context): Promise<void> {
@@ -215,8 +217,7 @@ async function openAndBack({ juno }: Context): Promise<void> {
   await expect.poll(() => topCard(page)).toBe(scrolled)
 }
 
-// What the Search tab shows and finds is in the DOM lane (`dom/search.test.ts`); the blur is CSS.
-test('search: with message text hidden, the field, its chips, the cards and the note blur', async ({ juno, slack }) => {
+async function blurred({ juno, slack }: Context): Promise<void> {
   const { palette, tabs, surface, sidebar, win } = juno
   const page = searchPage(win)
   slack.as('Maya').postIn('eng', 'Cormorant budget is approved')
@@ -235,11 +236,18 @@ test('search: with message text hidden, the field, its chips, the cards and the 
   const note = page.root.locator('[data-search-note]')
   await expect(note).toContainText('confidential:acquisition')
   await juno.privacy.expectBlurred(note)
+}
+
+// Each step searches for its own word, so the cards one step leaves do not match the next.
+test('search: Tab from the field lands on a card and the topic’s edge moves with the keys; a long match folds in view and unfolds in place; Jump to latest only while newer messages are out of view', async ({ juno, slack }) => {
+  await test.step('Tab from the field lands on a card, Space shows its topic, and the topic’s edge moves with the keys', () => tabAndEdge({ juno, slack }))
+  await test.step('a long message folds with its match in view, and Show more unfolds it in place without changing the selection', () => foldedMatch({ juno, slack }))
+  await test.step('the topic beside the results shows Jump to latest only while newer messages are out of view', () => jumpToLatest({ juno, slack }))
 })
 
-test('search: a held Slack answer restores a saved window beyond 200 matches', async ({ juno, fake, relaunch, userData }) => restoreWindow({ juno, fake, relaunch, userData }))
-test('search: reader navigation applies the whole query beyond the message window', async ({ juno, fake }) => navigateMatches({ juno, fake }))
-test('search: Tab from the field lands on a card, Space shows its topic, and the topic’s edge moves with the keys', async ({ juno, slack }) => tabAndEdge({ juno, slack }))
-test('search: a long message folds with its match in view, and Show more unfolds it in place without changing the selection', async ({ juno, slack }) => foldedMatch({ juno, slack }))
-test('search: the topic beside the results shows Jump to latest only while newer messages are out of view', async ({ juno, slack }) => jumpToLatest({ juno, slack }))
-test('search: a result not on this Mac shows in the reader at once, never the last topic, and held arrows load only where they stop', async ({ juno, slack, fake }) => readerWithoutCache({ juno, slack, fake }))
+// The restored window needs a relaunch, so it goes last.
+test('search: reader navigation applies the whole query beyond the message window; a result not on this Mac shows at once and held arrows load only where they stop; a held Slack answer restores a saved window beyond 200 matches', async ({ juno, slack, fake, relaunch, userData }) => {
+  await test.step('reader navigation applies the whole query beyond the message window', () => navigateMatches({ juno, fake }))
+  await test.step('a result not on this Mac shows in the reader at once, never the last topic, and held arrows load only where they stop', () => readerWithoutCache({ juno, slack, fake }))
+  await test.step('a held Slack answer restores a saved window beyond 200 matches', () => restoreWindow({ juno, fake, relaunch, userData }))
+})
