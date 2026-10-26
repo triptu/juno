@@ -55,13 +55,13 @@ console.error('Connection refused'); process.exit(255);
   fixtureGit('commit', '-qm', 'Fixture')
   const commit = fixtureGit('rev-parse', 'HEAD')
   // TMPDIR keeps the heavy lock inside the fixture, so other jobs on the machine cannot hold it.
-  const env = { ...fixtureEnv, JUNO_PLAN_MAX_LOAD: 'Infinity', TMPDIR: join(root, 'tmp'), PATH: `${join(root, 'bin')}:${process.env.PATH}`, TSTACK_HOME: join(root, 'tstack'), JUNO_RUNNER_HOST: 'runner.test', TEST_CALLS: join(root, 'calls'), TEST_PROBES: join(root, 'probes') }
+  const env = { ...fixtureEnv, JUNO_PLAN_MAX_BUSY: 'Infinity', TMPDIR: join(root, 'tmp'), PATH: `${join(root, 'bin')}:${process.env.PATH}`, TSTACK_HOME: join(root, 'tstack'), JUNO_RUNNER_HOST: 'runner.test', TEST_CALLS: join(root, 'calls'), TEST_PROBES: join(root, 'probes') }
   const invoke = (args, extra = {}) => spawnSync(process.execPath, ['scripts/verify-main.mjs', '--ref', 'HEAD', ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8', timeout: 60_000 })
   return { root, commit, env, invoke, git: fixtureGit }
 }
 
 test('local runs archive eligible records and preserve failed suites; an unreachable runner runs nothing', { timeout: 120_000 }, (t) => {
-  const { root, commit, env, invoke } = verificationFixture(t)
+  const { root, commit, env, invoke, git: fixtureGit } = verificationFixture(t)
   const dry = invoke(['--local', '--dry-run'])
   assert.equal(dry.status, 0, dry.stderr)
   // A full run reuses unchanged spec checks and conformance traces; --no-cache regenerates the traces.
@@ -116,6 +116,16 @@ test('local runs archive eligible records and preserve failed suites; an unreach
   assert.equal(readFileSync(env.TEST_PROBES, 'utf8'), 'probe\n')
   assert.equal(readRecords(join(root, '.juno-status')).filter((r) => r.execution).length, 3)
   assert.equal(releaseGate(root, commit).record.passed, true)
+  // A run of a commit off main (a branch, a release's version commit) is archived but leaves main's latest summary.
+  const latest = readFileSync(join(root, '.juno-status/verify-main.json'), 'utf8')
+  fixtureGit('checkout', '-qb', 'branch')
+  writeFileSync(join(root, 'branch.ts'), 'branch')
+  fixtureGit('add', 'branch.ts')
+  fixtureGit('commit', '-qm', 'Branch')
+  const branch = invoke(['--local'])
+  assert.equal(branch.status, 0, branch.stderr + branch.stdout)
+  assert.equal(readFileSync(join(root, '.juno-status/verify-main.json'), 'utf8'), latest)
+  assert.ok(readRecords(join(root, '.juno-status')).some((record) => record.commit === fixtureGit('rev-parse', 'HEAD')))
 })
 
 test('repair selects failed and unfinished files plus every reached spec, and refuses another runtime', async () => {
@@ -183,7 +193,7 @@ test('a repair installs its planner, reruns the failed suite, and retains passin
   assert.ok(releaseGate(root, record.commit))
 })
 
-test('remote jobs establish the record identity; reuse and release refuse a different runtime', { timeout: 60_000 }, (t) => {
+test('remote jobs establish the record identity; release refuses mixed runtimes; a spec check pass holds on another platform', { timeout: 60_000 }, (t) => {
   const { root, env, invoke, git: fixtureGit } = verificationFixture(t)
   // Fake the SSH transport, preserving the planner, records, input hashes and release gate.
   writeFileSync(join(root, 'bin/ssh'), `#!/usr/bin/env node
@@ -197,6 +207,8 @@ for (const [index, step] of parsePlan(process.argv.slice(process.argv.indexOf('t
   appendFileSync(process.env.TEST_CALLS, step.script + '\\n')
   const actual = step.script === process.env.TEST_MISMATCH ? { ...identity, arch: 'arm64' } : identity
   if (step.script !== process.env.TEST_MISSING) console.log('[' + step.script + '] juno-runtime: ' + JSON.stringify(actual))
+  const counts = { walked: 1, reused: {}, sampled: 0, missed: [] }
+  if (step.script === 'test:gallery') console.log('[test:gallery] juno-gallery-walk: ' + JSON.stringify({ uncached: step.env.GALLERY_SHIFT_ALL === '1', sample: step.env.GALLERY_SAMPLE ? { seed: step.env.GALLERY_SAMPLE, share: 0.05 } : null, states: counts, tests: counts }))
   console.log('plan: step ' + index + ' ' + step.script + ' exited with 0 after 1 s')
 }
 `)
@@ -219,7 +231,14 @@ for (const [index, step] of parsePlan(process.argv.slice(process.argv.indexOf('t
   assert.equal(second.status, 0, second.stderr + second.stdout)
   assert.deepEqual(record().suites.filter((suite) => suite.reusedFrom).map((suite) => suite.suite), ['specs:check'])
   assert.doesNotMatch(readFileSync(env.TEST_CALLS, 'utf8'), /specs:check/)
-  for (const extra of [{ TEST_PLATFORM: 'darwin' }, { TEST_MISMATCH: 'test:gallery' }, { TEST_MISSING: 'test:gallery' }]) {
+  // The spec check proves the models: its pass on another platform is reused, and the gate accepts it.
+  const other = run({ TEST_PLATFORM: 'darwin' })
+  assert.equal(other.status, 0, other.stderr + other.stdout)
+  const mac = record()
+  assert.equal(mac.identity.platform, 'darwin')
+  assert.equal(mac.suites.find((suite) => suite.suite === 'specs:check').identity.platform, 'linux')
+  assert.ok(releaseGate(root, mac.commit, [mac]))
+  for (const extra of [{ TEST_MISMATCH: 'test:gallery' }, { TEST_MISSING: 'test:gallery' }]) {
     const failed = run(extra)
     assert.equal(failed.status, 1, failed.stderr + failed.stdout)
     const rejected = record()
