@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { bodyFromMarkdown } from '../src/index'
-import { growth } from './scaling'
+import { scanGrowth } from './scaling'
 
 describe('markdown files', () => {
   it('reads headings, paragraphs, lists, quotes, code and rules', () => {
@@ -46,9 +46,9 @@ describe('markdown files that never close what they open', () => {
     ['backticks', '`a'],
     ['emphasis', '**a '],
     ['underscores', '_a '],
-  ])('reads unclosed %s in time linear in the text, up to 200 KB', (_, unit) => {
+  ])('reads unclosed %s with work linear in the text, up to 200 KB', (_, unit) => {
     const text = (bytes: number) => unit.repeat(Math.ceil(bytes / unit.length))
     expect(bodyFromMarkdown(text(200_000)).blocks).toHaveLength(1)
-    expect(growth((bytes) => bodyFromMarkdown(text(bytes)), 50_000)).toBeLessThan(10)
+    expect(scanGrowth((bytes) => bodyFromMarkdown(text(bytes)), 50_000)).toBeLessThan(6)
   })
 })
