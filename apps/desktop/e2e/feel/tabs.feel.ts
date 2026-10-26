@@ -2,7 +2,7 @@
 // was unmounted for being older than the 4 most recent (performance 4.3).
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { contentHoldsStill, firstFrameRight, neverBlank, noFlicker, noLayoutShift, switchesOnce } from './checks'
-import { test as base } from './feel'
+import { expect, test as base } from './feel'
 import { edgeKey, header, paneRegions, topEdgeNow, topicProbes } from './pane'
 import type { Probe, ProbeFrame } from './recorder'
 
@@ -29,8 +29,10 @@ test('switching back to a scrolled tab restores it before the first paint', { ta
   await juno.sidebar.row(THREAD).open()
   await juno.topic.expectAtBottom()
   await juno.topic.scrollUp(2_500)
-  // The tab records its position on scrollend.
+  // The tab records its position on scrollend. Rows that far up draw a few frames after the scroll lands, in place of the
+  // list's not-drawn room; on a busy machine that took longer than the wait.
   await juno.win.waitForTimeout(400)
+  await expect.poll(() => topEdgeNow(juno.topic.scroller).then(() => true, () => false)).toBe(true)
   const saved = await topEdgeNow(juno.topic.scroller)
   await juno.sidebar.row('#perf-main').openInNewTab()
   await juno.tabs.expectActive('perf-main')
