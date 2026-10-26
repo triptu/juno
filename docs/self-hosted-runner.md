@@ -43,7 +43,11 @@ Namespace, if needed again, is available only through `/tstack:runner`.
 
 ## Job sizes and workers
 
-The laptop lends physical cores `4-11`. tstack maps their sibling threads,
+The laptop lends physical cores `3-11` (`~/.config/juno-runner/cores` on the laptop, read only by tstack's
+`scripts/runner/host.sh`): its eight dense cores (4 to 11, up to 3.3 GHz) and one of its four fast cores (3, up to
+5.2 GHz), so a job that holds core 3 runs a little faster. Cores 0 to 2 stay with the laptop and other projects.
+Nine lent cores at 3 GiB each cap jobs at 27 GiB of the laptop's 30 GiB; full runs have peaked at about 17 GiB
+on the host. tstack maps their sibling threads,
 reserves disjoint core sets, and applies the CPU quota, memory cap and tmpfs.
 Juno requests these budgets:
 
