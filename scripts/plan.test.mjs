@@ -81,6 +81,13 @@ test('a nightly starts each perf part alone in a serial two-core job, as its bas
     assert.equal(job.overlap, false)
     assert.equal(planCores(job.kind, { env: [] }, {}, job.steps, job.cores), 2)
   }
+  const gallery = jobs.flatMap(job => job.steps).find(step => step.script === 'test:gallery')
+  assert.equal(gallery.env.GALLERY_SHIFT_ALL, '1')
+  assert.equal(gallery.env.GALLERY_REAL_WALK, '0')
+  for (const options of [{}, { noCache: true }]) {
+    const normal = parsePlan(fullSuites(scripts, options).find(suite => suite.name === 'test:gallery').words)[0]
+    assert.equal(normal.env.GALLERY_REAL_WALK, undefined)
+  }
   assert.equal(jobs.reduce((sum, job) => sum + job.cores, 0), 8)
   assert.deepEqual(jobs.flatMap((job) => job.steps.map((step) => step.script)).toSorted(), fullSuites(scripts, { nightly: true, perf: true }).map((suite) => suite.name).toSorted())
 })

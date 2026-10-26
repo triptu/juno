@@ -38,7 +38,7 @@ export function sourceKeys(root, kind) {
 
   // What a walk does to a state. The spec's other tests (delayed loads, the guard's
   // self-tests) are not part of it; the guard is, through the walk's imports.
-  const walk = { shift: 'apps/gallery/shift-walk.ts' }[kind]
+  const walk = { shift: 'apps/gallery/shift-walk.ts', computed: 'apps/gallery/computed-walk.ts' }[kind]
   const paint = kind === 'paint'
   const shared = new Set([
     'bunfig.toml', 'tsconfig.base.json',

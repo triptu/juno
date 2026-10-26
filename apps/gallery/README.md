@@ -4,12 +4,13 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 
 - `bun run gallery`: interactive review on port 4174.
 - `bun run test:gallery`: cache checks, build, then parallel Chromium behavior tests with zero retries.
-- `GALLERY_SHIFT_ALL=1 bun run test:gallery`: refresh every selected shift state, even if cached.
-- `bun run remote --env GALLERY_SHIFT_ALL=1 test:gallery`: the same full check on the runner.
-- `verify:main --nightly` and `verify:main --no-cache` force the broad walk automatically.
+- `bun run remote --env GALLERY_SHIFT_ALL=1 --env GALLERY_REAL_WALK=0 test:gallery`: the nightly gallery job: every fast state, no broad real-input walk.
+- `GALLERY_SHIFT_ALL=1` refreshes all fast-state and rendering-test records; the real-input walk still checks changed states.
+- `bun run remote --env GALLERY_REAL_WALK=1 test:gallery`: force the real-input walk by hand.
+- `verify:main --nightly` uses the nightly gallery job. Normal, affected and full runs check changed states with both guards; `--no-cache` also forces the fast states and rendering tests.
 - `bun run gallery:shots`: review screenshots in both themes. `GALLERY_SHOTS_ONLY=Button` narrows them.
 
-Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency; on the runner a run that does not walk every state uses `GALLERY_CACHED_WORKERS`, half a worker per thread. Every test in a worker runs on one loaded gallery page ([One page per worker](#one-page-per-worker)). Screenshots remain review artifacts, not pixel baselines in the behavior gate.
+Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency; on the runner a run that does not walk every state uses `GALLERY_CACHED_WORKERS`, half a worker per thread. Real-input tests in a worker run on one loaded gallery page ([One page per worker](#one-page-per-worker)). Screenshots remain review artifacts, not pixel baselines in the behavior gate.
 
 ## One page per worker
 
@@ -28,15 +29,19 @@ Measured before and after, with the worker counts, in [development notes](../../
 
 ## Fast sweep
 
-`computed-shift.spec.ts` checks the walk's touches in every state with forced pseudo-class styles and synthetic events, about a fifth of the walk's CPU a state. It runs with `GALLERY_SHIFT_COMPUTED=1`; its self-tests always run. See [the layout-shift guard](../../docs/development.md#the-layout-shift-guard).
+`computed-shift.spec.ts` checks changed states with forced pseudo-class styles and synthetic events. Nightly checks every state uncached. It also checks cursors and whole-pixel message rows; trigger fills remain in `trigger-open.spec.ts`, with paint-aware keys and both themes. Its self-tests and all targeted regressions run every time.
+
+Each fast-walk part owns its page: the forced guard rewrites CSS and blocks click defaults, so its document must never be reused by real-input tests. It reloads every 150 states and closes when the part ends. `GALLERY_SHIFT_COMPUTED` is no longer needed.
+
+The fast guard cannot see transient shifts during motion, frame-delayed handlers, or browser defaults beyond focus on press. Changed-state real input stays uncapped on commits, affected checks and normal full runs. The [history audit](../../docs/reviews/2026-10-26-gallery-shift-history.tsv) separates actual interaction bugs, data-change regressions, removed fixtures and synthetic mutations; it found no established trusted-input-only or mid-transition gallery bug requiring a new test. Existing delayed-image, data-change and desktop scroll regressions stay. See [the layout-shift guard](../../docs/development.md#the-layout-shift-guard).
 
 ## Cached walks
 
-`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports, plus the gallery shell, its styles, assets and fonts. Tokens count by value: only the layout tokens the state's files read, in every theme; colour and shadow tokens, comments, and paint-only CSS declarations do not count (`layout-tokens.mjs`). The walk counts through `shift-walk.ts` and its imports, which include `open-state.ts` and the guard; the spec's other tests, the scaffolding in `support.ts` and the Playwright config do not. Compositions and test fixtures key on `compositions.tsx` or `testFixtures.tsx` and what it imports, so editing one re-walks only its states and a change outside the gallery's packages re-walks none. Locked versions count only for packages the gallery imports or builds with. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
+`walk-cache.mjs` uses the repository import graph to hash a component's fixture and transitive workspace imports, plus the gallery shell, its styles, assets and fonts. Tokens count by value: only the layout tokens the state's files read, in every theme; colour and shadow tokens, comments, and paint-only CSS declarations do not count (`layout-tokens.mjs`). Each walk counts through its own implementation (`shift-walk.ts` or `computed-walk.ts`) and its imports, including readiness and its guard; the spec's other tests, the scaffolding in `support.ts` and the Playwright config do not. Compositions and test fixtures key on `compositions.tsx` or `testFixtures.tsx` and what it imports, so editing one re-walks only its states and a change outside the gallery's packages re-walks none. Locked versions count only for packages the gallery imports or builds with. Runtime keys include Playwright, the actual browser version, OS release, architecture and browser options. Unknown registrations widen to all source. State identity includes the fixture frame settings.
 
-Only a completed successful state is recorded. Before rechecking a state its old record is removed, so failure or interruption cannot preserve a previous pass. Records are written atomically under `$JUNO_BUILD_CACHE_DIR/gallery-walk-v1`, or the shared system temp directory's `juno-cache/results/gallery-walk-v1`. The remote runner uses `/cache/builds/gallery-walk-v1`.
+The `shift` and `computed` records are separate: a fast pass never authorizes real input, and a nightly never marks a real-input state as passed. Only a completed successful state is recorded. Before rechecking a state its old record is removed, so failure or interruption cannot preserve a previous pass. Records are written atomically under `$JUNO_BUILD_CACHE_DIR/gallery-walk-v1`, or the shared system temp directory's `juno-cache/results/gallery-walk-v1`. The remote runner uses `/cache/builds/gallery-walk-v1`.
 
-`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass the cache. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its reset, still has a 30-second limit. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
+`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` bypasses the fast cache; `GALLERY_REAL_WALK=1` bypasses the real-input cache, and `GALLERY_REAL_WALK=0` skips that broad walk. `--repeat-each` bypasses both caches for the walks enabled in that invocation. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its reset, still has a 30-second limit. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
 
 ## Cached rendering tests
 

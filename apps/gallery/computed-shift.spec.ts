@@ -1,87 +1,43 @@
 import { expect, type Page } from '@playwright/test'
-import { checkForcedInteractions, formatForcedShift, type ForcedInteractionReport } from '@juno/testing/forced-shift'
-import { checkStateWithin, interactive, statesPerDocument } from './shift-walk'
-import { claimQueue, openState, readRoutes, test, type Route } from './support'
+import { formatForcedShift } from '@juno/testing/forced-shift'
+import { computedWalk, forced } from './computed-walk'
+import { claimQueue, openState, readRoutes, stateCache, test } from './support'
 
-/**
- * A fast sweep of the shift guard over every state, on request:
- * bun run remote --env GALLERY_SHIFT_COMPUTED=1 test:gallery computed-shift.spec.ts
- *
- * Each state is opened once. In one call per state, the same elements the
- * real-input walk touches (shift-walk.ts) are hovered, focused from the
- * keyboard, blurred, pressed, released and left by forcing the pseudo-class
- * styles and dispatching the events React listens to, with transitions off
- * (`checkForcedInteractions` in packages/testing says what it cannot see).
- * Every box is compared after each step, as the guard does. It takes about a
- * fifth of a second a state, against one CPU-second for the real walk: use it to check a
- * broad change everywhere before the full walk. Ordinary runs do not need it,
- * since the walk's records already re-walk every state whose inputs changed.
- * Its self-tests run every time.
- *
- * GALLERY_SHIFT_ONLY and JUNO_SHARD select states as for the walk.
- */
-const perState = 8
-
-
+/** Fast shift checks for changed states; GALLERY_SHIFT_ALL=1 checks every state, including on nightly runs. */
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
 const parts = Number(process.env.GALLERY_SHIFT_PARTS ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
-const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim())
+const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map(name => name.trim())
 
-const forced = (page: Page, from = 0) =>
-  checkForcedInteractions(page, { targets: interactive, skipWithin: '[data-expands-in-place]', pending: '[data-chunk-pending]', max: perState, from })
+// The forced guard rewrites CSS and suppresses click defaults for the lifetime of its document.
+test.use({ ownPage: true })
 
 for (let part = 0; part < parts; part++) {
-  test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, async ({ page }) => {
-    test.skip(process.env.GALLERY_SHIFT_COMPUTED !== '1', 'runs with GALLERY_SHIFT_COMPUTED=1')
-    // One document opens many states through its hash: loading the gallery again for each would cost more than the check.
-    let opened = 0
-    let opening = 0
-    const open = async (route: Route, again = false) => {
-      if (!again && opened > 0 && opened % statesPerDocument === 0) {
-        await page.evaluate(() => { location.hash = '#/~' })
-        await page.reload()
-      }
-      if (!again) opened++
-      const from = Date.now()
-      await openState(page, route, 'light', undefined, { finishMotion: true, inPlace: true })
-      opening += Date.now() - from
-    }
+  test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, page }) => {
     const routes = (await readRoutes(page)).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
-    // Half a second a state is the target; a second a state leaves room on a loaded machine.
-    test.setTimeout(Math.max(5 * 60_000, Math.ceil((routes.length * 1_000) / Math.min(parts, test.info().config.workers))))
+    test.setTimeout(Math.max(5 * 60_000, Math.ceil(routes.length * 1_000 / Math.min(parts, test.info().config.workers))))
     const queue = claimQueue('computed')
-    const shifts: string[] = []
-    let states = 0, elements = 0, resets = 0, unforced = 0
-    const spent = { act: 0, settle: 0, boxes: 0 }
-    const started = Date.now()
+    const cache = stateCache('computed', browser)
+    const walk = computedWalk(page)
+    const failures: string[] = []
+    let states = 0, cached = 0, elements = 0, resets = 0, unforced = 0
     try {
       for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
-        await checkStateWithin(route, async () => {
-          await open(route)
-          states++
-          // A touch that changed what the state draws asks for a fresh document for the elements after it.
-          for (let report: ForcedInteractionReport = await forced(page); ; report = await forced(page, report.next)) {
-            elements += report.touched
-            spent.act += report.timing.act
-            spent.settle += report.timing.settle
-            spent.boxes += report.timing.boxes
-            unforced = Math.max(unforced, report.unforced)
-            for (const shift of report.shifts) shifts.push(`${route.route} (element ${shift.element + 1}, ${shift.target}) ${formatForcedShift(shift)}`)
-            if (report.next === undefined) break
-            resets++
-            await open(route, true)
-          }
-        })
+        if (cache.passed(route)) { cached++; continue }
+        cache.forget(route)
+        const result = await walk(route)
+        states++
+        elements += result.elements
+        resets += result.resets
+        unforced = Math.max(unforced, result.unforced)
+        failures.push(...result.failures.map(failure => `${route.route}: ${failure}`))
+        if (result.failures.length === 0) cache.pass(route)
       }
     } finally {
-      const ms = states > 0 ? Math.round((Date.now() - started) / states) : 0
-      const per = (ms: number) => `${states > 0 ? Math.round(ms / states) : 0} ms`
-      const open = states > 0 ? Math.round(opening / states) : 0
-      console.log(`computed shift: ${states} states, ${elements} elements, ${resets} resets, ${ms} ms a state (${open} ms opening, ${per(spent.act)} touching, ${per(spent.settle)} waiting, ${per(spent.boxes)} boxes), ${unforced} pseudo-class rules left unforced`)
+      console.log(`computed shift: ${states} states, ${cached} cached, ${elements} elements, ${resets} resets, ${unforced} pseudo-class rules left unforced`)
     }
-    expect(shifts.join('\n\n')).toBe('')
+    expect(failures.join('\n\n')).toBe('')
   })
 }
 

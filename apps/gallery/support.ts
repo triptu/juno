@@ -197,8 +197,10 @@ function cacheOptions(browser: Browser) {
   }
 }
 
-export function stateCache(kind: 'shift', browser: Browser) {
-  return walkCache({ ...cacheOptions(browser), kind })
+export function stateCache(kind: 'shift' | 'computed', browser: Browser) {
+  const options = cacheOptions(browser)
+  const all = kind === 'computed' ? options.all : process.env.GALLERY_REAL_WALK === '1' || test.info().project.repeatEach > 1 || test.info().retry > 0
+  return walkCache({ ...options, kind, all })
 }
 
 /**

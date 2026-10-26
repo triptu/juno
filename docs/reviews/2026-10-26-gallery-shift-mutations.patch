@@ -1,0 +1,79 @@
+diff --git a/apps/gallery/history-probe.spec.ts b/apps/gallery/history-probe.spec.ts
+new file mode 100644
+index 000000000..9b765cd2b
+--- /dev/null
++++ b/apps/gallery/history-probe.spec.ts
+@@ -0,0 +1,73 @@
++import { measureLayoutShift } from '@juno/testing/layout-shift'
++import { expect } from '@playwright/test'
++import { checkForcedInteractions, formatForcedShift } from '@juno/testing/forced-shift'
++import { ownPageTest as test, openState, readRoutes } from './support'
++import { interactive } from './shift-walk'
++
++// Temporary mutation audit: old layout rules transplanted onto current fixtures.
++const cases = [
++  { name: 'Button hover margin (previous synthetic probe)', component: 'Button', id: 'variant/primary', css: '[data-fixture-frame] button:hover { margin-bottom: 1px !important }' },
++  { name: 'TopicRow time in flow (previous synthetic probe)', component: 'TopicRow', id: 'content/long-title', target: '[data-topic-row]', css: '[data-row-part="time"] { position: static !important; display: none !important } [data-topic-row]:hover [data-row-part="time"] { display: block !important }' },
++  { name: 'eb25fc659 explainer in flow', component: 'AutomatedReview', id: 'sheet/over-home', target: '[data-review-about]', css: '[data-sheet] div:has(> [data-review-explainer]) { position: static !important }' },
++  { name: 'eb25fc659 outcome sizes slot', component: 'AutomatedReview', id: 'sheet/over-home', css: '[data-review-row] > span > span[aria-hidden="true"] { display: none !important } [data-review-row] > span > span[aria-live] { position: static !important }' },
++  { name: '0f4ca442e key hints without reserve', component: 'AutomatedReview', id: 'sheet/over-home', css: '[data-sheet] span:has(> [aria-hidden="true"]) > [aria-hidden="true"] { display: none !important }' },
++  { name: 'fd4d673e2 ChangeCard removes Show all', component: 'ChangeCard', id: 'change/long-field', css: '[data-chat-card] button[aria-pressed="true"] { display: none !important }' },
++]
++for (const entry of cases) test(entry.name, async ({ page }) => {
++  const routes = await readRoutes(page)
++  const route = routes.find(route => route.component === entry.component && (!entry.id || route.id === entry.id))
++  expect(route, routes.filter(route => route.component === entry.component).map(route => route.id).join(', ')).toBeDefined()
++  if (!route) throw new Error('Missing route')
++  await openState(page, route, 'light', undefined, { finishMotion: true })
++  await page.addStyleTag({ content: entry.css })
++  const report = await checkForcedInteractions(page, { targets: 'target' in entry ? entry.target! : interactive, skipWithin: '[data-expands-in-place]', pending: '[data-chunk-pending]', max: 8 })
++  console.log(`history-probe: ${entry.name} | ${route.route} | ${report.shifts.map(formatForcedShift).join('\n')}`)
++  expect(report.shifts.length).toBeGreaterThan(0)
++})
++
++for (const entry of [
++  { name: 'ce05383f5 source wrapping', id: 'shift/sources-link', css: '[data-source] { display: inline-block !important }', control: 'sources' },
++  { name: 'fd4d673e2 status height', id: 'shift/status-text-changes', css: '[data-chat-status] > div { min-height: 0 !important }', control: 'status-text' },
++]) test(entry.name, async ({ page }) => {
++  const route = (await readRoutes(page)).find(route => route.component === 'JunoChatList' && route.id === entry.id)
++  if (!route) throw new Error('Missing route')
++  await openState(page, route, 'light', undefined, { finishMotion: true })
++  await page.addStyleTag({ content: entry.css })
++  const fast = await checkForcedInteractions(page, { targets: interactive, max: 8 })
++  console.log(`history-probe: ${entry.name} | fast ${fast.shifts.length} (the sweep does not drive ${entry.control})`)
++  expect(fast.shifts).toEqual([])
++  const before = await page.locator('[data-chat-status], [data-chat-juno] p').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()))
++  await page.evaluate(control => (window as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), entry.control)
++  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
++  const after = await page.locator('[data-chat-status], [data-chat-juno] p').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()))
++  console.log(`history-probe: ${entry.name} | targeted boxes changed ${JSON.stringify(before) !== JSON.stringify(after)}`)
++  expect(after).not.toEqual(before)
++})
++
++test('2f42f0f69 Show result label reserve', async ({ page }) => {
++  const route = (await readRoutes(page)).find(route => route.component === 'ChangeCard' && route.id === 'change/call-done')
++  if (!route) throw new Error('Missing route')
++  await openState(page, route, 'light', undefined, { finishMotion: true })
++  await page.addStyleTag({ content: '[data-expands-in-place] > [aria-hidden] { display: none !important }' })
++  const broad = await checkForcedInteractions(page, { targets: interactive, skipWithin: '[data-expands-in-place]', max: 8 })
++  expect(broad.shifts).toEqual([])
++  const focused = await checkForcedInteractions(page, { root: 'p:has([data-expands-in-place])', targets: 'button' })
++  console.log(`history-probe: 2f42f0f69 Show result | broad ${broad.shifts.length}, focused ${focused.shifts.map(formatForcedShift).join('\n')}`)
++  expect(focused.shifts.length).toBeGreaterThan(0)
++})
++
++for (const entry of [
++  { name: 'ea43aac2c task footer height', id: 'shift/task-state-changes', css: '[data-chat-card] > div > div:last-child { min-height: 0 !important }' },
++  { name: 'fd4d673e2 sent text metrics', id: 'shift/send-settles', css: '[data-chat-card] p[dir=auto] { font-size: 12px !important; min-height: calc(2 * 1.55em + 18px) !important }' },
++]) test(entry.name, async ({ page }) => {
++  const route = (await readRoutes(page)).find(route => route.component === 'ChatCard' && route.id === entry.id)
++  if (!route) throw new Error('Missing route')
++  await openState(page, route, 'light', undefined, { finishMotion: true })
++  await page.addStyleTag({ content: entry.css })
++  const fast = await checkForcedInteractions(page, { targets: interactive, max: 8 })
++  expect(fast.shifts).toEqual([])
++  const report = await measureLayoutShift(page, () => page.getByRole('button', { name: 'Next step' }).click())
++  console.log(`history-probe: ${entry.name} | targeted ${JSON.stringify(report.moved)}`)
++  if (entry.name.startsWith('ea43')) expect(report.moved).toEqual([]) // The current task footer no longer reproduces the old shrink.
++  else expect(report.moved.length).toBeGreaterThan(0)
++})

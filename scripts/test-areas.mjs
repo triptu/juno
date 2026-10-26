@@ -47,10 +47,10 @@ export const HEAVY_AREAS = [
     area: 'gallery',
     suite: 'gallery',
     tag: '@heavy-gallery',
-    tests: 'the shift guard over every component (shift.spec.ts without GALLERY_SHIFT_ONLY)',
+    tests: 'the real and computed shift guards over every component (without GALLERY_SHIFT_ONLY)',
     whole: [],
     // The gallery harness: the app and its shared helpers, the shift guard, @juno/testing.
-    paths: [/^apps\/gallery\/(?!.*\.spec\.ts$)/, 'apps/gallery/shift.spec.ts', 'packages/testing/'],
+    paths: [/^apps\/gallery\/(?!.*\.spec\.ts$)/, 'apps/gallery/shift.spec.ts', 'apps/gallery/computed-shift.spec.ts', 'packages/testing/'],
   },
 ]
 

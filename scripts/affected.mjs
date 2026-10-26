@@ -209,7 +209,7 @@ if (components.length > 0 || gallerySpecs.length > 0) {
   // Every component without GALLERY_SHIFT_ONLY is the heavy full walk: only the wide plan, or a change to the gallery harness.
   const all = components.length === componentItems.length && gallerySpecs.length === gallerySpecItems.length && (wide || heavyActive.has('gallery'))
   // Playwright reads each as an unanchored pattern: the slash keeps geometry.spec.ts from matching list-geometry.spec.ts.
-  const specFiles = [...(components.length > 0 ? ['/shift.spec.ts'] : []), ...gallerySpecs.map((item) => item.id.replace('apps/gallery', ''))]
+  const specFiles = [...new Set([...(components.length > 0 ? ['/shift.spec.ts', '/computed-shift.spec.ts'] : []), ...gallerySpecs.map((item) => item.id.replace('apps/gallery', ''))])]
   plan.push({
     script: 'test:gallery',
     args: all ? [] : specFiles,

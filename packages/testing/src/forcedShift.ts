@@ -92,7 +92,11 @@ function forcePseudoClasses(): number {
 function settler(pending: string | null, earlier: ReadonlySet<Animation>, syncFocus: () => void, forcePseudo: () => number): () => Promise<void> {
   const task = () => new Promise<void>((resolve) => {
     const channel = new MessageChannel()
-    channel.port1.addEventListener('message', () => resolve())
+    channel.port1.addEventListener('message', () => {
+      channel.port1.close()
+      channel.port2.close()
+      resolve()
+    }, { once: true })
     channel.port1.start()
     channel.port2.postMessage(0)
   })

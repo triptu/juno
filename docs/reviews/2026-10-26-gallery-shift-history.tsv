@@ -1,0 +1,26 @@
+commit	failure	coverage boundary	verification
+mutation audit 2026-10-18	Button secondary hover gains 1px margin	Forced pseudo-class styles; synthetic probe, not a shipped regression	Forced hover fails on Button/variant/primary with 1px margin; mutation run 1793013471041 (11 probes passed)
+fbdf78912	TopicRow time placed in flow on hover	Synthetic counterexample to the overlay design, not a fix in this commit	Focused forced hover fails on TopicRow/content/long-title; short read-title fixture does not shift
+eb25fc659	Review explainer pushes the list	Pointer handler plus final geometry	Focused forced press on data-review-about fails; broad eight-target sample does not reach this button
+eb25fc659 / e29d954ee	Review outcome changes the action slot width	Pointer handler plus final geometry; SettledList later merged into ReviewList	Broad forced release fails on AutomatedReview/sheet/over-home
+0f4ca442e	Review key hints change width when focus changes row	Focus handler plus final geometry	Broad forced press fails on AutomatedReview/sheet/over-home
+fd4d673e2	Change card removes Show all after activation	Click handler plus final geometry	Broad forced release fails on ChangeCard/change/long-field
+2f42f0f69	Show result label changes after-line width	Excluded from both broad walks as intentional growth; a focused forced check can measure only the after-line	Broad check skips the disclosure (zero shifts); focused forced release on only the after-line fails
+ea43aac2c	Task card footer shrinks on completion	Fixture outcome action; existing targeted card-height test	Undoing only footer min-height does not reproduce on current task cards; no mutation pass claimed for the historical shrink
+fd4d673e2	Sent message uses different text metrics from its textarea	Fixture outcome action; existing targeted card-height test	Broad check reaches working only (zero shifts); next outcome click catches 16px card shrink
+fd4d673e2	Status bubble grows when text replaces dots	Data change, not a hover/press; existing targeted status-text test	Broad check sees zero shifts; status-text fixture action changes the mutated bubble boxes
+ce05383f5	Sources and citations become unwrappable button boxes	Data change, not a hover/press; existing targeted source-link test	Broad check sees zero shifts; sources fixture action changes the mutated paragraph boxes
+0aac6be37	Fractional message heights cause scroll-anchor rounding	Drawn-state whole-pixel check; not an interaction difference	Existing behaviour.spec.ts check will move into the fast sweep
+63759258c	Prepending changes the formerly first message's header and margin	Data/prepend journey; neither broad interaction sweep loads older pages	Existing message-geometry and desktop scroll tests retained
+cbbb0296a	New rows above the held row grow from estimates a frame late	Renderer container, real scrolling and asynchronous history; absent from gallery fixtures	Commit records 12/200 before and 0/300 after; existing desktop prepend tests retained; not replayed here
+901db4776	Attachment geometry depends on image bytes	Delayed network event; neither broad interaction sweep releases held bytes	Existing attachment-images and delayed-thumbnail tests retained
+5e674409c / e9ae5a91a	Off-screen row remembers fallback-font height	Gallery startup/readiness race, not trusted-event behavior	Pre-render font loading retained; historical 26/1300 failures, no deterministic replay claimed
+2026-10-17-1210-gallery-images-settle	Failed unfurl collapses after readiness	Expected collapse charged to hover by premature readiness	Image readiness retained; failed-image behavior test retained
+23855a88b	Message toolbar anchor grows when toolbar appears	Final geometry; old toolbar removed by 2bbf5701b	No current component to regress; not represented as a current mutation pass
+2b1e8f24d / 3f9883bf1	Live reaction picker's status line grows with emoji	Fixture-only feedback line; later deleted	No current line to regress; not represented as a current mutation pass
+55f73705d	Reading a sidebar row changes title and preview geometry	Data/read-state change; existing targeted sidebar test	Existing sidebar-row read-state check retained
+8bff827f0	Home sync count changes line width	Data/count change; not a trusted-input distinction	Existing Home and desktop sync checks retained
+ed10dc2ff	Focus ring clipped by scroll boxes	Paint clipping, not layout shift	Accessibility-only ring walk deliberately removed on 2026-10-25; outside this change
+b25f9f979 / 55961a2ce	Video controls produce layout-shift entries without page movement	Browser-native control false positive	Guard's video exclusion and box fallback retained
+990138f54 / c9bbe3003 / ce3973835	Entries count added/removed boxes or unchanged text anchors	Observer semantics and expected changes, not product interaction bugs	Existing guard self-tests and desktop anchor checks retained
+49e8e0134	Single sidebar-hover flake	Unresolved historical report, no established cause	No invented regression or deterministic replay claimed

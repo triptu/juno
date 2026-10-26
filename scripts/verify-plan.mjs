@@ -25,7 +25,7 @@ export function fullSuites(scripts, { nightly = false, noCache = false, perf = f
     // A nightly run uses no cached result: every Quint run and conformance trace is fresh.
     { name: 'specs:check', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : []), ...(nightly ? ['--nightly'] : [])] },
     { name: 'specs:conformance', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
-    { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },
+    { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), ...(nightly ? ['GALLERY_REAL_WALK=0'] : []), 'test:gallery'] },
     ...apps.map((name) => ({ name, words: [...skip, name] })),
   ]
 }

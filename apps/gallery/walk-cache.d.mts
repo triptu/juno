@@ -1,6 +1,6 @@
 import type { Route } from './support'
 
-type Kind = 'shift' | 'layout' | 'paint'
+type Kind = 'shift' | 'computed' | 'layout' | 'paint'
 interface Options {
   root: string
   kind: Kind
@@ -10,7 +10,7 @@ interface Options {
 }
 
 export function sourceKeys(root: string, kind: Kind): ((component: string) => string) & { specKey(file: string): string }
-export function walkCache(options: Options & { kind: 'shift' }): {
+export function walkCache(options: Options & { kind: 'shift' | 'computed' }): {
   key(route: Route): string
   passed(route: Route): boolean
   forget(route: Route): void
