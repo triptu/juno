@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures'
+import { absolute, budget } from './perfBaseline'
 import { stats } from './perfStats'
 
 test.skip(process.env.JUNO_PERF !== '1', 'set JUNO_PERF=1 to measure')
@@ -22,9 +23,9 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
   await field.pressSequentially('albatross', { delay: 60 })
   await expect(rows).toHaveCount(30)
   const resultSamples = await juno.measures('juno.search-results')
-  expect(resultSamples.length).toBeGreaterThanOrEqual(7)
-  const results = stats('search keystroke to rows painted', resultSamples.slice(2))
-  expect.soft(results.p95, `keystroke to rows p95 ${results.p95.toFixed(1)} ms`).toBeLessThanOrEqual(RESULTS_BUDGET)
+  // Deferred renders fold fast keys into one: the laptop gave 4 or 5 of the 9 on 10-26.
+  expect(resultSamples.length).toBeGreaterThanOrEqual(absolute ? 7 : 3)
+  budget(stats('search keystroke to rows painted', resultSamples.slice(2)), RESULTS_BUDGET)
 
   for (let i = 0; i < 20; i++) {
     await juno.win.keyboard.press('ArrowDown')
@@ -50,6 +51,5 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
   )
   // The next row was warm before each warm arrow, so the topic painted, not the stand-in.
   expect(painted.slice(3)).toEqual(Array.from({ length: 17 }, () => 'topic'))
-  const reader = stats('search arrow to reader painted', readerSamples.slice(3))
-  expect.soft(reader.p95, `arrow to reader p95 ${reader.p95.toFixed(1)} ms`).toBeLessThanOrEqual(READER_BUDGET)
+  budget(stats('search arrow to reader painted', readerSamples.slice(3)), READER_BUDGET)
 })

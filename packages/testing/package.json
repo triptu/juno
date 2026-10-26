@@ -8,7 +8,8 @@
     "./layout-shift": "./src/layoutShift.ts",
     "./forced-shift": "./src/forcedShift.ts",
     "./eventually": "./src/eventually.ts",
-    "./effect": "./src/effect.ts"
+    "./effect": "./src/effect.ts",
+    "./perf-budget": "./src/perfBudget.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

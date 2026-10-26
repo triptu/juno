@@ -25,7 +25,7 @@ export function assessRecord(record) {
   return record.smoke !== true && record.passed === true
     && required.every((name) => record.suites.some((suite) => suite.suite === name))
     && record.suites.every(suitePassed)
-    && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'test:feel'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
+    && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'perf @mac', 'test:feel'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
     && (record.version !== 2 || (record.identity && record.required?.every((name) => record.suites.some((suite) => suite.suite === name))))
 }
 

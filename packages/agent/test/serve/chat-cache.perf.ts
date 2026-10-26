@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { expect, it } from 'bun:test'
 import { measure, type Measurement } from './chat-cache-measure'
+import { perfBudget } from '@juno/testing/perf-budget'
 
 const percentile = (values: ReadonlyArray<number>, p: number) => values.toSorted((a, b) => a - b)[Math.floor(values.length * p)]!
 
@@ -15,8 +16,8 @@ it('5,000 messages: event to encoded window, query and payload stay within budge
   const report = JSON.stringify({ messages: 5000, window: 40, p95, queryP95, runs: summary })
   console.log(report)
   if (process.env.JUNO_CHAT_BENCH_REPORT) writeFileSync(process.env.JUNO_CHAT_BENCH_REPORT, report)
-  expect(queryP95).toBeLessThan(5)
-  expect(p95).toBeLessThan(50)
+  perfBudget('chat cache: query p95', queryP95, 5)
+  perfBudget('chat cache: event to encoded window p95', p95, 50)
   for (const run of after) {
     expect(run.events).toBe(100)
     expect(run.bytes).toBeLessThan(200_000)
