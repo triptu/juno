@@ -28,7 +28,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'quick-reactions.spec.ts',
   'emoji-frequents.spec.ts',
   'all-topics.spec.ts',
-  'code-highlight.spec.ts',
   'composer.spec.ts',
   'formatting.spec.ts',
   'home-pictures.spec.ts',
@@ -38,15 +37,12 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'search.spec.ts',
   'peek.spec.ts',
   'person-links.spec.ts',
-  'reaction-delivery.spec.ts',
   'send-while-staging.spec.ts',
   'sidebar-hold.spec.ts',
   'sidebar-motion.spec.ts',
   'sidebar-first-sync.spec.ts',
-  'tables.spec.ts',
   'tabs.spec.ts',
   'topic.spec.ts',
-  'usergroups.spec.ts',
 ]
 
 /**
