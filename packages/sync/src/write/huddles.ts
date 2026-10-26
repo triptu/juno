@@ -32,8 +32,9 @@ export const writeHuddle = (channel: string, room: RoomFrameRoom, selfId: string
 
 const decodeRoom = Schema.decodeUnknownOption(ShRoomFrame)
 
-export const writeHuddleFrame = (raw: unknown, selfId: string) => Effect.gen(function* () {
+/** The write for a room frame, or undefined for any other frame, so other frames open no transaction. */
+export const huddleFrameWrite = (raw: unknown, selfId: string) => {
   const frame = Option.getOrUndefined(decodeRoom(raw))
   const channel = frame?.huddle?.channel_id ?? frame?.room.channels?.[0]
-  if (frame !== undefined && channel !== undefined) yield* writeHuddle(channel, frame.room, selfId)
-})
+  return frame === undefined || channel === undefined ? undefined : writeHuddle(channel, frame.room, selfId)
+}
