@@ -1,918 +1,106 @@
 {
-  "identity": "linux-x64, 4 threads, Electron 44.7.0",
-  "commit": "0e3aef561b10db7b10f78fa182e8ae3c478ca61a",
+  "commit": "868de0299ba1711e349564dd67ff26fcdefb5474",
   "recorded": "2026-10-26",
-  "runs": 15,
-  "metrics": {
-    "20,000 distinct workspace URLs, cold subscription, click to loaded visible images": {
-      "low": 112.19999998807907,
-      "fastest": 102.19999998807907,
-      "slowest": 133.5,
-      "median": 115.90000003576279,
-      "p95": 120.09999996423721,
-      "runs": 15,
-      "n": 3,
-      "unit": "ms"
-    },
-    "account menu, first open in a second app": {
-      "low": 14.100000023841858,
-      "fastest": 11.399999976158142,
-      "slowest": 14.800000011920929,
-      "median": 14.800000011920929,
-      "p95": 16.19999998807907,
-      "runs": 15,
-      "n": 3,
-      "unit": "ms"
-    },
-    "activity: newest window, cold": {
-      "low": 6.8090669999999704,
-      "fastest": 5.387655999999993,
-      "slowest": 11.533803999999975,
-      "median": 6.8090669999999704,
-      "p95": 6.8090669999999704,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "activity: newest window, median": {
-      "low": 3.4248590000000263,
-      "fastest": 2.837192000000016,
-      "slowest": 4.0511659999999665,
-      "median": 3.4248590000000263,
-      "p95": 3.4248590000000263,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "All topics open, press to rows painted (juno.all-topics-open)": {
-      "low": 23.099999964237213,
-      "fastest": 20.19999998807907,
-      "slowest": 26.5,
-      "median": 24,
-      "p95": 27.899999976158142,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "allTopics.list: counts p95": {
-      "low": 2.53,
-      "fastest": 1.85,
-      "slowest": 3.63,
-      "median": 2.53,
-      "p95": 2.53,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "allTopics.list: first window p95": {
-      "low": 4.82,
-      "fastest": 3.38,
-      "slowest": 6.75,
-      "median": 4.82,
-      "p95": 4.82,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "allTopics.list: text filter p95": {
-      "low": 5.22,
-      "fastest": 4.12,
-      "slowest": 7.46,
-      "median": 5.22,
-      "p95": 5.22,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "chat cache: event to encoded window p95": {
-      "low": 13.327687999999966,
-      "fastest": 9.742706999999996,
-      "slowest": 14.903808999999967,
-      "median": 13.327687999999966,
-      "p95": 13.327687999999966,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "chat cache: query p95": {
-      "low": 0.18609800000001542,
-      "fastest": 0.15131200000001854,
-      "slowest": 0.23999800000001414,
-      "median": 0.18609800000001542,
-      "p95": 0.18609800000001542,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "chat first bubble, Enter to Juno's bubble painted, fake model (juno.chat-bubble)": {
-      "low": 55.30000001192093,
-      "fastest": 46.19999998807907,
-      "slowest": 64.10000002384186,
-      "median": 59.09999996423721,
-      "p95": 76.39999997615814,
-      "runs": 15,
-      "n": 20,
-      "unit": "ms"
-    },
-    "chat send, Enter to your bubble painted (juno.chat-send)": {
-      "low": 11.900000035762787,
-      "fastest": 10.5,
-      "slowest": 16.80000001192093,
-      "median": 14.599999964237213,
-      "p95": 21.5,
-      "runs": 15,
-      "n": 20,
-      "unit": "ms"
-    },
-    "code jump: long animation frames after the jump": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 1,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "frames"
-    },
-    "composer with a long draft, input timestamp to character presented": {
-      "low": 6.881,
-      "fastest": 5.638,
-      "slowest": 7.799,
-      "median": 9.289,
-      "p95": 16.227,
-      "runs": 15,
-      "n": 20,
-      "unit": "ms"
-    },
-    "composer, input timestamp to character presented": {
-      "low": 5.165,
-      "fastest": 4.199,
-      "slowest": 6.792,
-      "median": 9.365,
-      "p95": 15.901,
-      "runs": 15,
-      "n": 20,
-      "unit": "ms"
-    },
-    "conversation search: palette query p95": {
-      "low": 6.663589000003412,
-      "fastest": 4.535755999997491,
-      "slowest": 8.429301999996824,
-      "median": 6.663589000003412,
-      "p95": 6.663589000003412,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "conversation search: picker query p95": {
-      "low": 6.359067999997933,
-      "fastest": 4.870903000002727,
-      "slowest": 8.413780000002589,
-      "median": 6.359067999997933,
-      "p95": 6.359067999997933,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "emoji picker, first open in a second app": {
-      "low": 22.600000023841858,
-      "fastest": 20.30000001192093,
-      "slowest": 24.5,
-      "median": 22.69999998807907,
-      "p95": 23.899999976158142,
-      "runs": 15,
-      "n": 3,
-      "unit": "ms"
-    },
-    "emoji typing, input timestamp to character presented": {
-      "low": 5.384,
-      "fastest": 3.935,
-      "slowest": 6.109,
-      "median": 8.384,
-      "p95": 16.281,
-      "runs": 15,
-      "n": 20,
-      "unit": "ms"
-    },
-    "engine private memory after heavy use": {
-      "low": 149.90234375,
-      "fastest": 144.3203125,
-      "slowest": 153.671875,
-      "median": 149.90234375,
-      "p95": 149.90234375,
-      "runs": 15,
-      "n": 1,
-      "unit": "MB"
-    },
-    "engine private memory after scrolling": {
-      "low": 92.42578125,
-      "fastest": 89.97265625,
-      "slowest": 93.5234375,
-      "median": 92.42578125,
-      "p95": 92.42578125,
-      "runs": 15,
-      "n": 1,
-      "unit": "MB"
-    },
-    "filter change, press to new list painted (juno.filter)": {
-      "low": 18.69999998807907,
-      "fastest": 17.200000047683716,
-      "slowest": 20.400000035762787,
-      "median": 20,
-      "p95": 27.69999998807907,
-      "runs": 15,
-      "n": 9,
-      "unit": "ms"
-    },
-    "home open, quick (pointerdown on Home) to Home painted": {
-      "low": 12,
-      "fastest": 11.600000023841858,
-      "slowest": 15.5,
-      "median": 14.099999964237213,
-      "p95": 16.5,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "Juno mention typing, input timestamp to character presented": {
-      "low": 6.904,
-      "fastest": 5.796,
-      "slowest": 7.413,
-      "median": 8.897,
-      "p95": 17.623,
-      "runs": 15,
-      "n": 16,
-      "unit": "ms"
-    },
-    "live update in the topic, engine commit to pixels (juno.live-update, messages.list)": {
-      "low": 20.400048792362213,
-      "fastest": 17.500097632408142,
-      "slowest": 27.400097608566284,
-      "median": 24.39995115995407,
-      "p95": 50.20004880428314,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "live update, engine commit to pixels (juno.live-update)": {
-      "low": 5.299951195716858,
-      "fastest": 3.599951207637787,
-      "slowest": 7.499902307987213,
-      "median": 8.700048863887787,
-      "p95": 17.200048863887787,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "main private memory after heavy use": {
-      "low": 119.45703125,
-      "fastest": 94.65625,
-      "slowest": 122.625,
-      "median": 119.45703125,
-      "p95": 119.45703125,
-      "runs": 15,
-      "n": 1,
-      "unit": "MB"
-    },
-    "main private memory after scrolling": {
-      "low": 95.63671875,
-      "fastest": 78.5390625,
-      "slowest": 97.36328125,
-      "median": 95.63671875,
-      "p95": 95.63671875,
-      "runs": 15,
-      "n": 1,
-      "unit": "MB"
-    },
-    "media viewer open (click on a picture) to the viewer painted": {
-      "low": 10.399999976158142,
-      "fastest": 10,
-      "slowest": 12.400000035762787,
-      "median": 11.100000023841858,
-      "p95": 20.19999998807907,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "mention typing, input timestamp to character presented": {
-      "low": 6.984,
-      "fastest": 6.057,
-      "slowest": 8.272,
-      "median": 9.804,
-      "p95": 19.876,
-      "runs": 15,
-      "n": 16,
-      "unit": "ms"
-    },
-    "message menu, first open in a second app": {
-      "low": 13.800000011920929,
-      "fastest": 12,
-      "slowest": 15.399999976158142,
-      "median": 14.600000023841858,
-      "p95": 14.800000011920929,
-      "runs": 15,
-      "n": 3,
-      "unit": "ms"
-    },
-    "messages.list: decode median": {
-      "low": 1.41,
-      "fastest": 1.15,
-      "slowest": 1.68,
-      "median": 1.41,
-      "p95": 1.41,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "messages.list: encode median": {
-      "low": 1.77,
-      "fastest": 1.35,
-      "slowest": 1.86,
-      "median": 1.77,
-      "p95": 1.77,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "messages.list: live query p95": {
-      "low": 3.3,
-      "fastest": 2.33,
-      "slowest": 4.08,
-      "median": 3.3,
-      "p95": 3.3,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "messages.list: Main rerun p95": {
-      "low": 0.48,
-      "fastest": 0.24,
-      "slowest": 3.37,
-      "median": 0.48,
-      "p95": 0.48,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "messages.list: thread rerun p95": {
-      "low": 2.58,
-      "fastest": 1.81,
-      "slowest": 5.8,
-      "median": 2.58,
-      "p95": 2.58,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "New tab with Home to its composer": {
-      "low": 14.300000011920929,
-      "fastest": 12.899999976158142,
-      "slowest": 15,
-      "median": 14.5,
-      "p95": 17.099999964237213,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "palette input timestamp to character presented": {
-      "low": 8.822,
-      "fastest": 8.065,
-      "slowest": 10.289,
-      "median": 12.005,
-      "p95": 20.707,
-      "runs": 15,
-      "n": 56,
-      "unit": "ms"
-    },
-    "palette keystroke to its rows painted (juno.palette-results)": {
-      "low": 23.30000001192093,
-      "fastest": 18,
-      "slowest": 27,
-      "median": 25.30000001192093,
-      "p95": 57.59999996423721,
-      "runs": 15,
-      "n": 2,
-      "unit": "ms"
-    },
-    "palette open, ⌘K to recent rows painted (juno.palette-open)": {
-      "low": 10.899999976158142,
-      "fastest": 10.100000023841858,
-      "slowest": 13,
-      "median": 11.399999976158142,
-      "p95": 13.5,
-      "runs": 15,
-      "n": 5,
-      "unit": "ms"
-    },
-    "palette, input timestamp to character presented": {
-      "low": 6.254,
-      "fastest": 5.244,
-      "slowest": 9.443,
-      "median": 9.907,
-      "p95": 16.643,
-      "runs": 15,
-      "n": 20,
-      "unit": "ms"
-    },
-    "panel open, ⌘J to the panel painted (juno.panel-open)": {
-      "low": 24,
-      "fastest": 20.19999998807907,
-      "slowest": 28.899999976158142,
-      "median": 24.30000001192093,
-      "p95": 40.80000001192093,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "peek open, key down to the peeked rows painted (juno.peek-open)": {
-      "low": 14,
-      "fastest": 13.400000035762787,
-      "slowest": 16.19999998807907,
-      "median": 14.5,
-      "p95": 22.80000001192093,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "quick start, sign-in to sidebar rows": {
-      "low": 2868,
-      "fastest": 2851,
-      "slowest": 3087,
-      "median": 2868,
-      "p95": 2868,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "renderer private memory after heavy use": {
-      "low": 322.7734375,
-      "fastest": 270.90625,
-      "slowest": 345.7578125,
-      "median": 322.7734375,
-      "p95": 322.7734375,
-      "runs": 15,
-      "n": 1,
-      "unit": "MB"
-    },
-    "renderer private memory after scrolling": {
-      "low": 200.34375,
-      "fastest": 173.2734375,
-      "slowest": 220.078125,
-      "median": 200.34375,
-      "p95": 200.34375,
-      "runs": 15,
-      "n": 1,
-      "unit": "MB"
-    },
-    "row hover (pointerover event) to next frame presented": {
-      "low": 5.300000011920929,
-      "fastest": 4.699999988079071,
-      "slowest": 5.899999976158142,
-      "median": 5.600000023841858,
-      "p95": 6.900000035762787,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "scroll-all-topics: continuous scroll frame work": {
-      "low": 5.481,
-      "fastest": 4.669,
-      "slowest": 5.996,
-      "median": 8.453,
-      "p95": 9.766,
-      "runs": 15,
-      "n": 500,
-      "unit": "ms"
-    },
-    "scroll-all-topics: dropped frames, continuous": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "%"
-    },
-    "scroll-all-topics: long animation frames": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "frames"
-    },
-    "scroll-chat: continuous scroll frame work": {
-      "low": 3.763,
-      "fastest": 3.522,
-      "slowest": 4.408,
-      "median": 4.556,
-      "p95": 5.772,
-      "runs": 15,
-      "n": 380,
-      "unit": "ms"
-    },
-    "scroll-chat: dropped frames, continuous": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "%"
-    },
-    "scroll-chat: long animation frames": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "frames"
-    },
-    "scroll-messages: continuous scroll frame work": {
-      "low": 2.699,
-      "fastest": 2.581,
-      "slowest": 2.989,
-      "median": 3.723,
-      "p95": 8.143,
-      "runs": 15,
-      "n": 381,
-      "unit": "ms"
-    },
-    "scroll-messages: dropped frames, continuous": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "%"
-    },
-    "scroll-messages: long animation frames": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "frames"
-    },
-    "scroll-sidebar: continuous scroll frame work": {
-      "low": 5.588,
-      "fastest": 4.648,
-      "slowest": 6.51,
-      "median": 6.81,
-      "p95": 9.63,
-      "runs": 15,
-      "n": 379,
-      "unit": "ms"
-    },
-    "scroll-sidebar: dropped frames, continuous": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "%"
-    },
-    "scroll-sidebar: long animation frames": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "frames"
-    },
-    "search arrow to reader painted": {
-      "low": 25.19999998807907,
-      "fastest": 22.100000023841858,
-      "slowest": 28.600000023841858,
-      "median": 27.69999998807907,
-      "p95": 35.09999996423721,
-      "runs": 14,
-      "n": 17,
-      "unit": "ms"
-    },
-    "search keystroke to rows painted": {
-      "low": 16.19999998807907,
-      "fastest": 7.300000011920929,
-      "slowest": 30.80000001192093,
-      "median": 18.599999964237213,
-      "p95": 37.69999998807907,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "search.query: decode p95": {
-      "low": 1.9107370000001538,
-      "fastest": 0.8567030000003797,
-      "slowest": 2.95971499999996,
-      "median": 1.9107370000001538,
-      "p95": 1.9107370000001538,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "search.query: encode p95": {
-      "low": 2.7377800000003845,
-      "fastest": 1.0724419999996826,
-      "slowest": 3.7179740000001402,
-      "median": 2.7377800000003845,
-      "p95": 2.7377800000003845,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "search.query: filtered p95": {
-      "low": 7.546486000000186,
-      "fastest": 7.208644000000277,
-      "slowest": 7.695694000000003,
-      "median": 7.546486000000186,
-      "p95": 7.546486000000186,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "search.query: p95 while a backfill writes": {
-      "low": 9.039772999999514,
-      "fastest": 7.785863000000063,
-      "slowest": 10.694101999999475,
-      "median": 9.039772999999514,
-      "p95": 9.039772999999514,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "search.query: session p95": {
-      "low": 21.334279999999126,
-      "fastest": 17.915289999999914,
-      "slowest": 25.043751999999586,
-      "median": 21.334279999999126,
-      "p95": 21.334279999999126,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "selection drag with the panel open, frame work": {
-      "low": 1.215,
-      "fastest": 1.043,
-      "slowest": 1.308,
-      "median": 1.628,
-      "p95": 6.182,
-      "runs": 15,
-      "n": 254,
-      "unit": "ms"
-    },
-    "selection drag with the panel open: long animation frames": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "frames"
-    },
-    "send in Main with a 1 s model, Enter through the checks to the pending row painted (juno.send)": {
-      "low": 34.80000001192093,
-      "fastest": 31.80000001192093,
-      "slowest": 37,
-      "median": 39.40000003576279,
-      "p95": 54,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "send, Enter to the pending row painted (juno.send)": {
-      "low": 30.5,
-      "fastest": 29.5,
-      "slowest": 40.5,
-      "median": 31.5,
-      "p95": 44,
-      "runs": 15,
-      "n": 9,
-      "unit": "ms"
-    },
-    "Settings, first open in a second app": {
-      "low": 16.299999952316284,
-      "fastest": 15.899999976158142,
-      "slowest": 18.5,
-      "median": 17,
-      "p95": 25.399999976158142,
-      "runs": 15,
-      "n": 3,
-      "unit": "ms"
-    },
-    "show sidebar, click to frame presented": {
-      "low": 24.099999964237213,
-      "fastest": 22.5,
-      "slowest": 26.599999964237213,
-      "median": 24.100000023841858,
-      "p95": 25.399999976158142,
-      "runs": 15,
-      "n": 7,
-      "unit": "ms"
-    },
-    "sidebar drag, main-thread work per frame": {
-      "low": 8.914,
-      "fastest": 8.126,
-      "slowest": 11.492,
-      "median": 9.546,
-      "p95": 10.956,
-      "runs": 15,
-      "n": 180,
-      "unit": "ms"
-    },
-    "sidebar drag: long animation frames": {
-      "low": 0,
-      "fastest": 0,
-      "slowest": 0,
-      "median": 0,
-      "p95": 0,
-      "runs": 15,
-      "n": 1,
-      "unit": "frames"
-    },
-    "switch to Activity in the panel, pick to the page painted (juno.page-switch)": {
-      "low": 16.399999976158142,
-      "fastest": 15.899999976158142,
-      "slowest": 16.80000001192093,
-      "median": 16.700000047683716,
-      "p95": 33.700000047683716,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "tab switch, mounted (juno.tab-switch)": {
-      "low": 23.19999998807907,
-      "fastest": 21.099999964237213,
-      "slowest": 27.400000035762787,
-      "median": 25.19999998807907,
-      "p95": 31.5,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "tab switch, mounted, one tab scrolled up (juno.tab-switch)": {
-      "low": 23.899999976158142,
-      "fastest": 20.799999952316284,
-      "slowest": 27.69999998807907,
-      "median": 28.099999964237213,
-      "p95": 32.60000002384186,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "tab switch, unmounted with scroll restore (juno.tab-switch)": {
-      "low": 16.200000047683716,
-      "fastest": 14.800000011920929,
-      "slowest": 16.700000047683716,
-      "median": 16.899999976158142,
-      "p95": 35.60000002384186,
-      "runs": 15,
-      "n": 11,
-      "unit": "ms"
-    },
-    "topic open, cached 300 rows, press to rows painted at position (juno.topic-open)": {
-      "low": 23.5,
-      "fastest": 22.200000047683716,
-      "slowest": 30.19999998807907,
-      "median": 25,
-      "p95": 51.40000003576279,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "topic open, prefetched (juno.topic-open)": {
-      "low": 23.80000001192093,
-      "fastest": 22.19999998807907,
-      "slowest": 28,
-      "median": 25.599999964237213,
-      "p95": 28.899999976158142,
-      "runs": 15,
-      "n": 8,
-      "unit": "ms"
-    },
-    "topic open, uncached, press to header and stored rows painted (juno.topic-open)": {
-      "low": 31.700000047683716,
-      "fastest": 30.19999998807907,
-      "slowest": 32.5,
-      "median": 32.30000001192093,
-      "p95": 33.10000002384186,
-      "runs": 15,
-      "n": 3,
-      "unit": "ms"
-    },
-    "topic reopen, #eng, press to rows painted": {
-      "low": 13.563999976157902,
-      "fastest": 12.032000023841647,
-      "slowest": 14.164000023842164,
-      "median": 13.766000011921278,
-      "p95": 14.300000011920929,
-      "runs": 15,
-      "n": 4,
-      "unit": "ms"
-    },
-    "topic reopen, 50 code blocks with known colours, press to rows painted (juno.topic-open)": {
-      "low": 59.19999998807907,
-      "fastest": 53.80000001192093,
-      "slowest": 65.10000002384186,
-      "median": 60.40000003576279,
-      "p95": 68.80000001192093,
-      "runs": 15,
-      "n": 5,
-      "unit": "ms"
-    },
-    "topic reopen, Draft plan is in the doc, press to rows painted": {
-      "low": 13.563999988078649,
-      "fastest": 12.899999952316648,
-      "slowest": 14.398000011920885,
-      "median": 13.997999988078845,
-      "p95": 14.50000003576315,
-      "runs": 15,
-      "n": 4,
-      "unit": "ms"
-    },
-    "topic reopen, link, press to rows painted": {
-      "low": 15.600000000000364,
-      "fastest": 2.799999988079435,
-      "slowest": 23.80000001192093,
-      "median": 17.20000003576297,
-      "p95": 28.29999997615778,
-      "runs": 15,
-      "n": 4,
-      "unit": "ms"
-    },
-    "topic reopen, Long rollout log for perf, press to rows painted": {
-      "low": 13.432000000000698,
-      "fastest": 12.731999999999971,
-      "slowest": 14.398000011920885,
-      "median": 13.800000011920929,
-      "p95": 14.231999999999971,
-      "runs": 15,
-      "n": 4,
-      "unit": "ms"
-    },
-    "topic switcher, first open in a second app": {
-      "low": 12.899999976158142,
-      "fastest": 12.299999952316284,
-      "slowest": 14.199999988079071,
-      "median": 13.399999976158142,
-      "p95": 14,
-      "runs": 15,
-      "n": 3,
-      "unit": "ms"
-    },
-    "topics.list: query p95 in the engine": {
-      "low": 3.73,
-      "fastest": 3.01,
-      "slowest": 4.28,
-      "median": 3.73,
-      "p95": 3.73,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "turn timing: message to first bubble p95": {
-      "low": 12.9,
-      "fastest": 8.6,
-      "slowest": 15.5,
-      "median": 12.9,
-      "p95": 12.9,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "turn timing: run after an approved card to first bubble p95": {
-      "low": 15.3,
-      "fastest": 11.8,
-      "slowest": 23.6,
-      "median": 15.3,
-      "p95": 15.3,
-      "runs": 15,
-      "n": 1,
-      "unit": "ms"
-    },
-    "warm start, main process created to sidebar rows painted": {
-      "low": 1668.2998046875,
-      "fastest": 1614.39990234375,
-      "slowest": 1800.599853515625,
-      "median": 1687,
-      "p95": 1735.199951171875,
-      "runs": 15,
-      "n": 5,
-      "unit": "ms"
+  "shapes": {
+    "linux-x64, 2 threads, Electron 44.7.0": {
+      "runs": 2,
+      "metrics": {
+        "engine private memory after heavy use": {
+          "low": 140.89453125,
+          "fastest": 140.89453125,
+          "slowest": 143.10546875,
+          "median": 140.89453125,
+          "p95": 140.89453125,
+          "runs": 2,
+          "n": 1,
+          "unit": "MB"
+        },
+        "main private memory after heavy use": {
+          "low": 114.5390625,
+          "fastest": 114.5390625,
+          "slowest": 119.17578125,
+          "median": 114.5390625,
+          "p95": 114.5390625,
+          "runs": 2,
+          "n": 1,
+          "unit": "MB"
+        },
+        "renderer private memory after heavy use": {
+          "low": 268.265625,
+          "fastest": 268.265625,
+          "slowest": 269.3203125,
+          "median": 268.265625,
+          "p95": 268.265625,
+          "runs": 2,
+          "n": 1,
+          "unit": "MB"
+        },
+        "warm start, main process created to sidebar rows painted": {
+          "low": 2109.300048828125,
+          "fastest": 2109.300048828125,
+          "slowest": 2532.5,
+          "median": 2165.5,
+          "p95": 2246.39990234375,
+          "runs": 2,
+          "n": 4,
+          "unit": "ms"
+        }
+      }
+    },
+    "linux-x64, 4 threads, Electron 44.7.0": {
+      "runs": 2,
+      "metrics": {
+        "scroll-messages: continuous scroll frame work": {
+          "low": 2.846,
+          "fastest": 2.846,
+          "slowest": 3.067,
+          "median": 4.014,
+          "p95": 8.589,
+          "runs": 2,
+          "n": 380,
+          "unit": "ms"
+        },
+        "send in Main with a 1 s model, Enter through the checks to the pending row painted (juno.send)": {
+          "low": 35.799999952316284,
+          "fastest": 35.799999952316284,
+          "slowest": 38.69999998807907,
+          "median": 39.30000001192093,
+          "p95": 39.5,
+          "runs": 2,
+          "n": 5,
+          "unit": "ms"
+        },
+        "topic open, uncached, press to header and stored rows painted (juno.topic-open)": {
+          "low": 32.19999998807907,
+          "fastest": 32.19999998807907,
+          "slowest": 34,
+          "median": 32.30000001192093,
+          "p95": 33.59999996423721,
+          "runs": 2,
+          "n": 3,
+          "unit": "ms"
+        },
+        "topic reopen, #eng, press to rows painted": {
+          "low": 12.800000000000182,
+          "fastest": 12.800000000000182,
+          "slowest": 13.297999999999774,
+          "median": 13.166000000000167,
+          "p95": 14.097999999999956,
+          "runs": 2,
+          "n": 4,
+          "unit": "ms"
+        },
+        "topic reopen, Long rollout log for perf, press to rows painted": {
+          "low": 13,
+          "fastest": 13,
+          "slowest": 13.131999999999607,
+          "median": 13.163999988079013,
+          "p95": 13.431999988079042,
+          "runs": 2,
+          "n": 4,
+          "unit": "ms"
+        }
+      }
     }
   }
 }

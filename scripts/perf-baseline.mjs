@@ -90,6 +90,6 @@ if (import.meta.main) {
   }
   if (command === 'update') {
     writeFileSync(BASELINE, `${JSON.stringify(next, null, 2)}\n`)
-    console.log(`perf-baseline: ${runs.length} runs, ${Object.keys(next.shapes).length} runner shapes; commit apps/desktop/e2e/perf-baseline.json`)
+    console.log(`perf-baseline: ${runs.length} results folders, ${Object.keys(next.shapes).length} runner shapes; commit apps/desktop/e2e/perf-baseline.json`)
   }
 }
