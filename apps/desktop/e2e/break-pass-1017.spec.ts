@@ -1,9 +1,9 @@
-// Break pass of 10-17: what needs a browser's layout and focus. Keys typed
-// right after ⌘N, before the destination list's search has focus, reach it in
-// order (in the DOM lane the focus moves before the keys arrive, so it passed
-// there with the keys not held at all); a narrow window, the destination list
-// and switcher in it, Home's field through a send, Esc from Home's lists back
-// to their chips, and dark mode's surfaces. The flows of the break pass are in
+// Break pass of 10-17: what needs a browser's layout and focus. A narrow
+// window, the destination list and switcher in it, Home's field through a
+// send, Esc from Home's lists back to their chips, and dark mode's surfaces.
+// Keys typed right after ⌘N are not tested: the test seam moves focus before
+// the keys arrive, in this lane as in the DOM lane, so the test passed with
+// the keys not held at all. The flows of the break pass are in
 // the DOM lane (`dom/break-pass-1017*.test.ts`); a mouse press on a tab is in
 // tabs.spec.ts. Findings are in docs/reviews/2026-10-17-break-pass.md and
 // docs/reviews/2026-10-17-break-pass-b.md.
@@ -19,17 +19,7 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 
 const setWindowSize = (juno: Juno, width: number, height?: number) => juno.setWindowSize(width, height)
 
-/** ⌘N, then "maya", Enter and a first word, with no wait between them. */
-async function newMessageAndType(juno: Juno): Promise<void> {
-  await juno.tabs.shortcut('new-message')
-  await juno.win.keyboard.type('maya')
-  await juno.win.keyboard.press('Enter')
-  await juno.win.keyboard.type('Hi')
-}
-
-syncedTest('keys right after ⌘N reach the destination list; a narrow window keeps the tab strip and topic inside it, the destination list and topic switcher fit, Esc gives focus back to Home\'s chips, and dark mode leaves no light surface', async ({ juno, fake }) => {
-  // First, from the launch's single Home tab: each step types with no wait after the menu command.
-  await test.step('keys typed right after ⌘N reach the destination list on Home, a new Home tab when Home has a draft, and a new Home tab from a topic', () => typedAfterNewMessage(juno))
+syncedTest('a narrow window keeps the tab strip and topic inside it, the destination list and topic switcher fit, Esc gives focus back to Home\'s chips, and dark mode leaves no light surface', async ({ juno, fake }) => {
   // Sixty threads in #eng for the switcher.
   for (let i = 0; i < 60; i++) {
     const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: `Busy day thread number ${i} about things` })
@@ -142,52 +132,3 @@ syncedTest('keys right after ⌘N reach the destination list; a narrow window ke
     expect(await lightSurfaces()).toEqual([])
   })
 })
-
-const DRAFT = 'Half a thought'
-
-async function typedAfterNewMessage(juno: Juno): Promise<void> {
-  const { write, tabs, sidebar, topic } = juno
-
-  await test.step('on Home, the keys reach its destination list', async () => {
-    await write.composer.focus()
-    await newMessageAndType(juno)
-    await tabs.expectCount(1)
-    await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
-    await expect(write.composer).toHaveValue('Hi')
-    await expect(write.composer).toBeFocused()
-  })
-
-  await test.step('on Home with a draft, the keys reach a new Home tab, and the draft is untouched', async () => {
-    await write.composer.press('End')
-    await write.composer.pressSequentially(`. ${DRAFT}`)
-    await newMessageAndType(juno)
-    await tabs.expectCount(2)
-    await tabs.expectActiveAt('Home', 1)
-    await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
-    await expect(write.composer).toHaveValue('Hi')
-    await expect(write.composer).toBeFocused()
-    await tabs.selectAt('Home', 0)
-    await tabs.expectActiveAt('Home', 0)
-    await expect(write.composer).toHaveValue(`Hi. ${DRAFT}`)
-    await write.expectDestination('Maya')
-    await tabs.selectAt('Home', 1)
-    await tabs.menu('close-tab')
-    await tabs.expectCount(1)
-  })
-
-  await test.step('from a topic, the keys reach a new Home tab', async () => {
-    await sidebar.row(POSTGRES).open()
-    await topic.expectTitle(POSTGRES)
-    await topic.composer.focus()
-    await newMessageAndType(juno)
-    await tabs.expectCount(2)
-    await tabs.expectActiveAt('Home', 0)
-    await expect(write.composer).toHaveAttribute('placeholder', 'Message Maya')
-    await expect(write.composer).toHaveValue('Hi')
-    await expect(write.composer).toBeFocused()
-    // Leave the draft in no Home tab, so the steps after start from an empty field.
-    await write.composer.fill('')
-    await tabs.select(POSTGRES)
-    await expect(topic.composer).toHaveValue('')
-  })
-}

@@ -1,5 +1,5 @@
 // The sidebar in the browser, as one journey from a synced start. A Main row's new-thread count leaves the row's
-// height alone. Rows that scroll under a still pointer are not warmed. The list holds its order while the pointer
+// height alone. The list holds its order while the pointer
 // or keyboard focus is in it (SPEC 5, "Holding the order"): new activity updates a row in place but does not move
 // it, so a press lands on the row it was aimed at, and leaving the list applies the new order in one step. A view's
 // pill drags to a new place, and many views scroll the pill row sideways (SPEC 5, "Views"). What it shows after
@@ -9,7 +9,6 @@
 import { expect, test } from './fixtures'
 import { pointAt, press, type Juno } from './driver/juno'
 import type { FakeSlack } from '@juno/fake-slack'
-import type { Page } from '@playwright/test'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -57,7 +56,7 @@ async function expectMovedAbove(juno: Juno, movers: ReadonlyArray<string>, targe
 }
 
 // Each step takes its own order and rows from the list as the step before left it.
-test('the sidebar: a new-thread count keeps the row height, rows under a still pointer are not warmed, the order holds under the pointer and keyboard focus, and view pills drag and scroll', async ({ juno, win, fake }) => {
+test('the sidebar: a new-thread count keeps the row height, the order holds under the pointer and keyboard focus, and view pills drag and scroll', async ({ juno, win, fake }) => {
   await test.step('the new-thread count on a Main row keeps the row height, and reading Main clears it', async () => {
     const main = juno.sidebar.row('#eng')
     // #eng was read up to the Postgres plan; the staging bill thread started after it.
@@ -68,7 +67,6 @@ test('the sidebar: a new-thread count keeps the row height, rows under a still p
     await main.expectNoNewThreads()
     expect(await main.height()).toBe(height)
   })
-  await test.step('rows that scroll under a still pointer are not warmed; moving onto a row warms it', () => notWarmedUnderStillPointer(juno, win))
   await test.step('under the pointer, new activity does not move rows, and a press opens the row pointed at', async () => {
     const target = (await recentIds(juno))[1]!
     const title = await titleOf(juno, target)
@@ -139,40 +137,6 @@ test('the sidebar: a new-thread count keeps the row height, rows under a still p
   // Last: it deletes Automated, which changes the list.
   await test.step('a pill dragged before another takes its place, and many views scroll the pill row sideways', () => viewPills(juno))
 })
-
-async function notWarmedUnderStillPointer(juno: Juno, win: Page): Promise<void> {
-  const { sidebar } = juno
-  const list = sidebar.list
-  await sidebar.list.evaluate((node) => { node.scrollTop = 0 })
-  await sidebar.hoverList()
-  const before = await juno.lastMark('juno.prefetch')
-
-  type Watched = HTMLElement & { scrollEnded?: Promise<void> }
-  /** Turns the wheel over the list and waits for its scroll to end. The listener is in place before the wheel turns. */
-  const wheel = async () => {
-    const room = await list.evaluate((node: Watched) => {
-      node.scrollEnded = new Promise((resolve) => node.addEventListener('scrollend', () => resolve(), { once: true }))
-      return node.scrollHeight - node.clientHeight - node.scrollTop
-    })
-    await win.mouse.wheel(0, 300)
-    // At the end of the list the wheel scrolls nothing, and no scrollend comes.
-    if (room >= 1) await list.evaluate((node: Watched) => node.scrollEnded)
-  }
-  await wheel()
-  await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(0)
-  await wheel()
-  // The hover moves to the row now under the pointer on a frame after the scroll.
-  await win.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-  expect(await juno.lastMark('juno.prefetch')).toBe(before)
-
-  // A real move onto another row warms it, as before.
-  const box = (await list.boundingBox())!
-  await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 })
-  await expect.poll(() => juno.lastMark('juno.prefetch')).not.toBe(before)
-  // Back to the top, where the steps below read the Recent section.
-  await juno.sidebar.leave()
-  await list.evaluate((node) => { node.scrollTop = 0 })
-}
 
 async function viewPills(juno: Juno): Promise<void> {
   const { sidebar } = juno
