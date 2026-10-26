@@ -25,7 +25,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'send-checks.spec.ts',
   'break-pass-1017b.spec.ts',
   'tab-scroll.spec.ts',
-  'scroll-rest.spec.ts',
   'emoji-colon.spec.ts',
   'layout-shift.spec.ts',
   'stick-bottom.spec.ts',

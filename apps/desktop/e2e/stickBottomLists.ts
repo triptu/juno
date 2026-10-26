@@ -148,6 +148,11 @@ export async function backAtEnd(juno: Juno, win: Page, post: (text: string) => v
 export async function openFullWindow(juno: Juno, title: string): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
+  await reopenFull(juno, title)
+}
+
+/** As `openFullWindow`, signed in already. */
+export async function reopenFull(juno: Juno, title: string): Promise<void> {
   // The first open reads the topic. Opened again, it shows its newest 150 rows, so each message that arrives drops
   // the first row, and scroll anchoring lowers scrollTop by that row's height.
   const row = juno.sidebar.row(title)
