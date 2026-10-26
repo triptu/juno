@@ -36,7 +36,7 @@ export interface ForcedInteractionReport {
   /** Pseudo-class rules in this document that could not be rewritten, for the log. */
   readonly unforced: number
   /** Milliseconds spent dispatching, waiting and reading boxes, for the log. */
-  readonly timing: { readonly act: number; readonly settle: number; readonly boxes: number }
+  readonly timing: { readonly act: number; readonly settle: number; readonly boxes: number; readonly diff: number; readonly pseudo: number; readonly total: number }
 }
 
 // The functions below run in the page, through `toString()`: each uses nothing outside its own body.
@@ -240,14 +240,17 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
   return (await withHelpers(
     page,
     async (arg: { root: string; targets: string; skipWithin: string | null; max: number; from: number; pending: string | null; tolerance: number; grows: string | null }, h) => {
+      const started = performance.now()
       const found = document.querySelector(arg.root)
       const rootEl = found instanceof HTMLElement ? found : document.body
+      const pseudoStarted = performance.now()
       const unforced = h.forcePseudoClasses()
+      const pseudo = performance.now() - pseudoStarted
       const touch = h.touches()
       const settle = h.settler(arg.pending, new Set(document.getAnimations()), touch.syncFocus, h.forcePseudoClasses)
       const picked = h.sampleTargets(rootEl, arg.targets, arg.skipWithin, arg.max)
       const drawn = new Set(picked.filter((el) => el.getClientRects().length > 0))
-      const timing = { act: 0, settle: 0, boxes: 0 }
+      const timing = { act: 0, settle: 0, boxes: 0, diff: 0, pseudo, total: 0 }
       const shifts: ForcedShift[] = []
       let touched = 0
       let boxes = h.layoutBoxes(rootEl)
@@ -274,12 +277,14 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
           await settle()
           const t2 = performance.now()
           const now = h.layoutBoxes(rootEl)
+          const t3 = performance.now()
           const moved = h.changedBoxes(boxes, now, arg.tolerance, arg.grows, h.describeNode)
           if (moved.length > 0) shifts.push({ element: index, target, step: name, moved })
           boxes = now
           timing.act += t1 - t0
           timing.settle += t2 - t1
-          timing.boxes += performance.now() - t2
+          timing.boxes += t3 - t2
+          timing.diff += performance.now() - t3
         }
         await step('hover', () => touch.hover(hit, x, y))
         await step('focus from the keyboard', () => touch.focus(element))
@@ -289,8 +294,12 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
         await step('leave', () => touch.leave(hit, x, y))
         // A touch that took away or hid elements still to touch (Undo puts back other buttons) needs a fresh state for the rest.
         // Other changes stay: what follows is still something a person can do, and each step is measured on its own.
-        if (picked.slice(index + 1).some((next) => drawn.has(next) && (!next.isConnected || next.getClientRects().length === 0))) return { shifts, touched, next: index + 1, unforced, timing }
+        if (picked.slice(index + 1).some((next) => drawn.has(next) && (!next.isConnected || next.getClientRects().length === 0))) {
+          timing.total = performance.now() - started
+          return { shifts, touched, next: index + 1, unforced, timing }
+        }
       }
+      timing.total = performance.now() - started
       return { shifts, touched, unforced, timing }
     },
     {
