@@ -22,9 +22,10 @@ const shardIndex = Number(/^(\d+)\/\d+$/.exec(process.env.JUNO_SHARD ?? '')?.[1]
 // JUNO_SKIP_TAGS=@heavy-gallery skips the shift guard over every component, as the desktop config does for its tags.
 const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
 
-// Full fast-only runs use one worker per allocated thread; the real-input walk
-// benefits from more workers while frames settle. A cached run uses fewer still.
-const selectedWorkers = process.env.GALLERY_SHIFT_ALL === '1' && process.env.GALLERY_REAL_WALK === '0'
+// Full fast-only runs use one worker per allocated thread, a full run's sampled walk too, since a commit that
+// changes a shared component walks most states again; the real-input walk benefits from more workers while
+// frames settle. A cached run uses fewer still.
+const selectedWorkers = (process.env.GALLERY_SHIFT_ALL === '1' || process.env.GALLERY_SAMPLE !== undefined) && process.env.GALLERY_REAL_WALK === '0'
   ? process.env.GALLERY_FAST_WORKERS
   : process.env.GALLERY_SHIFT_ALL === '1' || process.env.GALLERY_REAL_WALK === '1' ? undefined : process.env.GALLERY_CACHED_WORKERS
 const workers = Number(selectedWorkers ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
