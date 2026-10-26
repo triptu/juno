@@ -8,7 +8,7 @@
 //   bun run affected --plan --json   the plan as JSON
 //   bun run affected --spec e2e/tabs.spec.ts   also run that spec (desktop or gallery; repeat or comma-separate)
 //   bun run affected --budget-seconds 300  estimated test time for optional coverage picks
-//   bun run affected --wide          the wide plan: every spec the change can reach, heavy tests included
+//   bun run affected --wide          the wide plan: every spec the change can reach, heavy and nightly tests included
 //   bun run affected --batch --base <ref>   the batch gate: unit tests, specs:check and conformance only
 //
 // The change is every file that differs from the merge base, committed or not,
@@ -17,7 +17,7 @@
 // barrel re-exports) decides what each change reaches; for desktop e2e specs
 // the coverage map narrows it, and the plan runs the changed and named specs
 // and coverage picks within a time budget, the most direct first (scripts/affected-select.mjs).
-// Heavy tests, the Quint checks and the perf suggestion follow the areas in
+// Heavy and nightly tests, the Quint checks and the perf suggestion follow the areas in
 // scripts/test-areas.mjs. The rules are in docs/development.md ("Affected
 // tests"); --wide plans as before 10-18. scripts/affected-run.mjs runs the plan.
 
@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url'
 import { MAP_PATH } from './coverage-map.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, graphCandidates, mapProblem, COVERAGE_BUDGET_SECONDS, rankComponents, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
-import { guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
+import { guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, NIGHTLY_AREAS, nightlyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { bunTestScripts, unitTestItems } from './affected-tests.mjs'
 import { isDomTest } from './dom-tests.mjs'
@@ -60,18 +60,20 @@ const git = (...args) => {
 
 // --files a,b plans for those files instead of the working tree's changes;
 // --range a..b for what changed between two commits (to replay a past merge).
+// --app-changes leaves out scripts/, which the app never runs (scripts/nightly-reach.mjs).
 const range = argv.includes('--range') ? argv[argv.indexOf('--range') + 1].split('..') : undefined
-const changed = argv.includes('--files')
+const changed = (argv.includes('--files')
   ? argv[argv.indexOf('--files') + 1].split(',')
   : range
     ? git('diff', '--name-only', range[0], range[1])
     : [...new Set([...git('diff', '--name-only', base), ...git('ls-files', '--others', '--exclude-standard')])].toSorted()
+).filter((file) => !argv.includes('--app-changes') || !file.startsWith('scripts/'))
 const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standard', '--', 'apps', 'packages').filter((file) => existsSync(join(root, file))))
 
 /** What every suite installs and compiles with: a change reaches every unit test, and a sample of every e2e suite. */
 const dependencies = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
-const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/dom-tests.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/build-inputs.mjs', 'scripts/locked-packages.mjs', 'scripts/without-run-as-node.mjs']
+const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/dom-tests.mjs', 'scripts/nightly-tests.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/build-inputs.mjs', 'scripts/locked-packages.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
 const deletedSources = wide ? changed.filter((file) => /^(apps|packages)\//.test(file) && !file.endsWith('.md') && !files.has(file)) : []
 const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : []), ...deletedSources]
@@ -106,7 +108,7 @@ const resultsDir = join(tmpdir(), 'juno-cache', 'results')
 const useCache = !flag('--no-cache')
 const contentHash = new Map()
 const shared = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
-const keyOf = (suite, id, inputs) => inputKey(root, [...shared, ...inputs], { ...identity, suite, id, wide, heavy: heavyAreasChanged(changed) }, contentHash)
+const keyOf = (suite, id, inputs) => inputKey(root, [...shared, ...inputs], { ...identity, suite, id, wide, heavy: heavyAreasChanged(changed), nightly: nightlyAreasChanged(changed) }, contentHash)
 const passed = (key) => useCache && existsSync(join(resultsDir, key))
 let skipped = 0
 /** The items that need a run: their inputs changed (or everything did) and their key has not passed. A forced item (named with --spec) always runs. */
@@ -156,11 +158,14 @@ const named = values('--spec').map((spec) => {
   return found
 })
 
-// Heavy tests (@heavy) run only for an area a changed file (or a named spec) is in; the wide plan and a full run keep them all.
+// Heavy (@heavy) and nightly (@nightly) tests run only for an area a changed file (or a named spec) is in; the wide plan
+// keeps them all. A full run keeps the heavy tests and skips the nightly ones.
 const heavyActive = new Set(wide ? HEAVY_AREAS.map((area) => area.area) : heavyAreasChanged([...changed, ...named]))
-/** Playwright skips these tags (JUNO_SKIP_TAGS, read by each suite's config): the heavy areas this change does not reach. */
-const skipTags = HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.tag)
+const nightlySkipped = wide ? [] : NIGHTLY_AREAS.filter((area) => !nightlyAreasChanged([...changed, ...named]).includes(area.area))
+/** The desktop and DOM lanes skip these tags (JUNO_SKIP_TAGS): the heavy and nightly areas this change does not reach. */
+const skipTags = [...HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)), ...nightlySkipped].map((area) => area.tag)
 const skipEnv = skipTags.length > 0 ? { JUNO_SKIP_TAGS: skipTags.join(',') } : {}
+for (const step of plan.filter((step) => step.script === 'test:dom' && nightlySkipped.length > 0)) step.env = { JUNO_SKIP_TAGS: nightlySkipped.map((area) => area.tag).join(',') }
 
 // Gallery.
 function componentFixtures() {
@@ -380,7 +385,8 @@ for (const step of plan) {
 if (skipped > 0) console.log(`  (${skipped} item(s) skipped: they passed before with the same inputs; --no-cache runs them)`)
 if (desktopDropped.length > 0) console.log(`  (${desktopDropped.length} more desktop spec(s) ran a changed file less directly; a full run (bun run verify:main) covers them, --wide or --budget-seconds runs them)`)
 for (const note of desktopNotes) console.log(`  (${note})`)
-if (!batch && skipTags.length > 0 && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. A full run (bun run verify:main) and --wide run them)`)
+if (!batch && skipTags.some((tag) => tag.startsWith('@heavy')) && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. A full run (bun run verify:main) and --wide run them)`)
+if (!batch && nightlySkipped.length > 0 && plan.some((step) => step.script === 'test:desktop' || step.script === 'test:dom')) console.log(`  (@nightly tests skipped: ${nightlySkipped.map((area) => area.area).join(', ')}; no changed file is in their area. --wide, a nightly run (verify:main --nightly) and a release run them)`)
 if (plan.length === 0) console.log('  nothing to run')
 for (const entry of interactions)
   console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, bun run perf -g "${entry.perf}"${entry.feel ? ` and bun run test:feel ${entry.feel}` : ''})`)

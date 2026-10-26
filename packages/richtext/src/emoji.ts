@@ -9,6 +9,7 @@
  */
 
 import { catalogData } from './emoji-catalog'
+import type { Inline, Lookups } from './model'
 
 /** One category of the standard emoji, in Slack's picker order. */
 export interface EmojiCategory {
@@ -120,4 +121,16 @@ export function reactionDisplay(
   const url = customUrl?.(splitEmojiName(name).name)
   if (url !== undefined) return { kind: 'image', url }
   return { kind: 'name', value: name }
+}
+
+export function emojiInline(rawName: string, lookups: Lookups, hex?: string): Inline {
+  const unicode = (hex !== undefined ? unicodeFromHex(hex) : undefined) ?? emojiUnicode(rawName)
+  if (unicode !== undefined) return { kind: 'emoji', name: rawName, unicode }
+  const name = splitEmojiName(rawName).name
+  const url = lookups.emoji?.(name)
+  if (url !== undefined) return { kind: 'emoji', name: rawName, url }
+  const target = lookups.emojiAlias?.(name)
+  const aliased = target === undefined ? undefined : emojiUnicode(target)
+  if (aliased !== undefined) return { kind: 'emoji', name: rawName, unicode: aliased }
+  return { kind: 'emoji', name: rawName }
 }

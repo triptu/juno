@@ -34,7 +34,7 @@ async function leave(win: Page, fake: FakeSlack) {
 }
 
 // One huddle with Maya in it for every step; each step ends with nothing of the user's shared.
-test('sharing your own screen or window: from the bar, the tab, ⌘K and the keys; how a share ends; and the Screen Recording steps', async ({ juno, fake, win, app }) => {
+test('sharing your own screen or window: from the bar, the tab, ⌘K and the keys; how a share ends; and the Screen Recording steps', { tag: ['@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app }) => {
   const bar = await startWithMaya(juno, fake, win)
   const sheet = win.getByRole('dialog', { name: 'Share your screen' })
 

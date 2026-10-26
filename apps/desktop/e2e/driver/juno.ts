@@ -7,6 +7,7 @@ import type { NotificationPermission } from '@juno/contract'
  */
 import { expect, type ElectronApplication, type Locator, type Page } from '@playwright/test'
 import { electronSurface, lastMenu as surfaceLastMenu, type AppMenuItem, type AppSurface, type WorkPassName } from './surface'
+import { cpuAll, printCpuSince } from '../cpu'
 
 import type { AccountMenuVerbs, HomeWriteVerbs, JunoVerbs, PaletteTabName, PaletteVerbs, SettingsSectionName, SettingsVerbs, SidebarFilterName, SidebarRowVerbs, SidebarSectionName, SidebarVerbs, TabStripVerbs, TopicVerbs } from './verbs'
 
@@ -1030,6 +1031,7 @@ export class Juno implements JunoVerbs {
 
   async waitForSync(): Promise<void> {
     const started = performance.now()
+    const startedCpu = cpuAll()
     await this.sidebar.expectRows()
     await this.expectEngineLive()
     // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
@@ -1039,6 +1041,7 @@ export class Juno implements JunoVerbs {
     if (await this.home.root.isVisible()) await this.home.root.click({ position: { x: 4, y: 4 } })
     else await this.win.mouse.click(900, 400)
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: sync ${Math.round(performance.now() - started)} ms`)
+    printCpuSince('sync', startedCpu)
   }
 
   /** Switches the theme in Settings › Appearance and waits for the page to follow, then closes Settings. */

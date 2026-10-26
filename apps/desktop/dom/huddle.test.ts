@@ -15,7 +15,7 @@ import { domTest, type DomContext } from './test'
 domTest('start a huddle from the topic menu, mute from the bar, open the tab and leave; join it again, and Join here after joining on another device', async ({ juno, fake, step }) => {
   await step('start a huddle from the topic menu, mute from the bar, open the tab and leave', () => startAndLeave({ juno, fake }))
   await step('join a running huddle, and Join here after joining on another device', () => joinAgain({ juno, fake }))
-}, { timeout: 90_000 })
+}, { timeout: 90_000, tag: ['@nightly', '@nightly-huddle'] })
 
 type Context = Pick<DomContext, 'juno' | 'fake'>
 

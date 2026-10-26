@@ -21,7 +21,7 @@ interface QuitHooks {
 const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalThis as unknown as QuitHooks).junoTest.huddleQuitAsked()])
 const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
 
-test('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', async ({ juno, fake, win }) => {
+test('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@nightly', '@nightly-huddle'] }, async ({ juno, fake, win }) => {
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
   await test.step('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop', async () => {
@@ -114,7 +114,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   })
 })
 
-test('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings', { tag: '@electron' }, async ({ juno, fake, win, app }) => {
+test('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app }) => {
   const { palette } = juno
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
@@ -196,7 +196,7 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
   })
 })
 
-test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', { tag: '@electron' }, async ({ juno, fake, win, app, running }) => {
+test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app, running }) => {
   await openEngMain(juno)
   await startHuddleFromMenu(juno)
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
@@ -218,7 +218,7 @@ test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it',
   expect(fake.calls.find((call) => call.method === 'rooms.leave')?.args).toMatchObject({ channel_id: 'C0ENG', attendee_id: attendeeId })
 })
 
-test('once the engine stops for good, quitting in a huddle does not ask', { tag: '@electron' }, async ({ juno, win, app }) => {
+test('once the engine stops for good, quitting in a huddle does not ask', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, win, app }) => {
   await openEngMain(juno)
   await startHuddleFromMenu(juno)
   // The bar shows once the media session has loaded.

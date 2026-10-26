@@ -45,7 +45,26 @@ export function compatible(root, green, commit) {
   return JSON.stringify({ ...before, version: after.version }) === JSON.stringify(after)
 }
 
-export function releaseGate(root, commit, records = readRecords(statusFolder(root))) {
+const SKIPS_NIGHTLY = /^JUNO_SKIP_TAGS=.*@nightly/
+
+/**
+ * Whether a record shows the nightly tier passing at its commit: a release's nightly reach that passed (every
+ * nightly file ran there, or passed before with unchanged inputs; scripts/nightly-reach.mjs), or a passing full
+ * run that skipped no nightly test (a nightly run, or one from before the tier).
+ */
+export function nightlyCovered(record) {
+  if (record.smoke === true) return false
+  if (record.nightlyReach) return record.nightlyReach.passed === true
+  return assessRecord(record) && !record.suites.some((suite) => (suite.command ?? []).some((word) => SKIPS_NIGHTLY.test(word)))
+}
+
+/** The newest record whose nightly tier covers `commit`, or null. */
+export function nightlyGate(root, commit, records = readRecords(statusFolder(root))) {
+  return records.find((record) => nightlyCovered(record) && compatible(root, record.commit, commit)) ?? null
+}
+
+/** A green full run that covers `commit`, or null. */
+export function fullRunGate(root, commit, records = readRecords(statusFolder(root))) {
   const provenance = (record, seen = new Set()) => {
     if (!record.repair) return true
     const key = `${record.commit}:${record.finishedAt}`
@@ -63,8 +82,15 @@ export function releaseGate(root, commit, records = readRecords(statusFolder(roo
   return null
 }
 
+/** A release needs a green full run and the nightly tier to cover its commit. */
+export function releaseGate(root, commit, records = readRecords(statusFolder(root))) {
+  const full = fullRunGate(root, commit, records)
+  const nightly = full && nightlyGate(root, commit, records)
+  return nightly ? { ...full, nightly } : null
+}
+
 export function printGate(gate) {
-  console.log(`release gate: ${gate.commit} covered by full run ${gate.record.commit} (${gate.record.finishedAt})`)
+  console.log(`release gate: ${gate.commit} covered by full run ${gate.record.commit} (${gate.record.finishedAt}) and the nightly tier at ${gate.nightly.commit} (${gate.nightly.finishedAt})`)
 }
 
 if (import.meta.main) {
@@ -72,5 +98,8 @@ if (import.meta.main) {
   const commit = git(root, 'rev-parse', process.argv[2] ?? 'HEAD')
   const gate = releaseGate(root, commit)
   if (gate) printGate(gate)
-  else { console.error(`release gate: no eligible full-run record for ${commit}`); process.exitCode = 1 }
+  else {
+    console.error(`release gate: ${fullRunGate(root, commit) ? 'no passing nightly tier (verify:main --nightly-reach-only)' : 'no eligible full-run record'} for ${commit}`)
+    process.exitCode = 1
+  }
 }

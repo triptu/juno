@@ -4,7 +4,7 @@ import { createRequire, isBuiltin } from 'node:module'
 import { dependencies } from './package.json'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import type { Plugin } from 'vite'
-import { rendererPlugins } from './renderer.vite'
+import { rendererOutput, rendererPlugins } from './renderer.vite'
 
 /**
  * Injects the renderer's Content Security Policy (architecture section 14).
@@ -115,7 +115,7 @@ function codemodeFiles(): Plugin {
 // less than half the size and parses faster; scripts/check-bundle-size.mjs
 // holds the renderer to the budget in docs/performance.md.
 // JUNO_UNMINIFIED=1 keeps function names for a CPU profile (scripts/perf-trace.mjs).
-const minify = process.env['JUNO_UNMINIFIED'] === '1' ? false : ('esbuild' as const)
+const minify = process.env['JUNO_UNMINIFIED'] === '1' ? false : ('oxc' as const)
 
 // JUNO_COVERAGE=1 writes source maps beside the bundles, without a comment in
 // them, so scripts/coverage-map.mjs can map what an e2e test ran back to the
@@ -138,7 +138,7 @@ export default defineConfig({
     build: {
       minify,
       sourcemap,
-      rollupOptions: {
+      rolldownOptions: {
         // index.js is the main process; engine.js and agent.js are forked as utility processes;
         // codemode-worker.js is the agent's codemode sandbox thread.
         input: {
@@ -155,7 +155,7 @@ export default defineConfig({
     build: {
       minify,
       sourcemap,
-      rollupOptions: { input: resolve(__dirname, 'src/preload/index.ts') },
+      rolldownOptions: { input: resolve(__dirname, 'src/preload/index.ts') },
     },
   }),
   renderer: only('renderer', {
@@ -163,7 +163,10 @@ export default defineConfig({
     build: {
       minify,
       sourcemap,
-      rollupOptions: { input: resolve(__dirname, 'src/renderer/index.html') },
+      rolldownOptions: {
+        input: resolve(__dirname, 'src/renderer/index.html'),
+        output: rendererOutput,
+      },
     },
     plugins: [
       contentSecurityPolicy(),

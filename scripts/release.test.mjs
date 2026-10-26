@@ -51,16 +51,20 @@ const [outcome, ...rest] = readFileSync(${JSON.stringify(plan)}, 'utf8').split('
 writeFileSync(${JSON.stringify(plan)}, rest.join('\\n'))
 const commit = execFileSync('git', ['rev-parse', args[args.indexOf('--ref') + 1]], { encoding: 'utf8' }).trim()
 const repair = args.includes('--repair') ? JSON.parse(readFileSync(args[args.indexOf('--repair') + 1], 'utf8')) : undefined
-const required = ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop']
+// "skipped" is a green run that skipped the nightly tests, as a normal full run does.
+const reachOnly = args.includes('--nightly-reach-only')
+const required = reachOnly ? ['test:nightly'] : ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop']
 const red = outcome === 'red'
+const command = (suite) => outcome === 'skipped' ? { command: ['JUNO_SKIP_TAGS=@nightly', suite] } : {}
 if (args.includes('--nightly')) writeFileSync('apps/desktop/e2e/coverage-map.json', JSON.stringify({ version: 1, commit, specs: [], files: {} }))
 const finishedAt = new Date().toISOString()
 const identity = { bun: '1', platform: 'linux', arch: 'x64', electron: '44' }
-const record = { version: 2, commit, finishedAt, passed: !red, identity, plannedIdentity: { ...identity, bun: 'canary' }, required,
+const record = { version: 2, commit, finishedAt, passed: !red, identity, plannedIdentity: { ...identity, bun: 'canary' }, required, reachOnly,
+  nightlyReach: reachOnly ? { passed: !red, files: [] } : undefined,
   repair: repair && { commit: repair.commit, finishedAt: repair.finishedAt, selection: 'graph-uncapped' },
-  suites: required.map((suite) => red && suite === 'test:desktop'
+  suites: required.map((suite) => red && (suite === 'test:desktop' || suite === 'test:nightly')
     ? { suite, identity, code: 1, failures: ['1) sidebar.spec.ts:40 › keeps the selected row'], log: '.juno-status/verify-main/run/test_desktop.log', cause: { category: 'test', provisional: true, evidence: 'timed out waiting for the row' } }
-    : { suite, identity, code: 0, failures: [] }) }
+    : { suite, identity, code: 0, failures: [], ...command(suite) }) }
 const folder = '.juno-status/verify-main/commits/' + commit
 mkdirSync(folder, { recursive: true })
 writeFileSync(folder + '/' + finishedAt.replace(/\\W/g, '') + '.json', JSON.stringify(record))
@@ -142,7 +146,7 @@ test('a red full run stops with its failures; after a fix, the same command repa
   assert.match(looked.output, /releasing 0\.1\.9/)
   assert.match(looked.output, /\n {2}Keep your place after scrolling\n/)
   assert.doesNotMatch(looked.output, /Add tests/)
-  assert.match(looked.output, new RegExp(`would run bun run verify:main --ref ${tip} --require-remote on the laptop`))
+  assert.match(looked.output, new RegExp(`would run bun run verify:main --ref ${tip} --release --require-remote on the laptop`))
   assert.deepEqual(lines('verify-calls'), [])
 
   plan('red')
@@ -238,6 +242,33 @@ test('a release covered by an earlier green run plus docs skips the full run; a 
   // release:publish, rerun by hand, also only finishes main.
   const publish = execFileSync(process.execPath, [publishScript, '--checkout', file('worktrees/release-0.1.9'), '--repo', 'triptu/fixture'], { cwd: file('repo'), env: env, encoding: 'utf8' })
   assert.match(publish, /already published/)
+})
+
+test('a full run that skipped the nightly tests is not enough: the release runs those its changes reach, and a red one stops it until main changes', { timeout: 30_000 }, async (t) => {
+  const { commit, release, lines, plan, file, env } = fixture(t)
+  const tip = commit('Keep your place after scrolling', { 'apps/desktop/src/app.js': 'scroll' })
+  plan('skipped')
+  execFileSync('bun', ['run', 'verify:main', '--ref', tip], { cwd: file('repo'), env: env })
+  const looked = await release(['--dry-run'])
+  assert.match(looked.output, new RegExp(`would run bun run verify:main --ref ${tip} --nightly-reach-only --require-remote on the laptop`))
+
+  plan('red')
+  const red = await release()
+  assert.equal(red.code, 1, red.output)
+  assert.match(red.output, /the nightly reach at \w+ failed/)
+  assert.match(red.output, /test:nightly: failed \(1\)/)
+  assert.match(red.output, /nothing was built or published/)
+  const unchanged = await release()
+  assert.equal(unchanged.code, 1)
+  assert.match(unchanged.output, /the newest nightly reach at the tip failed and main has not changed since/)
+
+  commit('Hold the row while the huddle bar opens', { 'apps/desktop/src/app.js': 'fixed' })
+  plan('skipped', 'green')
+  writeFileSync(join(file('repo'), 'notes.md'), '- Keep your place after scrolling.\n')
+  const published = await release(['--notes', 'notes.md'])
+  assert.equal(published.code, 0, published.output)
+  assert.match(published.output, /and the nightly tier at/)
+  assert.deepEqual(lines('verify-calls').slice(-2).map((line) => line.includes('--nightly-reach-only') ? 'reach' : line.includes('--release') ? 'full' : line), ['full', 'reach'])
 })
 
 test('the version commit lands on a newer main, keeping concurrent work and every other field', (t) => {

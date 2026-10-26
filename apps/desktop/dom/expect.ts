@@ -107,12 +107,14 @@ interface PollAssertions<T> {
   readonly not: Omit<PollAssertions<T>, 'not'>
 }
 
+const POLL_MILLIS = [20, 20, 50, 100]
+
 /** Polls `read` until Bun's matcher of that name passes on its answer. */
 function poll<T>(read: () => T | Promise<T>, options: Timeout & { readonly message?: string } = {}, negate = false): PollAssertions<T> {
   const timeout = options.timeout ?? DEFAULT_TIMEOUT
   const matcher = (name: string) => async (...args: unknown[]) => {
     const deadline = performance.now() + timeout
-    for (;;) {
+    for (let attempt = 0; ; attempt++) {
       const value = await read()
       try {
         const subject = bunExpect(value, options.message) as unknown as { readonly not: Record<string, (...given: unknown[]) => void> } & Record<string, (...given: unknown[]) => void>
@@ -122,7 +124,8 @@ function poll<T>(read: () => T | Promise<T>, options: Timeout & { readonly messa
       } catch (error) {
         if (performance.now() > deadline) throw error
       }
-      await new Promise((done) => setTimeout(done, 20))
+      // Soon at first, then every 100 ms: a read can open a database (`readUserDb`), and some waits last seconds.
+      await new Promise((done) => setTimeout(done, POLL_MILLIS[Math.min(attempt, POLL_MILLIS.length - 1)]))
     }
   }
   const names = ['toBe', 'toEqual', 'toContain', 'toContainEqual', 'toMatch', 'toBeGreaterThan', 'toBeGreaterThanOrEqual', 'toBeLessThan', 'toBeTruthy', 'toBeUndefined', 'toBeDefined', 'toBeNull', 'toHaveLength'] as const
