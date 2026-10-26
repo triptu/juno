@@ -18,6 +18,10 @@ const serial = new WeakSet<Window>()
  * Hands `window`'s engine frames to the page one at a time, the next once the
  * page has nothing scheduled (`settled`), so frames never share a React
  * commit by chance of timing and counted renders are the same in every run.
+ * A frame of several messages, or a stream chunk of several values, is split
+ * into one frame each: the engine puts the values it made while the page's
+ * acknowledgement was on its way into one chunk, so how many share a chunk
+ * depends on timing (`oneValueEach`).
  */
 export function serialFrames(window: Window): void {
   serial.add(window)
@@ -47,6 +51,20 @@ async function settled(window: Window): Promise<void> {
   }
 }
 
+/**
+ * `messages` as one message with at most one stream value each. Each chunk the page gets is acknowledged, so a
+ * chunk split into `n` adds `n - 1` acknowledgements for its request, which `extraAcks` counts for `send` to drop:
+ * the engine sends its next chunk once the page has taken every value of this one, as it would unsplit.
+ */
+function oneValueEach(messages: ReadonlyArray<Message>, extraAcks: Map<string, number>): ReadonlyArray<Message> {
+  return messages.flatMap((message) => {
+    if (message['_tag'] !== 'Chunk' || !Array.isArray(message['values']) || message['values'].length < 2) return [message]
+    const id = String(message['requestId'])
+    extraAcks.set(id, (extraAcks.get(id) ?? 0) + message['values'].length - 1)
+    return (message['values'] as Array<unknown>).map((value) => ({ ...message, values: [value] }))
+  })
+}
+
 type Meter = ReturnType<typeof meterOf>
 type Message = Record<string, unknown>
 
@@ -60,6 +78,8 @@ function countSent(meter: Meter, asked: Map<string, string>, data: unknown): voi
     if (request) asked.set(String(message['id']), message['_tag'] === 'Request' ? String(message['tag']) : `bridge ${String(message['channel'])}`)
     const traffic = meter.route(asked.get(String(message['requestId'] ?? message['id'])) ?? String(message['_tag']))
     if (request) traffic.requests++
+    if (message['_tag'] === 'Request') meter.unanswered.add(String(message['id']))
+    if (message['_tag'] === 'Interrupt') meter.unanswered.delete(String(message['requestId']))
     traffic.bytesOut += bytesOf(message)
   }
 }
@@ -69,6 +89,7 @@ function countReceived(meter: Meter, asked: ReadonlyMap<string, string>, message
   const tags = messages.map((message) => asked.get(String(message['requestId'] ?? message['id'])))
   messages.forEach((message, at) => {
     if (KEEP_ALIVE.has(String(message['_tag']))) return
+    if (message['_tag'] === 'Chunk' || message['_tag'] === 'Exit') meter.unanswered.delete(String(message['requestId']))
     const traffic = meter.route(tags[at] ?? String(message['_tag'] ?? 'bridge'))
     traffic.bytesIn += bytesOf(message)
     if (message['_tag'] === 'Chunk' && Array.isArray(message['values'])) traffic.messages += message['values'].length
@@ -112,6 +133,8 @@ export function pageSocket(window: Window): typeof WebSocket {
   const meter = meterOf(window)
   return class PageSocket extends WebSocket {
     readonly #asked = new Map<string, string>()
+    /** Acknowledgements of split chunks the engine does not expect, by request id (`oneValueEach`). */
+    readonly #extraAcks = new Map<string, number>()
     readonly #listeners = new Map<unknown, (event: Event) => void>()
     readonly #deliver = frameQueue(window, (event) => {
       for (const listener of Array.from(this.#listeners.values())) listener(event)
@@ -124,16 +147,31 @@ export function pageSocket(window: Window): typeof WebSocket {
       this.addEventListener('close', () => live.delete(this))
       super.addEventListener('message', (event) => {
         const data = (event as MessageEvent).data
-        const tags = countReceived(meter, this.#asked, typeof data === 'string' ? rpcMessages(data) : [])
+        const messages = typeof data === 'string' ? rpcMessages(data) : []
+        const tags = countReceived(meter, this.#asked, messages)
+        const events = serial.has(window) && messages.length > 0
+          ? oneValueEach(messages, this.#extraAcks).map((message) => new MessageEvent('message', { data: JSON.stringify(message) }))
+          : [event]
         const hold = held.get(window)
-        if (hold !== undefined && tags.some((tag) => tag !== undefined && hold.tags.has(tag))) hold.frames.push(() => this.#deliver(event))
-        else this.#deliver(event)
+        for (const one of events) {
+          if (hold !== undefined && tags.some((tag) => tag !== undefined && hold.tags.has(tag))) hold.frames.push(() => this.#deliver(one))
+          else this.#deliver(one)
+        }
       })
     }
 
     override send(data: Parameters<WebSocket['send']>[0]): void {
       countSent(meter, this.#asked, data)
-      super.send(data)
+      if (this.#extraAcks.size === 0 || typeof data !== 'string') return super.send(data)
+      const kept = rpcMessages(data).filter((message) => {
+        const id = String(message['requestId'])
+        const extra = message['_tag'] === 'Ack' ? this.#extraAcks.get(id) ?? 0 : 0
+        if (extra === 0) return true
+        if (extra === 1) this.#extraAcks.delete(id)
+        else this.#extraAcks.set(id, extra - 1)
+        return false
+      })
+      if (kept.length > 0) super.send(JSON.stringify(kept.length === 1 ? kept[0] : kept))
     }
 
     override addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {

@@ -42,6 +42,8 @@ export interface PageWork {
 class Meter {
   /** Channel messages posted and not yet delivered: React's scheduler has work queued (`socket.ts`, `settled`). */
   posts = 0
+  /** RPC requests the page sent that have had no reply yet: no value and no exit (`socket.ts`). */
+  readonly unanswered = new Set<string>()
   commits = 0
   renders = 0
   readonly byComponent = new Map<string, number>()
@@ -165,8 +167,10 @@ export function renderHook(window: Window): object {
 
 /**
  * Waits until the page and its engine are at rest: no commit, no frame either
- * way and nothing scheduled for `quietMillis` in a row, longer than the page's
- * own delays (the composer saves its draft 400 ms after the last key). Counts
+ * way, nothing scheduled and no request waiting for its reply for
+ * `quietMillis` in a row, longer than the page's own delays (the composer
+ * saves its draft 400 ms after the last key). A reply that a loaded engine
+ * sends late lands before the rest, not in the next action's count. Counts
  * taken after it hold all the work an action set off.
  */
 export async function settledPage(window: Window, quietMillis = 600, timeoutMillis = 15_000): Promise<void> {
@@ -182,7 +186,7 @@ export async function settledPage(window: Window, quietMillis = 600, timeoutMill
     if (Date.now() - started > timeoutMillis) throw new Error('the page did not come to rest')
     await new Promise((resolve) => setTimeout(resolve, 25))
     const now = signature()
-    if (now !== last || meter.posts > 0) {
+    if (now !== last || meter.posts > 0 || meter.unanswered.size > 0) {
       last = now
       since = Date.now()
     }

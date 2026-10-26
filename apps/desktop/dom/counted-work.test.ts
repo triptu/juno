@@ -43,10 +43,11 @@ async function engineAtRest(fake: FakeSlack): Promise<void> {
 }
 
 /**
- * The user's own presence on the account button: it comes from the socket at a time that depends on the
- * machine's load, so startup counts wait for it and no later step counts it.
+ * Slack shows the user active on the account button. It turns active once the shell's activity poll, every
+ * 10 s, has made the engine tickle Slack, at a time that depends on the machine's load, so startup counts wait
+ * for it and no later step counts it.
  */
-const presenceShown = (juno: Juno) => expect(juno.sidebar.accountButton.locator('[data-presence]')).toHaveCount(1, { timeout: 15_000 })
+const presenceShown = (juno: Juno) => expect(juno.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1, { timeout: 30_000 })
 
 /** `action`, then everything it set off, counted on the page. */
 async function measured(app: () => DomApp, action: () => Promise<void>): Promise<PageWork> {
