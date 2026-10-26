@@ -19,7 +19,9 @@ const electronWorkers = Number(process.env.JUNO_E2E_WORKERS ?? 1)
 // keep the job busy. A container sees every core of its host, so use the
 // allocation rather than the host's count. Local full verification caps this.
 const allocatedThreads = Number(process.env.JUNO_RUNNER_JOB_CORES)
-const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(1, allocatedThreads || Math.floor(cpus().length / 2)))
+// Five workers on eight threads: on a four-core job, eight used 11% more CPU per test (hyperthreads share cores) and
+// finished later; four left threads idle (README, "Browser lane").
+const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(1, Math.round((allocatedThreads || Math.floor(cpus().length / 2)) * 5 / 8)))
 
 // The electron project runs its own files whole, and of the browser files
 // only tests tagged @electron (they need main) or @canary (they run in both).
@@ -79,8 +81,6 @@ export default defineConfig<object, { lane: Lane }>({
       },
     },
   ],
-  // e2e/coverage.ts records which source files each spec runs, under JUNO_COVERAGE=1.
-  globalSetup: ['./e2e/coverage.ts'],
   timeout: 30_000,
   expect: { timeout: 5_000 },
   workers: Math.max(electronWorkers, browserWorkers),

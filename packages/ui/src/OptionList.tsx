@@ -126,7 +126,7 @@ export function OptionRow({
     >
       {leading ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
       <span {...stylex.props(styles.body, twoLine && styles.bodyColumn, size === 44 && styles.bodyColumnCompact)}>
-        <span {...stylex.props(styles.label, twoLine ? typeVariants.body : typeVariants.ui, size === 44 && styles.labelCompact)}>{label}</span>
+        <span data-option-label="" {...stylex.props(styles.label, twoLine ? typeVariants.body : typeVariants.ui, size === 44 && styles.labelCompact)}>{label}</span>
         {sub !== undefined && subPlacement !== 'end' ? (
           <span {...stylex.props(styles.sub, subPlacement === 'below' ? typeVariants.meta : typeVariants.tag, size === 44 && styles.subCompact)}>{sub}</span>
         ) : null}

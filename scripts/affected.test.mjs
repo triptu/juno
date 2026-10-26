@@ -66,19 +66,16 @@ test('protocol plans follow specs and transitive outbox inputs independently of 
   assert.deepEqual(protocols('packages/ui/src/Chip.tsx'), [])
 })
 
-test('zero budgets keep changed specs and components, tool smoke survives filtering, and repairs remain uncapped', (t) => {
+test('an app change runs every desktop spec, a spec or helper change runs its own, a zero budget keeps changed components, and tool smoke survives filtering', (t) => {
   const { plan } = fixture(t)
-  const changed = ['packages/ui/src/Chip.tsx', 'apps/desktop/e2e/changed.spec.ts']
-  const narrow = plan(changed, '--graph', '--budget-seconds', '0')
-  assert.deepEqual(items(narrow, 'test:desktop'), ['apps/desktop/e2e/changed.spec.ts'])
-  assert.deepEqual(items(narrow, 'test:gallery'), ['Chip'])
-  const wide = plan(changed, '--wide', '--graph', '--budget-seconds', '0')
-  assert.equal(items(wide, 'test:desktop').length, 3)
-  const root = plan(['package.json', 'apps/desktop/e2e/helper.ts'], '--budget-seconds', '0')
-  assert.deepEqual(items(root, 'test:desktop'), ['apps/desktop/e2e/changed.spec.ts'])
+  const app = plan(['packages/ui/src/Chip.tsx', 'apps/desktop/e2e/changed.spec.ts'], '--budget-seconds', '0')
+  assert.equal(items(app, 'test:desktop').length, 3)
+  assert.deepEqual(items(app, 'test:gallery'), ['Chip'])
+  assert.deepEqual(items(plan(['apps/desktop/e2e/helper.ts']), 'test:desktop'), ['apps/desktop/e2e/changed.spec.ts'])
+  assert.equal(items(plan(['package.json']), 'test:desktop').length, 3)
   assert.deepEqual(items(plan(['scripts/remote/plan.mjs']), 'test:desktop'), ['apps/desktop/e2e/app.spec.ts'])
   assert.deepEqual(items(plan(['scripts/remote/plan.mjs'], '--batch'), 'test:desktop'), [])
-  const deleted = plan(['packages/domain/src/deleted.ts'], '--wide', '--graph')
+  const deleted = plan(['packages/domain/src/deleted.ts'], '--wide')
   // Every unit file (no --files; the unit step carries only its order seed) and every desktop spec.
   assert.deepEqual(deleted.find((step) => step.script === 'test').args.filter((arg) => !arg.startsWith('--seed=')), [])
   assert.deepEqual(deleted.find((step) => step.script === 'test:desktop').args, [])

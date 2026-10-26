@@ -35,9 +35,10 @@ export function MessageMenuPanel({ menu, onReact, onSelect, onClose }: MessageMe
   // The workspace's emoji once they have come; changes take effect on the next open, so cells never move under a click.
   const [snapshot, setSnapshot] = useState(current)
   if (snapshot === undefined && current !== undefined) setSnapshot(current)
-  const data = (snapshot ?? current)?.data ?? standardEmojiPickerData
+  const answer = snapshot ?? current
+  const data = answer?.data ?? standardEmojiPickerData
   const [grid] = useState(() => gridEmoji(quick, frequent, data).map((emoji) => ({ ...emoji, selected: menu.chosen?.(emoji) === true })))
   const [recent] = useState(frequent)
   const searchReady = useEmojiSearchReady(data.all, searchIndex)
-  return <MessageMenu anchor={menu.anchor} reactions={grid} items={menu.items} noGrid={menu.noGrid === true} onReact={onReact} emoji={{ data, recent, searchReady }} onSelect={onSelect} onClose={onClose} initialPicking={menu.picking === true} />
+  return <MessageMenu anchor={menu.anchor} reactions={grid} items={menu.items} noGrid={menu.noGrid === true} onReact={onReact} emoji={{ data, recent, searchReady, customReady: answer !== undefined }} onSelect={onSelect} onClose={onClose} initialPicking={menu.picking === true} />
 }

@@ -40,7 +40,7 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     await menu.more.click()
     const picker = second.win.locator('[data-emoji-picker]')
     await expect.poll(() => second.win.evaluate(() => window.emojiGate.count())).toBeGreaterThan(0)
-    const recent = picker.getByRole('group', { name: 'Frequently used' })
+    const recent = picker.locator('[data-emoji-section][aria-label="Frequently used"]')
     const pending = recent.locator('[data-emoji="hello_juno"]')
     await expect(pending.locator('[data-emoji-placeholder]')).toBeVisible()
     await picker.getByRole('textbox').press('ArrowDown')

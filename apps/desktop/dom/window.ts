@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Window } from 'happy-dom'
 import type { PageClock } from './clock'
+import { closeSockets, pageClosed, pageSocket } from './socket'
 import { checkRealm, LANGUAGE, prepareRealm, startRenderer } from './realm'
 
 export const DOM_BUILD = resolve(__dirname, 'dist')
@@ -169,7 +170,7 @@ function messageChannel(window: Window): new () => { readonly port1: EventTarget
     }
 
     receive(data: unknown): void {
-      if (this.#closed || closed.has(window)) return
+      if (this.#closed || pageClosed(window)) return
       if (!this.#started) return void this.#queue.push(data)
       this.dispatchEvent(new W.MessageEvent('message', { data }))
     }
@@ -314,33 +315,9 @@ function sharedPrototypes(window: Window): Map<object, PropertyDescriptorMap> {
   return found
 }
 
-/** Windows `closeWindow` has closed, and each window's open sockets. */
-const closed = new WeakSet<Window>()
-const sockets = new WeakMap<Window, Set<WebSocket>>()
-
-/**
- * Bun's WebSocket, which happy-dom does not know about: each one is kept so
- * `closeWindow` closes it, and a closed page cannot open another. Left open,
- * a closed page keeps receiving, rendering and asking its host, and the
- * worker's pooled host serves the next test on the same port.
- */
-function pageSocket(window: Window): typeof WebSocket {
-  const live = new Set<WebSocket>()
-  sockets.set(window, live)
-  return class PageSocket extends WebSocket {
-    constructor(url: string | URL, protocols?: string | string[]) {
-      if (closed.has(window)) throw new Error(`This page has closed; it cannot connect to ${new URL(url).pathname}`)
-      super(url, protocols)
-      live.add(this)
-      this.addEventListener('close', () => live.delete(this))
-    }
-  }
-}
-
 /** Closes a window from `openWindow`, its sockets first, and undoes what its page did to the shared prototypes. */
 export async function closeWindow(window: Window): Promise<void> {
-  closed.add(window)
-  for (const socket of sockets.get(window) ?? []) socket.close()
+  closeSockets(window)
   try {
     await window.happyDOM.close()
   } finally {

@@ -37,7 +37,8 @@ import { closeJunoPanel, openPanel } from './juno/actions'
 import { openAllTopics, openGallery, openDevLog, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
 import { setPrivacy } from './privacy'
-import { isLinkable, labelOf, runTopicAction, topicOf, type ActionTopic } from './topicActions'
+import { isLinkable, labelOf, runTopicAction } from './topicActions'
+import { topicOf, type ActionTopic } from './topicSource'
 
 /** Where a global row shows: under Pages, Settings or Commands. */
 export type CommandGroup = 'pages' | 'settings' | 'commands'

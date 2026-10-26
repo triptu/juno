@@ -36,5 +36,5 @@ export default function QuickReactionPicker({ selected, onPick, onClose }: Quick
     const own = data.byName.get(name)
     if (own?.url !== undefined) return onPick({ name, unicode: `:${name}:`, url: own.url })
   }
-  return <EmojiPicker data={data} searchReady={searchReady} recent={recent} selected={selected} onPick={pick} onClose={onClose} />
+  return <EmojiPicker data={data} searchReady={searchReady} customReady={answer !== undefined} recent={recent} selected={selected} onPick={pick} onClose={onClose} />
 }
