@@ -19,13 +19,36 @@ export function isTs(value: string): value is Ts {
   return TS.test(value)
 }
 
-/** Numeric order of two timestamps. Throws on malformed input. */
+/**
+ * Numeric order of two timestamps. Throws on malformed input. Past leading
+ * zeros, a longer ts has more whole seconds, and two of the same length
+ * compare character by character, the fraction always being six digits.
+ * Sorting calls this often, so it reads characters rather than matching.
+ */
 export function compareTs(a: string, b: string): -1 | 0 | 1 {
-  const [as, af] = splitTs(a)
-  const [bs, bf] = splitTs(b)
-  if (as !== bs) return as < bs ? -1 : 1
-  if (af !== bf) return af < bf ? -1 : 1
+  const fromA = significantStart(a)
+  const fromB = significantStart(b)
+  const length = a.length - fromA
+  if (length !== b.length - fromB) return length < b.length - fromB ? -1 : 1
+  for (let at = 0; at < length; at++) {
+    const charA = a.charCodeAt(fromA + at)
+    const charB = b.charCodeAt(fromB + at)
+    if (charA !== charB) return charA < charB ? -1 : 1
+  }
   return 0
+}
+
+/** Where a ts's whole seconds start past leading zeros, keeping one digit. Throws unless it is `<digits>.<6 digits>`. */
+function significantStart(ts: string): number {
+  const dot = ts.length - 7
+  if (dot < 1 || ts.charCodeAt(dot) !== 46) throw new Error(`Not a Slack ts: ${JSON.stringify(ts)}`)
+  for (let at = 0; at < ts.length; at++) {
+    const char = ts.charCodeAt(at)
+    if (at !== dot && (char < 48 || char > 57)) throw new Error(`Not a Slack ts: ${JSON.stringify(ts)}`)
+  }
+  let start = 0
+  while (start < dot - 1 && ts.charCodeAt(start) === 48) start++
+  return start
 }
 
 export function maxTs<T extends string>(a: T, b: T): T {
