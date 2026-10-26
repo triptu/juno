@@ -53,6 +53,12 @@ for (const build of Object.keys(builds)) {
       assert.notEqual(next, last, `${file} changes the key`)
       last = next
     }
+
+    // The React Compiler: its options in renderer.vite.ts, and Oxc's port, which @vitejs/plugin-react loads as a peer.
+    assert.ok(inputs.files.includes('apps/desktop/renderer.vite.ts'), 'the compiler options are an input')
+    const lock = readFileSync(join(root, 'bun.lock'), 'utf8')
+    writeFileSync(join(root, 'bun.lock'), lock.replace(/("oxc-transform-react": \["oxc-transform-react@)[^"]+/, (_, entry) => `${entry}0.0.1`))
+    assert.notEqual(key(), last, 'the locked oxc-transform-react changes the key')
   })
 }
 
