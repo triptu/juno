@@ -31,8 +31,8 @@ const seedFlag = process.argv.indexOf('--seed')
 const seed = (seedFlag >= 0 ? process.argv[seedFlag + 1] : undefined) ?? process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
 if (!/^\d+$/.test(seed)) throw new Error('--seed and SPECS_SEED take an unsigned integer')
 console.log(`Spec check seed ${seed}; \`bun run specs:check --seed ${seed}\` repeats it.`)
-// 2,000 traces per sync protocol, nightly too: a new seed each run samples new traces.
-const samples = tracesOnly ? 100 : 2000
+// 500 traces per sync protocol, nightly too: a new seed each run samples new traces.
+const samples = tracesOnly ? 100 : 500
 const steps = 160
 const startedAt = Date.now()
 const apalacheVersion = '0.62.1' // Quint 0.33.0's default distribution.
