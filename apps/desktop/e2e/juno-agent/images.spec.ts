@@ -1,7 +1,8 @@
 // Images for Juno (SPEC 12 "Writing", 13.1): attached on Home with Juno chosen, or in the Juno tab,
 // they go to the chat model as image parts and show as thumbnails on the owner's bubble. A file
 // Juno does not read stays in the composer with a line saying so, and so does an image while the
-// chat model cannot read images.
+// chat model cannot read images. It needs the browser: the thumbnails take their size from the decoded image,
+// which happy-dom does not decode.
 import { chatCopy } from '@juno/agent-contract'
 import { brief, chart, drop, paste } from '../attach'
 import { openChat, openSettings, readySynced as ready } from './agent'

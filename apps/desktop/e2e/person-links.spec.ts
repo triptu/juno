@@ -11,6 +11,9 @@ import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start"); the replies and Deploy Bot's DM arrive live.
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const SELF = 'U0TUSHAR'
@@ -24,17 +27,17 @@ const DEV = '4 minutes is fine for us'
 const OWN = "Good. What's the rollback"
 
 const rootOf = (fake: FakeSlack) => fake.messages('C0ENG').find((message) => message.text?.includes(POSTGRES))!
-const reply = (fake: FakeSlack, user: string, text: string) => fake.workspace.post({ channel: 'C0ENG', user, threadTs: rootOf(fake).ts, text, silent: true })
+const reply = (fake: FakeSlack, user: string, text: string) => fake.workspace.post({ channel: 'C0ENG', user, threadTs: rootOf(fake).ts, text })
 
-/** A DM with `user`, with one message so it has a Main. Before sign-in. */
-function addDm(fake: FakeSlack, id: string, user: string, text: string): void {
-  fake.workspace.addConversation({ id, name: '', kind: 'im', members: new Set([SELF, user]), created: fake.now() - 30 * 86_400_000, topic: '', purpose: '', isOpen: true, archived: false })
-  fake.workspace.post({ channel: id, user, text, at: fake.now() - 86_400_000, silent: true })
+/** A DM with `user` that arrives live, with one message so it has a Main. */
+function addDm(fake: FakeSlack, user: string, text: string): void {
+  const { conversation } = fake.workspace.open([SELF, user])
+  fake.workspace.post({ channel: conversation.id, user, text })
 }
 
-/** Replies in the Postgres thread: Maya, Leo naming Sam, Maya again (a new header), the Grafana app and Deploy Bot, whose DM Juno has. */
+/** Replies in the Postgres thread, live: Maya, Leo naming Sam, Maya again (a new header), the Grafana app and Deploy Bot, whose DM Juno has. */
 function seedReplies(fake: FakeSlack): void {
-  addDm(fake, 'D0DEPLOY', 'U0DEPLOYBOT', 'Deploys for this week are in the calendar.')
+  addDm(fake, 'U0DEPLOYBOT', 'Deploys for this week are in the calendar.')
   reply(fake, 'U0MAYA', FIRST)
   reply(fake, 'U0LEO', `${MENTION} <@U0SAM> can you look?`)
   reply(fake, 'U0MAYA', SECOND)
@@ -43,8 +46,6 @@ function seedReplies(fake: FakeSlack): void {
 }
 
 async function openPostgres(juno: Juno): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   await juno.tabs.expectCount(1)

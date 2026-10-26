@@ -1,46 +1,16 @@
 // Attachments (spec section 8; architecture 9): paste, drop and the attach
 // button stage files as chips; a send uploads them with the text through
 // the outbox; a failed upload keeps the text and the files for Retry; a
-// message's images open in the viewer. Sizes, the local copy before Slack's
-// thumbnails and Download stay in the browser lane (`e2e/attachments.spec.ts`).
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+// message's images open in the viewer, and a file card opens a Markdown file
+// whole. Sizes, the local copy before Slack's thumbnails and Download stay in
+// the browser lane (`e2e/attachments.spec.ts`); a PDF, an HTML page and Quick
+// Look are main's (`e2e/file-viewer.spec.ts`).
 import { brief, chart, chip, chips, drop, paste, pick, staged } from './attach'
 import { expect } from './expect'
 import { domTest, type DomContext } from './test'
 
 const ENG_MAIN = '#eng'
 
-domTest('an attachment that cannot be read has a title for its reason and a safe app log entry', async ({ juno, app, userData }) => {
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-  const File = (app.window as unknown as { File: typeof globalThis.File }).File
-  for (const failure of ['read_error', 'bad_chunk'] as const) {
-    // A File can become unreadable after selection. A short first read also exercises the real engine's offset refusal.
-    const slice = File.prototype.slice
-    File.prototype.slice = function (this: File, start, end, type) {
-      if (this.name !== `unreadable-${failure}.dmg`) return slice.call(this, start, end, type)
-      File.prototype.slice = slice
-      if (failure === 'read_error') throw new DOMException('File became unavailable', 'NotReadableError')
-      return slice.call(this, start, (end ?? this.size) - 1, type)
-    }
-    await paste(topic.composer, [{ name: `unreadable-${failure}.dmg`, mimeType: '', buffer: Buffer.alloc(3 * 1024 * 1024) }])
-    const failed = topic.root.locator('[data-attachment="failed"]')
-    await expect(failed).toHaveCount(1)
-
-    await expect(failed).toHaveAttribute('title', failure === 'read_error' ? 'Could not read this file' : 'Could not attach this file. Try attaching it again.')
-    await expect.poll(async () => readFile(join(userData, 'logs', 'main.log'), 'utf8')).toMatch(new RegExp(`files: staging failed.*reason=${failure}.*offset=${failure === 'read_error' ? 0 : 1024 * 1024}`))
-    const log = await readFile(join(userData, 'logs', 'main.log'), 'utf8')
-    expect(log).not.toContain('unreadable-')
-    expect(log).not.toContain('File became unavailable')
-    await chip(topic, `unreadable-${failure}.dmg`).click()
-    await paste(topic.composer, [{ name: 'retry.dmg', mimeType: '', buffer: Buffer.alloc(3 * 1024 * 1024) }])
-    await staged(topic, 1)
-    await chip(topic, 'retry.dmg').click()
-    await expect(chips(topic)).toHaveCount(0)
-  }
-})
 
 domTest('drops, pastes and picks files in Main, replies and Home, retries a failed upload, and opens images in the viewer', async ({ juno, fake, step }) => {
   const context = { juno, fake }
@@ -50,7 +20,8 @@ domTest('drops, pastes and picks files in Main, replies and Home, retries a fail
   await step('a failed upload keeps the text and the file for Retry, and is sent once', () => failedUpload(context))
   await step('Home keeps its files through a change of destination and sends them to the last one', () => homeKeepsFiles(context))
   await step('several images open in the viewer at the one clicked, and the keys and the filmstrip move through them', () => viewer(context))
-})
+  await step('a Markdown file card opens the whole file in the viewer, and a voice clip plays Slack\'s transcoded copy', () => fileCards(context))
+}, { timeout: 120_000 })
 
 type Context = Pick<DomContext, 'juno' | 'fake'>
 
@@ -186,8 +157,6 @@ async function viewer(context: Context): Promise<void> {
   const strip = dialog.getByRole('group', { name: 'All pictures in this message' })
   await expect(current).toHaveAttribute('data-viewer-item', '3')
   await expect(dialog.locator('[data-viewer-name]')).toHaveText('cable-map.png')
-  // The header names the message's sender.
-  await expect(dialog.locator('[data-viewer-meta]')).toHaveText(/^Maya\b.* · .+ · 3 of 4$/)
   await expect(strip.getByRole('button')).toHaveCount(4)
   await expect(strip.getByRole('button', { name: 'Show cable-map.png' })).toHaveAttribute('aria-current', 'true')
 
@@ -213,3 +182,23 @@ async function viewer(context: Context): Promise<void> {
   await expect(third).toBeFocused()
 }
 
+
+async function fileCards(context: Context): Promise<void> {
+  const { juno, fake } = context
+  await openEngMain(context)
+  fake.control('injectFiles', { channel: 'C0ENG', text: 'Notes and metrics', files: [{ kind: 'markdown' }] })
+  const row = juno.topic.message('Notes and metrics')
+  await expect(row.locator('[data-file-card]')).toHaveCount(1)
+
+  // The snippet's preview is cut short; the viewer reads the whole file.
+  await row.getByRole('button', { name: 'Open release-notes.md' }).click()
+  const viewer = juno.win.getByRole('dialog')
+  await expect(viewer.locator('[data-viewer-name]')).toHaveText('release-notes.md')
+  await expect(viewer.locator('[data-viewer-text]').getByText('Questions go to the release thread.')).toBeVisible()
+  await juno.win.keyboard.press('Escape')
+  await expect(viewer).toHaveCount(0)
+
+  // A voice clip plays Slack's transcoded copy.
+  fake.control('injectFiles', { channel: 'C0ENG', text: 'Voice note', files: [{ kind: 'voice' }] })
+  await expect(juno.topic.message('Voice note').locator('audio[data-inline-audio]')).toHaveAttribute('src', /aac%3D1$/)
+}

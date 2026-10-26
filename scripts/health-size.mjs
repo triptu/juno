@@ -26,7 +26,7 @@ function isTestCallback(node, names) {
   return ts.isStringLiteralLike(call.arguments[0]) && !/(^|\.)(step|describe|extend|use)$/.test(name) && !name.startsWith('test.describe')
 }
 
-const hasStep = (node) => ts.isCallExpression(node) && callName(node.expression).endsWith('test.step') || (ts.forEachChild(node, hasStep) ?? false)
+const hasStep = (node, name = 'test.step') => ts.isCallExpression(node) && callName(node.expression).endsWith(name) || (ts.forEachChild(node, (child) => hasStep(child, name)) ?? false)
 
 // Names and call labels survive line moves. Occurrences distinguish equal callbacks.
 function functionContext(node, source) {
@@ -57,9 +57,11 @@ export function collectSizeReport(directory = root) {
     const occurrences = new Map()
     const visit = (node) => {
       // A flow test (`*.flow.test.ts`) is one user journey on one engine boot; its steps are named with `step`, so the test's own callback may run long.
-      // So is a desktop e2e test whose callback names its steps with `test.step`: one launch per journey.
+      // So is a desktop e2e test whose callback names its steps with `test.step`, or a DOM lane test whose callback names
+      // them with its `step`: one launch per journey.
       const journey = file.endsWith('.flow.test.ts') ? isTestCallback(node, ['it', 'test'])
-        : file.startsWith('apps/desktop/e2e/') && file.endsWith('.spec.ts') && isTestCallback(node) && hasStep(node)
+        : file.startsWith('apps/desktop/e2e/') && file.endsWith('.spec.ts') ? isTestCallback(node) && hasStep(node)
+        : file.startsWith('apps/desktop/dom/') && file.endsWith('.test.ts') && isTestCallback(node, ['domTest']) && hasStep(node, 'step')
       if (ts.isFunctionLike(node) && node.body && !journey) {
         const context = functionContext(node, source)
         const occurrence = (occurrences.get(context) ?? 0) + 1

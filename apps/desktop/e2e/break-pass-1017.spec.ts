@@ -1,8 +1,12 @@
-// Break pass of 10-17: what needs a browser's layout. A narrow window, the
-// destination list and switcher in it, Home's field through a send, dark
-// mode's surfaces and a mouse press on a tab. The flows
-// of the break pass are in the DOM lane (`dom/break-pass-1017*.test.ts`).
-// Findings are in docs/reviews/2026-10-17-break-pass.md.
+// Break pass of 10-17: what needs a browser's layout and focus. A narrow
+// window, the destination list and switcher in it, Home's field through a
+// send, Esc from Home's lists back to their chips, and dark mode's surfaces.
+// Keys typed right after ⌘N are not tested: the test seam moves focus before
+// the keys arrive, in this lane as in the DOM lane, so the test passed with
+// the keys not held at all. The flows of the break pass are in
+// the DOM lane (`dom/break-pass-1017*.test.ts`); a mouse press on a tab is in
+// tabs.spec.ts. Findings are in docs/reviews/2026-10-17-break-pass.md and
+// docs/reviews/2026-10-17-break-pass-b.md.
 import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 import { recordBoxes } from './shiftProbe'
@@ -15,7 +19,7 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 
 const setWindowSize = (juno: Juno, width: number, height?: number) => juno.setWindowSize(width, height)
 
-syncedTest('a narrow window keeps the tab strip and topic inside the window, the destination list and topic switcher fit, and dark mode leaves no light surface', async ({ juno, fake }) => {
+syncedTest('a narrow window keeps the tab strip and topic inside it, the destination list and topic switcher fit, Esc gives focus back to Home\'s chips, and dark mode leaves no light surface', async ({ juno, fake }) => {
   // Sixty threads in #eng for the switcher.
   for (let i = 0; i < 60; i++) {
     const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: `Busy day thread number ${i} about things` })
@@ -67,6 +71,15 @@ syncedTest('a narrow window keeps the tab strip and topic inside the window, the
     const frames = await fields()
     expect(frames.length, 'the field must be sampled in many frames').toBeGreaterThan(1)
     expect(frames.filter((boxes) => boxes.length !== 1 || JSON.stringify(boxes[0]) !== JSON.stringify(before)), `one field at ${JSON.stringify(before)} in every frame`).toEqual([])
+
+    // Esc from the topic list gives focus back to its chip, as Esc from the destination list did above.
+    await write.pickConversation('eng', 'eng')
+    await write.expectTopic('Main')
+    await write.composer.press('Shift+Tab')
+    await write.topicChip.press('ArrowDown')
+    await expect(write.topicSearch).toBeFocused()
+    await write.topicSearch.press('Escape')
+    await expect(write.topicChip).toBeFocused()
   })
 
   await test.step('the topic switcher with many threads keeps the selected row in view and fits the window', async () => {
@@ -118,24 +131,4 @@ syncedTest('a narrow window keeps the tab strip and topic inside the window, the
     await juno.openSettings('General')
     expect(await lightSurfaces()).toEqual([])
   })
-})
-
-// A press's focus follows Chromium's pointer and mouse events, which the DOM lane does not reproduce.
-syncedTest('a mouse press on a tab gives its page focus; the keyboard keeps focus in the strip', async ({ juno }) => {
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.sidebar.row(RINA).openInNewTab()
-  // Never focused in this tab: the press focuses its composer.
-  await juno.tabs.select(POSTGRES)
-  await expect(juno.topic.composer).toBeFocused()
-  await juno.win.keyboard.type('Typed after a click')
-  await expect(juno.topic.composer).toHaveValue('Typed after a click')
-  // From the sidebar, a press on the active tab focuses its page too.
-  await juno.sidebar.row(POSTGRES).focus()
-  await juno.tabs.select(POSTGRES)
-  await expect(juno.topic.composer).toBeFocused()
-  // Arrow keys in the strip move the selection and keep focus on the tabs.
-  await juno.tabs.tab(POSTGRES).focus()
-  await juno.win.keyboard.press('ArrowRight')
-  await juno.tabs.expectActive('Rina')
-  await juno.tabs.expectFocused('Rina')
 })

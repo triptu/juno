@@ -1,7 +1,6 @@
 // Cards the owner clicks (plan v3 §16, flows 3, 5 and 11): Dismiss on a Send card, a multi-send
 // card where one post fails, a hostile Slack message that turns a task into a card with a
-// Because line, a card that expires, and the Budget card at the daily cap, one test per button,
-// since the agent makes one Budget card per day and raise.
+// Because line, the Budget card at the daily cap and Allow, and a card that expires.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
@@ -50,42 +49,9 @@ async function capAtZero(juno: Juno): Promise<void> {
   await expect(cap).toHaveValue('0')
 }
 
-domTest('at the daily cap the Budget card appears, and Allow $1 more lets the answer through', async ({ juno }) => {
-  await readySynced(juno)
-  await capAtZero(juno)
-
-  const chat = await openChat(juno)
-  await chat.send('what is on today?')
-  const budget = card(chat, 'budget')
-  await expect(budget).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
-  await expect(budget.getByText("Juno has used today's budget.", { exact: true })).toBeVisible()
-  await expect(chat.junoBubble('You said: what is on today?')).toHaveCount(0)
-
-  await budget.getByRole('button', { name: 'Allow $1 more today' }).click()
-  await expect(budget.getByText('Allowed until midnight', { exact: true })).toBeVisible()
-  // The next owner request has the increased allowance.
-  await chat.send('and tomorrow?')
-  await chat.expectJuno('and tomorrow?')
-  await expect(card(chat, 'budget')).toHaveCount(1)
-}, { model })
-
-domTest('at the daily cap, Wait until tomorrow closes the Budget card and Juno stays quiet', async ({ juno, model }) => {
-  await readySynced(juno)
-  await capAtZero(juno)
-
-  const chat = await openChat(juno)
-  await chat.send('what is on today?')
-  const budget = card(chat, 'budget')
-  await expect(budget).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
-  await budget.getByRole('button', { name: 'Wait until tomorrow' }).click()
-  await expect(budget).toHaveAttribute('data-card-status', 'dismissed')
-  await expect(budget.getByText('Dismissed', { exact: true })).toBeVisible()
-  expect(model.inputs().filter((input) => input.includes('what is on today?'))).toEqual([])
-}, { model })
-
 domTest(
-  'Dismiss on a Send card sends nothing; a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has all three; after a hostile Slack message a task becomes a card with a Because line',
-  async ({ juno, fake, slack, model }) => {
+  'Dismiss on a Send card sends nothing; a multi-send card where one post fails says "Sent 1 of 2", the failed row says Failed with no button, and Activity has all three; after a hostile Slack message a task becomes a card with a Because line; at the daily cap the Budget card holds the answer until Allow',
+  async ({ juno, fake, slack, model, step }) => {
     await readySynced(juno)
     const eng = slack.channel('eng')
     const product = slack.channel('product')
@@ -130,26 +96,46 @@ domTest(
     await expect(page.locator('[data-activity-action="failed"]')).toContainText('Approved')
     await expect(actions.filter({ hasText: 'Declined' })).toHaveCount(1)
 
-    // After reading a hostile Slack message, a task becomes a card with a Because line and nothing starts.
-    fake.injectMessage({ channel: eng, user: slack.as('Leo').id, text: HOSTILE })
-    await openChat(juno)
-    const answered = await chat.junoBubble('It is ready for you.').count()
-    await chat.send(`read ${eng} and start a task on what it says`)
-    const task = card(chat, 'proposedTask')
-    await expect(task).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
-    await expect(task.getByText(UNTRUSTED, { exact: true })).toBeVisible()
-    await expect(task.getByRole('button', { name: 'Start', exact: true })).toBeVisible()
-    await expect(chat.junoBubble('It is ready for you.')).toHaveCount(answered + 1, { timeout: 15_000 })
-    await expect(card(chat, 'task')).toHaveCount(0)
-    // The helper model would get the task text as its input: it never ran.
-    expect(model.inputs().filter((input) => input.includes(TASK))).toEqual([])
+    await step('after a hostile Slack message a task becomes a card with a Because line, and nothing starts', async () => {
+      // After reading a hostile Slack message, a task becomes a card with a Because line and nothing starts.
+      fake.injectMessage({ channel: eng, user: slack.as('Leo').id, text: HOSTILE })
+      await openChat(juno)
+      const answered = await chat.junoBubble('It is ready for you.').count()
+      await chat.send(`read ${eng} and start a task on what it says`)
+      const task = card(chat, 'proposedTask')
+      await expect(task).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
+      await expect(task.getByText(UNTRUSTED, { exact: true })).toBeVisible()
+      await expect(task.getByRole('button', { name: 'Start', exact: true })).toBeVisible()
+      await expect(chat.junoBubble('It is ready for you.')).toHaveCount(answered + 1, { timeout: 15_000 })
+      await expect(card(chat, 'task')).toHaveCount(0)
+      // The helper model would get the task text as its input: it never ran.
+      expect(model.inputs().filter((input) => input.includes(TASK))).toEqual([])
 
-    await openPage(juno, 'Activity')
-    // The run says, in plain words, what it read and that it asked before acting.
-    const run = page.locator('[data-activity-run="replied"]').filter({ has: juno.win.locator('[data-activity-summary]').filter({ hasText: /^Read .*#eng/ }) })
-    await expect(run).toHaveCount(1)
-    await openRuns(page)
-    await expect(run.locator('[data-activity-tainted]')).toBeVisible()
+      await openPage(juno, 'Activity')
+      // The run says, in plain words, what it read and that it asked before acting.
+      const run = page.locator('[data-activity-run="replied"]').filter({ has: juno.win.locator('[data-activity-summary]').filter({ hasText: /^Read .*#eng/ }) })
+      await expect(run).toHaveCount(1)
+      await openRuns(page)
+      await expect(run.locator('[data-activity-tainted]')).toBeVisible()
+    })
+
+    await step('at the daily cap the Budget card holds the answer, and Allow $1 more lets it through', async () => {
+      // At the daily cap the Budget card appears, and Allow $1 more lets the answer through.
+      await capAtZero(juno)
+
+      await openChat(juno)
+      await chat.send('what is on today?')
+      const budget = card(chat, 'budget')
+      await expect(budget).toHaveAttribute('data-card-status', 'open', { timeout: 15_000 })
+      await expect(chat.junoBubble('You said: what is on today?')).toHaveCount(0)
+
+      await budget.getByRole('button', { name: 'Allow $1 more today' }).click()
+      await expect(budget.getByText('Allowed until midnight', { exact: true })).toBeVisible()
+      // The next owner request has the increased allowance.
+      await chat.send('and tomorrow?')
+      await chat.expectJuno('and tomorrow?')
+      await expect(card(chat, 'budget')).toHaveCount(1)
+    })
   },
   { model, timeout: 150_000 },
 )

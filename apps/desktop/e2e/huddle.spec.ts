@@ -21,11 +21,12 @@ interface QuitHooks {
 const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalThis as unknown as QuitHooks).junoTest.huddleQuitAsked()])
 const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
 
-test('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@nightly', '@nightly-huddle'] }, async ({ juno, fake, win }) => {
+// Starts signed in and synced (README, "Synced start").
+syncedTest('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@nightly', '@nightly-huddle'] }, async ({ juno, fake, win }) => {
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
   await test.step('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop', async () => {
-    await openEngMain(juno)
+    await openEngMain(juno, { signedIn: true })
     await startHuddleFromMenu(juno)
     // The bar shows once the media session has loaded.
     await expect(bar).toBeVisible()

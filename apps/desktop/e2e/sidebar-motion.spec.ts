@@ -4,6 +4,7 @@
 // the rows in place at once, and your own Resolve takes its row out in one
 // frame with no motion.
 import type { Page } from '@playwright/test'
+import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
@@ -13,7 +14,7 @@ test.use({ synced: true })
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
 test.use({ sidebarTrace: true })
 
-test.describe.configure({ timeout: 60_000 })
+test.describe.configure({ timeout: 90_000 })
 
 const ROW = '[role="group"][aria-label="Topics"] [data-topic-row]'
 
@@ -75,7 +76,7 @@ async function stopFrames(win: Page): Promise<ReadonlyArray<Frame>> {
   })
 }
 
-test('a reply from elsewhere slides its row to the top, and a press during the slide opens it; your own Resolve, a reply while scrolled down and reduced motion do not animate', async ({ juno, win, fake }) => {
+test('a reply from elsewhere slides its row to the top, and a press during the slide opens it; your own Resolve and a reply while scrolled down do not animate; a burst retargets and hiding cancels; reduced motion does not animate', async ({ juno, win, fake }) => {
   await atTheTop(juno, win)
   const mover = await threadInView(juno)
   const row = juno.sidebar.list.locator(`[data-topic-id="${mover}"]`)
@@ -110,7 +111,7 @@ test('a reply from elsewhere slides its row to the top, and a press during the s
   const first = await juno.sidebar.list.locator('[data-topic-row]').first().boundingBox()
   expect(await row.boundingBox()).toEqual(first)
 
-  // The steps below record no motion. Reduced motion goes last: it stays on for the page.
+  // Your own Resolve and a reply while scrolled down record no motion. Reduced motion goes last: it stays on for the page.
   await test.step('your own Resolve takes its row out in one frame, with no motion', async () => {
     await atTheTop(juno, win)
     const ids = await recentIds(juno)
@@ -141,6 +142,8 @@ test('a reply from elsewhere slides its row to the top, and a press during the s
     expect(frames.every((frame) => frame.animating === 0)).toBe(true)
   })
 
+  await test.step('a burst retargets the rows, including a row removed during its slide, and releases every animation; hiding the page cancels slides', () => burst(juno, win, fake))
+
   await test.step('with reduced motion, rows take their new places in one frame', async () => {
     await juno.sidebar.list.evaluate((list) => { list.scrollTop = 0 })
     await win.emulateMedia({ reducedMotion: 'reduce' })
@@ -159,7 +162,9 @@ test('a reply from elsewhere slides its row to the top, and a press during the s
   })
 })
 
-test('a burst retargets the rows, including a row removed during its slide, and releases every animation; hiding the page cancels slides', async ({ juno, win, fake }) => {
+async function burst(juno: Juno, win: Page, fake: FakeSlack): Promise<void> {
+  // The step before left the list scrolled down.
+  await juno.sidebar.list.evaluate((list) => { list.scrollTop = 0 })
   await atTheTop(juno, win)
   const movers = (await recentIds(juno)).filter((id) => id.startsWith('t:')).slice(2, 4)
   expect(movers).toHaveLength(2)
@@ -222,4 +227,4 @@ test('a burst retargets the rows, including a row removed during its slide, and 
     })
     expect(await win.evaluate((selector) => [...document.querySelectorAll(selector)].flatMap((row) => row.getAnimations()).length, ROW)).toBe(0)
   })
-})
+}

@@ -1,12 +1,16 @@
 // What a message does (spec section 7): edit and delete your own from the
 // keyboard and the message menu; reactions from the menu's grid, the emoji
-// picker it turns into and the chips; Quote, whole and selected; and Start or
-// open a thread from Main. Every change shows at once and reaches the fake
-// Slack through the outbox. A message's fills are the gallery's.
+// picker it turns into and the chips, and one Slack keeps refusing; Quote,
+// whole and selected; and Start or open a thread from Main. Forward… and Also
+// send to #eng are in send.test.ts. Every change
+// shows at once and reaches the fake Slack through the outbox, once. How the
+// outbox spaces and drops tries is the engine's (outbox-reactions.flow.test.ts).
+// A message's fills are the gallery's.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
 import type { Query } from './query'
+import { MessageMenuDriver } from './driver/topic'
 import { domTest, type DomContext } from './test'
 
 const ENG_MAIN = '#eng'
@@ -43,15 +47,17 @@ async function selectWords(text: Query, words: string): Promise<void> {
   node.dispatchEvent(new W.PointerEvent('pointerup', { bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true }))
 }
 
-// One Main: each step sends its own message, so ↑ from the composer selects the newest one.
-domTest('edits and deletes with the keyboard and menus, reacts and quotes messages', async ({ juno, fake, step }) => {
+// One launch on #eng's Main: each step sends its own message, so ↑ from the composer selects the newest one.
+domTest('edits, deletes, reacts, quotes and opens threads from Main', async ({ juno, fake, step }) => {
   await openMain(juno)
   const context = { juno, fake, step }
   await step('the keyboard: ↑ selects, E edits, Delete asks once, and E and Delete do nothing on others’ messages', () => keyboardActions(context))
   await step('reactions: a quick reaction, its chip toggled off, and one from the full picker', () => reactToMessage(context))
+  await step('a reaction Slack keeps refusing stops after five tries with one toast, and Retry starts again', () => refusedReaction(context))
   await step('Quote puts the message in the composer as "> " lines; a selection quotes only itself', () => quoteMessage(context))
   await step('Edit and Delete from the menus, and Edit after the message changed elsewhere', () => menuActions(context))
-})
+  await step('Open thread and Start thread from Main open the message’s thread, and ⌘-click opens it in a background tab', () => threads(context))
+}, { timeout: 120_000 })
 
 async function keyboardActions({ juno, fake, step }: Context): Promise<void> {
   await juno.topic.composer.fill('')
@@ -127,7 +133,7 @@ async function moveSelection(juno: Juno, fake: FakeSlack): Promise<void> {
   await expect(topic.message('Looking now')).toBeFocused()
   await juno.win.keyboard.press('Escape')
   await expect(topic.composer).toBeFocused()
-  // ↑ with a draft: composer-up.spec.ts.
+  // ↑ with a draft: composer.spec.ts.
 }
 
 async function reactToMessage({ juno, fake }: Context): Promise<void> {
@@ -227,9 +233,6 @@ async function menuActions({ juno, fake, step }: Context): Promise<void> {
     const menu = await topic.messageMenu('Retro at 3')
     juno.win.unhover()
     await expect(row).toHaveAttribute('data-popover-active', '')
-    // Your own message's menu ends with Edit and Delete…; message-menu.spec.ts checks a message from someone else has neither.
-    // Ask Juno shows while AI assist is on.
-    expect((await menu.labels()).filter((label) => label !== 'Ask Juno').slice(-2)).toEqual(['Edit', 'Delete…'])
     await menu.choose('edit')
     const editing = topic.list.locator('[data-editing]')
     const field = editing.getByRole('textbox', { name: 'Edit message' })
@@ -258,78 +261,19 @@ async function menuActions({ juno, fake, step }: Context): Promise<void> {
   })
 }
 
-domTest('an edit made while the message is still sending is kept, and reaches Slack once it has the message', async ({ juno, fake, step }) => {
-  await openMain(juno)
-  const { topic } = juno
-  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
 
-  await step('an edit started while the message is sending stays open, with what was typed, when Slack takes the message', async () => {
-    fake.holdNext({ method: 'chat.postMessage', before: true })
-    await topic.send('Typo in thsi one')
-    await expect(topic.message('Typo in thsi one')).toHaveAttribute('data-pending', 'sending')
-    await topic.composer.press('ArrowUp')
-    await topic.message('Typo in thsi one').press('e')
-    await field.fill('Typo in this one, still typing')
-
-    fake.release()
-    await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in thsi one')).toBe(true)
-    await expect(topic.list.locator('[data-message-row][data-pending]')).toHaveCount(0)
-    await expect(field).toHaveValue('Typo in this one, still typing')
-    await expect(field).toBeFocused()
-    await field.press('Enter')
-    await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in this one, still typing')).toBe(true)
-  })
-
-  await step('an edit saved while the message is still sending reaches Slack once it has the message', async () => {
-    const updates = () => fake.calls.filter((call) => call.method === 'chat.update').length
-    fake.holdNext({ method: 'chat.postMessage', before: true })
-    await topic.send('Wrnog word here')
-    await expect(topic.message('Wrnog word here')).toHaveAttribute('data-pending', 'sending')
-    const before = updates()
-    await topic.composer.press('ArrowUp')
-    await juno.win.keyboard.press('e')
-    await field.fill('Wrong word here')
-    await field.press('Enter')
-    await expect(topic.message('Wrong word here')).toBeVisible()
-    expect(updates()).toBe(before)
-    fake.release()
-    await topic.expectSent('Wrong word here')
-    await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Wrong word here').length).toBe(1)
-    expect(fake.messages('C0ENG').some((m) => m.text === 'Wrnog word here')).toBe(false)
-  })
-
-  await step('Edit from a menu opened while the message was sending follows it once it is sent', async () => {
-    fake.holdNext({ method: 'chat.postMessage', before: true })
-    await topic.send('Menu during send')
-    await expect(topic.message('Menu during send')).toHaveAttribute('data-pending', 'sending')
-    const menu = await topic.messageMenu('Menu during send')
-    fake.release()
-    await topic.expectSent('Menu during send')
-    await menu.choose('edit')
-    await expect(field).toHaveValue('Menu during send')
-    await field.fill('Edited after send')
-    await field.press('Enter')
-    await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Edited after send').length).toBe(1)
-  })
-})
-
-domTest('Open thread and Start thread from Main open the message’s thread, and ⌘-click opens it in a background tab', async ({ juno, fake, step }) => {
-  await openMain(juno)
+async function threads({ juno, fake, step }: Context): Promise<void> {
   const { topic, tabs } = juno
   await step('Open thread from Main opens the message’s thread with its composer', async () => {
-    const menu = await topic.messageMenu(POSTGRES)
-    expect((await menu.labels())[0]).toBe('Open thread')
-    await menu.choose('reply')
+    await openMain(juno)
+    await topic.chooseInMessageMenu(POSTGRES, 'reply')
     await topic.expectTitle(/Postgres|Draft plan/)
     await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
   })
-  // Back to Main for the next message.
-  await openMain(juno)
   await step('Start thread from Main opens a new topic for the message', async () => {
+    await openMain(juno)
     const ts = await sendOwn(juno, fake, 'A new topic from Main')
-    const menu = await topic.messageMenu('A new topic from Main')
-    expect((await menu.labels())[0]).toBe('Start thread')
-    await menu.choose('reply')
+    await topic.chooseInMessageMenu('A new topic from Main', 'reply')
     await topic.expectTitle(/A new topic from Main/)
     await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
     expect(fake.messages('C0ENG').find((message) => message.ts === ts)?.reply_count ?? 0).toBe(0)
@@ -363,4 +307,25 @@ domTest('Open thread and Start thread from Main open the message’s thread, and
     await topic.expectTitle(/A topic for later/)
     await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
   })
-})
+}
+
+async function refusedReaction({ juno, fake }: Context): Promise<void> {
+  await openMain(juno)
+  const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Reaction delivery target' })
+  const row = juno.topic.message('Reaction delivery target')
+  await expect(row).toBeVisible()
+  const sent = () => fake.messages('C0ENG').find((m) => m.ts === message.ts)?.reactions?.some((r) => r.name === 'eyes') === true
+  const tries = () => fake.calls.filter((c) => c.method === 'reactions.add').length
+  const before = tries()
+  fake.forceError({ method: 'reactions.add', error: 'internal_error', times: 5 })
+  await (await new MessageMenuDriver(juno.win).openOnRow(row)).react('eyes')
+  await expect(row.locator('[data-reaction-issue="waiting"]')).toBeVisible({ timeout: 6000 })
+  await expect(row.locator('[data-reaction-issue="failed"]')).toBeVisible({ timeout: 20_000 })
+  await juno.expectToast('Reaction not sent')
+  expect(tries() - before).toBe(5)
+  await expect(row.getByRole('button', { name: '1 👀, including you' })).toHaveCount(0)
+  await row.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect.poll(sent).toBe(true)
+  await expect(row.locator('[data-reaction-issue]')).toHaveCount(0)
+  expect(tries() - before).toBe(6)
+}

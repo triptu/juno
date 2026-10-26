@@ -1,13 +1,17 @@
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start"); Slack's use counts arrive as a pref change, as from another
+// client, and the fake keeps them for the relaunches.
+test.use({ synced: true })
+
 test('frequently used emoji survive a restart and an update from their first picker paint', async ({ juno, fake, relaunch }) => {
   test.setTimeout(120_000)
-  fake.workspace.prefs = { ...fake.workspace.prefs, emoji_use: JSON.stringify({
+  const used = JSON.stringify({
     eyes: 5, tada: 20, hello_juno: 30, '+1::skin-tone-3': 12, thumbsup: 10,
     missing_emoji: 100, deleted_custom: 90,
-  }) }
-  await juno.signIn()
-  await juno.waitForSync()
+  })
+  fake.workspace.prefs = { ...fake.workspace.prefs, emoji_use: used }
+  fake.emitFrame({ type: 'pref_change', name: 'emoji_use', value: used })
   await juno.sidebar.row('#eng').open()
   const row = juno.topic.list.locator('[data-message-row]').last()
   const ts = await row.getAttribute('data-message-row')
@@ -29,7 +33,8 @@ test('frequently used emoji survive a restart and an update from their first pic
   ])
   await search.press('Escape')
 
-  for (const cacheMigration of [false, true]) {
+  // An update's relaunch migrates the cache, and is a restart too.
+  for (const cacheMigration of [true]) {
     const second = await relaunch({ cacheMigration })
     await second.waitForSync()
     await second.sidebar.row('#eng').open()

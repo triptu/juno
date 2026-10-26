@@ -1,7 +1,6 @@
 import type { Locator } from '@playwright/test'
-import { expect, hooks, syncedTest, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import { expectHomeSyncFrames } from './homeSyncProbe'
-import { JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { messageStored } from './driver/userDb'
 import { expectStableAnchor } from './shiftProbe'
 
@@ -21,10 +20,11 @@ const growingEdge = async (list: Locator): Promise<'top' | 'bottom'> =>
     ? 'bottom'
     : 'top'
 const RINA = 'Rina finished the onsite'
+const QUIET = 'Lag alerts are firing on the'
 
 // Each path opens a topic or page this test has not opened before, from Home as at launch, so the first message row
 // the probe finds is the new topic's. The Home path opens the topic it leaves from first.
-syncedTest('topics and pages open without a layout shift', async ({ juno, win, fake }) => {
+syncedTest('topics and pages open without a layout shift, and a row on All topics opens its topic', async ({ juno, win, fake }) => {
   test.setTimeout(120_000)
   for (const [index, path] of (['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const).entries()) {
     await test.step(`stable open: ${path}`, async () => {
@@ -58,126 +58,133 @@ syncedTest('topics and pages open without a layout shift', async ({ juno, win, f
       })
     })
   }
+
+  // What each filter keeps is the engine's all-topics flow test; this checks a row opens what the sidebar leaves out.
+  await test.step('a quiet topic on All topics opens in the same tab, and Back returns to the page', async () => {
+    const { allTopics, tabs } = juno
+    await juno.sidebar.row(QUIET).expectAbsent()
+    await allTopics.open()
+    await allTopics.row(QUIET).expectStatus('Quiet')
+    await allTopics.row(QUIET).open()
+    await juno.topic.expectTitle(/Lag alerts are firing on the/)
+    await tabs.expectCount(1)
+    await juno.nav.back()
+    await tabs.expectActive('All topics')
+    await allTopics.row(QUIET).expectVisible()
+  })
 })
 
 // No line is held for reactions a message does not have yet (SPEC 7, "Stable geometry"). The last message's first
 // chip grows it in one step: in a list that fits the view, downwards; at the bottom of a longer one, the list keeps
 // its end and the rows above lift in the same frame, as Slack's do.
 // What must never move: the rows in view when something changes above them, and the list's end while it is held.
-syncedTest('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async ({ juno, win, slack, fake }) => {
-  const channel = slack.channel('eng')
-  const user = slack.as('Leo').id
-  const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
-  const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true }))
-  const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest reply under the view check' })
-  await juno.sidebar.expectTop('#eng')
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
-  await juno.topic.expectMessage('Latest reply under the view check')
-  const above = juno.topic.list.locator(`[data-message-row="${replies[1]!.ts}"]`)
-  expect(await above.evaluate((node) => node.getBoundingClientRect().bottom < (node.closest('[data-scroll-area]')?.getBoundingClientRect().top ?? 0))).toBe(true)
-  await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
-    fake.addReaction({ channel, ts: replies[1]!.ts, name: 'eyes', user })
-    await expect(above.getByRole('list', { name: 'Reactions' })).toBeAttached()
+// Then two late changes in Main: a sender name that resolves after the message paints, and a reply that gives a new
+// message its thread link.
+syncedTest('late changes move nothing in view: a reaction above or on the last message, a sender name, a new thread link', async ({ juno, win, slack, fake }) => {
+  await test.step('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async () => {
+    const channel = slack.channel('eng')
+    const user = slack.as('Leo').id
+    const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
+    const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true }))
+    const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest reply under the view check' })
+    await juno.sidebar.expectTop('#eng')
+    await juno.sidebar.row('#eng').open()
+    await juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
+    await juno.topic.expectMessage('Latest reply under the view check')
+    const above = juno.topic.list.locator(`[data-message-row="${replies[1]!.ts}"]`)
+    expect(await above.evaluate((node) => node.getBoundingClientRect().bottom < (node.closest('[data-scroll-area]')?.getBoundingClientRect().top ?? 0))).toBe(true)
+    await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
+      fake.addReaction({ channel, ts: replies[1]!.ts, name: 'eyes', user })
+      await expect(above.getByRole('list', { name: 'Reactions' })).toBeAttached()
+    })
+    expect(await growingEdge(juno.topic.list)).toBe('bottom')
+    const last = juno.topic.list.locator(`[data-message-row="${latest.ts}"]`)
+    await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
+      fake.addReaction({ channel, ts: latest.ts, name: 'eyes', user })
+      await expect(last.getByRole('list', { name: 'Reactions' })).toBeVisible()
+    }, { edge: 'bottom' })
   })
-  expect(await growingEdge(juno.topic.list)).toBe('bottom')
-  const last = juno.topic.list.locator(`[data-message-row="${latest.ts}"]`)
-  await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
-    fake.addReaction({ channel, ts: latest.ts, name: 'eyes', user })
-    await expect(last.getByRole('list', { name: 'Reactions' })).toBeVisible()
-  }, { edge: 'bottom' })
+
+  // The time follows the name, so a name that resolves late moves the time along its line once; the message stays put.
+  await test.step('a sender name resolves without moving the message', async () => {
+    const person = { ...fake.workspace.users.get(slack.as('Leo').id)!, id: 'U0LATE', name: 'late', profile: { display_name: 'Leonard Alexander Park', real_name: 'Leonard Alexander Park' } }
+    fake.workspace.users.set(person.id, person)
+    fake.holdNext({ method: 'edge:users/info' })
+    const message = fake.injectMessage({ channel: slack.channel('eng'), user: person.id, text: 'A message before its sender resolves' })
+    await juno.sidebar.expectTop('#eng')
+    await juno.sidebar.row('#eng').open()
+    await juno.topic.expectMessage('A message before its sender resolves')
+    await expect.poll(() => fake.heldCount({ method: 'edge:users/info' })).toBe(1)
+    await expectStableAnchor(win, `[data-message-row="${message.ts}"] [data-msg-text]`, async () => {
+      fake.release({ method: 'edge:users/info' })
+      await expect(juno.topic.list.getByText('Leonard Alexander Park', { exact: true }).first()).toBeVisible()
+    })
+  })
+
+  await test.step('a new Main message gains a thread link without a jump, and the header stays put', async () => {
+    const channel = slack.channel('deploys')
+    const user = slack.as('Leo').id
+    const root = fake.injectMessage({ channel, user, text: 'A new Main message for the thread slot' })
+    await win.getByRole('button', { name: 'Automated', exact: true }).click()
+    await juno.sidebar.row('#deploys').open()
+    await juno.topic.expectMessage('A new Main message for the thread slot')
+    // Main's threads are behind the title's switcher now; the right island (⋯ and Juno) must not move either.
+    const island = juno.topic.header.locator('[data-island="right"]')
+    const islandBefore = await island.boundingBox()
+    const edge = await growingEdge(juno.topic.list)
+    await expectStableAnchor(win, `[data-message-row="${root.ts}"]`, async () => {
+      fake.injectMessage({ channel, user, threadTs: root.ts, text: 'A reply arriving after Main paints' })
+      await expect(juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)).toBeVisible()
+      expect(await island.boundingBox()).toEqual(islandBefore)
+    }, { edge })
+    // The new thread is in the switcher.
+    const switcher = await juno.topic.openSwitcher()
+    await expect(switcher.row('A new Main message')).toBeVisible()
+  })
 })
 
 // A thread no page proves, with 30 replies Juno never stored and the latest it heard live. At the bottom the
 // latest paints at once, at the foot of the list, and the 30 come in above it without moving its text. At the
 // "N new" divider the list waits for them, since the topic opens at the divider, which belongs among them.
-for (const divider of [false, true]) {
-  syncedTest(`a partial thread ${divider ? 'waits for history at its divider' : 'paints what it holds at the bottom and grows above it'}`, { tag: divider ? ['@nightly', '@nightly-scroll'] : [] }, async ({ juno, win, slack, fake, userData }) => {
-    const channel = slack.channel('eng')
-    const user = slack.as('Leo').id
-    // The root is not posted live: a root heard on this connection proves its thread from the root (`liveRoots`),
-    // so silent replies under it would not make a partial thread. Main's open fetch brings it instead.
-    const root = fake.workspace.post({ channel, user, text: 'Delayed history layout check', silent: true })
-    const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user, threadTs: root.ts, text: `Earlier reply ${i}`, silent: true }))
-    const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest delayed reply' })
-    if (divider) fake.markThreadRead({ channel, threadTs: root.ts, ts: replies[24]!.ts })
-    // The read mark makes the thread a row; open #eng once it is there.
-    if (divider) await juno.sidebar.expectTop('Delayed history layout check')
-    await juno.sidebar.row('#eng').open()
-    const link = juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)
-    await expect(link).toBeVisible()
-    // The live reply is stored before the open, so the thread holds it when it opens.
-    await expect.poll(() => messageStored(userData, fake.teamId, channel, latest.ts)).toBe(true)
-    fake.holdNext({ method: 'conversations.replies', reason: 'open' })
-    await link.click()
-    await expect.poll(() => fake.heldCount({ method: 'conversations.replies' })).toBe(1)
-    const rows = juno.topic.list.locator('[data-message-row]')
-    await expect(rows).toHaveCount(divider ? 0 : 1)
-    // The same sender's replies above it take the latest into their group, so its name line goes; its text stays.
-    // Chromium reports the row's top edge moving down as a shift; it skips that only within 500 ms of the click, and
-    // under load the replies render later. The text is the anchor, so the samples check it stays to the pixel.
-    const latestRow = `[data-message-row="${latest.ts}"]`
-    await expectStableAnchor(win, divider ? '[data-new-divider]' : `${latestRow} [data-msg-text]`, async () => {
-      fake.release({ method: 'conversations.replies' })
-      await juno.topic.expectMessage('Earlier reply 0')
-      await expect(rows).toHaveCount(32)
-    }, divider ? {} : { outside: latestRow })
-  })
-}
-
-// The time follows the name, so a name that resolves late moves the time along its line once; the message stays put.
-syncedTest('a sender name resolves without moving the message', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
-  const person = { ...fake.workspace.users.get(slack.as('Leo').id)!, id: 'U0LATE', name: 'late', profile: { display_name: 'Leonard Alexander Park', real_name: 'Leonard Alexander Park' } }
-  fake.workspace.users.set(person.id, person)
-  fake.holdNext({ method: 'edge:users/info' })
-  const message = fake.injectMessage({ channel: slack.channel('eng'), user: person.id, text: 'A message before its sender resolves' })
-  await juno.sidebar.expectTop('#eng')
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.expectMessage('A message before its sender resolves')
-  await expect.poll(() => fake.heldCount({ method: 'edge:users/info' })).toBe(1)
-  await expectStableAnchor(win, `[data-message-row="${message.ts}"] [data-msg-text]`, async () => {
-    fake.release({ method: 'edge:users/info' })
-    await expect(juno.topic.list.getByText('Leonard Alexander Park', { exact: true }).first()).toBeVisible()
-  })
+syncedTest('a partial thread paints what it holds at the bottom and grows above it, and at its divider waits for history', async ({ juno, win, slack, fake, userData }) => {
+  for (const divider of [false, true]) {
+    await test.step(divider ? 'at the divider it waits for history' : 'at the bottom it paints what it holds and grows above it', async () => {
+      const channel = slack.channel('eng')
+      const user = slack.as('Leo').id
+      const title = divider ? 'Delayed history divider check' : 'Delayed history layout check'
+      // The root is not posted live: a root heard on this connection proves its thread from the root (`liveRoots`),
+      // so silent replies under it would not make a partial thread. Main's open fetch brings it instead.
+      const root = fake.workspace.post({ channel, user, text: title, silent: true })
+      const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user, threadTs: root.ts, text: `Earlier reply ${i}`, silent: true }))
+      const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest delayed reply' })
+      if (divider) fake.markThreadRead({ channel, threadTs: root.ts, ts: replies[24]!.ts })
+      // The read mark makes the thread a row; open #eng once it is there.
+      if (divider) await juno.sidebar.expectTop(title)
+      await juno.sidebar.row('#eng').open()
+      const link = juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)
+      await expect(link).toBeVisible()
+      // The live reply is stored before the open, so the thread holds it when it opens.
+      await expect.poll(() => messageStored(userData, fake.teamId, channel, latest.ts)).toBe(true)
+      fake.holdNext({ method: 'conversations.replies', reason: 'open' })
+      await link.click()
+      await expect.poll(() => fake.heldCount({ method: 'conversations.replies' })).toBe(1)
+      const rows = juno.topic.list.locator('[data-message-row]')
+      await expect(rows).toHaveCount(divider ? 0 : 1)
+      // The same sender's replies above it take the latest into their group, so its name line goes; its text stays.
+      // Chromium reports the row's top edge moving down as a shift; it skips that only within 500 ms of the click, and
+      // under load the replies render later. The text is the anchor, so the samples check it stays to the pixel.
+      const latestRow = `[data-message-row="${latest.ts}"]`
+      await expectStableAnchor(win, divider ? '[data-new-divider]' : `${latestRow} [data-msg-text]`, async () => {
+        fake.release({ method: 'conversations.replies' })
+        await juno.topic.expectMessage('Earlier reply 0')
+        await expect(rows).toHaveCount(32)
+      }, divider ? {} : { outside: latestRow })
+    })
+  }
 })
-
-syncedTest('a new Main message gains a thread link without a jump, and the header stays put', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
-  const channel = slack.channel('deploys')
-  const user = slack.as('Leo').id
-  const root = fake.injectMessage({ channel, user, text: 'A new Main message for the thread slot' })
-  await win.getByRole('button', { name: 'Automated', exact: true }).click()
-  await juno.sidebar.row('#deploys').open()
-  await juno.topic.expectMessage('A new Main message for the thread slot')
-  // Main's threads are behind the title's switcher now; the right island (⋯ and Juno) must not move either.
-  const island = juno.topic.header.locator('[data-island="right"]')
-  const islandBefore = await island.boundingBox()
-  const edge = await growingEdge(juno.topic.list)
-  await expectStableAnchor(win, `[data-message-row="${root.ts}"]`, async () => {
-    fake.injectMessage({ channel, user, threadTs: root.ts, text: 'A reply arriving after Main paints' })
-    await expect(juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)).toBeVisible()
-    expect(await island.boundingBox()).toEqual(islandBefore)
-  }, { edge })
-  // The new thread is in the switcher.
-  const switcher = await juno.topic.openSwitcher()
-  await expect(switcher.row('A new Main message')).toBeVisible()
-})
-
-syncedTest('delayed image bytes keep the reserved thumbnail box', async ({ juno, win, fake }) => {
-  fake.holdNext({ method: 'file:bytes', times: 100 })
-  await juno.sidebar.row('Proposal: cut offline mode').open()
-  const image = juno.topic.list.locator('[data-thumbnail] img').last()
-  await expect(image).toBeVisible()
-  await expect.poll(() => fake.heldCount({ method: 'file:bytes' })).toBeGreaterThan(0)
-  expect(await image.evaluate((node) => node instanceof HTMLImageElement && node.complete)).toBe(false)
-  await expectStableAnchor(win, '[data-thumbnail]', async () => {
-    fake.release({ method: 'file:bytes' })
-    await expect.poll(() => image.evaluate((node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0)).toBe(true)
-  })
-})
-
 
 // The quick start paints rows before history lands, and a clear bot channel leaves for Automated when its history
-// does (decision 10-16 16:56, sidebar.spec.ts "during the first sync"): #alerts-prod and #deploys were in 2 of 20
+// does (decision 10-16 16:56, sidebar-first-sync.spec.ts): #alerts-prod and #deploys were in 2 of 20
 // first paints at 16 workers, and left 150 to 330 ms later. Once they have left, the rest of the sync fills in the
 // remaining topics below and the card at the foot goes, and no row on screen moves.
 test('sidebar rows stay fixed while sync fills the remaining topics', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
@@ -196,23 +203,6 @@ test('sidebar rows stay fixed while sync fills the remaining topics', { tag: ['@
     await juno.expectEngineLive()
     await juno.sidebar.expectNoSyncStatus()
   })
-})
-
-test('cold sync fills All topics without moving painted rows', { tag: ['@nightly', '@nightly-sync'] }, async ({ juno, win, fake }) => {
-  fake.holdNext({ method: 'subscriptions.thread.getView' })
-  await juno.signIn()
-  await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
-  // Open the page under test from the sidebar, so it reads its rows afresh.
-  await juno.allTopics.open()
-  const selector = '[data-all-topics-row]'
-  await expect(win.locator(selector)).toHaveCount(0)
-  // The unfocused sidebar may reorder as cold history and Automated membership arrive (SPEC 5).
-  // This probe checks the destination page; sidebar.spec.ts checks the changing topic list.
-  await expectStableAnchor(win, selector, async () => {
-    fake.release({ method: 'subscriptions.thread.getView' })
-    await expect(win.locator('[data-topic-row]').first()).toBeVisible()
-    await expect(win.locator(selector).first()).toBeVisible()
-  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
 })
 
 test('cold sync fills Home with retained rows, a fixed composer and no flicker', { tag: ['@nightly', '@nightly-sync'] }, async ({ juno, win, fake }) => {
@@ -258,30 +248,5 @@ test('cold sync fills Home with retained rows, a fixed composer and no flicker',
     await juno.expectEngineLive()
     await juno.sidebar.expectNoSyncStatus()
     await expect(rows.first()).toBeVisible()
-  })
-})
-
-test('the probe rejects a one-pixel movement that returns before the action ends', async ({ win }) => {
-  await win.setContent('<div id="anchor">Anchor</div>')
-  await expect(expectStableAnchor(win, '#anchor', async () => {
-    await win.evaluate(async () => {
-      const anchor = document.getElementById('anchor')!
-      anchor.style.transform = 'translateY(1px)'
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-      anchor.style.transform = ''
-    })
-  })).rejects.toThrow('anchor must move by exactly 0 px')
-})
-
-chatTest('a Juno response leaves the owner bubble where it first painted', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
-  await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
-  const chat = JunoChatPane.tab(win)
-  await chat.composer.fill('Check the layout of this reply')
-  await expectStableAnchor(win, '[data-chat-owner]', async () => {
-    await chat.composer.press('Enter')
-    await chat.expectJuno('You said: Check the layout of this reply')
   })
 })

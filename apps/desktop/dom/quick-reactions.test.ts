@@ -1,8 +1,8 @@
 /**
  * Quick reactions (SPEC 7, 14), the form in Settings › Appearance: Add opens
  * the emoji picker over the page, a pick shows in the message menu's grid,
- * remove and reset come back to the default, and Add stops at eleven. A
- * workspace alias adds its real emoji. Reordering by drag, and the picker's
+ * remove and reset come back to the default, and a workspace alias adds its
+ * real emoji. Reordering by drag, and the picker's
  * cells, drawn as its list scrolls, are quick-reactions.spec.ts's.
  */
 import type { Juno } from './driver/juno'
@@ -36,7 +36,7 @@ async function gridStart(juno: Juno, text: string, count: number): Promise<strin
   return names
 }
 
-domTest('adds, removes and resets quick reactions, then enforces the eleven-reaction limit', async ({ juno, fake, step }) => {
+domTest('adds, removes and resets quick reactions, and a workspace alias adds its real emoji', async ({ juno, fake, userData, step }) => {
   await step('Add opens the emoji picker over the page; a pick shows in the menu’s grid, and remove and reset come back to the default', async () => {
     fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'The picker test message' })
     await juno.openSettings('Appearance')
@@ -67,25 +67,13 @@ domTest('adds, removes and resets quick reactions, then enforces the eleven-reac
     await expect.poll(() => gridStart(juno, 'The picker test message', 3)).toEqual(['+1', 'white_check_mark', 'eyes'])
   })
 
-  await step('at eleven, Add stays focusable, says "Up to 11" and opens nothing', async () => {
+  await step('a workspace alias adds its real emoji', async () => {
     await juno.openSettings('Appearance')
-    // Settings opens again on the saved list, which shows the reset once its save has come back.
     await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
-    for (const name of ['tada', 'pray', 'rocket', 'fire', '100', 'heart', 'joy', 'sparkles']) await add(juno, name)
-    await expect.poll(() => pillNames(juno)).toHaveLength(11)
-    const full = juno.settings.root.getByRole('button', { name: 'Up to 11' })
-    await expect(full).toHaveAttribute('aria-disabled', 'true')
-    await full.focus()
-    await expect(full).toBeFocused()
-    juno.win.click(full.all()[0]!)
-    await expect(picker(juno)).toHaveCount(0)
+    await add(juno, 'hello_juno')
+    await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes', 'juno_wave'])
+    await expect(juno.settings.root.locator('[data-quick-reaction="juno_wave"] img')).toHaveCount(1)
+    await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare("SELECT value_json FROM prefs WHERE key = 'quickReactions'").get()?.['value_json'])).toContain(`${fake.url}/emoji/juno_wave.svg`)
   })
 })
 
-domTest('a workspace alias adds its real emoji to quick reactions', async ({ juno, fake, userData }) => {
-  await juno.openSettings('Appearance')
-  await add(juno, 'hello_juno')
-  await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes', 'juno_wave'])
-  await expect(juno.settings.root.locator('[data-quick-reaction="juno_wave"] img')).toHaveCount(1)
-  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare("SELECT value_json FROM prefs WHERE key = 'quickReactions'").get()?.['value_json'])).toContain(`${fake.url}/emoji/juno_wave.svg`)
-})

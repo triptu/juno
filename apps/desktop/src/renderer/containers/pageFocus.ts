@@ -5,8 +5,10 @@
  * list leaves focus on its row, so ↑ and ↓ go on through the list, and the
  * first character typed there moves focus to the composer. Typed before
  * that composer is ready, the keys are held and typed into it once it
- * mounts, never into the topic still on screen. A tab that shows
- * is given page focus by `Workspace` (the focus it had, or its composer).
+ * mounts, never into the topic still on screen. So are characters typed
+ * with focus nowhere while any other open's composer is on its way. A tab
+ * that shows is given page focus by `Workspace` (the focus it had, or its
+ * composer).
  */
 
 import { holdKeys, releaseKeys } from '@juno/views'
@@ -17,15 +19,33 @@ let composerWanted: string | undefined
 /**
  * Key and pointer presses so far. A focus asked for before the latest press
  * is dropped: the user has acted since, and may have put focus somewhere
- * (Enter on the title, then Esc, leaves it on the title).
+ * (Enter on the title, then Esc, leaves it on the title). A character held
+ * for the composer on its way (`holdForComposer`) is not a press.
  */
 let presses = 0
 let composerWantedAt = 0
 let countingPresses = false
 
 function countPress(event: Event): void {
-  if (event instanceof KeyboardEvent && (event.repeat || MODIFIERS.has(event.key))) return
+  if (event instanceof KeyboardEvent && (event.repeat || MODIFIERS.has(event.key) || holdForComposer(event))) return
   presses += 1
+}
+
+/** Until when an open's composer is on its way: from the open, and again from when it lands. */
+let composerDueUntil = 0
+
+/**
+ * A character typed with focus nowhere while a composer is on its way, as
+ * after a pick in the switcher closes it: held, with the ones after it,
+ * and typed into the composer once it mounts.
+ */
+function holdForComposer(event: KeyboardEvent): boolean {
+  if (performance.now() >= composerDueUntil || event.metaKey || event.ctrlKey || [...event.key].length !== 1) return false
+  const focused = document.activeElement
+  if (focused instanceof HTMLElement && focused !== document.body && focused.checkVisibility()) return false
+  holdKeys(event)
+  typedAheadUntil = performance.now() + TYPE_AHEAD_MS
+  return true
 }
 
 const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Fn'])
@@ -44,24 +64,32 @@ const TYPE_AHEAD_MS = 1_000
 /** A tab whose page takes focus once it shows, wherever focus was: one a pointer pressed, or one an open found. */
 let pageForced: string | undefined
 
-export function wantComposerFocus(view: string): void {
+/** An open that will focus its composer was asked for; it lands once its topic can paint (`wantComposerFocus`). */
+export function expectComposerFocus(): void {
   countPresses()
+  composerDueUntil = performance.now() + TYPE_AHEAD_MS
+}
+
+export function wantComposerFocus(view: string): void {
+  expectComposerFocus()
   composerWanted = view
   composerWantedAt = presses
 }
 
 /**
- * Focuses the composer field of `view` if a topic open asked for it, with
- * the caret at the end of the draft. Not once a key or the pointer was
- * pressed since the open, nor while focus is in another visible field or
- * popup, where the user may have moved before the topic landed.
+ * Focuses the composer field of `view` if a topic open asked for it, or
+ * keys typed ahead wait for it, with the caret at the end of the draft.
+ * Not while focus is in another visible field or popup, where the user may
+ * have moved before the topic landed, nor, with no keys waiting, once a key
+ * or the pointer was pressed since the open.
  */
 export function takeComposerFocus(view: string, field: HTMLTextAreaElement): void {
   const typedAhead = performance.now() < typedAheadUntil
   if (composerWanted !== view && !typedAhead) return
   composerWanted = undefined
+  composerDueUntil = 0
   typedAheadUntil = 0
-  if (!typedAhead && (presses !== composerWantedAt || focusElsewhere(document.activeElement))) return
+  if (focusElsewhere(document.activeElement) || (!typedAhead && presses !== composerWantedAt)) return
   focusPage(field)
   field.setSelectionRange(field.value.length, field.value.length)
   if (typedAhead) releaseKeys()

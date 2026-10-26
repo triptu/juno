@@ -3,13 +3,12 @@
  * and by drag, the message menu's emoji grid starts with them in that order
  * and one click reacts; the picker, whose cells are drawn as its list
  * scrolls, marks the chosen ones, and a choice in Settings is not a use. The
- * form's add, remove, reset, limit and stored aliases are dom/quick-reactions.test.ts's.
+ * form's add, remove, reset, limit and stored aliases are
+ * dom/quick-reactions.test.ts's; workspace emoji in the picker are
+ * emoji-picker-loading.spec.ts's.
  */
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
-
-// Starts signed in and synced (README, "Synced start").
-test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -38,6 +37,9 @@ async function menuOf(juno: Juno, text: string) {
   await expect(juno.topic.message(text)).toBeVisible()
   return juno.topic.messageMenu(text)
 }
+
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
 
 // The defaults first: the second step starts from what the first leaves.
 test('the picker marks the chosen quick reactions and choosing one does not record recent use; five set in Settings start the menu’s emoji grid in order and react in one click', async ({ juno, fake }) => {
@@ -87,6 +89,7 @@ test('the picker marks the chosen quick reactions and choosing one does not reco
     await expect.poll(() => fake.messages('C0ENG').find((m) => m.ts === ts)?.reactions?.map((r) => r.name)).toEqual(['rocket'])
   })
 })
+
 
 /**
  * Frequently used in Settings' picker, then Esc. Each open keeps the list it
