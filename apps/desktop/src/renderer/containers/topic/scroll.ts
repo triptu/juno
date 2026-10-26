@@ -79,6 +79,8 @@ export const rowSelector = (ts: string) => `[data-message-row="${CSS.escape(ts)}
  * it is taller than the view. Not the row cut by the top edge: after a jump that row may still be at its size
  * estimate, and holding its top would let its real height move every row below it. Row tops only grow down the
  * list, so a binary search reads about ten of them; a hit test at the edge finds nothing in the gap between groups.
+ * When no drawn row reaches the view (a scroll up before the rows above the first frame are drawn), the first drawn
+ * row below it: holding that one keeps the rows drawn later from moving what is already on screen.
  */
 export function rowInView(scroller: HTMLElement): { readonly element: HTMLElement; readonly anchorKey: string; readonly offset: number } | undefined {
   const box = scroller.getBoundingClientRect()
@@ -91,7 +93,7 @@ export function rowInView(scroller: HTMLElement): { readonly element: HTMLElemen
     else high = middle
   }
   const below = rows[low]
-  const element = below !== undefined && below.getBoundingClientRect().top < box.bottom ? below : rows[low - 1]
+  const element = below !== undefined && below.getBoundingClientRect().top < box.bottom ? below : (rows[low - 1] ?? below)
   const anchorKey = element?.dataset['messageRow']
   if (element === undefined || anchorKey === undefined) return undefined
   return { element, anchorKey, offset: element.getBoundingClientRect().top - box.top }
