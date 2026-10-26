@@ -1,6 +1,8 @@
 # Sourced by run.sh. Explicit worker settings take precedence.
 # SSH workers scale with the CPU limit, since nproc can see the whole host.
 cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
+# JUNO_MEMORY_BUDGET=4g sets each lane's workers to fit that memory (scripts/memory-budget.mjs).
+if [ -n "${JUNO_MEMORY_BUDGET:-}" ]; then eval "$(bun scripts/memory-budget.mjs "$JUNO_MEMORY_BUDGET" "$cores")"; fi
 at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
 export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1
 # Marks the isolated test workspace; build-cached.mjs uses the mounted build cache.

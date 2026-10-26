@@ -1,4 +1,5 @@
-import { hostname } from 'node:os'
+import { availableParallelism, hostname } from 'node:os'
+import { budgetEnv, parseBudget } from './memory-budget.mjs'
 import { checkRunner, runnerConfig } from './remote/runner.mjs'
 
 /**
@@ -14,12 +15,11 @@ export function verifyExecution(local, { config = runnerConfig, probe = checkRun
   throw new Error(`verify:main: runner ${runner.host} unreachable: ${health.reason}. Heavy runs do not fall back to this Mac; wait for the runner (\`bun run runner:check\`), or pass --local only when Tushar asks.`)
 }
 
-// Serial suites under an exclusive reservation leave room for Electron's engine
-// and renderer processes and one 1536 MB Apalache JVM on the 8 GB Mac.
+// Serial suites under an exclusive reservation. Workers per lane fit a memory budget
+// (JUNO_MEMORY_BUDGET, 4g by default) on all but two threads, so the 8 GB Mac keeps two cores and
+// about 4 GB for other use (scripts/memory-budget.mjs).
 export const localVerifyEnv = {
   JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_LOAD: process.env.JUNO_PLAN_MAX_LOAD ?? '8',
-  JUNO_TEST_WORKERS: '4',
-  JUNO_BROWSER_WORKERS: '2', JUNO_E2E_WORKERS: '1', GALLERY_WORKERS: '3', GALLERY_SHIFT_PARTS: '3',
-  SPECS_JOBS: '2', SPECS_APALACHE: '1', SPECS_OVERLAP: '0', SPECS_APALACHE_HEAP: '1536m',
-  CONFORMANCE_JOBS: '2', CI: '1',
+  ...budgetEnv(parseBudget(process.env.JUNO_MEMORY_BUDGET ?? '4g'), Math.max(1, availableParallelism() - 2)),
+  SPECS_OVERLAP: '0', CI: '1',
 }
