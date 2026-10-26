@@ -11,8 +11,7 @@ import { readFileSync } from 'node:fs'
 import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { nativeTheme } from 'electron'
-import { AccentSchema, DEFAULT_THEME, DensitySchema, TopicTitleLinesSchema, ReadySession, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
+import { AccentSchema, DEFAULT_THEME, DensitySchema, TopicTitleLinesSchema, ReadySession, SidebarLayout, ThemeSchema } from '@juno/contract'
 
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
@@ -43,11 +42,6 @@ const DEFAULTS: Launch = { theme: DEFAULT_THEME }
  * import StyleX files, so the two values are repeated here; keep them in sync.
  */
 export const BACKGROUND = { light: '#fdfcf8', dark: '#1b1916' } as const
-
-/** The background a window paints in before the page loads. System follows macOS. */
-export function backgroundFor(theme: Theme): string {
-  return BACKGROUND[theme === 'system' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : theme]
-}
 
 const decode = Schema.decodeUnknownSync(Launch)
 const encode = Schema.encodeSync(Launch)

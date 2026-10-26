@@ -62,7 +62,7 @@ export const NIGHTLY_AREAS = [
   {
     area: 'crash',
     tag: '@nightly-crash',
-    tests: 'the engine kill and inbox crash in juno-agent/crash.spec.ts, transfer.spec.ts, backup.spec.ts, engine.spec.ts and the relaunch tests in session.spec.ts; the uncertain write in crash.spec.ts stays on every run',
+    tests: 'the engine kill and inbox crash in juno-agent/crash.spec.ts, the backup and move in backup.spec.ts and the expired relaunch in session.spec.ts; the uncertain write in crash.spec.ts stays on every run',
     paths: [
       'apps/desktop/src/main/agent.ts',
       'apps/desktop/src/main/engine.ts',
@@ -84,9 +84,7 @@ export const NIGHTLY_AREAS = [
       'packages/engine/src/startEngine.ts',
       'packages/engine/src/status/',
       'apps/desktop/e2e/juno-agent/crash.spec.ts',
-      'apps/desktop/e2e/juno-agent/transfer.spec.ts',
       'apps/desktop/e2e/juno-agent/backup.spec.ts',
-      'apps/desktop/e2e/engine.spec.ts',
       'apps/desktop/e2e/session.spec.ts',
     ],
   },

@@ -597,5 +597,5 @@ export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from './
 export { CODE_BLOCK_COUNT, codeBlocksSeed } from './seeds/codeBlocks.ts'
 export type { ManyReactionsInput, ManyReactionsSeed } from './seeds/manyReactions.ts'
 export { REACTORS_LISTED } from './reactors.ts'
-export { sharedMessage, unfurlFixtures } from './unfurls.ts'
+export { unfurlFixtures } from './unfurls.ts'
 export { tableBlock } from './tables.ts'

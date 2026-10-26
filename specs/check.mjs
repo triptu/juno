@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { createHash, randomInt } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, randomInt, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { connect, createServer } from 'node:net'
 import { homedir, setPriority, tmpdir } from 'node:os'
@@ -54,7 +54,7 @@ mkdirSync(generated, { recursive: true })
 // retaining deterministic results; --nightly, SPECS_CACHE=off or --no-cache runs
 // everything. The seed is left out of every key.
 const jobs = []
-// SPECS_CACHE_DIR: bun run remote brings the Mac's cache along and back.
+// SPECS_CACHE_DIR: on the runner, its persistent /cache/specs (scripts/remote/run.sh).
 const cacheDir = process.env.SPECS_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'specs')
 const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
 const cacheRuns = process.env.SPECS_RUN_CACHE !== 'off'
@@ -200,6 +200,8 @@ async function runJob(job, lane = 0, execute = job.args[0] === 'verify' ? verify
   // A nightly checks everything again and records the passes for the runs after it.
   if (cacheJob && !nightly && existsSync(cached)) {
     const saved = JSON.parse(readFileSync(cached, 'utf8'))
+    // A read marks the entry as used, so the runner keeps it (scripts/remote/run.sh).
+    utimesSync(cached, new Date(), new Date())
     if (trace) writeFileSync(trace, saved.trace)
     check(saved.output)
     measurements.push({ args, outcome: violation ? 'violation' : 'ok', cached: true, seconds: 0 })
@@ -224,7 +226,8 @@ async function runJob(job, lane = 0, execute = job.args[0] === 'verify' ? verify
   }
   if (cacheJob) {
     mkdirSync(cacheDir, { recursive: true })
-    const temporary = `${cached}.${process.pid}`
+    // Jobs in other containers share the folder and can have the same pid.
+    const temporary = `${cached}.${process.pid}-${randomUUID()}`
     writeFileSync(temporary, JSON.stringify({ output, notes, trace: trace ? readFileSync(trace, 'utf8') : undefined }))
     renameSync(temporary, cached)
   }

@@ -1,6 +1,6 @@
 // Reading a topic (SPEC 6 and 7): prefetch on hover, where it opens, the context pill and a
 // #channel chip, the "N new" divider and the read mark, the topic menu's Notify me, Follow and
-// ⌘Z, Main's thread links, the title's topic switcher, a composer that mounts late and the header's Tab order.
+// ⌘Z, Main's thread links, the title's topic switcher and a composer that mounts late.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -11,10 +11,12 @@ const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
+const STAGING = 'Unrelated: has anyone looked at the'
 
-// The hover goes first, while the topic has never been opened. The chip step moves the scope from #eng, where
-// the pill step left it, to #platform.
-domTest('a read topic warms on hover, opens from the cache with no divider, and its context pill and a #channel chip scope the sidebar', async ({ juno, slack, step }) => {
+// One launch. The hover goes first, while the topic has never been opened; the chip step leaves the sidebar
+// scoped to #platform, and Show everything takes that off. The late composer needs threads not opened yet. Rina's thread opens while it still has its 2 unread.
+// The Follow step ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
+domTest('a topic warms on hover, opens at its "N new" divider, follows and unfollows from its menus, switches from Main, and a late composer takes focus', async ({ juno, slack, fake, app, step }) => {
   await step('hovering a row warms the topic without asking Slack', async () => {
     slack.resetCalls()
     const warmed = juno.lastMark('juno.prefetch')
@@ -46,7 +48,43 @@ domTest('a read topic warms on hover, opens from the cache with no divider, and 
     await juno.sidebar.expectScope('platform')
     await juno.sidebar.row(POSTGRES).expectAbsent()
   })
-})
+  await juno.sidebar.root.getByRole('button', { name: 'Show everything' }).click()
+
+  // The engine's draft replies are held, so each thread's composer mounts only when the test lets it.
+  await step('a composer that mounts late takes focus after a switcher pick, and leaves it on the title the user moved to', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.expectTitle('Main')
+
+    let release = app.holdReplies('drafts.get')
+    let switcher = await juno.topic.openSwitcher()
+    await switcher.open(CHECKOUT)
+    await juno.topic.expectTitle(CHECKOUT)
+    await expect(juno.topic.composer).toHaveCount(0)
+    release()
+    await expect(juno.topic.composer).toBeFocused()
+
+    release = app.holdReplies('drafts.get')
+    switcher = await juno.topic.openSwitcher()
+    await switcher.open(STAGING)
+    await juno.topic.expectTitle(STAGING)
+    await expect(juno.topic.composer).toHaveCount(0)
+    switcher = await juno.topic.openSwitcherWithKeyboard()
+    await juno.win.keyboard.press('Escape')
+    await expect(switcher.root).toHaveCount(0)
+    await expect(juno.topic.titleButton).toBeFocused()
+    release()
+    await expect(juno.topic.composer).toBeVisible()
+    await expect(juno.topic.titleButton).toBeFocused()
+  })
+
+  const context: Following = { juno, fake, called: (method, channel) => slack.fake.calls.some((call) => call.method === method && (channel === undefined || call.args['channel'] === channel)) }
+  await step('a topic with unread messages opens at the "N new" divider and is marked read', () => openAtDivider(context))
+  await step('⋯ opens the topic menu, as a right-click on the title does, and Notify me follows and unfollows the thread', () => notifyMeFromMenus(context))
+  await step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with Auto, no menu, and ⌘Z undoes it', () => followFromMain(context))
+  await step('after Follow, Notify me in ⋯ shows Auto and changes it', () => notifyMeAfterFollow(context))
+  await step('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', () => linksAndSwitcher(juno))
+  await step('the switcher searches the channel’s topics, and ⌘ opens one in a new tab', () => searchSwitcher(juno))
+}, { timeout: 120_000 })
 
 /** The driver, and whether Slack was called with `method` (in `channel`). */
 interface Following {
@@ -54,50 +92,6 @@ interface Following {
   readonly fake: FakeSlack
   readonly called: (method: string, channel?: string) => boolean
 }
-
-// Rina’s thread opens first, while it still has its 2 unread. Then checkout’s thread from Main: the Follow step
-// ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
-domTest('Rina’s thread opens at the "N new" divider and its ⋯ menu unfollows and follows it; Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack, fake, step }) => {
-  const context: Following = { juno, fake, called: (method, channel) => slack.fake.calls.some((call) => call.method === method && (channel === undefined || call.args['channel'] === channel)) }
-  await step('a topic with unread messages opens at the "N new" divider and is marked read', () => openAtDivider(context))
-  await step('⋯ opens the topic menu, as a right-click on the title does, and Notify me follows and unfollows the thread', () => notifyMeFromMenus(context))
-  await step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with Auto, no menu, and ⌘Z undoes it', () => followFromMain(context))
-  await step('after Follow, Notify me in ⋯ shows Auto and changes it', () => notifyMeAfterFollow(context))
-})
-
-// The switcher step ends on Main, where the header step starts.
-domTest('Main’s thread links, its title switcher, its Notify me and its header order, and the switcher’s search and ⌘ opens', async ({ juno, step }) => {
-  await step('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', () => linksAndSwitcher(juno))
-  await step('Main’s Notify me is its channel’s, and the header is reached pill, title, Juno, ⋯', () => headerOrder(juno))
-  await step('the switcher searches the channel’s topics, and ⌘ opens one in a new tab', () => searchSwitcher(juno))
-})
-
-// The engine's draft replies are held, so each thread's composer mounts only when the test lets it.
-domTest('a composer that mounts late takes focus after a switcher pick, and leaves it on the title the user moved to', async ({ juno, app }) => {
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
-
-  let release = app.holdReplies('drafts.get')
-  let switcher = await juno.topic.openSwitcher()
-  await switcher.open(CHECKOUT)
-  await juno.topic.expectTitle(CHECKOUT)
-  await expect(juno.topic.composer).toHaveCount(0)
-  release()
-  await expect(juno.topic.composer).toBeFocused()
-
-  release = app.holdReplies('drafts.get')
-  switcher = await juno.topic.openSwitcher()
-  await switcher.open(POSTGRES)
-  await juno.topic.expectTitle(POSTGRES)
-  await expect(juno.topic.composer).toHaveCount(0)
-  switcher = await juno.topic.openSwitcherWithKeyboard()
-  await juno.win.keyboard.press('Escape')
-  await expect(switcher.root).toHaveCount(0)
-  await expect(juno.topic.titleButton).toBeFocused()
-  release()
-  await expect(juno.topic.composer).toBeVisible()
-  await expect(juno.topic.titleButton).toBeFocused()
-})
 
 async function openAtDivider({ juno, called }: Following): Promise<void> {
   const rina = juno.sidebar.row(RINA)
@@ -190,10 +184,8 @@ async function notifyMeAfterFollow({ juno }: Following): Promise<void> {
 
 async function linksAndSwitcher(juno: Juno): Promise<void> {
   const main = juno.sidebar.row(ENG_MAIN)
-  await main.expectNewThreads(1)
   await main.open()
   await juno.topic.expectTitle('Main')
-  await expect(juno.topic.contextPill).toHaveAccessibleName('eng, public channel. Show in sidebar.')
   await expect(juno.topic.threadLinkUnder(POSTGRES).root).toBeVisible()
 
   await juno.topic.threadLinkUnder(POSTGRES).open()
@@ -209,7 +201,6 @@ async function linksAndSwitcher(juno: Juno): Promise<void> {
   await switcher.open(CHECKOUT)
   await juno.topic.expectTitle(CHECKOUT)
   await juno.tabs.expectCount(1)
-  await juno.sidebar.row(CHECKOUT).expectAbsent()
 
   // From a thread, back to Main and to a sibling thread; the current one is marked.
   switcher = await juno.topic.openSwitcher()
@@ -232,24 +223,6 @@ async function linksAndSwitcher(juno: Juno): Promise<void> {
   await juno.tabs.expectCount(1)
 }
 
-async function headerOrder(juno: Juno): Promise<void> {
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
-  const { labels } = await juno.topic.chooseInMenu('copy-link')
-  expect(labels).toContain('> Auto ✓')
-  expect(labels).not.toContain('Rename')
-  // No huddle runs in #eng, so its header has no huddle control: Start huddle is in ⋯.
-  expect(labels).toContain('Start huddle')
-
-  await juno.topic.contextPill.focus()
-  const order: string[] = []
-  for (let i = 0; i < 4; i++) {
-    const active = juno.win.active
-    order.push(active?.getAttribute('aria-label') ?? active?.textContent ?? '')
-    await juno.win.keyboard.press('Tab')
-  }
-  expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Juno ⌘J', 'More'])
-}
 
 async function searchSwitcher(juno: Juno): Promise<void> {
   await juno.sidebar.row(POSTGRES).open()

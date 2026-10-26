@@ -1,6 +1,6 @@
 // macOS's notification prompt waits for Home (SPEC 14): no prompt while Set up Juno shows, though the dock dot
 // already does, and the first Home view after it asks once, before any banner. A denied answer remembered across a
-// full restart needs main, so it is the Electron lane's (`e2e/notification-badge.spec.ts`). The dot's rules are the
+// full restart needs main, so it is the Electron lane's (the sign-in journey in `e2e/session.spec.ts`). The dot's rules are the
 // engine's notifications flow test.
 import { caughtUpSeed } from '../e2e/caughtUpSeed'
 import { expect } from './expect'

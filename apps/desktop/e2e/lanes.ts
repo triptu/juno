@@ -45,13 +45,11 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
  * `e2e-timing` lines (`bun scripts/e2e-timings.mjs <run.log>`).
  */
 export const ELECTRON_FIRST: ReadonlyArray<string> = [
-  'juno-agent/transfer.spec.ts',
   'juno-agent/crash.spec.ts',
   'juno-agent/backup.spec.ts',
   'file-viewer.spec.ts',
   'app.spec.ts',
+  'relaunch.spec.ts',
+  'session.spec.ts',
   'huddle-share.spec.ts',
-  'engine.spec.ts',
-  'privacy.spec.ts',
-  'break-pass.spec.ts',
 ]

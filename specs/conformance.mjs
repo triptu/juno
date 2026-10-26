@@ -9,13 +9,13 @@
 // CONFORMANCE_ONLY=<part of a file name> replays only the matching traces.
 //
 // Each Quint run's traces are cached as specs:check caches its runs: in
-// SPECS_CACHE_DIR (bun run remote carries it along and back) or the system temp
+// SPECS_CACHE_DIR (on the runner, its persistent /cache/specs) or the system temp
 // folder, keyed by the run's arguments, the spec and what it imports, and
 // the Quint version. SPECS_CACHE=off or --no-cache generates everything.
 // CONFORMANCE_JOBS sets how many Quint runs go at once (default: cores, at most 4).
 import { spawn } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { availableParallelism, tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -84,6 +84,9 @@ async function quint(args, violation) {
   const cached = join(cacheDir, `conformance-${key}.json`)
   if (useCache && existsSync(cached)) {
     const saved = JSON.parse(readFileSync(cached, 'utf8'))
+    // A read marks the entry as used, so the runner keeps it (scripts/remote/run.sh).
+    const now = new Date()
+    utimesSync(cached, now, now)
     for (const [name, text] of Object.entries(saved.files)) writeFileSync(join(out, name), text)
     cachedRuns += 1
     return
@@ -93,7 +96,8 @@ async function quint(args, violation) {
   const files = Object.fromEntries(written(itf).map((name) => [name, readFileSync(join(out, name), 'utf8')]))
   if (Object.keys(files).length === 0) throw new Error(`quint run ${args.join(' ')} wrote no trace`)
   mkdirSync(cacheDir, { recursive: true })
-  const temporary = `${cached}.${process.pid}`
+  // Jobs in other containers share the folder and can have the same pid.
+  const temporary = `${cached}.${process.pid}-${randomUUID()}`
   writeFileSync(temporary, JSON.stringify({ files }))
   renameSync(temporary, cached)
 }

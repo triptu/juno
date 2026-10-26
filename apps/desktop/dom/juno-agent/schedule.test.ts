@@ -66,66 +66,10 @@ const scheduleRow = (page: Query, what: string) => page.locator('[data-schedule]
 // A schedule from a clean run waking once after a quit past its due time, under its own label: the agent's
 // schedule-flow test.
 
-domTest('Pause, Resume and Delete work on the Scheduled page and on the Schedule card, and a schedule from a run that read Slack waits for Start', async ({ juno, model }) => {
-  await ready(juno)
-  const chatPane = await openChat(juno)
-  await chatPane.send('schedule standup notes')
-  await chatPane.expectJuno('Scheduled.')
-  const standup = card(chatPane, 'schedule').filter({ hasText: 'standup notes' })
-  await expect(standup).toHaveAttribute('data-card-status', 'open')
-
-  // Pause on the card, then Resume, Pause, Resume and Delete on the page.
-  await standup.getByRole('button', { name: 'Pause' }).click()
-  await expect(standup).toHaveAttribute('data-card-status', 'done')
-  await expect(standup).toContainText('Paused')
-  const page = await openPage(juno, 'Scheduled')
-  const row = scheduleRow(page, 'standup notes')
-  await expect(row).toHaveAttribute('data-schedule', 'paused')
-  await expect(row).not.toContainText('Next ')
-  await row.getByRole('button', { name: 'Resume' }).click()
-  await expect(row).toHaveAttribute('data-schedule', 'active')
-  await expect(row).toContainText('Next ')
-  await row.getByRole('button', { name: 'Pause' }).click()
-  await expect(row).toHaveAttribute('data-schedule', 'paused')
-  await row.getByRole('button', { name: 'Resume' }).click()
-  await expect(row).toHaveAttribute('data-schedule', 'active')
-  await row.getByRole('button', { name: 'Delete' }).click()
-  await expect(row).toHaveCount(0)
-  await expect(page.getByText('Nothing scheduled')).toBeVisible()
-
-  // A run that read Slack only proposes its schedule: nothing is scheduled until Start.
-  await openChat(juno)
-  await chatPane.send('read #eng then schedule the eng digest')
-  await chatPane.expectJuno('It waits for you to start it.')
-  expect(model.requests.some((request) => request.toolResult !== undefined && request.input.includes('read #eng'))).toBe(true)
-  const proposed = card(chatPane, 'proposedSchedule')
-  await expect(proposed).toHaveAttribute('data-card-status', 'open')
-  await expect(proposed).toContainText('the eng digest')
-  await expect(proposed.locator('[data-schedule-prompt]')).toHaveText('Catch me up: the eng digest.')
-  await expect(card(chatPane, 'schedule').filter({ hasText: 'the eng digest' })).toHaveCount(0)
-  await expect((await openPage(juno, 'Scheduled')).getByText('Nothing scheduled')).toBeVisible()
-  await openChat(juno)
-  await proposed.getByRole('button', { name: 'Start' }).click()
-  await expect(proposed).toHaveAttribute('data-card-status', 'done')
-  await expect(proposed).toContainText('Started')
-  const digest = card(chatPane, 'schedule').filter({ hasText: 'the eng digest' })
-  await expect(digest).toBeVisible()
-  const listed = await openPage(juno, 'Scheduled')
-  await expect(scheduleRow(listed, 'the eng digest')).toHaveAttribute('data-schedule', 'active')
-
-  // Delete on the card removes it from the page.
-  await openChat(juno)
-  await digest.getByRole('button', { name: 'Delete' }).click()
-  await expect(digest).toHaveAttribute('data-card-status', 'done')
-  await expect(digest).toContainText('Deleted')
-  const after = await openPage(juno, 'Scheduled')
-  await expect(after.getByText('Nothing scheduled')).toBeVisible()
-}, { model, timeout: 180_000 })
-
-domTest('reply watches from the chat and the message menu: Undo deletes one, and a reply ends the others quietly', async ({ juno, slack, fake, model, step }) => {
+// One launch: the reply watches first, which end with nothing scheduled, then the Scheduled page's buttons.
+domTest('Pause, Resume and Delete work on the Scheduled page and the card, a schedule from a run that read Slack waits for Start, and reply watches end quietly when the person replies', async ({ juno, slack, fake, model, step }) => {
   model.thread.find = postgresThread(slack, fake)
   await ready(juno)
-  // Undo first: it leaves nothing scheduled, so the second watch is the only one.
   await step('Undo on a menu reply watch deletes it without a model run', async () => {
     const requests = model.inputs().length
     await juno.sidebar.row(POSTGRES).open()
@@ -164,4 +108,59 @@ domTest('reply watches from the chat and the message menu: Undo deletes one, and
     await expect(page.getByText('Nothing scheduled')).toBeVisible({ timeout: 30_000 })
     expect(model.inputs().some((input) => input.includes(WATCH))).toBe(false)
   })
+  await step('Pause, Resume and Delete on the page and the card, and a proposed schedule waits for Start', async () => {
+    const chatPane = await openChat(juno)
+    await chatPane.send('schedule standup notes')
+    await chatPane.expectJuno('Scheduled.')
+    const standup = card(chatPane, 'schedule').filter({ hasText: 'standup notes' })
+    await expect(standup).toHaveAttribute('data-card-status', 'open')
+
+    // Pause on the card, then Resume, Pause, Resume and Delete on the page.
+    await standup.getByRole('button', { name: 'Pause' }).click()
+    await expect(standup).toHaveAttribute('data-card-status', 'done')
+    await expect(standup).toContainText('Paused')
+    const page = await openPage(juno, 'Scheduled')
+    const row = scheduleRow(page, 'standup notes')
+    await expect(row).toHaveAttribute('data-schedule', 'paused')
+    await expect(row).not.toContainText('Next ')
+    await row.getByRole('button', { name: 'Resume' }).click()
+    await expect(row).toHaveAttribute('data-schedule', 'active')
+    await expect(row).toContainText('Next ')
+    await row.getByRole('button', { name: 'Pause' }).click()
+    await expect(row).toHaveAttribute('data-schedule', 'paused')
+    await row.getByRole('button', { name: 'Resume' }).click()
+    await expect(row).toHaveAttribute('data-schedule', 'active')
+    await row.getByRole('button', { name: 'Delete' }).click()
+    await expect(row).toHaveCount(0)
+    await expect(page.getByText('Nothing scheduled')).toBeVisible()
+
+    // A run that read Slack only proposes its schedule: nothing is scheduled until Start.
+    await openChat(juno)
+    await chatPane.send('read #eng then schedule the eng digest')
+    await chatPane.expectJuno('It waits for you to start it.')
+    expect(model.requests.some((request) => request.toolResult !== undefined && request.input.includes('read #eng'))).toBe(true)
+    const proposed = card(chatPane, 'proposedSchedule')
+    await expect(proposed).toHaveAttribute('data-card-status', 'open')
+    await expect(proposed).toContainText('the eng digest')
+    await expect(proposed.locator('[data-schedule-prompt]')).toHaveText('Catch me up: the eng digest.')
+    await expect(card(chatPane, 'schedule').filter({ hasText: 'the eng digest' })).toHaveCount(0)
+    await expect((await openPage(juno, 'Scheduled')).getByText('Nothing scheduled')).toBeVisible()
+    await openChat(juno)
+    await proposed.getByRole('button', { name: 'Start' }).click()
+    await expect(proposed).toHaveAttribute('data-card-status', 'done')
+    await expect(proposed).toContainText('Started')
+    const digest = card(chatPane, 'schedule').filter({ hasText: 'the eng digest' })
+    await expect(digest).toBeVisible()
+    const listed = await openPage(juno, 'Scheduled')
+    await expect(scheduleRow(listed, 'the eng digest')).toHaveAttribute('data-schedule', 'active')
+
+    // Delete on the card removes it from the page.
+    await openChat(juno)
+    await digest.getByRole('button', { name: 'Delete' }).click()
+    await expect(digest).toHaveAttribute('data-card-status', 'done')
+    await expect(digest).toContainText('Deleted')
+    const after = await openPage(juno, 'Scheduled')
+    await expect(after.getByText('Nothing scheduled')).toBeVisible()
+  })
+  // Undo first: it leaves nothing scheduled, so the second watch is the only one.
 }, { model, timeout: 180_000 })

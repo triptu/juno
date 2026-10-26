@@ -72,7 +72,9 @@ async function startFakeReleases(): Promise<FakeReleases> {
   return fake
 }
 
+// Starts signed in and synced (README, "Synced start").
 const withReleases = test.extend<{ releases: FakeReleases }>({
+  synced: true,
   // oxlint-disable-next-line no-empty-pattern
   releases: async ({}, use) => {
     const releases = await startFakeReleases()
@@ -94,8 +96,6 @@ withReleases('with a releases repository, Check for updates says what it found, 
     '## 0.1.4 - 2026-10-01', '', '- Added topic filters.', '',
     '## 0.1.3 - 2026-09-25', '', '- Improved startup.', '',
   ].join('\n')
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.openSettings('About')
   const about = juno.settings.root
   const updates = about.getByRole('checkbox', { name: 'Download updates automatically' })

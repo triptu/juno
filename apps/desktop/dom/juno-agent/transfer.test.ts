@@ -1,5 +1,5 @@
 // Plan flow 14: move between two Macs through Settings, then review the restored chat. The same
-// move with a crash during the restore is in `e2e/juno-agent/transfer.spec.ts`, in Electron.
+// move with a crash during the restore is in `e2e/juno-agent/backup.spec.ts`, in Electron.
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -16,8 +16,9 @@ const model = () => startFakeOpenRouter({ answer: (request) => {
   return answer(request)
 } })
 
-async function ready(juno: Juno): Promise<void> {
-  await juno.signIn()
+/** The first Mac starts synced; another Mac (`otherApp`) signs in first. */
+async function ready(juno: Juno, signIn = false): Promise<void> {
+  if (signIn) await juno.signIn()
   await juno.waitForSync()
   await agentReady(juno)
 }
@@ -55,7 +56,7 @@ domTest('a move restores the chat and pending cards for review', async ({ juno, 
     await expect(chat.composer).toBeDisabled()
 
     const mac = await otherApp()
-    await ready(mac)
+    await ready(mac, true)
     const page = await openSettings(mac, 'Backup & This Mac')
     await page.getByRole('button', { name: 'Restore', exact: true }).click()
     const restore = mac.win.getByRole('dialog', { name: 'Restore from backup' })
@@ -86,4 +87,4 @@ domTest('a move restores the chat and pending cards for review', async ({ juno, 
   } finally {
     await rm(shared, { recursive: true, force: true })
   }
-}, { synced: false, model, engine: { backupIntervalMs: 1_000 }, timeout: 180_000 })
+}, { model, engine: { backupIntervalMs: 1_000 }, timeout: 180_000 })

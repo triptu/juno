@@ -53,6 +53,11 @@ export const playing = (video: Locator) =>
 export async function openEngMain(juno: Juno, { signedIn = false }: { readonly signedIn?: boolean } = {}): Promise<void> {
   if (!signedIn) await juno.signIn()
   await juno.waitForSync()
+  await openEng(juno)
+}
+
+/** Opens #eng's Main on an app that is already signed in, as a synced start is. */
+export async function openEng(juno: Juno): Promise<void> {
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
   await juno.sidebar.leave()

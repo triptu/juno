@@ -35,8 +35,8 @@ second allocator or container cleanup path.
 
 Jobs from all projects count against the same capacity. Each split job releases
 its cores independently. A changed lockfile installs against the persistent
-store without rebuilding the toolchain. Reports and passing spec cache entries
-return to the client. The laptop must be reachable; no paid fallback is hidden
+store without rebuilding the toolchain. Reports return to the client; the spec
+cache stays on the runner under `/cache`. The laptop must be reachable; no paid fallback is hidden
 inside a test command. Setup and troubleshooting belong to `/tstack:runner`;
 [the Juno runner guide](../self-hosted-runner.md) contains only project settings.
 

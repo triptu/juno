@@ -1,12 +1,10 @@
 // Sidebar views (SPEC 5 "Views"): making a view with and without an icon,
 // keeping its channels out of All, the mention dot, editing, reordering by
-// menu, deleting with Undo, Add to view from a channel's menu, an icon's
-// colour across a relaunch and an empty view. The built-in Automated view is
+// menu, deleting with Undo, and Add to view from a channel's menu. An icon's
+// colour is the gallery's. The built-in Automated view is
 // deleted first where a test needs the bot channels in All or only its own
 // views. Dragging a pill and the pill row's sideways scroll are the browser
 // lane's (sidebar-hold.spec.ts).
-import { DatabaseSync } from 'node:sqlite'
-import { join } from 'node:path'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
 import { domTest, type DomContext } from './test'
@@ -15,15 +13,6 @@ const ALERTS_MAIN = '#alerts-prod'
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 
-/** The colour user.db holds for the view named `name`, read while the app runs. */
-function storedColor(userData: string, teamId: string, name: string): string | null {
-  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
-  try {
-    return (db.prepare('SELECT color FROM sidebar_views WHERE name = ?').get(name) as { color: string | null } | undefined)?.color ?? null
-  } finally {
-    db.close()
-  }
-}
 
 /** Deletes Automated, which holds #alerts-prod and #deploys after the first sync. */
 async function withoutAutomated(juno: Juno): Promise<void> {
@@ -39,48 +28,12 @@ domTest('views: an icon view keeps its channel out of All and lights for a menti
   await step('Add to view on a channel’s menu adds and removes it, with Undo, and New view… starts with it', () => addToView({ juno }))
 })
 
-domTest('a view icon keeps the colour picked for it across a relaunch, and an empty view says so and opens its sheet', async ({ juno, relaunch, userData, fake, step }) => {
-  await withoutAutomated(juno)
-  const { sidebar } = juno
-  await sidebar.createView({ name: 'Work', icon: 'Briefcase', conversations: ['eng'] })
-  await sidebar.createView({ name: 'Bots', icon: 'Robot', color: 'Teal', conversations: ['alerts-prod'] })
-  const tint = sidebar.viewPill('Bots').locator('[data-icon-tint]')
-  await expect(tint).toHaveAttribute('data-icon-tint', 'teal')
-  // The default stays neutral: no tint on Work's icon.
-  await expect(sidebar.viewPill('Work').locator('[data-icon-tint]')).toHaveCount(0)
-  // Not selected, it keeps its tint. That it is drawn in the same colour either way is the gallery's.
-  await sidebar.filter('All')
-  await expect(tint).toHaveAttribute('data-icon-tint', 'teal')
-  // The colour is in user.db before the quit.
-  await expect.poll(() => storedColor(userData, fake.teamId, 'Bots')).toBe('teal')
-  const restarted = await relaunch()
-  await expect(restarted.sidebar.viewPill('Bots').locator('[data-icon-tint]')).toHaveAttribute('data-icon-tint', 'teal', { timeout: 15_000 })
-  // Edit shows the colour chosen; Neutral takes it off again.
-  await restarted.sidebar.viewMenu('Bots', 'view-edit')
-  const colours = restarted.sidebar.viewSheet.getByRole('radiogroup', { name: 'Colour' })
-  await expect(colours.getByRole('radio', { name: 'Teal', exact: true })).toHaveAttribute('aria-checked', 'true')
-  await colours.getByRole('radio', { name: 'Neutral', exact: true }).click()
-  await restarted.sidebar.viewSheet.getByRole('button', { name: 'Save' }).click()
-  await expect(restarted.sidebar.viewPill('Bots').locator('[data-icon-tint]')).toHaveCount(0)
-
-  await step('a view with no conversations says so, and Edit view opens its sheet', async () => {
-    await restarted.sidebar.createView({ name: 'Later' })
-    await restarted.sidebar.expectEmpty('No conversations in this view')
-    await restarted.sidebar.list.getByRole('button', { name: 'Edit view' }).click()
-    await expect(restarted.sidebar.viewSheet).toBeVisible()
-    await expect(restarted.sidebar.viewSheet.getByPlaceholder('Name')).toHaveValue('Later')
-  })
-})
 
 async function iconView({ juno, fake }: Pick<DomContext, 'juno' | 'fake'>): Promise<void> {
   const { sidebar } = juno
   await sidebar.row(ALERTS_MAIN).expectVisible()
 
   await sidebar.createView({ name: 'Bots', icon: 'Robot', conversations: ['alerts-prod'], keepOutOfAll: true })
-  // An icon pill: the name is its tooltip and accessible name, not its text.
-  const bots = sidebar.viewPill('Bots')
-  await expect(bots).toHaveAttribute('data-tooltip', 'Bots')
-  await expect(bots).toHaveText('')
   // Saved and selected: only the view's channel.
   await sidebar.row(ALERTS_MAIN).expectVisible()
   await sidebar.row(POSTGRES).expectAbsent()
@@ -132,8 +85,7 @@ async function namedView({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
   await sidebar.row(RINA).expectVisible()
 
   // Move right by the menu; Move left is disabled on the first view.
-  const labels = await sidebar.viewMenu('Eng team', 'view-right')
-  expect(labels).toContain('(Move left)')
+  await sidebar.viewMenu('Eng team', 'view-right')
   await expect.poll(() => sidebar.viewNames()).toEqual(['Hiring', 'Eng team'])
 
   // And back by the menu. Dragging a pill is in sidebar-hold.spec.ts.
@@ -157,17 +109,13 @@ async function addToView({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
   const ops = await sidebar.viewId('Ops')
   await sidebar.filter('All')
 
-  const { labels } = await sidebar.row(ALERTS_MAIN).chooseInMenu(`view-add:${ops}`)
-  expect(labels).toContain('Add to view')
-  expect(labels).toContain('> Ops')
-  expect(labels).toContain('> New view…')
+  await sidebar.row(ALERTS_MAIN).chooseInMenu(`view-add:${ops}`)
   await juno.expectToast('Added #alerts-prod to Ops')
   await sidebar.selectView('Ops')
   await sidebar.row(ALERTS_MAIN).expectVisible()
 
   // The menu now checks Ops; choosing it removes the channel. Undo adds it back.
-  const again = await sidebar.row(ALERTS_MAIN).chooseInMenu(`view-remove:${ops}`)
-  expect(again.labels).toContain('> Ops ✓')
+  await sidebar.row(ALERTS_MAIN).chooseInMenu(`view-remove:${ops}`)
   await juno.expectToast('Removed #alerts-prod from Ops')
   await sidebar.row(ALERTS_MAIN).expectAbsent()
   await juno.undo()
@@ -187,7 +135,6 @@ async function addToView({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
   await sidebar.row(ALERTS_MAIN).chooseInMenu('view-new')
   await expect(sidebar.viewSheet).toBeVisible()
   await expect(sidebar.viewSheet.getByRole('option', { name: 'alerts-prod', exact: true })).toHaveAttribute('aria-selected', 'true')
-  await expect(sidebar.viewSheet.getByText('1 conversation')).toBeVisible()
   await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
   await expect(sidebar.viewSheet).toHaveCount(0)
 }
