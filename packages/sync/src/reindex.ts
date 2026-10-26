@@ -98,15 +98,13 @@ export const reindexTopics = (
     return changed
   })
 
-/** Every topic the index knows, for a full rebuild. */
+/** Every topic the index knows, computed again whatever its mark says: a full rebuild. */
 export const reindexAll = (options: ReindexOptions): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    yield* sql`DELETE FROM topic_inputs`
     const rows = yield* sql<{ topic_id: string }>`SELECT topic_id FROM topic_index`
-    return yield* reindexTopics(
-      rows.map((r) => r.topic_id),
-      options,
-    )
+    return yield* reindexTopics(rows.map((r) => r.topic_id), options)
   })
 
 /** Topic ids a set of message rows belongs to: Main for roots, the thread for replies, both for broadcasts. */

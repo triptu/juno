@@ -2,8 +2,8 @@
  * `reindexTopics` keeps a row it computed while none of the row's inputs
  * change (`topic_inputs`). Whatever changes, a re-index must leave the row a
  * rebuild from scratch would give. Each step below changes one input the
- * way a writer does, re-indexes, and checks that forgetting every marker
- * and re-indexing again changes nothing.
+ * way a writer does, re-indexes, and checks that a full rebuild
+ * (`reindexAll`, which forgets every mark) changes nothing.
  */
 import { describe, expect } from 'bun:test'
 import { itEffect } from '@juno/testing/effect'
@@ -14,7 +14,7 @@ import * as path from 'node:path'
 import type { Message } from '@juno/slack-schema'
 import { Invalidation, Store, StoreWriter, transaction, workspacePathsFromDir } from '@juno/store'
 import type { Me, UserId, UsergroupId } from '@juno/domain'
-import { reindexTopics, toMessageRow } from '../src/index'
+import { reindexAll, reindexTopics, toMessageRow } from '../src/index'
 import { endEventCoverage, writeMessage } from '../src/write'
 
 const C = 'C0ENG'
@@ -45,10 +45,7 @@ describe('re-indexing an unchanged topic', () => {
       let me: Me = { userId: ME, usergroupIds: [] }
       const ids = [MAIN, THREAD]
       const reindex = transaction(Effect.suspend(() => reindexTopics(ids, { me })))
-      const rebuild = Effect.gen(function* () {
-        yield* sql`DELETE FROM topic_inputs`
-        return yield* reindex
-      })
+      const rebuild = transaction(Effect.suspend(() => reindexAll({ me })))
 
       yield* sql`INSERT INTO users (id, name, display_name) VALUES ('U0ANA', 'ana', 'Ana'), ('U0BEN', 'ben', 'Ben')`
       yield* sql`INSERT INTO conversations (id, kind, name) VALUES (${C}, 'public', 'eng'), ('C0OPS', 'public', 'ops')`
