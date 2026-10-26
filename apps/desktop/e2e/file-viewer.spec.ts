@@ -72,7 +72,10 @@ test('in #eng: a pasted image is sent once, a PDF opens in Chromium’s PDF view
     await topic.expectTitle('Main')
     await paste(topic.composer, [chart()])
     await expect(chip(topic, 'chart.png')).toBeVisible()
-    await expect(topic.root.locator(`[data-composer] img${schemeSrc('uploads')}`)).toHaveCount(1)
+    // Main serves the staged copy from the engine's uploads folder.
+    const staged = topic.root.locator(`[data-composer] img${schemeSrc('uploads')}`)
+    await expect(staged).toHaveCount(1)
+    await expect.poll(() => staged.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(640)
     await topic.send('The chart for Thursday')
     await expect(chips(topic)).toHaveCount(0)
     await topic.expectSent('The chart for Thursday')
