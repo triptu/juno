@@ -19,7 +19,15 @@ const DESIGN = 'Two options for the thread list'
 // A thread in the DM with Maya.
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-test('lists quiet, resolved and never-followed topics, and a row opens its topic in the tab', async ({ juno }) => {
+// What each filter keeps, the chip counts and a row's status after an action are the engine's
+// all-topics flow test; the row menu is `dom/actions.test.ts`. This checks the controls reach the list.
+test('lists quiet, resolved and never-followed topics, a row opens its topic in the tab, the filters reach the list, and the place picker searches conversations by word', async ({ juno }) => {
+  await test.step('lists quiet, resolved and never-followed topics, and a row opens its topic in the tab', () => listAndOpen(juno))
+  await test.step('a status chip, the text filter and the empty list\'s Clear filters each change the list', () => useFilters(juno))
+  await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace({ juno }))
+})
+
+async function listAndOpen(juno: Fixtures['juno']): Promise<void> {
   const { sidebar, allTopics, tabs } = juno
 
   // A quiet topic and a thread nobody followed are not in the sidebar.
@@ -54,14 +62,7 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
   await allTopics.row(FLAGS).open({ newTab: true })
   await tabs.expectCount(2)
   await juno.topic.expectTitle(/We have 142 flags/)
-})
-
-// What each filter keeps, the chip counts and a row's status after an action are the engine's
-// all-topics flow test; the row menu is `dom/actions.test.ts`. This checks the controls reach the list.
-test('the filters reach the list, and the place picker searches conversations by word', async ({ juno }) => {
-  await test.step('a status chip, the text filter and the empty list\'s Clear filters each change the list', () => useFilters(juno))
-  await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace({ juno }))
-})
+}
 
 async function useFilters(juno: Fixtures['juno']): Promise<void> {
   const { allTopics } = juno

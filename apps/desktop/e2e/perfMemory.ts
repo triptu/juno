@@ -56,7 +56,7 @@ async function wheel(win: Page, target: Locator, steps: number, delta: number): 
 function heavyContext(juno: Juno, running: RunningApp) {
   const { win } = running
   // A topic's message list, not the Juno chat's, in the tab on screen.
-  const scrollTopic = win.getByRole('main').locator('[data-topic-view] [data-scroll]:visible')
+  const scrollTopic = win.locator('main [data-topic-view] [data-scroll]:visible')
   const panel = win.locator('aside[data-juno-panel]')
   return {
     juno, running, win, scrollTopic, panel,
@@ -104,7 +104,7 @@ async function fillChat(at: HeavyContext, start: number): Promise<void> {
   const { juno, win } = at
   await juno.tabs.menu('new-tab')
   await juno.tabs.expectCount(start + 21)
-  await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  await win.locator('nav[aria-label="Pages"] [role="button"]', { hasText: /^Juno/ }).click()
   const composer = win.locator('main [data-juno-chat] textarea:visible')
   await composer.waitFor()
   const answers = win.locator('main [data-juno-chat]:visible [data-chat-juno]')
@@ -156,7 +156,7 @@ async function scrollRounds(at: HeavyContext, scrollFor: number): Promise<number
 export async function heavyUse(juno: Juno, running: RunningApp, scrollFor = 120_000): Promise<MemoryReading> {
   const at = heavyContext(juno, running)
   const { win } = running
-  const start = await juno.tabs.root.getByRole('tab').count()
+  const start = await juno.tabs.root.locator('[role="tab"]').count()
   const dump = process.env['JUNO_MEMORY_DUMP']
   // After each part: private memory as it stands, and with JUNO_MEMORY_DUMP=<prefix> and JUNO_MEMORY_PHASES=1 a dump
   // as it stands and one after a collection, which changes what follows; without them only the end is dumped.

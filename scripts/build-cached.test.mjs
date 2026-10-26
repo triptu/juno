@@ -62,7 +62,7 @@ test('fresh archives reuse verified output and rebuild changed or damaged inputs
   assert.equal(readFileSync(join(freshApp, 'out/result'), 'utf8'), 'second')
   writeFileSync(join(fresh, 'bun.lock'), 'lock v2')
   assert.match(run(freshApp).stdout, /BUILT/)
-  assert.match(run(freshApp, { JUNO_COVERAGE: '1' }).stdout, /BUILT/)
+  assert.match(run(freshApp, { JUNO_UNMINIFIED: '1' }).stdout, /BUILT/)
   assert.match(run(freshApp, { JUNO_REBUILD: '1' }).stdout, /BUILT/)
   writeFileSync(join(freshApp, 'source.txt'), 'failed')
   assert.equal(run(freshApp, { FAIL_BUILD: '1' }).status, 1)

@@ -73,7 +73,7 @@ export class TestHost implements EngineHooks {
   readonly #detach: () => void
   url = ''
 
-  constructor(child: ChildProcess, fake: FakeSlack, readonly userData: string, readonly release?: () => void) {
+  constructor(child: ChildProcess, fake: FakeSlack, readonly userData: string, readonly release: () => void) {
     this.#child = child
     const onMessage = (message: HostMessage) => {
       if (message.type === 'ask') {
@@ -156,8 +156,7 @@ export class TestHost implements EngineHooks {
       await within(this.#command({ type: 'stop' }), 5_000, 'The host did not stop its test')
       this.#detach()
       this.#exited = true
-      if (this.release !== undefined) this.release()
-      else await terminate(this.#child)
+      this.release()
     } catch (error) {
       await terminate(this.#child)
       throw error
@@ -167,8 +166,7 @@ export class TestHost implements EngineHooks {
 
 /**
  * A worker's loaded processes. Each lease creates a new engine and shell on
- * a fresh data folder. Coverage keeps a process per test so offsets cannot
- * cross spec boundaries. A failed cleanup discards the process. `build` is
+ * a fresh data folder. A failed cleanup discards the process. `build` is
  * the folder with `host/` and `renderer/`: `dist/` for the browser lane,
  * `dom/dist/` for the DOM lane.
  */
@@ -199,7 +197,7 @@ export class HostPool {
   async start(fake: FakeSlack, start: Omit<HostStart, 'fakeUrl' | 'webRoot'>): Promise<TestHost> {
     const child = this.#take()
     await child.loaded
-    const host = new TestHost(child.process, fake, start.userData, start.coverage === undefined ? () => this.#idle.push(child) : undefined)
+    const host = new TestHost(child.process, fake, start.userData, () => this.#idle.push(child))
     try {
       await host.start({ ...start, fakeUrl: fake.url, webRoot: resolve(this.build, 'renderer') })
     } catch (error) {

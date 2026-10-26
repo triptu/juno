@@ -109,10 +109,10 @@ async function headerFeedback({ juno, win }: Pick<Fixtures, 'juno' | 'win'>): Pr
   await juno.topic.expectTitle(POSTGRES)
   const header = juno.topic.header
   const controls = [
-    header.getByRole('button', { name: 'Resolve', exact: true }),
+    header.locator('button[aria-label="Resolve"]'),
     juno.topic.titleButton,
-    header.getByRole('button', { name: /Show in sidebar/ }),
-    header.getByRole('button', { name: 'Juno ⌘J' }),
+    header.locator('button[aria-label*="Show in sidebar"]'),
+    header.locator('button[aria-label="Juno ⌘J"]'),
     juno.topic.moreButton,
   ]
   const look = (control: (typeof controls)[number]) =>

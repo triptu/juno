@@ -56,7 +56,6 @@ const reachOnly = args.includes('--nightly-reach-only')
 const required = reachOnly ? ['test:nightly'] : ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop']
 const red = outcome === 'red'
 const command = (suite) => outcome === 'skipped' ? { command: ['JUNO_SKIP_TAGS=@nightly', suite] } : {}
-if (args.includes('--nightly')) writeFileSync('apps/desktop/e2e/coverage-map.json', JSON.stringify({ version: 1, commit, specs: [], files: {} }))
 const finishedAt = new Date().toISOString()
 const identity = { bun: '1', platform: 'linux', arch: 'x64', electron: '44' }
 const record = { version: 2, commit, finishedAt, passed: !red, identity, plannedIdentity: { ...identity, bun: 'canary' }, required, reachOnly,
@@ -116,7 +115,6 @@ function fixture(t) {
     '.gitignore': 'node_modules\n.juno-status\napps/desktop/release\n',
     [app]: '{\n  "version": "0.1.8",\n  "main": "app.js"\n}\n',
     'apps/desktop/src/app.js': 'first',
-    'apps/desktop/e2e/coverage-map.json': '{}',
   })
   const github = () => JSON.parse(readFileSync(file('gh-state.json'), 'utf8'))
   const state = github()
@@ -291,25 +289,4 @@ test('the version commit lands on a newer main, keeping concurrent work and ever
   assert.equal(git('diff', '--name-only', 'origin/main^', 'origin/main'), app)
   assert.equal(sync('v0.1.9'), 'false')
   assert.equal(sync('0.1.8'), 'false')
-})
-
-
-test('nightly coverage survives a red run and is pushed after repair without changing the caller checkout', { timeout: 30_000 }, async (t) => {
-  const { commit, release, plan, file, git, lines } = fixture(t)
-  const source = commit('Keep scrolling smooth', { 'apps/desktop/src/app.js': 'scroll' })
-  plan('red')
-  const red = await release(['--nightly'])
-  assert.equal(red.code, 1, red.output)
-  assert.equal(readFileSync(file('repo/apps/desktop/e2e/coverage-map.json'), 'utf8'), '{}')
-  assert.equal(JSON.parse(readFileSync(file('repo/.juno-status/release-coverage.json'), 'utf8')).source, source)
-  commit('Fix scrolling', { 'apps/desktop/src/app.js': 'fixed' })
-  plan('green')
-  writeFileSync(file('notes.md'), '- Keep scrolling smooth.\n')
-  const green = await release(['--notes', file('notes.md')])
-  assert.equal(green.code, 0, green.output)
-  assert.ok(lines('verify-calls').every((line) => line.includes('--require-remote')))
-  git('fetch', '-q', 'origin')
-  assert.equal(JSON.parse(git('show', 'origin/main:apps/desktop/e2e/coverage-map.json')).commit, source)
-  assert.equal(existsSync(file('repo/.juno-status/release-coverage.json')), false)
-  assert.equal(readFileSync(file('repo/apps/desktop/e2e/coverage-map.json'), 'utf8'), '{}')
 })

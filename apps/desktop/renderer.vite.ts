@@ -12,9 +12,8 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { parseSync, Visitor, type ESTree, type PluginOption, type Plugin } from 'vite'
-import react from '@vitejs/plugin-react'
 import stylex from '@stylexjs/unplugin'
-import { reactCompiler } from './react-compiler.vite'
+import react from '@vitejs/plugin-react'
 
 // The icon weights Juno draws: `IconWeight` in packages/ui/src/Icon.tsx. Keep the two lists the same.
 const ICON_WEIGHTS = new Set(['regular', 'bold', 'fill'])
@@ -155,6 +154,18 @@ function inlineTokenReads(): Plugin {
 }
 
 /**
+ * React with the React Compiler (performance.md 5.4). `@vitejs/plugin-react` runs Oxc's Rust port
+ * of the compiler (`oxc-transform-react`), which turns JSX into calls in the same pass, with no
+ * Babel. It compiles the workspace packages' source too. A component or hook it cannot compile, or
+ * one under an `eslint-disable` or `oxlint-disable` of a `react-hooks` rule, is left as written;
+ * `reportDiagnostics` prints which one and why. The gallery uses it too, so it renders the same
+ * compiled components the app does.
+ */
+export function reactWithCompiler(reportDiagnostics: boolean): PluginOption {
+  return react({ compiler: { target: '19', reportDiagnostics } })
+}
+
+/**
  * `repoRoot` is the monorepo root: StyleX hashes class names relative to it
  * and needs it to resolve the workspace token package, no matter which
  * directory the build is started from. `minify` minifies the StyleX sheet,
@@ -172,9 +183,6 @@ export function rendererPlugins(options: { readonly repoRoot: string; readonly m
       lightningcssOptions: { minify: options.minify },
       unstable_moduleResolution: { type: 'commonJS', rootDir: options.repoRoot },
     }),
-    // The React Compiler memoizes components and hooks at build time (react-compiler.vite.ts), on the
-    // workspace packages' source too. A component it cannot compile is left as written; the build prints which one and why.
-    reactCompiler(options.repoRoot, options.reportSkipped !== false),
-    react(),
+    reactWithCompiler(options.reportSkipped !== false),
   ]
 }

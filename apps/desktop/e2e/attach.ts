@@ -38,7 +38,8 @@ export async function drop(target: Locator, files: ReadonlyArray<Upload>): Promi
   await target.dispatchEvent('drop', { dataTransfer: transfer })
 }
 
-export const chips = (topic: TopicPane) => topic.root.locator('[data-composer]').getByRole('button', { name: /^Remove / })
-export const chip = (topic: TopicPane, name: string) => topic.root.locator('[data-composer]').getByRole('button', { name: `Remove ${name}` })
+// A chip's Remove button is an IconButton, named by its aria-label.
+export const chips = (topic: TopicPane) => topic.root.locator('[data-composer] button[aria-label^="Remove "]')
+export const chip = (topic: TopicPane, name: string) => topic.root.locator(`[data-composer] button[aria-label=${JSON.stringify(`Remove ${name}`)}]`)
 /** Waits until `count` of a pane's chips are staged. Home's Enter does nothing while a file is still being read, so its sends wait for this. */
 export const staged = (pane: { readonly root: Locator }, count: number) => expect(pane.root.locator('[data-composer] [data-attachment="ready"]')).toHaveCount(count)

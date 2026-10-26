@@ -117,11 +117,6 @@ function codemodeFiles(): Plugin {
 // JUNO_UNMINIFIED=1 keeps function names for a CPU profile (scripts/perf-trace.mjs).
 const minify = process.env['JUNO_UNMINIFIED'] === '1' ? false : ('oxc' as const)
 
-// JUNO_COVERAGE=1 writes source maps beside the bundles, without a comment in
-// them, so scripts/coverage-map.mjs can map what an e2e test ran back to the
-// source files (docs/development.md, "Affected tests").
-const sourcemap = process.env['JUNO_COVERAGE'] === '1' ? ('hidden' as const) : false
-
 // scripts/build-desktop.mjs builds main and preload in one process and the
 // renderer in another, at the same time; JUNO_ELECTRON_TARGETS names the
 // targets this process builds. Unset, it builds all three.
@@ -137,7 +132,6 @@ export default defineConfig({
     define: { 'process.env.WS_NO_BUFFER_UTIL': JSON.stringify('1') },
     build: {
       minify,
-      sourcemap,
       rolldownOptions: {
         // index.js is the main process; engine.js and agent.js are forked as utility processes;
         // codemode-worker.js is the agent's codemode sandbox thread.
@@ -154,7 +148,6 @@ export default defineConfig({
     plugins: [externalize, runtimeImports()],
     build: {
       minify,
-      sourcemap,
       rolldownOptions: { input: resolve(__dirname, 'src/preload/index.ts') },
     },
   }),
@@ -162,7 +155,6 @@ export default defineConfig({
     root: resolve(__dirname, 'src/renderer'),
     build: {
       minify,
-      sourcemap,
       rolldownOptions: {
         input: resolve(__dirname, 'src/renderer/index.html'),
         output: rendererOutput,

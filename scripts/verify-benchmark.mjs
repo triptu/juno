@@ -10,7 +10,7 @@ const args = process.argv.slice(2)
 const commit = git(root, 'rev-parse', args.includes('--ref') ? args[args.indexOf('--ref') + 1] : 'origin/main')
 const scripts = JSON.parse(git(root, 'show', `${commit}:package.json`)).scripts
 const splits = [[4, 4], [5, 3], [3, 5], [4, 4]]
-const plan = { commit, splits: splits.map(([desktop, unit]) => ({ desktop, unit })), specs: 'reuse unchanged inputs', coverage: false,
+const plan = { commit, splits: splits.map(([desktop, unit]) => ({ desktop, unit })), specs: 'reuse unchanged inputs',
   measures: ['whole-run wall seconds', 'per-suite seconds', 'allocator waits', 'peak container memory', 'CPU pressure', 'failure causes', 'per-test durations'],
   pending: !(scripts['test:browser'] && scripts['test:electron']) }
 console.log(JSON.stringify(plan, null, 2))

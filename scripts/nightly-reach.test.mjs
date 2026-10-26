@@ -17,7 +17,7 @@ test('what counts as a passing run of a file’s nightly tests', () => {
   assert.equal(evidenceCommit(skipped, DOM, isAncestor), undefined)
 
   // A nightly run, or one from before the tier, ran every lane whole.
-  const whole = run('b', [passed('test:browser', ['JUNO_COVERAGE=1', 'test:browser']), passed('test:electron', ['test:electron']), passed('test:dom', ['test:dom', '--seed=1'])])
+  const whole = run('b', [passed('test:browser', ['test:browser']), passed('test:electron', ['test:electron']), passed('test:dom', ['test:dom', '--seed=1'])])
   assert.equal(evidenceCommit(whole, SPEC, isAncestor), 'b')
   assert.equal(evidenceCommit(whole, DOM, isAncestor), 'b')
   assert.equal(evidenceCommit({ ...whole, smoke: true }, SPEC, isAncestor), undefined)
