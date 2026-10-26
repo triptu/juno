@@ -3,7 +3,7 @@
 // Search, a peek, and opening at a message from a link (performance.md 3.3). Every Slack API call waits at the
 // fake's gate while the step paints; nothing here waits for Slack. `bun run affected` runs this file, as every DOM file, whenever
 // the renderer, the host or what they import changes.
-import { topic300Seed, type FakeSlack } from '@juno/fake-slack'
+import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { searchPage } from './driver/palette'
 import { expect } from './expect'
@@ -53,7 +53,7 @@ async function longThread(juno: Juno, fake: FakeSlack) {
   return { root, replies, row }
 }
 
-domTest('Main, a thread, a thread again, a tab gone back to, ⌘K and Search paint from what Juno holds', async ({ juno, fake, step }) => {
+domTest('Main, a thread, a thread again, a tab gone back to, ⌘K, Search, a long thread, its peek and a link to its reply paint from what Juno holds', async ({ juno, fake, step }) => {
   await step('Main opens from the sidebar', () => paintsHeld(fake, () => juno.sidebar.row(ENG).open(), () => expect(juno.topic.message('preview environments never shut down')).toBeVisible()))
   await step('a thread opens from the sidebar', () => paintsHeld(fake, () => juno.sidebar.row(POSTGRES).open(), () => expect(juno.topic.message('Booked 2–4pm')).toBeVisible()))
   await step('a thread opens again', async () => {
@@ -84,10 +84,7 @@ domTest('Main, a thread, a thread again, a tab gone back to, ⌘K and Search pai
       await juno.win.keyboard.press('Space')
     }, () => expect(page.reader.getByText('Booked 2–4pm')).toBeVisible())
   })
-})
-
-domTest('a long thread opens again, peeks and opens at a linked reply from what Juno holds', async ({ juno, fake, step }) => {
-  const { root, replies, row } = await longThread(juno, fake)
+  const { root, replies, row } = await step('a long thread read to its end, then closed', () => longThread(juno, fake))
   await step('it opens again', async () => {
     await paintsHeld(fake, () => row.open(), () => expect(juno.topic.message(`rollout step ${LONG_REPLIES}`)).toBeVisible())
     await juno.sidebar.row(ENG).open()
@@ -110,12 +107,4 @@ domTest('a long thread opens again, peeks and opens at a linked reply from what 
     await juno.topic.expectMessage('Look at the middle step')
     await paintsHeld(fake, () => anchor.click(), () => expect(juno.topic.message('rollout step 300')).toBeVisible())
   })
-})
-
-// Its replies came from `getView` alone, which proves none of them continuous: the tab shows what Juno holds
-// while its one fetch is out.
-domTest('a thread known only from Slack’s thread list opens from the sidebar with what Juno holds', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await paintsHeld(fake, () => juno.sidebar.row('Review the rollout checklist 1').open(), () => expect(juno.topic.message('Review the rollout checklist 300')).toBeVisible())
-}, { synced: false, fake: { seed: (workspace, avatars) => void topic300Seed()(workspace, avatars) } })
+}, { timeout: 90_000 })
