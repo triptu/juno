@@ -36,6 +36,16 @@ async function answered(clock: PageClock, userData: string, teamId: string, sinc
   }, { timeout: 15_000 }).toBeGreaterThanOrEqual(since)
 }
 
+/**
+ * Runs `action` with the page's clock stopped. Enter sends without a bar when the
+ * engine's check takes over 250 ms of page time (`SEND_CHECK_WAIT_MS`), so a step
+ * that expects the bar must not let a loaded engine's reply lose to that timer.
+ */
+async function pageTimeStopped(clock: PageClock, action: () => Promise<void>): Promise<void> {
+  await clock.pauseAt(clock.now())
+  try { await action() } finally { clock.resume() }
+}
+
 /** Types a draft and waits for the typing pause's wrong-place answer. */
 async function typeAndPause({ juno, clock, userData, fake }: Pick<DomContext, 'juno' | 'clock' | 'userData' | 'fake'>, text: string): Promise<void> {
   const since = clock.now()
@@ -66,8 +76,10 @@ domTest('wrong place, the audience line, local fixes and grammar after sending, 
 
     await step('Post in thread posts it there', async () => {
       await typeAndPause(context, BILL_REPLY)
-      await topic.composer.press('Enter')
-      await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
+      await pageTimeStopped(clock, async () => {
+        await topic.composer.press('Enter')
+        await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
+      })
       expect(posts(fake)).toHaveLength(0)
       // Enter takes the first choice.
       await topic.composer.press('Enter')
@@ -82,7 +94,10 @@ domTest('wrong place, the audience line, local fixes and grammar after sending, 
     await step('Send to Main sends it where it was typed', async () => {
       const again = `${BILL_REPLY} tonight`
       await typeAndPause(context, again)
-      await topic.composer.press('Enter')
+      await pageTimeStopped(clock, async () => {
+        await topic.composer.press('Enter')
+        await expect(topic.checkBar.bar).toBeVisible()
+      })
       await topic.checkBar.choose('Send to Main')
       await topic.expectSent(again)
       expect(posts(fake)).toHaveLength(2)
@@ -148,8 +163,10 @@ domTest('wrong place, the audience line, local fixes and grammar after sending, 
     const since = clock.now()
     await juno.write.write(BILL_REPLY)
     await answered(clock, userData, fake.teamId, since)
-    await juno.write.send()
-    await expect(juno.write.root.getByText('Looks like a reply to', { exact: false })).toBeVisible()
+    await pageTimeStopped(clock, async () => {
+      await juno.write.send()
+      await expect(juno.write.root.getByText('Looks like a reply to', { exact: false })).toBeVisible()
+    })
     expect(posts(fake)).toHaveLength(0)
     await juno.write.send()
     await expect.poll(() => posts(fake).length).toBe(1)
@@ -184,6 +201,7 @@ domTest('wrong place, the audience line, local fixes and grammar after sending, 
     const asked = cacheCount(userData, fake.teamId, "SELECT count(*) AS n FROM ai_cache WHERE task = 'grammarCheck'")
     const grammarRows = () => cacheCount(userData, fake.teamId, "SELECT count(*) AS n FROM ai_cache WHERE task = 'grammarCheck'") - asked
     await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.expectTitle(POSTGRES)
     await juno.topic.composer.fill('its broken')
     // Past the typing pause: grammar has not been asked.
     await clock.fastForward(1_000)
@@ -274,7 +292,7 @@ domTest('wrong place, the audience line, local fixes and grammar after sending, 
 }, { clock: true, timeout: 120_000 })
 
 // The model answers five seconds after it is asked, on the test clock.
-domTest('Enter never waits for a slow model, and a slow grammar fix joins the local one when it comes, even after leaving the topic', async ({ juno, fake, userData, clock, step }) => {
+domTest('Enter never waits for a slow model, and a slow grammar fix joins the local one when it comes, even after leaving the topic', async ({ juno, app, fake, userData, clock, step }) => {
   const context = { juno, fake, userData, clock }
   const { topic } = juno
   await step('before the model answers the message sends at once, after it the bar shows, and Home sends at once too', async () => {
@@ -283,8 +301,9 @@ domTest('Enter never waits for a slow model, and a slow grammar fix joins the lo
     // Enter while the model is still answering the pause: no bar, no wait.
     await topic.composer.fill(BILL_REPLY)
     await clock.fastForward(500)
+    // Had Enter waited for the model, its answer (a reply to the bill thread) would show the bar and keep the draft.
     await topic.composer.press('Enter')
-    await expect(topic.composer).toHaveValue('', { timeout: 500 })
+    await expect(topic.composer).toHaveValue('')
     await topic.expectSent(BILL_REPLY)
     await expect(topic.checkBar.bar).toHaveCount(0)
     expect(posts(fake)[0]!.args['thread_ts']).toBeUndefined()
@@ -292,8 +311,10 @@ domTest('Enter never waits for a slow model, and a slow grammar fix joins the lo
     // Once the model has answered, Enter finds the answer and the bar shows.
     const later = `${BILL_REPLY} tonight`
     await typeAndPause(context, later)
-    await topic.composer.press('Enter')
-    await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
+    await pageTimeStopped(clock, async () => {
+      await topic.composer.press('Enter')
+      await expect(topic.checkBar.bar).toContainText('Looks like a reply to')
+    })
     expect(posts(fake)).toHaveLength(1)
 
     await newHome(juno)
@@ -301,7 +322,7 @@ domTest('Enter never waits for a slow model, and a slow grammar fix joins the lo
     await juno.write.write(`${BILL_REPLY} next week`)
     await clock.fastForward(500)
     await juno.write.send()
-    await expect(juno.write.composer).toHaveValue('', { timeout: 500 })
+    await expect(juno.write.composer).toHaveValue('')
     await expect.poll(() => posts(fake).length).toBe(2)
     expect(posts(fake)[1]!.args['thread_ts']).toBeUndefined()
   })
@@ -311,15 +332,19 @@ domTest('Enter never waits for a slow model, and a slow grammar fix joins the lo
     await juno.sidebar.row(POSTGRES).open()
     const text = 'its broken, I think the the build is red'
     const sent = clock.now()
+    // The model's answer reaches the page only when the test lets it, not after five seconds of real time.
+    const grammarReply = app.holdReplies('messages.grammar')
     await juno.topic.send(text)
-    await expect(juno.topic.composer).toHaveValue('', { timeout: 500 })
+    await expect(juno.topic.composer).toHaveValue('')
     await juno.topic.expectSent(text)
     // The local rule answers before the model.
     await expect(suggestion(juno)).toContainText('the the → the')
     await expect(suggestion(juno)).not.toContainText("its → it's")
     // The answer comes while another topic shows: nothing appears there.
     await juno.sidebar.row(RINA).open()
+    await juno.topic.expectTitle(RINA)
     await answered(clock, userData, fake.teamId, sent, 'grammarCheck')
+    grammarReply()
     await expect(suggestion(juno)).toHaveCount(0)
     await juno.sidebar.row(POSTGRES).open()
     await expect(suggestion(juno)).toContainText("its → it's")

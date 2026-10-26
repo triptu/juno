@@ -50,8 +50,10 @@ function scripted(): (request: OpenRouterRequest) => string | ToolCallAnswer {
 
 /** Privacy mode blurs what is marked sensitive (tokens/global.css): the page's flag, and the mark on or around `target`. */
 async function expectBlurred(juno: Juno, target: Query, blurred = true): Promise<void> {
-  const el = await target.element()
-  expect(juno.dom.document.documentElement.hasAttribute('data-privacy') && el.closest('[data-sensitive]') !== null).toBe(blurred)
+  await expect.poll(async () => {
+    const el = await target.element()
+    return juno.dom.document.documentElement.hasAttribute('data-privacy') && el.closest('[data-sensitive]') !== null
+  }).toBe(blurred)
 }
 
 /** ⌃⌘H through View, and waits until the page has the change. */

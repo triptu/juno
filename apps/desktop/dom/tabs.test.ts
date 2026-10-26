@@ -212,7 +212,8 @@ async function openFocusAndClose(juno: Juno): Promise<void> {
   await tabs.expectActive(POSTGRES)
   await sidebar.row(ROADMAP).openInNewTab()
   await tabs.expectCount(3)
-  expect(await tabs.titles()).toEqual([expect.stringMatching(/^Rina/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/)])
+  // A new tab can show before its topic has given it a title.
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Rina/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/)])
 
   // Already open: its tab gets focus, no duplicate.
   await sidebar.row(RINA).open()

@@ -112,6 +112,7 @@ domTest('search opens results behind, scopes to a thread, hides apps until asked
     await palette.type('cormorant in:C0ENG')
     await palette.expectResults()
     // The first selection stays on a result; the arrows reach the last row as any other.
+    await expect.poll(() => palette.activeText()).not.toBe('')
     expect(await palette.activeText()).not.toMatch(/All results for/)
     await palette.arrowTo(/All results for “cormorant in:C0ENG”/)
     await palette.press('Enter')

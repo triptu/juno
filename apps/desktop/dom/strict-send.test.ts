@@ -129,9 +129,14 @@ async function staging({ juno, fake, clock, userData, step }: Pick<DomContext, '
     const since = clock.now()
     await topic.composer.fill(BILL_REPLY)
     await routeCheckAnswered(clock, userData, fake.teamId, since)
-    await topic.composer.press('Enter')
     const post = topic.root.getByRole('button', { name: /Post in thread/ })
-    await expect(post).toBeVisible()
+    // Enter sends without the bar when the engine's check takes over 250 ms of page time (`SEND_CHECK_WAIT_MS`):
+    // the page's clock stops so a loaded engine's reply cannot lose to that timer.
+    await clock.pauseAt(clock.now())
+    try {
+      await topic.composer.press('Enter')
+      await expect(post).toBeVisible()
+    } finally { clock.resume() }
 
     const release = holdFileRead(juno.win)
     await paste(topic.composer, [chart()])

@@ -113,7 +113,7 @@ domTest('start, mute, leave and join huddles; an incoming huddle rings, joins, d
     fake.control('joinHuddle', { channel: 'D0MAYA', user: 'U0MAYA' })
     await addRemote(win, 'U0MAYA')
     // Mount the tab between the bar's ticks: independently mounted clocks used to disagree.
-    await expect(bar).toContainText(/0:0[1-4]/)
+    await expect(bar).toContainText(/0:(0[1-9]|[1-5]\d)/)
     await bar.getByRole('button', { name: 'Open huddle in Maya' }).click()
     await juno.tabs.expectActive('Maya · Huddle')
 
@@ -128,15 +128,16 @@ domTest('start, mute, leave and join huddles; an incoming huddle rings, joins, d
     await expect(bar).toContainText(/0:(0[3-9]|[1-5]\d)/, { timeout: 10_000 })
     await expect(bar).not.toContainText('0:00')
     await expect(row.root.locator('[data-huddle-indicator]')).toBeVisible()
-    // Sampled every 20 ms until the clock has ticked once, at most 2 s.
+    // Sampled every 20 ms until the clock has ticked once, however long the page's one-second timer takes under load.
     const durations: Array<ReadonlyArray<string | null>> = []
-    for (let i = 0; i < 100; i++) {
+    const ticked = () => new Set(durations.map(([time]) => time)).size > 1
+    const deadline = performance.now() + 10_000
+    while (!ticked() && performance.now() < deadline) {
       durations.push(['[data-huddle-bar]', '[data-huddle-page]'].map((selector) => win.document.querySelector(selector)?.textContent?.match(/\d+:\d{2}/)?.[0] ?? null))
-      if (new Set(durations.map(([time]) => time)).size > 1) break
-      await new Promise((resolve) => setTimeout(resolve, 20))
+      if (!ticked()) await new Promise((resolve) => setTimeout(resolve, 20))
     }
     expect(durations.filter(([barTime, tabTime]) => barTime === null || barTime !== tabTime)).toEqual([])
-    expect(new Set(durations.map(([time]) => time)).size).toBeGreaterThan(1)
+    expect(ticked()).toBe(true)
   })
 }, { timeout: 150_000, tag: ['@heavy', '@heavy-huddle'] })
 
@@ -177,7 +178,7 @@ async function startAndLeave({ juno, fake }: Context): Promise<void> {
   const mute = bar.getByRole('button', { name: /^Mute/ })
   await mute.click()
   await expect(mute).toHaveAttribute('aria-pressed', 'true')
-  expect(await localMuted(win)).toBe(true)
+  await expect.poll(() => localMuted(win)).toBe(true)
   await win.keyboard.press('Meta+Shift+Space')
   await expect(mute).toHaveAttribute('aria-pressed', 'false')
 

@@ -55,19 +55,20 @@ domTest('with AI assist on, Mark done and Resolve all take their row away at onc
   await expect.poll(() => home.kinds(), { timeout: 30_000 }).toEqual(['waiting', 'moved', 'followUp'])
 
   // Under the pointer, Mark done takes the row away at once and Tidy up takes the free place at the bottom.
+  // The pointer stays on the rows, so a change the hold kept back would never show: the default wait tells the two apart.
   await home.button('followUp', 'Mark done').click()
   await juno.expectToast('Follow-up done')
-  await expect.poll(() => home.kinds(), { timeout: 2_000 }).toEqual(['waiting', 'moved', 'tidyUp'])
+  await expect.poll(() => home.kinds()).toEqual(['waiting', 'moved', 'tidyUp'])
 
   // Tidy up is live too: the follow-up just marked done can make its topic look settled, so read the count off the row.
   await expect(home.meta('tidyUp')).toContainText('incidents')
   const settled = (await home.title('tidyUp').textContent())!.match(/^(\d+) topics look settled$/)![1]
   await home.button('tidyUp', 'Resolve all').click()
-  await expect.poll(() => home.kinds(), { timeout: 2_000 }).toEqual(['waiting', 'moved'])
+  await expect.poll(() => home.kinds()).toEqual(['waiting', 'moved'])
   await juno.expectToast(`Resolved ${settled} topics`)
   await juno.sidebar.row(KEYS).expectAbsent()
   await juno.undoFromToast()
-  await expect.poll(() => home.kinds(), { timeout: 5_000 }).toEqual(['waiting', 'moved', 'tidyUp'])
+  await expect.poll(() => home.kinds()).toEqual(['waiting', 'moved', 'tidyUp'])
   await juno.sidebar.row(KEYS).expectVisible()
 
   await step('Tidy up\'s review opens a proposal, and Resolve, Undo, Keep open and Resolve all work per row', async () => {
