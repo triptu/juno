@@ -63,8 +63,8 @@ test('local runs archive eligible records and preserve failed suites; an unreach
   const dry = invoke(['--local', '--dry-run', '--nightly'])
   assert.equal(dry.status, 0, dry.stderr)
   assert.match(dry.stdout, /SPECS_SEED=\d+ specs:check --nightly/)
-  assert.doesNotMatch(dry.stdout, /@mac, then perf/)
-  assert.match(invoke(['--local', '--dry-run', '--with-mac']).stdout, /test:desktop --grep @mac, then perf @mac, then test:feel/)
+  assert.doesNotMatch(dry.stdout, /@mac, then test:feel/)
+  assert.match(invoke(['--local', '--dry-run', '--with-mac']).stdout, /test:desktop --grep @mac, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)
   assert.equal(existsSync(env.TEST_CALLS), false)
   for (const [args, failing] of [[['--local'], false], [['--local', '--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {
@@ -89,7 +89,7 @@ test('local runs archive eligible records and preserve failed suites; an unreach
     if (failing) {
       assert.equal(summary.suites.find((s) => s.suite === 'specs:conformance').code, 7)
       assert.equal(summary.suites.find((s) => s.suite === 'specs:conformance').cause.category, 'test')
-      assert.deepEqual(calls.slice(6).map((c) => c.suite), ['test:desktop', 'perf', 'test:feel'])
+      assert.deepEqual(calls.slice(6).map((c) => c.suite), ['test:desktop', 'test:feel'])
       assert.deepEqual(calls[6].args, ['--grep', '@mac'])
       assert.equal(calls[6].skip, undefined)
     }
