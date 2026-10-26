@@ -31,12 +31,16 @@ const BELOW = 320
 const SLIDE_LIMIT = 2
 /** How far the rows below a new row have moved aside (in eased progress) when it starts to show in its place. */
 const SHOW_FROM = 0.8
+/** The longest start delay a capture allows for, in ms: past it a row is late anyway and ends its motion at its place. */
+const MAX_START_DELAY = 150
 
 /** One list's rows in motion. */
 export class Player {
   private readonly running = new Map<HTMLElement, Animation>()
-  /** When each animation was made, on the document timeline. */
+  /** When each animation was made, in `performance.now()` time. */
   private readonly made = new WeakMap<Animation, number>()
+  /** How long the last animation took from being made to starting on the compositor: under load, many frames. */
+  private startDelay = 0
   private readonly raised = new Set<HTMLElement>()
   private readonly arriving = new Set<HTMLElement>()
 
@@ -51,12 +55,16 @@ export class Player {
   capture(before: ReorderMotionProps, { groups, animate, scroller: { current: scroller }, row, rowKey }: ReorderMotionProps): Snapshot | null {
     if (document.hidden || scroller === null || !scroller.checkVisibility() || scroller.scrollTop > 0.5 || rootDuration('--duration-reorder') < 1 || !animate) return { drawn: undefined }
     if (appendedOnly(before.groups, groups)) return null
-    // The compositor runs an animation from the frame after it was made, while this
-    // thread holds it at its start until it hears back. Put such an animation at the
-    // time the compositor drew, so the rows are read where they are on screen.
-    const now = Number(document.timeline.currentTime ?? 0)
+    // The rows move on the compositor until the motion this change makes starts there,
+    // which under load is many frames after now, and this thread knows only its last
+    // frame's time. Read each row where it will be drawn when the new motion starts, so
+    // the change neither pulls rows back nor pushes them on; an animation this thread has
+    // not yet heard start is taken to have started as long after it was made as the last.
+    const at = performance.now() + this.startDelay
     for (const animation of this.running.values()) {
-      if (animation.startTime === null) animation.currentTime = Math.max(0, now - (this.made.get(animation) ?? now))
+      const made = this.made.get(animation)
+      const start = animation.startTime === null ? (made === undefined ? undefined : made + this.startDelay) : Number(animation.startTime)
+      if (start !== undefined) animation.currentTime = Math.max(0, at - start)
     }
     const view = scroller.getBoundingClientRect()
     const drawn = new Map<string, Drawn>()
@@ -102,7 +110,9 @@ export class Player {
     }
     for (const [i, entry] of rows.entries()) {
       const { el, top, height, from } = entry
-      if (from !== undefined && !from.arriving && (from.seen || Math.abs(from.top - top) <= SLIDE_LIMIT * height)) {
+      // A new row already showing slides from where it is drawn: coming in again from the top, it would leave its place empty for a frame.
+      const shown = from !== undefined && (!from.arriving || (from.seen && from.opacity > 0))
+      if (from !== undefined && shown && (from.seen || Math.abs(from.top - top) <= SLIDE_LIMIT * height)) {
         const dy = from.top - top
         if (Math.abs(dy) < 0.5 && from.opacity >= 1) continue
         // A row that rises past others is drawn over them, on the list's own colour, so two rows' text never shows through each other.
@@ -142,7 +152,11 @@ export class Player {
       this.raised.add(el)
     }
     const animation = el.animate(keyframes, timing)
-    this.made.set(animation, Number(document.timeline.currentTime ?? 0))
+    const made = performance.now()
+    this.made.set(animation, made)
+    void animation.ready.then(() => {
+      if (animation.startTime !== null) this.startDelay = Math.min(MAX_START_DELAY, Math.max(0, Number(animation.startTime) - made))
+    }, () => {})
     this.running.set(el, animation)
     // A cancelled animation was stopped by `stop`, which lowers its row there and then.
     animation.addEventListener('finish', () => {
