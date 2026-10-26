@@ -205,7 +205,8 @@ export interface EngineOptions {
 export const fastTiming: EngineTimingConfig = {
   ...Record.map(productionTiming, (millis) => millis / 20),
   sweepIntervalMillis: 0,
-  followPassMillis: 0,
+  // The follow pass stays scaled (3 minutes), as in the e2e profile: a boot's own pass is the only one in a test.
+  // At 0 every boot and reconnect read every followed thread a second time. A test of the pass after a catch-up sets 0.
   // Retry-After stays real, so the wait it is compared with does too.
   slackInteractiveMaxWaitMillis: productionTiming.slackInteractiveMaxWaitMillis,
 }

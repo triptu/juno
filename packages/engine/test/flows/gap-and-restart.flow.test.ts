@@ -20,6 +20,8 @@ afterEach(async () => {
 })
 
 const synced = (options: SyncedOptions = {}) => syncedEngine(engines, options)
+/** A follow pass at every catch-up, so a reconnect reads every followed thread (the app does this once an hour). */
+const EVERY_CATCH_UP = { timing: { followPassMillis: 0 } }
 /** A warm engine whose periodic sweeps run only when the test calls `sweep()`. */
 async function sweeping(followPassMillis: number) {
   const sweeps = await controlledSweeps()
@@ -97,7 +99,7 @@ async function expectChanges(engine: RunningEngine, seeded: Awaited<ReturnType<t
 
 // A socket drop
 it('brings back what changed offline (a read, a reply, an unfollow, a Main message, a channel joined), reading only what moved', async () => {
-  const engine = await synced()
+  const engine = await synced(EVERY_CATCH_UP)
   const draft = threadId(engine.fake, 'C0ENG', 'Draft plan is in the doc.')
   const finance = threadId(engine.fake, 'C0LEADERSHIP', 'Finance wants the 2027 plan')
   expect((await engine.rows()).some((r) => r.id === finance)).toBe(true)
@@ -152,7 +154,7 @@ it('reads followed threads past the first getView page', async () => {
   const threads: Array<SeededThread> = []
   const engine = await restart(engines, first, (fake) => {
     for (let i = 0; i < 15; i++) threads.push(seedThread(fake, { channel: 'C0PLATFORM', text: `Migration ${i + 1}`, ago: 3 * DAY, replies: [2 * DAY + i * 60_000], follow: true }))
-  })
+  }, EVERY_CATCH_UP)
   await engine.rowsUntil((rows) => threads.every((t) => rows.some((r) => r.id === t.id)), 'the seeded threads')
   // Read everywhere but here while offline: Slack moves the read pointers and Juno sees no event.
   await offline(engine, () => {

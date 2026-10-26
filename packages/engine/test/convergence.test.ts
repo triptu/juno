@@ -70,6 +70,8 @@ describe('convergence', () => {
       },
       // Every topic the test touches is recent; the recheck reads all of them.
       recheckTopics: 200,
+      // Each catch-up reads every followed thread, so an unfollow made offline converges without waiting an hour.
+      timing: { followPassMillis: 0 },
     })
     await engine.status('ready')
     await engine.phase('live', 30_000)
