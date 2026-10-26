@@ -69,7 +69,8 @@ one Apalache checker per four, at least one each. Explicit worker settings win.
 the spec checks and conformance) and a unit job (unit tests, the DOM lane, the gallery and the
 tool tests); "Remote runs" in `docs/development.md` has the detail. The coordinator checks the
 runner and its image and packs the workspace once. Each job has its own install, results and independently released core set. In a full run
-each job runs its steps in order; elsewhere its lanes run at once with their own workers.
+each job runs its steps in order, except that Electron runs beside the browser lane; elsewhere
+a job's lanes run at once with their own workers.
 `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also runs its steps
 in order. `--cores` and `--wait` apply to each job. `--shards n` is an explicit
 split into n jobs on the same shared allocator.
