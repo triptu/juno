@@ -31,8 +31,11 @@ if [ "$cores" -ge 8 ]; then desktop_workers=$cores; fi
 # Plans retain their own lane budgets.
 if [ "$cores" -eq 4 ] && [ "$1" = test:desktop ]; then desktop_workers=3; fi
 export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$desktop_workers}
+# A run that walks only changed states (no GALLERY_SHIFT_ALL) uses GALLERY_CACHED_WORKERS: on one
+# loaded page per worker, half a worker per thread ran it in the least CPU at the same wall (10-26).
+# An explicit GALLERY_WORKERS sets both.
+export GALLERY_CACHED_WORKERS=${GALLERY_CACHED_WORKERS:-${GALLERY_WORKERS:-$(at_least $(( cores / 2 )) 1)}}
 export GALLERY_WORKERS=${GALLERY_WORKERS:-$gallery_workers}
-export GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$GALLERY_WORKERS}
 # Spec simulations run beside the Apalache checks here (on the Mac they run first).
 spec_jobs=$(at_least $(( cores / 2 )) 1)
 if [ "$1" = specs:traces ]; then spec_jobs=$cores; fi

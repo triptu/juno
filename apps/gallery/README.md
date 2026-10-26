@@ -9,7 +9,7 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 - `verify:main --nightly` and `verify:main --no-cache` force the broad walk automatically.
 - `bun run gallery:shots`: review screenshots in both themes. `GALLERY_SHOTS_ONLY=Button` narrows them.
 
-Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency. Every test in a worker runs on one loaded gallery page ([One page per worker](#one-page-per-worker)). Screenshots remain review artifacts, not pixel baselines in the behavior gate.
+Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency; on the runner a run that does not walk every state uses `GALLERY_CACHED_WORKERS`, half a worker per thread. Every test in a worker runs on one loaded gallery page ([One page per worker](#one-page-per-worker)). Screenshots remain review artifacts, not pixel baselines in the behavior gate.
 
 ## One page per worker
 
@@ -24,7 +24,7 @@ Between tests the fixture puts the page back to `#/~`, which draws nothing and a
 
 What the components keep at module level and a document now carries from test to test: the topic art markup cache (strings by recipe), the pointer position `pointerMoved` compares against (rewritten by the reset's mouse move), lazy chunks once loaded, and keys held while a send is pending (released within a second). None changes what a state draws. The computed sweep has opened 150 states per document since 10-25.
 
-Isolation is checked by running the suite in a shuffled order with different worker counts: `bun run remote --env GALLERY_SHIFT_ALL=1 --env GALLERY_WORKERS=<n> test:gallery --shuffle <seed>`. `shared-page.spec.ts` checks that the reset fails a test that leaves a node or a global.
+Measured before and after, with the worker counts, in [development notes](../../docs/development.md#gallery-one-loaded-page-per-worker-2026-10-26). Isolation is checked by running the suite in a shuffled order with different worker counts: `bun run remote --env GALLERY_SHIFT_ALL=1 --env GALLERY_WORKERS=<n> test:gallery --shuffle <seed>`. `shared-page.spec.ts` checks that the reset fails a test that leaves a node or a global.
 
 ## Fast sweep
 

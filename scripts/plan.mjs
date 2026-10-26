@@ -62,14 +62,15 @@ export function lanes(steps, serial) {
 /**
  * Split the CPU limit between app workers (half the cores), unit workers
  * and simulations (a quarter each), plus one uncached Apalache checker.
- * Gallery gets three quarters because its checks wait for the browser.
+ * Gallery gets three quarters because its checks wait for the browser, and a
+ * quarter when it walks only changed states (apps/gallery/playwright.config.ts).
  * Wide unit-only plans retain their inherited unit workers; app plans split them.
  * A step's own KEY=VALUE words still win.
  */
 export function sideBySide(cores, wideUnit = false) {
   const galleryWorkers = String(cores === 3 ? 3 : Math.max(1, Math.floor((cores * 3) / 4)))
   return {
-    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
+    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_CACHED_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
     rest: wideUnit ? {} : { JUNO_TEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
     specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
   }

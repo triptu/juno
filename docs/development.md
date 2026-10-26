@@ -760,7 +760,7 @@ Records are shared across worktrees in the system temp folder's `juno-cache/resu
 
 Gallery tests that only read what states draw (geometry, overlap, contrast, wrapping, static attributes) are cached the same way, a whole test at a time: `layoutTest` and `paintTest` in `apps/gallery/support.ts`. A test's record keys on its title, its spec and what that imports, the runtime, and the walk key of every component it opened, which the fixture reads from the page's navigations (the state list counts as `#index`: the registries and fixture code). `paintTest` also counts the colour and shadow tokens those components read and paint-only CSS, so contrast reruns when a colour it resolves changes and not otherwise. `GALLERY_SHIFT_ALL=1` (so nightly and no-cache full runs) runs every one; repeats and retries do too. Interaction timing, motion, delayed loads, keyboard flows and the guard's self-tests are plain tests and run every time. See [the gallery README](../apps/gallery/README.md#cached-rendering-tests).
 
-`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. A remote job that runs only the gallery gets four workers per three allocated threads (eight on a full run's six), since the walk mostly waits for frames and motion; `scripts/remote/workers.sh` sets this. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
+`GALLERY_SHIFT_ONLY=Button,Chip` limits the shift walk; `GALLERY_SHIFT_PARTS` controls the number of queue consumers and defaults to the worker count. A remote job that runs only the gallery gets four workers per three allocated threads (eight on a full run's six) when it walks every state (`GALLERY_SHIFT_ALL=1`), since the walk mostly waits for frames and motion. Otherwise it gets one worker per two threads (`GALLERY_CACHED_WORKERS`), which on one shared page per worker ran a cached run in the least CPU at the same wall ([One loaded page per worker](#gallery-one-loaded-page-per-worker-2026-10-26)). `scripts/remote/workers.sh` and `scripts/plan.mjs` set these, `apps/gallery/playwright.config.ts` picks one, and an explicit `GALLERY_WORKERS` sets both. Existing remote shard selection remains supported. The queue is unique per run and repeat. Targeted interaction and delayed-load regressions run every time, even when all broad-walk states are cached.
 
 Every test in a worker runs on one loaded gallery document. Opening the gallery in a new document costs about 0.45 CPU-s (it loads the 2.4 MB bundle); a new context adds 0.06, and a new page in a context that already loaded the bundle saves only 0.06 of the 0.45. A state opened by its hash in an open document costs about 0.03 CPU-s (single probe runs on the runner, 10-25). So tests and walks move the worker's document by its hash, and between tests the `test` fixture in `apps/gallery/support.ts` puts it back to a blank page, fails the test if it left anything, and clears focus, selection, scroll and storage. Tests that route requests, install a clock or inject scripts or styles get a page of their own. The walks load the document again every 150 states. See [One page per worker](../apps/gallery/README.md#one-page-per-worker). Fonts, visible images, lazy chunks and finite entrance motion must settle before measurement; a readiness deadline fails the state instead of silently treating it as ready. Scrolling an interaction target settles before the guard starts, so remembered off-screen row sizes are not charged to the following input. Motion stays enabled during the shift walk.
 
@@ -824,6 +824,23 @@ Single runs of `bun run remote --cores 4 --env GALLERY_WORKERS=6 --env GALLERY_C
 | After, eight workers | this change | 115 run, 60 cached | 150 CPU-s | 20.1 s | 23 s | 86% |
 
 Before, most tests cost about 0.5 CPU-s each: one new document of the 2.4 MB bundle. The largest were the shift spec (55 CPU-s: six cached walk parts reading the state list and keys, 14 composition states walked again on every source change, and its targeted tests), `behaviour` (23), `narrow-geometry` (17, 25 tests), `contrast` (12, 18 tests) and `message-geometry` (6). Uncached, as in a full run, the merged specs cost less too: `narrow-geometry` 6.7 CPU-s, `contrast` 4.6, `message-geometry` 3.1, `peek-contrast` 2.8. Removing the accessibility-only tests (merged from main before the after runs) accounts for about 5 CPU-s of the difference. The full walk with every record replaced took 610 s and passed. Eight workers were not faster than six: each walk part pays for the state list and keys, so the six of `scripts/remote/workers.sh` stay.
+
+### Gallery: one loaded page per worker, 2026-10-26
+
+Single runs of `bun run remote --cores 4 --env GALLERY_CPU=1 test:gallery` (eight threads), with `--env GALLERY_SHIFT_ALL=1` for the full walk. CPU and wall are the Playwright phase from the job's cgroup. Before is `bdda1e373`, where every test loaded the gallery in a new page and the walk loaded it again for every state.
+
+| Run | Workers | Tests run | CPU | Wall | CPU busy |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Before, cached | 6 | 113 | 129 CPU-s | 19.1 s | 78% |
+| After, cached | 6 | 115 | 82 CPU-s | 13.4 s | 68% |
+| After, cached | 4 | 113 | 59 CPU-s | 14.4 s | 46% |
+| After, cached | 8 | 117 | 101 CPU-s | 14.0 s | 80% |
+| After, cached | 10 (the old default) | 119 | 116 CPU-s | 15.6 s | 82% |
+| Before, every state walked | 6 | 165 | 3,170 CPU-s | 597 s | 66% |
+| After, every state walked | 6 | 166 | 2,339 CPU-s | 510 s | 56% |
+| After, every state walked | 10 | 171 | 2,208 CPU-s | 335 s | 82% |
+
+Tests run differ by the walk parts, one per worker. In a cached run most of the remaining CPU is per worker (a browser, the loaded page, a walk part reading the state list and keys), so four workers cost 29% less than six for one more second; a full walk still gains from ten. The full walk at six workers had one failure, the overlap check's script tag refused by the shared page, since fixed. Isolation: three runs with every cached test forced and the walk skipped, `--shuffle` seeds 11, 22 and 33 at 2, 6 and 10 workers, each 161 passed and none failed; both full walks in place passed every state.
 
 ## Web shell
 
