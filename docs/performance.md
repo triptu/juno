@@ -1327,7 +1327,8 @@ Tried, measured and not kept:
 
 - Node's compile cache for the engine (`NODE_COMPILE_CACHE` on the fork):
   engine ready at 316 against 323 ms, rows 472.5 against 473.6 ms median,
-  20 launches each. No change.
+  20 launches each. No change. Its CPU in an e2e launch did not change either:
+  0.86 to 0.98 CPU-s with it and without (10-26, laptop, 12 launches each).
 - Registering IPC after the window: the time before the window is
   `protocol.handle`, not IPC, so nothing moved.
 - Waiting without polling in the scenario: after a 2 s idle gap the CPU
