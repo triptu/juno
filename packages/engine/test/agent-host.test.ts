@@ -19,7 +19,8 @@ import { runCommand, topicAtom, searchSnapshots } from '@juno/state'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { slackWrites } from './scenario'
-import { syncedEngine } from './synced'
+import { syncedEngine, type SyncedOptions } from './synced'
+import { clockAt, localNoon } from './controlledClock'
 
 const CHANNEL = 'C0ENG'
 const engines: Array<RunningEngine> = []
@@ -95,9 +96,9 @@ async function startRealAgent(transport: ReturnType<typeof memoryTransport>, age
   return handle
 }
 
-async function hostWithAgent(writes: 'enabled' | 'disabled') {
+async function hostWithAgent(writes: 'enabled' | 'disabled', options: SyncedOptions = {}) {
   const transport = memoryTransport()
-  const engine = await syncedEngine(engines, { agent: { transport, writes } })
+  const engine = await syncedEngine(engines, { ...options, agent: { transport, writes } })
   const agent = await connectAgent(transport)
   const account = (await presence(agent.client))!.accountId!
   return { engine, transport, agent, account }
@@ -325,19 +326,16 @@ describe('the AgentHost port', () => {
   })
 
   it('reads notification and active hours from the notifications settings', async () => {
-    const { engine, agent } = await hostWithAgent('disabled')
+    // The hours are local, so the engine reads noon whenever the test runs.
+    const { engine, agent } = await hostWithAgent('disabled', { clock: clockAt(localNoon()) })
     const never = { days: [], from: 9 * 60, to: 19 * 60 }
     const settings = { notificationHours: never, presenceHours: never, matters: '', channels: {}, people: {} }
     await runCommand(engine.registry, prefsSet, { key: 'notifications', value: settings })
     expect(await presence(agent.client, (p) => p.quietHours && !p.ownerActive)).toMatchObject({ quietHours: true, ownerActive: false })
 
     const always = { days: [0, 1, 2, 3, 4, 5, 6], from: 0, to: 1439 }
-    const minute = new Date().getHours() * 60 + new Date().getMinutes()
-    // 23:59 is outside 0 to 1439; skip the flip when the test runs in that minute.
-    if (minute < 1438) {
-      await runCommand(engine.registry, prefsSet, { key: 'notifications', value: { ...settings, notificationHours: always, presenceHours: always } })
-      expect(await presence(agent.client, (p) => !p.quietHours && p.ownerActive)).toMatchObject({ quietHours: false, ownerActive: true })
-    }
+    await runCommand(engine.registry, prefsSet, { key: 'notifications', value: { ...settings, notificationHours: always, presenceHours: always } })
+    expect(await presence(agent.client, (p) => !p.quietHours && p.ownerActive)).toMatchObject({ quietHours: false, ownerActive: true })
   })
 
   it('follows AI assist and the topic last viewed in presence', async () => {
