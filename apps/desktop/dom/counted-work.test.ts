@@ -9,6 +9,7 @@
 import { largeSeed, type FakeSlack } from '@juno/fake-slack'
 import { expectWork, type Counts } from '@juno/testing/work-budget'
 import type { DomApp } from './app'
+import type { Juno } from './driver/juno'
 import { expect } from './expect'
 import { domTest } from './test'
 import { pageWork, settledPage, workSince, type PageWork } from './work'
@@ -41,6 +42,12 @@ async function engineAtRest(fake: FakeSlack): Promise<void> {
   }
 }
 
+/**
+ * The user's own presence on the account button: it comes from the socket at a time that depends on the
+ * machine's load, so startup counts wait for it and no later step counts it.
+ */
+const presenceShown = (juno: Juno) => expect(juno.sidebar.accountButton.locator('[data-presence]')).toHaveCount(1, { timeout: 15_000 })
+
 /** `action`, then everything it set off, counted on the page. */
 async function measured(app: () => DomApp, action: () => Promise<void>): Promise<PageWork> {
   await settledPage(app().window)
@@ -55,6 +62,7 @@ domTest('startup, a topic opened and opened again, tabs, typing, a send and a li
     juno = await relaunch({ beforeOpen: () => engineAtRest(fake) })
     await juno.sidebar.expectRows()
     await juno.expectEngineLive()
+    await presenceShown(juno)
     await settledPage(app.window)
     const work = pageWork(app.window)
     expectWork('startup', counts(work), { commits: 38, renders: 526, requests: 47, messages: 47, bytesIn: 42009 }, detail(work))
@@ -125,6 +133,7 @@ domTest('the sidebar of 300 conversations: its first rows from the cache, and on
     juno = await relaunch({ beforeOpen: () => engineAtRest(fake) })
     await juno.sidebar.expectRows()
     await juno.expectEngineLive()
+    await presenceShown(juno)
     await settledPage(app.window)
     const work = pageWork(app.window)
     expectWork('large sidebar startup', counts(work), { commits: 40, renders: 3112, requests: 48, messages: 49, bytesIn: 398313 }, detail(work))
