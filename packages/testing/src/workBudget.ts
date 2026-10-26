@@ -6,11 +6,11 @@
  * runs in every test run. It fails only when the work grows; a count well
  * under its budget is printed so the budget can be lowered on purpose.
  *
+ * It throws a plain error, so `bun test` and Playwright tests share it.
+ *
  * `JUNO_WORK_COUNTS=1` prints every count (`counted work:` lines) for setting
  * or raising a budget; `JUNO_WORK_COUNTS=detail` adds what each was made of.
  */
-import { expect } from 'bun:test'
-
 export type Counts = Readonly<Record<string, number>>
 
 /**
@@ -32,5 +32,5 @@ export function expectWork(action: string, counts: Counts, budget: Counts, detai
     ...(detail === undefined ? [] : [typeof detail === 'string' ? detail : JSON.stringify(detail, null, 1)]),
     'If the extra work is on purpose, raise the budget in the same change and say why (docs/performance.md, "Counted budgets").',
   ].join('\n')
-  expect(over, report).toEqual([])
+  throw new Error(report)
 }
