@@ -114,7 +114,10 @@ test('a full run reuses passes by the run that wrote them and walks its seed\'s 
   const routes = Array.from({ length: 2000 }, (_, index) => ({ ...button, id: `s${index}`, route: `Button/s${index}` }))
   const affected = cache({ kind: 'computed', source: 'gallery run at noon' })
   for (const route of routes) affected.pass(route)
-  const picked = seed => routes.filter(route => cache({ kind: 'computed', sample: seed }).reuse(route)?.sampled).map(route => route.route)
+  const picked = seed => {
+    const sampled = cache({ kind: 'computed', sample: seed })
+    return routes.filter(route => sampled.reuse(route)?.sampled).map(route => route.route)
+  }
   const first = picked('11')
   assert.ok(Math.abs(first.length - routes.length * sampleShare) < 40, `${first.length} of ${routes.length} sampled`)
   assert.deepEqual(picked('11'), first, 'every worker picks the same states for one seed')
