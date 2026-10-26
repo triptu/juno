@@ -32,19 +32,36 @@ export const drawnRules = (page: Page, route: Route) => page.evaluate((frameName
 export function computedWalk(page: Page) {
   let opened = 0
   return async (route: Route) => {
+    const started = performance.now()
+    const timing = { open: 0, rules: 0, reload: 0, forced: 0, act: 0, settle: 0, boxes: 0, diff: 0, pseudo: 0, total: 0 }
     const failures: string[] = []
     let elements = 0, resets = 0, unforced = 0
     await checkStateWithin(route, async () => {
       if (opened === statesPerDocument) {
+        const start = performance.now()
         await page.evaluate(() => { location.hash = '#/~' })
         await page.reload()
+        timing.reload += performance.now() - start
         opened = 0
       }
       opened++
-      const open = () => openState(page, route, 'light', undefined, { finishMotion: true, inPlace: true })
+      const open = async () => {
+        const start = performance.now()
+        await openState(page, route, 'light', undefined, { finishMotion: true, inPlace: true })
+        timing.open += performance.now() - start
+      }
+      const check = async (from = 0) => {
+        const start = performance.now()
+        const report = await forced(page, from)
+        timing.forced += performance.now() - start
+        for (const key of ['act', 'settle', 'boxes', 'diff', 'pseudo', 'total'] as const) timing[key] += report.timing[key]
+        return report
+      }
       await open()
+      const rulesStart = performance.now()
       failures.push(...await drawnRules(page, route))
-      for (let report = await forced(page); ; report = await forced(page, report.next)) {
+      timing.rules += performance.now() - rulesStart
+      for (let report = await check(); ; report = await check(report.next)) {
         elements += report.touched
         unforced = Math.max(unforced, report.unforced)
         failures.push(...report.shifts.map(shift => `element ${shift.element + 1}, ${shift.target}: ${formatForcedShift(shift)}`))
@@ -53,6 +70,7 @@ export function computedWalk(page: Page) {
         await open()
       }
     })
+    if (process.env.GALLERY_PROFILE === '1') console.log(`gallery-state: ${JSON.stringify({ route: route.route, ms: performance.now() - started, elements, resets, timing })}`)
     return { failures, elements, resets, unforced }
   }
 }

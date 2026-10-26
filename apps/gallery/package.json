@@ -10,7 +10,7 @@
     "preview": "vite preview --port 4174 --strictPort",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.shots.json",
     "shots": "bun ../../scripts/build-cached.mjs dist vite build && playwright test --project shots",
-    "test:e2e": "bun test --randomize walk-cache.test.mjs && bun ../../scripts/build-cached.mjs dist vite build && playwright test --project=behaviour",
+    "test:e2e": "bun test --randomize walk-cache.test.mjs && bun ../../scripts/build-cached.mjs dist vite build && NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" playwright test --project=behaviour",
     "test:cache": "bun test --randomize walk-cache.test.mjs"
   },
   "dependencies": {

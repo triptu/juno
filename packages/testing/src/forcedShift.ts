@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { formatLayoutShiftReport } from './layoutShift'
-import { withHelpers, type MovedElement } from './inPage'
+import { withHelpers, type MovedElement, type Helpers } from './inPage'
 
 export interface ForcedInteractionOptions {
   /** CSS selector of the region to check. Default: the gallery's `[data-fixture-frame]`, else `body`. */
@@ -36,7 +36,7 @@ export interface ForcedInteractionReport {
   /** Pseudo-class rules in this document that could not be rewritten, for the log. */
   readonly unforced: number
   /** Milliseconds spent dispatching, waiting and reading boxes, for the log. */
-  readonly timing: { readonly act: number; readonly settle: number; readonly boxes: number }
+  readonly timing: { readonly act: number; readonly settle: number; readonly boxes: number; readonly diff: number; readonly pseudo: number; readonly total: number }
 }
 
 // The functions below run in the page, through `toString()`: each uses nothing outside its own body.
@@ -87,14 +87,12 @@ function forcePseudoClasses(): number {
 /**
  * Lets the page answer a touch: two tasks so React renders (a continuous event's update, then an effect's),
  * the code the touch started loading, then the animations it started, finished, and the tasks after them.
- * Then the focus attributes follow the active element.
+ * Focus attributes follow the active element before reading animations and after their completion tasks.
  */
-function settler(pending: string | null, earlier: ReadonlySet<Animation>, syncFocus: () => void, forcePseudo: () => number): () => Promise<void> {
+function settler(pending: string | null, earlier: ReadonlySet<Animation>, syncFocus: () => void, forcePseudo: () => number) {
+  const channel = new MessageChannel()
   const task = () => new Promise<void>((resolve) => {
-    const channel = new MessageChannel()
     channel.port1.addEventListener('message', () => {
-      channel.port1.close()
-      channel.port2.close()
       resolve()
     }, { once: true })
     channel.port1.start()
@@ -113,7 +111,7 @@ function settler(pending: string | null, earlier: ReadonlySet<Animation>, syncFo
     })
     observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true })
   })
-  return async () => {
+  const wait = async () => {
     await task()
     await task()
     if (pending !== null && document.querySelector(pending) !== null) {
@@ -122,6 +120,7 @@ function settler(pending: string | null, earlier: ReadonlySet<Animation>, syncFo
       await task()
       await task()
     }
+    syncFocus()
     for (let round = 0; round < 4; round++) {
       const started = document.getAnimations().filter((animation) => !earlier.has(animation) && animation.playState !== 'finished' && Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)))
       if (started.length === 0) break
@@ -137,6 +136,32 @@ function settler(pending: string | null, earlier: ReadonlySet<Animation>, syncFo
     }
     syncFocus()
   }
+  return { wait, close: () => { channel.port1.close(); channel.port2.close() } }
+}
+
+/** Owns the forced focus attributes for one check, including those left on ancestors by its previous state. */
+function focusAttributes() {
+  const focusedAttributes = new Map(['data-juno-focus', 'data-juno-focus-visible', 'data-juno-focus-within']
+    .map(name => [name, new Set(document.querySelectorAll(`[${name}]`))]))
+  return (keyboard: boolean) => {
+    const active = document.activeElement
+    const focused = active !== null && active !== document.body ? [active] : []
+    const field = active?.matches('input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="reset"], [type="range"], [type="color"]), textarea, [contenteditable]:not([contenteditable="false"])')
+    const update = (name: string, desired: ReadonlyArray<Element>) => {
+      const next = new Set(desired)
+      const previous = focusedAttributes.get(name)!
+      for (const el of previous) if (!next.has(el)) el.removeAttribute(name)
+      for (const el of next) if (!previous.has(el)) el.setAttribute(name, '')
+      focusedAttributes.set(name, next)
+    }
+    // Keep unchanged attributes: clearing then restoring them invalidates style
+    // across the focused element's ancestors on every touch.
+    update('data-juno-focus', focused)
+    update('data-juno-focus-visible', keyboard || field ? focused : [])
+    const ancestors: Element[] = []
+    for (let el = focused[0]; el; el = el.parentElement ?? undefined) ancestors.push(el)
+    update('data-juno-focus-within', ancestors)
+  }
 }
 
 /**
@@ -144,7 +169,7 @@ function settler(pending: string | null, earlier: ReadonlySet<Animation>, syncFo
  * (the element under the point and its ancestors for hover and press, the active element and its ancestors for
  * focus) and the pointer, mouse, key and focus events it would fire.
  */
-function touches() {
+function touches(focus: (keyboard: boolean) => void) {
   let keyboard = false
   const chain = (el: Element): Element[] => {
     const out: Element[] = []
@@ -154,15 +179,7 @@ function touches() {
   const clear = (name: string) => {
     for (const el of Array.from(document.querySelectorAll(`[${name}]`))) el.removeAttribute(name)
   }
-  const syncFocus = () => {
-    for (const name of ['data-juno-focus', 'data-juno-focus-visible', 'data-juno-focus-within']) clear(name)
-    const active = document.activeElement
-    if (!active || active === document.body) return
-    active.setAttribute('data-juno-focus', '')
-    const field = active.matches('input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="reset"], [type="range"], [type="color"]), textarea, [contenteditable]:not([contenteditable="false"])')
-    if (keyboard || field) active.setAttribute('data-juno-focus-visible', '')
-    for (const el of chain(active)) el.setAttribute('data-juno-focus-within', '')
-  }
+  const syncFocus = () => focus(keyboard)
   const fire = (type: string, target: Element, x: number, y: number, extra: { buttons?: number; bubbles?: boolean } = {}) => {
     const init = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', isPrimary: true, ...extra }
     return target.dispatchEvent(type.startsWith('pointer') ? new PointerEvent(type, init) : new MouseEvent(type, init))
@@ -226,6 +243,74 @@ function sampleTargets(rootEl: HTMLElement, targets: string, skipWithin: string 
   return all.length <= max ? all : [...all.slice(0, max - tail), ...all.slice(-tail)]
 }
 
+const forcedHelpers = { forcePseudoClasses, settler, touches, sampleTargets, focusAttributes }
+
+async function runForced(arg: { root: string; targets: string; skipWithin: string | null; max: number; from: number; pending: string | null; tolerance: number; grows: string | null }, h: Helpers & typeof forcedHelpers): Promise<ForcedInteractionReport> {
+  const started = performance.now()
+  const found = document.querySelector(arg.root)
+  const rootEl = found instanceof HTMLElement ? found : document.body
+  const pseudoStarted = performance.now()
+  const unforced = h.forcePseudoClasses()
+  const pseudo = performance.now() - pseudoStarted
+  const touch = h.touches(h.focusAttributes())
+  const settling = h.settler(arg.pending, new Set(document.getAnimations()), touch.syncFocus, h.forcePseudoClasses)
+  try {
+    const picked = h.sampleTargets(rootEl, arg.targets, arg.skipWithin, arg.max)
+    const drawn = new Set(picked.filter((el) => el.getClientRects().length > 0))
+    const timing = { act: 0, settle: 0, boxes: 0, diff: 0, pseudo, total: 0 }
+    const shifts: ForcedShift[] = []
+    let touched = 0
+    let boxes = h.layoutBoxes(rootEl)
+    for (let index = arg.from; index < picked.length; index++) {
+      const element = picked[index]!
+      if (!element.isConnected || element.getClientRects().length === 0 || getComputedStyle(element).visibility === 'hidden') continue
+      const was = element.getBoundingClientRect()
+      element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      const box = element.getBoundingClientRect()
+      if (box.x !== was.x || box.y !== was.y) {
+        // Scrolling can lay out content-visibility rows; that is not the touch's doing.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+        boxes = h.layoutBoxes(rootEl)
+      }
+      touched++
+      const x = box.x + box.width / 2
+      const y = box.y + box.height / 2
+      const hit = document.elementFromPoint(x, y) ?? element
+      const target = h.describeNode(element)
+      const step = async (name: string, action: () => void) => {
+        const t0 = performance.now()
+        action()
+        const t1 = performance.now()
+        await settling.wait()
+        const t2 = performance.now()
+        const now = h.layoutBoxes(rootEl)
+        const t3 = performance.now()
+        const moved = h.changedBoxes(boxes, now, arg.tolerance, arg.grows, h.describeNode)
+        if (moved.length > 0) shifts.push({ element: index, target, step: name, moved })
+        boxes = now
+        timing.act += t1 - t0
+        timing.settle += t2 - t1
+        timing.boxes += t3 - t2
+        timing.diff += performance.now() - t3
+      }
+      await step('hover', () => touch.hover(hit, x, y))
+      await step('focus from the keyboard', () => touch.focus(element))
+      await step('blur', () => element.blur())
+      await step('press', () => touch.press(hit, x, y))
+      await step('release', () => touch.release(hit, x, y))
+      await step('leave', () => touch.leave(hit, x, y))
+      // A touch that took away or hid elements still to touch (Undo puts back other buttons) needs a fresh state for the rest.
+      // Other changes stay: what follows is still something a person can do, and each step is measured on its own.
+      if (picked.slice(index + 1).some((next) => drawn.has(next) && (!next.isConnected || next.getClientRects().length === 0))) {
+        timing.total = performance.now() - started
+        return { shifts, touched, next: index + 1, unforced, timing }
+      }
+    }
+    timing.total = performance.now() - started
+    return { shifts, touched, unforced, timing }
+  } finally { settling.close() }
+}
+
 /**
  * The cheap tier of the guard: every touch of `measureLayoutShift`, without real input or animation frames, in
  * one `page.evaluate`. For each target it hovers, focuses from the keyboard, blurs, presses, releases and leaves
@@ -236,63 +321,10 @@ function sampleTargets(rootEl: HTMLElement, targets: string, skipWithin: string 
  * or a ResizeObserver, and browser defaults of real input other than focus on press (text selection, `:active`
  * from a keyboard press). The real-input walk covers those.
  */
-export async function checkForcedInteractions(page: Page, options: ForcedInteractionOptions): Promise<ForcedInteractionReport> {
-  return (await withHelpers(
+export function checkForcedInteractions(page: Page, options: ForcedInteractionOptions): Promise<ForcedInteractionReport> {
+  return withHelpers(
     page,
-    async (arg: { root: string; targets: string; skipWithin: string | null; max: number; from: number; pending: string | null; tolerance: number; grows: string | null }, h) => {
-      const found = document.querySelector(arg.root)
-      const rootEl = found instanceof HTMLElement ? found : document.body
-      const unforced = h.forcePseudoClasses()
-      const touch = h.touches()
-      const settle = h.settler(arg.pending, new Set(document.getAnimations()), touch.syncFocus, h.forcePseudoClasses)
-      const picked = h.sampleTargets(rootEl, arg.targets, arg.skipWithin, arg.max)
-      const drawn = new Set(picked.filter((el) => el.getClientRects().length > 0))
-      const timing = { act: 0, settle: 0, boxes: 0 }
-      const shifts: ForcedShift[] = []
-      let touched = 0
-      let boxes = h.layoutBoxes(rootEl)
-      for (let index = arg.from; index < picked.length; index++) {
-        const element = picked[index]!
-        if (!element.isConnected || element.getClientRects().length === 0 || getComputedStyle(element).visibility === 'hidden') continue
-        const was = element.getBoundingClientRect()
-        element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-        const box = element.getBoundingClientRect()
-        if (box.x !== was.x || box.y !== was.y) {
-          // Scrolling can lay out content-visibility rows; that is not the touch's doing.
-          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-          boxes = h.layoutBoxes(rootEl)
-        }
-        touched++
-        const x = box.x + box.width / 2
-        const y = box.y + box.height / 2
-        const hit = document.elementFromPoint(x, y) ?? element
-        const target = h.describeNode(element)
-        const step = async (name: string, action: () => void) => {
-          const t0 = performance.now()
-          action()
-          const t1 = performance.now()
-          await settle()
-          const t2 = performance.now()
-          const now = h.layoutBoxes(rootEl)
-          const moved = h.changedBoxes(boxes, now, arg.tolerance, arg.grows, h.describeNode)
-          if (moved.length > 0) shifts.push({ element: index, target, step: name, moved })
-          boxes = now
-          timing.act += t1 - t0
-          timing.settle += t2 - t1
-          timing.boxes += performance.now() - t2
-        }
-        await step('hover', () => touch.hover(hit, x, y))
-        await step('focus from the keyboard', () => touch.focus(element))
-        await step('blur', () => element.blur())
-        await step('press', () => touch.press(hit, x, y))
-        await step('release', () => touch.release(hit, x, y))
-        await step('leave', () => touch.leave(hit, x, y))
-        // A touch that took away or hid elements still to touch (Undo puts back other buttons) needs a fresh state for the rest.
-        // Other changes stay: what follows is still something a person can do, and each step is measured on its own.
-        if (picked.slice(index + 1).some((next) => drawn.has(next) && (!next.isConnected || next.getClientRects().length === 0))) return { shifts, touched, next: index + 1, unforced, timing }
-      }
-      return { shifts, touched, unforced, timing }
-    },
+    runForced,
     {
       root: options.root ?? '[data-fixture-frame]',
       targets: options.targets,
@@ -303,8 +335,8 @@ export async function checkForcedInteractions(page: Page, options: ForcedInterac
       tolerance: options.tolerance ?? 0.5,
       grows: options.grows ?? null,
     },
-    { forcePseudoClasses, settler, touches, sampleTargets },
-  )) as ForcedInteractionReport
+    forcedHelpers,
+  )
 }
 
 /** A forced shift in the guard's report format. */

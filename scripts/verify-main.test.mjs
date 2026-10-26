@@ -5,7 +5,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFi
 import { hostname } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { verifyExecution } from './verify-execution.mjs'
+import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
 import { assessRecord, readRecords, releaseGate } from './release-gate.mjs'
 
 test('explicit local skips probing; an unreachable runner fails; reachable stays remote; configuration errors fail', () => {
@@ -82,7 +82,7 @@ test('local runs archive eligible records and preserve failed suites; an unreach
     const calls = readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse)
     const desktop = calls.find((c) => c.suite === 'test:desktop')
     assert.equal(desktop.skip, '@mac')
-    assert.equal(desktop.workers, '1')
+    assert.equal(desktop.workers, localVerifyEnv.JUNO_E2E_WORKERS)
     if (again) {
       // A full run reuses no suite from the run before it except the unchanged spec check.
       assert.ok(!summary.suites.find((s) => s.suite === 'specs:conformance').reusedFrom)

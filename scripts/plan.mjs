@@ -78,7 +78,7 @@ export function lanes(steps, serial) {
 export function sideBySide(cores, wideUnit = false) {
   const galleryWorkers = String(cores === 3 ? 3 : Math.max(1, Math.floor((cores * 3) / 4)))
   return {
-    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_CACHED_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
+    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_FAST_WORKERS: galleryWorkers, GALLERY_CACHED_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
     desktop: { JUNO_BROWSER_WORKERS: String(Math.max(1, Math.floor(cores / 2))), JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 3))) },
     rest: wideUnit ? {} : { JUNO_TEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
     specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
