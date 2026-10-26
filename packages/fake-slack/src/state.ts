@@ -442,9 +442,17 @@ export class Workspace {
           }),
     }
     const list = this.all(input.channel)
-    const last = list.at(-1)
-    list.push(message)
-    if (last !== undefined && compareTs(last.ts, message.ts) > 0) list.sort((a, b) => compareTs(a.ts, b.ts))
+    // The list stays in ts order: a backdated post goes after every older message, where a stable sort would put it.
+    let at = list.length
+    if (at > 0 && compareTs(list[at - 1]!.ts, message.ts) > 0) {
+      let low = 0
+      while (low < at) {
+        const middle = (low + at) >>> 1
+        if (compareTs(list[middle]!.ts, message.ts) > 0) at = middle
+        else low = middle + 1
+      }
+    }
+    list.splice(at, 0, message)
 
     if (root !== undefined) this.#touchRoot(input.channel, root.ts)
     this.#touchConversation(input.channel, input.at)
