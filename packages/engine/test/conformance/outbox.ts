@@ -23,7 +23,7 @@ import type { GatedCall } from '@juno/fake-slack'
 import { deleteMessage, discardMessage, editMessage, retryMessage, runCommand } from '@juno/state'
 import { Exit } from 'effect'
 import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from '../harness'
-import { quiet, readDb } from '../scenario'
+import { quiet } from '../scenario'
 import { syncedEngine } from '../synced'
 import type { Trace, TraceState } from './itf'
 import {
@@ -34,6 +34,7 @@ import {
   copyInSlack,
   draftOf,
   draftOfChannel,
+  debug,
   expectedDraft,
   inSlack,
   isAction,
@@ -391,15 +392,7 @@ export const outboxSpec: Spec<World, View> = {
     d2: expectedDraft(states, index, 2),
     connected: sOf(states[index]!).connected,
   }),
-  debug: (world) =>
-    [
-      `  gated: ${JSON.stringify(world.engine.fake.gated().map((call) => ({ id: call.id, method: call.method, stage: call.stage, outcome: call.outcome, ts: call.args['ts'], channel: call.args['channel'] })))}`,
-      `  calls: ${world.engine.fake.calls
-        .filter((call) => call.kind === 'api' && (isAction(call.method, call.args) || isPost(world, call.method, call.args) || isLookup(call.method, call.args)))
-        .map((call) => `${call.method} ${call.args['channel']} ${call.args['ts'] ?? ''} ${call.ok ? 'ok' : call.error}`)
-        .join(', ')}`,
-      `  outbox: ${JSON.stringify(readDb(world.engine, 'user.db', (db) => db.prepare('SELECT kind, target_key, depends_on, payload_json, attempts, next_at, last_error FROM outbox').all()))}`,
-    ].join('\n'),
+  debug,
   observe,
   settle,
   // A catch-up's reads are not gated: one still running would store what the next step puts in Slack.

@@ -5,6 +5,7 @@
  */
 import type { GatedCall } from '@juno/fake-slack'
 import type { EngineOptions, RunningEngine } from '../harness'
+import { readDb } from '../scenario'
 import type { outboxReader } from './outbox-store'
 import type { TraceState } from './itf'
 
@@ -290,3 +291,13 @@ export async function settle(world: World): Promise<void> {
   await world.engine.syncIdle()
   await world.engine.handle.commandIdle()
 }
+
+export const debug = (world: World) =>
+    [
+      `  gated: ${JSON.stringify(world.engine.fake.gated().map((call) => ({ id: call.id, method: call.method, stage: call.stage, outcome: call.outcome, ts: call.args['ts'], channel: call.args['channel'] })))}`,
+      `  calls: ${world.engine.fake.calls
+        .filter((call) => call.kind === 'api' && (isAction(call.method, call.args) || isPost(world, call.method, call.args) || isLookup(call.method, call.args)))
+        .map((call) => `${call.method} ${call.args['channel']} ${call.args['ts'] ?? ''} ${call.ok ? 'ok' : call.error}`)
+        .join(', ')}`,
+      `  outbox: ${JSON.stringify(readDb(world.engine, 'user.db', (db) => db.prepare('SELECT kind, target_key, depends_on, payload_json, attempts, next_at, last_error FROM outbox').all()))}`,
+    ].join('\n')
