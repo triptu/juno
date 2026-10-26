@@ -50,7 +50,6 @@ async function drawn(win: Page): Promise<void> {
 
 longTest('scrolling a long message list and typing in its composer stay within their counted layouts', async ({ juno, win }) => {
   await openFullWindow(juno, 'Review the rollout checklist 1')
-  await juno.surface.system('activityPoll')
   await expect(juno.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1)
   const cdp = await win.context().newCDPSession(win)
   await cdp.send('Performance.enable')

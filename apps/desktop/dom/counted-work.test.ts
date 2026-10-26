@@ -42,13 +42,8 @@ async function engineAtRest(fake: FakeSlack): Promise<void> {
   }
 }
 
-/**
- * Slack shows the user active on the account button. It turns active once the shell's activity poll, every
- * 10 s, has made the engine tickle Slack, at a time that depends on the machine's load, so startup polls at
- * once, as the timer would, and waits for it, and no later step counts it.
- */
+/** Slack shows the user active on the account button, from the poll when the engine is ready, so no later step counts it. */
 async function presenceShown(juno: Juno): Promise<void> {
-  await juno.system('activityPoll')
   await expect(juno.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1)
 }
 

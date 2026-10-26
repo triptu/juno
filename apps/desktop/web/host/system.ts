@@ -62,7 +62,6 @@ export function createShell(userData: string, options: AgentOptions) {
     dockBounces: bounce.testHooks.dockBounces,
     frontmost: bounce.testHooks.frontmost,
     wake: () => { dock.refresh(); notifier.wake() },
-    activityPoll: () => activity.poll(),
   }
   const dispatch = shellDispatch({ chooseFolder: () => { const picked = folder; folder = null; return picked }, agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings: () => { settingsOpened += 1 } })
 
@@ -71,12 +70,10 @@ export function createShell(userData: string, options: AgentOptions) {
     hooks,
     connect: (next: ReturnType<typeof memoryHost>) => {
       host = next
-      next.onEngine((message) => {
-        if (message._tag === 'ready') { notifier.engineReady(); activity.poll(); pages.report() }
-        else notifier.handle(message)
-      })
-      activity.start()
+      next.onEngine((message) => notifier.handle(message))
     },
+    /** The engine has started: what main does when the engine process says `ready`. */
+    ready: () => { notifier.engineReady(); activity.start(); pages.report() },
     attach: (socket: WebSocket) => {
       const page = ++nextPage
       clients.add(socket)

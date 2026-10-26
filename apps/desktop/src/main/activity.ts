@@ -6,6 +6,8 @@
  * sends `active`. The engine then sends
  * a socket `tickle`, paced and skipped while the owner is away. An idle or
  * locked Mac sends nothing, so Slack's own timeout shows the owner away.
+ * The cycle starts when the engine is ready, so a launch reads at once,
+ * before the engine could hear it.
  *
  * No Electron import here: `index.ts` passes `powerMonitor`'s pieces in,
  * tests pass a seam.
@@ -33,9 +35,9 @@ export function createActivityWatch(deps: ActivityWatchDeps) {
     if (!deps.locked() && deps.idleSeconds() <= ACTIVE_WITHIN_SECONDS) deps.send({ _tag: 'active' })
   }
   return {
-    /** Reads once now, then every `POLL_MS`, until `stop`. */
+    /** Reads once now, then every `POLL_MS`, until `stop`. Called each time the engine is ready; a call while running starts the cycle again. */
     start(): void {
-      if (timer !== undefined) return
+      if (timer !== undefined) clearInterval(timer)
       poll()
       timer = setInterval(poll, POLL_MS)
       timer.unref()

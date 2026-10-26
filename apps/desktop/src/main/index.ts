@@ -160,8 +160,8 @@ const activity = createActivityWatch({
   locked: () => screenLocked,
   send: (message) => supervisor.send(message),
 })
-// A new engine hears at once, not at the next poll.
-supervisor.onReady(() => activity.poll())
+// Each engine hears at once, not at the next poll: after a launch Slack shows the owner active right away.
+supervisor.onReady(() => activity.start())
 
 /** Native notification permission, or the e2e stand-in. */
 const permissionForTests = testNotificationPermission()
@@ -280,7 +280,6 @@ app.whenReady().then(() => {
 
   // Fork the engine and open the window in the same tick; neither waits.
   supervisor.start()
-  activity.start()
   void providers.load()
   openWindow()
   setMenuCheckForUpdates(() => void updates.check())
@@ -375,7 +374,6 @@ if (e2e) {
       ...huddleSettingsForTests,
       slackKeychainReads,
       wake: () => { notifier.wake(); refreshDockBadge() },
-      activityPoll: () => activity.poll(),
       // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
       screenShared: (shared: boolean) => {
         sharedForTests = shared

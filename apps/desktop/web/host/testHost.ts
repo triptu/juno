@@ -177,6 +177,7 @@ async function startEngineOn(start: HostStart, options: EngineOptions, transport
       ...(clock === undefined ? {} : { clock: clock.clock }),
     },
   )
+  shell.ready()
   await shell.agent.start()
   return { engine, log, testWork: work, cookie: main.cookie }
 }

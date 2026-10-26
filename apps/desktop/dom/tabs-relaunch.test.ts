@@ -1,8 +1,9 @@
 // What a relaunch keeps (spec sections 4 and 6): every tab, pinned ones first, their topic drafts,
-// each Home tab's draft and destination, the Search tab and privacy mode; and ⌘W held down after a
-// relaunch closes a tab per press, even on tabs it has not loaded.
+// each Home tab's draft and destination, the Search tab and privacy mode, and Slack shows the owner active
+// at once (SPEC 14); and ⌘W held down after a relaunch closes a tab per press, even on tabs it has not loaded.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
+import { AUTO_AWAY_MILLIS } from '@juno/fake-slack'
 import { readUserDb, savedTabs, threadId } from '../e2e/driver/userDb'
 import { searchPage } from './driver/palette'
 import { expect } from './expect'
@@ -104,7 +105,12 @@ domTest("a relaunch keeps every tab, pinned ones first, their topic drafts, each
     .toBe(true)
   // The Search tab's session has reached the engine.
   await expect.poll(() => readUserDb(userData, fake.teamId, (db) => (db.prepare("SELECT value_json FROM prefs WHERE key = 'tabs'").get() as { value_json: string } | undefined)?.value_json ?? '')).toMatch(/"search":\{"text":"pelican".*"selected":.*"panel":true/)
-  const restarted = await relaunch()
+  // Closed long enough that Slack's own timeout shows the owner away.
+  const restarted = await relaunch({ whileClosed: () => { fake.advanceClock({ millis: AUTO_AWAY_MILLIS + 60_000 }) } })
+
+  await step('Slack shows the owner active as soon as Juno is open, not at the next activity poll', async () => {
+    await expect(restarted.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1)
+  })
 
   await step('privacy mode is still on from the first render, and the footer turns it off', async () => {
     await expect(restarted.privacy.footer).toBeVisible()
