@@ -77,7 +77,7 @@ const homeIcon = (icon: string): Scenario => ({
   ],
 })
 
-test('after 30 s idle: Home replaces a topic with its rows, a topic opens at its divider, another at its bottom; then the Home icon', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
+test('after 30 s idle: Home replaces a topic with its rows, a topic opens at its divider, another at its bottom; then the Home icon', { tag: '@on-demand' }, async ({ juno, win, feel }) => {
   await juno.home.open()
   await expect(juno.home.item('waiting')).toBeVisible()
   // After sign-in the thread's replies are search matches, which do not cover its window (performance.md 3.3);

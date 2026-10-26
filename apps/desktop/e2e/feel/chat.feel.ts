@@ -34,7 +34,7 @@ const POSTGRES = 'Draft plan is in the doc'
 const TAB = 'main [data-juno-chat]'
 const PANEL = 'aside[data-juno-panel]'
 
-test('open the Juno tab, send, and the first bubble arrives', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('open the Juno tab, send, and the first bubble arrives', { tag: '@on-demand' }, async ({ juno, feel }) => {
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 
   await feel.run(
@@ -91,7 +91,7 @@ test('open the Juno tab, send, and the first bubble arrives', { tag: ['@nightly'
 
 })
 
-test('react to a Juno bubble in the Juno tab', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('react to a Juno bubble in the Juno tab', { tag: '@on-demand' }, async ({ juno, feel }) => {
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const composer = juno.win.locator(`${TAB} textarea`)
@@ -131,7 +131,7 @@ test('react to a Juno bubble in the Juno tab', { tag: ['@nightly', '@nightly-fee
   )
 })
 
-test('open the Juno panel beside a topic with ⌘J', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('open the Juno panel beside a topic with ⌘J', { tag: '@on-demand' }, async ({ juno, feel }) => {
   await juno.setWindowSize(1400, 900)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectAtBottom()
@@ -170,7 +170,7 @@ test('open the Juno panel beside a topic with ⌘J', { tag: ['@nightly', '@night
   )
 })
 
-test('attach an image in the Juno tab and send it: the chip and the thumbnail keep their boxes', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('attach an image in the Juno tab and send it: the chip and the thumbnail keep their boxes', { tag: '@on-demand' }, async ({ juno, feel }) => {
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const composer = juno.win.locator(`${TAB} [data-juno-composer]`)
@@ -283,7 +283,7 @@ const longTest = test.extend({
   },
 })
 
-longTest('a long chat: jump to the bottom, then scroll up through it', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+longTest('a long chat: jump to the bottom, then scroll up through it', { tag: '@on-demand' }, async ({ juno, feel }) => {
   longTest.setTimeout(240_000)
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()

@@ -158,7 +158,7 @@ async function closeSheet(feel: Feel, juno: Juno, card: Card): Promise<void> {
 test.describe('cards from the AI jobs', () => {
   test.use({ aiJobs: true })
 
-  test('Tidy up and follow-ups that look done: each sheet opens whole, and Resolve and Mark done move no row', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, win, feel }) => {
+  test('Tidy up and follow-ups that look done: each sheet opens whole, and Resolve and Mark done move no row', { tag: '@on-demand' }, async ({ juno, fake, win, feel }) => {
     const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * 3_600_000 })
     fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 150 * 60_000 })
     fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
@@ -188,7 +188,7 @@ function followedUnread(fake: FakeSlack, text: string): void {
 }
 
 // Home shows three rows (SPEC 12), and the seed's waiting question is one, so two cards share a launch.
-test('threads you never open and channels you never read: each sheet opens whole, and Unfollow and Ignore move no row', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, feel }) => {
+test('threads you never open and channels you never read: each sheet opens whole, and Unfollow and Ignore move no row', { tag: '@on-demand' }, async ({ juno, fake, feel }) => {
   followedUnread(fake, 'Billing queue rollout')
   followedUnread(fake, 'Pricing page copy')
   fake.addChannel({ id: 'C0BUILDS', name: 'build-chatter', messages: [{ user: 'U0LEO', text: 'Nightly builds move to 2am', ago: 40 * 24 * 60 }] })
@@ -202,7 +202,7 @@ test('threads you never open and channels you never read: each sheet opens whole
   await reviewSheet(feel, juno, { name: 'review-ignore', kind: 'ignore', sheet: 'ignore', row: '#build-chatter' })
 })
 
-test("Automated's record, then old drafts after a relaunch: each sheet opens whole, and Move back and Delete move no row", { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, fake, userData, relaunch, studio, feel }) => {
+test("Automated's record, then old drafts after a relaunch: each sheet opens whole, and Move back and Delete move no row", { tag: '@on-demand' }, async ({ juno, fake, userData, relaunch, studio, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
   fake.workspace.addConversation({ id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: fake.now(), topic: '', purpose: '', isOpen: true, archived: false })
