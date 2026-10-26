@@ -103,31 +103,45 @@ try {
   mkdirSync(reportDir, { recursive: true })
   runLog = join(reportDir, 'run.log')
   writeFileSync(runLog, `bun run ${[options.script, ...options.args].map(quote).join(' ')}\nremote: run ${JSON.stringify({ version: 1, script: options.script, args: options.args, started: new Date(started).toISOString() })}\n`)
-  const health = checkRunner(runner)
+  // A plan's coordinator has checked the runner and its image and packed the workspace once for its jobs.
+  const inherited = process.env.JUNO_RUNNER_PARENT === '1' && process.env.JUNO_RUNNER_HEALTH ? JSON.parse(process.env.JUNO_RUNNER_HEALTH) : undefined
+  const health = inherited ?? checkRunner(runner)
   if (!health.reachable) throw new Error(`runner unreachable: ${health.reason}. ${localHint}.`)
+  runner.args = health.args ?? runner.args
   if (cancelled) throw new Error('run cancelled')
-  await ensureRunnerImage(runner, log)
-  if (cancelled) throw new Error('run cancelled')
-  if (jobs.length) {
-    renameSync(runLog, join(reportDir, 'plan.log')); runLog = join(reportDir, 'plan.log')
-    code = await runRunnerPlan(jobs, { self, root, options, log })
-  } else {
+  // The image check is an SSH round trip; packing the workspace overlaps it.
+  const image = inherited?.image === runner.image ? Promise.resolve() : ensureRunnerImage(runner, log)
+  image.catch(() => {})
+  work = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-remote-'))
+  const pack = (extra) => {
     const { files, bytes } = snapshot(root)
     log(`remote: ${files.length} files (${(bytes / 1048576).toFixed(1)} MB before compression), no secrets found`)
+    const list = join(work, 'files'), tarball = join(work, 'workspace.tgz')
+    writeFileSync(list, [...files, ...extra].join('\0'))
+    const packed = spawnSync('tar', ['-czf', tarball, '--no-xattrs', '--null', '-T', list], { cwd: root, env: { ...process.env, COPYFILE_DISABLE: '1' }, encoding: 'utf8' })
+    if (packed.status !== 0) throw new Error(`could not pack workspace: ${packed.stderr}`)
+    return tarball
+  }
+  if (jobs.length) {
+    renameSync(runLog, join(reportDir, 'plan.log')); runLog = join(reportDir, 'plan.log')
+    // A job that carries the spec cache packs its own workspace with it; the others share this one.
+    const tarball = pack([])
+    await image
+    if (cancelled) throw new Error('run cancelled')
+    const env = { JUNO_RUNNER_HEALTH: JSON.stringify({ ...health, args: runner.args, image: runner.image }), JUNO_REMOTE_TARBALL: tarball }
+    code = await runRunnerPlan(jobs, { self, root, options, log, env })
+  } else {
     if (carriesCache) {
       mkdirSync(join(root, stagedCache), { recursive: true })
       if (existsSync(specCache)) cpSync(specCache, join(root, stagedCache), { recursive: true })
-      for (const name of readdirSync(join(root, stagedCache))) files.push(`${stagedCache}/${name}`)
       options.env.push(`SPECS_CACHE_DIR=/work/${stagedCache}`)
     }
+    const shared = process.env.JUNO_RUNNER_PARENT === '1' && !carriesCache ? process.env.JUNO_REMOTE_TARBALL : undefined
+    const tarball = shared && existsSync(shared) ? shared : pack(carriesCache ? readdirSync(join(root, stagedCache)).map((name) => `${stagedCache}/${name}`) : [])
     const specsCached = carriesCache && process.env.SPECS_RUN_CACHE !== 'off' && !options.env.includes('SPECS_RUN_CACHE=off') && existsSync(specCache) && readdirSync(specCache).some((name) => name.endsWith('.json'))
     const size = runnerJobSize({ ...options, specsCached }, health.cores)
     reserved = size.reserved
-    work = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-remote-'))
-    const list = join(work, 'files'), tarball = join(work, 'workspace.tgz')
-    writeFileSync(list, files.join('\0'))
-    const packed = spawnSync('tar', ['-czf', tarball, '--no-xattrs', '--null', '-T', list], { cwd: root, env: { ...process.env, COPYFILE_DISABLE: '1' }, encoding: 'utf8' })
-    if (packed.status !== 0) throw new Error(`could not pack workspace: ${packed.stderr}`)
+    await image
     if (cancelled) throw new Error('run cancelled')
     const args = [`id=${runId}`, `cores=${reserved}`, `memory=${reserved * 3}g`, `image=${runner.image}`, 'project=juno', `wait=${options.wait}`, `command=bash scripts/remote/run.sh ${[options.script, ...options.args].map(quote).join(' ')}`, 'artifact=.remote/reports.tgz', ...options.env.map((pair) => `env=${pair}`), `env=JUNO_RUNNER_WIDE_UNIT=${size.wideUnit ? 1 : 0}`, `env=JUNO_RUNNER_PINNED=${health.pinned ? 1 : 0}`]
     log(`remote: SSH job ${runId}, ${reserved} ${health.pinned ? 'physical cores' : 'CPUs'}`)

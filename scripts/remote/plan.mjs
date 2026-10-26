@@ -42,7 +42,7 @@ export function planCores(kind, options, env = process.env, steps = []) {
   return cores
 }
 
-export async function runRunnerPlan(jobs, { self, root, options, log }) {
+export async function runRunnerPlan(jobs, { self, root, options, log, env = {} }) {
   const children = new Set()
   forwardSignals(children)
   let cancelled = false
@@ -58,7 +58,7 @@ export async function runRunnerPlan(jobs, { self, root, options, log }) {
     ]
     const child = spawn(process.execPath, [self, ...flags, 'test:plan', ...planWords(steps)], {
       cwd: root, stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, JUNO_RUNNER_PLAN: 'single', JUNO_RUNNER_PARENT: '1' },
+      env: { ...process.env, ...env, JUNO_RUNNER_PLAN: 'single', JUNO_RUNNER_PARENT: '1' },
     })
     children.add(child)
     const results = new Map()
