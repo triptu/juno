@@ -48,6 +48,8 @@ class Meter {
   renders = 0
   readonly byComponent = new Map<string, number>()
   readonly byRoute = new Map<string, Traffic>()
+  /** The counts when `settledPage` last found the page at rest, and since when they had held. */
+  rest: { readonly signature: string; readonly since: number } | undefined
 
   route(tag: string): Traffic {
     let traffic = this.byRoute.get(tag)
@@ -171,7 +173,9 @@ export function renderHook(window: Window): object {
  * `quietMillis` in a row, longer than the page's own delays (the composer
  * saves its draft 400 ms after the last key). A reply that a loaded engine
  * sends late lands before the rest, not in the next action's count. Counts
- * taken after it hold all the work an action set off.
+ * taken after it hold all the work an action set off. The counts only grow,
+ * so when they are as the last rest left them the page has been quiet since
+ * then, and the wait counts from there: a rest right after another ends at once.
  */
 export async function settledPage(window: Window, quietMillis = 600, timeoutMillis = 15_000): Promise<void> {
   const meter = meterOf(window)
@@ -181,16 +185,18 @@ export async function settledPage(window: Window, quietMillis = 600, timeoutMill
   }
   const started = Date.now()
   let last = signature()
-  let since = Date.now()
+  const busy = () => meter.posts > 0 || meter.unanswered.size > 0
+  let since = meter.rest?.signature === last && !busy() ? meter.rest.since : Date.now()
   while (Date.now() - since < quietMillis) {
     if (Date.now() - started > timeoutMillis) throw new Error('the page did not come to rest')
     await new Promise((resolve) => setTimeout(resolve, 25))
     const now = signature()
-    if (now !== last || meter.posts > 0 || meter.unanswered.size > 0) {
+    if (now !== last || busy()) {
       last = now
       since = Date.now()
     }
   }
+  meter.rest = { signature: last, since }
 }
 
 /** A seeded `Math.random` for the page (mulberry32), on the window only: the realm's `Math` stays as it was. */

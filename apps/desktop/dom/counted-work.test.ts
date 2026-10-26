@@ -44,10 +44,13 @@ async function engineAtRest(fake: FakeSlack): Promise<void> {
 
 /**
  * Slack shows the user active on the account button. It turns active once the shell's activity poll, every
- * 10 s, has made the engine tickle Slack, at a time that depends on the machine's load, so startup counts wait
- * for it and no later step counts it.
+ * 10 s, has made the engine tickle Slack, at a time that depends on the machine's load, so startup polls at
+ * once, as the timer would, and waits for it, and no later step counts it.
  */
-const presenceShown = (juno: Juno) => expect(juno.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1, { timeout: 30_000 })
+async function presenceShown(juno: Juno): Promise<void> {
+  await juno.system('activityPoll')
+  await expect(juno.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1)
+}
 
 /** `action`, then everything it set off, counted on the page. */
 async function measured(app: () => DomApp, action: () => Promise<void>): Promise<PageWork> {
@@ -127,10 +130,9 @@ domTest('startup, a topic opened and opened again, tabs, typing, a send and a li
 }, { counted: true })
 
 domTest('the sidebar of 300 conversations: its first rows from the cache, and one live message renders one row', async ({ juno, app, fake, relaunch, step }) => {
+  // The first sync of 300 conversations is setup, not counted: the app quits once signed in, and the engine
+  // finishes the sync with no page open, which would draw every row as it came, before the page opens again.
   await juno.signIn()
-  await juno.sidebar.expectRows()
-  // The first sync of 300 conversations is setup, not counted; beside a full lane's other workers it takes longer than the usual wait.
-  await juno.expectEngineLive(100_000)
 
   await step('startup: a relaunch to the first rows from the cache, at rest', async () => {
     juno = await relaunch({ beforeOpen: () => engineAtRest(fake) })

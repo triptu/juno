@@ -375,6 +375,7 @@ if (e2e) {
       ...huddleSettingsForTests,
       slackKeychainReads,
       wake: () => { notifier.wake(); refreshDockBadge() },
+      activityPoll: () => activity.poll(),
       // The screen watch's seam: says whether another app is capturing the screen, and polls at once.
       screenShared: (shared: boolean) => {
         sharedForTests = shared

@@ -18,5 +18,7 @@ export interface SystemHooks {
   dockBounces: () => number
   frontmost: (value: boolean) => void
   wake: () => void
+  /** Reads the owner's activity now and tells the engine, as the 10 s poll does. */
+  activityPoll: () => void
 }
 export type SystemCall = { [K in keyof SystemHooks]: { readonly name: K; readonly args: Parameters<SystemHooks[K]> } }[keyof SystemHooks]

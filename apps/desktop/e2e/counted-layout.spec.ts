@@ -7,7 +7,7 @@
 // every picture in view has loaded and the page is idle, after a first pass over the same rows, so the
 // counts do not depend on frame timing: layouts and mutations are the same in every run, style
 // recalculations within one. Work that comes by timing stays out: counting starts once Slack shows the user
-// active, which happens after the shell's 10 s activity poll, and mutations are counted in the open topic only,
+// active, which the shell's 10 s activity poll sets off (the test polls at once), and mutations are counted in the open topic only,
 // not in the sidebar, whose sync cycles mark it busy on their own schedule. Budgets are today's counts plus a
 // little headroom; a failure prints the counts and the mutations.
 import type { CDPSession, Page } from '@playwright/test'
@@ -50,7 +50,8 @@ async function drawn(win: Page): Promise<void> {
 
 longTest('scrolling a long message list and typing in its composer stay within their counted layouts', async ({ juno, win }) => {
   await openFullWindow(juno, 'Review the rollout checklist 1')
-  await expect(juno.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1, { timeout: 30_000 })
+  await juno.surface.system('activityPoll')
+  await expect(juno.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1)
   const cdp = await win.context().newCDPSession(win)
   await cdp.send('Performance.enable')
   await juno.topic.root.evaluate((view) => {

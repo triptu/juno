@@ -62,6 +62,7 @@ export function createShell(userData: string, options: AgentOptions) {
     dockBounces: bounce.testHooks.dockBounces,
     frontmost: bounce.testHooks.frontmost,
     wake: () => { dock.refresh(); notifier.wake() },
+    activityPoll: () => activity.poll(),
   }
   const dispatch = shellDispatch({ chooseFolder: () => { const picked = folder; folder = null; return picked }, agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings: () => { settingsOpened += 1 } })
 
