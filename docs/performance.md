@@ -417,9 +417,63 @@ The `Juno mention typing` scenario types the same "@ma " ten times in the Juno t
 | Engine query timing | The `meta.queryMs` field, and the engine benchmarks in `packages/engine/test/perf/*-large.perf.ts`. |
 | By hand | `bun run dev`, open DevTools, record the Performance panel while repeating the interaction 5 times. Read the Juno track, the React tracks and the LoAF entries. |
 
+### Counted budgets
+
+Tushar, 10-26: "count work instead of timing it ... timing is flaky anyway depends on cpu state, we can even count renders/cpu instructions whatever". Every run, the full run included, checks counted budgets: the work a main path does, counted, against a fixed number. A count does not depend on the machine, its clock or its load, so a budget is today's count with a little headroom (about 10 %, or 2 under 20) and fails only when the work grows. Timed (stopwatch) perf, section 7.3, runs on demand.
+
+**What is counted, and where.** Each count sits in the cheapest lane that sees it.
+
+| Lane | Counts | How | File |
+| --- | --- | --- | --- |
+| Engine flow (`bun test`) | SQL statements run and rows they returned, by statement text | `packages/engine/test/sqlWork.ts` wraps `node:sqlite`'s statement methods in the test process | `packages/engine/test/flows/counted-work.flow.test.ts` |
+| DOM lane | React commits and component renders, by component name; port requests, live messages and replies, and bytes each way, by RPC route and bridge channel | A React DevTools hook on the window (`onCommitFiberRoot`, which production React calls): a component rendered when it mounted or has React's PerformedWork flag, and subtrees React did not visit are skipped (`apps/desktop/dom/work.ts`). The page's socket counts frames (`dom/socket.ts`) | `apps/desktop/dom/counted-work.test.ts` |
+| Browser lane | Layouts and style recalculations (CDP `Performance.getMetrics`: `LayoutCount`, `RecalcStyleCount`) and DOM mutations (a `MutationObserver`) | Chromium's own counters | `apps/desktop/e2e/counted-layout.spec.ts` |
+
+**Why the counts hold still.** Work that runs on a timer or by chance of timing is kept out of the counted window, never averaged over:
+
+- Engine: engine time is frozen after boot (`controlledClock`) and moves in 1 s steps, with the fake's answers and the socket's frames landing between steps, until the action's outcome shows and two steps run no SQL. Periodic work (the socket keep-alive, the title, Home and Automated ticks) is set to a day. Before the first count, sleeps started before the freeze end on live time and Automated's first pass over every conversation is run, so boot's leftovers fall in no counted step. This found that every unknown socket frame opened an empty write transaction; it no longer does.
+- DOM lane: with `domTest(..., { counted: true })` the engine's frames reach the page one at a time, each after React has nothing scheduled, so two frames never share a commit by chance; the page's `Math.random` is seeded; a step ends after 600 ms with no commit or frame, longer than the page's own delays (the draft save waits 400 ms). Bytes count every number, run of digits and UUID at one width, so a later timestamp or a new message id is not more traffic; the RPC keep-alive and stream acknowledgements are left out. Startup is a relaunch counted from the new page's first frame to rest, with the engine's catch-up done before the page opens and the user's presence shown, since both arrive at times that depend on load. Typing counts the keys until the field shows them; the debounced draft save is counted on its own, as requests.
+- Browser lane: the list moves by a fixed distance per step, programmatically, after a first pass over the same rows (pictures loaded, row sizes kept), and each step waits for two frames, every picture in view, an idle callback and two more frames.
+
+Measured 10-26: the engine's counts were the same in three runs on this Mac and in laptop runs at 1, 2 and 4 cores (the same work on less CPU), on macOS and Linux alike. The DOM lane's were the same in laptop runs at 1, 2 and 4 cores, except startup's request count, which moved by one when Home's randomly picked picture had to be fetched (the seed cannot fix how many random numbers the page drew before the pick); outgoing bytes at startup are not budgeted for the same reason. In the browser lane layouts and mutations were the same in six runs; style recalculations during the scroll read 30 to 32.
+
+**The budgets.** Count on 10-26, then budget.
+
+| Path | Engine (statements / rows) | Renderer (commits / renders; requests / messages; bytes in / out) | Layout |
+| --- | --- | --- | --- |
+| Startup to the first rows, at rest | Sidebar first run: 8 / 31 → 10 / 35 | 34 / 478; 42 / 42; 38,190 B in → 38 / 526; 47 / 47; 42,009 | |
+| Topic open, cold | #eng's Main: 32 / 45 → 36 / 50 | 10 / 405; 12 / 13; 8,823 / 1,262 B → 12 / 446; 14 / 15; 9,706 / 1,389 | |
+| Topic open again | 31 / 40 → 35 / 44 | 5 / 316; 4 / 5; 470 / 489 B → 7 / 348; 6 / 7; 517 / 538 | |
+| Tab switch | | 3 / 58; 3 / 4; 492 / 507 B → 5 / 64; 5 / 6; 542 / 558 | |
+| Typing 21 keys | | 42 / 105; no request → 47 / 116; 0 / 0; then one draft save | 44 layouts, 25 styles, 45 mutations → 49 / 28 / 50 |
+| Send | 107 / 134 → 118 / 148 | 8 / 260; 4 / 12; 5,785 / 515 B → 10 / 286; 6 / 14; 6,364 / 567 | |
+| A live message or reply | Message 49 / 92 → 54 / 102; reply 103 / 156 → 114 / 172 | Reply: 6 / 250; 1 / 13; 8,167 / 92 B → 8 / 275; 3 / 15; 8,984 / 102 | |
+| Scrolling a message list, 12 steps of 180 px | | | 6 layouts, 30–32 styles, 1 mutation → 8 / 36 / 3 |
+| Sidebar of 300 conversations | First run 8 / 348 → 10 / 383; one live message 51 / 619 → 56 / 681 | Startup 34–36 / 2,821–2,829; 43 / 43–44 → 40 / 3,112; 48 / 49; one live message 1 / 17; 0 / 4; 7,412 B → 3 / 19; 0 / 6; 8,154 | |
+
+**What each catches.** Each was put in by hand on 10-26 and failed its budget (the patches are in `/Volumes/AgentWork/scratch/counted-perf/`):
+
+| Regression | Failed on |
+| --- | --- |
+| The sidebar query reads each row's conversation with a query of its own | Large sidebar first run: 295 statements against 10; default sidebar 29 against 10 |
+| The messages window counts each message's reactions with a query of its own | Topic open, cold: 41 statements against 36 |
+| A message event reads the whole channel's history again | Send: 182 rows against 148 |
+| Each sidebar row reads the whole list atom instead of its own row | One live message in 300 conversations: 302 renders against 19 (287 rows); tab switch 79 against 64 |
+| A live list sends every row in every delta | One live message: 279,054 bytes in against 8,154; topic open 30,198 against 9,706 |
+| The topic view keeps the composer's text and hands it to the message list; the draft saves on every key | Typing: 819 renders against 116 (every message rendered on each key), 21 requests against 0 |
+| A scroll handler writes a style to every drawn row and reads its height | Scroll: 714 layouts against 8, 2,491 style recalculations against 36 |
+
+Taking `memo` off `TopicRow` changed no count: the React Compiler already keeps each row's element, so the rows still skip. The budget counts what React does, not what the code says.
+
+**Cost.** The engine file is two tests, about 3 s on this Mac. The DOM file is two tests, 9 to 14 s each on two laptop cores. The browser spec is one test of 4 to 6 s. Counting itself is a few increments per statement, commit or frame.
+
+**Raising or lowering a budget on purpose.** A failure names the action, every count over its budget, and what the counts were made of: the statements by text with their runs and rows, the components that rendered most, the routes with their requests, messages and bytes. `JUNO_WORK_COUNTS=1` prints every count in the `bun test` lanes (`detail` adds what each was made of; `bun run remote --env JUNO_WORK_COUNTS=1 test:dom --files ...`); the browser lane prints its counts when it fails. When the work grew on purpose, set the budget to the new count plus the headroom in the same change and say why in the commit. A count well under its budget prints a line saying to lower it; lower it in the change that made the work smaller. A budget that fails on an action nobody changed points at something running by timing in its window: find it and keep it out of the window, do not widen the budget.
+
+**Not counted.** CPU instructions: Valgrind is tens of times slower than the code it runs and Linux `perf` counters need a privileged container, and V8's `--cpu-prof` ticks are samples, not counts. V8's precise coverage gives exact function call counts, but they change with any refactor, and a test that changes with every code change gives no signal.
+
 ### 7.3 The perf harness
 
-`bun run perf` runs the agent's `*.perf.ts` files (`bun test`) and the engine's perf and bench checks first, then the desktop scenarios in `apps/desktop/e2e/perf.spec.ts` and `*.perf.spec.ts`, under the exclusive heavy lock. `bun run perf --unit` runs only the package budgets; `bun run perf -g "topic view"` runs only matching desktop scenarios, and `--with-unit` adds the package budgets to such a selection. Normal unit and e2e runs do not assert latency budgets. Their readiness timeouts still fail hung operations, and query-count, payload and correctness assertions remain in normal runs. The remote heavy idle smoke check is the deliberate exception: it checks gross resource growth, not fine performance. A scenario that did not run fails the run (`e2e/no-skips.ts`): Playwright counts a skipped test as a pass, and in a serial group a failed setup skips every scenario after it, so a setup that broke once left topic opening, scrolling and peek unmeasured with only the setup reported.
+`bun run perf` runs the agent's `*.perf.ts` files (`bun test`) and the engine's perf and bench checks first, then the desktop scenarios in `apps/desktop/e2e/perf.spec.ts` and `*.perf.spec.ts`, under the exclusive heavy lock. `bun run perf --unit` runs only the package budgets; `bun run perf -g "topic view"` runs only matching desktop scenarios, and `--with-unit` adds the package budgets to such a selection. Normal unit and e2e runs do not assert latency budgets. Their readiness timeouts still fail hung operations, and the counted budgets (above), query-count, payload and correctness assertions remain in normal runs. The remote heavy idle smoke check is the deliberate exception: it checks gross resource growth, not fine performance. A scenario that did not run fails the run (`e2e/no-skips.ts`): Playwright counts a skipped test as a pass, and in a serial group a failed setup skips every scenario after it, so a setup that broke once left topic opening, scrolling and peek unmeasured with only the setup reported.
 
 **Two ways to run it.** The budgets in section 1 are product targets on the reference Mac. The nightly checks for regressions on the laptop instead, where Electron draws to an Xvfb display in a Linux container and its numbers differ from the Mac's:
 
@@ -457,10 +511,10 @@ the top, fit the reserved space, and never move or disappear.
 ### 7.4 Review checklist for any UI, list, IPC, query or startup change
 
 1. Does the interaction paint on the next frame? Trace it once.
-2. Does the change add work to scroll, to a tick, or to every row? If so, measure the scroll scenario.
+2. Does the change add work to scroll, to a tick, or to every row? The counted budgets fail on more statements, renders, messages or layouts; for time, measure the scroll scenario.
 3. Does anything new run before the first sidebar paint? It must be on the deferred list or justified.
 4. Does the query have an index and a window? Run the plan test.
-5. Does a live query message grow? Check the size budget.
+5. Does a live query message grow? The counted budgets count its bytes; check the size budget too.
 6. Did memory or bundle size move? Check the report.
 
 ## 8. Known gaps

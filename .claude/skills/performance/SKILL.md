@@ -60,12 +60,22 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 
 ## Measure changes to a measured path
 
+Count work; do not time it (Tushar, 10-26: "count work instead of timing it ... timing is flaky anyway depends on cpu state"). Counted budgets run in every run and give the same numbers on any machine under any load (`docs/performance.md`, "Counted budgets"):
+
+- Engine SQL, statements and rows per path: `packages/engine/test/flows/counted-work.flow.test.ts` (engine time frozen, stepped by the test).
+- Renderer React commits and renders by component, and port requests, messages and bytes by route: `apps/desktop/dom/counted-work.test.ts` (`domTest(..., { counted: true })`, `dom/work.ts`).
+- Layouts, style recalculations and DOM mutations per scroll step and keystroke: `apps/desktop/e2e/counted-layout.spec.ts` (CDP `Performance.getMetrics`).
+- A new main path gets a counted step in the cheapest lane that sees it, counted from rest to rest, with nothing on a timer inside the window; prove it by putting a regression in and seeing it fail. Show the counts are the same over three runs at different loads (`bun run remote --cores 1|2|4`).
+- A budget fails only when work grows. If the growth is on purpose, raise the budget to the new count plus about 10 % in the same change and say why; lower it when the run prints that a count is well under. `JUNO_WORK_COUNTS=1` prints the counts, `detail` what they are made of.
+
+Beside the counts (timed perf runs on demand):
+
 - Instrument with `@juno/state/perf.ts` marks (`juno.topic-open`, `juno.tab-switch`, ...) so the DevTools "Juno" track and the harness see the change.
 - Bundle: `bun run build` runs `scripts/check-bundle-size.mjs` (initial JS 1.1 MB, CSS 200 KB minified). Phosphor icons ship every weight in one module; `phosphorWeights` in `apps/desktop/renderer.vite.ts` drops thin and light at build time (about 66 KB, measured 10-15), and duotone from every icon `packages/ui/src/duotone.ts` does not import (about 37 KB, 10-17), so a new `IconWeight` must be added to its list too, and a new duotone icon goes in `duotone.ts`.
 - New per-row, per-frame or startup work (`bun run affected --plan` names matching scenarios from `PERF_INTERACTIONS` in `scripts/test-areas.mjs`): run the matching scenario on the laptop with `bun run remote --cores 2 perf -g "<name>"` (`apps/desktop/e2e/perf.spec.ts`). It fails on a regression of a steady metric against the laptop's baseline (`perf-baseline.json`, `docs/performance.md` 7.3); the nightly runs every scenario. The absolute budgets above are checked on the Mac by hand (`bun run perf -g "<name>"`, queued on the heavy-job lock), when Tushar asks or before a release. A change that moves a number on purpose refreshes the baseline with `bun scripts/perf-baseline.mjs update` after ten or more laptop runs, with the reason in the commit. To find the cost, add `JUNO_PERF_TRACE=<dir> JUNO_UNMINIFIED=1` and read the result with `bun scripts/perf-trace.mjs` (`docs/performance.md` 7.3). Drive clicks with the driver's `press`: a pointerup in the next frame defers the measure's end by a frame.
 - A list or scroll change is tested in a topic past the window cap (more messages than the loaded window), with real gestures: trackpad momentum, fingers resting on the trackpad, a held scrollbar thumb. Reaching the bottom with a programmatic jump, or a fake topic that never fills the window, misses whole classes of bugs.
 - For a change to a measured interaction, `bun run affected` runs its feel scenario on the laptop (`test:desktop --project=feel`); a failed scenario's filmstrip is in `apps/desktop/test-results/feel-report/` of the run's results. `bun run test:feel -g "<name>"` records it in Electron on the Mac with full videos, when Tushar asks.
-- Query change: run the plan test and the engine benchmark.
+- Query change: the counted SQL budgets and the plan test; the engine benchmark on demand.
 - Other UI changes are covered by the nightly's laptop perf job and its feel scenarios, and by perf's absolute budgets and `test:feel` in `bun run verify:main --with-mac` when Tushar asks. If unsure, say so in your report.
 - By hand: `bun run dev`, DevTools Performance panel, repeat the interaction 5 times, read the Juno and React tracks and the long-animation-frame entries (`window.__juno.perf`).
 
