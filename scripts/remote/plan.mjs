@@ -12,8 +12,8 @@ const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e',
 // (docs/development.md, "Job sizes"). A step not named here joins the unit job.
 export const fullRunJobs = [
   { kind: 'desktop', cores: 3, scripts: ['test:desktop', 'test:browser', 'test:electron', 'test:e2e'] },
-  { kind: 'unit', cores: 3, scripts: ['test', 'test:dom', 'specs:conformance', 'specs:check'] },
-  { kind: 'gallery', cores: 2, scripts: ['test:gallery'] },
+  { kind: 'unit', cores: 2, scripts: ['test', 'test:dom', 'specs:check'] },
+  { kind: 'gallery', cores: 3, scripts: ['specs:conformance', 'test:gallery'] },
 ]
 
 export function runnerPlanJobs(options, env = process.env) {

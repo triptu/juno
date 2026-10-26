@@ -65,8 +65,8 @@ test('a full run splits into its measured jobs; other plans keep two four-core j
   const scripts = { 'test:dom': 'x', 'test:browser': 'x', 'test:electron': 'x' }
   const full = runnerPlanJobs({ script: 'test:plan', env: [], args: fullSuites(scripts, { seed: 1, testSeed: 2 }).flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words]) }, {})
   assert.deepEqual(full.map((job) => [job.kind, job.cores, job.steps.map((step) => step.script)]), [
-    ['unit', 3, ['test', 'test:dom', 'specs:check', 'specs:conformance']],
-    ['gallery', 2, ['test:gallery']],
+    ['unit', 2, ['test', 'test:dom', 'specs:check']],
+    ['gallery', 3, ['specs:conformance', 'test:gallery']],
     ['desktop', 3, ['test:browser', 'test:electron']],
   ])
   assert.equal(full.reduce((sum, job) => sum + job.cores, 0), 8)
