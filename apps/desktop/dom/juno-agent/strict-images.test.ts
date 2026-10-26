@@ -1,34 +1,21 @@
-// Images for Juno (SPEC 12 "Writing", 13.1): attached on Home with Juno chosen, or in the Juno tab,
-// they go to the chat model as image parts and show as thumbnails on the owner's bubble. A file
-// Juno does not read stays in the composer with a line saying so, and so does an image while the
-// chat model cannot read images.
+// Images for Juno (SPEC 12 "Writing", 13.1): attached on Home with Juno chosen, or in the Juno tab, they go to the
+// chat model as image parts and show as thumbnails on the owner's bubble. A file Juno does not read stays in the
+// composer with a line saying so, and so does an image while the chat model cannot read images.
 import { chatCopy } from '@juno/agent-contract'
+import { answer, startScriptedModel, type CatalogueModel, type ScriptedModel } from '../../e2e/juno-agent/model'
 import { brief, chart, drop, paste } from '../attach'
-import { openChat, openSettings, readySynced as ready } from './agent'
-import { answer, expect, JunoChatPane, test as base } from './chat'
-import { startScriptedModel, type CatalogueModel, type ScriptedModel } from './model'
+import { JunoChatPane, openChat, openSettings, readySynced } from '../driver/agent'
+import { expect } from '../expect'
+import { domTest } from '../test'
 
 /** Grok reads text only here; the other models read images too, as the fake's catalogue says. */
 const textOnlyGrok = (models: ReadonlyArray<CatalogueModel>): ReadonlyArray<CatalogueModel> =>
   models.map((model) => (model.id.startsWith('x-ai/grok') ? { ...model, architecture: { input_modalities: ['text'], output_modalities: ['text'] } } : model))
 
-const test = base.extend<{ readonly model: ScriptedModel }>({
-  // oxlint-disable-next-line no-empty-pattern
-  model: async ({}, use) => {
-    const model = await startScriptedModel({ answer, catalogue: textOnlyGrok })
-    await use(model)
-    await model.close()
-  },
-})
-
-test.use({ synced: true })
-
-test.describe.configure({ timeout: 120_000 })
-
 const chatRequests = (model: ScriptedModel) => model.requests.filter((request) => !request.compaction)
 
-test('an image attached on Home goes to Juno as an image part and a PDF stays on Home; the Juno tab takes a dropped image on its own, and with a model that reads text only the image stays and the line says why', async ({ juno, model }) => {
-  await ready(juno)
+domTest<ScriptedModel>('an image attached on Home goes to Juno as an image part and a PDF stays on Home; the Juno tab takes a dropped image on its own, and with a model that reads text only the image stays and the line says why', async ({ juno, model }) => {
+  await readySynced(juno)
   const { write, tabs } = juno
   await write.expectDestination('Juno')
   // The attach button is there with Juno chosen.
@@ -84,4 +71,4 @@ test('an image attached on Home goes to Juno as an image part and a PDF stays on
   expect(chatRequests(model).slice(before).every((request) => request.images.length === 0)).toBe(true)
   await expect(again.root.locator('[data-juno-composer] [data-attachment]')).toHaveCount(1)
   await expect(note).toBeVisible()
-})
+}, { model: () => startScriptedModel({ answer, catalogue: textOnlyGrok }), timeout: 120_000 })

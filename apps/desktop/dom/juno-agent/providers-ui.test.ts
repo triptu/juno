@@ -1,6 +1,6 @@
 // Setting up a model provider (SPEC 13.10): "Set up Juno" right after the first sign-in, and from
 // "Juno needs a model" an OpenAI-compatible endpoint that lists no models takes a typed model id, and
-// Remove stops the agent. Skip for now is in `e2e/juno-agent/providers-ui.spec.ts`.
+// Remove stops the agent. Skip for now is in `strict-provider.test.ts`.
 import { startFakeOpenAi } from '@juno/agent-testing/openai'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { hooks } from '../../e2e/hooks'

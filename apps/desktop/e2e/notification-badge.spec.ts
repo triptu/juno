@@ -15,22 +15,8 @@ const badgeTest = test.extend({
 
 // The dot's rules (unread DMs, group DMs and mentions through reads, Notify me, kept-out views, Automated) are in the
 // engine's notifications flow test; the host sends the dot in the DOM lane's notifications test, and what it does across
-// an engine restart is in the restart journey (juno-agent/crash.spec.ts).
-
-// No prompt during onboarding; the first Home view after it asks, before any banner has been shown.
-badgeTest('no permission prompt during onboarding, and the first Home view asks before any notification is shown', async ({ juno }) => {
-  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
-  await juno.signIn({ skipSetUp: false })
-  await expect(juno.setUp).toBeVisible()
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-  expect(await juno.surface.system('notificationRequests')).toBe(0)
-  await juno.skipSetUp()
-  await juno.waitForSync()
-  await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
-  expect(await juno.osNotifications()).toEqual([])
-  await juno.openNotifications()
-  await expect(juno.notifications.root.getByRole('status', { name: 'Notification permission' })).toHaveCount(0)
-})
+// an engine restart is in the restart journey (juno-agent/crash.spec.ts). No prompt during onboarding, and the first
+// Home view asking, are in the DOM lane (`dom/strict-notification-prompt.test.ts`).
 
 badgeTest('a denied request is remembered across a full app restart', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
   const options = { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, notificationInitial: 'notDetermined' as const, notificationResponse: 'denied' as const }

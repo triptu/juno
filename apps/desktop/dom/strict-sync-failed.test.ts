@@ -1,13 +1,12 @@
+// A first sync that keeps failing says why (SPEC section 5, item 5): the card at the sidebar's foot and its Copy log.
+// Which phase and reason the engine reports, across retries and for a boot that never reaches Slack, is in
+// packages/engine/test/flows/first-sync.flow.test.ts.
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { expect, test } from './fixtures'
+import { expect } from './expect'
+import { domTest } from './test'
 
-// A first sync that keeps failing says why (SPEC section 5, item 5): the card and
-// its Copy log. Which phase and reason the engine reports, across retries and
-// for a boot that never reaches Slack, is in packages/engine/test/flows/first-sync.flow.test.ts.
-
-test('a boot Slack answers with data Juno cannot read shows the sync failure and copies the log', async ({ juno, fake, userData }) => {
-  test.setTimeout(90_000)
+domTest('a boot Slack answers with data Juno cannot read shows the sync failure and copies the log', async ({ juno, fake, userData }) => {
   fake.forceMalformed({ method: 'client.userBoot', times: 1_000 })
   await juno.signIn()
   const card = juno.sidebar.root.locator('[data-sync-status]')
@@ -19,10 +18,9 @@ test('a boot Slack answers with data Juno cannot read shows the sync failure and
   await card.getByRole('button', { name: 'Copy log' }).click()
   await juno.expectToast('Copied the log')
   const copied = await juno.clipboard()
-  const version = juno.surface.kind === 'web' ? 'web' : await juno.app.evaluate(({ app: electron }) => electron.getVersion())
   expect(copied).toContain('Juno sync log')
-  expect(copied).toContain(`Juno ${version} on `)
+  expect(copied).toContain('Juno web on ')
   expect(copied).toMatch(/on (macOS|linux|darwin)/)
   expect(copied).toContain('Sync: failed (SlackDecodeError, client.userBoot)')
   expect(copied).toMatch(line)
-})
+}, { synced: false, timeout: 90_000 })
