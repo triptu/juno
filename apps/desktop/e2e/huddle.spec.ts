@@ -40,12 +40,13 @@ syncedTest('someone shares their screen: the bar says so, the tab shows it, two 
     const stack = win.locator(faces)
     await expect(stack.locator(':scope > span')).toHaveCount(2)
 
-    // Maya shares: the bar says so at once, and nothing in it moves or changes size.
+    // Maya shares: the bar says so at once, and nothing in it moves or changes size. Only the bar is watched: the
+    // sidebar is still taking in the joins above, which reach it through the engine, apart from the faces.
     const before = await bar.boundingBox()
     await expectStableAnchor(win, faces, async () => {
       await startShare(win, 'U0MAYA')
       await expect(bar).toContainText('Maya is sharing')
-    })
+    }, { within: '[data-huddle-bar]' })
     expect(await bar.boundingBox()).toEqual(before)
     // With no tab showing it, the share is not played.
     expect(await sharesReady(win)).toEqual([false])
