@@ -13,7 +13,7 @@ import { claimQueue, openState, readRoutes, type Route } from './support'
  * styles and dispatching the events React listens to, with transitions off
  * (`checkForcedInteractions` in packages/testing says what it cannot see).
  * Every box is compared after each step, as the guard does. It takes about a
- * fifth of a second a state, against two for the real walk: use it to check a
+ * fifth of a second a state, against one CPU-second for the real walk: use it to check a
  * broad change everywhere before the full walk. Ordinary runs do not need it,
  * since the walk's records already re-walk every state whose inputs changed.
  * Its self-tests run every time.
