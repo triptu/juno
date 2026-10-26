@@ -167,9 +167,11 @@ function focusAttributes() {
 /**
  * The touches a person makes, as the browser would show them: the pseudo-class attributes where it would match
  * (the element under the point and its ancestors for hover and press, the active element and its ancestors for
- * focus) and the pointer, mouse, key and focus events it would fire.
+ * focus) and the pointer, mouse, key and focus events it would fire. Leaving moves the pointer off the root but
+ * not off the page, as the real-input walk does, so the root's ancestors stay hovered: taking hover off the
+ * document element restyles the whole document, twice for every element touched.
  */
-function touches(focus: (keyboard: boolean) => void) {
+function touches(rootEl: HTMLElement, focus: (keyboard: boolean) => void) {
   let keyboard = false
   const chain = (el: Element): Element[] => {
     const out: Element[] = []
@@ -197,7 +199,7 @@ function touches(focus: (keyboard: boolean) => void) {
       each('mouseenter', outward.toReversed(), x, y)
       fire('pointermove', hit, x, y)
       fire('mousemove', hit, x, y)
-      for (const el of outward) el.setAttribute('data-juno-hover', '')
+      for (const el of outward) if (!el.hasAttribute('data-juno-hover')) el.setAttribute('data-juno-hover', '')
     },
     focus(element: HTMLElement) {
       const keyTarget = document.activeElement ?? document.body
@@ -229,7 +231,8 @@ function touches(focus: (keyboard: boolean) => void) {
       each('pointerleave', outward, x, y)
       fire('mouseout', hit, x, y)
       each('mouseleave', outward, x, y)
-      clear('data-juno-hover')
+      const page = new Set(chain(rootEl).slice(1))
+      for (const el of Array.from(document.querySelectorAll('[data-juno-hover]'))) if (!page.has(el)) el.removeAttribute('data-juno-hover')
     },
   }
 }
@@ -252,7 +255,7 @@ async function runForced(arg: { root: string; targets: string; skipWithin: strin
   const pseudoStarted = performance.now()
   const unforced = h.forcePseudoClasses()
   const pseudo = performance.now() - pseudoStarted
-  const touch = h.touches(h.focusAttributes())
+  const touch = h.touches(rootEl, h.focusAttributes())
   const settling = h.settler(arg.pending, new Set(document.getAnimations()), touch.syncFocus, h.forcePseudoClasses)
   try {
     const picked = h.sampleTargets(rootEl, arg.targets, arg.skipWithin, arg.max)
