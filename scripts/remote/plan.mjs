@@ -9,11 +9,6 @@ import { forwardSignals } from './children.mjs'
 // unit tests, the DOM lane and the gallery. Smaller jobs each left one long suite on too few cores.
 // A release's nightly tests (test:nightly) join the desktop job, which has the builds.
 const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:nightly', 'test:e2e', 'specs:check', 'specs:conformance']
-// A nightly (docs/development.md, "Nightly runs"): each perf part starts a two-core job alone, since its baseline is
-// for two cores and one worker, and that job then runs short serial steps. The rest share a four-core job with its
-// lanes at once: the gallery walk mostly waits for frames, and the spec check fills those threads at a lower priority.
-const nightlyJobs = { 'perf:part1': 'perf1', test: 'perf1', 'test:dom': 'perf1', 'perf:part2': 'perf2', 'specs:conformance': 'perf2', 'test:electron': 'perf2' }
-const nightlyCores = { perf1: 2, perf2: 2, wide: 4 }
 
 export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
@@ -22,17 +17,13 @@ export function runnerPlanJobs(options, env = process.env) {
   // An uncached gallery walk (a nightly, --no-cache) is about half of all the CPU: it gets a job of
   // its own, and the other job takes every other step.
   const fullWalk = steps.some((step) => step.script === 'test:gallery' && step.env.GALLERY_SHIFT_ALL === '1')
-  const nightly = steps.some((step) => step.script.startsWith('perf:part'))
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
-    const kind = nightly ? nightlyJobs[step.script] ?? 'wide'
-      : fullWalk ? step.script === 'test:gallery' ? 'gallery' : 'desktop' : desktopJob.includes(step.script) ? 'desktop' : 'unit'
+    const kind = fullWalk ? step.script === 'test:gallery' ? 'gallery' : 'desktop' : desktopJob.includes(step.script) ? 'desktop' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
-    // Beside the spec check, the walk gets one walker per thread of its four cores rather than six (workers.sh).
-    const env = kind === 'wide' && step.script === 'test:gallery' ? { GALLERY_WORKERS: '8', ...step.env } : step.env
-    groups.get(kind).push({ ...step, env, index })
+    groups.get(kind).push({ ...step, index })
   }
-  return groups.size > 1 ? [...groups].map(([kind, group]) => ({ kind, steps: group, ...(nightly ? { cores: nightlyCores[kind], overlap: kind === 'wide' } : {}) })) : []
+  return groups.size > 1 ? [...groups].map(([kind, group]) => ({ kind, steps: group })) : []
 }
 
 export const planWords = (steps) => steps.flatMap((step, index) => [
@@ -43,10 +34,10 @@ export const planWords = (steps) => steps.flatMap((step, index) => [
 export const defaultPlanCores = (kind, steps) =>
   kind === 'desktop' || steps.some((step) => step.script === 'test:dom' || step.script === 'test:gallery') ? 4 : undefined
 
-export function planCores(kind, options, env = process.env, steps = [], planned = undefined) {
+export function planCores(kind, options, env = process.env, steps = []) {
   const key = `JUNO_RUNNER_${kind.toUpperCase()}_CORES`
   const value = options.env.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
-  const cores = value === undefined ? planned ?? options.cores ?? defaultPlanCores(kind, steps) : Number(value)
+  const cores = value === undefined ? options.cores ?? defaultPlanCores(kind, steps) : Number(value)
   if (cores !== undefined && (!Number.isInteger(cores) || cores < 1)) throw new Error(`${key} must be a positive whole number`)
   return cores
 }
@@ -59,16 +50,16 @@ export async function runRunnerPlan(jobs, { self, root, options, log, env = {} }
   let cancelled = false
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = true })
   log(`remote: SSH plan in ${jobs.length} jobs: ${jobs.map((job) => job.kind).join(', ')}; each waits for runner capacity`)
-  const codes = await Promise.all(jobs.map(({ kind, steps, cores: planned, overlap }) => new Promise((done) => {
-    const cores = planCores(kind, options, process.env, steps, planned)
+  const codes = await Promise.all(jobs.map(({ kind, steps }) => new Promise((done) => {
+    const cores = planCores(kind, options, process.env, steps)
     const flags = [
       ...(cores !== undefined ? ['--cores', String(cores)] : []),
       '--wait', String(options.wait ?? 60),
       ...options.env.flatMap((pair) => ['--env', pair]),
-      // A full run keeps each job's steps in order, as its job sizes were measured, except a nightly's
-      // four-core job. Elsewhere a job's lanes run at once with their own workers: the gallery mostly
-      // waits for frames, and the unit and DOM steps fill those cores at a lower priority.
-      '--env', 'JUNO_RUNNER_PLAN=single', '--env', verifyRun(options) && !overlap ? 'JUNO_PLAN_SERIAL=1' : 'JUNO_PLAN_OVERLAP=1',
+      // A full run keeps each job's steps in order, as its job sizes were measured. Elsewhere a job's
+      // lanes run at once with their own workers: the gallery mostly waits for frames, and the unit
+      // and DOM steps fill those cores at a lower priority.
+      '--env', 'JUNO_RUNNER_PLAN=single', '--env', verifyRun(options) ? 'JUNO_PLAN_SERIAL=1' : 'JUNO_PLAN_OVERLAP=1',
     ]
     const child = spawn(process.execPath, [self, ...flags, 'test:plan', ...planWords(steps)], {
       cwd: root, stdio: ['pipe', 'pipe', 'pipe'],

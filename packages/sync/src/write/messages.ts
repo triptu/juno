@@ -33,7 +33,8 @@ export const writeMessage = (message: MessageRow): Writer =>
         blocks_json = excluded.blocks_json, files_json = excluded.files_json, attachments_json = excluded.attachments_json,
         edited_ts = excluded.edited_ts, deleted = excluded.deleted, client_msg_id = excluded.client_msg_id,
         reply_count = excluded.reply_count, latest_reply = excluded.latest_reply, reply_users_json = excluded.reply_users_json,
-        last_event_ts = excluded.last_event_ts, partial = excluded.partial, version = excluded.version`
+        last_event_ts = excluded.last_event_ts, partial = excluded.partial, version = excluded.version,
+        ephemeral = MAX(messages.ephemeral, excluded.ephemeral), bot_id = COALESCE(excluded.bot_id, messages.bot_id)`
     // Whichever of the answer, the echo or a page stores Juno's own message first ends its pending row (5.7).
     if (row.client_msg_id !== null) yield* reconcilePost(row.client_msg_id)
     // A second copy of a post the network sent twice is hidden and deleted (ADR 0014).

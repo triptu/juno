@@ -21,6 +21,7 @@ import {
   messagesDelete,
   messagesDiscard,
   messagesEdit,
+  messagesAttachmentAction,
   messagesBroadcast,
   messagesReact,
   messagesResolveAction,
@@ -111,6 +112,10 @@ export const broadcastMessage = (registry: Registry, message: MessageRef) => run
 
 /** Adds (`on`) or removes the user's reaction `name`. The chip changes at once; the outbox sends it. */
 export const reactToMessage = (registry: Registry, message: MessageRef, name: string, on: boolean) => runCommand(registry, messagesReact, { message, name, on })
+
+/** Presses a button in a message, such as Slackbot's Add Them. Slack is called at once; what the press changes comes back on the socket. */
+export const pressMessageButton = (registry: Registry, message: MessageRef, attachment: string, button: string) =>
+  runCommand(registry, messagesAttachmentAction, { message, attachment, button })
 
 const draftFamily = liveQuery(draftsGet)
 

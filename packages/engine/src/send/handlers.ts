@@ -3,6 +3,7 @@
  * write locally and wake `PostWorker` and `ActionWorker`; `drafts.get` follows the open
  * workspace and never calls Slack. `messages.precheck` asks the route model; `messages.check` reads its answer.
  * `messages.postcheck` and `messages.grammar` check a sent message afterwards (`checks.ts`, `grammar.ts`).
+ * `messages.attachmentAction` sends a button press straight to Slack (`buttons.ts`).
  */
 import { decodeDraft, NotSignedIn, SendRoutes } from '@juno/contract'
 import { liveQuery, transaction } from '@juno/store'
@@ -17,6 +18,7 @@ import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
 import { ActionWorker } from './actionWorker'
 import { broadcastMessage, deleteMessage, editMessage, reactToMessage, resolveMessageAction } from './actions'
+import { pressButton } from './buttons'
 import { checkMessage, dailyBudget, grammarForSent, postcheckMessage, precheckMessage, ROUTE_DAILY_BUDGET } from './checks'
 import { grammarChecks } from './grammar'
 import { discardMessage, retryMessage, sendMessage } from './commands'
@@ -81,6 +83,7 @@ export const SendHandlers = SendRoutes.toLayer(
       'messages.delete': ({ message }) => provide(deleteMessage(message)),
       'messages.resolveAction': ({ id, retry }) => provide(resolveMessageAction(id, retry)),
       'messages.react': ({ message, name, on }) => provide(reactToMessage(message, name, on)),
+      'messages.attachmentAction': (press) => provide(pressButton(press)),
       'messages.check': (payload) => checkMessage(payload).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(EngineConfig, config)),
       'messages.precheck': (payload) => precheckMessage(payload, routeBudget).pipe(checking),
       'drafts.get': ({ topicId }) =>

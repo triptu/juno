@@ -11,19 +11,18 @@ export function planOutcomes(lines, suites, planned) {
 /**
  * The suites of a full run. A normal run skips the nightly tier's tests (`@nightly`, scripts/test-areas.mjs) in
  * the DOM and desktop lanes; a nightly run keeps them. `skipTags` are skipped as well (`@mac` on a local run).
- * `perf` adds the laptop perf job's two parts first, so each starts its job alone (scripts/remote/plan.mjs).
  */
-export function fullSuites(scripts, { nightly = false, noCache = false, perf = false, seed, testSeed, skipTags = [] } = {}) {
+export function fullSuites(scripts, { nightly = false, noCache = false, seed, testSeed, skipTags = [] } = {}) {
   const apps = scripts['test:browser'] && scripts['test:electron'] ? ['test:browser', 'test:electron'] : ['test:desktop']
   const skipped = [...skipTags, ...(nightly || !scripts['test:nightly'] ? [] : ['@nightly'])]
   const skip = skipped.length > 0 ? [`JUNO_SKIP_TAGS=${skipped.join(',')}`] : []
   return [
-    ...(perf ? ['perf:part1', 'perf:part2'].map((name) => ({ name, words: [name] })) : []),
     { name: 'test', words: ['test', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] },
     // The DOM lane (apps/desktop/dom), in the unit job; a commit from before it has no test:dom.
     ...(scripts['test:dom'] ? [{ name: 'test:dom', words: [...skip, 'test:dom', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] }] : []),
-    // A nightly run uses no cached result: every Quint run and conformance trace is fresh.
-    { name: 'specs:check', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : []), ...(nightly ? ['--nightly'] : [])] },
+    // The spec check proves the models, not Juno's code, so a nightly reuses its unchanged checks like any run;
+    // conformance replays traces against the engine, so a nightly runs it uncached.
+    { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
     { name: 'specs:conformance', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
     { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), ...(nightly ? ['GALLERY_REAL_WALK=0'] : []), 'test:gallery'] },
     ...apps.map((name) => ({ name, words: [...skip, name] })),

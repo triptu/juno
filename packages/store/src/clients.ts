@@ -201,7 +201,7 @@ const prepareCache = (
     )
   }).pipe(Effect.withSpan('Store.prepareCache'))
 
-/** Opens `cache.db`, creating it if needed, and runs the migrations it has not recorded yet. */
+/** Opens `cache.db`, creating it if needed, runs the migrations it has not recorded yet, and drops ephemeral messages. */
 const createCache = (
   paths: WorkspacePaths,
   invalidation: Invalidation['Service'],
@@ -212,6 +212,8 @@ const createCache = (
       const sql = yield* SqliteClient.make({ filename: paths.cacheDb, busyTimeout: BUSY_TIMEOUT })
       const applied = yield* Effect.provideService(migrate(migrations), SqlClient.SqlClient, sql)
       if (applied.length > 0) yield* Effect.logInfo('cache.db migrated', { applied: applied.map(([id, name]) => `${id}_${name}`) })
+      // Ephemeral messages (Slackbot's notes) last until a restart, as in Slack's client: Slack never sends them again.
+      yield* sql`DELETE FROM messages WHERE ephemeral = 1`
       yield* sql`PRAGMA user_version = ${sql.literal(String(CACHE_RESET_EPOCH))}`
     }),
   ).pipe(invalidation.provideReactivity)

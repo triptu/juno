@@ -95,27 +95,9 @@ export const NIGHTLY_AREAS = [
     paths: [/^(apps|packages)\/.*huddle/i],
   },
   {
-    area: 'idle',
-    tag: '@nightly-idle',
-    tests: 'the CPU and memory walk of every process in idle-cpu.spec.ts; its fine Mac walk is @mac and runs only by hand',
-    paths: [
-      'apps/desktop/e2e/idle-cpu.spec.ts',
-      'apps/desktop/e2e/idleJourney.ts',
-      'apps/desktop/src/main/processes.ts',
-      'apps/desktop/src/main/processWatch.ts',
-      'apps/desktop/src/main/screenWatch.ts',
-      'packages/engine/src/send/',
-      'packages/engine/src/workerPasses.ts',
-      'packages/engine/src/markWorker.ts',
-      'packages/agent/src/schedule/scheduler.ts',
-      'packages/agent/src/compactor/scheduler.ts',
-      'packages/fake-slack/src/seeds/',
-    ],
-  },
-  {
     area: 'feel',
     tag: '@nightly-feel',
-    tests: 'the feel scenarios (e2e/feel/*.feel.ts), filmed in the browser; affected plans also run a scenario whose interaction changed (PERF_INTERACTIONS)',
+    tests: 'the nightly subset of the feel scenarios (e2e/feel/*.feel.ts), filmed in the browser; affected plans also run a scenario whose interaction changed (PERF_INTERACTIONS). The rest are @on-demand',
     paths: ['apps/desktop/e2e/feel/'],
   },
   {
@@ -131,13 +113,13 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'launch',
     perf: 'launch warm start',
-    feel: 'launch.feel.ts',
+    feel: undefined,
     paths: ['apps/desktop/src/main/index.ts', 'apps/desktop/src/renderer/main.tsx', 'apps/desktop/src/renderer/start.tsx', 'apps/desktop/src/renderer/App.tsx', 'apps/desktop/src/preload/', 'packages/state/src/transport.ts', 'packages/state/src/port.ts', 'packages/state/src/client.ts'],
   },
   {
     interaction: 'topic open, scroll and live updates',
     perf: 'topic open|scroll|live update',
-    feel: 'after-idle.feel.ts',
+    feel: 'long.feel.ts',
     paths: ['apps/desktop/src/renderer/containers/TopicView.tsx', 'apps/desktop/src/renderer/containers/topic/', 'apps/desktop/src/renderer/containers/messageRows.ts', 'packages/views/src/TopicView.tsx', 'packages/views/src/MessageList.tsx', 'packages/views/src/Message.tsx', 'packages/views/src/MessageBody.tsx', 'packages/state/src/messages.ts', 'packages/state/src/topics.ts', 'packages/engine/src/messages/', 'packages/engine/src/protocol/'],
   },
   {
@@ -149,19 +131,19 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'Home open and a new tab with Home',
     perf: 'home open|a new tab with Home',
-    feel: 'after-idle.feel.ts',
+    feel: 'home-write.feel.ts',
     paths: ['apps/desktop/src/renderer/containers/Home.tsx', 'apps/desktop/src/renderer/containers/HomeComposer.tsx', /^packages\/views\/src\/Home[A-Za-z]*\.tsx$/, /^packages\/state\/src\/home[A-Za-z]*\.ts$/, 'packages/engine/src/home/'],
   },
   {
     interaction: '⌘K open and typing',
     perf: 'palette',
-    feel: 'interaction.feel.ts',
+    feel: undefined,
     paths: ['apps/desktop/src/renderer/containers/Palette.tsx', 'apps/desktop/src/renderer/containers/PaletteContent.tsx', 'apps/desktop/src/renderer/containers/paletteCommands.ts', 'packages/views/src/CommandPalette.tsx', 'packages/views/src/PaletteRow.tsx', 'packages/state/src/palette.ts', 'packages/engine/src/search/'],
   },
   {
     interaction: 'Search tab: keystroke to results and arrow to reader',
     perf: 'search: arrow to reader',
-    feel: 'interaction.feel.ts',
+    feel: undefined,
     paths: [/^apps\/desktop\/src\/renderer\/containers\/search\//, /^packages\/views\/src\/search\//, 'packages/state/src/search.ts', 'packages/engine/src/search/'],
   },
   {
@@ -173,7 +155,7 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'peek',
     perf: 'peek',
-    feel: 'topic.feel.ts',
+    feel: undefined,
     paths: ['apps/desktop/src/renderer/containers/Peek.tsx', 'apps/desktop/src/renderer/containers/PeekTopic.tsx', 'packages/views/src/PeekView.tsx', 'packages/state/src/peek.ts'],
   },
   {
@@ -197,7 +179,7 @@ export const PERF_INTERACTIONS = [
   {
     interaction: 'the Juno panel and chat',
     perf: 'send to your bubble|drag a selection',
-    feel: 'chat.feel.ts',
+    feel: undefined,
     paths: ['apps/desktop/src/renderer/containers/juno/', 'packages/views/src/juno-chat/', 'packages/views/src/juno-pages/', 'packages/state/src/junoPanel.ts', 'packages/state/src/agent/'],
   },
 ]
@@ -222,14 +204,14 @@ export const perfInteractionsChanged = (changed) =>
   PERF_INTERACTIONS.map((entry) => ({ ...entry, files: changed.filter((file) => inPaths(entry.paths, file)) })).filter((entry) => entry.files.length > 0)
 
 /**
- * The feel scenarios among `files` (the e2e config's feel project, all @nightly-feel). `own` marks those an
- * affected plan runs: a changed scenario, every scenario when their harness changed, and the scenario of a
- * changed interaction (`interactions`, from perfInteractionsChanged).
+ * The nightly feel scenarios among `files`: the feel project's files that hold a `@nightly-feel` test, read through
+ * `read`; the others are `@on-demand`. `own` marks those an affected plan runs: a changed scenario, every one when
+ * their harness changed, and the scenario of a changed interaction (`interactions`, from perfInteractionsChanged).
  */
-export function feelScenarios(files, changed, interactions) {
+export function feelScenarios(files, changed, interactions, read) {
   const harness = changed.some((file) => file.startsWith('apps/desktop/e2e/feel/') && !file.endsWith('.feel.ts'))
   const named = new Set([...changed, ...interactions.flatMap((entry) => (entry.feel ? [`apps/desktop/e2e/feel/${entry.feel}`] : []))])
-  return files.filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file)).map((file) => ({ file, own: harness || named.has(file) }))
+  return files.filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file) && read(file).includes("'@nightly-feel'")).map((file) => ({ file, own: harness || named.has(file) }))
 }
 
 /** The guard specs a change reaches, each with the first changed file in its area. */

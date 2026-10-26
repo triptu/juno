@@ -7,9 +7,11 @@
 // (juno.expectAtRest). The real-CPU check of that case is
 // packages/engine/test/perf/edit-retry-idle.perf.ts.
 //
-// The portable walk (idleJourney.ts) runs on the laptop in full runs: every
-// process of the real app in five states, including the 10-16 case of an
-// unread mention of a known person. The large-seed walk below keeps minute
+// The portable walk (idleJourney.ts) runs on the laptop on demand
+// (`bun run remote --env JUNO_ON_DEMAND=1 test:desktop e2e/idle-cpu.spec.ts`):
+// every process of the real app in five states, including the 10-16 case of an
+// unread mention of a known person. Every browser run also checks that Home and
+// a topic run no frame loop, looping animation or timer loop (topic.spec.ts). The large-seed walk below keeps minute
 // windows and the fine Mac budgets; it is @mac and runs only by hand, before
 // a release that changes idle behaviour or when asked:
 // `bun run test:desktop e2e/idle-cpu.spec.ts --grep @mac`. App diagnostics are
@@ -147,7 +149,7 @@ async function tabAndWindowStates(running: RunningApp, fake: FakeSlack): Promise
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show())
 }
 
-test('idle resources while the first sync waits, after sync with a mention, in a topic and the Juno panel, and hidden', { tag: ['@nightly', '@nightly-idle'] }, idleJourney)
+test('idle resources while the first sync waits, after sync with a mention, in a topic and the Juno panel, and hidden', { tag: '@on-demand' }, idleJourney)
 
 test.describe('mac process budgets', { tag: '@mac' }, () => {
   // The large seed with Juno on a fake model: each state is reached in turn

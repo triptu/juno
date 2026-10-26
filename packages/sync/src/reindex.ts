@@ -23,6 +23,8 @@
  *   event replaces it, or a synced range without Main messages removes it.
  *   Until a synced range exists, a Main with messages keeps at least the
  *   activity `client.counts` reported, so a search preview does not move it down.
+ * - Ephemeral messages are left out: they never set a row's preview,
+ *   activity, unread count or mention.
  */
 import {
   compareTs,
@@ -127,7 +129,8 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const root = parsed.kind === 'thread' ? rows.find((r) => r.ts === parsed.threadTs) : undefined
 
     // Names for the preview: the latest live message's sender and mentions. The root's text is stored raw and named at read time.
-    const live = rows.filter((r) => r.deleted === 0)
+    // An ephemeral message (Slackbot's notes) shows in the topic but is never its latest, unread or mention.
+    const live = rows.filter((r) => r.deleted === 0 && r.ephemeral !== 1)
     let latest: MessageRow | undefined
     for (const row of live) if (latest === undefined || compareTs(row.ts, latest.ts) > 0) latest = row
     const userIds = new Set<string>()
