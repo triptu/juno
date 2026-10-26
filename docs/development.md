@@ -1346,6 +1346,8 @@ Causes found so far (2026-10-15):
 
 - **A download that beat the first sync.** Home downloads its next picture when idle after it paints, which can be during the first sync, and shows a picture already on disk when it first becomes caught up (SPEC 12). `home-pictures.spec.ts` checked that the first caught-up Home had no picture, which held only while the sync ended before the download: 3 of 160 failed at 12 and 16 browser workers with Home showing a picture. The test now holds the small picture (`picture:small`) until it has checked that Home, then releases it and checks the picture does not arrive on that Home: 0 of 160 at 12 workers.
 
+- **A reorder read where the rows were, not where they would be.** When a reply moves sidebar rows while others still slide, `reorderPlayer.ts` reads each row's place and starts the next motion from there. It read them at this thread's last frame time, and the new motion started on the compositor 50 to 150 ms later under load, while the old one kept drawing: rows jumped back 3 to 23 px for one frame (`sidebar-motion.feel.ts`, the noFlicker check). A new row half faded in was also sent back above the list to come in again, leaving its place empty for a frame. The player now measures how long its animations take to start (`animation.ready`) and reads rows at now plus that delay, and a new row that shows slides from where it is drawn: no flicker in 120 runs with two CPU burners per feel worker, 4 in 100 before. To repeat a feel scenario, `bun run flake` works now that each repeat writes its own `feel-report/<name>-repeatN`; parallel repeats used to delete each other's frames.
+
 ## Machine shapes
 
 Juno requests physical cores from the laptop's shared `4-11` allocation:
