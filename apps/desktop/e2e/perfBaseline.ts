@@ -65,7 +65,7 @@ export function budget(metric: Metric, limit: number, options: { readonly at?: '
     return
   }
   const file = stored()
-  const base = file?.identity === runnerIdentity() ? file.metrics[metric.name] : undefined
+  const base = file?.shapes?.[runnerIdentity()]?.metrics[metric.name]
   if (base === undefined) {
     console.log(`${metric.name}: no baseline for ${runnerIdentity()}; lower quartile ${metric.low.toFixed(1)} ${metric.unit} recorded`)
     return

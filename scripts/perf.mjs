@@ -7,6 +7,8 @@
 //   bun run perf --unit                   the package budgets only (Mac)
 //   bun run perf -g "<scenario>"          matching desktop scenarios only
 //   bun run perf --with-unit -g "..."     both (Mac)
+//   bun run perf --part 1                 a nightly's one-core perf job: the warm start, memory and the uncached open
+//   bun run perf --part 2                 its two-core perf job: every other scenario of the laptop's set
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -21,8 +23,17 @@ const flag = (name) => {
 const unitsOnly = flag('--unit')
 const withUnit = flag('--with-unit')
 if (unitsOnly && args.length > 0) throw new Error('Use bun run perf --unit, or bun run perf -g <desktop scenario>')
+const partAt = args.indexOf('--part')
+const part = partAt === -1 ? undefined : args.splice(partAt, 2)[1]
+if (part !== undefined && part !== '1' && part !== '2') throw new Error('--part is 1 or 2')
+if (part !== undefined && (unitsOnly || withUnit || args.length > 0)) throw new Error('--part takes no other arguments')
 const mac = process.platform === 'darwin' || process.env['JUNO_PERF_ABSOLUTE'] === '1'
 if (!mac && (unitsOnly || withUnit)) throw new Error('The package budgets run on the Mac only (docs/performance.md 7.3)')
+// A nightly runs the laptop's set in two jobs, one worker each (docs/performance.md 7.3): the scenarios whose lower
+// quartile holds on one core, then those that need two (the reopens, the scroll and send). A new scenario lands in
+// part 2, on two cores.
+const partOne = 'perf\\.spec\\.ts (large workspace |topic open, uncached:)'
+if (part !== undefined) args.push(part === '1' ? '--grep' : '--grep-invert', partOne)
 
 /**
  * The package budgets: the agent's and the engine's `*.perf.ts` files, which bun test's default pattern skips,
@@ -36,7 +47,7 @@ function unitPerfFiles() {
 
 const env = { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1' }
 let failed = 0
-if (mac && (unitsOnly || withUnit || args.length === 0)) {
+if (mac && part === undefined && (unitsOnly || withUnit || args.length === 0)) {
   const chosen = unitPerfFiles()
   // The large-seed budgets share one boot (packages/engine/test/perf/largeSeedEngine.ts), so they run in one process,
   // in bun's shuffled order; every other file runs alone.

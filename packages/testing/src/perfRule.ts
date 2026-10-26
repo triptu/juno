@@ -25,12 +25,17 @@ export interface BaselineMetric {
   readonly unit: string
 }
 
-export interface BaselineFile {
-  readonly identity: string
-  readonly commit: string
-  readonly recorded: string
+/** The metrics of one runner shape (platform, threads, Electron), and how many runs they come from. */
+export interface BaselineShape {
   readonly runs: number
   readonly metrics: Readonly<Record<string, BaselineMetric>>
+}
+
+/** A nightly's perf parts run on jobs of different sizes, so the baseline holds one set of metrics per shape. */
+export interface BaselineFile {
+  readonly commit: string
+  readonly recorded: string
+  readonly shapes: Readonly<Record<string, BaselineShape>>
 }
 
 export interface Verdict {
