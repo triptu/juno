@@ -15,15 +15,15 @@ process.env.GALLERY_TEST_PORT = String(port)
 // One id per run, set before the workers start, so the shift guard's parts share one queue.
 process.env.GALLERY_SHIFT_RUN ??= `${Date.now()}-${process.pid}`
 // JUNO_SHARD=i/n (bun run remote --shards n): shard 0 runs every test; the others
-// run only the shift guard's parts, which split the states between the shards.
+// run only the two shift guards' parts, which split the states between the shards.
 const shardIndex = Number(/^(\d+)\/\d+$/.exec(process.env.JUNO_SHARD ?? '')?.[1] ?? 0)
 // JUNO_SKIP_TAGS=@heavy-gallery skips the shift guard over every component, as the desktop config does for its tags.
 const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
 
 // GALLERY_WORKERS lets a machine of its own (bun run remote) run more. A run that walks only
 // changed states spends its CPU starting workers and walk parts, so bun run remote gives it
-// fewer (GALLERY_CACHED_WORKERS); GALLERY_SHIFT_ALL=1 walks every state with GALLERY_WORKERS.
-const workers = Number((process.env.GALLERY_SHIFT_ALL === '1' ? undefined : process.env.GALLERY_CACHED_WORKERS) ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
+// fewer (GALLERY_CACHED_WORKERS); a forced fast or real walk uses GALLERY_WORKERS.
+const workers = Number((process.env.GALLERY_SHIFT_ALL === '1' || process.env.GALLERY_REAL_WALK === '1' ? undefined : process.env.GALLERY_CACHED_WORKERS) ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
 // The walks split their states into one part per worker.
 process.env.GALLERY_SHIFT_PARTS ??= String(workers)
 
@@ -46,7 +46,7 @@ export default defineConfig({
     colorScheme: 'light',
     reducedMotion: 'reduce',
   },
-  ...(shardIndex > 0 ? { grep: /no interaction shifts the layout, in any state of any component/ } : {}),
+  ...(shardIndex > 0 ? { grep: /no (?:forced )?interaction shifts the layout, in any state of any component/ } : {}),
   ...(skipTags.length > 0 ? { grepInvert: new RegExp(skipTags.map((tag) => `${tag}\\b`).join('|')) } : {}),
   projects: [
     // Wide enough for the 240px switcher plus the widest frame (1400px).
