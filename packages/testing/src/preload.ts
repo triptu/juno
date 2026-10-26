@@ -23,6 +23,10 @@ import { Database } from 'bun:sqlite'
 import { mock, setDefaultTimeout } from 'bun:test'
 import { existsSync } from 'node:fs'
 
+// Process kills and snapshot restores cannot discard the drive cache. Keep WAL + FULL,
+// but skip macOS's hardware flush in tests and their children. Set 1 to use the app settings.
+process.env.JUNO_TEST_FULLFSYNC ??= '0'
+
 // A test that boots an engine against the fake Slack waits on real I/O. The harness's own waits
 // (`WAIT_MS` in packages/engine/test/harness.ts) are half of this, so a slow step fails with its label.
 // A preload runs once per Bun process, and this reaches only the first file the process runs, so the

@@ -1,0 +1,1 @@
+- 10-27 01:00 · Tushar · Agent store and journal share an explicit fullfsync option, ON by default; the unit preload sets JUNO_TEST_FULLFSYNC=0 for tests and child processes, keeping WAL and synchronous=FULL. SIGKILL and restored file snapshots cannot test drive-cache loss, so crash/recovery coverage does not need macOS hardware flushes; Linux ignores these pragmas.
