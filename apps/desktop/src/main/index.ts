@@ -1,5 +1,3 @@
-// First, so coverage (test runs only) starts before the rest of the bundle runs.
-import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
@@ -35,8 +33,6 @@ import { appWindow, createMainWindow, setMenuCheckForUpdates, setMenuPrivacy, se
 app.enableSandbox()
 
 const e2e = process.env.JUNO_E2E === '1'
-// Under JUNO_E2E_COVERAGE, record which renderer functions run (../coverage.ts).
-if (e2e) recordWindowCoverage(app)
 
 // Keep dev data apart from a packaged install. JUNO_USER_DATA lets tests
 // point at a throwaway directory. Both must be set before ready.
@@ -387,7 +383,6 @@ if (e2e) {
       screenWatchElapse: (ms: number) => {
         screenClockForTests += ms
       },
-      flushCoverage: () => flushAllCoverage(),
       rejectInMain: () => void Promise.reject(new Error('rejected for a test')),
     },
   })

@@ -14,8 +14,6 @@
  *   0007), so Chromium attaches the `d` cookie, stores rotations and uses
  *   the system proxy and CAs.
  */
-// First, so coverage (test runs only) starts before the rest of the bundle runs.
-import '../coverage'
 import { installProcessLog } from '../processLog'
 import { createTestWork, fastTestTiming } from './testWork'
 import { net } from 'electron'

@@ -21,8 +21,6 @@
  * the next open installs the restore. This Mac's name for the
  * other Mac's banner is the computer name from System Settings.
  */
-// First, so coverage (test runs only) starts before the rest of the bundle runs.
-import '../coverage'
 import { installProcessLog } from '../processLog'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'

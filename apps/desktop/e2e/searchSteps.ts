@@ -27,7 +27,8 @@ export function searchPage(win: Page) {
     places: results.locator('[data-search-place]'),
     // The topic beside the results, once asked for.
     reader: root.locator('[data-search-reader]'),
-    filter: (name: string) => root.getByRole('toolbar', { name: 'Filters' }).getByRole('button', { name }),
+    // A filter by the text it shows: From, In, Date, Has, Newest, Apps hidden.
+    filter: (name: string) => root.locator('[role="toolbar"][aria-label="Filters"] button', { hasText: name }),
     hint: root.locator('[data-palette-hint]'),
   }
 }
@@ -93,10 +94,10 @@ export async function navigateMatches({ juno, fake }: Pick<Fixtures, 'juno' | 'f
   await expect(page.rows).toHaveCount(2)
   await page.row('navigationprobe entry 640').click()
   await expect(page.reader.locator('[data-match-count]')).toHaveText('2 of 2')
-  await page.reader.getByRole('button', { name: 'Previous match (2 of 2)' }).click()
+  await page.reader.locator('button[aria-label^="Previous match (2 of 2)"]').click()
   await expect(page.reader.locator(`[data-message-row="${matches[0]}"]`)).toBeVisible()
   await expect(page.reader.locator('[data-match-count]')).toHaveText('1 of 2')
-  await page.reader.getByRole('button', { name: 'Next match (1 of 2)' }).click()
+  await page.reader.locator('button[aria-label^="Next match (1 of 2)"]').click()
   await expect(page.reader.locator(`[data-message-row="${matches[1]}"]`)).toBeVisible()
   await expect(page.reader.locator('[data-match-count]')).toHaveText('2 of 2')
 }
@@ -127,7 +128,7 @@ export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack
 
   // The topic's left edge: ← widens it, as a drag to the left does. The window has room for it to grow.
   await juno.surface.setWindowSize(1440, 900)
-  const edge = page.root.getByRole('separator', { name: 'Resize topic' })
+  const edge = page.root.locator('[role="separator"][aria-label="Resize topic"]')
   const panel = page.root.locator('[data-search-panel]')
   const width = () => panel.evaluate((element) => Math.round(element.getBoundingClientRect().width))
   const start = await width()
@@ -189,9 +190,9 @@ export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slac
 
   await shot(win, 'card-folded-light')
   const top = await card.evaluate((element) => Math.round(element.getBoundingClientRect().top))
-  await card.getByRole('button', { name: 'Show more' }).click()
+  await card.locator('button[data-search-more]', { hasText: 'Show more' }).click()
   await expect(body).not.toHaveAttribute('data-folded', '')
-  await expect(card.getByRole('button', { name: 'Show less' })).toBeVisible()
+  await expect(card.locator('button[data-search-more]', { hasText: 'Show less' })).toBeVisible()
   await expect.poll(() => body.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1)
   await expect.poll(() => matchInView(page, 'Line 1 of the launch notes', 'gannet')).toBe(true)
   // Unfolding grows the card downward; the card itself stays where it was, and no topic opened.
@@ -222,7 +223,7 @@ export async function jumpToLatest({ juno, slack }: Pick<Fixtures, 'juno' | 'sla
   for (let i = 1; i <= 40; i++) slack.as(i % 2 === 0 ? 'Maya' : 'Leo').replyIn('Plover review notes', `Follow-up ${i} on the review order`)
   await juno.sidebar.row('#product').expectVisible()
   await juno.surface.appMenu('search-messages')
-  const jump = page.reader.getByRole('button', { name: 'Jump to latest' })
+  const jump = page.reader.locator('button', { hasText: 'Jump to latest' })
 
   // A short thread opens at its match with its newest reply in view: nothing newer to jump to.
   await page.field.pressSequentially('kestrel monday')

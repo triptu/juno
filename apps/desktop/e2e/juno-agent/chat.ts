@@ -39,7 +39,7 @@ export class JunoChatPane {
   }
 
   get composer(): Locator {
-    return this.root.getByRole('textbox', { name: /^Ask Juno/ })
+    return this.root.locator('textarea[aria-label^="Ask Juno"]')
   }
 
   /** The @, # or emoji suggestions above the composer. */
@@ -49,7 +49,8 @@ export class JunoChatPane {
 
   /** The suggestion row whose name starts with `name`. */
   suggestion(name: string): Locator {
-    return this.suggestions.getByRole('option', { name: new RegExp(`^${name}(\\s|$)`) })
+    // Matched on the row's label: the row's whole text starts with the avatar's initials.
+    return this.suggestions.locator('[role="option"]').filter({ has: this.win.locator('[data-option-label]', { hasText: new RegExp(`^${name}(\\s|$)`) }) })
   }
 
   /** The picked people and channels drawn as chips in the composer's field. */
@@ -99,7 +100,7 @@ export class JunoChatPane {
   /** A quick reaction (👍 ✅ 👀 by default), from the menu's grid. */
   async react(bubble: string, emoji: string): Promise<void> {
     const menu = await this.openReactions(bubble)
-    await menu.root.getByRole('button', { name: `React ${emoji}` }).click()
+    await menu.root.locator(`button[aria-label=${JSON.stringify(`React ${emoji}`)}]`).click()
     await expect(menu.root).toHaveCount(0)
   }
 

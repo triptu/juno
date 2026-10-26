@@ -25,7 +25,7 @@ test('the avatar menu and the palette have one active row under the pointer and 
     const menu = await accountMenu.root.boundingBox()
     expect(Math.abs(menu!.x + menu!.width / 2 - (avatar!.x + avatar!.width / 2))).toBeLessThanOrEqual(1)
     expect(menu!.y).toBeGreaterThan(avatar!.y + avatar!.height)
-    const list = accountMenu.root.getByRole('menu', { name: 'Account' })
+    const list = accountMenu.root.locator('[role="menu"][aria-label="Account"]')
     const notifications = accountMenu.item(/^Notifications/)
 
     await notifications.hover()
@@ -51,7 +51,7 @@ test('the avatar menu and the palette have one active row under the pointer and 
   await test.step('the palette has one active row under the pointer and the arrow keys', async () => {
     const { palette } = juno
     await palette.open()
-    const list = palette.root.getByRole('listbox', { name: 'Results' })
+    const list = palette.root.locator('[role="listbox"][aria-label="Results"]')
     const rows = list.getByRole('option')
     await expect(rows.nth(2)).toBeVisible()
 

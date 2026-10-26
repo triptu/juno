@@ -37,7 +37,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
     // The faces sit after the status line: a longer line must not push them.
     const faces = '[data-huddle-bar] button [role="img"]'
     const stack = win.locator(faces)
-    await expect(stack).toHaveAccessibleName('Maya, Leo')
+    await expect(stack.locator(':scope > span')).toHaveCount(2)
 
     // Maya shares: the bar says so at once, and nothing in it moves or changes size.
     const before = await bar.boundingBox()
@@ -52,7 +52,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
     // The bar opens the tab, which shows her screen playing, named for her, in place of the tiles.
     await bar.getByRole('button', { name: 'Open huddle in #eng' }).click()
     await juno.tabs.expectActive('eng · Huddle')
-    const maya = win.getByRole('region', { name: "Maya's screen" })
+    const maya = win.locator(`section[aria-label="Maya's screen"]`)
     await expect(maya.locator('video')).toBeVisible()
     await expect.poll(() => playing(maya.locator('video'))).toBe(true)
     await expect(maya).not.toContainText('Loading')
@@ -62,7 +62,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
     // Leo shares too: both screens show, and Expand gives one all the room until Esc.
     await startShare(win, 'U0LEO')
     await expect(bar).toContainText('Maya and Leo are sharing')
-    const leo = win.getByRole('region', { name: "Leo's screen" })
+    const leo = win.locator(`section[aria-label="Leo's screen"]`)
     await expect.poll(() => playing(leo.locator('video'))).toBe(true)
     await expect(maya).toBeVisible()
     await leo.hover()

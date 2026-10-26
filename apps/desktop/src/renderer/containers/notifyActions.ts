@@ -18,19 +18,46 @@ import {
   type NotifyChoice,
   type NotifyTargetView,
 } from '@juno/contract'
-import { currentNotificationSettings, holdLevel, junoAvailableAtom, loadNotificationSettings, pendingLevel, popupContextMenu, registry, releaseSidebarTopic, runAction } from '@juno/state'
+import { currentNotificationSettings, holdLevel, junoAvailableAtom, loadNotificationSettings, notificationSettingsAtom, pendingLevel, popupContextMenu, registry, releaseSidebarTopic, runAction } from '@juno/state'
 import { askJunoAbout, showWhatJunoKnows } from './juno/actions'
 import { openNotificationsAt } from './notificationsAnchor'
+import { topicOf, watchTopic } from './topicSource'
 
 /** Sets a Notify me choice: "#design-review: Never", with Undo. */
 export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, label: string): void {
   // Following or unfollowing a thread adds or removes its row at once, even while the sidebar holds its order (SPEC 5).
   if (target.kind === 'thread') releaseSidebarTopic(registry, target.id)
-  // The toast waits until the settings hold the new level, read as for a followed thread: an unfollowed one is Never
-  // whatever the settings say, which would end the wait before they arrive. A thread's follow flag arrives with its row.
-  const stored = () => loadNotificationSettings(registry, (settings) => storedChoice(settings, target, true) === choice)
-  // Menus opened before the settings and the follow flag arrive read the choice just made.
-  void holdLevel(registry, target, choice, () => runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` }, stored))
+  // Menus opened before the settings and the follow flag show it read the choice just made; the toast waits for them too.
+  void holdLevel(registry, target, choice, () => runAction(registry, notificationsSetLevel, { target, choice }, { text: `${label}: ${notifyChoiceLabel(choice)}` }, () => shown(target, choice)))
+}
+
+/** Longest a hold waits for the sources, for when an Undo or Slack changes the level again before they show this one. */
+const SHOWN_WAIT_MS = 10_000
+
+/**
+ * Resolves once the menus' own sources show `choice` as they read it (`choiceFor`): the settings and, on a thread,
+ * the follow flag of its header or row. The command has written both when this starts; their live queries trail it.
+ */
+function shown(target: NotifyTargetView, choice: NotifyChoice): Promise<void> {
+  const subscribed = () => target.kind === 'thread' && topicOf(target.id)?.subscribed === true
+  const agrees = () => storedChoice(currentNotificationSettings(registry), target, subscribed()) === choice
+  return new Promise((resolve) => {
+    const stops: Array<() => void> = []
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      // The registry may be mid-notify: unsubscribe after.
+      queueMicrotask(() => { for (const stop of stops) stop() })
+      resolve()
+    }
+    const timer = setTimeout(finish, SHOWN_WAIT_MS)
+    const check = () => { if (agrees()) finish() }
+    stops.push(registry.subscribe(notificationSettingsAtom, check))
+    if (target.kind === 'thread') stops.push(watchTopic(target.id, check))
+    if (agrees()) finish()
+  })
 }
 
 /** The current choice for a target: the one just made while the stored state catches up, else the stored one. */

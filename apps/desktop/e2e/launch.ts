@@ -1,7 +1,7 @@
 import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import type { TestHost } from './browser/host'
@@ -83,23 +83,6 @@ export interface LaunchOptions {
   readonly sendTrace?: boolean
 }
 
-let launches = 0
-
-/**
- * Under JUNO_COVERAGE=1, a directory of its own for this launch's coverage,
- * under the spec file it belongs to (e2e/coverage.ts reduces them after the run).
- */
-export function coverageDir(): string | undefined {
-  if (process.env.JUNO_COVERAGE !== '1') return undefined
-  let spec = 'unknown'
-  try {
-    spec = relative(resolve(__dirname, '..'), base.info().file)
-  } catch {
-    // Outside a test or hook: the launch counts for no spec.
-  }
-  return resolve(__dirname, '../coverage/raw', spec.replaceAll('/', '__'), `${process.pid}-${launches++}`)
-}
-
 export function launchTiming(options: LaunchOptions): 'fast' | 'production' {
   const info = base.info()
   const production = options.paced === true || /(?:perf|idle-cpu)\.spec\.ts$|[/\\]feel[/\\]/.test(info.file) || info.tags.includes('@mac')
@@ -157,8 +140,6 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
   const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
   if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
-  const coverage = coverageDir()
-  if (coverage !== undefined) env.JUNO_E2E_COVERAGE = coverage
 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
@@ -187,8 +168,6 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     app,
     win,
     close: async () => {
-      // Main and the renderers write what ran since their last write; the engine and the agent write as they end.
-      if (coverage !== undefined) await app.evaluate(() => (globalThis as unknown as { junoTest: { flushCoverage: () => Promise<void> } }).junoTest.flushCoverage()).catch(() => undefined)
       const closing = performance.now()
       const closingCpu = cpuAll()
       await app.close()

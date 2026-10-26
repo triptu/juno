@@ -5,7 +5,8 @@ import { redrawTopic, showToast, type RedrawProblem, canRedraw, currentNotificat
 import { choiceFor, nativeMenu } from './notifyActions'
 import { viewChoices } from './viewActions'
 import { huddleMenuItem } from './huddle/menuItem'
-import { labelOf, isLinkable, notifyTarget, runTopicAction, type ActionTopic } from './topicActions'
+import { labelOf, isLinkable, notifyTarget, runTopicAction } from './topicActions'
+import type { ActionTopic } from './topicSource'
 
 const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.channel.partner : undefined
 

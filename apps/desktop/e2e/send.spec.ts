@@ -4,7 +4,7 @@
 // Delete draft, and drafts kept across tabs and a restart are in the DOM lane
 // (`dom/send.test.ts`).
 import { measureLayoutShift } from '@juno/testing/layout-shift'
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -13,11 +13,17 @@ test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-test('a reply in a thread shows at once and settles in place, posted once', async ({ juno, fake }) => {
+test('a reply in a thread shows at once and settles in place, posted once; the composer grows to about eight lines, then scrolls inside, and Shift Enter adds a line', async ({ juno, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
   await topic.expectAtBottom()
+  await test.step('a reply in a thread shows at once and settles in place, posted once', () => sendReply(juno, fake))
+  await test.step('the composer grows to about eight lines, then scrolls inside, and Shift Enter adds a line', () => composerGrowth(juno, fake))
+})
+
+async function sendReply(juno: Fixtures['juno'], fake: Fixtures['fake']): Promise<void> {
+  const { topic } = juno
 
   // The answer waits, so the pending row is on screen until it is released.
   fake.holdNext({ method: 'chat.postMessage', before: true })
@@ -50,27 +56,25 @@ test('a reply in a thread shows at once and settles in place, posted once', asyn
   expect(posted[0]!.args['thread_ts']).toBeDefined()
   const copies = fake.messages(String(posted[0]!.args['channel'])).filter((m) => m.client_msg_id === posted[0]!.args['client_msg_id'])
   expect(copies).toHaveLength(1)
-})
+}
 
-test('the composer grows to about eight lines, then scrolls inside, and Shift Enter adds a line', async ({ juno, fake }) => {
-  const { topic, sidebar } = juno
-  await sidebar.row(POSTGRES).open()
-
-  await test.step('the composer grows to about eight lines, then scrolls inside', async () => {
-    const one = (await topic.composer.boundingBox())!.height
-    await topic.composer.fill('one\ntwo\nthree')
-    const three = (await topic.composer.boundingBox())!.height
-    expect(three).toBeGreaterThan(one)
-    await topic.composer.fill(Array.from({ length: 14 }, (_, i) => `Line ${i + 1}`).join('\n'))
-    const capped = (await topic.composer.boundingBox())!.height
-    expect(capped).toBeGreaterThan(150)
-    expect(capped).toBeLessThanOrEqual(194)
-    expect(await topic.composer.evaluate((field) => field.scrollHeight > field.clientHeight)).toBe(true)
-    // Shift Enter adds a line, it does not send.
-    await topic.composer.fill('first line')
-    await topic.composer.press('Shift+Enter')
-    await topic.composer.pressSequentially('second line')
-    await expect(topic.composer).toHaveValue('first line\nsecond line')
-    expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toEqual([])
-  })
-})
+async function composerGrowth(juno: Fixtures['juno'], fake: Fixtures['fake']): Promise<void> {
+  const { topic } = juno
+  const posts = () => fake.calls.filter((call) => call.method === 'chat.postMessage').length
+  const postedBefore = posts()
+  const one = (await topic.composer.boundingBox())!.height
+  await topic.composer.fill('one\ntwo\nthree')
+  const three = (await topic.composer.boundingBox())!.height
+  expect(three).toBeGreaterThan(one)
+  await topic.composer.fill(Array.from({ length: 14 }, (_, i) => `Line ${i + 1}`).join('\n'))
+  const capped = (await topic.composer.boundingBox())!.height
+  expect(capped).toBeGreaterThan(150)
+  expect(capped).toBeLessThanOrEqual(194)
+  expect(await topic.composer.evaluate((field) => field.scrollHeight > field.clientHeight)).toBe(true)
+  // Shift Enter adds a line, it does not send.
+  await topic.composer.fill('first line')
+  await topic.composer.press('Shift+Enter')
+  await topic.composer.pressSequentially('second line')
+  await expect(topic.composer).toHaveValue('first line\nsecond line')
+  expect(posts()).toBe(postedBefore)
+}
