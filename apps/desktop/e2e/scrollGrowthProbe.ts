@@ -30,7 +30,7 @@ export async function expectScrollEscapesGrowth(win: Page, scroller: Locator, ro
 /** A coalesced programmatic/user scrollend, followed by growth before the deferred rest check. */
 export async function expectRestSurvivesGrowth(scroller: Locator, rowSelector: string): Promise<void> {
   for (const gap of [0, 16]) {
-    const result = await scroller.evaluate(async (node, { rowSelector, gap }) => {
+    await scroller.evaluate(async (node, { rowSelector, gap }) => {
       const row = [...node.querySelectorAll<HTMLElement>(rowSelector)].at(-1)!
       const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       node.scrollTop = node.scrollHeight
@@ -55,11 +55,11 @@ export async function expectRestSurvivesGrowth(scroller: Locator, rowSelector: s
         })
         observer.observe(row, { box: 'border-box' })
       })
+      // Fixed wait: the list's rest check is a 100 ms timer with no event of its own; this one fires after it.
       await new Promise((resolve) => setTimeout(resolve, 200))
-      const distance = node.scrollHeight - node.scrollTop - node.clientHeight
-      row.style.paddingBottom = ''
-      return distance
     }, { rowSelector, gap })
-    expect(result, `resting ${gap}px from the end survives growth during the rest check`).toBeLessThanOrEqual(1)
+    // What the rest check changes reaches the list in a later task or frame.
+    await expect.poll(() => scroller.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight), { message: `resting ${gap}px from the end survives growth during the rest check` }).toBeLessThanOrEqual(1)
+    await scroller.evaluate((node, rowSelector) => { [...node.querySelectorAll<HTMLElement>(rowSelector)].at(-1)!.style.paddingBottom = '' }, rowSelector)
   }
 }

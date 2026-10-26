@@ -2,7 +2,7 @@ import { test as base, type Browser, type BrowserContext, type ElectronApplicati
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { AgentOptions } from '../web/host/agent'
 import { HostPool } from './browser/host'
-import { WebPages } from './browser/pages'
+import { PINNED, WebPages } from './browser/pages'
 import { startWebApp } from './browser/running'
 import { copySnapshot, matchingFake as matchingWebFake, snapshotState, webSnapshot, type WebSnapshot } from './browser/snapshot'
 import { electronSurface, webSurface, type AppSurface } from './driver/surface'
@@ -252,7 +252,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           try { await context?.close() } finally { await rm(userData, { recursive: true, force: true }) }
         }
       })
-      context = lane === 'web' ? await (await webBrowser()).newContext({ viewport: { width: 1200, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] }) : undefined
+      context = lane === 'web' ? await (await webBrowser()).newContext({ viewport: { width: 1200, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'], ...PINNED }) : undefined
       running = context === undefined
         ? await launchApp(userData, { ...agentLaunch, ...options, fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
         : await startWebApp(hostPool, await context.newPage(), fake, userData, undefined, { sidebarTrace: false, sendTrace: false, engine: { ...agentLaunch, ...options } })

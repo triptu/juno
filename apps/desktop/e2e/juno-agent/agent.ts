@@ -55,10 +55,18 @@ export async function openPage(juno: Juno, label: JunoPage): Promise<Locator> {
   return juno.win.locator('main')
 }
 
-/** Opens every run on the Activity page, so each shows its steps and actions. */
+/**
+ * Opens every run on the Activity page, so each shows its steps and actions. The page draws nothing until its
+ * live query answers, so this waits for the first run before it counts the closed ones.
+ */
 export async function openRuns(page: Locator): Promise<void> {
+  await expect(page.locator('[data-activity-run]').first()).toBeVisible()
   const closed = page.locator('[data-activity-run] button[aria-expanded="false"]')
-  for (let n = await closed.count(); n > 0; n = await closed.count()) await closed.first().click()
+  for (let n = await closed.count(); n > 0; n = await closed.count()) {
+    await closed.first().click()
+    // A second click before the run shows it is open would land on the same run and close it again.
+    await expect.poll(() => closed.count()).toBeLessThan(n)
+  }
 }
 
 /** Opens Settings from the Juno menu, which lands on its Juno section, then goes to `section`. Returns the page. */

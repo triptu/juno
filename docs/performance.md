@@ -426,7 +426,7 @@ Tushar, 10-26: "count work instead of timing it ... timing is flaky anyway depen
 
 | Lane | Counts | How | File |
 | --- | --- | --- | --- |
-| Engine flow (`bun test`) | SQL statements run and rows they returned, by statement text | `packages/engine/test/sqlWork.ts` wraps `node:sqlite`'s statement methods in the test process | `packages/engine/test/flows/counted-work.flow.test.ts` |
+| Engine flow (`bun test`) | SQL statements run and rows they returned, by statement text | `packages/engine/test/sqlWork.ts` wraps `node:sqlite`'s `prepare` and statement methods in the test process and counts only the statements on the databases in the engine's user-data folder, so work from another file in the same test worker is not counted | `packages/engine/test/flows/counted-work.flow.test.ts` |
 | DOM lane | React commits and component renders, by component name; port requests, live messages and replies, and bytes each way, by RPC route and bridge channel | A React DevTools hook on the window (`onCommitFiberRoot`, which production React calls): a component rendered when it mounted or has React's PerformedWork flag, and subtrees React did not visit are skipped (`apps/desktop/dom/work.ts`). The page's socket counts frames (`dom/socket.ts`) | `apps/desktop/dom/counted-work.test.ts` |
 | Browser lane | Layouts and style recalculations (CDP `Performance.getMetrics`: `LayoutCount`, `RecalcStyleCount`; style recalculations for typing only) and DOM mutations (a `MutationObserver`) | Chromium's own counters | `apps/desktop/e2e/counted-layout.spec.ts` |
 

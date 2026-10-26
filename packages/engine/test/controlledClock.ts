@@ -28,6 +28,29 @@ export async function controlledClock() {
   }
 }
 
+/** Live time and sleeps, moved so the clock reads `at` now. For tests of local hours, which must not depend on when they run. */
+export function clockAt(at: number): Clock.Clock {
+  const live = Effect.runSync(Clock.Clock)
+  const offset = at - live.currentTimeMillisUnsafe()
+  const nanos = BigInt(offset) * 1_000_000n
+  return {
+    currentTimeMillisUnsafe: () => live.currentTimeMillisUnsafe() + offset,
+    currentTimeNanosUnsafe: () => live.currentTimeNanosUnsafe() + nanos,
+    monotonicTimeNanosUnsafe: () => live.monotonicTimeNanosUnsafe(),
+    currentTimeMillis: Effect.sync(() => live.currentTimeMillisUnsafe() + offset),
+    currentTimeNanos: Effect.sync(() => live.currentTimeNanosUnsafe() + nanos),
+    monotonicTimeNanos: live.monotonicTimeNanos,
+    sleep: (duration) => live.sleep(duration),
+  }
+}
+
+/** Today's noon in the local zone, within about 12 hours of now, so a moved clock keeps stored data about as old as it is. */
+export function localNoon(): number {
+  const noon = new Date()
+  noon.setHours(12, 0, 0, 0)
+  return noon.getTime()
+}
+
 /** Controls one scheduling window while unrelated I/O and debounce timers keep live time. */
 export async function controlledSleep(millis: number) {
   const time = await controlledClock()

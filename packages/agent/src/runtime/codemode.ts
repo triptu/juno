@@ -57,7 +57,15 @@ export interface CodemodeRunner {
   readonly wasmPath?: string
   readonly workerUrl?: string | URL
   readonly limits?: Partial<ScriptLimits>
+  /** Waits out a script's wall time, resolving early when `signal` aborts. Default: a real timer; tests end it when they choose. */
+  readonly wallTime?: (ms: number, signal: AbortSignal) => Promise<void>
 }
+
+const realWallTime = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+  })
 
 export class ScriptStopped extends Error {}
 
@@ -73,6 +81,7 @@ const refusal = (api: ToolExecutionApi, message: string): NestedToolExecutionRes
 /** A sandbox whose runs have a deadline and keep no values. */
 class BoundedSandbox extends CodemodeSandbox {
   private readonly wallMs: number
+  private readonly wallTime: NonNullable<CodemodeRunner['wallTime']>
   constructor(runner: CodemodeRunner, limits: ScriptLimits) {
     super({
       memoryLimitBytes: limits.memoryBytes,
@@ -80,11 +89,23 @@ class BoundedSandbox extends CodemodeSandbox {
       ...(runner.workerUrl === undefined ? {} : { workerUrl: runner.workerUrl }),
     })
     this.wallMs = limits.wallMs
+    this.wallTime = runner.wallTime ?? realWallTime
   }
 
+  /** The wall time stops the run through its signal, so it can come from `wallTime`; the run then reports a timeout, as pi's own deadline does. */
   override start(code: string, options: Parameters<CodemodeSandbox['start']>[1]): CodemodeRun {
-    const run = super.start(code, { ...options, store: {}, timeoutMs: Math.min(options.timeoutMs ?? this.wallMs, this.wallMs) })
-    const result = run.result.then((done) => (done.ok ? { ...done, storeWrites: { set: {}, delete: [] } } : done))
+    const { timeoutMs, signal, ...rest } = options
+    const wallMs = Math.min(timeoutMs ?? this.wallMs, this.wallMs)
+    const deadline = new AbortController()
+    const ended = new AbortController()
+    void this.wallTime(wallMs, ended.signal).then(() => { if (!ended.signal.aborted) deadline.abort() })
+    const run = super.start(code, { ...rest, store: {}, signal: signal === undefined ? deadline.signal : AbortSignal.any([signal, deadline.signal]) })
+    const result = run.result.then((done) => {
+      ended.abort()
+      if (done.ok) return { ...done, storeWrites: { set: {}, delete: [] } }
+      const timedOut = done.error.kind === 'aborted' && deadline.signal.aborted && signal?.aborted !== true
+      return timedOut ? { ...done, error: { kind: 'timeout' as const, message: `Execution timed out after ${wallMs} ms` } } : done
+    })
     return { result, deliver: (...args) => run.deliver(...args), get finished() { return run.finished } }
   }
 }

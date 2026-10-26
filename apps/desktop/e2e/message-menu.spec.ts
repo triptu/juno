@@ -50,8 +50,8 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     if (Math.round(box.top) !== Math.round(at.y) + 1) expect(Math.round(box.bottom)).toBe(view - 6)
     expect(box.top).toBeLessThanOrEqual(at.y + 1)
     // Eleven emoji, the quick reactions first, then More reactions; no why row and no Copy Slack link.
+    await expect.poll(() => menu.grid()).toHaveLength(11)
     expect((await menu.grid()).slice(0, 3)).toEqual(['+1', 'white_check_mark', 'eyes'])
-    expect(await menu.grid()).toHaveLength(11)
     // Ask Juno shows while AI assist is on.
     const labels = (await menu.labels()).filter((label) => label !== 'Ask Juno')
     expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Open in Slack'])

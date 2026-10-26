@@ -34,7 +34,7 @@ async function heldToCardHeight({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>)
   fake.injectMedia({ channel: 'C0ENG', user: 'U0LEO', text: 'The venue floor plan', media: [{ name: 'floor-plan.png', width: 800, height: 600 }] })
   const image = juno.topic.message('The venue floor plan').getByRole('button', { name: 'Open floor-plan.png' })
   await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1)
-  expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
+  await expect.poll(() => image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 }
 
 syncedTest('pictures keep their box: a sent image before and after Slack\'s thumbnails, a 4:3 picture, a video, a partial file, late bytes; the viewer zooms and pans', async ({ juno, win, fake }) => {
@@ -79,7 +79,7 @@ syncedTest('pictures keep their box: a sent image before and after Slack\'s thum
     const image = row.getByRole('button', { name: 'Open Screenshot check.png' })
     await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
     await expect.poll(() => image.locator('img').evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
-    expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
+    await expect.poll(() => image.boundingBox()).toMatchObject({ width: 360, height: 225 })
     await expect(row.locator('[data-file-card]')).toHaveCount(0)
   })
   await test.step('a picture in the viewer zooms with a double-click and a pinch, and pans with a drag', () => zoomAndPan({ juno, win, fake }))
@@ -150,11 +150,11 @@ async function zoomAndPan({ juno, win, fake }: Pick<Fixtures, 'juno' | 'win' | '
   await win.mouse.move(box.x - 24, box.y + box.height / 2, { steps: 4 })
   await win.mouse.up()
   await expect(viewer).toHaveCount(1)
-  expect((await view()).e).not.toBe(before.e)
+  await expect.poll(async () => (await view()).e).not.toBe(before.e)
 
   await frame.dblclick()
   await expect.poll(async () => (await view()).a).toBe(1)
-  expect((await view()).e).toBe(0)
+  await expect.poll(async () => (await view()).e).toBe(0)
 
   await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await win.keyboard.down('Control')

@@ -20,7 +20,8 @@ import { forwardSignals } from './remote/children.mjs'
 
 // The default test timeout. The preload's setDefaultTimeout reaches only the
 // first file a Bun process runs, so it is passed on the command line too.
-const TIMEOUT_MS = 30_000
+// A stress run (JUNO_STRESS, scripts/remote/workers.sh) scales it with the load it adds.
+const TIMEOUT_MS = 30_000 * Number(process.env.JUNO_STRESS_SCALE ?? 1)
 
 const runsBunTest = (root, dir) => /^bun test\b/.test(JSON.parse(readFileSync(resolve(root, dir, 'package.json'), 'utf8')).scripts?.test ?? '')
 

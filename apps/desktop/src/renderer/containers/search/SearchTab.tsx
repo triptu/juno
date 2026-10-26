@@ -27,12 +27,13 @@ import {
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { searchTime, SearchField, SearchFilters, SearchPage, SearchResults, searchRowDomId, type SearchRowItem, type SearchToggle } from '@juno/views'
+import { wantComposerFocus } from '../pageFocus'
 import { openPalette } from '../paletteActions'
 import { messageLinkInfo, openMessageLink } from '../slackLinks'
 import { chipViewsOf, useSearchField } from './field'
 import { openResultHere, selectionOf, useListScroll, useResultRows, useWarmNeighbours, useWindowPaging } from './list'
 import { showFilterMenu } from './menus'
-import { moveReader, openResultBehind, SearchReader } from './Reader'
+import { moveReader, openResultBehind, readerView, SearchReader } from './Reader'
 
 /** Focus requests already taken, by session: a page shown again does not take focus twice. */
 const focusTaken = new Map<string, number>()
@@ -273,9 +274,16 @@ function ResultsColumn({ sessionId, session, snapshot, prefs, rows, empty, listR
       onHoverRow={onHoverRow}
       onLeaveTop={() => inputRef.current?.focus()}
       onTab={() => {
+        const shown = session.selected
+        if (!panelShown || shown === undefined) return false
         const composer = readerRef.current?.querySelector<HTMLTextAreaElement>('[data-composer] textarea')
-        if (composer == null || !panelShown) return false
-        composer.focus()
+        if (composer != null) {
+          composer.focus()
+          return true
+        }
+        // The reader shows its composer once the draft has loaded; until then Tab asks for it, and it takes focus as it
+        // mounts unless a key or the pointer was pressed since (pageFocus.ts).
+        wantComposerFocus(readerView(sessionId, shown.topicId))
         return true
       }}
       onType={(key) => {

@@ -35,7 +35,7 @@ const KEY_SETTLE_MS = 120
 const GONE_WAIT_MS = 400
 
 /** The reader's own view of a topic, apart from any tab's: its window and scroll position. */
-const readerView = (sessionId: string, topicId: string) => topicView(topicId, `search:${sessionId}`)
+export const readerView = (sessionId: string, topicId: string) => topicView(topicId, `search:${sessionId}`)
 
 /** The topic each session's reader shows, for `moveReader`. */
 const shownTopics = new Map<string, string>()

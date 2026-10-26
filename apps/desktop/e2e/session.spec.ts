@@ -152,10 +152,17 @@ test('sign-in: the preload and a second launch, importing the Slack app’s sess
       expect(fake.calls.find((call) => call.method === 'auth.test')?.ok).toBe(true)
       // ...and holds a socket open through main's cookie handshake.
       await expect.poll(() => fake.socketCount(), { timeout: 10_000 }).toBe(1)
-      // The verified secrets are on disk (plain JSON under JUNO_E2E) and the engine is live.
-      const stored = JSON.parse(await readFile(join(userData, 'secrets.bin'), 'utf8')) as { teamId: string; token: string }
-      expect(stored.teamId).toBe(fake.teamId)
-      expect(stored.token.startsWith('xoxc-')).toBe(true)
+      // The verified secrets are on disk (plain JSON under JUNO_E2E) and the engine is live. The engine asks main to
+      // store them and tells the page it is signed in in two messages, so the file can come after the page shows it.
+      const stored = async () => {
+        try {
+          return JSON.parse(await readFile(join(userData, 'secrets.bin'), 'utf8')) as { teamId: string; token: string }
+        } catch {
+          return undefined
+        }
+      }
+      await expect.poll(async () => (await stored())?.teamId).toBe(fake.teamId)
+      expect((await stored())!.token.startsWith('xoxc-')).toBe(true)
       await expect.poll(() => hooks(first.app, 'notificationRequests')).toBe(1)
       await juno.waitForSync()
       await sessionSaved(userData, fake.teamId)

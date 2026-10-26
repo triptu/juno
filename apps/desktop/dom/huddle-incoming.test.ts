@@ -32,7 +32,8 @@ domTest('a huddle the user started elsewhere shows no card, an ignored channel r
     await expect(card.getByRole('button', { name: 'Open huddle in #product' })).toBeVisible()
     await card.getByRole('button', { name: 'Dismiss' }).click()
     await expect(card).toBeHidden()
-    expect((await juno.osNotifications()).slice(shown).map((notification) => notification.title)).toEqual(['#product'])
+    // The notification reaches the shell on its own path, not with the card.
+    await expect.poll(async () => (await juno.osNotifications()).slice(shown).map((notification) => notification.title)).toEqual(['#product'])
     // Both end, so the next huddle in #eng is a new one.
     fake.control('endHuddle', { channel: 'C0ENG' })
     fake.control('endHuddle', { channel: 'C0PRODUCT' })

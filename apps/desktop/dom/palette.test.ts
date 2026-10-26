@@ -59,10 +59,7 @@ domTest('⌘K opens, switches tabs, finds conversations, topics, messages and co
       await expect(palette.row(POSTGRES)).toHaveCount(1)
       // Grafana's alerts on db-replica-2 are from an app.
       await expect(palette.row('db-replica-2')).toHaveCount(0)
-      // Slack's search used to be asked 400 ms after the last key: wait past that.
-      await new Promise((done) => setTimeout(done, 1_000))
-      // Sync's own discovery searches Slack too, never with typed text.
-      expect(fake.calls.filter((call) => call.method.startsWith('search.') && String(call.args['query']).includes('replica'))).toEqual([])
+      // That Slack was never asked is checked at the end of the test, long past the 400 ms after the last key when it used to be.
       await palette.press('Escape')
       await palette.expectClosed()
     })
@@ -326,7 +323,7 @@ domTest('⌘K opens, switches tabs, finds conversations, topics, messages and co
     })
 
     // ⌘K never waits on the network (performance 5.3). Sync's own discovery searches Slack too, never with typed text.
-    expect(fake.calls.filter((call) => call.method.startsWith('search.') && /platfo|nothing like/.test(String(call.args['query'])))).toEqual([])
+    expect(fake.calls.filter((call) => call.method.startsWith('search.') && /replica|platfo|nothing like/.test(String(call.args['query'])))).toEqual([])
 }, { timeout: 120_000 })
 
 async function openPalette({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
@@ -362,7 +359,7 @@ async function openPalette({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
   // The first frequent conversation is active, and Enter opens it in the current tab.
   await palette.open()
   await palette.expectResults()
-  expect(await palette.activeText()).not.toBe('')
+  await expect.poll(() => palette.activeText()).not.toBe('')
   await palette.press('Enter')
   await palette.expectClosed()
   await tabs.expectCount(1)

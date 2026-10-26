@@ -70,12 +70,12 @@ async function measured(engine: RunningEngine, time: Time, operation: () => Prom
       await tick()
       await time.advance(1_000)
       await tick()
-      const total = statementsSoFar()
+      const total = statementsSoFar(engine.userData)
       unchanged = done() && total === last ? unchanged + 1 : 0
       last = total
       if (Date.now() - started > WAIT_MS) throw new Error('the work did not settle')
     }
-  })
+  }, () => engine.userData)
   return sql
 }
 
@@ -171,6 +171,10 @@ it('the sidebar of 300 conversations reads its window, not the workspace', async
 it('a warm start re-indexes only the topics whose inputs changed', async () => {
   // The first start in a process syncs the template it copies; the counted one starts from a copy, as a relaunch does.
   await (await syncedEngine([], { timing: noTicks })).stop()
-  const { sql } = await countSql(async () => quiet(await syncedEngine(engines, { timing: noTicks })))
+  const { sql } = await countSql(async () => {
+    const engine = await syncedEngine(engines, { timing: noTicks })
+    await quiet(engine)
+    return engine
+  }, (engine) => engine.userData)
   expectWork('warm start', counts(sql), { statements: 815, rows: 950 }, detail(sql))
 })

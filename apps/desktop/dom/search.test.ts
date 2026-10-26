@@ -15,7 +15,7 @@ async function freshHome(juno: Juno): Promise<void> {
 }
 
 // One launch: each step searches its own words, from one Home tab.
-domTest('search opens results behind, scopes to a thread, hides apps until asked, keeps local rows when Slack fails, and takes text from ⌘K', async ({ juno, slack, fake, step }) => {
+domTest('search opens results behind, scopes to a thread, hides apps until asked, keeps local rows when Slack fails, and takes text from ⌘K', async ({ juno, slack, fake, app, step }) => {
   const { surface, tabs, win, sidebar, palette } = juno
   const page = searchPage(win)
 
@@ -39,6 +39,21 @@ domTest('search opens results behind, scopes to a thread, hides apps until asked
     await tabs.expectActive('heron')
     await expect(page.row('Heron dashboards are live')).toBeFocused()
     await expect.poll(() => tabs.titles()).toEqual(expect.arrayContaining([expect.stringMatching(/^design-review/), expect.stringMatching(/^product/)]))
+    await freshHome(juno)
+  })
+
+  // A Tab pressed before the draft came went past the placeholder, and the composer that mounted after had no focus.
+  await step('Tab from a result while the reader’s draft loads lands in its composer once it mounts', async () => {
+    await surface.appMenu('search-messages')
+    await page.field.pressSequentially('heron')
+    await expect(page.rows).toHaveCount(3)
+    await page.field.press('ArrowDown')
+    const release = app.holdReplies('drafts.get')
+    await win.keyboard.press('Space')
+    await expect(page.reader.locator('[data-composer-slot]')).toBeVisible()
+    await win.keyboard.press('Tab')
+    release()
+    await expect(page.reader.locator('[data-composer] textarea')).toBeFocused()
     await freshHome(juno)
   })
 
@@ -112,6 +127,7 @@ domTest('search opens results behind, scopes to a thread, hides apps until asked
     await palette.type('cormorant in:C0ENG')
     await palette.expectResults()
     // The first selection stays on a result; the arrows reach the last row as any other.
+    await expect.poll(() => palette.activeText()).not.toBe('')
     expect(await palette.activeText()).not.toMatch(/All results for/)
     await palette.arrowTo(/All results for “cormorant in:C0ENG”/)
     await palette.press('Enter')

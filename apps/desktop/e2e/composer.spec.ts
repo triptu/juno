@@ -323,7 +323,7 @@ async function upAndEsc({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promis
     await win.keyboard.press('ArrowDown')
     await expect(topic.composer).toBeFocused()
     await expect(topic.composer).toHaveValue(draft)
-    expect(await caretOf(topic.composer)).toEqual([at, at])
+    await expect.poll(() => caretOf(topic.composer)).toEqual([at, at])
   })
 
   await test.step('a first paragraph that wraps: ↑ from its last visual line moves the caret, from its first it selects', async () => {

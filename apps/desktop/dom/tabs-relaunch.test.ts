@@ -40,12 +40,16 @@ domTest("a relaunch keeps every tab, pinned ones first, their topic drafts, each
   slack.as('Tushar').postIn('eng', 'Pelican migration plan for the queue')
   for (const n of ['one', 'two', 'three']) slack.as('Leo').replyIn('Pelican migration plan', `pelican step ${n} is done`)
   await juno.sidebar.row('Pelican migration plan').expectVisible()
+  // Each draft is typed once its topic shows, not into the topic still on screen.
   await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
   await juno.topic.composer.fill('Draft one')
   await juno.sidebar.row(RINA).openInNewTab()
+  await juno.topic.expectTitle(RINA)
   await juno.topic.composer.fill('Draft two')
   await juno.sidebar.row(ROADMAP).openInNewTab()
   await juno.sidebar.row('#eng').openInNewTab()
+  await juno.topic.expectTitle('Main')
   await juno.topic.composer.fill('Draft in Main')
   await juno.sidebar.row(POSTGRES).openInNewTab()
   // Two Home tabs, from ⌘-click on Home and from ⌘T, each with its own draft and destination.
@@ -83,8 +87,8 @@ domTest("a relaunch keeps every tab, pinned ones first, their topic drafts, each
   await juno.tabs.contextMenu(ROADMAP, 'pin')
   await juno.tabs.expectPinned(ROADMAP)
   await juno.tabs.expectCount(8)
+  await expect.poll(async () => (await juno.tabs.titles())[0]).toMatch(/^Proposal/)
   const before = await juno.tabs.titles()
-  expect(before[0]).toMatch(/^Proposal/)
   await juno.tabs.select('Rina')
 
   // Privacy mode: message text in the sidebar is hidden.
@@ -116,7 +120,7 @@ domTest("a relaunch keeps every tab, pinned ones first, their topic drafts, each
 
   await step('privacy mode is still on from the first render, and the footer turns it off', async () => {
     await expect(restarted.privacy.footer).toBeVisible()
-    expect(restarted.win.document.documentElement.hasAttribute('data-privacy')).toBe(true)
+    await expect.poll(() => restarted.win.document.documentElement.hasAttribute('data-privacy')).toBe(true)
     const rina = restarted.sidebar.row(RINA)
     await rina.expectVisible()
     await restarted.privacy.expectBlurred(rina.preview)

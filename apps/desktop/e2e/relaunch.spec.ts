@@ -49,7 +49,7 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
   await test.step('a share that starts while Juno runs hides message text, and stopping shows it again', async () => {
     await privacy.startSharing()
     await privacy.expectBlurred(rina.preview)
-    expect(await privacy.footerText()).toBe('Message text hidden while sharing')
+    await privacy.expectFooter('Message text hidden while sharing')
     await privacy.stopSharing()
     await expect(privacy.footer).toHaveCount(0)
     await privacy.expectBlurred(rina.preview, false)
@@ -71,7 +71,7 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
     await privacy.toggleWithMenu()
     await privacy.startSharing()
     await privacy.stopSharing()
-    expect(await privacy.footerText()).toBe('Message text hidden')
+    await privacy.expectFooter('Message text hidden')
     await privacy.expectBlurred(rina.preview)
     // Turned on by sharing, then touched by hand (off and on again): it is the user's now and stays on.
     await privacy.toggleWithMenu()
@@ -81,7 +81,7 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
     await privacy.toggleWithMenu()
     await privacy.toggleWithMenu()
     await privacy.stopSharing()
-    expect(await privacy.footerText()).toBe('Message text hidden')
+    await privacy.expectFooter('Message text hidden')
     await privacy.toggleWithMenu()
     await expect(privacy.footer).toHaveCount(0)
 
@@ -103,7 +103,7 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
     await rina.expectVisible()
     await expect(privacy.footer).toBeVisible()
     await privacy.expectBlurred(rina.preview)
-    expect(await privacy.menuLabel()).toBe('Show Message Text')
+    await expect.poll(() => privacy.menuLabel()).toBe('Show Message Text')
   })
 
   await test.step('the sidebar resizes by its edge, resets on double-click, and hides', async () => {

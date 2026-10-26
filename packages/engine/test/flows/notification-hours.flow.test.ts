@@ -6,6 +6,7 @@ import { notificationsSetGroupHours, notificationsSettings, notificationsStatus,
 import { liveQuery, notificationsPageAtom, runCommand } from '@juno/state'
 import { Schema } from 'effect'
 import { productionTiming } from '../../src/config'
+import { clockAt, localNoon } from '../controlledClock'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { restart, valueOf } from '../scenario'
 import { step } from '../step'
@@ -141,7 +142,9 @@ it('Use Juno’s hours writes nothing when Slack holds them; a change made in Sl
 })
 
 it('hours saved by an older version load; Saturday reaches Slack as a custom day, Weekdays sets all five, and the Active in Slack rows set presence by the day', async () => {
-  const engine = await synced()
+  // Presence follows the local day and time, so the engine reads noon whenever the test runs.
+  const noon = localNoon()
+  const engine = await synced({ clock: clockAt(noon) })
   const rowOf = (day: number): HoursGroup => (day === 6 ? 'saturday' : day === 0 ? 'sunday' : 'weekdays')
 
   await step('hours saved before the rows, Monday to Thursday with one from and to, load as they were', async () => {
@@ -178,10 +181,8 @@ it('hours saved by an older version load; Saturday reaches Slack as a custom day
   await step('the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async () => {
     const status = (predicate: (value: NotificationStatus) => boolean, label: string) =>
       liveUntil<NotificationStatus, NotificationStatus>(engine, liveQuery(notificationsStatus)(undefined), (value) => (predicate(value) ? value : undefined), label)
-    const now = new Date()
-    const today = now.getDay()
-    const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
-    await setRow(engine, 'presence', rowOf(today), { from: half, to: (half + 120) % 1440 })
+    const today = new Date(noon).getDay()
+    await setRow(engine, 'presence', rowOf(today), { from: 660, to: 780 })
     expect((await status((value) => value.presence === 'active', 'active by today\'s row')).presenceLabel).toMatch(/^Active/)
     // Every row off but the weekend day that is not today, 11am to 2pm.
     const weekend: HoursGroup = today === 6 ? 'sunday' : 'saturday'

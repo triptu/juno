@@ -2776,9 +2776,9 @@ export class PrivacyMode {
     return this.surface.menuLabel('toggle-privacy')
   }
 
-  /** The footer's text: "Message text hidden", or "… while sharing" when sharing turned it on. */
-  footerText(): Promise<string> {
-    return this.footer.getByText(/^Message text hidden/).innerText()
+  /** The footer says `text`: "Message text hidden", or "… while sharing" when sharing turned it on. */
+  async expectFooter(text: string): Promise<void> {
+    await expect(this.footer.getByText(/^Message text hidden/)).toHaveText(text)
   }
 
   /** Another app starts capturing the screen, as main's screen watch would see it (the JUNO_E2E seam). */

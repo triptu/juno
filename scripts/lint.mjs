@@ -13,6 +13,7 @@ const checks = [
   ['cache epoch', bun('check-cache-epoch.mjs')],
   ['migration order', bun('check-migration-order.mjs')],
   ['cursor rule', bun('check-no-pointer-cursor.mjs')],
+  ['test timing', bun('check-test-patterns.mjs')],
   ['duotone icons', bun('check-duotone.mjs')],
   ['tokens', bun('check-tokens.mjs')],
   ['dependencies', bun('check-deps.mjs')],

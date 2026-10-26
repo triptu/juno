@@ -136,14 +136,16 @@ export function Popover({
     // An owner that stayed open after Escape is not closing; forget it.
     restoreFocus.current = false
     // An owner whose content closes on Escape itself (an option list's search) does so before the key
-    // bubbles to `onKey`, so mark where focus was on the way down; the mark lasts for this key only.
+    // bubbles to `onKey`, so mark where focus was on the way down. The close can commit in a later task than
+    // the key, so the mark lasts until the panel closes or the next other input, not for a timer.
     const onEscapeDown = (event: KeyboardEvent) => {
       const panel = panelRef.current
-      if (event.key !== 'Escape' || panel === null || !panel.contains(document.activeElement)) return
-      restoreFocus.current = true
-      setTimeout(() => {
+      if (event.key !== 'Escape') {
         restoreFocus.current = false
-      })
+        return
+      }
+      if (panel === null || !panel.contains(document.activeElement)) return
+      restoreFocus.current = true
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -154,6 +156,7 @@ export function Popover({
       }
     }
     const onPointerDown = (event: PointerEvent) => {
+      restoreFocus.current = false
       const root = rootRef.current
       if (root && event.target instanceof Node && !root.contains(event.target)) onClose()
     }
