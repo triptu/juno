@@ -5,7 +5,7 @@ import { connect } from 'node:net'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { proxyFor } from '../src/session/handshake'
 import type { RunningEngine } from './harness'
-import { bootedEngine } from './scenario'
+import { syncedEngine } from './synced'
 
 const engines: Array<RunningEngine> = []
 const servers: Array<Server> = []
@@ -41,7 +41,7 @@ async function connectProxy(): Promise<{ readonly port: number; readonly tunnels
 describe('socket proxy', () => {
   it('reconnects through the HTTP proxy main names and still receives events', async () => {
     const proxy = await connectProxy()
-    const engine = await bootedEngine(engines)
+    const engine = await syncedEngine(engines)
     const fakeHost = new URL(engine.fake.url).host
     engine.main.network.proxy = `PROXY 127.0.0.1:${proxy.port}; DIRECT`
     engine.fake.dropSocket()

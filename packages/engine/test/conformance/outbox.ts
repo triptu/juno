@@ -23,7 +23,8 @@ import type { GatedCall } from '@juno/fake-slack'
 import { deleteMessage, discardMessage, editMessage, retryMessage, runCommand } from '@juno/state'
 import { Exit } from 'effect'
 import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from '../harness'
-import { bootedEngine, quiet, readDb } from '../scenario'
+import { quiet, readDb } from '../scenario'
+import { syncedEngine } from '../synced'
 import type { Trace, TraceState } from './itf'
 import {
   DRAFTS,
@@ -344,7 +345,7 @@ export const outboxSpec: Spec<World, View> = {
     // This model schedule has neither a fallback read nor any observation of the deleted original.
     const covers = trace.states.every((state) => sOf(state).label !== 'catchUp' || sOf(state).rechecked.size > 0)
     const options: EngineOptions = covers ? {} : { recheckTopics: 0 }
-    const engine = await bootedEngine([], options)
+    const engine = await syncedEngine([], options)
     const world: World = {
       engine,
       reader: outboxReader(engine),
