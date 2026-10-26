@@ -1,0 +1,1 @@
+- 10-26 20:32 · Tushar · Keep every forced-gallery event and whole-frame comparison; reuse each check's task channel and focus-attribute sets, and wait for in-place frame visibility beside the navigation to avoid repeated driver polling. Per-state profiling and the rejected snapshot shortcut are recorded in `docs/reviews/2026-10-26-gallery-cost.md`.
