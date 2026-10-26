@@ -12,7 +12,7 @@ import type { CrashPoint } from '@juno/agent/crash'
 import { caughtUpSeed } from '../caughtUpSeed'
 import { Juno } from '../driver/juno'
 import { hooks, launchApp, type LaunchOptions, type RunningApp } from '../fixtures'
-import { addServer, agentReady, card, expectKilled, launchArmed, openChat, ready } from './agent'
+import { addServer, agentReady, card, expectKilled, launchArmed, openChat, ready, readySynced } from './agent'
 import { codemode, codemodeAnswer, diagnostics, rejectionInMain, SCRIPT, seedFullLogs } from './processes'
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
@@ -309,7 +309,7 @@ for (const point of MESSAGE_POINTS) {
 
 /** Connects the fake Littlebird, has Juno propose a note, and clicks Add material with `point` armed. */
 async function applyNote(juno: Juno, mcp: FakeLittlebird, app: RunningApp['app']): Promise<{ readonly pid: number | undefined }> {
-  await ready(juno)
+  await readySynced(juno)
   const { id } = await addServer(juno, 'Notes', mcp.url)
   const chat = await openChat(juno)
   await chat.send(`${NOTE} on ${id}`)
@@ -333,7 +333,8 @@ async function expectChatIntact(juno: Juno, status: 'done' | 'failed'): Promise<
   await expect(card(chat, 'change')).toHaveAttribute('data-card-status', status)
 }
 
-test('a write that reached the server before the agent died is not sent again; after a clean relaunch a codemode script runs, and About shows every process and copies content-free diagnostics', async ({ userData, options, mcp, fake }) => {
+// Starts from the synced workspace (README, "Synced start"): sign-in is not what it checks.
+test.extend({ synced: true })('a write that reached the server before the agent died is not sent again; after a clean relaunch a codemode script runs, and About shows every process and copies content-free diagnostics', async ({ userData, options, mcp, fake }) => {
   await seedFullLogs(userData)
   await using(launchArmed(userData, options, 'attempt.beforeReceipt'), async (juno, { app }) => {
     const { pid } = await applyNote(juno, mcp, app)

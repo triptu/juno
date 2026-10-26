@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from '../driver/juno'
-import { agentReady, card, expectArmedCrash, openChat, openSettings, pickFolder, ready, restartArmed } from './agent'
+import { agentReady, card, expectArmedCrash, openChat, openSettings, pickFolder, ready, readySynced, restartArmed } from './agent'
 import { answer, expect, test as base } from './chat'
 
 /** Exports every second instead of every minute, so each Mac sees the other's backup quickly. */
@@ -34,6 +34,9 @@ const test = base.extend<{ readonly shared: string; readonly model: FakeOpenRout
   agentOptions: async ({ model }, use) => use({ agent: true, fakeOpenRouterUrl: model.origin, deviceName: 'Studio', backupIntervalMs: BACKUP_INTERVAL_MS }),
 })
 
+// The first Mac starts from the synced workspace (README, "Synced start"); the second signs in.
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 180_000 })
 
 const point = 'restore.swapped'
@@ -48,7 +51,7 @@ test(`backup to a shared folder, export the phrase, move to a second Mac whose a
 
 /** The first Mac: a chat with a pending card, and the backup on from the start, in its own folder. */
 async function backUpAndMove(juno: Juno, shared: string): Promise<{ readonly phrase: string; readonly code: string }> {
-  await ready(juno)
+  await readySynced(juno)
   const chat = await openChat(juno)
   await chat.send('what is on today?')
   await chat.expectJuno('You said: what is on today?')

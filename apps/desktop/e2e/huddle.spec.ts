@@ -7,9 +7,9 @@
  * page's media stopped (`stopMedia`), as Chime would.
  */
 import type { ElectronApplication } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import { hooks } from './hooks'
-import { addRemote, attendee, chimeDrops, connection, huddleMenuItem, localMuted, microphoneAccess, openEngMain, playing, sharesReady, startHuddleFromMenu, startShare, stopShare } from './huddleFake'
+import { addRemote, attendee, chimeDrops, connection, huddleMenuItem, localMuted, microphoneAccess, openEng, openEngMain, playing, sharesReady, startHuddleFromMenu, startShare, stopShare } from './huddleFake'
 import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 90_000 })
@@ -114,12 +114,12 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   })
 })
 
-test('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings; quitting in a huddle asks first', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app, running }) => {
+syncedTest('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings; quitting in a huddle asks first', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app, running }) => {
   const { palette } = juno
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
   await test.step('start and mute a huddle from the palette, with the Huddle menu following, and show it', async () => {
-    await openEngMain(juno)
+    await openEng(juno)
     // No huddle: the Huddle menu is dimmed, and the palette offers only Start huddle on a Main.
     expect(await huddleMenuItem(app, 'huddle-show')).toEqual({ label: 'Show Huddle', enabled: false })
     expect(await huddleMenuItem(app, 'huddle-mute')).toEqual({ label: 'Mute Microphone', enabled: false })
