@@ -11,7 +11,8 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { Window } from 'happy-dom'
 import type { PageClock } from './clock'
-import { closeSockets, pageClosed, pageSocket } from './socket'
+import { closeSockets, pageClosed, pageSocket, serialFrames } from './socket'
+import { meterOf, renderHook, seedRandom } from './work'
 import { checkRealm, LANGUAGE, prepareRealm, startRenderer } from './realm'
 
 export const DOM_BUILD = resolve(__dirname, 'dist')
@@ -69,7 +70,7 @@ const quiet = Object.fromEntries(['log', 'info', 'debug', 'trace', 'group', 'gro
  * its localStorage first. The page's errors and warnings reach the test
  * output; JUNO_DOM_DEBUG=1 passes everything.
  */
-export function openWindow(url: string, clock?: PageClock, engineClock?: Parameters<PageClock['install']>[1], storage: ReadonlyArray<readonly [string, string]> = []): Window {
+export function openWindow(url: string, clock?: PageClock, engineClock?: Parameters<PageClock['install']>[1], storage: ReadonlyArray<readonly [string, string]> = [], counted = false): Window {
   const window = new Window({
     url,
     width: 1200,
@@ -93,6 +94,10 @@ export function openWindow(url: string, clock?: PageClock, engineClock?: Paramet
   clock?.install(window, engineClock)
   for (const [key, value] of storage) window.localStorage.setItem(key, value)
   window.document.write(`<!doctype html><html><head><style>${rootSheet()}</style></head><body><div id="root"></div></body></html>`)
+  if (counted) {
+    serialFrames(window)
+    seedRandom(window)
+  }
   warmRenderer()
   startRenderer(window, language)
   return window
@@ -165,8 +170,12 @@ function messageChannel(window: Window): new () => { readonly port1: EventTarget
       const other = this.other
       if (this.#closed || other === undefined) return
       const copy = structuredClone(data)
+      const meter = meterOf(window)
+      meter.posts++
       // Bun's timer, not the page's, which a test clock may hold.
-      setImmediate(() => other.receive(copy))
+      setImmediate(() => {
+        try { other.receive(copy) } finally { meter.posts-- }
+      })
     }
 
     receive(data: unknown): void {
@@ -333,6 +342,8 @@ function fillGaps(window: Window): void {
   for (const name of ['structuredClone', 'BroadcastChannel']) if (globals[name] === undefined) globals[name] = (globalThis as Record<string, unknown>)[name]
   if (globals['WebSocket'] === undefined) globals['WebSocket'] = pageSocket(window)
   if (globals['MessageChannel'] === undefined) globals['MessageChannel'] = messageChannel(window)
+  // React reports each commit here, as to React DevTools: the counted renders (`work.ts`).
+  if (globals['__REACT_DEVTOOLS_GLOBAL_HOOK__'] === undefined) globals['__REACT_DEVTOOLS_GLOBAL_HOOK__'] = renderHook(window)
   if (globals['requestIdleCallback'] === undefined) {
     globals['requestIdleCallback'] = (callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void) => (window.setTimeout as unknown as (run: () => void, delay: number) => number)(() => callback({ didTimeout: false, timeRemaining: () => 50 }), 1)
     globals['cancelIdleCallback'] = (id: number) => (window.clearTimeout as unknown as (id: number) => void)(id)

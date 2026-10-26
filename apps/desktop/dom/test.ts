@@ -34,6 +34,8 @@ export interface DomTestOptions<M extends Model | undefined = undefined> {
   readonly clock?: boolean | number | Date
   /** Starts the model the agent talks to; the agent runs with it unless `engine.agent` is false, and the engine's AI uses it. */
   readonly model?: () => Promise<M & Model>
+  /** The engine's frames reach the page one at a time, so counted renders do not depend on timing (`work.ts`). */
+  readonly counted?: boolean
   readonly timeout?: number
   /** Tags, as a Playwright test has them: a test with a tag JUNO_SKIP_TAGS names is skipped (`@nightly`, scripts/test-areas.mjs). */
   readonly tag?: ReadonlyArray<string>
@@ -82,7 +84,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
     warmWorker()
     const snapshot = options.synced === false ? undefined : await domSnapshot(signIn)
     const ready = meter.lap()
-    const started = await startDomApp({ snapshot, engine, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
+    const started = await startDomApp({ snapshot, engine, counted: options.counted === true, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
     const warm = meter.lap()
     const others: Array<{ app: DomApp | undefined; readonly userData: string }> = []
     try {

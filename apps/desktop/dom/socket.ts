@@ -1,12 +1,51 @@
 /**
- * The page's WebSocket in the DOM lane (`window.ts` installs it), and a hold
- * on the engine's replies that lets a test make the engine slow.
+ * The page's WebSocket in the DOM lane (`window.ts` installs it): a hold on
+ * the engine's replies that lets a test make the engine slow, the port
+ * traffic counted by RPC route (`work.ts`), and, with `serialFrames`, the
+ * engine's frames handed to the page one at a time.
  */
 import type { Window } from 'happy-dom'
+import { meterOf } from './work'
 
 /** Windows `closeWindow` has closed, and each window's open sockets. */
 const closed = new WeakSet<Window>()
 const sockets = new WeakMap<Window, Set<WebSocket>>()
+
+/** Windows whose engine frames reach the page one at a time (`serialFrames`). */
+const serial = new WeakSet<Window>()
+
+/**
+ * Hands `window`'s engine frames to the page one at a time, the next once the
+ * page has nothing scheduled (`settled`), so frames never share a React
+ * commit by chance of timing and counted renders are the same in every run.
+ */
+export function serialFrames(window: Window): void {
+  serial.add(window)
+}
+
+/** The RPC protocol's own messages: the keep-alive, sent on a timer, and the acknowledgement of each stream value, which `messages` already counts. */
+const KEEP_ALIVE = new Set(['Ping', 'Pong', 'Ack'])
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
+/** Every number, run of digits and UUID counted at one width: a later timestamp, a larger id or a new message id is not more traffic. */
+const fixedNumbers = (_key: string, value: unknown) => (typeof value === 'number' ? 0 : typeof value === 'string' ? value.replace(UUID, 'uuid').replace(/\d+/g, '0') : value)
+const encoder = new TextEncoder()
+const bytesOf = (message: unknown) => encoder.encode(JSON.stringify(message, fixedNumbers)).byteLength
+
+/**
+ * Waits until the page has nothing scheduled: no message on a channel
+ * (React's scheduler) for three turns of Bun's own timers and immediates,
+ * which the page's zero-delay timers come before.
+ */
+async function settled(window: Window): Promise<void> {
+  const meter = meterOf(window)
+  let quiet = 0
+  while (quiet < 3 && !closed.has(window)) {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise((resolve) => setImmediate(resolve))
+    quiet = meter.posts === 0 ? quiet + 1 : 0
+  }
+}
 
 /**
  * Bun's WebSocket, which happy-dom does not know about: each one is kept so
@@ -17,30 +56,83 @@ const sockets = new WeakMap<Window, Set<WebSocket>>()
 export function pageSocket(window: Window): typeof WebSocket {
   const live = new Set<WebSocket>()
   sockets.set(window, live)
+  const meter = meterOf(window)
   return class PageSocket extends WebSocket {
     readonly #asked = new Map<string, string>()
+    readonly #listeners = new Map<unknown, (event: Event) => void>()
+    readonly #queue: Array<Event> = []
+    #pumping = false
+
     constructor(url: string | URL, protocols?: string | string[]) {
       if (closed.has(window)) throw new Error(`This page has closed; it cannot connect to ${new URL(url).pathname}`)
       super(url, protocols)
       live.add(this)
       this.addEventListener('close', () => live.delete(this))
+      super.addEventListener('message', (event) => this.#arrive(event))
     }
 
     override send(data: Parameters<WebSocket['send']>[0]): void {
-      if (typeof data === 'string') for (const message of rpcMessages(data)) if (message['_tag'] === 'Request') this.#asked.set(String(message['id']), String(message['tag']))
+      if (typeof data === 'string') {
+        for (const message of rpcMessages(data)) {
+          if (KEEP_ALIVE.has(String(message['_tag']))) continue
+          // The engine's RPC (`_tag`), or the web shell's bridge to what main does (`channel`).
+          const request = message['_tag'] === 'Request' || typeof message['channel'] === 'string'
+          if (request) this.#asked.set(String(message['id']), message['_tag'] === 'Request' ? String(message['tag']) : `bridge ${String(message['channel'])}`)
+          const traffic = meter.route(this.#asked.get(String(message['requestId'] ?? message['id'])) ?? String(message['_tag']))
+          if (request) traffic.requests++
+          traffic.bytesOut += bytesOf(message)
+        }
+      }
       super.send(data)
     }
 
     override addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
       if (type !== 'message') return super.addEventListener(type, listener, options)
-      const deliver = (event: Event) => (typeof listener === 'function' ? listener.call(this, event) : listener.handleEvent(event))
-      super.addEventListener(type, (event) => {
-        const hold = held.get(window)
-        const data = (event as MessageEvent).data
-        const tags = typeof data === 'string' ? rpcMessages(data).map((message) => this.#asked.get(String(message['requestId']))) : []
-        if (hold !== undefined && tags.some((tag) => tag !== undefined && hold.tags.has(tag))) hold.frames.push(() => deliver(event))
-        else deliver(event)
-      }, options)
+      this.#listeners.set(listener, (event) => (typeof listener === 'function' ? listener.call(this, event) : listener.handleEvent(event)))
+    }
+
+    override removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+      if (type !== 'message') return super.removeEventListener(type, listener, options)
+      this.#listeners.delete(listener)
+    }
+
+    #arrive(event: Event): void {
+      const data = (event as MessageEvent).data
+      const messages = typeof data === 'string' ? rpcMessages(data) : []
+      const tags = messages.map((message) => this.#asked.get(String(message['requestId'] ?? message['id'])))
+      messages.forEach((message, at) => {
+        if (KEEP_ALIVE.has(String(message['_tag']))) return
+        const traffic = meter.route(tags[at] ?? String(message['_tag'] ?? 'bridge'))
+        traffic.bytesIn += bytesOf(message)
+        if (message['_tag'] === 'Chunk' && Array.isArray(message['values'])) traffic.messages += message['values'].length
+        else if (message['_tag'] === 'Exit' || message['_tag'] === undefined) traffic.messages++
+      })
+      const hold = held.get(window)
+      if (hold !== undefined && tags.some((tag) => tag !== undefined && hold.tags.has(tag))) hold.frames.push(() => this.#deliver(event))
+      else this.#deliver(event)
+    }
+
+    #deliver(event: Event): void {
+      if (!serial.has(window)) return this.#dispatch(event)
+      this.#queue.push(event)
+      void this.#pump()
+    }
+
+    #dispatch(event: Event): void {
+      for (const listener of [...this.#listeners.values()]) listener(event)
+    }
+
+    async #pump(): Promise<void> {
+      if (this.#pumping) return
+      this.#pumping = true
+      try {
+        while (this.#queue.length > 0 && !closed.has(window)) {
+          this.#dispatch(this.#queue.shift()!)
+          await settled(window)
+        }
+      } finally {
+        this.#pumping = false
+      }
     }
   }
 }
