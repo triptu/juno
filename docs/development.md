@@ -1656,7 +1656,8 @@ ten lines, or a line with a commit hash. The script:
    tagged;
 3. uploads a draft release `v<version>` with the DMG, its block map and
    `latest-mac.yml` (plus the ZIP and its block map if signed), or reuses a
-   staged draft from the same build after checking its asset names and sizes;
+   staged draft from the same build after checking its asset names, sizes and
+   the local bytes against the digest saved when staging;
 4. adds the section to `CHANGELOG.md` with today's date;
 5. publishes the draft and marks it latest. Installs see it from now on;
 6. sets the released version on the current `origin/main` tip with a version-only
@@ -1672,7 +1673,8 @@ main update; an already published stable version is not uploaded again.
 full-run gate or highlights. It never changes latest, CHANGELOG.md or main.
 Publishing that draft still requires the normal gate and valid highlights.
 `--discard-draft` deletes only a staged draft whose build commit matches the
-checkout. Both refuse published releases and drafts from another build.
+checkout. Restaging the same build replaces its own draft if the rebuilt
+assets differ. Both refuse published releases and drafts from another build.
 Installed copies read `/releases/latest`, which excludes drafts and prereleases.
 
 `--dry-run` checks and prints the plan without changing anything.

@@ -337,6 +337,11 @@ test('a staged draft cannot publish without a full run, and only its build can r
   assert.match(partial.output, /incomplete or mismatched draft assets/)
   draft.assets = assets
   writeFileSync(file('gh-state.json'), JSON.stringify(state))
+  // Even a same-sized local change must not approve the old upload.
+  writeFileSync(file('repo/apps/desktop/release/Juno-0.1.9-arm64.dmg'), 'bad')
+  assert.equal(publish(['--notes', file('notes.md')]).code, 1)
+  assert.equal(publish(['--stage']).code, 0)
+  assert.equal(lines('gh-calls').filter((call) => call.startsWith('release create v0.1.9')).length, 2)
 
   commit('A different build', { 'apps/desktop/src/app.js': 'another' })
   const other = publish(['--discard-draft'])

@@ -20,6 +20,7 @@
  *   --dir <path>     the build folder (default apps/desktop/release)
  *   --repo <o/r>     the releases repository (default triptu/juno-releases)
  */
+import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -84,7 +85,7 @@ if (published && !values.prerelease) {
 }
 // Only drafts created by this exact build can be resumed or deleted.
 const existing = releases.find((release) => release.tagName === tag)
-const draft = existing?.isDraft ? JSON.parse(gh(['release', 'view', tag, '--repo', repo, '--json', 'body,assets'])) as { body: string; assets: Array<{ name: string; size: number }> } : undefined
+let draft = existing?.isDraft ? JSON.parse(gh(['release', 'view', tag, '--repo', repo, '--json', 'body,assets'])) as { body: string; assets: Array<{ name: string; size: number }> } : undefined
 if (existing && (!draft || !draft.body.includes(`<!-- juno-build: ${buildCommit} -->`)
   || !draft.body.includes('<!-- juno-staged -->'))) fail(`${repo} already has ${tag}; refusing to change another release`)
 if (values['discard-draft']) {
@@ -143,7 +144,16 @@ if (!urgent) {
   }
 }
 
-if (draft && (draft.assets.length !== files.length || files.some((name) => !draft.assets.some((asset) => asset.name === name && asset.size === statSync(join(dir, name)).size)))) fail(`${tag} has incomplete or mismatched draft assets; discard the draft and stage it again`)
+const assetDigest = createHash('sha256').update(JSON.stringify(files.toSorted().map((name) => [name,
+  createHash('sha256').update(readFileSync(join(dir, name))).digest('hex'),
+]))).digest('hex')
+if (draft && (!draft.body.includes(`<!-- juno-assets: ${assetDigest} -->`) || draft.assets.length !== files.length
+  || files.some((name) => !draft.assets.some((asset) => asset.name === name && asset.size === statSync(join(dir, name)).size)))) {
+  if (!values.stage) fail(`${tag} has incomplete or mismatched draft assets; discard the draft and stage it again`)
+  // Rebuilding the same commit can change DMG timestamps. Restage our own draft.
+  if (!dry) measured('discard draft', () => gh(['release', 'delete', tag, '--repo', repo, '--yes']))
+  draft = undefined
+}
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
   .map((release) => normalizeVersion(release.tagName)).toSorted(compareVersions).at(-1)
 if (newest !== undefined && compareVersions(version, newest) <= 0) fail(`${version} is not newer than the published ${newest}`)
@@ -163,7 +173,7 @@ if (urgent) {
 const scratch = mkdtempSync(join(scratchFolder(), 'juno-release-'))
 try {
   const notesFile = join(scratch, 'notes.md')
-  writeFileSync(notesFile, `${lines.map((line) => `- ${line}`).join('\n')}\n${urgent ? '\n<!-- juno-release: urgent -->\n' : ''}\n<!-- juno-source: ${sourceCommit} -->\n<!-- juno-build: ${buildCommit} -->\n<!-- juno-staged -->\n`)
+  writeFileSync(notesFile, `${lines.map((line) => `- ${line}`).join('\n')}\n${urgent ? '\n<!-- juno-release: urgent -->\n' : ''}\n<!-- juno-source: ${sourceCommit} -->\n<!-- juno-build: ${buildCommit} -->\n<!-- juno-staged -->\n<!-- juno-assets: ${assetDigest} -->\n`)
   if (!draft) {
     // gh uploads all assets concurrently, with five workers (including signed ZIPs).
     measured('upload', () => gh(['release', 'create', tag, '--repo', repo, '--draft', '--title', `Juno ${version}`, '--notes-file', notesFile,
