@@ -335,6 +335,19 @@ if (specs.length > 0) {
   })
 }
 
+// A test file the change edits runs again, several times over, in one more step per lane: a new or changed test that
+// passes only some of the time fails here, before it merges (docs/development.md, "Rules for tests").
+const REPEATS = { test: 5, 'test:dom': 5, 'test:desktop': 3 }
+const edited = (items) => pending(items.filter((item) => changed.includes(item.id)).map((item) => ({ ...item, suite: `repeat-${item.suite}`, own: true })))
+if (!batch) {
+  const unitRepeat = edited(unitItems)
+  if (unitRepeat.length > 0) plan.push({ script: 'test', args: [`--rerun-each=${REPEATS.test}`, '--files', ...unitRepeat.map((item) => item.id)], items: unitRepeat, why: `${REPEATS.test} more runs of each unit test file the change edits` })
+  const domRepeat = edited(domItems)
+  if (domRepeat.length > 0) plan.push({ script: 'test:dom', args: [`--rerun-each=${REPEATS['test:dom']}`, '--files', ...domRepeat.map((item) => item.id)], env: Object.keys(skipEnv).length > 0 ? skipEnv : undefined, items: domRepeat, why: `${REPEATS['test:dom']} more runs of each DOM test file the change edits` })
+  const specRepeat = edited(specItems.filter((item) => !heavyOnly.has(item.id)))
+  if (specRepeat.length > 0) plan.push({ script: 'test:desktop', args: [...specRepeat.map((item) => item.id.replace('apps/desktop/', '')), `--repeat-each=${REPEATS['test:desktop']}`], env: Object.keys(skipEnv).length > 0 ? skipEnv : undefined, items: specRepeat, why: `${REPEATS['test:desktop']} more runs of each e2e spec the change edits` })
+}
+
 // The tool tests of the repository's scripts (scripts/affected-tests.mjs).
 for (const { script, reached } of bunTestScripts(root, changed))
   if (everythingChanged.length > 0 || toolChanged.length > 0 || reached.length > 0)
