@@ -1781,7 +1781,7 @@ for parsing the StyleX source files, not a lint speedup.
 
 ## Delayed-load layout checks
 
-Gallery image, avatar, thumbnail, replier and late-content checks run on every behavior invocation. The content cache applies only to the broad interaction checks; it does not replace delayed-load checks against fake Slack. `GALLERY_SHIFT_ALL=1` (fast states) and `GALLERY_REAL_WALK=1` (real input) forces the broad walk too.
+Gallery image, avatar, thumbnail, replier and late-content checks run on every behavior invocation. The content cache applies only to the broad interaction checks; it does not replace delayed-load checks against fake Slack. `GALLERY_SHIFT_ALL=1` forces all fast states; `GALLERY_REAL_WALK=1` forces all real-input states.
 
 At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remote runner with two workers. This is test time, excluding allocation, image pull and build. Use `bun run remote --machine linux/amd64:4x8 test:desktop layout-shift.spec.ts` for the same runner size.
 
