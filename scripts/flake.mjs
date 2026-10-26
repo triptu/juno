@@ -63,7 +63,7 @@ const runner = unit
 const env = options.workers ? ['--env', `JUNO_E2E_WORKERS=${options.workers}`, '--env', `JUNO_BROWSER_WORKERS=${options.workers}`, '--env', `GALLERY_WORKERS=${options.workers}`, '--env', `JUNO_TEST_WORKERS=${options.workers}`] : []
 // GALLERY_SHIFT_ONLY=MediaViewer bun run flake apps/gallery/shift.spec.ts: the walk covers only those components.
 if (process.env.GALLERY_SHIFT_ONLY) env.push('--env', `GALLERY_SHIFT_ONLY=${process.env.GALLERY_SHIFT_ONLY}`)
-if (options.stress) env.push('--env', 'JUNO_STRESS=1')
+if (options.stress) env.push('--env', 'JUNO_STRESS=1', ...(process.env.JUNO_STRESS_CPU_RATE ? ['--env', `JUNO_STRESS_CPU_RATE=${process.env.JUNO_STRESS_CPU_RATE}`] : []))
 const args = [join(root, 'scripts/remote.mjs'), ...(options.machines > 1 ? ['--shards', String(options.machines)] : []), ...env, suite.script, ...runner]
 console.error(`flake: ${options.specs.join(' ')}${options.grep ? ` -g "${options.grep}"` : ''}, ${each} times on each of ${options.machines} job(s)${options.stress ? ', under stress' : ''}`)
 
