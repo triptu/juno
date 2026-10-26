@@ -38,6 +38,9 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
     const ts = id!.slice(id!.indexOf(':') + 1)
     await expect(page.locator(`[data-search-reader] [data-message-row="${ts}"]`)).toBeVisible()
     await expect.poll(async () => (await juno.measures('juno.search-reader')).length).toBe(i + 1)
+    // A reader's pause before the next arrow, so the neighbour's prefetch has landed: pressed at once, one
+    // arrow in 17 found it still loading and painted the stand-in (laptop, 10-26).
+    await juno.win.waitForTimeout(150)
   }
   // The first moves warm the neighbours; the rest read from a warm cache.
   const readerSamples = await juno.measures('juno.search-reader')
