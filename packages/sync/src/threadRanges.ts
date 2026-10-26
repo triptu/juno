@@ -111,7 +111,10 @@ export const provenToEnd = (ranges: ReadonlyArray<ThreadRange>, from: string, la
 /**
  * The unread count is exact: the pointer (the root when the thread was never
  * read) is at or past the latest reply, or one range reaches from it to the
- * end, through a tail that is not `none` or up to the latest reply.
+ * end, through a tail that is not `none` or up to the latest reply. A `live`
+ * and a `held` tail count the same here, and this is all `reindexTopics`
+ * reads of a range, so the store's `topic_inputs` trigger keeps a topic's
+ * index when a tail moves between them.
  */
 export const countExact = (ranges: ReadonlyArray<ThreadRange>, pointer: string, latestReply: string | undefined): boolean =>
   latestReply === undefined ||

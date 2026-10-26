@@ -15,9 +15,10 @@ import { Effect } from 'effect'
  *   which count the same (`countExact`);
  * - a channel's newest synced range and its counts in `channel_reads`;
  * - the topic's own row, when anything else writes it;
- * - any stored name (people, user groups, conversations) or a
- *   conversation's kind, for every topic: a preview names whoever it
- *   mentions.
+ * - for every topic, a person or user group renamed or deleted, and a
+ *   conversation added, renamed, deleted or changing kind: a preview names
+ *   whoever it mentions. A new person or group cannot change a marked row,
+ *   which found everyone it looked for.
  * The table starts empty, so every topic is re-indexed once more after this
  * migration.
  */
@@ -71,7 +72,6 @@ export default Effect.gen(function* () {
     conversations: 'OLD.name IS NOT NEW.name OR OLD.kind IS NOT NEW.kind',
   }
   for (const [table, changed] of Object.entries(names)) {
-    // A marked row found every person and group it looked for (`reindex.ts`), so a new one cannot change it.
     if (table === 'conversations') yield* sql.unsafe(`CREATE TRIGGER topic_inputs_${table}_insert AFTER INSERT ON ${table} BEGIN DELETE FROM topic_inputs; END`)
     yield* sql.unsafe(`CREATE TRIGGER topic_inputs_${table}_delete AFTER DELETE ON ${table} BEGIN DELETE FROM topic_inputs; END`)
     yield* sql.unsafe(`CREATE TRIGGER topic_inputs_${table}_update AFTER UPDATE ON ${table} WHEN ${changed} BEGIN DELETE FROM topic_inputs; END`)
