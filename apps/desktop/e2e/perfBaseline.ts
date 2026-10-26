@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { arch } from 'node:os'
 import { resolve } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { jobSpeed, judge, type BaselineFile } from '@juno/testing/perf-rule'
+import { judge, type BaselineFile } from '@juno/testing/perf-rule'
 
 /**
  * How a perf scenario fails (performance.md 7.3). On the Mac the budgets of
@@ -14,7 +14,7 @@ import { jobSpeed, judge, type BaselineFile } from '@juno/testing/perf-rule'
  */
 
 /** Absolute floors on the laptop, so a 2 ms metric does not fail on 0.5 ms of noise. */
-const FLOORS = { ms: 2, MB: 20, frames: 0, '%': 0 } as const
+const FLOORS = { ms: 1, MB: 20, frames: 0, '%': 0 } as const
 
 export interface Metric {
   readonly name: string
@@ -59,22 +59,20 @@ function record(entry: Record<string, unknown>): void {
  */
 export function budget(metric: Metric, limit: number, options: { readonly at?: 'p95' | 'median'; readonly floor?: number } = {}): void {
   const at = options.at ?? 'p95'
+  record({ ...metric, limit, at })
   if (absolute) {
-    record({ ...metric, limit, at })
     expect.soft(metric[at], `${metric.name}, ${at}: ${metric[at].toFixed(1)} ${metric.unit} against a budget of ${limit.toFixed(1)} ${metric.unit}`).toBeLessThanOrEqual(limit)
     return
   }
-  const speed = jobSpeed()
-  record({ ...metric, speed, limit, at })
   const file = stored()
   const base = file?.identity === runnerIdentity() ? file.metrics[metric.name] : undefined
   if (base === undefined) {
     console.log(`${metric.name}: no baseline for ${runnerIdentity()}; lower quartile ${metric.low.toFixed(1)} ${metric.unit} recorded`)
     return
   }
-  const verdict = judge(metric.name, metric.low, metric.unit, speed, base, options.floor ?? FLOORS[metric.unit])
+  const verdict = judge(metric.name, metric.low, metric.unit, base, options.floor ?? FLOORS[metric.unit])
   console.log(verdict.line)
-  if (verdict.ceiling !== undefined) expect.soft(verdict.value, verdict.line).toBeLessThanOrEqual(verdict.ceiling)
+  if (verdict.ceiling !== undefined) expect.soft(metric.low, verdict.line).toBeLessThanOrEqual(verdict.ceiling)
 }
 
 /** A single reading as a metric, for memory and other one-sample checks. */

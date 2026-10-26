@@ -4,7 +4,7 @@ import { arch } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect } from 'bun:test'
-import { jobSpeed, judge, type BaselineFile } from './perfRule'
+import { judge, type BaselineFile } from './perfRule'
 
 /**
  * A package perf budget in milliseconds (docs/performance.md 7.3), as the
@@ -15,26 +15,25 @@ import { jobSpeed, judge, type BaselineFile } from './perfRule'
  * `apps/desktop/perf-results`, which the laptop's job brings back (the desktop
  * run clears `test-results`), for `bun scripts/perf-baseline.mjs update`.
  */
-export function perfBudget(name: string, value: number, limit: number, floor = 2): void {
+export function perfBudget(name: string, value: number, limit: number, floor = 1): void {
   if (process.platform === 'darwin' || process.env['JUNO_PERF_ABSOLUTE'] === '1') {
     expect(value, `${name}: ${value.toFixed(2)} ms against a budget of ${limit} ms`).toBeLessThanOrEqual(limit)
     return
   }
   const identity = runnerIdentity()
-  const speed = jobSpeed()
   const out = join(ROOT, 'apps/desktop/perf-results')
   mkdirSync(out, { recursive: true })
   const file = join(out, `${createHash('sha256').update(name).digest('hex').slice(0, 16)}.perf-metrics.json`)
-  writeFileSync(file, JSON.stringify([{ name, low: value, median: value, p95: value, n: 1, unit: 'ms', speed, limit, at: 'p95', identity }], null, 1))
+  writeFileSync(file, JSON.stringify([{ name, low: value, median: value, p95: value, n: 1, unit: 'ms', limit, at: 'p95', identity }], null, 1))
   const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) as BaselineFile : undefined
   const base = baseline?.identity === identity ? baseline.metrics[name] : undefined
   if (base === undefined) {
     console.log(`${name}: no baseline for ${identity}; ${value.toFixed(2)} ms recorded`)
     return
   }
-  const verdict = judge(name, value, 'ms', speed, base, floor)
+  const verdict = judge(name, value, 'ms', base, floor)
   console.log(verdict.line)
-  if (verdict.ceiling !== undefined) expect(verdict.value, verdict.line).toBeLessThanOrEqual(verdict.ceiling)
+  if (verdict.ceiling !== undefined) expect(value, verdict.line).toBeLessThanOrEqual(verdict.ceiling)
 }
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
