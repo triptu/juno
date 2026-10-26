@@ -28,7 +28,10 @@ function pictureProps(picture: NonNullable<ReturnType<typeof takePicture>>) {
     picture: { src: pictureUrl(picture.id, 'small'), title: picture.title, artist: picture.artist, date: picture.date, ratio: picture.ratio, line: picture.line },
     onOpenPicture: (event: ActivateEvent) => {
       notePicture(registry, picture.id, 'small')
-      openGallery(picture.id, { newTab: event.metaKey })
+      const open = () => openGallery(picture.id, { newTab: event.metaKey })
+      // Opened before the idle load brought the page's code (a busy Mac), Home stays until it has, so the page never draws empty.
+      if (gallery.ready()) open()
+      else void gallery.load().then(open)
     },
     onPictureMissing: () => forgetPicture(picture.id),
   }
