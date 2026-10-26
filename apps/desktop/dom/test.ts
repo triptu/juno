@@ -18,6 +18,8 @@ import { DomApp, domSnapshot, startDomApp, tempUserData, warmWorker } from './ap
 import { PageClock } from './clock'
 import { Juno } from './driver/juno'
 
+const gcAboveBytes = Number(process.env.JUNO_DOM_GC_MB ?? 400) * 2 ** 20
+
 /** A model a test serves the agent from: the fake OpenRouter or a scripted one. */
 interface Model {
   readonly origin: string
@@ -132,6 +134,9 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
       }
       await started.close()
       if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total(), memory: memoryMB() })}`)
+      // Bun collects late: a worker's heap is about 100 MB after a full collection, but without one its
+      // resident memory grew to 550 MB over a run. Collect once it passes JUNO_DOM_GC_MB (docs/development.md, "Memory").
+      if (process.memoryUsage.rss() > gcAboveBytes) (globalThis as unknown as { Bun: { gc: (force: boolean) => void } }).Bun.gc(true)
     }
   } finally {
     await model?.close()

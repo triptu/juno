@@ -37,11 +37,13 @@ async function terminate(child: ChildProcess): Promise<void> {
 }
 
 // One bundled file loads in about a fifth of the CPU time Node takes to strip and resolve the source's modules.
+// A 256 MB heap (JUNO_HOST_HEAP_MB) holds a host near 230 MB resident; uncapped, Node let it grow to 340 MB
+// (docs/development.md, "Memory").
 function forkHost(build: string): Child {
   const child = fork(resolve(build, 'host/testHost.mjs'), [], {
     execPath: node,
     // JUNO_E2E_HOST_PROFILE=<dir> writes each host's CPU profile there when it exits.
-    execArgv: ['--disable-warning=ExperimentalWarning', ...(process.env.JUNO_E2E_HOST_PROFILE === undefined ? [] : ['--cpu-prof', `--cpu-prof-dir=${process.env.JUNO_E2E_HOST_PROFILE}`])],
+    execArgv: ['--disable-warning=ExperimentalWarning', `--max-old-space-size=${process.env.JUNO_HOST_HEAP_MB ?? 256}`, ...(process.env.JUNO_E2E_HOST_PROFILE === undefined ? [] : ['--cpu-prof', `--cpu-prof-dir=${process.env.JUNO_E2E_HOST_PROFILE}`])],
     cwd: repoRoot,
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     env: { ...process.env, JUNO_E2E: '1', NODE_OPTIONS: '' },
