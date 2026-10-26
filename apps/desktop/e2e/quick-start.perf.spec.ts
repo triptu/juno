@@ -1,4 +1,4 @@
-// First-sync timing ceilings, in the Mac's perf run (docs/performance.md 7.3); correctness is in
+// First-sync timing ceilings, in the full perf run (docs/performance.md 7.3); correctness is in
 // packages/engine/test/flows/first-sync.flow.test.ts and quick-start.flow.test.ts. The quick start's own budget, sign-in to rows on the
 // large seed, is `quick start` in perf.spec.ts.
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { largeSeed, startFakeSlack } from '@juno/fake-slack'
 import { expect, launchApp, test, writeSlackApp } from './fixtures'
-import { absolute } from './perfBaseline'
 
 test.skip(process.env.JUNO_PERF !== '1', 'set JUNO_PERF=1 to measure')
 
@@ -44,7 +43,7 @@ const signInOn = (seed: Parameters<typeof largeSeed>[0], options: { readonly lat
 const MEDIUM = { topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }
 const medium = signInOn(MEDIUM)
 
-if (absolute) medium('the busiest channels show a preview seconds after sign-in, before their history is read', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake }) => {
+medium('the busiest channels show a preview seconds after sign-in, before their history is read', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake }) => {
   test.setTimeout(120_000)
   // History waits: any channel preview now comes from the preview search after the quick start.
   fake.holdNext({ method: 'conversations.history', times: 1_000, before: true, reason: 'history' })

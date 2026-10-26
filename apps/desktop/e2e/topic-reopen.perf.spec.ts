@@ -42,7 +42,7 @@ async function pressAt(juno: Juno, box: { x: number; y: number; width: number; h
   await press(juno.win)
 }
 
-test('topic reopen: Main, a thread and a 600-reply thread from the sidebar, and a link to a reply, to rows painted', async ({ juno, fake }) => {
+test('topic reopen: Main, a thread and a 600-reply thread from the sidebar, and a link to a reply, to rows painted', { tag: '@proxy' }, async ({ juno, fake }) => {
   test.setTimeout(600_000)
   await juno.signIn()
   await juno.waitForSync()

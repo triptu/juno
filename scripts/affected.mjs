@@ -369,7 +369,7 @@ if (!batch && skipTags.some((tag) => tag.startsWith('@heavy')) && plan.some((ste
 if (!batch && nightlySkipped.length > 0 && plan.some((step) => step.script === 'test:desktop' || step.script === 'test:dom')) console.log(`  (@nightly tests skipped: ${nightlySkipped.map((area) => area.area).join(', ')}; no changed file is in their area. --wide, a nightly run (verify:main --nightly) and a release run them)`)
 if (plan.length === 0) console.log('  nothing to run')
 for (const entry of interactions)
-  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, bun run perf -g "${entry.perf}" when Tushar asks)`)
+  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: bun run remote --cores 2 perf -g "${entry.perf}")`)
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
 const results = await runPlan(plan, { root, local: flag('--local') })

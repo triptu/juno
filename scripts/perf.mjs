@@ -1,17 +1,38 @@
-// The perf budgets, on the Mac (absolute budgets) or the laptop (its small set against the baseline), under the
-// exclusive heavy lock (docs/performance.md 7.3). A grep keeps the desktop-only workflow; --with-unit adds the
-// package budgets. The package budgets run on the Mac only: their p95s of a few milliseconds are not steady on
-// the laptop, and the warm start and topic opens there cover the same queries end to end.
+// The perf budgets under the exclusive heavy lock (docs/performance.md 7.3): on the laptop against its baseline, on
+// the Mac (or with JUNO_PERF_ABSOLUTE=1) against the absolute budgets. By default only the small set that stands in
+// for the rest (the scenarios tagged @proxy); the full set and focused subsets run on demand.
 //
-//   bun run perf                          the package budgets (Mac), then every desktop scenario (the laptop's set there)
-//   bun run perf --unit                   the package budgets only (Mac)
+//   bun run perf                          the small set (@proxy), as the nightly runs it
+//   bun run perf --full                   every desktop scenario and the package budgets
+//   bun run perf --area <area>            one area's scenarios and package budgets (AREAS below)
 //   bun run perf -g "<scenario>"          matching desktop scenarios only
-//   bun run perf --with-unit -g "..."     both (Mac)
-//   bun run perf --part 1                 a nightly's one-core perf job: the large workspace's warm start and memory
-//   bun run perf --part 2                 its two-core perf job: every other scenario of the laptop's set
+//   bun run perf --unit                   the package budgets only
+//   bun run perf --with-unit -g "..."     both
+//   bun run perf --part 1                 a nightly's one-core perf job: the small set's warm start and memory
+//   bun run perf --part 2                 its two-core perf job: the rest of the small set
+//
+// Outside the small set no metric has a laptop baseline: there it is printed and passes, and the Mac checks it.
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+
+/**
+ * Areas of the app, for an agent changing one area's hot path: a title pattern over the desktop scenarios, and the
+ * package budget files that time the same work. `bun run affected` names finer patterns per interaction
+ * (PERF_INTERACTIONS in scripts/test-areas.mjs).
+ */
+const AREAS = {
+  startup: { grep: 'launch warm start|quick start|busiest channels|first open in a second app', unit: [] },
+  sidebar: { grep: 'show the hidden sidebar|row hover|filter change|sidebar drag|scroll frame times|All topics', unit: ['topics-large'] },
+  topic: { grep: 'topic open|topic reopen|peek|tab switch|live update|media viewer|jump into|scroll the 300', unit: ['messages-large'] },
+  scroll: { grep: 'scroll|sidebar drag|drag a selection|jump into', unit: [] },
+  composer: { grep: 'keystroke controls|typing|send', unit: [] },
+  search: { grep: 'palette|search', unit: ['search-large', 'conversation-search-large'] },
+  chat: { grep: 'Juno chat|Juno mention|drag a selection', unit: ['packages/agent/'] },
+  home: { grep: 'home open|a new tab with Home', unit: [] },
+  emoji: { grep: 'emoji', unit: [] },
+  memory: { grep: 'memory', unit: [] },
+}
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const args = process.argv.slice(2)
@@ -20,20 +41,30 @@ const flag = (name) => {
   if (at !== -1) args.splice(at, 1)
   return at !== -1
 }
+const option = (name) => {
+  const at = args.indexOf(name)
+  return at === -1 ? undefined : args.splice(at, 2)[1]
+}
 const unitsOnly = flag('--unit')
 const withUnit = flag('--with-unit')
-if (unitsOnly && args.length > 0) throw new Error('Use bun run perf --unit, or bun run perf -g <desktop scenario>')
-const partAt = args.indexOf('--part')
-const part = partAt === -1 ? undefined : args.splice(partAt, 2)[1]
+const full = flag('--full')
+const areaName = option('--area')
+const part = option('--part')
+const area = areaName === undefined ? undefined : AREAS[areaName]
+if (areaName !== undefined && area === undefined) throw new Error(`--area is one of ${Object.keys(AREAS).join(', ')}`)
 if (part !== undefined && part !== '1' && part !== '2') throw new Error('--part is 1 or 2')
-if (part !== undefined && (unitsOnly || withUnit || args.length > 0)) throw new Error('--part takes no other arguments')
-const mac = process.platform === 'darwin' || process.env['JUNO_PERF_ABSOLUTE'] === '1'
-if (!mac && (unitsOnly || withUnit)) throw new Error('The package budgets run on the Mac only (docs/performance.md 7.3)')
-// A nightly runs the laptop's set in two jobs, one worker each (docs/performance.md 7.3): the scenarios whose lower
-// quartile holds on one core, then those that need two (the topic opens, the scroll and send). A new scenario lands
-// in part 2, on two cores.
-const partOne = 'perf\\.spec\\.ts large workspace '
-if (part !== undefined) args.push(part === '1' ? '--grep' : '--grep-invert', partOne)
+const chosenBy = [unitsOnly, full, areaName !== undefined, part !== undefined].filter(Boolean).length
+if (chosenBy > 1) throw new Error('Use one of --unit, --full, --area and --part')
+if ((unitsOnly || part !== undefined || full) && args.length > 0) throw new Error('--unit, --full and --part take no grep')
+// The small set (docs/performance.md 7.3). A nightly runs it in two jobs, one worker each: the scenarios whose lower
+// quartile holds on one core, then those that need two (the topic opens, the scroll and send). A new scenario in the
+// set lands in part 2, on two cores.
+const partOne = 'perf\\.spec\\.ts large workspace .*@proxy'
+if (part === '1') args.push('--grep', partOne)
+else if (part === '2') args.push('--grep', '@proxy', '--grep-invert', partOne)
+else if (area !== undefined) args.push('--grep', area.grep)
+else if (!full && !unitsOnly && args.length === 0) args.push('--grep', '@proxy')
+const runUnits = unitsOnly || full || withUnit || (area !== undefined && area.unit.length > 0)
 
 /**
  * The package budgets: the agent's and the engine's `*.perf.ts` files, which bun test's default pattern skips,
@@ -47,8 +78,8 @@ function unitPerfFiles() {
 
 const env = { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1' }
 let failed = 0
-if (mac && part === undefined && (unitsOnly || withUnit || args.length === 0)) {
-  const chosen = unitPerfFiles()
+if (runUnits) {
+  const chosen = unitPerfFiles().filter((file) => area === undefined || area.unit.some((name) => file.includes(name)))
   // The large-seed budgets share one boot (packages/engine/test/perf/largeSeedEngine.ts), so they run in one process,
   // in bun's shuffled order; every other file runs alone.
   const shared = chosen.filter((file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').includes('largeSeedEngine'))
