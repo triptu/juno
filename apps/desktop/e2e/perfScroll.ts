@@ -138,7 +138,7 @@ export async function scrollReading(win: Page, name: string, options: {
     expect.soft(dropped(ordinary), 'dropped frames, stepped').toBeLessThan(0.01)
     expect.soft(p95(held), `${name}: held-clock frame work p95, budget 7 ms`).toBeLessThanOrEqual(7)
   } else {
-    // Three workers share the laptop's job, so a frame missed there says little alone: against the baseline.
+    // On a shared host a missed frame says little alone: recorded, not checked (perfBaseline.ts).
     budget(reading(`${name}: long animation frames`, loaf(unheld), 'frames'), 0)
     budget(reading(`${name}: dropped frames, continuous`, dropped(gesture) * 100, '%'), 1)
   }

@@ -9,7 +9,8 @@
     "./forced-shift": "./src/forcedShift.ts",
     "./eventually": "./src/eventually.ts",
     "./effect": "./src/effect.ts",
-    "./perf-budget": "./src/perfBudget.ts"
+    "./perf-budget": "./src/perfBudget.ts",
+    "./perf-rule": "./src/perfRule.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

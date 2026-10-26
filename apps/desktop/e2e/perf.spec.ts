@@ -601,7 +601,6 @@ defaultSeedTest('send in Main: Enter through the checks on send to the pending r
 // With one worker they still run in order on one setup; after a failure the
 // next worker runs the setup again and goes on.
 test.describe('large workspace', () => {
-  // One worker runs the group on its synced workspace, while the laptop's other workers take other scenarios.
   test.describe.configure({ mode: 'default' })
   let fake: FakeSlack
   let userData: string
