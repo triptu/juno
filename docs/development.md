@@ -815,6 +815,21 @@ Single runs of `bun run remote --cores 4 --env GALLERY_SHIFT_ALL=1 test:gallery 
 
 The headless shell keeps its 60 Hz frame clock with those flags, so the guard's two-frame wait is unchanged and the flags are not used. Three pages per part were faster only because the CPU had room; with eight workers the gallery allocation is already 94% busy, so the pool was not kept.
 
+### Gallery nightly fast sweep, 2026-10-26
+
+Single runs on the laptop, four physical cores. The nightly comparison uses ten workers; the normal comparison uses the default four cached-run workers, with records warmed by a preceding successful walk. CPU and wall cover the Playwright phase (job cgroup), not allocation, build or cache unit tests. Before is `8738adee7`; after is the fast-sweep change. This is a gallery-job comparison, not a full nightly pipeline benchmark.
+
+| Run | Before wall | After wall | Before CPU | After CPU |
+| --- | ---: | ---: | ---: | ---: |
+| Nightly, every state uncached | 242.4 s | 77.5 s | 1,041.1 CPU-s | 552.8 CPU-s |
+| Normal, warm state records | 15.1 s | 14.7 s | 62.5 CPU-s | 59.4 CPU-s |
+
+Both use `bun run remote --cores 4 --wait 3600 --env GALLERY_CPU=1 test:gallery`. Nightly adds `--env GALLERY_SHIFT_ALL=1 --env GALLERY_WORKERS=10`; after also adds `--env GALLERY_REAL_WALK=0`. Before ran 172 tests and skipped 10; after ran 171 and skipped 10. The old broad real-input parts were replaced by fast parts, and the standalone whole-pixel sweep moved into them. Nightly wall fell 68% and CPU 47%; no fixture sizes, action limits or component motion changed. This does not predict a cold normal run: changed states still pay for real input as well as the fast check.
+
+Normal ran 114 tests and skipped 56 before; 118 ran and 51 skipped after. Its small timing difference is within the uncertainty of single runs; the added cached fast parts did not materially increase this warm run. Normal evidence: `juno-1793012693006-69829-4edafc94` (before) and `juno-1793014498434-44651-0727e9e5` (after).
+
+Nightly evidence: remote jobs `juno-1793012413049-46732-7d5c5a13` (before) and `juno-1793013730259-86508-737c0215` (after). The [history audit](reviews/2026-10-26-gallery-shift-history.tsv) records which old failures the fast guard reproduces and which need data, network or scroll journeys. The [replay patch](reviews/2026-10-26-gallery-shift-mutations.patch) contains 11 probes; all passed in job `juno-1793013471041`. A passing mutation probe means its stated expectation held, including explicit non-reproductions; it does not mean every historical bug was caught by the broad sweep.
+
 ### Gallery CPU per spec, 2026-10-26
 
 Single runs of `bun run remote --cores 4 --env GALLERY_WORKERS=6 --env GALLERY_CPU=1 test:gallery`, the unit job's gallery step of a full run (eight threads, six workers), each after a run that left the walk records current. CPU is the Playwright phase from the job's cgroup; the build and the cache unit tests are outside it.

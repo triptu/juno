@@ -10,7 +10,7 @@ ea43aac2c	Task card footer shrinks on completion	Fixture outcome action; existin
 fd4d673e2	Sent message uses different text metrics from its textarea	Fixture outcome action; existing targeted card-height test	Broad check reaches working only (zero shifts); next outcome click catches 16px card shrink
 fd4d673e2	Status bubble grows when text replaces dots	Data change, not a hover/press; existing targeted status-text test	Broad check sees zero shifts; status-text fixture action changes the mutated bubble boxes
 ce05383f5	Sources and citations become unwrappable button boxes	Data change, not a hover/press; existing targeted source-link test	Broad check sees zero shifts; sources fixture action changes the mutated paragraph boxes
-0aac6be37	Fractional message heights cause scroll-anchor rounding	Drawn-state whole-pixel check; not an interaction difference	Existing behaviour.spec.ts check will move into the fast sweep
+0aac6be37	Fractional message heights cause scroll-anchor rounding	Drawn-state whole-pixel check; not an interaction difference	Existing behaviour.spec.ts check moved into the fast sweep
 63759258c	Prepending changes the formerly first message's header and margin	Data/prepend journey; neither broad interaction sweep loads older pages	Existing message-geometry and desktop scroll tests retained
 cbbb0296a	New rows above the held row grow from estimates a frame late	Renderer container, real scrolling and asynchronous history; absent from gallery fixtures	Commit records 12/200 before and 0/300 after; existing desktop prepend tests retained; not replayed here
 901db4776	Attachment geometry depends on image bytes	Delayed network event; neither broad interaction sweep releases held bytes	Existing attachment-images and delayed-thumbnail tests retained
