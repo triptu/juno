@@ -22,8 +22,8 @@ const counts = (work: PageWork): Counts => ({ commits: work.commits, renders: wo
 
 /** What the counts were made of: the components that rendered most and the routes that carried them. */
 const detail = (work: PageWork) => [
-  'renders: ' + Object.entries(work.byComponent).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([name, n]) => `${name} ${n}`).join(', '),
-  'routes: ' + Object.entries(work.byRoute).sort((a, b) => b[1].bytesIn - a[1].bytesIn).slice(0, 12).map(([tag, t]) => `${tag} ${t.requests}/${t.messages}/${t.bytesIn}B/${t.bytesOut}B`).join(', '),
+  'renders: ' + Object.entries(work.byComponent).toSorted((a, b) => b[1] - a[1]).slice(0, 15).map(([name, n]) => `${name} ${n}`).join(', '),
+  'routes: ' + Object.entries(work.byRoute).toSorted((a, b) => b[1].bytesIn - a[1].bytesIn).slice(0, 12).map(([tag, t]) => `${tag} ${t.requests}/${t.messages}/${t.bytesIn}B/${t.bytesOut}B`).join(', '),
 ].join('\n')
 
 /**

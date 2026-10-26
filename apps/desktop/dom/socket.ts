@@ -47,6 +47,59 @@ async function settled(window: Window): Promise<void> {
   }
 }
 
+type Meter = ReturnType<typeof meterOf>
+type Message = Record<string, unknown>
+
+/** Counts the page's frame to the host by route; `asked` learns each request's route from its id. */
+function countSent(meter: Meter, asked: Map<string, string>, data: unknown): void {
+  if (typeof data !== 'string') return
+  for (const message of rpcMessages(data)) {
+    if (KEEP_ALIVE.has(String(message['_tag']))) continue
+    // The engine's RPC (`_tag`), or the web shell's bridge to what main does (`channel`).
+    const request = message['_tag'] === 'Request' || typeof message['channel'] === 'string'
+    if (request) asked.set(String(message['id']), message['_tag'] === 'Request' ? String(message['tag']) : `bridge ${String(message['channel'])}`)
+    const traffic = meter.route(asked.get(String(message['requestId'] ?? message['id'])) ?? String(message['_tag']))
+    if (request) traffic.requests++
+    traffic.bytesOut += bytesOf(message)
+  }
+}
+
+/** Counts a frame from the host by route, and answers each message's route. */
+function countReceived(meter: Meter, asked: ReadonlyMap<string, string>, messages: ReadonlyArray<Message>): ReadonlyArray<string | undefined> {
+  const tags = messages.map((message) => asked.get(String(message['requestId'] ?? message['id'])))
+  messages.forEach((message, at) => {
+    if (KEEP_ALIVE.has(String(message['_tag']))) return
+    const traffic = meter.route(tags[at] ?? String(message['_tag'] ?? 'bridge'))
+    traffic.bytesIn += bytesOf(message)
+    if (message['_tag'] === 'Chunk' && Array.isArray(message['values'])) traffic.messages += message['values'].length
+    else if (message['_tag'] === 'Exit' || message['_tag'] === undefined) traffic.messages++
+  })
+  return tags
+}
+
+/** A socket's frames for the page, one at a time once the page has settled after the last (`serialFrames`). */
+function frameQueue(window: Window, dispatch: (event: Event) => void): (event: Event) => void {
+  const queue: Array<Event> = []
+  let pumping = false
+  const pump = async () => {
+    if (pumping) return
+    pumping = true
+    try {
+      while (queue.length > 0 && !closed.has(window)) {
+        dispatch(queue.shift()!)
+        await settled(window)
+      }
+    } finally {
+      pumping = false
+    }
+  }
+  return (event) => {
+    if (!serial.has(window)) return dispatch(event)
+    queue.push(event)
+    void pump()
+  }
+}
+
 /**
  * Bun's WebSocket, which happy-dom does not know about: each one is kept so
  * `closeWindow` closes it, and a closed page cannot open another. Left open,
@@ -60,29 +113,26 @@ export function pageSocket(window: Window): typeof WebSocket {
   return class PageSocket extends WebSocket {
     readonly #asked = new Map<string, string>()
     readonly #listeners = new Map<unknown, (event: Event) => void>()
-    readonly #queue: Array<Event> = []
-    #pumping = false
+    readonly #deliver = frameQueue(window, (event) => {
+      for (const listener of Array.from(this.#listeners.values())) listener(event)
+    })
 
     constructor(url: string | URL, protocols?: string | string[]) {
       if (closed.has(window)) throw new Error(`This page has closed; it cannot connect to ${new URL(url).pathname}`)
       super(url, protocols)
       live.add(this)
       this.addEventListener('close', () => live.delete(this))
-      super.addEventListener('message', (event) => this.#arrive(event))
+      super.addEventListener('message', (event) => {
+        const data = (event as MessageEvent).data
+        const tags = countReceived(meter, this.#asked, typeof data === 'string' ? rpcMessages(data) : [])
+        const hold = held.get(window)
+        if (hold !== undefined && tags.some((tag) => tag !== undefined && hold.tags.has(tag))) hold.frames.push(() => this.#deliver(event))
+        else this.#deliver(event)
+      })
     }
 
     override send(data: Parameters<WebSocket['send']>[0]): void {
-      if (typeof data === 'string') {
-        for (const message of rpcMessages(data)) {
-          if (KEEP_ALIVE.has(String(message['_tag']))) continue
-          // The engine's RPC (`_tag`), or the web shell's bridge to what main does (`channel`).
-          const request = message['_tag'] === 'Request' || typeof message['channel'] === 'string'
-          if (request) this.#asked.set(String(message['id']), message['_tag'] === 'Request' ? String(message['tag']) : `bridge ${String(message['channel'])}`)
-          const traffic = meter.route(this.#asked.get(String(message['requestId'] ?? message['id'])) ?? String(message['_tag']))
-          if (request) traffic.requests++
-          traffic.bytesOut += bytesOf(message)
-        }
-      }
+      countSent(meter, this.#asked, data)
       super.send(data)
     }
 
@@ -95,54 +145,15 @@ export function pageSocket(window: Window): typeof WebSocket {
       if (type !== 'message') return super.removeEventListener(type, listener, options)
       this.#listeners.delete(listener)
     }
-
-    #arrive(event: Event): void {
-      const data = (event as MessageEvent).data
-      const messages = typeof data === 'string' ? rpcMessages(data) : []
-      const tags = messages.map((message) => this.#asked.get(String(message['requestId'] ?? message['id'])))
-      messages.forEach((message, at) => {
-        if (KEEP_ALIVE.has(String(message['_tag']))) return
-        const traffic = meter.route(tags[at] ?? String(message['_tag'] ?? 'bridge'))
-        traffic.bytesIn += bytesOf(message)
-        if (message['_tag'] === 'Chunk' && Array.isArray(message['values'])) traffic.messages += message['values'].length
-        else if (message['_tag'] === 'Exit' || message['_tag'] === undefined) traffic.messages++
-      })
-      const hold = held.get(window)
-      if (hold !== undefined && tags.some((tag) => tag !== undefined && hold.tags.has(tag))) hold.frames.push(() => this.#deliver(event))
-      else this.#deliver(event)
-    }
-
-    #deliver(event: Event): void {
-      if (!serial.has(window)) return this.#dispatch(event)
-      this.#queue.push(event)
-      void this.#pump()
-    }
-
-    #dispatch(event: Event): void {
-      for (const listener of [...this.#listeners.values()]) listener(event)
-    }
-
-    async #pump(): Promise<void> {
-      if (this.#pumping) return
-      this.#pumping = true
-      try {
-        while (this.#queue.length > 0 && !closed.has(window)) {
-          this.#dispatch(this.#queue.shift()!)
-          await settled(window)
-        }
-      } finally {
-        this.#pumping = false
-      }
-    }
   }
 }
 
 /** Replies held back from a page's engine socket, by RPC tag, until `release`. */
 const held = new WeakMap<Window, { readonly tags: Set<string>; readonly frames: Array<() => void> }>()
 
-const rpcMessages = (data: string): ReadonlyArray<Record<string, unknown>> => {
+const rpcMessages = (data: string): ReadonlyArray<Message> => {
   const decoded = JSON.parse(data) as unknown
-  return (Array.isArray(decoded) ? decoded : [decoded]).filter((message): message is Record<string, unknown> => typeof message === 'object' && message !== null)
+  return (Array.isArray(decoded) ? decoded : [decoded]).filter((message): message is Message => typeof message === 'object' && message !== null)
 }
 
 /**
