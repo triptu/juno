@@ -1,5 +1,5 @@
 import { loadavg } from 'node:os'
-import { absolute, budget, reading } from './perfBaseline'
+import { absolute, budget } from './perfBaseline'
 import { contention, holdClock } from './perfStats'
 import type { Page } from '@playwright/test'
 import { expect } from './fixtures'
@@ -23,9 +23,10 @@ const GESTURE_SPEED = 2_000
  * animation frame and under 1 % dropped frames.
  *
  * On the laptop (not `absolute`) only one continuous sweep runs, its frame
- * work p95, long animation frames and dropped frames checked against the
- * baseline: the stepped sweep is reported, not gated, and the held clock
- * answers Apple silicon's power management.
+ * work checked against the baseline. Long animation frames and dropped
+ * frames are printed: on a shared host a missed frame says little alone. The
+ * stepped sweep is reported, not gated, and the held clock answers Apple
+ * silicon's power management.
  */
 export async function scrollReading(win: Page, name: string, options: {
   readonly steps: number
@@ -137,10 +138,6 @@ export async function scrollReading(win: Page, name: string, options: {
     expect.soft(dropped(gesture), 'dropped frames, continuous').toBeLessThan(0.01)
     expect.soft(dropped(ordinary), 'dropped frames, stepped').toBeLessThan(0.01)
     expect.soft(p95(held), `${name}: held-clock frame work p95, budget 7 ms`).toBeLessThanOrEqual(7)
-  } else {
-    // On a shared host a missed frame says little alone: recorded, not checked (perfBaseline.ts).
-    budget(reading(`${name}: long animation frames`, loaf(unheld), 'frames'), 0)
-    budget(reading(`${name}: dropped frames, continuous`, dropped(gesture) * 100, '%'), 1)
   }
   const work = gesture.flatMap((s) => s.work)
   budget({ name: `${name}: continuous scroll frame work`, low: percentile(work, 0.25), median: percentile(work, 0.5), p95: p95(gesture), n: work.length, unit: 'ms' }, 8.3, { floor: 1 })

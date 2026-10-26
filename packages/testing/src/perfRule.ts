@@ -6,9 +6,9 @@
  * quartile, which its slow samples do not move. A metric is checked only when
  * it is steady: its lower quartile moved at most `STEADY` times between the
  * baseline's fastest and slowest runs. It fails above `RATIO` times the
- * slowest of them plus a floor. Other metrics, and counts of long and dropped
- * frames, are printed and recorded, and the Mac checks them against the
- * absolute budgets.
+ * slowest of them plus a floor. The laptop's set keeps steady metrics only
+ * (performance.md 7.3); one that a new baseline finds unsteady is printed,
+ * and the Mac checks it against the absolute budgets.
  */
 export const RATIO = 1.1
 export const STEADY = 1.3
@@ -51,7 +51,6 @@ const shown = (value: number): string => value.toFixed(value < 10 ? 2 : 1)
 /** The laptop's verdict on a metric's lower quartile `low` against its baseline. */
 export function judge(name: string, low: number, unit: string, base: BaselineMetric, floor: number): Verdict {
   const head = `${name}: lower quartile ${shown(low)} ${unit}, baseline ${shown(base.low)}, runs ${shown(base.fastest)} to ${shown(base.slowest)}`
-  if (unit === 'frames' || unit === '%') return { line: `${head}; a count of missed frames, not checked on the laptop` }
   if (base.slowest > base.fastest * STEADY) return { line: `${head}; not steady, not checked on the laptop` }
   const ceiling = base.slowest * RATIO + floor
   return { line: `${head}; ceiling ${shown(ceiling)}`, ceiling }
