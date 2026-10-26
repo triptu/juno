@@ -795,6 +795,18 @@ The suite keeps checks for interaction stability, delayed loads, keyboard activa
 
 Single before/after runs reduced the gallery script from 107 to 88 seconds (572 to 436 CPU-seconds), with all 1,835 states uncached. The [per-state and per-spec profile](reviews/2026-10-26-gallery-cost.md) records the full uncached gallery runs on three laptop cores, their worker counts, the guard and historical mutation checks, and the rejected snapshot experiment. The forced guard reuses its task channel and focus-attribute sets, preserving both task turns and every whole-frame snapshot. In-place navigation waits for frame visibility in the browser before returning. Full fast-only runs use six workers on six allocated threads; the real-input walk and the three-job full-run plan retain their existing allocation.
 
+### Gallery reuse in full runs, 2026-10-27
+
+Single runs on the full run's gallery allocation (three physical cores, six threads), all 1,835 states. Before is the last full run at `2e1878cc7`, which walked every state; uncached is `bun run remote --cores 3 --env GALLERY_SHIFT_ALL=1 --env GALLERY_REAL_WALK=0 --env GALLERY_CPU=1 test:gallery` at this change, which also wrote the records; after is the next full run at this change, with the records current.
+
+| Run | Gallery step | Gallery job (with conformance) | Walked | Sampled | Reused |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Before, full run | 100 s, 491 CPU-s | 111 s, 548 CPU-s | 1,835 states, 51 tests | 0 | 0 |
+| Uncached, gallery alone | 89 s, 430 CPU-s | | 1,835 states, 51 tests | 0 | 0 |
+| After, full run | 25 s, 105 CPU-s | 35 s, 157 CPU-s | 0 | 83 states, 3 tests | 1,752 states, 48 tests |
+
+The after run took 282 s end to end because its desktop and gallery jobs waited 122 s and 238 s for cores other agents' jobs held; its unit job, now the longest, took 122 s. A commit that changes a shared component walks most states again and costs about what the uncached walk does.
+
 ### Gallery measurements, 2026-10-24
 
 Single completed observations using the pinned Chromium headless shell. The runner had two physical cores and four workers; the Mac baseline used three workers.
