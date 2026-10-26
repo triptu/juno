@@ -1,0 +1,1 @@
+- 10-26 23:41 · engine tests · Do not retain the per-reindex user-name cache experiment: a one-core laptop probe of 40 isolated warm starts reduced SQL statements from 35,351 to 34,824 but used 7.89 → 11.05 CPU-s. This pair establishes no CPU saving; keep product code and counted budgets unchanged.

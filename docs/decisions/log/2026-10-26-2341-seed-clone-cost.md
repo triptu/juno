@@ -1,0 +1,1 @@
+- 10-26 23:41 · engine tests · Keep constructing the default fake workspace: PNG drawing is already cached. A laptop probe used 1.01–1.03 CPU-s for 1,000 seeds; raw deep copies used 0.43 CPU-s before restoring times, URLs and private state, leaving under 0.3 CPU-s across 350 starts to recover. Avoid the extra snapshot format for that bound.

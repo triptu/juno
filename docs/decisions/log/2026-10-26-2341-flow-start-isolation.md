@@ -1,0 +1,1 @@
+- 10-26 23:41 · engine tests · Keep independent outbox, follow-race and thread-coverage cases on separate engines. Their held calls, failure injections, follow observations and restart histories are separate initial conditions, not consecutive steps; the existing journeys already share their own engine.
