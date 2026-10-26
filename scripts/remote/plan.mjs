@@ -22,6 +22,29 @@ export const fullRunJobs = {
   everyState: [fullRunJob('desktop', 3, desktopSteps, true), fullRunJob('unit', 3, ['test', 'test:dom']), fullRunJob('gallery', 3, gallerySteps)],
 }
 
+/** Each lane's CPU-s over every file in a full run, and the gallery job's wall seconds (docs/development.md, "Job sizes", 10-27). */
+export const fullLaneCpu = { test: 165, 'test:dom': 220, 'test:browser': 435, 'test:electron': 175 }
+const galleryWall = { sampled: 46, everyState: 95 }
+
+/**
+ * The cores of each full-run job when file reuse leaves only part of its lanes to run (`shares`, each lane's share of
+ * its full work): the fewest that still finish within the slowest job's estimate at its measured size, so the run
+ * takes no longer and leaves the rest of the laptop to other jobs. A job's wall is about 5 s plus its CPU-s over its
+ * threads at 80% busy (the 10-27 runs); a 15% margin covers the estimate. A job with nearly all its work keeps its size.
+ */
+export function fullRunCores(layout, shares) {
+  const kind = layout === fullRunJobs.everyState ? 'everyState' : 'sampled'
+  const cpu = (job) => job.scripts.reduce((sum, script) => sum + (fullLaneCpu[script] ?? 0) * (shares[script] ?? 1), 0)
+  const full = (job) => job.scripts.reduce((sum, script) => sum + (fullLaneCpu[script] ?? 0), 0)
+  const wall = (seconds, cores) => 5 + seconds / (cores * 2 * 0.8)
+  const limit = Math.max(galleryWall[kind], ...layout.filter((job) => job.kind !== 'gallery').map((job) => wall(cpu(job), job.cores)))
+  return Object.fromEntries(layout.map((job) => {
+    if (job.kind === 'gallery' || cpu(job) >= 0.9 * full(job)) return [job.kind, job.cores]
+    const cores = Array.from({ length: job.cores }, (_, index) => index + 1).find((count) => wall(cpu(job), count) <= 0.85 * limit) ?? job.cores
+    return [job.kind, cores]
+  }))
+}
+
 /** The full run's jobs by its gallery step, or undefined for a plan that is not a full run. */
 export function fullRunLayout(steps) {
   const gallery = steps.find((step) => step.script === 'test:gallery')

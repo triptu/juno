@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { stripVTControlCharacters } from 'node:util'
 
 // Sparse failures finish the suite. These thresholds identify unusable runs.
@@ -57,4 +58,23 @@ export function failureMonitor() {
 export function stopFromLog(log) {
   const match = /^juno-stop: (.+)$/m.exec(log)
   return match ? JSON.parse(match[1]) : undefined
+}
+
+/** The failing tests a log names: Playwright's numbered failures, bun test's `(fail)` lines, a failed spec job. */
+export function failures(log) {
+  let text = ''
+  try {
+    text = readFileSync(log, 'utf8')
+  } catch {
+    return []
+  }
+  const lines = text.split('\n').map((line) => line.replace(/^\[runner:[^\]]+\] /, ''))
+  const found = [
+    ...lines.filter((line) => /^\s+\d+\) /.test(line)).map((line) => line.trim().replace(/\s*─+$/, '')),
+    ...lines.filter((line) => /^did not run: |against a budget of/.test(line)).map((line) => line.trim()),
+    ...lines.filter((line) => line.startsWith('(fail) ')).map((line) => line.replace(/ \[[\d.]+m?s\]$/, '').trim()),
+    ...lines.filter((line) => /^Error: (Quint|Spec check|Missing|A corrected|Agent schedule|No usable)/.test(line)),
+    ...lines.filter((line) => /^remote: (?!.*exited with)/.test(line) && /failed|lost the connection|not reach|unreachable|Gave up/.test(line)),
+  ]
+  return [...new Set(found)].slice(0, 20)
 }

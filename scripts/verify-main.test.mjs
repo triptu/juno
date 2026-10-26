@@ -275,3 +275,81 @@ setInterval(() => {}, 1000)
   const record = JSON.parse(readFileSync(join(root, '.juno-status/verify-main.json'), 'utf8'))
   assert.ok(record.suites.some((suite) => suite.stop?.rule === 'setup'))
 })
+
+test('a full run reuses unchanged test files, reruns a sampled fifth of them, and starts fresh on a new toolchain', { timeout: 60_000 }, async (t) => {
+  const { samplePick } = await import('./verify-files.mjs')
+  const { root, env, invoke, git: fixtureGit } = verificationFixture(t)
+  writeFileSync(join(root, 'bin/ssh'), `#!/usr/bin/env node
+console.log('__juno_runner_connected\\nos=Linux fixture\\narch=x86_64\\ndocker=ready\\ncapacity=8 pinned');
+`)
+  // The jobs report their runtime and toolchain; a step fails when it runs TEST_FAIL_FILE, as bun test prints it.
+  writeFileSync(join(root, 'scripts/remote.mjs'), `
+import { appendFileSync } from 'node:fs'
+import { parsePlan } from './plan.mjs'
+const identity = { runtime: 'bun', version: '1.4.4', bun: '1.4.4', node: '26.11.1', platform: 'linux', arch: 'x64', electron: '44.7.0' }
+console.log('[runner:unit] juno-toolchain: ' + JSON.stringify({ bun: '1.4.4+fixture', kernel: process.env.TEST_KERNEL ?? '6.8.0', timeZone: 'UTC' }))
+for (const [index, step] of parsePlan(process.argv.slice(process.argv.indexOf('test:plan') + 1)).entries()) {
+  appendFileSync(process.env.TEST_CALLS, JSON.stringify(step) + '\\n')
+  console.log('[' + step.script + '] juno-runtime: ' + JSON.stringify(identity))
+  const failing = step.script === 'test' && (step.args.includes(process.env.TEST_FAIL_FILE) || (process.env.TEST_FAIL_FILE && !step.args.includes('--files')))
+  if (failing) console.log('[test] ' + process.env.TEST_FAIL_FILE + ':\\n[test] (fail) reads its fixture [1.00ms]')
+  const walk = { walked: 0, reused: {}, sampled: 0, missed: [] }
+  if (step.env.GALLERY_SAMPLE) console.log('[test:gallery] juno-gallery-walk: ' + JSON.stringify({ uncached: false, sample: { seed: step.env.GALLERY_SAMPLE, share: 0.05 }, states: walk, tests: walk }))
+  console.log('plan: step ' + index + ' ' + step.script + ' exited with ' + (failing ? 1 : 0) + ' after 1 s')
+}
+`)
+  const write = (file, text) => { mkdirSync(join(root, file, '..'), { recursive: true }); writeFileSync(join(root, file), text) }
+  write('packages/a/package.json', '{"name":"@juno/a","scripts":{"test":"bun test"}}')
+  write('packages/a/src/one.ts', 'export const one = 1\n')
+  write('packages/a/test/one.test.ts', "import { one } from '../src/one'\n")
+  const others = ['two', 'three', 'four', 'five', 'six'].map((name) => `packages/a/test/${name}.test.ts`)
+  for (const file of others) write(file, '\n')
+  fixtureGit('add', '.')
+  fixtureGit('commit', '-qm', 'Remote transport and unit tests')
+  const record = () => JSON.parse(readFileSync(join(root, '.juno-status/verify-main.json'), 'utf8'))
+  const unitCall = () => readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse).filter((step) => step.script === 'test').at(-1)
+  const fresh = invoke([])
+  assert.equal(fresh.status, 0, fresh.stderr + fresh.stdout)
+  assert.equal(record().fileReuse.fresh, true)
+  assert.deepEqual(record().suites.find((suite) => suite.suite === 'test').files.counts, { fresh: 6, changed: 0, sampled: 0, reused: 0 })
+  assert.ok(!unitCall().args.includes('--files'))
+
+  // One source change: its test runs, one of the five unchanged files is sampled and the rest keep the fresh run's pass.
+  write('packages/a/src/one.ts', 'export const one = 2\n')
+  fixtureGit('commit', '-qam', 'Change one')
+  const seed = '12345'
+  const sampled = [...samplePick(seed, 'test', others)]
+  writeFileSync(env.TEST_CALLS, '')
+  const reusing = invoke([], { JUNO_FILE_SAMPLE: seed })
+  assert.equal(reusing.status, 0, reusing.stderr + reusing.stdout)
+  const reused = record()
+  const lane = reused.suites.find((suite) => suite.suite === 'test')
+  assert.deepEqual(lane.files.counts, { fresh: 0, changed: 1, sampled: 1, reused: 4 })
+  assert.deepEqual(Object.values(lane.files.from), [4])
+  assert.deepEqual(unitCall().args.slice(unitCall().args.indexOf('--files') + 1).toSorted(), ['packages/a/test/one.test.ts', ...sampled].toSorted())
+  assert.match(readFileSync(join(root, '.juno-status/verify-main.md'), 'utf8'), /test: 1 ran because they changed, 1 sampled, 4 reused \(4 from /)
+  assert.equal(assessRecord(reused), true)
+  // The gate refuses counts, a sample or a command that do not match the files.
+  const tampered = (change) => assessRecord({ ...reused, suites: reused.suites.map((suite) => suite === lane ? change(structuredClone(suite)) : suite) })
+  assert.equal(tampered((suite) => { suite.files.counts.reused = 5; return suite }), false)
+  assert.equal(tampered((suite) => { suite.files.sample = '1'; return suite }), false)
+  assert.equal(tampered((suite) => { suite.command = suite.command.slice(0, -1); return suite }), false)
+  assert.equal(tampered((suite) => { const other = others.find((file) => !sampled.includes(file)); suite.files.entries[other].ran = 'sampled'; suite.files.entries[sampled[0]].ran = 'reused'; return suite }), false)
+
+  // A sampled file that fails now means its key missed an input.
+  write('packages/a/src/one.ts', 'export const one = 3\n')
+  fixtureGit('commit', '-qam', 'Change one again')
+  const missed = invoke([], { JUNO_FILE_SAMPLE: seed, TEST_FAIL_FILE: sampled[0] })
+  assert.equal(missed.status, 1, missed.stderr + missed.stdout)
+  assert.match(record().suites.find((suite) => suite.suite === 'test').failures[0], new RegExp(`Sampled reused test files failed, so the reuse key missed an input: ${sampled[0]}`))
+
+  // A new kernel on the runner: the reused passes ran on another toolchain, so the run starts again with every file fresh.
+  writeFileSync(env.TEST_CALLS, '')
+  const moved = invoke([], { TEST_KERNEL: '6.9.0' })
+  assert.equal(moved.status, 0, moved.stderr + moved.stdout)
+  assert.match(moved.stderr, /the toolchain changed since the reused passes \(kernel\)/)
+  assert.equal(record().fileReuse.fresh, true)
+  assert.equal(record().toolchain.kernel, '6.9.0')
+  assert.ok(!unitCall().args.includes('--files'))
+  assert.equal(assessRecord(record()), true)
+})
