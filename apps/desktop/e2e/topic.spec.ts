@@ -22,16 +22,10 @@ const ENG_MAIN = '#eng'
 const RINA = 'Rina finished the onsite'
 
 syncedTest('Home and a topic are at rest; the header answers hover and press, its menus open under their islands, Resolve takes Follow’s place without moving the title; menus have one active row and open on press', async ({ juno, win }) => {
-  // The renderer's share of idle CPU (performance.md section 1): nothing loops on the screens a person leaves open.
-  await test.step('Home, then a topic beside the sidebar, run no frame loop, looping animation or timer loop', async () => {
-    await juno.home.expectShown()
-    await juno.expectAtRest()
-    await juno.sidebar.row(POSTGRES).open()
-    await juno.topic.expectTitle(POSTGRES)
-    await juno.expectAtRest()
-  })
-
+  // At rest nothing loops on Home or an open topic: no frame loop, looping animation or timer loop (performance.md 1, idle CPU).
+  await test.step('Home is at rest', async () => { await juno.home.expectShown(); await juno.expectAtRest() })
   await test.step('every control in the header answers hover and press', () => headerFeedback({ juno, win }))
+  await test.step('the open topic is at rest', () => juno.expectAtRest())
 
   await test.step('⋯ opens the topic menu at its left edge under the right island; the title’s menu opens at the title’s left edge', async () => {
     await juno.sidebar.row(POSTGRES).open()
