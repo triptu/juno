@@ -8,30 +8,40 @@ import { forwardSignals } from './children.mjs'
 // spec checks; and the unit tests, the DOM lane and the gallery.
 const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'specs:check', 'specs:conformance']
 
-// A full run (its gallery walks every state or a sample, GALLERY_SHIFT_ALL or GALLERY_SAMPLE) splits Juno's eight cores by each step's measured CPU
-// (docs/development.md, "Job sizes"). A step not named here joins the unit job. The desktop job runs
-// Electron beside the browser lane, with three and two workers on its six threads (sideBySide in
-// scripts/plan.mjs); the others run their steps in order.
-export const fullRunJobs = [
-  { kind: 'desktop', cores: 3, beside: true, scripts: ['test:desktop', 'test:browser', 'test:electron', 'test:e2e'] },
-  { kind: 'unit', cores: 2, scripts: ['test', 'test:dom'] },
-  { kind: 'gallery', cores: 3, scripts: ['specs:check', 'specs:conformance', 'test:gallery'] },
-]
+// A full run (its gallery walks every state or a sample, GALLERY_SHIFT_ALL or GALLERY_SAMPLE) splits Juno's nine
+// laptop cores by each step's measured CPU (docs/development.md, "Job sizes"). The unit job runs the unit tests,
+// then the DOM lane. A sampled gallery walk reuses most states, so the gallery job gets two cores and the desktop
+// job, the longest, four; even when a change re-keys most states, two cores walk them in about the desktop job's
+// time on three. A walk of every state takes three cores. A step not named here joins the unit job. The desktop
+// job runs Electron beside the browser lane (sideBySide in scripts/plan.mjs); the others run their steps in order.
+const fullRunJob = (kind, cores, scripts, beside = false) => ({ kind, cores, beside, scripts })
+const desktopSteps = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e']
+const gallerySteps = ['specs:check', 'specs:conformance', 'test:gallery']
+export const fullRunJobs = {
+  sampled: [fullRunJob('desktop', 4, desktopSteps, true), fullRunJob('unit', 3, ['test', 'test:dom']), fullRunJob('gallery', 2, gallerySteps)],
+  everyState: [fullRunJob('desktop', 3, desktopSteps, true), fullRunJob('unit', 3, ['test', 'test:dom']), fullRunJob('gallery', 3, gallerySteps)],
+}
+
+/** The full run's jobs by its gallery step, or undefined for a plan that is not a full run. */
+export function fullRunLayout(steps) {
+  const gallery = steps.find((step) => step.script === 'test:gallery')
+  return gallery?.env.GALLERY_SHIFT_ALL === '1' ? fullRunJobs.everyState : gallery?.env.GALLERY_SAMPLE !== undefined ? fullRunJobs.sampled : undefined
+}
 
 export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
   if (options.script !== 'test:plan' || setting('JUNO_RUNNER_PLAN') === 'single' || setting('JUNO_PLAN_SERIAL') === '1') return []
   const steps = parsePlan(options.args)
-  const fullRun = steps.some((step) => step.script === 'test:gallery' && (step.env.GALLERY_SHIFT_ALL === '1' || step.env.GALLERY_SAMPLE !== undefined))
+  const layout = fullRunLayout(steps)
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
-    const kind = fullRun ? fullRunJobs.find((job) => job.scripts.includes(step.script))?.kind ?? 'unit'
+    const kind = layout ? layout.find((job) => job.scripts.includes(step.script))?.kind ?? 'unit'
       : desktopJob.includes(step.script) ? 'desktop' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
     groups.get(kind).push({ ...step, index })
   }
   return groups.size > 1 ? [...groups].map(([kind, group]) => {
-    const sized = fullRun ? fullRunJobs.find((job) => job.kind === kind) : undefined
+    const sized = layout?.find((job) => job.kind === kind)
     return { kind, steps: group, cores: sized?.cores, beside: sized?.beside }
   }) : []
 }

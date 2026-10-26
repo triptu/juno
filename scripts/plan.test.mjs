@@ -59,17 +59,21 @@ test('only complete successful job reports pass, including report collection', (
   ]) assert.equal(planOutcomes(lines, suites, { ...planned, code }).every((result) => result.code === 0), false)
 })
 
-test('a full run splits into its measured jobs; other plans keep two four-core jobs; overrides win', async () => {
+test('a full run sizes its jobs by whether the gallery walks every state; other plans keep two four-core jobs; overrides win', async () => {
   const { planCores, runnerPlanJobs } = await import('./remote/plan.mjs')
   const { fullSuites } = await import('./verify-plan.mjs')
   const scripts = { 'test:dom': 'x', 'test:browser': 'x', 'test:electron': 'x' }
-  const full = runnerPlanJobs({ script: 'test:plan', env: [], args: fullSuites(scripts, { seed: 1, testSeed: 2 }).flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words]) }, {})
-  assert.deepEqual(full.map((job) => [job.kind, job.cores, job.steps.map((step) => step.script)]), [
-    ['unit', 2, ['test', 'test:dom']],
-    ['gallery', 3, ['specs:check', 'specs:conformance', 'test:gallery']],
-    ['desktop', 3, ['test:browser', 'test:electron']],
+  const jobs = (options) => runnerPlanJobs({ script: 'test:plan', env: [], args: fullSuites(scripts, { seed: 1, testSeed: 2, ...options }).flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words]) }, {})
+    .map((job) => [job.kind, job.cores, job.steps.map((step) => step.script)])
+  const sampled = jobs({ gallerySample: 7 })
+  const everyState = jobs({})
+  assert.deepEqual(sampled, [
+    ['unit', 3, ['test', 'test:dom']],
+    ['gallery', 2, ['specs:check', 'specs:conformance', 'test:gallery']],
+    ['desktop', 4, ['test:browser', 'test:electron']],
   ])
-  assert.equal(full.reduce((sum, job) => sum + job.cores, 0), 8)
+  assert.deepEqual(everyState.map(([kind, cores]) => [kind, cores]), [['unit', 3], ['gallery', 3], ['desktop', 3]])
+  for (const layout of [sampled, everyState]) assert.equal(layout.reduce((sum, [, cores]) => sum + cores, 0), 9)
   const affected = runnerPlanJobs({ script: 'test:plan', env: [], args: ['test', 'a.test.ts', '+', 'test:dom', '+', 'test:desktop'] }, {})
   assert.deepEqual(affected.map((job) => [job.kind, planCores(job.kind, { env: [] }, {}, job.steps, job.cores)]), [['unit', 4], ['desktop', 4]])
   assert.equal(planCores('unit', { env: [] }, {}, parsePlan(['test', 'a.test.ts'])), undefined)
