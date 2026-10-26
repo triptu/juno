@@ -97,6 +97,21 @@ const ContentBlock = Schema.Union([
     height: Schema.optionalKey(Schema.Number),
   }),
   /**
+   * A legacy attachment's buttons that go back to their app, in Slack's
+   * order (`messages.attachmentAction`). `attachment` is the attachment's id
+   * and each `id` the button's; `confirm` is Slack's question before sending.
+   */
+  Schema.Struct({
+    kind: Schema.Literal('buttons'),
+    attachment: Schema.String,
+    items: Schema.Array(Schema.Struct({
+      id: Schema.String,
+      text: Schema.String,
+      style: Schema.optionalKey(Schema.Literals(['primary', 'danger'])),
+      confirm: Schema.optionalKey(Schema.Struct({ title: Schema.optionalKey(Schema.String), text: Schema.String, ok: Schema.String, dismiss: Schema.String })),
+    })),
+  }),
+  /**
    * A Slack table: rows of cells of the same length, each cell a run of
    * inlines, the first row its header. `columns` holds Slack's settings by
    * column index; `caption` names the table, shown above it with `showCaption`.

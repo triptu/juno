@@ -94,6 +94,26 @@ export type File = typeof File.Type
 
 export const AttachmentField = S.Struct({ title: opt(S.String), value: opt(S.String), short: opt(S.Boolean) })
 
+/** What a legacy button asks before it is sent: Slack's words for the question and its two answers. */
+export const AttachmentActionConfirm = S.Struct({ title: opt(S.String), text: opt(S.String), ok_text: opt(S.String), dismiss_text: opt(S.String) })
+
+/**
+ * A legacy attachment's button or menu. A button without `url` is sent back
+ * to its app as it came (`chat.attachmentAction`); `id` names it in the
+ * attachment (research `integration-shapes.md`, "Buttons on a Slackbot message").
+ */
+export const AttachmentAction = S.Struct({
+  id: opt(S.Union([S.String, S.Number])),
+  type: opt(S.String),
+  text: opt(S.String),
+  url: opt(S.String),
+  name: opt(S.String),
+  value: opt(S.String),
+  style: opt(S.String),
+  confirm: opt(AttachmentActionConfirm),
+})
+export type AttachmentAction = typeof AttachmentAction.Type
+
 /** Legacy attachments, still used by many bots and by link unfurls. */
 export const Attachment = S.Struct({
   id: opt(S.Number),
@@ -104,7 +124,9 @@ export const Attachment = S.Struct({
   title_link: opt(S.String),
   image_width: opt(S.Number),
   image_height: opt(S.Number),
-  actions: opt(S.Array(S.Struct({ type: opt(S.String), text: opt(S.String), url: opt(S.String), name: opt(S.String) }))),
+  actions: opt(S.Array(AttachmentAction)),
+  /** Names the attachment to its app when a button is pressed. */
+  callback_id: opt(S.String),
   color: opt(S.String),
   author_name: opt(S.String),
   author_link: opt(S.String),
@@ -178,6 +200,8 @@ export const MessageFields = {
   files: opt(S.Array(File)),
   upload: opt(S.Boolean),
   display_as_bot: opt(S.Boolean),
+  /** Shown only to the signed-in user, and only on the socket: never in history (Slackbot's notes, an app's private answers). */
+  is_ephemeral: opt(S.Boolean),
   reactions: opt(S.Array(Reaction)),
   edited: opt(Edited),
   client_msg_id: opt(S.String),

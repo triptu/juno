@@ -58,6 +58,8 @@ export type ContentBlock =
   | { readonly kind: 'context'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'image'; readonly url: string; readonly alt: string; readonly width?: number; readonly height?: number }
   | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
+  /** An attachment's buttons, in Slack's order; `attachment` is its `id`. A button with a link is a link instead. */
+  | { readonly kind: 'buttons'; readonly attachment: string; readonly items: ReadonlyArray<AttachmentButton> }
   /**
    * A Slack table. Every row has the same number of cells; a cell is a run
    * of inlines, empty for an empty cell. The first row is the header, as
@@ -72,6 +74,17 @@ export type ContentBlock =
       readonly caption?: string
       readonly showCaption?: true
     }
+
+/**
+ * A legacy attachment's button that goes back to its app. `id` names it in
+ * its attachment; `confirm` is the question Slack asks before sending it.
+ */
+export interface AttachmentButton {
+  readonly id: string
+  readonly text: string
+  readonly style?: 'primary' | 'danger'
+  readonly confirm?: { readonly title?: string; readonly text: string; readonly ok: string; readonly dismiss: string }
+}
 
 export type PlaceKind = 'public' | 'private' | 'im' | 'mpim'
 
@@ -167,6 +180,7 @@ export function inlinesOf(body: MessageBody): ReadonlyArray<Inline> {
         out.push({ kind: 'text', text: block.text, style: { code: true } })
         break
       case 'divider':
+      case 'buttons':
         break
       case 'file':
         out.push({ kind: 'text', text: block.name })

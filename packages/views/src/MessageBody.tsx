@@ -4,6 +4,7 @@ import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@ju
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, Divider, Emoji, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { HighlightedCodeBlock } from './CodeHighlight'
+import { AttachmentButtons, type OnAttachmentButton } from './AttachmentButtons'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { MessageTable } from './MessageTable'
@@ -33,6 +34,8 @@ export interface MessageBodyProps {
    * order. Without it each is a quiet line with its kind and name.
    */
   readonly renderFiles?: ((files: ReadonlyArray<FileBlock>) => ReactNode) | undefined
+  /** A press on an attachment's button. Without it the buttons are dimmed. */
+  readonly onButton?: OnAttachmentButton | undefined
 }
 
 // An emoji-only message (one to three emoji and nothing else) is drawn
@@ -59,13 +62,13 @@ export function isEmojiOnly(body: MessageBodyModel): boolean {
  * its `files`. A shared message's files are drawn in its card, by
  * `renderFiles`. Text is selectable and follows its own direction.
  */
-export function MessageBody({ body, now, hueOf, onChannel, onLink, linkInfo, tabbable = false, renderFiles }: MessageBodyProps) {
+export function MessageBody({ body, now, hueOf, onChannel, onLink, linkInfo, tabbable = false, renderFiles, onButton }: MessageBodyProps) {
   const jumbo = isEmojiOnly(body)
   const tabIndex = tabbable ? 0 : -1
   return (
     <div data-msg-text="" {...stylex.props(styles.body, jumbo && styles.jumbo)}>
       {body.blocks.map((block, index) => (
-        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} renderFiles={renderFiles} />
+        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} renderFiles={renderFiles} onButton={onButton} />
       ))}
     </div>
   )
@@ -80,9 +83,10 @@ interface BlockProps {
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
   readonly renderFiles?: ((files: ReadonlyArray<FileBlock>) => ReactNode) | undefined
+  readonly onButton?: OnAttachmentButton | undefined
 }
 
-function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex, renderFiles }: BlockProps) {
+function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex, renderFiles, onButton }: BlockProps) {
   switch (block.kind) {
     case 'attachment': {
       const files = block.blocks.filter((child): child is FileBlock => child.kind === 'file')
@@ -91,12 +95,14 @@ function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex, rende
         // A shared message's place opens the message, as a Slack link in the text does.
         source={block.source && <Link url={block.source.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet><SharedPlace source={block.source} /></Link>}
         footer={<Inlines inlines={block.footer} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet />}>
-        {block.blocks.map((child, index) => <Block key={index} block={child} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />)}
+        {block.blocks.map((child, index) => <Block key={index} block={child} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} onButton={onButton} />)}
         {files.length === 0 ? null : renderFiles === undefined ? <SharedFileLines files={files} /> : renderFiles(files)}
       </AttachmentCard>
     }
     case 'image':
       return <AttachmentImage image={block} />
+    case 'buttons':
+      return <AttachmentButtons block={block} onButton={onButton} tabbable={tabIndex === 0} />
     case 'table':
       return <MessageTable table={block} tabbable={tabIndex === 0} render={(inlines) => <Inlines inlines={inlines} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />} />
     case 'fields':

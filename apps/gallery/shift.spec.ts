@@ -33,6 +33,7 @@ for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once a page is open.
   // Over every component the walk is @heavy (scripts/test-areas.mjs); limited with GALLERY_SHIFT_ONLY it is not.
   test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, page }) => {
+    test.skip(process.env.GALLERY_REAL_WALK === '0', 'Nightly checks every state with the fast sweep; changed-state real input runs on commits')
     const pages = walkPages(page)
     // JUNO_SHARD=i/n (bun run remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))

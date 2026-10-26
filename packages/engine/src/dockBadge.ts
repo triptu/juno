@@ -42,7 +42,7 @@ export function badgeStatement(policy: ReturnType<typeof badgePolicy>, self: str
   return {
     sql: `SELECT EXISTS(SELECT 1 ${unreadFrom(true, 'LEFT JOIN topic_reads r ON r.topic_id = i.topic_id LEFT JOIN channel_reads cr ON cr.channel = i.channel')} AND ${knownRead} AND (
       EXISTS(SELECT 1 FROM messages m LEFT JOIN notification_log n ON n.channel = m.channel AND n.ts = m.ts
-        WHERE m.channel = i.channel AND (m.ts > COALESCE(r.last_read_ts, CASE WHEN i.kind = 'main' THEN cr.slack_last_read ELSE s.slack_last_read END, '0') OR (r.marked_unread = 1 AND m.ts = i.last_activity_ts)) AND m.deleted = 0 AND COALESCE(m.user_id, '') <> ?
+        WHERE m.channel = i.channel AND (m.ts > COALESCE(r.last_read_ts, CASE WHEN i.kind = 'main' THEN cr.slack_last_read ELSE s.slack_last_read END, '0') OR (r.marked_unread = 1 AND m.ts = i.last_activity_ts)) AND m.deleted = 0 AND m.ephemeral = 0 AND COALESCE(m.user_id, '') <> ?
           AND ((i.kind = 'main' AND (m.thread_ts IS NULL OR m.thread_ts = m.ts OR m.subtype = 'thread_broadcast')) OR (i.kind = 'thread' AND (m.thread_ts = i.root_ts OR m.ts = i.root_ts)))
           AND ${code('m.user_id', 'm.attention', AUTO)} LIMIT 1)
       OR ((i.message_count = 0 OR (r.marked_unread = 1 AND c.kind IN ('im', 'mpim'))) AND (c.kind = 'im' OR ${policy.unknownSender ? '1' : '0'}) AND ${code('c.user_id', 'CASE WHEN i.mentions_me = 1 THEN 2 ELSE 0 END', '0')})

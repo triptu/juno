@@ -91,6 +91,8 @@ const frameHandler = (userId: string, sql: StoreReader['Service'], notifications
   }
   if (frame.type !== 'message' && frame.type !== 'desktop_notification') return
   if (frame.type === 'message' && ('message' in frame || 'deleted_ts' in frame || !('ts' in frame))) return
+  // An ephemeral message (Slackbot's notes) never notifies, as in Slack's client.
+  if (frame.type === 'message' && 'is_ephemeral' in frame && frame.is_ephemeral === true) return
   if (!('channel' in frame) || frame.channel === undefined) return
   const ts = frame.type === 'desktop_notification' ? frame.msg ?? frame.ts : frame.ts
   if (ts === undefined) return

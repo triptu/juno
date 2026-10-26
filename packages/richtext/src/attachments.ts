@@ -1,5 +1,5 @@
-import type { Attachment, File } from '@juno/slack-schema'
-import type { Block, ContentBlock, Inline, Lookups, SharedSource } from './model'
+import type { Attachment, AttachmentAction, File } from '@juno/slack-schema'
+import type { AttachmentButton, Block, ContentBlock, Inline, Lookups, SharedSource } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { inlineText } from './inline'
 import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
@@ -18,10 +18,14 @@ export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extra
   if (attachment.fields?.length) blocks.push({ kind: 'fields', items: attachment.fields.map((f) => mrkdwnInlines([f.title && `*${f.title}*`, f.value].filter(Boolean).join('\n'), lookups)) })
   const url = attachment.image_url || attachment.thumb_url
   if (url) blocks.push({ kind: 'image', url, alt: attachment.title || 'Attachment image', ...(attachment.image_width && attachment.image_height ? { width: attachment.image_width, height: attachment.image_height } : {}) })
+  const buttons: AttachmentButton[] = []
   for (const action of attachment.actions ?? []) {
     const text = action.text || action.name || action.url || ''
-    blocks.push({ kind: 'paragraph', children: action.url ? [{ kind: 'link', url: action.url, text }] : mrkdwnInlines(text, lookups) })
+    // A button with no link goes back to its app, which needs the attachment's and the button's ids.
+    if (!action.url && action.type === 'button' && action.id !== undefined && attachment.id !== undefined) buttons.push(attachmentButton(action, String(action.id), text))
+    else blocks.push({ kind: 'paragraph', children: action.url ? [{ kind: 'link', url: action.url, text }] : mrkdwnInlines(text, lookups) })
   }
+  if (buttons.length > 0) blocks.push({ kind: 'buttons', attachment: String(attachment.id), items: buttons })
   if (!blocks.length && !attachment.title && attachment.fallback) blocks.push(...mrkdwnBlocks(attachment.fallback, lookups))
   const titleUrl = attachment.title_link || attachment.from_url || attachment.original_url
   const title: Inline[] = titleUrl && attachment.title ? [{ kind: 'link', url: titleUrl, text: inlineText(mrkdwnInlines(attachment.title, lookups)) }] : mrkdwnInlines(attachment.title ?? '', lookups)
@@ -42,6 +46,18 @@ export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extra
     ...(attachment.author_name ? { author: { name: attachment.author_name, ...(attachment.author_icon ? { icon: attachment.author_icon } : {}) } } : {}),
     ...(attachment.footer_icon || attachment.service_icon ? { footerIcon: attachment.footer_icon || attachment.service_icon } : {}),
     tint: attachmentTint(attachment.color), title, blocks, ...(source === undefined ? {} : { source }), footer }
+}
+
+function attachmentButton(action: AttachmentAction, id: string, text: string): AttachmentButton {
+  const style = action.style === 'primary' || action.style === 'danger' ? action.style : undefined
+  const confirm = action.confirm
+  return {
+    id,
+    text,
+    ...(style === undefined ? {} : { style }),
+    // Slack's own defaults when an app leaves the answers out.
+    ...(confirm === undefined ? {} : { confirm: { ...(confirm.title ? { title: confirm.title } : {}), text: confirm.text || 'Are you sure?', ok: confirm.ok_text || 'Okay', dismiss: confirm.dismiss_text || 'Cancel' } }),
+  }
 }
 
 /** A file as a body names it; the message's `files` carry the rest. */

@@ -202,3 +202,27 @@ test('a cached rendering test keys on its spec, the components it opened and, fo
   cache().forget(spec, 'rows')
   assert.equal(cache().passed(spec, 'rows'), false)
 })
+
+test('a computed pass never authorizes real input, and each guard invalidates its own records', t => {
+  const { cache, write, button, other } = fixture(t)
+  write('apps/gallery/computed-walk.ts', "import { forced } from './forced'\nexport const walk = forced")
+  write('apps/gallery/forced.ts', 'export const forced = 1')
+  const computed = () => cache({ kind: 'computed' })
+  computed().pass(button)
+  assert.equal(cache().passed(button), false)
+  for (const route of [button, other]) { cache().pass(route); computed().pass(route) }
+  write('apps/gallery/forced.ts', 'export const forced = 2')
+  assert.equal(computed().passed(button), false)
+  assert.equal(cache().passed(button), true)
+  computed().pass(button)
+  write('packages/ui/src/width.ts', 'export const width = 22')
+  assert.equal(computed().passed(button), false)
+  assert.equal(cache().passed(button), false)
+  assert.equal(cache().passed(other), true)
+  // A failed forced check loses only its own pass, never the real-input pass.
+  cache().pass(button)
+  computed().pass(button)
+  computed().forget(button)
+  assert.equal(computed().passed(button), false)
+  assert.equal(cache().passed(button), true)
+})

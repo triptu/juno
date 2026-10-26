@@ -5,7 +5,7 @@
  */
 import { useMemo, type Dispatch, type KeyboardEvent, type RefObject, type SetStateAction } from 'react'
 import type { MessageView, TopicDetail } from '@juno/contract'
-import { deleteMessage, noteRecentEmoji, reactToMessage, registry, type MessageWindow } from '@juno/state'
+import { deleteMessage, noteRecentEmoji, pressMessageButton, reactToMessage, registry, type MessageWindow } from '@juno/state'
 import type { MenuAt, MenuPoint, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
 import { withMenus } from '../messageMenu'
@@ -122,6 +122,7 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       reply,
       onSeeReactions: (message, name, chip) => setReactions({ ts: message.ts, name, anchor: chip }),
       onConfirmDelete: confirmDelete,
+      onButton: (message, attachment, button) => pressMessageButton(registry, refOf(channel, message), attachment, button).then((exit) => exit._tag === 'Success'),
       onCancelDelete: () => {
         const ts = latest.current.confirming?.ts
         setConfirming(undefined)
