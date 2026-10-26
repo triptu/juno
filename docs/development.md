@@ -1220,7 +1220,7 @@ See [Juno runner configuration](self-hosted-runner.md); use `/tstack:runner`
 for machine setup, lessons and troubleshooting.
 
 Jobs wait up to 60 seconds for capacity (`--wait <seconds>` or
-`JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. `bun run remote --local <script>` and `bun run affected --local` run the steps on
+`JUNO_RUNNER_WAIT` changes this); split plans and every `verify:main` (so every release's full run or repair) wait up to an hour. The allocator has no priority: a waiting job takes cores in no set order against other waiting jobs. An unavailable or full runner fails. `bun run remote --local <script>` and `bun run affected --local` run the steps on
 this Mac through the heavy lock; use them only when Tushar asks, since heavy runs make the Mac hang and restart. These commands have no automatic local fallback.
 `bun run verify:main` fails when its runner health check reports an
 unreachable host (see "Full runs").

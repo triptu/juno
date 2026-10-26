@@ -32,7 +32,7 @@ bun run remote test --files packages/engine/test/flows/topic-view.flow.test.ts
 bun run remote test:plan test --files packages/engine/test/flows/topic-view.flow.test.ts + test:desktop e2e/app.spec.ts
 ```
 
-Standalone jobs wait up to 60 seconds for capacity; split plans default to one hour so queued jobs can wait for capacity released by their siblings. `--wait <seconds>` or
+Standalone jobs wait up to 60 seconds for capacity; split plans and `verify:main` (full runs, repairs and the release's run) default to one hour, so queued jobs can wait for capacity released by their siblings or by other agents. `--wait <seconds>` or
 `JUNO_RUNNER_WAIT` changes the wait, including for each job in a split plan.
 An unreachable or full runner fails with a message explaining that `--local`
 runs the steps on this Mac through the heavy lock. There is no automatic local
