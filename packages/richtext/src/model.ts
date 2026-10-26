@@ -58,6 +58,8 @@ export type ContentBlock =
   | { readonly kind: 'context'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'image'; readonly url: string; readonly alt: string; readonly width?: number; readonly height?: number }
   | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
+  /** An attachment's buttons, in Slack's order; `attachment` is its `id`. A button with a link is a link instead. */
+  | { readonly kind: 'buttons'; readonly attachment: string; readonly items: ReadonlyArray<AttachmentButton> }
   /**
    * A Slack table. Every row has the same number of cells; a cell is a run
    * of inlines, empty for an empty cell. The first row is the header, as
@@ -65,8 +67,6 @@ export type ContentBlock =
    * when Slack sent any. `caption` names the table; `showCaption` when Slack
    * shows it above the table.
    */
-  /** An attachment's buttons, in Slack's order; `attachment` is its `id`. A button with a link is a link instead. */
-  | { readonly kind: 'buttons'; readonly attachment: string; readonly items: ReadonlyArray<AttachmentButton> }
   | {
       readonly kind: 'table'
       readonly rows: ReadonlyArray<ReadonlyArray<ReadonlyArray<Inline>>>
