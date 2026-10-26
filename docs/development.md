@@ -1654,8 +1654,9 @@ ten lines, or a line with a commit hash. The script:
    (a build without `JUNO_UPDATE_TOKEN` would never update again);
 2. checks the version is newer than every published release and not already
    tagged;
-3. creates a draft release `v<version>` with the DMG, its block map and
-   `latest-mac.yml` (plus the ZIP and its block map if signed);
+3. uploads a draft release `v<version>` with the DMG, its block map and
+   `latest-mac.yml` (plus the ZIP and its block map if signed), or reuses a
+   staged draft from the same build after checking its asset names and sizes;
 4. adds the section to `CHANGELOG.md` with today's date;
 5. publishes the draft and marks it latest. Installs see it from now on;
 6. sets the released version on the current `origin/main` tip with a version-only
@@ -1666,6 +1667,13 @@ The main update uses a normal push, fetching and rebasing on concurrent changes
 for up to four attempts. It never force-pushes. If it fails after publication,
 the command exits non-zero. Rerun the same publish command to finish only the
 main update; an already published stable version is not uploaded again.
+
+`--stage` validates the build and uploads only a draft, without requiring the
+full-run gate or highlights. It never changes latest, CHANGELOG.md or main.
+Publishing that draft still requires the normal gate and valid highlights.
+`--discard-draft` deletes only a staged draft whose build commit matches the
+checkout. Both refuse published releases and drafts from another build.
+Installed copies read `/releases/latest`, which excludes drafts and prereleases.
 
 `--dry-run` checks and prints the plan without changing anything.
 `--prerelease` publishes a pre-release, which the updater never offers, and
@@ -1715,23 +1723,29 @@ changes nothing; it does not fetch.
 2. It prints the product commits since the last release, the input for the
    highlights, and the highlights file to write
    (`.juno-status/release-<version>-notes.md`, or `--notes <file>`).
-3. If no green full run covers the tip (the release gate in "Publishing"), it
-   runs `bun run verify:main --ref <tip>` on the laptop. If the newest record
-   for an ancestor of the tip failed and main has changed since, it runs
-   `verify:main --ref <tip> --repair <record>` instead. If main has not changed
-   since a failed run, it refuses to run anything. A failed run stops the
-   command before any build, with each failed suite's failures, cause and log,
-   and the repair command.
-4. It waits for the highlights file, which the agent writes while the full run
-   goes. It reads the file once it has not changed for a second, and waits for
-   a corrected file if it is invalid, up to `--notes-timeout` minutes (60).
-5. It bumps the patch version in a detached worktree on the scratch volume
-   (`release-<version>`), commits `Release x.y.z`, runs `bun run package` and
-   `bun run test:package` there (both through the heavy lock with release
-   priority), and publishes with `release:publish`.
-6. It checks the GitHub release (not a draft, marked latest, with the DMG, its
-   block map and `latest-mac.yml`) and that main has the version, then removes
-   the worktree.
+3. It bumps the patch version in a detached worktree on the scratch volume
+   (`release-<version>`) and commits `Release x.y.z`. If no green full run covers
+   that build commit, it runs `bun run verify:main --ref <build>` on the laptop.
+   An eligible failed ancestor is repaired; a failure at the same build refuses
+   a rerun without a fix. A failed version commit on another branch needs a
+   fresh full run after the fix, since repairs require ancestry.
+4. While verification runs, it runs `bun run package`, then `bun run test:package`
+   on the Mac, each under the exclusive heavy lock with release priority.
+   Packaging reuses the checked JS build cache when its inputs and output bytes
+   match. Once smoke passes, it uploads a draft with `release:publish --stage`.
+   The draft stays invisible to updates and is never marked latest. Asset
+   uploads are concurrent, including signed builds' ZIPs.
+5. Both verification and staging must pass. On failure it drains both jobs,
+   deletes its draft and discards the package. It prints failed suites with
+   their failures, cause, log and the next verification command.
+6. It waits for the highlights file, which the agent writes during verification.
+   It reads the file once it has not changed for a second, and waits for a
+   corrected file if invalid, up to `--notes-timeout` minutes (60). It checks
+   the gate again, writes CHANGELOG.md and publishes the draft with the final
+   notes and latest mark. No assets are uploaded again.
+7. The publisher checks the published release's assets and latest mark before
+   advancing main's version. The command checks main's version and removes
+   its worktree.
 
 `JUNO_UPDATE_TOKEN` must be in its environment; the command checks this before
 the full run. Supply it through the existing secure release setup, never in a
@@ -1745,12 +1759,15 @@ added.
 Rerun the same command after any failure. Before anything else it repairs
 main from the latest published stable version, after checking its assets and latest mark, and exits without publishing,
 which needs the `gh` login but no build. A green record covering the tip is
-reused. A failed run keeps its worktree for inspection, and a rerun refuses to
-reuse it. The lock is `.juno-status/release.lock`; a lock whose process has
+reused. A failed run keeps its clean version worktree for inspection. A rerun
+reuses it for the same source, or replaces it when main changes; dirty or
+unrelated worktrees are refused. A draft left by an interrupted command can
+be resumed only by the same build. The lock is `.juno-status/release.lock`; a lock whose process has
 gone is taken over.
 
 Step timings (full run, highlights wait, prepare, package, packaged smoke,
-publish, upload and cleanup) persist in the main checkout's
+stage draft, publish, upload, changelog, mark published, release validation,
+main version sync and cleanup) persist in the main checkout's
 `.juno-status/release-timings.json`, including failed steps, after the release
 worktree is removed.
 

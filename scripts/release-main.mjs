@@ -70,15 +70,14 @@ export function syncReleasedVersion(root, released) {
 export function checkPublishedRelease(repo, version) {
   const tag = `v${normalizeVersion(version)}`
   const gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }))
-  const release = gh('release', 'view', tag, '--repo', repo, '--json', 'tagName,isDraft,isPrerelease,assets')
+  const release = gh('api', `repos/${repo}/releases/latest`)
   const names = release.assets.map((asset) => asset.name).toSorted()
-  const latest = gh('release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isLatest').find((entry) => entry.isLatest)?.tagName
   const dmg = names.find((name) => name.endsWith('.dmg'))
   const problems = [
-    ...(release.isDraft || release.isPrerelease ? ['it is a draft or a pre-release'] : []),
+    ...(release.draft || release.prerelease ? ['it is a draft or a pre-release'] : []),
     ...(!dmg ? ['it has no DMG'] : !names.includes(`${dmg}.blockmap`) ? ['it has no matching DMG block map'] : []),
     ...(names.includes('latest-mac.yml') ? [] : ['it has no latest-mac.yml']),
-    ...(latest === tag ? [] : [`the latest release is ${latest ?? 'none'}`]),
+    ...(release.tag_name === tag ? [] : [`the latest release is ${release.tag_name ?? 'none'}`]),
   ]
   if (problems.length) throw new Error(`${tag} is published, but ${problems.join('; ')}`)
   console.log(`release: checked ${tag}: ${names.join(', ')}; marked latest`)

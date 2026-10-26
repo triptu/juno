@@ -1,0 +1,1 @@
+- 10-27 00:52 · Tushar · Prepare the release version commit before verification, then package, smoke-test and upload a draft while the laptop verifies that build. Publish only after the full-run gate and highlights pass; delete the draft and discard the package on failure. This keeps upload off the path after verification without exposing unverified updates.

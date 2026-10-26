@@ -7,25 +7,22 @@
 // 1. Fetches main and takes its tip. Stops if the tip is already released, has
 //    no user-facing change since the last release, or does not descend from it.
 // 2. Prints the commits since the last release and the highlights file to write.
-// 3. Unless a green full run covers the tip, runs one on the laptop
-//    (verify:main --ref <tip>, at high priority), or a repair of the newest
-//    failed run when main has changed since it. A red run stops with its
-//    failures and the repair command.
-// 4. Waits for the highlights file, which the agent writes while the full run goes.
-// 5. Bumps the patch version in a release worktree, packages, runs the packaged
-//    smoke, publishes, checks the GitHub release and main's version, and removes
-//    the worktree.
+// 3. Bumps the patch version in a release worktree. Runs the full run on that
+//    commit on the laptop while packaging and smoking it on the Mac.
+// 4. Requires both to pass, then waits for valid highlights and publishes.
+//    A failed run discards the package and prints its failures and repair command.
+// 5. Checks main's version and removes the worktree. The publisher checks GitHub.
 //
 // Rerun the same command after any failure: green records are reused, and an
 // already published version only finishes the main version update. --dry-run
 // reads GitHub and local records and changes nothing.
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { compareVersions, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
-import { assessRecord, git, isAncestor, printGate, readRecords, releaseGate, skippedTests, statusFolder } from './release-gate.mjs'
+import { assessRecord, compatible, git, isAncestor, printGate, readRecords, releaseGate, skippedTests, statusFolder } from './release-gate.mjs'
 import { highlightLines, userFacingChanges } from './release-highlights.mjs'
 import { checkPublishedRelease, syncReleasedVersion } from './release-main.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
@@ -54,8 +51,7 @@ const gh = (...args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }
 let locked = false
 try {
   if (!dry) {
-    // Checked before the full run, not twenty minutes into it.
-    if (process.env.JUNO_RELEASE === '1') throw new Error('Juno releases are unsigned; unset JUNO_RELEASE')
+    // Checked before the full run.
     if (!process.env.JUNO_UPDATE_TOKEN) throw new Error('JUNO_UPDATE_TOKEN is required for the packaged updater; pass it inline from the keychain (.claude/skills/do-release/SKILL.md)')
     locked = takeLock()
     // The full run and the urgent gate take laptop cores before waiting normal jobs. JUNO_PRIORITY=normal opts out.
@@ -98,23 +94,39 @@ async function release() {
   for (const change of changes) console.log(`  ${change}`)
   say(`write the highlights to ${notes} (3 to 8 "- " lines; do-release skill, "Write the highlights")`)
 
-  const ready = await fullRun(tip)
   if (dry) {
+    const ready = await fullRun(tip)
     if (existsSync(notes)) {
       try { printHighlights(highlightLines(readFileSync(notes, 'utf8'))) } catch (error) { say(`${notes}: ${error.message}`) }
     } else say(`no highlights at ${notes} yet`)
-    say(`${ready ? 'then' : 'after it'}: wait for the highlights, package, packaged smoke, publish to ${repo}, check the release and main`)
+    say(`prepare the version commit first; ${ready ? 'reuse its covering full run' : 'verify that commit on the laptop'} while packaging, smoking and uploading a draft on the Mac; then wait for highlights, publish to ${repo}, check the release and main`)
     return
   }
-  await timed('highlights wait', { version, source: tip }, () => waitForHighlights(notes))
-  publish(tip, version, notes)
+  const checkout = prepare(tip, version)
+  const build = git(checkout, 'rev-parse', 'HEAD')
+  const detail = { version, source: tip, build }
+  // Start the laptop first; its preflight may refuse an unchanged failed commit.
+  let verificationFailed = false
+  const verification = Promise.resolve(fullRun(build)).catch((error) => { verificationFailed = true; throw error })
+  const publisher = (args) => run(process.execPath, [join(here, 'release-publish.ts'), '--checkout', checkout, '--source', tip, '--repo', repo, ...args], checkout)
+  const outcomes = await Promise.allSettled([verification, packageRelease(checkout, detail).then(() => {
+    if (!verificationFailed) timedSync('stage draft', detail, () => publisher(['--stage']))
+  })])
+  const failed = outcomes.find((outcome) => outcome.status === 'rejected')
+  if (failed) {
+    try { publisher(['--discard-draft']) } catch (error) { say(`draft cleanup failed: ${error.message}; inspect the draft before rerunning`) }
+    rmSync(join(checkout, 'apps/desktop/release'), { recursive: true, force: true })
+    throw failed.reason
+  }
+  await timed('highlights wait', detail, () => waitForHighlights(notes))
+  timedSync('publish', detail, () => publisher(['--notes', notes]))
   check(version)
   timedSync('cleanup', { version, source: tip }, () => run(process.execPath, [join(here, 'worktree.mjs'), 'remove', `release-${version}`, '--force']))
   say(`released ${version} from ${tip} in ${Math.round((Date.now() - started) / 1000)} s`)
 }
 
 /** Makes sure a green full run covers the tip, running one on the laptop if needed. False on a dry run that would need one. */
-async function fullRun(tip) {
+function fullRun(tip) {
   const covered = releaseGate(root, tip, readRecords(status))
   if (covered) { printGate(covered); return true }
   const records = readRecords(status)
@@ -130,14 +142,15 @@ async function fullRun(tip) {
   say(`no green full run covers ${tip}; running ${command} on the laptop. Write the highlights meanwhile.`)
   const begun = new Date().toISOString()
   const begunAt = Date.now()
-  const exit = spawnSync('bun', ['run', 'verify:main', ...args], { cwd: root, stdio: 'inherit' }).status
-  recordReleaseTiming('full run', begunAt, { source: tip, status: exit === 0 ? 'passed' : 'failed' }, root)
-  const gate = exit === 0 ? releaseGate(root, tip) : null
-  if (gate) { printGate(gate); return true }
-  const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
-  if (record) report(record, recordFile(record))
-  else say(`the full run exited with ${exit} and wrote no record; see its output above`)
-  throw new Error('the full run failed; nothing was built or published')
+  return runAsync('bun', ['run', 'verify:main', ...args]).then((exit) => {
+    recordReleaseTiming('full run', begunAt, { source: tip, status: exit === 0 ? 'passed' : 'failed' }, root)
+    const gate = exit === 0 ? releaseGate(root, tip) : null
+    if (gate) { printGate(gate); return true }
+    const record = readRecords(status).find((record) => record.commit === tip && record.finishedAt >= begun)
+    if (record) report(record, recordFile(record))
+    else say(`the full run exited with ${exit} and wrote no record; see its output above`)
+    throw new Error('the full run failed; the package was discarded and nothing was published')
+  })
 }
 
 /** The failed suites of a full-run record, their causes and the way on. */
@@ -150,8 +163,8 @@ function report(record, file) {
     if (suite.log) console.log(`    log ${suite.log}`)
   }
   say('confirm each cause: bun scripts/verify-records.mjs <record> <suite> product|test|infrastructure|cancellation "evidence"')
-  say('fix the failures and push the fixes to main, then rerun this command: it runs the repair itself. The repair by hand:')
-  console.log(`  bun run verify:main --ref origin/main --repair ${file}`)
+  say('fix the failures and push the fixes to main, then rerun this command. A repair requires the failed commit to be an ancestor; otherwise it starts a fresh full run.')
+  console.log(`  bun run verify:main --ref <fixed-descendant-of-${record.commit}> --repair ${file}`)
 }
 
 /** The file a record was read from, for --repair. */
@@ -199,26 +212,48 @@ function previousCommit(tag) {
   return legacy
 }
 
-function publish(source, version, notes) {
+function prepare(source, version) {
   const name = `release-${version}`
   const checkout = join(worktreeFolder(mainCheckout(root)), name)
-  const detail = { version, source }
-  // A failed release keeps its worktree for inspection; a rerun refuses to reuse it.
-  timedSync('prepare', detail, () => {
+  timedSync('prepare', { version, source }, () => {
+    if (existsSync(checkout)) {
+      const build = git(checkout, 'rev-parse', 'HEAD')
+      const parent = git(checkout, 'rev-parse', 'HEAD^')
+      const manifest = JSON.parse(readFileSync(join(checkout, 'apps/desktop/package.json'), 'utf8'))
+      if (git(checkout, 'status', '--porcelain') || git(checkout, 'branch', '--show-current')
+        || manifest.version !== version || git(checkout, 'diff', '--name-only', parent, build) !== 'apps/desktop/package.json'
+        || !compatible(root, parent, build)) throw new Error(`${checkout} is not a clean release worktree; inspect it and remove it with bun scripts/worktree.mjs remove release-${version} --force`)
+      if (parent === source) return
+      run(process.execPath, [join(here, 'worktree.mjs'), 'remove', name, '--force'])
+    }
     run(process.execPath, [join(here, 'worktree.mjs'), 'add', name, '--detach', source])
     const file = join(checkout, 'apps/desktop/package.json')
     const text = readFileSync(file, 'utf8')
     writeFileSync(file, text.replace(/("version"\s*:\s*")[^"]+"/, `$1${version}"`))
     run('git', ['commit', '-qm', `Release ${version}`, '--', 'apps/desktop/package.json'], checkout)
   })
-  timedSync('package', detail, () => run('bun', ['run', 'package'], checkout))
-  timedSync('package-smoke', detail, () => run('bun', ['run', 'test:package'], checkout, { JUNO_E2E_AI_JOBS: '1' }))
-  timedSync('publish', detail, () => run(process.execPath, [join(here, 'release-publish.ts'), '--checkout', checkout, '--source', source, '--repo', repo, '--notes', notes], checkout))
+  return checkout
 }
 
-/** Checks what installs will see: the release, its files, the latest mark, and main's version. */
+async function packageRelease(checkout, detail) {
+  for (const [step, script] of [['package', 'package'], ['package-smoke', 'test:package']]) {
+    await timed(step, detail, async () => {
+      const code = await runAsync('bun', ['run', script], checkout, { JUNO_E2E_AI_JOBS: '1' })
+      if (code !== 0) throw new Error(`${script} failed (${code}); nothing was published`)
+    })
+  }
+}
+
+function runAsync(command, args, cwd = root, env = {}) {
+  return new Promise((done, reject) => {
+    const child = spawn(command, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } })
+    child.on('error', reject)
+    child.on('close', (code) => done(code ?? 1))
+  })
+}
+
+/** The publisher already checked GitHub; check the version that reached main. */
 function check(version) {
-  checkPublishedRelease(repo, version)
   git(root, 'fetch', 'origin', 'main')
   const main = JSON.parse(git(root, 'show', 'origin/main:apps/desktop/package.json')).version
   if (compareVersions(main, version) < 0) throw new Error(`origin/main is still at version ${main}`)

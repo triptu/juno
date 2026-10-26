@@ -30,19 +30,24 @@ else if (group === 'release' && command === 'create') {
   const valued = ['--repo', '--title', '--notes-file']
   const files = args.slice(3).filter((arg, i, rest) => !arg.startsWith('--') && !valued.includes(rest[i - 1]))
   state.releases.push({ tagName: tag, isDraft: true, isPrerelease: args.includes('--prerelease'), isLatest: false, publishedAt: '',
-    body: fs.readFileSync(args[args.indexOf('--notes-file') + 1], 'utf8'), assets: files.map((file) => ({ name: file.split('/').pop() })) })
+    body: fs.readFileSync(args[args.indexOf('--notes-file') + 1], 'utf8'), assets: files.map((file) => ({ name: file.split('/').pop(), size: fs.statSync(file).size })) })
   save()
 } else if (group === 'release' && command === 'edit') {
   for (const release of state.releases) release.isLatest = args.includes('--latest') ? release.tagName === tag : release.isLatest
-  Object.assign(find(tag), { isDraft: false, publishedAt: new Date().toISOString() })
+  Object.assign(find(tag), { isDraft: false, publishedAt: new Date().toISOString(), body: fs.readFileSync(args[args.indexOf('--notes-file') + 1], 'utf8') })
   save()
+} else if (group === 'release' && command === 'delete') { state.releases = state.releases.filter((release) => release.tagName !== tag); save() }
+else if (group === 'api' && args[1].endsWith('/releases/latest')) {
+  const latest = state.releases.find((release) => release.isLatest && !release.isDraft && !release.isPrerelease)
+  if (!latest) process.exit(1)
+  console.log(JSON.stringify({ tag_name: latest.tagName, draft: latest.isDraft, prerelease: latest.isPrerelease, assets: latest.assets }))
 } else if (group === 'api' && !args.includes('PUT')) console.log(JSON.stringify({ sha: 'one', content: Buffer.from(state.changelog).toString('base64') }))
 else if (group === 'api') { state.changelog = Buffer.from(JSON.parse(fs.readFileSync(0, 'utf8')).content, 'base64').toString('utf8'); save() }
 else process.exit(99)
 `
 
 // The laptop's full run: takes the next outcome from a plan file and writes the record verify:main would.
-const fakeVerify = (plan, calls) => `
+const fakeVerify = (plan, calls, state) => `
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 const args = process.argv.slice(2)
@@ -53,6 +58,15 @@ const commit = execFileSync('git', ['rev-parse', args[args.indexOf('--ref') + 1]
 const repair = args.includes('--repair') ? JSON.parse(readFileSync(args[args.indexOf('--repair') + 1], 'utf8')) : undefined
 // "skipped" is a green run that skipped tests, as a normal full run did before 10-26.
 const required = ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop']
+// A full run must make progress while packaging, smoke and draft upload run.
+// Waiting for a draft makes a serial implementation fail instead of pass slowly.
+if (process.env.JUNO_FIXTURE_WAIT_FOR_DRAFT === '1') {
+  const deadline = Date.now() + 5000
+  while (!JSON.parse(readFileSync(${JSON.stringify(state)}, 'utf8')).releases.some((release) => release.isDraft)) {
+    if (Date.now() > deadline) throw new Error('draft upload did not overlap the full run')
+    await new Promise((done) => setTimeout(done, 10))
+  }
+}
 const red = outcome === 'red'
 const command = (suite) => outcome === 'skipped' ? { command: ['JUNO_SKIP_TAGS=@nightly', suite] } : {}
 const finishedAt = new Date().toISOString()
@@ -102,7 +116,7 @@ function fixture(t) {
   writeFileSync(file('plan'), '')
   writeFileSync(join(bin, 'gh'), fakeGh(file('gh-state.json'), file('gh-calls')))
   chmodSync(join(bin, 'gh'), 0o755)
-  writeFileSync(file('verify.mjs'), fakeVerify(file('plan'), file('verify-calls')))
+  writeFileSync(file('verify.mjs'), fakeVerify(file('plan'), file('verify-calls'), file('gh-state.json')))
   writeFileSync(file('package.mjs'), fakePackage)
   execFileSync('git', ['init', '-q', '--bare', remote], { env })
   git('init', '-q', '-b', 'main')
@@ -132,8 +146,8 @@ function fixture(t) {
   return { folder, repo, remote, env, git, commit, release, github, lines, plan: (...outcomes) => writeFileSync(file('plan'), outcomes.join('\n')), file }
 }
 
-test('a red full run stops with its failures; after a fix, the same command repairs, waits for highlights and publishes', { timeout: 60_000 }, async (t) => {
-  const { git, commit, release, github, lines, plan, file } = fixture(t)
+test('a red full run stops with its failures; after a fix, the same command verifies the new build, waits for highlights and publishes', { timeout: 60_000 }, async (t) => {
+  const { git, commit, release, github, lines, plan, file, env } = fixture(t)
   commit('Add tests for sidebar selection', { 'apps/desktop/src/sidebar.test.ts': 'test' })
   const tip = commit('Keep your place after scrolling', { 'apps/desktop/src/app.js': 'scroll' })
 
@@ -145,14 +159,18 @@ test('a red full run stops with its failures; after a fix, the same command repa
   assert.match(looked.output, new RegExp(`would run bun run verify:main --ref ${tip} --require-remote on the laptop`))
   assert.deepEqual(lines('verify-calls'), [])
 
+  env.JUNO_FIXTURE_WAIT_FOR_DRAFT = '1'
   plan('red')
   const red = await release()
   assert.equal(red.code, 1, red.output)
   assert.match(red.output, /test:desktop: failed \(1\), cause test \(provisional\): timed out waiting for the row/)
   assert.match(red.output, /1\) sidebar\.spec\.ts:40 › keeps the selected row/)
-  const repairCommand = /bun run verify:main --ref origin\/main --repair (\S+\.json)/.exec(red.output)
+  const repairCommand = /bun run verify:main --ref <fixed-descendant-of-\w+> --repair (\S+\.json)/.exec(red.output)
   assert.ok(repairCommand, red.output)
-  assert.match(red.output, /nothing was built or published/)
+  assert.match(red.output, /the package was discarded and nothing was published/)
+  assert.equal(github().releases.some((entry) => entry.tagName === 'v0.1.9'), false)
+  assert.equal(existsSync(file('worktrees/release-0.1.9/apps/desktop/release')), false)
+  assert.equal(lines('gh-calls').some((call) => call.startsWith('release edit')), false)
 
   // Rerunning without a fix would only hope for green, so it refuses.
   const unchanged = await release()
@@ -174,12 +192,18 @@ test('a red full run stops with its failures; after a fix, the same command repa
     }
   })
   assert.equal(green.code, 0, green.output)
-  assert.match(lines('verify-calls')[1], new RegExp(`--repair ${repairCommand[1]}`))
+  // The failed version commit is on another branch: a fresh full run covers the new build.
+  assert.doesNotMatch(lines('verify-calls')[1], /--repair/)
+  const build = /juno-build: (\w+)/.exec(github().releases.find((entry) => entry.tagName === 'v0.1.9').body)[1]
+  assert.equal(lines('verify-calls')[1], `--ref ${build} --require-remote`)
+  assert.equal(JSON.parse(git('show', `${build}:${app}`)).version, '0.1.9')
   assert.match(green.output, /checked v0\.1\.9: Juno-0\.1\.9-arm64\.dmg, Juno-0\.1\.9-arm64\.dmg\.blockmap, latest-mac\.yml; marked latest/)
 
   const published = github().releases.find((entry) => entry.tagName === 'v0.1.9')
   assert.equal(published.isDraft, false)
   assert.equal(published.isLatest, true)
+  assert.equal(lines('gh-calls').filter((call) => call.startsWith('release create v0.1.9')).length, 2)
+  assert.equal(lines('gh-calls').filter((call) => call.startsWith('release edit v0.1.9')).length, 1)
   assert.match(published.body, new RegExp(`juno-source: ${git('rev-parse', 'origin/main^')}`))
   assert.match(github().changelog, /## 0\.1\.9 - \d{4}-\d\d-\d\d\n\n- Keep your place after scrolling\.\n- The selected row stays selected\.\n\n## 0\.1\.8/)
   git('fetch', '-q', 'origin')
@@ -187,7 +211,7 @@ test('a red full run stops with its failures; after a fix, the same command repa
   assert.deepEqual(JSON.parse(git('show', `origin/main:${app}`)), { version: '0.1.9', main: 'app.js' })
   assert.equal(existsSync(file('worktrees/release-0.1.9')), false)
   const steps = JSON.parse(readFileSync(join(file('repo'), '.juno-status/release-timings.json'), 'utf8')).steps.map((step) => step.step)
-  for (const step of ['full run', 'highlights wait', 'prepare', 'package', 'package-smoke', 'upload', 'publish', 'cleanup']) assert.ok(steps.includes(step), step)
+  for (const step of ['full run', 'highlights wait', 'prepare', 'package', 'package-smoke', 'stage draft', 'upload', 'publish', 'cleanup']) assert.ok(steps.includes(step), step)
 
   const again = await release()
   assert.equal(again.code, 0, again.output)
@@ -241,7 +265,7 @@ test('a release covered by an earlier green run plus docs skips the full run; a 
 })
 
 test('a green run that skipped tests is not a full run: the release runs one', { timeout: 30_000 }, async (t) => {
-  const { commit, release, lines, plan, file, env } = fixture(t)
+  const { commit, release, github, lines, plan, file, env } = fixture(t)
   const tip = commit('Keep your place after scrolling', { 'apps/desktop/src/app.js': 'scroll' })
   plan('skipped')
   execFileSync('bun', ['run', 'verify:main', '--ref', tip], { cwd: file('repo'), env: env })
@@ -253,7 +277,8 @@ test('a green run that skipped tests is not a full run: the release runs one', {
   const published = await release(['--notes', 'notes.md'])
   assert.equal(published.code, 0, published.output)
   assert.match(published.output, /release gate: \w+ covered by full run/)
-  assert.equal(lines('verify-calls').at(-1), `--ref ${tip} --require-remote`)
+  const build = /juno-build: (\w+)/.exec(github().releases.find((entry) => entry.tagName === 'v0.1.9').body)[1]
+  assert.equal(lines('verify-calls').at(-1), `--ref ${build} --require-remote`)
 })
 
 test('the version commit lands on a newer main, keeping concurrent work and every other field', (t) => {

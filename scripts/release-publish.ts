@@ -11,7 +11,9 @@
  * publish the draft. The app only sees a release once it is published.
  *
  * Flags:
- *   --notes <file>   the highlights of this version, one per line, at most ten (required)
+ *   --notes <file>   the highlights of this version, one per line, at most ten (required to publish)
+ *   --stage         validate and upload a draft only; never publishes or changes main
+ *   --discard-draft delete only a staged draft from this exact build
  *   --urgent         publish after typecheck, lint, unit tests and package smoke; start bun run verify:main for it next
  *   --prerelease     publish as a pre-release: the app never offers it, and CHANGELOG.md is left alone
  *   --dry-run        check everything and print the plan; change nothing
@@ -19,14 +21,14 @@
  *   --repo <o/r>     the releases repository (default triptu/juno-releases)
  */
 import { execFileSync } from 'node:child_process'
-import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { addChangelogEntry, compareVersions, isVersion, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
 import { releaseGate, printGate } from './release-gate.mjs'
 import { highlightLines } from './release-highlights.mjs'
 import { checkPublishedRelease, syncReleasedVersion } from './release-main.mjs'
+import { scratchFolder } from './worktree-folder.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
 
 const scriptRoot = resolve(import.meta.dirname, '..')
@@ -36,6 +38,8 @@ const { values } = parseArgs({
     checkout: { type: 'string', default: scriptRoot },
     source: { type: 'string' },
     urgent: { type: 'boolean', default: false },
+    stage: { type: 'boolean', default: false },
+    'discard-draft': { type: 'boolean', default: false },
     prerelease: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
     dir: { type: 'string' },
@@ -47,6 +51,7 @@ const dry = values['dry-run']
 const repo = values.repo
 const dir = resolve(values.dir ?? join(root, 'apps/desktop/release'))
 const urgent = values.urgent
+if ((values.stage || values['discard-draft']) && (urgent || values.prerelease)) fail('draft staging cannot be urgent or a pre-release')
 const buildCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 const sourceCommit = values.source ?? buildCommit
 if (!/^[a-f0-9]{40}$/.test(sourceCommit)) fail('source must be a full commit id')
@@ -66,20 +71,34 @@ const version = String(JSON.parse(readFileSync(join(root, 'apps/desktop/package.
 if (!isVersion(version) || normalizeVersion(version) !== version) fail(`apps/desktop/package.json has "${version}", not a plain semver version`)
 const tag = `v${version}`
 // The repository.
-gh(['auth', 'status'])
 const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean }>
 const published = releases.find((release) => release.tagName === tag && !release.isDraft && !release.isPrerelease)
+if (published && (values.stage || values['discard-draft'])) fail(`${tag} is already published; refusing to change it as a draft`)
 if (published && !values.prerelease) {
-  if (!dry) { checkPublishedRelease(repo, version); syncReleasedVersion(root, version) }
+  if (!dry) {
+    measured('release validation', () => checkPublishedRelease(repo, version))
+    measured('main version sync', () => syncReleasedVersion(root, version))
+  }
   console.log(`release:publish: ${tag} is already published; only the main version update was needed`)
   process.exit(0)
 }
-if (values.notes === undefined) fail('--notes <file> is required: the highlights of this version')
+// Only drafts created by this exact build can be resumed or deleted.
+const existing = releases.find((release) => release.tagName === tag)
+const draft = existing?.isDraft ? JSON.parse(gh(['release', 'view', tag, '--repo', repo, '--json', 'body,assets'])) as { body: string; assets: Array<{ name: string; size: number }> } : undefined
+if (existing && (!draft || !draft.body.includes(`<!-- juno-build: ${buildCommit} -->`)
+  || !draft.body.includes('<!-- juno-staged -->'))) fail(`${repo} already has ${tag}; refusing to change another release`)
+if (values['discard-draft']) {
+  if (draft && !dry) measured('discard draft', () => gh(['release', 'delete', tag, '--repo', repo, '--yes']))
+  process.exit(0)
+}
 let lines: readonly string[] = []
-try {
-  lines = highlightLines(readFileSync(values.notes, 'utf8'))
-} catch (error) {
-  fail(`${values.notes}: ${(error as Error).message}`)
+if (!values.stage) {
+  if (values.notes === undefined) fail('--notes <file> is required: the highlights of this version')
+  try {
+    lines = highlightLines(readFileSync(values.notes, 'utf8'))
+  } catch (error) {
+    fail(`${values.notes}: ${(error as Error).message}`)
+  }
 }
 
 // The build.
@@ -117,17 +136,19 @@ if (!signed && files.some((name) => name.endsWith('.zip'))) fail('an unsigned bu
 if (!urgent) {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
   if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()) fail('commit or remove working-tree changes before publishing')
-  const gate = releaseGate(root, commit)
-  if (!gate) fail('no eligible full-run record for this commit; inspect bun run verify:main results')
-  printGate(gate)
+  if (!values.stage) {
+    const gate = releaseGate(root, commit)
+    if (!gate) fail('no eligible full-run record for this commit; inspect bun run verify:main results')
+    printGate(gate)
+  }
 }
 
-if (releases.some((release) => release.tagName === tag)) fail(`${repo} already has ${tag}; bump the version (bun run release:version)`)
+if (draft && (draft.assets.length !== files.length || files.some((name) => !draft.assets.some((asset) => asset.name === name && asset.size === statSync(join(dir, name)).size)))) fail(`${tag} has incomplete or mismatched draft assets; discard the draft and stage it again`)
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
   .map((release) => normalizeVersion(release.tagName)).toSorted(compareVersions).at(-1)
 if (newest !== undefined && compareVersions(version, newest) <= 0) fail(`${version} is not newer than the published ${newest}`)
 
-console.log(`release:publish: ${tag} to ${repo}${values.prerelease ? ' as a pre-release' : ''}${urgent ? ' (urgent)' : ''}, ${signed ? 'Developer ID signed' : 'unsigned (installs offer the DMG)'}`)
+console.log(`release:publish: ${tag} to ${repo}${values.stage ? ' as a draft only' : values.prerelease ? ' as a pre-release' : ''}${urgent ? ' (urgent)' : ''}, ${signed ? 'Developer ID signed' : 'unsigned (installs offer the DMG)'}`)
 for (const name of files) console.log(`  ${name}`)
 console.log(`  notes: ${lines.length} line(s)${values.prerelease ? ', CHANGELOG.md unchanged' : ''}`)
 if (dry) process.exit(0)
@@ -139,31 +160,54 @@ if (urgent) {
   }
 }
 
-const scratch = mkdtempSync(join(tmpdir(), 'juno-release-'))
+const scratch = mkdtempSync(join(scratchFolder(), 'juno-release-'))
 try {
   const notesFile = join(scratch, 'notes.md')
-  writeFileSync(notesFile, `${lines.map((line) => `- ${line}`).join('\n')}\n${urgent ? '\n<!-- juno-release: urgent -->\n' : ''}\n<!-- juno-source: ${sourceCommit} -->\n<!-- juno-build: ${buildCommit} -->\n`)
-  const uploadStarted = Date.now()
-  gh(['release', 'create', tag, '--repo', repo, '--draft', '--title', `Juno ${version}`, '--notes-file', notesFile,
-    ...(values.prerelease ? ['--prerelease'] : []), ...files.map((name) => join(dir, name))])
-  recordReleaseTiming('upload', uploadStarted, { version, status: urgent ? 'urgent' : 'normal' })
-  if (!values.prerelease) {
-    const current = JSON.parse(gh(['api', `repos/${repo}/contents/CHANGELOG.md`])) as { content: string; sha: string }
-    const next = addChangelogEntry(Buffer.from(current.content, 'base64').toString('utf8'), {
-      version,
-      date: new Date().toISOString().slice(0, 10),
-      lines,
-    })
-    const body = JSON.stringify({ message: `Juno ${version}`, content: Buffer.from(next).toString('base64'), sha: current.sha })
-    gh(['api', '-X', 'PUT', `repos/${repo}/contents/CHANGELOG.md`, '--input', '-'], body)
+  writeFileSync(notesFile, `${lines.map((line) => `- ${line}`).join('\n')}\n${urgent ? '\n<!-- juno-release: urgent -->\n' : ''}\n<!-- juno-source: ${sourceCommit} -->\n<!-- juno-build: ${buildCommit} -->\n<!-- juno-staged -->\n`)
+  if (!draft) {
+    // gh uploads all assets concurrently, with five workers (including signed ZIPs).
+    measured('upload', () => gh(['release', 'create', tag, '--repo', repo, '--draft', '--title', `Juno ${version}`, '--notes-file', notesFile,
+      ...(values.prerelease ? ['--prerelease'] : []), ...files.map((name) => join(dir, name))]))
   }
-  gh(['release', 'edit', tag, '--repo', repo, '--draft=false', ...(values.prerelease ? [] : ['--latest'])])
-  if (urgent) {
-    const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-    console.log(`release:publish: no full run covers this urgent release; run bun run verify:main --ref ${commit} next`)
+  if (values.stage) {
+    console.log(`release:publish: staged ${tag}; still a draft, not latest`)
+    process.exitCode = 0
+  } else {
+    if (!values.prerelease) {
+      measured('changelog', () => {
+        const current = JSON.parse(gh(['api', `repos/${repo}/contents/CHANGELOG.md`])) as { content: string; sha: string }
+        const next = addChangelogEntry(Buffer.from(current.content, 'base64').toString('utf8'), {
+          version,
+          date: new Date().toISOString().slice(0, 10),
+          lines,
+        })
+        const body = JSON.stringify({ message: `Juno ${version}`, content: Buffer.from(next).toString('base64'), sha: current.sha })
+        gh(['api', '-X', 'PUT', `repos/${repo}/contents/CHANGELOG.md`, '--input', '-'], body)
+      })
+    }
+    measured('mark published', () => gh(['release', 'edit', tag, '--repo', repo, '--notes-file', notesFile, '--draft=false', ...(values.prerelease ? [] : ['--latest'])]))
+    if (urgent) {
+      const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+      console.log(`release:publish: no full run covers this urgent release; run bun run verify:main --ref ${commit} next`)
+    }
+    console.log(`release:publish: published ${tag}`)
+    if (!values.prerelease) {
+      measured('release validation', () => checkPublishedRelease(repo, version))
+      measured('main version sync', () => syncReleasedVersion(root, version))
+    }
   }
-  console.log(`release:publish: published ${tag}`)
-  if (!values.prerelease) { checkPublishedRelease(repo, version); syncReleasedVersion(root, version) }
 } finally {
   rmSync(scratch, { recursive: true, force: true })
+}
+
+function measured<T>(step: string, work: () => T): T {
+  const started = Date.now()
+  let status = 'failed'
+  try {
+    const result = work()
+    status = 'passed'
+    return result
+  } finally {
+    recordReleaseTiming(step, started, { version, status }, root)
+  }
 }
