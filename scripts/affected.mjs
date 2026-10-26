@@ -347,7 +347,9 @@ for (const { script, reached } of bunTestScripts(root, changed))
 // An interaction with a budget whose own files changed: perf is suggested, and its feel scenario runs (feelScenarios; --wide, every one reached).
 const interactions = batch ? [] : perfInteractionsChanged(changed)
 const feel = pending(feelScenarios(batch ? [] : [...files], changed, interactions).map(({ file, own }) => ({ suite: 'desktop', id: file, own, inputs: new Set([...app, ...support, ...closure(file)]) })).filter((item) => wide || item.own))
-if (feel.length > 0) plan.push({ script: 'test:desktop', args: ['--project=feel', ...feel.map((item) => item.id.replace('apps/desktop/', ''))], local: false, items: feel, why: `${feel.length} feel scenario file(s): ${wide ? 'the change reaches them' : 'changed, their harness changed, or the scenario of a changed interaction'}` })
+// A desktop step over every spec runs every project, so it already runs the feel scenarios unless their tag is skipped.
+const everyFeel = plan.some((step) => step.script === 'test:desktop' && step.args.length === 0) && !skipTags.includes('@nightly-feel')
+if (feel.length > 0 && !everyFeel) plan.push({ script: 'test:desktop', args: ['--project=feel', ...feel.map((item) => item.id.replace('apps/desktop/', ''))], local: false, items: feel, why: `${feel.length} feel scenario file(s): ${wide ? 'the change reaches them' : 'changed, their harness changed, or the scenario of a changed interaction'}` })
 // --plan --json prints the plan for tools (a replay of past merges, for one).
 if (flag('--json')) {
   writeFileSync(1, JSON.stringify({ changed, steps: plan.map((step) => ({ script: step.script, args: step.args, env: step.env, local: step.local === true, items: step.items.map((item) => item.id), why: step.why })), notes: desktopNotes, heavySkipped: skipTags }) + '\n')
