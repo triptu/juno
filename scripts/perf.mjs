@@ -7,7 +7,7 @@
 //   bun run perf --unit                   the package budgets only (Mac)
 //   bun run perf -g "<scenario>"          matching desktop scenarios only
 //   bun run perf --with-unit -g "..."     both (Mac)
-//   bun run perf --part 1                 a nightly's one-core perf job: the warm start, memory and the uncached open
+//   bun run perf --part 1                 a nightly's one-core perf job: the large workspace's warm start and memory
 //   bun run perf --part 2                 its two-core perf job: every other scenario of the laptop's set
 import { spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -30,9 +30,9 @@ if (part !== undefined && (unitsOnly || withUnit || args.length > 0)) throw new 
 const mac = process.platform === 'darwin' || process.env['JUNO_PERF_ABSOLUTE'] === '1'
 if (!mac && (unitsOnly || withUnit)) throw new Error('The package budgets run on the Mac only (docs/performance.md 7.3)')
 // A nightly runs the laptop's set in two jobs, one worker each (docs/performance.md 7.3): the scenarios whose lower
-// quartile holds on one core, then those that need two (the reopens, the scroll and send). A new scenario lands in
-// part 2, on two cores.
-const partOne = 'perf\\.spec\\.ts (large workspace |topic open, uncached:)'
+// quartile holds on one core, then those that need two (the topic opens, the scroll and send). A new scenario lands
+// in part 2, on two cores.
+const partOne = 'perf\\.spec\\.ts large workspace '
 if (part !== undefined) args.push(part === '1' ? '--grep' : '--grep-invert', partOne)
 
 /**
