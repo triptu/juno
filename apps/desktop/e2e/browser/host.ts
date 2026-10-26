@@ -46,7 +46,9 @@ function forkHost(build: string): Child {
     execArgv: ['--disable-warning=ExperimentalWarning', `--max-old-space-size=${process.env.JUNO_HOST_HEAP_MB ?? 256}`, ...(process.env.JUNO_E2E_HOST_PROFILE === undefined ? [] : ['--cpu-prof', `--cpu-prof-dir=${process.env.JUNO_E2E_HOST_PROFILE}`])],
     cwd: repoRoot,
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-    env: { ...process.env, JUNO_E2E: '1', NODE_OPTIONS: '' },
+    // The test's own time zone: `bun test` runs in UTC without setting TZ, and a host in the machine's zone
+    // would read the hours a test set for "now" as other hours.
+    env: { ...process.env, JUNO_E2E: '1', NODE_OPTIONS: '', TZ: Intl.DateTimeFormat().resolvedOptions().timeZone },
   })
   const loaded = new Promise<void>((done, fail) => {
     const onMessage = (message: HostMessage) => {
