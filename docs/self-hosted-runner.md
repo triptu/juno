@@ -66,8 +66,7 @@ one Apalache checker per four, at least one each. Explicit worker settings win.
 `test:plan` groups its steps into two jobs: a desktop job (the browser and Electron lanes,
 the spec checks and conformance) and a unit job (unit tests, the DOM lane, the gallery and the
 tool tests); "Remote runs" in `docs/development.md` has the detail. The coordinator checks the
-runner and its image and packs the workspace once; a job that carries the spec cache packs its
-own. Each job has its own install, results and independently released core set. In a full run
+runner and its image and packs the workspace once. Each job has its own install, results and independently released core set. In a full run
 each job runs its steps in order; elsewhere its lanes run at once with their own workers.
 `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also runs its steps
 in order. `--cores` and `--wait` apply to each job. `--shards n` is an explicit
@@ -84,11 +83,10 @@ override. Images must not depend on a baked `/work`, which tstack mounts as tmpf
 
 Each job runs `bun install --frozen-lockfile --prefer-offline`, checks the Bun
 version and starts tests under xvfb. tstack mounts `~/.cache/tstack-runner` at
-`/cache`; Juno keeps the bun run store, metadata, Electron downloads and app build
-cache there. Missing packages are downloaded. The former Juno cache is not
+`/cache`; Juno keeps the bun run store, metadata, Electron downloads, the app build
+cache and the spec cache (`/cache/specs`, entries unused for 14 days removed) there. Missing packages are downloaded. The former Juno cache is not
 removed or migrated while other clients might use it.
 
-Passing spec results travel with the workspace and return with new results.
 Logs, test reports and coverage arrive in `.remote/<job>/`; split plans have a
 `plan.log` plus child `run.log` files. `bun run remote:usage` summarizes retained
 logs across worktrees, including failed and incomplete runs.

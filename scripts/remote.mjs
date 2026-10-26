@@ -3,7 +3,7 @@
 // bun run remote --local <script> [args...] uses the Mac's heavy-job queue.
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -89,9 +89,6 @@ const reportDir = join(root, '.remote', runId)
 let runLog, work, code = 255, reserved, threads
 let jobStarted = false
 const log = (line) => { if (line.startsWith('juno-runtime:')) jobStarted = true; console.log(line); if (runLog) appendFileSync(runLog, `${line}\n`); const match = /^remote: allocated threads=(\d+)$/.exec(line); if (match) threads = Number(match[1]) }
-const stagedCache = `.remote/cache-${runId}/specs`
-const specCache = join(tmpdir(), 'juno-cache', 'specs')
-const carriesCache = (options.script.startsWith('specs:') || (options.script === 'test:plan' && options.args.some((arg) => arg.startsWith('specs:')))) && process.env.SPECS_CACHE !== 'off' && !options.env.includes('SPECS_CACHE=off')
 try {
   hostCommand('check') // Fail clearly before preparing any work if tstack is missing.
   const runner = runnerConfig()
@@ -113,32 +110,27 @@ try {
   const image = inherited?.image === runner.image ? Promise.resolve() : ensureRunnerImage(runner, log)
   image.catch(() => {})
   work = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-remote-'))
-  const pack = (extra) => {
+  const pack = () => {
     const { files, bytes } = snapshot(root)
     log(`remote: ${files.length} files (${(bytes / 1048576).toFixed(1)} MB before compression), no secrets found`)
     const list = join(work, 'files'), tarball = join(work, 'workspace.tgz')
-    writeFileSync(list, [...files, ...extra].join('\0'))
+    writeFileSync(list, files.join('\0'))
     const packed = spawnSync('tar', ['-czf', tarball, '--no-xattrs', '--null', '-T', list], { cwd: root, env: { ...process.env, COPYFILE_DISABLE: '1' }, encoding: 'utf8' })
     if (packed.status !== 0) throw new Error(`could not pack workspace: ${packed.stderr}`)
     return tarball
   }
   if (jobs.length) {
     renameSync(runLog, join(reportDir, 'plan.log')); runLog = join(reportDir, 'plan.log')
-    // A job that carries the spec cache packs its own workspace with it; the others share this one.
-    const tarball = pack([])
+    const tarball = pack()
     await image
     if (cancelled) throw new Error('run cancelled')
     const env = { JUNO_RUNNER_HEALTH: JSON.stringify({ ...health, args: runner.args, image: runner.image }), JUNO_REMOTE_TARBALL: tarball }
     code = await runRunnerPlan(jobs, { self, root, options, log, env })
   } else {
-    if (carriesCache) {
-      mkdirSync(join(root, stagedCache), { recursive: true })
-      if (existsSync(specCache)) cpSync(specCache, join(root, stagedCache), { recursive: true })
-      options.env.push(`SPECS_CACHE_DIR=/work/${stagedCache}`)
-    }
-    const shared = process.env.JUNO_RUNNER_PARENT === '1' && !carriesCache ? process.env.JUNO_REMOTE_TARBALL : undefined
-    const tarball = shared && existsSync(shared) ? shared : pack(carriesCache ? readdirSync(join(root, stagedCache)).map((name) => `${stagedCache}/${name}`) : [])
-    const specsCached = carriesCache && process.env.SPECS_RUN_CACHE !== 'off' && !options.env.includes('SPECS_RUN_CACHE=off') && existsSync(specCache) && readdirSync(specCache).some((name) => name.endsWith('.json'))
+    const shared = process.env.JUNO_RUNNER_PARENT === '1' ? process.env.JUNO_REMOTE_TARBALL : undefined
+    const tarball = shared && existsSync(shared) ? shared : pack()
+    // The spec cache lives on the runner (scripts/remote/run.sh) and nearly always holds the last pass.
+    const specsCached = process.env.SPECS_RUN_CACHE !== 'off' && !options.env.includes('SPECS_RUN_CACHE=off')
     const size = runnerJobSize({ ...options, specsCached }, health.cores)
     reserved = size.reserved
     await image
@@ -155,12 +147,6 @@ try {
       const unpack = (args, input) => { if (spawnSync('tar', args, { input }).status !== 0) throw new Error('could not unpack remote reports') }
       unpack(['-xzf', '-', '-C', work], fetched.stdout)
       unpack(['-xzf', join(work, '.remote/reports.tgz'), '-C', reportDir])
-      const returned = join(reportDir, stagedCache)
-      if (carriesCache && existsSync(returned)) {
-        mkdirSync(specCache, { recursive: true })
-        cpSync(returned, specCache, { recursive: true, force: false })
-        rmSync(join(reportDir, '.remote'), { recursive: true, force: true })
-      }
       log(`remote: reports in ${relative(root, reportDir)}/`)
     }
   }
@@ -170,7 +156,6 @@ try {
   code = cancelled ? 130 : 255
 } finally {
   if (work) rmSync(work, { recursive: true, force: true })
-  rmSync(join(root, '.remote', `cache-${runId}`), { recursive: true, force: true })
   if (runLog) {
     appendFileSync(runLog, `remote: exited with ${code}\nremote: summary ${JSON.stringify({ code, backend: 'ssh', cores: reserved, threads, wallSeconds: (Date.now() - started) / 1000 })}\n`)
     console.log(`remote: output in ${relative(root, runLog)}`)
