@@ -16,7 +16,10 @@ export type { MovedElement, ShiftEntry } from './inPage'
  *    `hadRecentInput` are kept: Chromium sets that flag on every shift within
  *    500 ms of a keypress or pointer press. Hovering alone need not set it.
  *    The usual "ignore recent input" filter would hide shifts caused by
- *    pressing a control.
+ *    pressing a control. With a `root` other than `body`, a source outside it
+ *    is another region's and is dropped, and an entry whose every source is
+ *    outside counts as no shift; Chromium names at most five sources, and the
+ *    geometry check below still covers every element under the root.
  * 2. A geometry fallback. The layout box of every HTML element under the root
  *    is taken before and after, relative to the root, and any element that
  *    moved or resized is reported. An element added or removed, or one that
