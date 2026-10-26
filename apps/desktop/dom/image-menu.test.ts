@@ -1,6 +1,6 @@
 // An image's native menu inside a peek (SPEC 7, "Pictures"): Open opens the
 // picture in the topic's viewer. Copy, Download and Open in Preview need
-// main and the clipboard, so they are the Electron lane's (image-menu.spec.ts).
+// main and the clipboard, so they are the Electron lane's (file-viewer.spec.ts).
 import { expect } from './expect'
 import { domTest } from './test'
 

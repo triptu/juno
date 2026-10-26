@@ -7,12 +7,16 @@ import { readdirSync, readFileSync } from 'node:fs'
  * (the test host, the browser and its renderers, Electron and its engine),
  * by kind. The `running` fixture prints them as `e2e timing: cpu-<kind>`
  * lines, which `JUNO_E2E_TIMINGS=1` collects (README, "Scheduling and setup
- * timings"). A process that ended during the test is not counted.
+ * timings"). A process that ended during the test is not counted there;
+ * `cpu-all` (the whole test) and the `cpu-launch`, `cpu-sync`, `cpu-close`
+ * and `cpu-synced-build` phases use `cpuAll`, which counts it.
  */
 interface Process {
   readonly pid: number
   readonly ppid: number
   readonly cpuMillis: number
+  /** What the process's exited and reaped children burned (Linux only; 0 on macOS). */
+  readonly reapedMillis: number
   readonly args: string
 }
 
@@ -25,10 +29,10 @@ function linuxProcesses(): Process[] {
     .flatMap((name) => {
       try {
         const stat = readFileSync(`/proc/${name}/stat`, 'utf8')
-        // After the command in parentheses: state, ppid, ... utime (12th), stime (13th).
+        // After the command in parentheses: state, ppid, ... utime (12th), stime (13th), cutime, cstime.
         const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
         const args = readFileSync(`/proc/${name}/cmdline`, 'utf8').replaceAll('\0', ' ')
-        return [{ pid: Number(name), ppid: Number(fields[1]), cpuMillis: (Number(fields[11]) + Number(fields[12])) * TICK_MILLIS, args }]
+        return [{ pid: Number(name), ppid: Number(fields[1]), cpuMillis: (Number(fields[11]) + Number(fields[12])) * TICK_MILLIS, reapedMillis: (Number(fields[13]) + Number(fields[14])) * TICK_MILLIS, args }]
       } catch {
         return []
       }
@@ -42,7 +46,7 @@ function macProcesses(): Process[] {
     const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line)
     if (match === null) return []
     const seconds = match[3]!.split(':').reduce((total, part) => total * 60 + Number(part), 0)
-    return [{ pid: Number(match[1]), ppid: Number(match[2]), cpuMillis: seconds * 1000, args: match[4]! }]
+    return [{ pid: Number(match[1]), ppid: Number(match[2]), cpuMillis: seconds * 1000, reapedMillis: 0, args: match[4]! }]
   })
 }
 
@@ -55,30 +59,72 @@ function kindOf(process: Process, worker: number): string {
   return 'other'
 }
 
-/** CPU milliseconds of this worker and every process under it, by pid. */
-function sample(): Map<number, { readonly kind: string; readonly cpuMillis: number }> {
+/** This worker and every process under it. */
+function tree(): Process[] {
   const all = process.platform === 'linux' ? linuxProcesses() : macProcesses()
   const children = new Map<number, Process[]>()
   for (const entry of all) children.set(entry.ppid, [...(children.get(entry.ppid) ?? []), entry])
-  const own = new Map<number, { kind: string; cpuMillis: number }>()
+  const own = new Map<number, Process>()
   const queue = all.filter((entry) => entry.pid === process.pid)
   while (queue.length > 0) {
     const next = queue.pop()!
     if (own.has(next.pid)) continue
-    own.set(next.pid, { kind: kindOf(next, process.pid), cpuMillis: next.cpuMillis })
+    own.set(next.pid, next)
     queue.push(...(children.get(next.pid) ?? []))
   }
-  return own
+  return [...own.values()]
+}
+
+/** CPU milliseconds of this worker and every process under it, by pid. */
+function sample(): Map<number, { readonly kind: string; readonly cpuMillis: number }> {
+  return new Map(tree().map((entry) => [entry.pid, { kind: kindOf(entry, process.pid), cpuMillis: entry.cpuMillis }]))
+}
+
+/** The job's own cgroup counter (Linux), which also counts processes an app leaves behind as it quits. */
+function cgroupMillis(): number | undefined {
+  try {
+    const usec = /^usage_usec (\d+)$/m.exec(readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8'))?.[1]
+    return usec === undefined ? undefined : Number(usec) / 1000
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The CPU milliseconds burned so far; the difference of two readings is what
+ * ran between them. With one worker (JUNO_E2E_WORKERS=1) on Linux that is the
+ * job's cgroup, everything the test caused. Otherwise it is this worker's
+ * tree, counting reaped children: Chromium's helpers and the utility
+ * processes that outlive main as an app quits are lost. Undefined unless
+ * JUNO_E2E_CPU=1.
+ */
+export function cpuAll(): number | undefined {
+  if (process.env.JUNO_E2E_CPU !== '1') return undefined
+  if (process.env.JUNO_E2E_WORKERS === '1') {
+    const job = cgroupMillis()
+    if (job !== undefined) return job
+  }
+  // When a process exits, its time and its own reaped children's move into its parent's reaped time.
+  return tree().reduce((total, entry) => total + entry.cpuMillis + entry.reapedMillis, 0)
 }
 
 /** Starts counting; `stop` answers the CPU milliseconds burned since, by kind. */
-export function cpuMeter(): { readonly stop: () => Record<string, number> } {
+export function cpuMeter(): { readonly stop: () => Record<string, number>; readonly all: () => number } {
   const start = sample()
+  const startAll = cpuAll() ?? 0
   return {
     stop: () => {
       const burned: Record<string, number> = {}
       for (const [pid, { kind, cpuMillis }] of sample()) burned[kind] = (burned[kind] ?? 0) + cpuMillis - (start.get(pid)?.cpuMillis ?? 0)
       return burned
     },
+    all: () => (cpuAll() ?? 0) - startAll,
   }
+}
+
+/** Prints `e2e timing: cpu-<name>`, what the tree burned since `started` (a `cpuAll` reading). */
+export function printCpuSince(name: string, started: number | undefined): void {
+  const now = cpuAll()
+  if (started === undefined || now === undefined || process.env.JUNO_E2E_TIMINGS !== '1') return
+  console.log(`e2e timing: cpu-${name} ${Math.round(now - started)} ms`)
 }

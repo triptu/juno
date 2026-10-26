@@ -4,7 +4,7 @@
 // later, so Juno re-reads the message and the card becomes the picture in place.
 import type { Page } from '@playwright/test'
 import { schemeSrc } from './driver/juno'
-import { expect, syncedTest, test } from './fixtures'
+import { expect, syncedTest, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -27,19 +27,18 @@ function naturalSize(win: Page, src: string): Promise<{ width: number; height: n
 // When an old card becomes the picture, and the retry on reopen after the lookups ran out, are engine
 // behaviour (packages/engine/test/flows/message-content.flow.test.ts). Here a wide picture is held to the
 // card's height.
-syncedTest('a 4:3 picture shows in a box held to the card height', async ({ juno, fake }) => {
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
+async function heldToCardHeight({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   fake.injectMedia({ channel: 'C0ENG', user: 'U0LEO', text: 'The venue floor plan', media: [{ name: 'floor-plan.png', width: 800, height: 600 }] })
   const image = juno.topic.message('The venue floor plan').getByRole('button', { name: 'Open floor-plan.png' })
   await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1)
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
-})
+}
 
-syncedTest('images and videos in #eng show inline and open full screen, and a partial file becomes the picture', async ({ juno, win, fake }) => {
+syncedTest('images and videos in #eng show inline and open full screen, a 4:3 picture is held to the card height, a partial file becomes the picture, and the viewer zooms and pans', async ({ juno, win, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
+  await test.step('a 4:3 picture shows in a box held to the card height', () => heldToCardHeight({ juno, fake }))
   await test.step('a video plays inline with its poster, and opens full screen', async () => {
     fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Recording of the demo', media: [{ name: 'demo.mp4', width: 1280, height: 720, kind: 'video' }] })
     const row = topic.message('Recording of the demo')
@@ -100,14 +99,13 @@ syncedTest('images and videos in #eng show inline and open full screen, and a pa
     expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
     await expect(row.locator('[data-file-card]')).toHaveCount(0)
   })
+  await test.step('a picture in the viewer zooms with a double-click and a pinch, and pans with a drag', () => zoomAndPan({ juno, win, fake }))
 })
 
 // An image zooms inside its box (SPEC 8, "Zoom"): a double-click goes to 2.5x and back, a pinch zooms, and a drag pans
 // without closing the viewer, even when it ends over the backdrop.
-syncedTest('a picture in the viewer zooms with a double-click and a pinch, and pans with a drag', async ({ juno, win, fake }) => {
+async function zoomAndPan({ juno, win, fake }: Pick<Fixtures, 'juno' | 'win' | 'fake'>): Promise<void> {
   const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
   fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from the planning session', media: [{ name: 'whiteboard.png', width: 900, height: 600 }] })
   await topic.message('Whiteboard from the planning session').getByRole('button', { name: 'Open whiteboard.png' }).click()
   const viewer = win.getByRole('dialog')
@@ -139,4 +137,4 @@ syncedTest('a picture in the viewer zooms with a double-click and a pinch, and p
   await expect.poll(async () => (await view()).a).toBeGreaterThan(2)
   await win.keyboard.press('Escape')
   await expect(viewer).toHaveCount(0)
-})
+}

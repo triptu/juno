@@ -19,13 +19,15 @@ happy-dom's element classes are shared by every window in a worker. `window.ts` 
 
 The window has only the root rules of the StyleX sheet (`:root`, `html`: the tokens, such as the durations `rootDuration` reads). happy-dom matches every rule against an element and its ancestors on each `getComputedStyle`, which the app calls in layout effects; with the whole sheet that was an eighth of the worker's CPU, for values that need layout to mean anything.
 
+The renderer runs in one VM context per worker, not in each window's own (`realm.ts`). JSC keeps compiled and optimised code per context, so in a new context per test React and Effect ran cold every time. The bundle is compiled as one function in the worker's context, and each window calls it: the modules start new, as on a page load, and each global the bundle names (`document`, `setTimeout`, `fetch`, `globalThis`) is a variable bound to that window's value, so a closed page's late callbacks reach only its own window and `otherApp` runs beside it. A global the page replaces later (`urls.ts` sets `window.fetch`) is followed; one it adds is read as `window.name`. JavaScript's own globals (`Array`, `Uint8Array`) are the shared context's, on the window too, except one the test replaced (the clock's `Date`). What the shared context holds itself is checked when each window closes: a property added, removed or replaced on a JavaScript object or prototype (`Array.prototype`, `Error.stackTraceLimit`), or on its global through a sloppy `this`, fails the test that left it, and the worker starts a new context for the tests after.
+
 A list drawn as it scrolls (the emoji picker's cells, All topics' table) draws nothing here, since every box is zero: a test of its rows stays in Playwright.
 
 ## What runs
 
-- **The app.** `vite.config.ts` bundles the browser lane's page entry (`web/page/main.ts`) into one classic script; `bun web/build-host.mjs dom/dist` bundles the host (`web/host/testHost.ts`). Both go to `dom/dist/` through `build-cached` (`bun run build:dom` in `apps/desktop`). Each test gets a new window, a new fake Slack, a copy of the synced snapshot and a host from the worker's pool (`app.ts`). The renderer's module state is new for every window.
+- **The app.** `vite.config.ts` bundles the browser lane's page entry (`web/page/main.ts`) into one classic script; `bun web/build-host.mjs dom/dist` bundles the host (`web/host/testHost.ts`). Both go to `dom/dist/` through `build-cached` (`bun run build:dom` in `apps/desktop`). Each test gets a new window, a new fake Slack, a copy of the synced snapshot and a host from the worker's pool (`app.ts`). The renderer's module state is new for every window; its compiled code is the worker's (`realm.ts`, above).
 - **Synced start.** One snapshot per run, shared by every worker through the browser lane's lock (`e2e/browser/snapshotCache.ts`), signed in through happy-dom. A test starts where `juno.signIn()` and `juno.waitForSync()` leave it. `domTest(title, body, { synced: false })` starts signed out on an empty folder; add `fake` (the fake's `FakeSlackOptions`, such as `{ seed }`) for a seed of its own.
-- **Workers.** `bun test --parallel --no-isolate`: a worker keeps its compiled renderer and its pool of loaded hosts for the whole run. Files run in a shuffled order whose seed `test:dom` prints.
+- **Workers.** `bun test --parallel --no-isolate`: a worker keeps the renderer's context and its pool of loaded hosts for the whole run. Files run in a shuffled order whose seed `test:dom` prints.
 
 ## Writing a test
 
@@ -45,13 +47,14 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 
 - **Driver.** `driver/` has the Playwright driver's page objects with the same verbs (`e2e/driver/verbs.ts`; both drivers implement it, so a renamed verb fails the typecheck in both): `juno.sidebar` (with views and their sheet), `.tabs`, `.topic` (with thread links, the switcher and Follow), `.write` (Home's composer), `.home` (with a card's review sheet), `.welcome`, `.palette`, `.peek`, `.privacy` (whether `data-sensitive` text sits under `data-privacy`), `.settings`, `.notifications` (with the hours rows), `.accountMenu`, `.nav`, `.surface` (an `AppSurface`, as the web surface is), `searchPage(juno.win)` and the agent's `openChat`, `openPage`, `openSettings`, `openRuns`, `addServer`, `configure`, `card` and the chat's `menu`, `reply` (`driver/agent.ts`).
 - **Queries.** `Query` (`query.ts`) is shaped like Playwright's Locator: `locator`, `getByRole`, `getByText`, `getByLabel`, `getByTitle`, `filter`, `first`, `nth`, `parent`, `and`, `or`, and actions that wait for a shown element (`click`, `hover`, `fill`, `press`, `pressSequentially`, `check`). Roles, names and text are matched in `find.ts`, by walking happy-dom's own child arrays (the page changes between most polls, so happy-dom's selector cache misses and its engine costs several times as much). Roles and names follow Playwright's rules near enough: a string name matches a substring, ignoring case; `exact` asks for the whole name. `juno.win` is the page (`Dom`, `input.ts`), with `win.keyboard.press('Meta+Enter')`, and `win.keyboard.down('Alt')` and `up` for a held key (a row's `peek()`). A `<select>` takes `selectOption(value)`.
-- **expect.** `expect(query)` has Playwright's assertions (`toBeVisible`, `toHaveCount`, `toHaveText`, `toContainText`, `toHaveAttribute`, `toHaveValue`, `toBeFocused`, `toBeDisabled`, `toHaveAccessibleName`, with `.not`), each polled for 5 s unless given `{ timeout }`. Any other value goes to Bun's `expect`. `expect.poll(fn)` polls.
+- **expect.** `expect(query)` has Playwright's assertions (`toBeVisible`, `toHaveCount`, `toHaveText`, `toContainText`, `toHaveAttribute`, `toHaveValue`, `toBeFocused`, `toBeDisabled`, `toHaveAccessibleName`, with `.not`), each polled for 5 s unless given `{ timeout }`. Any other value goes to Bun's `expect`. `expect.poll(fn)` polls `fn`, soon at first and then every 100 ms.
 - **Visible** means in the document and not under `hidden`, `inert`, `aria-hidden` or an inline `display: none` (React's Activity hides tabs that way). Style sheets do not hide anything here. A control the app keeps for the pointer only, out of the accessibility tree (See all on a reactions card, a presence dot), is checked with `toHaveCount` and pressed with `juno.win.click(query.all()[0]!)`.
 - **Nothing happened.** A check that something did not appear passes at once if it is made before the app could have shown it. Anchor it on something that did happen (`slack.expectNoMarks()` after the row shows the new message), or give it a short wait with a comment, as `peek.test.ts` does.
 - **Menus** go through the page's test seam, as in the browser lane: `juno.chooseNextMenuItem(id)` then the right-click, or a row's `chooseInMenu(id)`; app-menu items with `juno.tabs.menu(id)` or `juno.surface.appMenu(id)`.
 - **Clock.** `domTest(..., { clock: true })` installs a test clock before the page loads (`clock.ts`, Playwright's semantics): time flows until the test moves it; `clock.fastForward(ms)` jumps and fires each due timer once, `runFor` fires every timer in order, `pauseAt`, `resume`, `setFixedTime`. The engine's Effect clock follows each jump (`web/host/clock.ts`), so a wait in the engine, such as a slow fake model (`engine: { fakeAiDelayMillis }`), passes with the page's. The page's engine socket keeps real time.
 - **Agent.** `model: () => startScriptedModel({ answer })` (`e2e/juno-agent/model.ts`) runs the agent against it; wait for it with `readySynced(juno)`.
 - **Waiting.** Wait for the thing, as everywhere (`docs/development.md`, "Rules for tests"). The sidebar's filters wait for the engine's list for the new filter (the sidebar trace is always on here). This lane runs faster than a browser, so a step the browser's slowness used to cover now races: after an open, wait for the new title before typing or pressing in the topic, or the step lands in the topic still on screen.
+- **A slow engine.** `app.holdReplies('drafts.get')` holds the engine's replies to the RPCs the page asks for from then on (by route tag), and returns a function that delivers them in order (`socket.ts`). `topic.test.ts` holds a draft so a composer mounts after a key the user pressed.
 - **Marks.** `juno.lastMark(name)` and `juno.lastMeasure(name)` read the app's performance marks. The worker's `performance` is shared by every window it opens; each test starts with its marks cleared, and a relaunch keeps them, so compare with the value read before the step.
 
 ## Porting a Playwright test
@@ -65,6 +68,21 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 
 ## Measured
 
+10-26, SSH laptop, 2 physical cores (4 threads), one run each, builds cached, `JUNO_E2E_TIMINGS=1`. The whole lane (147 tests in 81 files, 4 workers), before and after the renderer's shared context and `expect.poll`'s back-off; after, three runs with different order seeds:
+
+| | Before | After |
+| --- | ---: | ---: |
+| Script time | 139 s | 91 s, 97 s, 91 s |
+| `bun test` wall | 124 s | 91 s, 96 s, 90 s |
+| CPU, whole job | 475 CPU-s | 338, 335, 324 |
+| CPU per test, sum | 451 CPU-s | 338, 334, 330 |
+| CPU per test, median | 2.8 s (Bun 1.9, host 0.9) | 1.9–2.1 s (Bun 1.1–1.2, host 0.9) |
+| Bun in the test's start, median | 0.96 s | 0.46–0.47 s |
+| Worker peak RSS | 0.6 GB | 0.6–0.8 GB |
+| Container peak | 3.2 GB | 3.3–3.6 GB |
+
+The host was not changed. Its CPU is the engine's own work: in a profile, running SQL is a fifth of it and the Effect fibers of sync and live queries most of the rest, while the engine's start and stop take about 25 ms a test. An engine kept booted between tests and reset to the snapshot would still do the warm catch-up the test starts after. The fake Slack starts in about 5 ms of CPU, so one per test stays.
+
 10-25, SSH laptop, 2 physical cores (4 threads), one run each, builds cached. The whole lane after the four port batches (136 tests in 77 files, 4 workers), before and after the harness changes of `git log --grep 'DOM lane:' -- apps/desktop/dom/window.ts apps/desktop/dom/find.ts`, two interleaved runs each:
 
 | | Before | After |
@@ -76,9 +94,9 @@ domTest('a refused send stays with Retry', async ({ juno, fake, slack, step }) =
 
 Earlier, against Playwright, on the 14 tests ported first: 4.3 CPU-s per test in the browser lane, 3.9 at 4 workers in this lane before the changes above. The agent's flows (`juno-agent/`): 40 browser tests took 73 s of script time; after the move, 29 DOM tests take 37 s and the 12 browser tests left take 40 s. The browser specs i–r: 56 browser tests took 73 s; after the port, 15 stay in the browser (about 30 s) and 33 DOM tests run in 34 s.
 
-Where a test's CPU goes now (an inspector profile of the Bun side, `JUNO_DOM_PROFILE=1`): the app itself (React rendering and the renderer's Effect runtime) about 60%, the harness's queries and polls about 15%, the fake Slack about 13%. The host is a third of the total, nearly all engine boot, warm catch-up (about 25 calls to the fake) and the test's own engine work.
+Where a test's CPU goes now (an inspector profile of the Bun side, `JUNO_DOM_PROFILE=1`, 10-26): the renderer's code about a third, happy-dom a sixth, the harness's queries and polls and the fake Slack most of the rest; running the bundle's modules for a new window is about 60 ms. The host is over 40% of the total, nearly all warm catch-up (about 25 calls to the fake) and the test's own engine work.
 
-A worker's first test pays for the host's fork and the renderer's compile (about 1.5 CPU-s); both start while the worker waits for the synced snapshot. At four workers on four threads the job is CPU-bound (99% busy at the median). Three workers finish 42 runs in the same wall time with less CPU per test (hyperthreads share cores), five take longer; keep one worker per thread.
+A worker's first test pays for the host's fork and the renderer's compile (about 1.5 CPU-s); both start while the worker waits for the synced snapshot, and the renderer's code gets faster over the worker's first few tests. At four workers on four threads the job is CPU-bound (99% busy at the median). Three workers finish 42 runs in the same wall time with less CPU per test (hyperthreads share cores), five take longer; keep one worker per thread.
 
 ## Commands
 

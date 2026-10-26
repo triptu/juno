@@ -28,7 +28,7 @@ Measured before and after, with the worker counts, in [development notes](../../
 
 ## Fast sweep
 
-`computed-shift.spec.ts` checks the walk's touches in every state with forced pseudo-class styles and synthetic events, about a tenth of the walk's time a state. It runs with `GALLERY_SHIFT_COMPUTED=1`; its self-tests always run. See [the layout-shift guard](../../docs/development.md#the-layout-shift-guard).
+`computed-shift.spec.ts` checks the walk's touches in every state with forced pseudo-class styles and synthetic events, about a fifth of the walk's CPU a state. It runs with `GALLERY_SHIFT_COMPUTED=1`; its self-tests always run. See [the layout-shift guard](../../docs/development.md#the-layout-shift-guard).
 
 ## Cached walks
 

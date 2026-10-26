@@ -13,10 +13,11 @@ export function repairPlan({ baseline, identity, suites, affected: selected }) {
   const affected = selected.filter((step) => !step.local)
     .flatMap((step) => step.script === 'test:desktop' && lanes.length > 0 ? lanes.map((script) => ({ ...step, script, split: true })) : [step])
   if (!sameIdentity(baseline.identity, identity)) throw new Error('Repair runtime/platform differs from the baseline; start a full run')
-  if (baseline.suites.some((suite) => ['perf', 'test:feel', 'test:desktop @mac'].includes(suite.suite)))
-    throw new Error('Repair of a Mac timing/nightly run needs a fresh --with-mac full run')
+  if (baseline.suites.some((suite) => ['perf @mac', 'test:feel', 'test:desktop @mac'].includes(suite.suite)))
+    throw new Error('Repair of a Mac timing run needs a fresh --with-mac full run')
   const coordinatorFailed = baseline.suites.some((suite) => ['plan', 'setup'].includes(suite.suite) && !suitePassed(suite))
-  const all = [...suites, ...baseline.suites.filter((previous) => !['plan', 'setup'].includes(previous.suite) && !suites.some((suite) => suite.name === previous.suite))
+  // The laptop perf job is not part of a repair: the next nightly measures what changed.
+  const all = [...suites, ...baseline.suites.filter((previous) => !['plan', 'setup', 'perf'].includes(previous.suite) && !suites.some((suite) => suite.name === previous.suite))
     .map((previous) => ({ name: previous.suite, words: [previous.suite] }))]
   const planned = []
   const reused = []
@@ -32,7 +33,7 @@ export function repairPlan({ baseline, identity, suites, affected: selected }) {
     const failures = completeInventory ? previous.tests.cases.filter((test) => !['expected', 'flaky'].includes(test.outcome) && test.expectedStatus !== 'skipped') : []
     const files = failures.map((test) => test.file)
     const selective = previous && (suitePassed(previous) || (completeInventory && files.length > 0 && files.every(Boolean)))
-      && (!reached || reached.args.length > 0) && /^test:(desktop|browser|electron|gallery)$/.test(suite.name)
+      && (!reached || reached.args.length > 0) && /^test:(desktop|browser|electron|nightly|gallery)$/.test(suite.name)
     if (selective) {
       const prefix = suite.name === 'test:gallery' ? 'apps/gallery/' : 'apps/desktop/'
       const args = [...new Set([...files.map((file) => file.replace(prefix, '')), ...(reached?.args ?? [])])]

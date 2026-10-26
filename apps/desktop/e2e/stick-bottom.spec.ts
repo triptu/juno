@@ -21,7 +21,7 @@ function expectHeldAtEnd(frames: Frame[]): void {
 const TOPIC_SCROLLER = '[data-topic-view] [data-scroll]'
 const PANEL_SCROLLER = 'aside[data-juno-panel] [data-scroll]'
 
-test('a thread at the bottom keeps a new reply fully in view', async ({ juno, win, slack, fake }) => {
+test('a thread at the bottom keeps a new reply fully in view', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
   const root = fake.injectMessage({ channel: slack.channel('eng'), user: slack.as('Leo').id, text: 'Stick to the bottom thread check' })
   for (let i = 0; i < 30; i++) fake.workspace.post({ channel: slack.channel('eng'), user: slack.as(i % 2 === 0 ? 'Leo' : 'Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true })
   await juno.signIn()
@@ -79,9 +79,9 @@ async function editLastStaysAbove({ juno, win, fake }: Pick<Fixtures, 'juno' | '
           } else {
             await (await juno.messageMenu.openOnRow(row, { scroll: false })).choose('edit')
           }
-          await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
-          await expect(topic.list.locator(EDITING).getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
-          await expect(topic.list.locator(EDITING).getByRole('button', { name: /^Save/ })).toBeVisible()
+          await expect(topic.list.locator('textarea[aria-label="Edit message"]')).toBeFocused()
+          await expect(topic.list.locator(EDITING).locator('button', { hasText: /^Cancel$/ })).toBeVisible()
+          await expect(topic.list.locator(EDITING).locator('button', { hasText: /^Save/ })).toBeVisible()
           await frames(win, 12)
           const samples = await watched()
           await test.info().attach(`${name}-${method}`, { body: JSON.stringify(samples), contentType: 'application/json' })
@@ -97,7 +97,7 @@ async function editLastStaysAbove({ juno, win, fake }: Pick<Fixtures, 'juno' | '
 }
 
 // A DM is the same TopicView as Main; the thread view is checked on its own (below), since a thread window once broke it alone.
-test('Main: editing the last message without reactions stays above the composer', async ({ juno, win, slack, fake }) => {
+test('Main: editing the last message without reactions stays above the composer', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, slack, fake }) => {
   const channel = slack.channel('eng')
   for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Edit history ${i}`, silent: true })
   await juno.signIn()
@@ -238,7 +238,7 @@ test('releases the bottom during an upward gesture and uses the resting threshol
   })
 })
 
-longTest('Main: back at the end after scrolling up by hand, a full window follows new messages', async ({ juno, win, fake }) => {
+longTest('Main: back at the end after scrolling up by hand, a full window follows new messages', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, fake }) => {
   await openFullWindow(juno, '#perf-main')
   await backAtEnd(juno, win, (text) => void fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, user: 'U0PERFLEO', text }))
 })
@@ -326,7 +326,7 @@ const heldTest = chatTest.extend<{ readonly gate: { readonly wait: Promise<void>
   },
 })
 
-heldTest('the Juno panel at the bottom keeps a new answer fully in view', async ({ juno, win, gate }) => {
+heldTest('the Juno panel at the bottom keeps a new answer fully in view', { tag: ['@nightly', '@nightly-scroll'] }, async ({ juno, win, gate }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.setWindowSize(1400)

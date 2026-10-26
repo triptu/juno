@@ -17,7 +17,7 @@ export default {
   },
   workspaces: {
     '.': {
-      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
+      entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/verify-agent.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
       project: ['scripts/**/*.{mjs,ts}', 'specs/**/*.mjs'],
     },
     // Knip reads every package.json exports map; bun test's *.test.ts files are entries
@@ -39,6 +39,9 @@ export default {
         'e2e/timings.ts', // Loaded only when JUNO_E2E_TIMINGS enables the reporter.
         'src/main/index.ts',
         'src/engine/index.ts',
+        // Knip's Vite plugin reads rollupOptions.input, which Vite 8 calls rolldownOptions.
+        'src/agent/index.ts',
+        'src/agent/codemode-worker.ts',
         'src/preload/index.ts',
         'src/renderer/index.html',
         // The web shell (`bun run web`): its host and the page entry it serves.
@@ -51,6 +54,8 @@ export default {
       project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'dom/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', 'web/**/*.ts', '*.config.ts', '*.vite.ts'],
       playwright: { config: ['playwright*.config.ts'] },
       vite: { config: ['electron.vite.config.ts', 'vite.web.config.ts', 'dom/vite.config.ts'] },
+      // @vitejs/plugin-react imports the React Compiler by name when `compiler` is set (renderer.vite.ts).
+      ignoreDependencies: ['oxc-transform-react'],
     },
     'apps/gallery': {
       entry: ['index.html'],

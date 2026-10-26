@@ -1,28 +1,17 @@
 /**
  * Updates (SPEC section 15, Settings › About). Without a releases repository
- * updates are unavailable. With one, a fake of the private repository's GitHub
- * API stands in: the app reads it with its token, offers an unsigned build's
- * DMG, and shows "What's new" from CHANGELOG.md. Nothing leaves the machine.
+ * updates are unavailable (app.spec.ts checks it in the signed-in shell). With
+ * one, a fake of the private repository's GitHub API stands in: the app
+ * reads it with its token, offers an unsigned build's DMG, and shows "What's
+ * new" from CHANGELOG.md. Nothing leaves the machine.
  */
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { version as currentVersion } from '../package.json'
-import { expect, syncedTest, test } from './fixtures'
+import { expect, test } from './fixtures'
 
 const nextVersion = currentVersion.replace(/\d+$/, (patch) => String(Number(patch) + 1))
-
-syncedTest('Settings › About shows the build and keeps updates off in tests', async ({ juno, win }) => {
-  await juno.openSettings('About')
-  await expect(juno.settings.root.getByText(/Juno 0\./)).toBeVisible()
-  const updates = juno.settings.root.getByRole('checkbox', { name: 'Download updates automatically' })
-  await expect(updates).not.toBeChecked()
-  await expect(updates).toBeDisabled()
-  await expect(win.evaluate(() => window.juno.updates.set(true))).resolves.toEqual({ kind: 'unavailable' })
-  await expect(juno.settings.root.getByRole('button', { name: 'Restart to update' })).toHaveCount(0)
-  await expect(juno.settings.root.getByRole('button', { name: "What's new" })).toHaveCount(0)
-  await expect(juno.settings.root.getByRole('button', { name: 'Check for updates' })).toHaveCount(0)
-})
 
 /** The token main sends to a fake server (releaseFeed.ts, E2E_UPDATE_TOKEN). */
 const TOKEN = 'Bearer e2e-update-token'

@@ -4,11 +4,19 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         varied Quint seed, full gallery walks, coverage and Mac suites
+//   bun run verify:main --nightly         every check uncached, a fresh Quint seed, full gallery walks, the perf job; laptop only
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
-//                                    then `perf` and `test:feel`
+//                                    then `perf` (absolute budgets) and `test:feel`
+//   bun run verify:main --release       also the nightly tests the change reaches (bun run release)
+//   bun run verify:main --nightly-reach-only   only those nightly tests
+//
+// A normal run skips the nightly tier (tests tagged @nightly, scripts/test-areas.mjs);
+// --nightly runs it. With --release or --nightly-reach-only it adds a `test:nightly`
+// suite of the nightly files the change since each one last passed reaches
+// (scripts/nightly-reach.mjs) and records the result as `nightlyReach`, which the
+// release gate reads.
 //
 // It checks main out into a temporary detached worktree, so nothing local is
 // sent, and runs `test`, `specs:check` (reused while its inputs match),
@@ -16,17 +24,15 @@
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
-// suite failed. perf and test:feel time the Mac, so they run only with
-// --with-mac, one after the other, each holding the whole machine; the feel
-// contact sheet is copied next to the logs.
-//
-// The nightly desktop suite records coverage (JUNO_COVERAGE=1) and writes the
-// coverage map bun run affected selects specs by to
-// apps/desktop/e2e/coverage-map.json in this checkout; commit it after a
-// run on main (docs/development.md, "Affected tests").
+// suite failed. --nightly adds `perf` on the laptop as its own SSH job beside
+// the plan: every scenario and package budget, checked against the laptop's
+// baseline (docs/performance.md 7.3). On the Mac, perf (as `perf @mac`, the
+// absolute budgets) and test:feel run only with --with-mac, after the @mac
+// tests, each holding the whole machine; with the plan on the laptop they
+// start when it does. The feel contact sheet is copied next to the logs.
 
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomInt } from 'node:crypto'
@@ -37,23 +43,27 @@ import { assessRecord, isAncestor, readRecords, statusFolder } from './release-g
 import { failureCause, testResults } from './test-results-reporter.mjs'
 import { fullSuites, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
-import { formatMap, MAP_PATH, mergePartials } from './coverage-map.mjs'
 import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
 import { committedInputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
 import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { keepReports } from './verify-reports.mjs'
 import { stopFromLog } from './verify-failures.mjs'
+import { checkoutReach } from './nightly-reach.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
-const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
+const withMac = argv.includes('--with-mac')
 const nightly = argv.includes('--nightly')
 const smoke = argv.includes('--smoke')
+const reachOnly = argv.includes('--nightly-reach-only')
+const reach = reachOnly || argv.includes('--release')
 if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
+if (reach && ['--smoke', '--repair', '--nightly'].some((flag) => argv.includes(flag))) throw new Error('--release and --nightly-reach-only cannot be combined with --smoke, --repair or --nightly (which runs every nightly test)')
 const noCache = argv.includes('--no-cache')
-const seed = process.env.SPECS_SEED ?? (nightly ? String(randomInt(1, 2 ** 32)) : undefined)
+// Every spec simulation that runs takes a fresh seed, kept in the record: `bun run specs:check --seed <n>` repeats it.
+const seed = process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
 // The unit tests' shuffled order, kept in the record: `bun run test --seed <n>` repeats it.
 const testSeed = process.env.JUNO_TEST_SEED || String(randomInt(1, 2 ** 32))
 
@@ -83,7 +93,8 @@ if (local && argv.includes('--require-remote')) throw new Error('This run requir
 const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
-const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }] : fullSuites(scripts, { nightly, noCache, seed, testSeed })
+const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }]
+  : reachOnly ? [] : fullSuites(scripts, { nightly, noCache, seed, testSeed, skipTags: local ? ['@mac'] : [] })
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
 const baseline = repairArg === 'latest' ? records[0] : repairArg ? JSON.parse(readFileSync(resolve(repairArg), 'utf8')) : undefined
 if (repairArg && (!baseline || baseline.version !== 2 || !isAncestor(root, baseline.commit, commit)))
@@ -96,7 +107,8 @@ const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
 let suites = required.filter((suite) => {
-  if (baseline || !protocolRoots[suite.name] || noCache || (seed !== undefined && suite.name === 'specs:check')) return true
+  // A nightly run reuses no suite from an earlier run: it runs everything. The spec seed is always set, and not part of any key.
+  if (baseline || !protocolRoots[suite.name] || noCache || nightly) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
     if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
@@ -108,6 +120,11 @@ let suites = required.filter((suite) => {
   return true
 })
 let words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
+// The laptop perf job: nightly, every scenario and package budget, beside the plan on two cores of its own. A
+// nightly's plan is the gallery walk's job and the desktop job (scripts/remote/plan.mjs); each gives up a core.
+const perfCores = process.env.JUNO_RUNNER_PERF_CORES ?? '2'
+const perfWords = nightly && !local && !baseline ? ['perf'] : undefined
+const planEnv = perfWords === undefined ? {} : { JUNO_RUNNER_DESKTOP_CORES: process.env.JUNO_RUNNER_DESKTOP_CORES ?? '3', JUNO_RUNNER_GALLERY_CORES: process.env.JUNO_RUNNER_GALLERY_CORES ?? '3' }
 if (argv.includes('--dry-run')) {
   console.log(`verify:main: ${commit} on ${execution.host} (${execution.mode}); no checkout, tests or record written`)
   if (local) console.log('bun install --frozen-lockfile; exclusive heavy lock; serial plan; desktop skips @mac')
@@ -115,7 +132,9 @@ if (argv.includes('--dry-run')) {
   console.log(`test:plan ${words.join(' ')}`)
   for (const suite of reused) console.log(`Reuse ${suite.suite}: unchanged inputs and runtime (${suite.reusedFrom.commit})`)
   if (baseline) console.log(`Repair ${baseline.commit}: failed/unfinished files plus uncapped import-graph selection (resolved in the target checkout)` )
-  if (withMac) console.log('On this Mac: test:desktop --grep @mac, then perf, then test:feel (exclusive heavy lock)')
+  if (perfWords) console.log(`On the laptop beside the plan (${perfCores} cores): ${perfWords.join(' ')}`)
+  if (withMac) console.log('On this Mac: test:desktop --grep @mac, then perf @mac, then test:feel (exclusive heavy lock)')
+  if (reach) console.log('Then test:nightly: the nightly files the change since each last passed reaches (decided in the checkout)')
   process.exit(0)
 }
 mkdirSync(logDir, { recursive: true })
@@ -195,10 +214,25 @@ if (baseline && !installed) throw new Error(`Repair dependencies did not install
 const checkoutFiles = tracked.filter((file) => /^(apps|packages)\//.test(file))
 const graph = new ImportGraph(checkout, new Set(checkoutFiles))
 const protocols = protocolInputs(tracked, (file) => graph.closure(file))
+// The nightly files this commit must run before a release (scripts/nightly-reach.mjs).
+let nightlyReach
+if (reach) {
+  const files = scripts['test:nightly'] ? checkoutReach(checkout, commit, records, { ...process.env, JUNO_TEST_SEED: testSeed }) : []
+  for (const item of files) console.log(`verify:main: nightly ${item.file.replace('apps/desktop/', '')}: ${item.run ? 'runs' : 'not needed'}, ${item.why}`)
+  const run = files.filter((item) => item.run).map((item) => item.file)
+  if (run.length > 0) {
+    const suite = { name: 'test:nightly', words: ['test:nightly', ...run] }
+    required.push(suite)
+    suites.push(suite)
+    words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
+  }
+  nightlyReach = { files }
+}
+
 let affected
 if (baseline) {
-  // The graph is deliberately broader than coverage: a repair has no sampling or heavy exclusions.
-  const selected = spawnSync(process.execPath, [join(checkout, 'scripts/affected.mjs'), '--plan', '--json', '--wide', '--graph', '--no-cache', '--range', `${baseline.commit}..${commit}`, ...(local ? ['--local'] : [])], { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, JUNO_TEST_SEED: testSeed } })
+  // A repair plans wide: no sampling or heavy exclusions.
+  const selected = spawnSync(process.execPath, [join(checkout, 'scripts/affected.mjs'), '--plan', '--json', '--wide', '--no-cache', '--range', `${baseline.commit}..${commit}`, ...(local ? ['--local'] : [])], { cwd: checkout, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, JUNO_TEST_SEED: testSeed } })
   if (selected.status !== 0) throw new Error(`Could not plan repair: ${selected.stderr}`)
   affected = JSON.parse(selected.stdout)
   const repair = repairPlan({ baseline, identity, suites: required, affected: affected.steps })
@@ -210,7 +244,10 @@ if (baseline) {
 const runs = [cancelled || !installed ? Promise.resolve(suites.map(({ name }) => ({ suite: name, code: cancelled ? 130 : 1, seconds: 0, log: join(logDir, 'install.log') })))
   : suites.length === 0 ? Promise.resolve([]) : run('plan', process.execPath, local
     ? [heavy, '--exclusive', process.execPath, join(checkout, 'scripts/plan.mjs'), ...words]
-    : [join(checkout, 'scripts/remote.mjs'), '--env', 'JUNO_VERIFY_POLICY=1', 'test:plan', ...words], checkout, local ? { ...localVerifyEnv, JUNO_SKIP_TAGS: '@mac', JUNO_VERIFY_POLICY: '1' } : {}).then((planned) => splitPlan(planned))]
+    : [join(checkout, 'scripts/remote.mjs'), '--env', 'JUNO_VERIFY_POLICY=1', 'test:plan', ...words], checkout, local ? { ...localVerifyEnv, JUNO_SKIP_TAGS: '@mac', JUNO_VERIFY_POLICY: '1' } : planEnv).then((planned) => splitPlan(planned))]
+if (perfWords && !cancelled && installed) {
+  runs.push(run('perf', process.execPath, [join(checkout, 'scripts/remote.mjs'), '--cores', perfCores, '--wait', '3600', '--env', 'JUNO_VERIFY_POLICY=1', ...perfWords], checkout).then((result) => [result]))
+}
 if (withMac) {
   // The @mac tests need the installed workspace and a build here; they take a heavy-job slot.
   runs.push(
@@ -220,35 +257,20 @@ if (withMac) {
       if (cancelled) return [{ suite: 'test:desktop @mac', code: 130, seconds: 0, log: '' }]
       const install = local ? { status: installed ? 0 : 1 } : spawnSync('bun', ['install', '--frozen-lockfile', '--silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
-      return [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
+      const mac = [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
+      // perf and feel time this Mac, so they follow its @mac tests; with the plan on the laptop they need not wait for it.
+      if (!local) for (const [suite, script] of [['perf @mac', 'perf'], ['test:feel', 'test:feel']]) mac.push(await run(suite, 'bun', ['run', script], checkout))
+      return mac
     })(),
   )
 }
 let results = (await Promise.all(runs)).flat()
 const readLog = (result) => result.log && existsSync(result.log) ? readFileSync(result.log, 'utf8') : ''
-const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local ? identity : undefined, reused.map((suite) => suite.identity), baseline?.identity)
+const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local || suites.length === 0 ? identity : undefined, reused.map((suite) => suite.identity), baseline?.identity)
 
-// The coverage map, from the partials this run's desktop machines brought back
-// (scripts/coverage-map.mjs). A failed test still ran its code, so a failure
-// does not stop the refresh; a spec with no partial is left out of the map and
-// then always runs.
-const coverageRoot = local ? join(checkout, 'apps/desktop/coverage/map') : join(checkout, '.remote')
-const partials = nightly && existsSync(coverageRoot)
-  ? readdirSync(coverageRoot, { recursive: true })
-      .map((name) => join(coverageRoot, String(name)))
-      .filter((path) => /apps\/desktop\/coverage\/map\/partial-[^/]*\.json$/.test(path) && statSync(path).mtimeMs >= planStarted)
-  : []
-let coverageNote = nightly ? 'no coverage partials came back; the coverage map was not refreshed' : 'coverage recording is nightly only'
-if (partials.length > 0) {
-  const map = mergePartials(partials.map((path) => JSON.parse(readFileSync(path, 'utf8'))), commit)
-  map.identity = runtime.identity
-  writeFileSync(join(root, MAP_PATH), formatMap(map))
-  coverageNote = `coverage map refreshed from ${partials.length} partial(s): ${map.specs.length} spec file(s), ${Object.keys(map.files).length} source file(s); commit ${MAP_PATH}`
-}
-console.log(`verify:main: ${coverageNote}`)
 if (withMac && !cancelled) {
-  // After the rest, so they do not time a machine the other suites are using.
-  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, local ? localVerifyEnv : {})]
+  // A local plan ran on this Mac too: they wait for it, so they do not time a machine the other suites are using.
+  if (local) for (const [suite, script] of [['perf @mac', 'perf'], ['test:feel', 'test:feel']]) results = [...results, await run(suite, 'bun', ['run', script], checkout, localVerifyEnv)]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }
@@ -286,24 +308,28 @@ const measured = results.map((result) => {
   const inputs = protocols[result.suite]
   const override = argv.filter((word, index) => argv[index - 1] === '--cause').map((word) => word.split('=')).find(([suite]) => suite === result.suite)?.[1]
   return { ...result, code, stop, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs && actual ? committedInputKey(root, commit, inputs, actual) : undefined,
-    host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? execution.host : hostname(),
+    host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' || result.suite === 'perf' ? execution.host : hostname(),
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
     failures: code === 0 ? [] : stop ? [`${stop.rule}: ${stop.signature ?? `${stop.failed}/${stop.completed} tests failed`}`] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused'] : failures(result.log), tests,
     cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch || stop ? 'infrastructure' : undefined), note: stop ? JSON.stringify(stop) : mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
   }
 })
 const outcomes = [...measured, ...reused]
+if (nightlyReach) {
+  const ran = outcomes.find((suite) => suite.suite === 'test:nightly')
+  nightlyReach.passed = nightlyReach.files.every((item) => !item.run) || (ran !== undefined && suitePassed(ran))
+}
 const summary = {
-  version: 2, commit, subject, ref, identity: runtime.identity, plannedIdentity, execution, smoke,
+  version: 2, commit, subject, ref, identity: runtime.identity, plannedIdentity, execution, smoke, reachOnly,
   finishedAt: new Date().toISOString(),
   passed: !cancelled && !setupFailure && !runtimeFailure && !runtime.mismatch && outcomes.every(suitePassed),
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
-  coverage: coverageNote, nightly, seed, testSeed,
+  nightly, nightlyReach, seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
-  allocation: Object.fromEntries(['DESKTOP', 'UNIT'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
+  allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'GALLERY', 'PERF'].map((kind) => [kind.toLowerCase(), planEnv[`JUNO_RUNNER_${kind}_CORES`] ?? (kind === 'PERF' && perfWords ? perfCores : undefined) ?? process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
   reports: keepReports(checkout, logDir, planStarted).map((file) => join('.juno-status', relative(statusDir, file))),
 }
 writeRecord(statusDir, runId, summary)
@@ -314,10 +340,9 @@ const markdown = [
   '',
   `Full plan ran on ${execution.host} (${execution.mode}).`,
   '',
-  `${coverageNote[0].toUpperCase()}${coverageNote.slice(1)}.`,
-  '',
   `Unit test order seed ${testSeed}; \`bun run test --seed ${testSeed}\` repeats it.`,
   '',
+  ...(nightly ? ['Nightly tests ran in their lanes.', ''] : nightlyReach ? [`Nightly reach ${nightlyReach.passed ? 'passed' : 'FAILED'}: ${nightlyReach.files.filter((item) => item.run).length} of ${nightlyReach.files.length} nightly file(s) ran; the rest passed before with unchanged inputs.`, ''] : scripts['test:nightly'] && !smoke ? ['Nightly tests skipped (a release runs those its changes reach).', ''] : []),
   '| Suite | Result | Time | Log |',
   '| --- | --- | --- | --- |',
   ...summary.suites.map((suite) => `| \`${suite.suite}\` | ${suite.code === 0 ? 'passed' : `failed (${suite.code})`} | ${suite.seconds} s | \`${suite.log}\` |`),

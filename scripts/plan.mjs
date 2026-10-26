@@ -49,7 +49,7 @@ const cgroupRead = (file, pick) => { try { return pick(readFileSync(`/sys/fs/cgr
 const cpuMicros = () => cgroupRead('cpu.stat', (text) => Number(/^usage_usec (\d+)$/m.exec(text)?.[1]))
 const memoryBytes = () => cgroupRead('memory.current', Number)
 
-export const appSuites = ['test:desktop', 'test:browser', 'test:electron', 'test:gallery', 'test:e2e']
+export const appSuites = ['test:desktop', 'test:browser', 'test:electron', 'test:nightly', 'test:gallery', 'test:e2e']
 /** The steps in lanes that run at the same time; each lane runs its steps in order. */
 export function lanes(steps, serial) {
   if (serial) return [steps]

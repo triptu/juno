@@ -1,6 +1,6 @@
 // Reading a topic (SPEC 6 and 7): prefetch on hover, where it opens, the context pill and a
 // #channel chip, the "N new" divider and the read mark, the topic menu's Notify me, Follow and
-// ⌘Z, Main's thread links, the title's topic switcher and the header's Tab order.
+// ⌘Z, Main's thread links, the title's topic switcher, a composer that mounts late and the header's Tab order.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -70,6 +70,33 @@ domTest('Main’s thread links, its title switcher, its Notify me and its header
   await step('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', () => linksAndSwitcher(juno))
   await step('Main’s Notify me is its channel’s, and the header is reached pill, title, Juno, ⋯', () => headerOrder(juno))
   await step('the switcher searches the channel’s topics, and ⌘ opens one in a new tab', () => searchSwitcher(juno))
+})
+
+// The engine's draft replies are held, so each thread's composer mounts only when the test lets it.
+domTest('a composer that mounts late takes focus after a switcher pick, and leaves it on the title the user moved to', async ({ juno, app }) => {
+  await juno.sidebar.row(ENG_MAIN).open()
+  await juno.topic.expectTitle('Main')
+
+  let release = app.holdReplies('drafts.get')
+  let switcher = await juno.topic.openSwitcher()
+  await switcher.open(CHECKOUT)
+  await juno.topic.expectTitle(CHECKOUT)
+  await expect(juno.topic.composer).toHaveCount(0)
+  release()
+  await expect(juno.topic.composer).toBeFocused()
+
+  release = app.holdReplies('drafts.get')
+  switcher = await juno.topic.openSwitcher()
+  await switcher.open(POSTGRES)
+  await juno.topic.expectTitle(POSTGRES)
+  await expect(juno.topic.composer).toHaveCount(0)
+  switcher = await juno.topic.openSwitcherWithKeyboard()
+  await juno.win.keyboard.press('Escape')
+  await expect(switcher.root).toHaveCount(0)
+  await expect(juno.topic.titleButton).toBeFocused()
+  release()
+  await expect(juno.topic.composer).toBeVisible()
+  await expect(juno.topic.titleButton).toBeFocused()
 })
 
 async function openAtDivider({ juno, called }: Following): Promise<void> {

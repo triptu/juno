@@ -14,6 +14,29 @@ import { holdKeys, releaseKeys } from '@juno/views'
 /** The topic view whose composer takes focus when it mounts. */
 let composerWanted: string | undefined
 
+/**
+ * Key and pointer presses so far. A focus asked for before the latest press
+ * is dropped: the user has acted since, and may have put focus somewhere
+ * (Enter on the title, then Esc, leaves it on the title).
+ */
+let presses = 0
+let composerWantedAt = 0
+let countingPresses = false
+
+function countPress(event: Event): void {
+  if (event instanceof KeyboardEvent && (event.repeat || MODIFIERS.has(event.key))) return
+  presses += 1
+}
+
+const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Fn'])
+
+function countPresses(): void {
+  if (countingPresses) return
+  countingPresses = true
+  window.addEventListener('keydown', countPress, true)
+  window.addEventListener('mousedown', countPress, true)
+}
+
 /** Until when keys typed on a sidebar row wait for the next composer to mount. The hold itself ends after a second. */
 let typedAheadUntil = 0
 const TYPE_AHEAD_MS = 1_000
@@ -22,20 +45,23 @@ const TYPE_AHEAD_MS = 1_000
 let pageForced: string | undefined
 
 export function wantComposerFocus(view: string): void {
+  countPresses()
   composerWanted = view
+  composerWantedAt = presses
 }
 
 /**
  * Focuses the composer field of `view` if a topic open asked for it, with
- * the caret at the end of the draft. Not while focus is in another visible
- * field or popup, where the user may have moved before the topic landed.
+ * the caret at the end of the draft. Not once a key or the pointer was
+ * pressed since the open, nor while focus is in another visible field or
+ * popup, where the user may have moved before the topic landed.
  */
 export function takeComposerFocus(view: string, field: HTMLTextAreaElement): void {
   const typedAhead = performance.now() < typedAheadUntil
   if (composerWanted !== view && !typedAhead) return
   composerWanted = undefined
   typedAheadUntil = 0
-  if (!typedAhead && focusElsewhere(document.activeElement)) return
+  if (!typedAhead && (presses !== composerWantedAt || focusElsewhere(document.activeElement))) return
   focusPage(field)
   field.setSelectionRange(field.value.length, field.value.length)
   if (typedAhead) releaseKeys()
@@ -44,12 +70,15 @@ export function takeComposerFocus(view: string, field: HTMLTextAreaElement): voi
 /**
  * Focuses `element` in a page just shown. An open on a mousedown can land
  * before the press moves focus to what it pressed, such as the sidebar
- * row, so focus comes back here once the press is done.
+ * row, so focus comes back here once the press is done, unless another
+ * press came after it.
  */
 export function focusPage(element: HTMLElement): void {
+  countPresses()
+  const at = presses
   element.focus({ preventScroll: true })
   setTimeout(() => {
-    if (document.activeElement !== element && element.isConnected && element.checkVisibility() && !focusElsewhere(document.activeElement)) element.focus({ preventScroll: true })
+    if (presses === at && document.activeElement !== element && element.isConnected && element.checkVisibility() && !focusElsewhere(document.activeElement)) element.focus({ preventScroll: true })
   }, 0)
 }
 

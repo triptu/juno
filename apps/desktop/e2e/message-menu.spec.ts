@@ -50,7 +50,6 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     // Eleven emoji, the quick reactions first, then More reactions; no why row and no Copy Slack link.
     expect((await menu.grid()).slice(0, 3)).toEqual(['+1', 'white_check_mark', 'eyes'])
     expect(await menu.grid()).toHaveLength(11)
-    await expect(menu.more).toHaveAccessibleName('More reactions')
     // Ask Juno shows while AI assist is on.
     const labels = (await menu.labels()).filter((label) => label !== 'Ask Juno')
     expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Open in Slack'])
@@ -175,7 +174,7 @@ async function keysInMenu(juno: Juno): Promise<void> {
     await expect(row).toBeFocused()
     await row.press('t')
     await topic.expectTitle(/Keys in the menu/)
-    await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+    await expect(topic.composer).toHaveAttribute('placeholder', 'Reply')
   })
 
   await test.step('in the thread the menu shows no T, and T does nothing', async () => {

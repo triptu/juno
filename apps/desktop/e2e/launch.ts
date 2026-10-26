@@ -1,10 +1,11 @@
 import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import type { TestHost } from './browser/host'
+import { cpuAll, printCpuSince } from './cpu'
 import { startSendTrace, startSidebarTrace } from './traces'
 
 /**
@@ -82,36 +83,14 @@ export interface LaunchOptions {
   readonly sendTrace?: boolean
 }
 
-let launches = 0
-
-/**
- * Under JUNO_COVERAGE=1, a directory of its own for this launch's coverage,
- * under the spec file it belongs to (e2e/coverage.ts reduces them after the run).
- */
-export function coverageDir(): string | undefined {
-  if (process.env.JUNO_COVERAGE !== '1') return undefined
-  let spec = 'unknown'
-  try {
-    spec = relative(resolve(__dirname, '..'), base.info().file)
-  } catch {
-    // Outside a test or hook: the launch counts for no spec.
-  }
-  return resolve(__dirname, '../coverage/raw', spec.replaceAll('/', '__'), `${process.pid}-${launches++}`)
-}
-
 export function launchTiming(options: LaunchOptions): 'fast' | 'production' {
   const info = base.info()
   const production = options.paced === true || /(?:perf|idle-cpu)\.spec\.ts$|[/\\]feel[/\\]/.test(info.file) || info.tags.includes('@mac')
   return options.timing ?? (production ? 'production' : 'fast')
 }
 
-/**
- * Launches the built app (prepared by Playwright setup) on the given user-data
- * directory and waits for its first window. Launch the same directory twice
- * to test what survives a relaunch.
- */
-export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
-  const started = performance.now()
+/** The app's environment for a launch: this process's, without what a packaged app never gets, and the e2e seams `options` asks for. */
+function launchEnv(userData: string, options: LaunchOptions): Record<string, string> {
   const env: Record<string, string> = {}
   // A package manager or test runner may give the scripts it runs NODE_PATH
   // or NODE_OPTIONS. The app is bundled and the packaged app gets neither, so
@@ -134,10 +113,6 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.slackAppDir !== undefined) env.JUNO_SLACK_APP_DIR = options.slackAppDir
   if (options.keychainPassword !== undefined) env.JUNO_SLACK_SAFE_STORAGE_PASSWORD = options.keychainPassword
   if (options.fakeAiDelayMillis !== undefined) env.JUNO_FAKE_AI_DELAY_MS = String(options.fakeAiDelayMillis)
-  const ownOpenRouter = options.agent === true && options.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
-  if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
-  const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
-  if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
   if (options.deviceName !== undefined) env.JUNO_E2E_DEVICE_NAME = options.deviceName
   if (options.codemode === true) env.JUNO_AGENT_CODEMODE = '1'
   if (options.screenShared === true) env.JUNO_E2E_SCREEN_SHARED = '1'
@@ -149,8 +124,22 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   if (options.aiJobs === true) env.JUNO_E2E_AI_JOBS = '1'
   else delete env.JUNO_E2E_AI_JOBS
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
-  const coverage = coverageDir()
-  if (coverage !== undefined) env.JUNO_E2E_COVERAGE = coverage
+  return env
+}
+
+/**
+ * Launches the built app (prepared by Playwright setup) on the given user-data
+ * directory and waits for its first window. Launch the same directory twice
+ * to test what survives a relaunch.
+ */
+export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
+  const started = performance.now()
+  const startedCpu = cpuAll()
+  const env = launchEnv(userData, options)
+  const ownOpenRouter = options.agent === true && options.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
+  if (options.agent === true) env.JUNO_E2E_OPENROUTER_KEY = E2E_OPENROUTER_KEY
+  const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
+  if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
@@ -174,15 +163,16 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     await win.evaluate(startSendTrace)
   }
   if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: launch ${Math.round(performance.now() - started)} ms`)
+  printCpuSince('launch', startedCpu)
   return {
     app,
     win,
     close: async () => {
-      // Main and the renderers write what ran since their last write; the engine and the agent write as they end.
-      if (coverage !== undefined) await app.evaluate(() => (globalThis as unknown as { junoTest: { flushCoverage: () => Promise<void> } }).junoTest.flushCoverage()).catch(() => undefined)
       const closing = performance.now()
+      const closingCpu = cpuAll()
       await app.close()
       if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: close ${Math.round(performance.now() - closing)} ms`)
+      printCpuSince('close', closingCpu)
       await ownOpenRouter?.close()
     },
   }

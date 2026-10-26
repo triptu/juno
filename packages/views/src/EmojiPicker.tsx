@@ -4,6 +4,7 @@ import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type Keyb
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { matchEmoji, type PickerItem as Item, type PreparedEmojiPicker } from '@juno/contract'
 import { itemKey, neighbour, normalize, type Section } from './emojiPickerModel'
+import { useHeldEnter } from './useHeldEnter'
 import { accent, colors, layout, menu, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Emoji, ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
@@ -11,6 +12,8 @@ export interface EmojiPickerProps {
   readonly data: PreparedEmojiPicker
   /** The container warms the full index; until then search uses names only. */
   readonly searchReady?: boolean
+  /** False while the workspace's emoji are still coming and `data` has only the standard ones. */
+  readonly customReady?: boolean
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
   /** A Slack emoji name: "+1", "partying_face", a custom name; its glyph, or a custom emoji's image. */
@@ -37,7 +40,7 @@ const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
 /** A windowed grid: only nearby rows mount, including in a large workspace or search. */
-export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', material = 'popover', searchReady = true }: EmojiPickerProps) {
+export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', material = 'popover', searchReady = true, customReady = true }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
   const [focused, setFocused] = useState<number | undefined>(undefined)
@@ -159,13 +162,21 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
     onClose()
   }
 
+  const holdEnter = useHeldEnter(customReady, (typed) => {
+    const match = typed === normalize(query) ? matchEmoji(all, typed, recent, [], Infinity, searchReady).find((item) => !isChosen(item)) : undefined
+    if (match !== undefined) pick(match)
+  })
+
   const onFieldKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       // The live query, not the deferred one, so Enter right after typing picks what was typed.
       const typed = normalize(query)
       const matches = typed === search ? sections.flatMap((section) => section.items) : matchEmoji(all, typed, recent, [], Infinity, searchReady)
       const match = typed === '' ? undefined : matches.find((item) => !isChosen(item))
-      if (match === undefined) return
+      if (match === undefined) {
+        if (!customReady && typed !== '') holdEnter(typed)
+        return
+      }
       event.preventDefault()
       pick(match)
     } else if (event.key === 'ArrowDown') {
@@ -204,6 +215,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
           value={query}
           onChange={(event) => {
             setQuery(event.currentTarget.value)
+            holdEnter(undefined)
             // A new search starts at the top.
             scrollerRef.current?.scrollTo({ top: 0 })
           }}

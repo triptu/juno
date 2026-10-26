@@ -6,6 +6,7 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { press, type Juno } from './driver/juno'
+import { absolute, budget } from './perfBaseline'
 import { stats } from './perfStats'
 
 test.skip(process.env.JUNO_PERF !== '1', 'set JUNO_PERF=1 to measure')
@@ -77,7 +78,7 @@ test('topic reopen: Main, a thread and a 600-reply thread from the sidebar, and 
 
   const samples = new Map<string, number[]>()
   const add = (name: string, ms: number) => samples.set(name, [...(samples.get(name) ?? []), ms])
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < (absolute ? 10 : 4); i++) {
     for (const title of [ENG, POSTGRES, LONG]) {
       // From Home, so each open is fresh.
       await juno.home.open()
@@ -94,7 +95,6 @@ test('topic reopen: Main, a thread and a 600-reply thread from the sidebar, and 
     await expect(juno.topic.message('Look at the middle step')).toBeVisible()
   }
   for (const [name, values] of samples) {
-    const result = stats(`topic reopen, ${name}, press to rows painted`, values)
-    expect.soft(result.p95, `${name} p95 ${result.p95.toFixed(1)} ms`).toBeLessThanOrEqual(CACHED_BUDGET)
+    budget(stats(`topic reopen, ${name}, press to rows painted`, values), CACHED_BUDGET)
   }
 })
