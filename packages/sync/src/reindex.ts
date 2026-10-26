@@ -8,6 +8,9 @@
  * Runs on the writer connection inside the caller's transaction, at the end
  * of every page, event or command that touched the topics it is given.
  *
+ * A topic whose inputs have not changed since its row was last computed is
+ * not computed again (`topicInputs.ts`).
+ *
  * What the pure rule cannot know is added here from the mirror:
  * - a thread whose replies are not all stored takes `message_count` and
  *   `last_activity_ts` from the root's counters and reports `unread_exact`
@@ -45,6 +48,7 @@ import { Invalidation, StoreWriter, type MessageRow, type SqlError, type TopicIn
 import { Effect } from 'effect'
 import { messageTopics, syncKeys } from './keys'
 import { countExact } from './threadRanges'
+import { markUpToDate, storedRow, topicInputs } from './topicInputs'
 import { latestSyncedRange, readState, threadMessages, threadRanges } from './write'
 
 export interface ReindexOptions {
@@ -94,15 +98,13 @@ export const reindexTopics = (
     return changed
   })
 
-/** Every topic the index knows, for a full rebuild. */
+/** Every topic the index knows, computed again whatever its mark says: a full rebuild. */
 export const reindexAll = (options: ReindexOptions): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    yield* sql`DELETE FROM topic_inputs`
     const rows = yield* sql<{ topic_id: string }>`SELECT topic_id FROM topic_index`
-    return yield* reindexTopics(
-      rows.map((r) => r.topic_id),
-      options,
-    )
+    return yield* reindexTopics(rows.map((r) => r.topic_id), options)
   })
 
 /** Topic ids a set of message rows belongs to: Main for roots, the thread for replies, both for broadcasts. */
@@ -119,13 +121,20 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const sql = yield* StoreWriter
     const channel = parsed.channel
 
+    const reads = yield* readState(id)
+    const inputs = topicInputs(options.me, reads)
+    const { row: existing, upToDate } = yield* storedRow(id, inputs)
+    if (upToDate) return false
+    // Set when the row looked for someone not stored: it gets no marker, so the next re-index looks again.
+    let complete = true
+    const settle = (changed: boolean) => Effect.as(complete ? markUpToDate(id, inputs) : Effect.void, changed)
+
     const rows: ReadonlyArray<MessageRow> =
       parsed.kind === 'thread'
         ? yield* threadMessages(channel, parsed.threadTs)
         : yield* sql<MessageRow>`
             SELECT * FROM messages WHERE channel = ${channel}
               AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast')`
-    const reads = yield* readState(id)
     const root = parsed.kind === 'thread' ? rows.find((r) => r.ts === parsed.threadTs) : undefined
 
     // Names for the preview: the latest live message's sender and mentions. The root's text is stored raw and named at read time.
@@ -161,7 +170,10 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     if (usergroupIds.size > 0) {
       const found = yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups WHERE id IN ${sql.in([...usergroupIds])}`
       for (const group of found) usergroups.set(group.id, { handle: group.handle, ...(group.name === null ? {} : { name: group.name }) })
-      if (found.length < usergroupIds.size) options.onMissingUsergroup?.(id)
+      if (found.length < usergroupIds.size) {
+        complete = false
+        options.onMissingUsergroup?.(id)
+      }
     }
     // The rule also names people in other messages (mentions in unread ones, blocks, attachments). It asks
     // through `lookups`; names not loaded above are noted here and looked up after.
@@ -232,7 +244,11 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       // Stored people the first pass did not load: run the rule again with their names.
       if ((yield* loadUsers(requested)) > 0) indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete, includeAttention: true })
       // Only a person with no `users` row is missing. Asking for a stored one would re-index this topic and ask again, without end.
-      for (const userId of requested) if (!users.has(userId)) options.onMissingUser?.(userId, id)
+      for (const userId of requested) {
+        if (users.has(userId)) continue
+        complete = false
+        options.onMissingUser?.(userId, id)
+      }
     }
 
     const attention = new Map<string, number>(indexed?.attention?.map((item) => [item.ts, item.kind]))
@@ -244,10 +260,9 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       }
     }
 
-    const existing = (yield* sql<TopicIndexRow>`SELECT * FROM topic_index WHERE topic_id = ${id}`)[0]
     if (indexed === undefined && parsed.kind === 'main' && live.length === 0 && (options.provisionalMain === true || existing?.message_count === 0)) {
       const provisional = yield* provisionalMain(id, channel, reads, existing)
-      if (provisional !== undefined) return yield* writeRow(id, provisional, existing)
+      if (provisional !== undefined) return yield* settle(yield* writeRow(id, provisional, existing))
     }
     if (indexed === undefined) {
       if (existing === undefined) return false
@@ -257,7 +272,9 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     }
 
     const activity = indexed.activity
-    const sakes = latest?.bot_name == null && latest?.user_id != null ? yield* senderNamesakes(latest.user_id, live, options.me.userId) : []
+    const namesakeCheck = latest?.bot_name == null && latest?.user_id != null ? yield* senderNamesakes(latest.user_id, live, options.me.userId) : undefined
+    if (namesakeCheck?.complete === false) complete = false
+    const sakes = namesakeCheck?.names ?? []
     const rootText = root !== undefined && root.deleted === 0 ? indexed.rootText?.slice(0, ROOT_TEXT_CHARS) : undefined
     const preview: StoredPreview = {
       sender: latest?.bot_name ?? indexed.preview?.sender ?? '',
@@ -280,24 +297,31 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       preview_json: JSON.stringify(preview),
       rev: existing === undefined ? 1 : existing.rev + 1,
     }
-    return yield* writeRow(id, next, existing)
+    return yield* settle(yield* writeRow(id, next, existing))
   })
 
-/** The people among the topic's latest senders who share the sender's first name. Usually none. */
-const senderNamesakes = (senderId: string, live: ReadonlyArray<MessageRow>, me: string): Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> =>
+/**
+ * The people among the topic's latest senders who share the sender's first name. Usually none. `complete` is false
+ * when a sender has no `users` row: one stored later could be a namesake.
+ */
+const senderNamesakes = (
+  senderId: string,
+  live: ReadonlyArray<MessageRow>,
+  me: string,
+): Effect.Effect<{ readonly names: ReadonlyArray<string>; readonly complete: boolean }, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const ids = new Set<string>([senderId])
     for (const row of live.toSorted((a, b) => compareTs(b.ts, a.ts))) {
       if (ids.size > NAMESAKE_WINDOW) break
       if (row.user_id !== null && row.user_id !== me) ids.add(row.user_id)
     }
-    if (ids.size < 2) return []
+    if (ids.size < 2) return { names: [], complete: true }
     const sql = yield* StoreWriter
     const found = yield* sql<{ id: string; display_name: string | null; real_name: string | null; name: string | null }>`
       SELECT id, display_name, real_name, name FROM users WHERE id IN ${sql.in([...ids])}`
     const people = found.map((user) => ({ id: user.id, name: user.display_name ?? user.real_name ?? user.name ?? '' }))
     const sender = people.find((person) => person.id === senderId)
-    return sender === undefined ? [] : namesakes(sender, people)
+    return { names: sender === undefined ? [] : namesakes(sender, people), complete: found.length === ids.size }
   })
 
 /** Writes `next` unless it equals `existing`, bumping `rev`, and fires the topic's key. */
@@ -360,7 +384,6 @@ function sameIndexRow(a: TopicIndexRow, b: TopicIndexRow): boolean {
   }
   return true
 }
-
 
 /** The initial projection of a locally started thread, before its first sync reindex. */
 export const indexStartedThread = (input: {

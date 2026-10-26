@@ -50,8 +50,9 @@ describe('conversation observation fence', () => {
     const counts = fake.calls.filter((c) => c.method === 'client.counts')
     expect(counts).toHaveLength(1)
     expect(counts[0]!.args['counts_last_fetched']).toBeUndefined()
-    // The sidebar follows: the new name, and no Main for the channel left or the one archived.
-    const rows = await engine.rowsUntil((list) => list.find((row) => row.id === 'm:C0ENG')?.title === '#engineering', 'the renamed row')
+    // The sidebar follows: the new name, and no Main for the channel left or the one archived. The rename and the
+    // membership land in separate writes, so the list can show one before the other; wait for both.
+    const rows = await engine.rowsUntil((list) => list.find((row) => row.id === 'm:C0ENG')?.title === '#engineering' && shown(list).length === 0, 'the renamed row, without the left and archived channels')
     expect(shown(rows)).toEqual([])
   })
 

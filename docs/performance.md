@@ -365,6 +365,7 @@ Menu and popover buttons use `menuTriggerHandlers` in `@juno/ui`: primary mouse 
 - **Windows.** A query takes an anchor and a count and returns at most the window. A query that can return unbounded rows is rejected in review. All topics has to sort and count the whole index, so its order statement reads every topic of every member conversation through the channel index and returns only the window's ids and the length; the rows are then read by primary key. Its query time is in the engine benchmark (`allTopics.list on the large seed`).
 - **Deltas.** The engine keeps the last emitted `{ order, revById }` per subscription and sends only rows whose `rev` changed plus the new `order` when it differs. A run that changes nothing sends nothing, and a value equal to the last one is not sent again.
 - **Reuse between runs.** A list query whose rows are expensive to shape keeps what it built for its subscription and rebuilds only rows whose inputs changed. The sidebar query (`engine/src/topics/query.ts`, `RowCache`) reuses each topic and row object while the joined columns and the people are unchanged, and keeps the users it has read until the `users` table is invalidated. On the large seed this takes a re-run from about 6 ms to about 2.5 ms; the SQL is about 1 ms of it. The message window (`engine/src/messages/query.ts`, `MessageCache`) does the same per message: a message whose version, reactions, group start and thread link hold keeps its row, and a body is parsed again only when it changed or a name it uses did; on a 300-message window a re-run is about 1 ms and a first run about 4 ms.
+- **Re-index only what changed.** `reindexTopics` runs at the end of every page, event and command for the topics they touched, but a topic none of whose inputs changed since its row was computed stops after reading its read state and its mark (`topic_inputs`, architecture 4.2; `sync/src/topicInputs.ts`). Writers keep marks by not writing what did not change: `writeMessage` skips an unchanged message, and a thread range whose tail only moves between `live` and `held` is updated in place. A write that changes nothing the index reads must not clear a mark, or every start computes those topics again (8.15).
 - **Batching.** One writer transaction per socket event or command, wrapped in `Reactivity.withBatch`, so dependent queries re-run once. Invalidation keys are specific (`['messages', topicId]`, `['topics']`), never a global key. Backfill pages commit in 200-row transactions and `Effect.yieldNow` between them.
 - **Debounce.** Leading-edge, 30 ms trailing on live query re-runs (architecture 2.6). A command's own invalidation is never delayed.
 - **Sleep when idle.** A worker computes its next wake from what is due and sleeps until then or until a wake; it never re-runs on a timer of zero. The next wake comes only from rows the next pass would try: a send worker tries the first row of each channel, so a due row behind a row that waits out a backoff does not count (`channelHeads`, 8.12). A step that asks another fiber for work (a missing user, a lookup) must make that work end: ask only for what the store lacks, and never ask again from the answer's own re-run. The idle-CPU budget in section 1 checks this.
@@ -437,7 +438,7 @@ Tushar, 10-26: "count work instead of timing it ... timing is flaky anyway depen
 
 Measured 10-26: the engine's counts were the same in three runs (and, after the open was ordered, in 40 runs of the file beside six busy loops on this Mac) on this Mac and in laptop runs at 1, 2 and 4 cores (the same work on less CPU), on macOS and Linux alike. The DOM lane's were the same in laptop runs at 1, 2 and 4 cores, except startup's request count, which moved by one when Home's randomly picked picture had to be fetched (the seed cannot fix how many random numbers the page drew before the pick); outgoing bytes at startup are not budgeted for the same reason. In the browser lane layouts and mutations were the same in six runs; style recalculations during the scroll read 30 to 32. On 10-26, 20 runs of each counted test under load (four workers on two laptop cores) gave the same counts every time, except startup's request count as above, the large sidebar's startup commits (34 to 36, within its budget) and the scroll's style recalculations, which read 25 to 38 against a budget of 36 and are no longer counted (above). With them left out, 20 runs under load gave the same scroll and typing counts every time.
 
-**The budgets.** Count on 10-26, then budget.
+**The budgets.** Count on 10-26 (the send and the warm start on 10-27), then budget.
 
 | Path | Engine (statements / rows) | Renderer (commits / renders; requests / messages; bytes in / out) | Layout |
 | --- | --- | --- | --- |
@@ -446,8 +447,9 @@ Measured 10-26: the engine's counts were the same in three runs (and, after the 
 | Topic open again | 31 / 40 → 35 / 44 | 5 / 316; 4 / 5; 470 / 489 B → 7 / 348; 6 / 7; 517 / 538 | |
 | Tab switch | | 3 / 58; 3 / 4; 492 / 507 B → 5 / 64; 5 / 6; 542 / 558 | |
 | Typing 21 keys | | 42 / 105; no request → 47 / 116; 0 / 0; then one draft save | 44 layouts, 25 styles, 45 mutations → 49 / 28 / 50 |
-| Send | 107 / 134 → 118 / 148 | 8 / 260; 4 / 12; 5,785 / 515 B → 10 / 286; 6 / 14; 6,364 / 567 | |
+| Send | 102 / 115 → 112 / 127 (10-27; 107 / 134 → 118 / 148 before unchanged messages were no longer rewritten) | 8 / 260; 4 / 12; 5,785 / 515 B → 10 / 286; 6 / 14; 6,364 / 567 | |
 | A live message or reply | Message 49 / 92 → 54 / 102; reply 103 / 156 → 114 / 172 | Reply: 6 / 250; 1 / 13; 8,167 / 92 B → 8 / 275; 3 / 15; 8,984 / 102 | |
+| Warm start of the synced default workspace, to rest | 736 / 865 → 815 / 950 (10-27; 872 / 1,134 before topic marks, which fails it) | | |
 | Scrolling a message list, 12 steps of 180 px | | | 6 layouts, 1 mutation → 8 / 3 |
 | Sidebar of 300 conversations | First run 8 / 348 → 10 / 383; one live message 51 / 619 → 56 / 681 | Startup 34–36 / 2,821–2,829; 43 / 43–44 → 40 / 3,112; 48 / 49; one live message 1 / 17; 0 / 4; 7,412 B → 3 / 19; 0 / 6; 8,154 | |
 
@@ -465,7 +467,7 @@ Measured 10-26: the engine's counts were the same in three runs (and, after the 
 
 Taking `memo` off `TopicRow` changed no count: the React Compiler already keeps each row's element, so the rows still skip. The budget counts what React does, not what the code says.
 
-**Cost.** The engine file is two tests, about 3 s on this Mac. The DOM file is two tests, 9 to 14 s each on two laptop cores. The browser spec is one test of 4 to 6 s. Counting itself is a few increments per statement, commit or frame.
+**Cost.** The engine file is three tests, about 3.5 s on this Mac. The DOM file is two tests, 9 to 14 s each on two laptop cores. The browser spec is one test of 4 to 6 s. Counting itself is a few increments per statement, commit or frame.
 
 **Raising or lowering a budget on purpose.** A failure names the action, every count over its budget, and what the counts were made of: the statements by text with their runs and rows, the components that rendered most, the routes with their requests, messages and bytes. `JUNO_WORK_COUNTS=1` prints every count in the `bun test` lanes (`detail` adds what each was made of; `bun run remote --env JUNO_WORK_COUNTS=1 test:dom --files ...`); the browser lane prints its counts when it fails. When the work grew on purpose, set the budget to the new count plus the headroom in the same change and say why in the commit. A count well under its budget prints a line saying to lower it; lower it in the change that made the work smaller. A budget that fails on an action nobody changed points at something running by timing in its window: find it and keep it out of the window, do not widen the budget.
 
@@ -1994,3 +1996,26 @@ The large-store Search benchmark now measures the actual session stream's first 
 On the SSH runner with two allocated cores, the final session query p95 was 18.19 ms, the full window was 99,151 bytes, and encode/decode p95 was 2.22/2.05 ms. Palette query p95 was 8.77 ms. The earlier session run exceeded 40 ms: broad FTS queries looked up and sorted every match. A bounded FTS probe now chooses the existing date index when the candidate set exceeds the requested window; smaller sets retain FTS row lookups. Query-plan checks cover both paths. The Unicode mapper only builds offset maps when normalization changes boundaries.
 
 These measurements cover the engine and codec on the runner. Search's Mac-only interaction spec requires samples for the expected keystrokes and arrows, and waits for the selected message to appear before each next arrow. It was not run for this change; no UI timing claim follows from the functional browser flows.
+
+### 8.15 Re-indexing at start (10-27)
+
+A warm start re-indexed every topic a page or the end of event coverage touched, and nearly all came out unchanged: 42 on the synced default workspace, 1,086 on a 300-conversation workspace. `reindexTopics` now stops at a topic whose inputs have not changed since its row was computed (section 6, "Re-index only what changed").
+
+Measured on the SSH laptop on one physical core with an in-process probe (not committed; `/Volumes/AgentWork/scratch/reindex-start/zz-startcost.test.ts`): 40 warm starts of the synced default workspace, 15 first syncs of the default seed, and 6 warm restarts of a large seed (300 conversations, 400 threads, 6,000 messages over five days), each to rest. CPU is the test process's, engine and fake Slack together, per start. "Computed" counts the re-indexes that read the topic's messages and stored a mark.
+
+| Per start | Before (`b377acc27`) | After |
+| --- | --- | --- |
+| Warm start, default: CPU | 0.123 s, 0.123 s (two runs) | 0.113 s |
+| statements / rows | 873 / 1,135 | 738 / 866 |
+| re-indexes computed / asked | 42 / 42 | 11 / 42 |
+| First sync, default: CPU | 0.188 s, 0.175 s | 0.188 s |
+| statements | 2,200 | 2,144 |
+| Warm start, large: CPU | 0.648 s | 0.495 s |
+| statements / rows | 18,955 / 28,776 | 13,948 / 18,749 |
+| re-indexes computed / asked | 1,086 / 1,086 | 8 / 1,086 |
+
+The default warm start's remaining computes are real input changes in the test template: messages a recheck page completes, page ranges it adds, live tails that end. SQL was about 19 ms of a 64 ms default warm start on this Mac (8 ms of it statements, the rest prepares, commits and closing), so the statements fell faster than the CPU; Effect's runtime and the fake are most of the rest. A first sync gains little: most of its re-indexes follow real changes, and each computed one now also writes its mark. The unit and DOM lanes, one run each on two cores with seed 4242: `test` 62 s and about 211 CPU-s before, 40 s and about 122 CPU-s after; `test:dom` 48 s and about 155 CPU-s before, 56 s and about 160 CPU-s after. Single runs on the shared laptop move more than the change.
+
+Output: a probe compared the index, the attention cache, the sidebar, its unread filter and Home after a first sync, two warm restarts, a live message and reply, and a catch-up over messages sent while stopped, on four seeds (default, the 300-conversation mutation seed, topic300 and the large seed), with engine time pinned to the seed time. Every row and value matched main except `rev`, a per-row write counter: 2 rows of the default seed and 8 of the large one end on a different count. That comes from how concurrent first-sync pages and re-indexes interleave, which moves with the number of statements a re-index runs: two `SELECT 1` added to main's `reindexTopics` give the same `rev` values. `attention_context`, the attention cache's key, now holds the full user from the start of a run, where before it alternated with the user id alone until `client.userBoot` answered.
+
+Seen and not changed: Automated's pass samples every unsettled conversation on every start (34 samples on the default workspace, 518 on the large one, 1.7 ms of SQL a default start), and a warm start opens 44 write transactions on the default workspace and 593 on the large one.

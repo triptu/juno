@@ -1,6 +1,6 @@
 // Counted budgets for the engine's SQL (docs/performance.md, "Counted budgets"): the statements each
 // main path runs and the rows they return, from the synced default workspace and from one of 300
-// conversations. A budget fails when the work grows: a query per row, a window read whole for one
+// conversations, and a warm start of the synced default workspace. A budget fails when the work grows: a query per row, a window read whole for one
 // change, a list that reads every conversation, a live query that re-runs for writes it does not show.
 //
 // Engine time is frozen after boot and moves only in fixed steps (`measured`), so timers and the live
@@ -128,7 +128,7 @@ it('the sidebar, a topic open and reopen, a send and a live message stay within 
     const sql = await measured(engine, time, async () => {
       valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0ENG' }, 'Counting the work of a send', main))
     }, () => texts(eng()).includes('Counting the work of a send') && engine.fake.messages('C0ENG').some((message) => message.text === 'Counting the work of a send'))
-    expectWork('send', counts(sql), { statements: 118, rows: 148 }, detail(sql))
+    expectWork('send', counts(sql), { statements: 112, rows: 127 }, detail(sql))
   })
 
   await step('a message arriving on the socket: one event, the sidebar and the open window', async () => {
@@ -166,4 +166,11 @@ it('the sidebar of 300 conversations reads its window, not the workspace', async
     }, () => rowsOf(engine).some((row) => row.preview.text === 'Counting one live message'))
     expectWork('large sidebar live message', counts(sql), { statements: 56, rows: 681 }, detail(sql))
   })
+})
+
+it('a warm start re-indexes only the topics whose inputs changed', async () => {
+  // The first start in a process syncs the template it copies; the counted one starts from a copy, as a relaunch does.
+  await (await syncedEngine([], { timing: noTicks })).stop()
+  const { sql } = await countSql(async () => quiet(await syncedEngine(engines, { timing: noTicks })))
+  expectWork('warm start', counts(sql), { statements: 815, rows: 950 }, detail(sql))
 })

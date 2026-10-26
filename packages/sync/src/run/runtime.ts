@@ -1,13 +1,14 @@
-import { quietDaysOf } from '@juno/domain'
+import { quietDaysOf, type Me } from '@juno/domain'
 import { prefs } from '@juno/store'
 import { SlackAuthRequired, SlackSession, SlackSocket } from '@juno/slack'
 import { Cause, Deferred, Effect, Exit, FiberSet, Queue, Semaphore } from 'effect'
-import type { BootState, Phase } from '../boot'
+import { ME_KEY, type BootState, type Phase } from '../boot'
 import { makeMarkerCandidates } from '../markerCandidates'
 import { SyncConfig } from '../config'
 import type { FileFetch, RootFetch, SyncContext } from '../context'
 import { syncEmoji } from '../emoji'
 import { syncUsergroups } from '../usergroups'
+import { getSyncState } from '../write/state'
 
 import type { RunSyncOptions, SyncStepName } from '../sync'
 
@@ -28,8 +29,11 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
   const quietDays = quietDaysOf({ now: 0, quietDays: typeof saved === 'number' ? saved : config.quietDays })
   const session = yield* SlackSession
   const socket = yield* SlackSocket
+  // The user groups from the last boot until this one's `client.userBoot` answers, so a re-index before then
+  // counts group mentions as later ones do, and keeps the rows computed for the same user (`reindex.ts`).
+  const stored = yield* getSyncState<Me>(ME_KEY).pipe(Effect.orDie)
   const ctx: SyncContext = {
-    me: { userId: session.userId as SyncContext['me']['userId'] },
+    me: stored?.userId === session.userId ? stored : { userId: session.userId as Me['userId'] },
     config: { ...config, quietDays },
     rootFetches: yield* Queue.unbounded<RootFetch>(),
     readLookups: yield* Queue.unbounded<string>(),
