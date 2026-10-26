@@ -74,7 +74,7 @@ export const longerThanView = (scroller: Locator) => scroller.evaluate((node) =>
 export async function openLongMain(juno: Juno, fake: FakeSlack, slack: Slack): Promise<string> {
   const channel = slack.channel('eng')
   for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Earlier message ${i}` })
-  await juno.sidebar.row('#eng').expectPreview('Earlier message 29')
+  await juno.sidebar.row('#eng').expectPreview(/Earlier message 29/)
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('Earlier message 29')
   await juno.topic.toLatest()

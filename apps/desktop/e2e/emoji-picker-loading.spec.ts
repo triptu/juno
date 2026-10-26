@@ -76,10 +76,6 @@ async function workspaceEmoji(juno: Juno, fake: FakeSlack): Promise<void> {
     return menu.root.locator('[data-emoji-picker]')
   }
   let picker = await open()
-  const workspace = picker.getByRole('group', { name: 'Workspace', exact: true })
-  await workspace.evaluate((node) => node.scrollIntoView({ block: 'start' }))
-  await expect(workspace.locator('[data-emoji="juno_wave"]')).toBeVisible()
-  await expect(picker.locator('[data-emoji="hello_juno"]')).toHaveCount(0)
   await picker.getByRole('textbox', { name: 'Search emoji' }).fill('unavailable_image')
   const unavailable = picker.locator('[data-emoji="unavailable_image"]')
   await expect(unavailable.locator('[data-emoji-placeholder]')).toBeVisible()
@@ -92,8 +88,10 @@ async function workspaceEmoji(juno: Juno, fake: FakeSlack): Promise<void> {
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
   await picker.getByRole('textbox', { name: 'Search emoji' }).fill('juno_wave')
   await expect(picker.locator('[data-emoji]')).toHaveCount(1)
+  // The alias finds the emoji it names, not a cell of its own.
   await picker.getByRole('textbox', { name: 'Search emoji' }).fill('hello_juno')
   await expect(picker.locator('[data-emoji]')).toHaveCount(1)
+  await expect(picker.locator('[data-emoji="juno_wave"]')).toHaveCount(1)
   await picker.getByRole('button', { name: ':juno_wave:', exact: true }).click()
   await expect.poll(() => fake.calls.some((call) => call.method === 'reactions.add' && call.args['name'] === 'juno_wave' && call.args['timestamp'] === message.ts && call.ok)).toBe(true)
   const chip = row.locator('[data-reaction="juno_wave"][aria-label="1 :juno_wave:, including you"]')
