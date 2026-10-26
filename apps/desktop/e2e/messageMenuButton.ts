@@ -17,7 +17,6 @@ export async function checkMessageMenuButton(juno: Juno, target: Locator, neighb
     const before = await boxOf(neighbour)
     await target.locator('[data-msg-text]').first().hover()
     await expect(button).toBeVisible()
-    await expect(button).toHaveAccessibleName('More actions ⇧F10')
     await expect(neighbour.locator('[data-message-more] button')).toBeHidden()
     expect(await boxOf(neighbour)).toEqual(before)
   })

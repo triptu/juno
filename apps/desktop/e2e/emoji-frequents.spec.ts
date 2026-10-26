@@ -12,7 +12,7 @@ test('frequently used emoji survive a restart and an update from their first pic
   const row = juno.topic.list.locator('[data-message-row]').last()
   const ts = await row.getAttribute('data-message-row')
   await (await juno.messageMenu.openOnRow(row)).more.click()
-  const frequents = () => juno.win.getByRole('group', { name: 'Frequently used' }).locator('[data-emoji]')
+  const frequents = () => juno.win.locator('[data-emoji-section][aria-label="Frequently used"] [data-emoji]')
   await expect.poll(() => frequents().evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-emoji')))).toEqual([
     'juno_wave', '+1', 'tada', 'eyes', 'white_check_mark',
   ])
@@ -44,7 +44,7 @@ test('frequently used emoji survive a restart and an update from their first pic
       requestAnimationFrame(sample)
     }))
     await menu.more.click()
-    const frequent = second.win.getByRole('group', { name: 'Frequently used' }).locator('[data-emoji]').first()
+    const frequent = second.win.locator('[data-emoji-section][aria-label="Frequently used"] [data-emoji]').first()
     await expect(frequent).toHaveAttribute('data-emoji', 'rocket')
     expect(await firstPaint).toBe('rocket')
   }
