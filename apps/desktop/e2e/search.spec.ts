@@ -64,7 +64,8 @@ test('search: from: chip, local cards first, Slack merges below, Space shows the
     await page.row('Flamingo note 17 on the pager').click()
     await expect(page.reader.getByText('Flamingo note 17 on the pager')).toBeVisible()
     await page.reader.getByRole('button', { name: 'Back to results', exact: true }).click()
-    await expect(page.row('Flamingo note 17 on the pager')).toBeVisible()
+    // The card takes focus after the next paint; until it has, that focus could land in whatever opens next.
+    await expect(page.row('Flamingo note 17 on the pager')).toBeFocused()
     await juno.surface.setWindowSize(1440, 900)
   })
   if (SHOTS) await test.step('shots: one column and dark', () => moreShots(context))
