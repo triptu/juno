@@ -1,9 +1,9 @@
 // The bottom of Main at 2x zoom, which needs Electron's zoom. Resting short of the end and growth during a
 // coalesced scrollend are in stick-bottom.spec.ts.
-import { expect, test } from './fixtures'
+import { expect, syncedTest } from './fixtures'
 import { openLongMain } from './stickBottomLists'
 
-test('the bottom survives shrinking content and fractional offsets at 2x', { tag: '@electron' }, async ({ juno, win, slack, fake }) => {
+syncedTest('the bottom survives shrinking content and fractional offsets at 2x', { tag: '@electron' }, async ({ juno, win, slack, fake }) => {
   await openLongMain(juno, fake, slack)
   const zoom = 2 / await win.evaluate(() => devicePixelRatio)
   await juno.app.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]!.webContents.setZoomFactor(zoom), zoom)

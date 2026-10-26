@@ -1,4 +1,4 @@
-// What a message's content paints, from one cold sign-in. Photos, built from the avatar hash as live, load in
+// What a message's content paints, from one synced start. Photos, built from the avatar hash as live, load in
 // messages, sidebar stacks, a DM row and the account menu; unfurls keep their text when their images fail, and a
 // shared message's words show once. A Slack `table` block shows its cells, the first row as the header (spec
 // section 7, "Tables"), keeps Slack's alignment, copies as rows of tab-separated cells, and a table wider than the
@@ -11,6 +11,9 @@ import type { Locator } from '@playwright/test'
 import { tableBlock, unfurlFixtures } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import { schemeSrc } from './driver/juno'
+
+// Starts signed in and synced (README, "Synced start"); the messages arrive live.
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -40,23 +43,21 @@ function colouredRuns(selector: string): Record<string, string[]> {
 // same way, so every photo here is built from the hash.
 test('message content paints: photos load everywhere and unfurls keep text when images fail; a wide table scrolls in its own box; code shows in colour', async ({ juno, fake }) => {
   const fixtures = unfurlFixtures(fake.credentials().url)
-  fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Preview setup', silent: true })
+  fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Preview setup' })
   for (const [name, attachment] of Object.entries(fixtures)) {
-    fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `Preview ${name}`, attachments: [attachment], silent: true })
+    fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `Preview ${name}`, attachments: [attachment] })
   }
   fake.workspace.post({
     channel: 'C0ENG',
     user: 'U0DEPLOYBOT',
     text: 'Traffic by region',
-    silent: true,
     blocks: [tableBlock([
       COLUMNS,
       ['us-east-1', '1,284,113', '1,920', '0.15%', '38 ms', '212 ms', '480 ms', '61%', '7.2 GB', '24', [{ type: 'text', text: 'web@c91d02', style: { code: true } }], [{ type: 'user', user_id: 'U0MAYA' }], 'Capacity raised after the morning spike; check the queue depth again at the evening peak before scaling down'],
       ['eu-west-1', '842,550', '611', '0.07%', '41 ms', '198 ms', '455 ms', '54%', '6.8 GB', '16', [{ type: 'link', url: 'https://example.test/builds/c91d02', text: 'c91d02' }], null, 'No change'],
     ], [null, { align: 'right' }])],
   })
-  await juno.signIn()
-  await juno.waitForSync()
+  await juno.sidebar.expectTop('#eng')
 
   await test.step('photos load in messages, sidebar stacks, a DM row and the account menu, and unfurls keep text when images fail', async () => {
     // The sidebar's people are the senders of unread messages, so check them before opening marks #eng read.

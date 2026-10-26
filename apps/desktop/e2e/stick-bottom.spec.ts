@@ -2,7 +2,7 @@
 // first frame, including while the scrollbar thumb is held at the end. A full message window drops its first
 // row without moving the viewport; an upward gesture lets go, and arrivals leave that scrolled position alone.
 import { TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
-import { expect, test, type Fixtures } from './fixtures'
+import { expect, syncedTest, test, type Fixtures } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
 import { backAtEnd, distance, frames, longTest, openFullWindow, openLongMain, reopenFull, wheelToEnd } from './stickBottomLists'
@@ -77,7 +77,7 @@ async function editLastStaysAbove({ juno, win, fake }: Pick<Fixtures, 'juno' | '
   }
 }
 
-test('keeps Main at the bottom through arrivals, composer growth and a growing last message, and holds its position when scrolled up', async ({ juno, win, slack, fake }) => {
+syncedTest('keeps Main at the bottom through arrivals, composer growth and a growing last message, and holds its position when scrolled up', async ({ juno, win, slack, fake }) => {
   const channel = await openLongMain(juno, fake, slack)
   const context = { juno, win, slack, fake }
   const { topic } = juno
@@ -158,7 +158,7 @@ test('keeps Main at the bottom through arrivals, composer growth and a growing l
   })
 })
 
-test('releases the bottom during an upward gesture, uses the resting threshold for later growth, and a scroll that stops short of the end stays put', async ({ juno, win, slack, fake }) => {
+syncedTest('releases the bottom during an upward gesture, uses the resting threshold for later growth, and a scroll that stops short of the end stays put', async ({ juno, win, slack, fake }) => {
   const channel = await openLongMain(juno, fake, slack)
   const { topic } = juno
   const last = fake.messages(channel).find((message) => message.text === 'Earlier message 29')!

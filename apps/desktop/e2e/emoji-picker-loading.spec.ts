@@ -1,14 +1,20 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
+import type { FakeSlack } from '@juno/fake-slack'
+import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 import { holdWorkspaceEmoji } from './emojiDelay'
 
-test('cold picker paints Frequently used complete and keeps its first cell still', async ({ juno, fake, relaunch, userData }) => {
+// Starts signed in and synced (README, "Synced start"); the relaunch reads the emoji the fake gains after it.
+test.use({ synced: true })
+
+test('a cold picker paints Frequently used complete and keeps its first cell still; workspace emoji are found by name and alias, react by name and show their image', async ({ fake, relaunch, userData }) => {
   test.setTimeout(120_000)
   // The gate below holds the workspace emoji, so a few hundred stand for a large workspace; perf.spec.ts times 20,000.
   for (let i = 0; i < 300; i++) fake.addEmoji({ name: `cold_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
-  await juno.signIn()
-  await juno.waitForSync()
+  // An alias of an emoji that does not exist, and one whose image does not load.
+  fake.addEmoji({ name: 'missing_image', url: 'alias:absent_target' })
+  fake.addEmoji({ name: 'unavailable_image', url: `${fake.url}/no-such-emoji.png` })
   const second = await relaunch({ whileClosed: () => {
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
   db.prepare('INSERT INTO prefs (key, value_json) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json').run('quickReactions', JSON.stringify([{ name: 'hello_juno', unicode: ':hello_juno:', url: `${fake.url}/emoji/juno_wave.svg` }, { name: '+1', unicode: '👍' }]))
@@ -55,4 +61,50 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     expect(seen[0]!.names.some((name) => name === 'hello_juno' || name === 'juno_wave')).toBe(true)
     expect(new Set(seen.map((frame) => frame.names.length)).size).toBe(1)
     expect(new Set(seen.map((frame) => frame.top)).size).toBe(1)
+    await second.win.keyboard.press('Escape')
+    await expect(second.win.locator('[data-emoji-picker]')).toHaveCount(0)
+    await test.step('workspace emoji are searchable by name and alias, react by name and show their image', () => workspaceEmoji(second, fake))
 })
+
+async function workspaceEmoji(juno: Juno, fake: FakeSlack): Promise<void> {
+  const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Reaction delivery target' })
+  const row = juno.topic.message('Reaction delivery target')
+  await expect(row).toBeVisible()
+  const open = async () => {
+    const menu = await juno.messageMenu.openOnRow(row)
+    await menu.more.click()
+    return menu.root.locator('[data-emoji-picker]')
+  }
+  let picker = await open()
+  const workspace = picker.getByRole('group', { name: 'Workspace', exact: true })
+  await workspace.evaluate((node) => node.scrollIntoView({ block: 'start' }))
+  await expect(workspace.locator('[data-emoji="juno_wave"]')).toBeVisible()
+  await expect(picker.locator('[data-emoji="hello_juno"]')).toHaveCount(0)
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('unavailable_image')
+  const unavailable = picker.locator('[data-emoji="unavailable_image"]')
+  await expect(unavailable.locator('[data-emoji-placeholder]')).toBeVisible()
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('missing_image')
+  await expect(picker.getByText('No match.', { exact: true })).toBeVisible()
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('')
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('juno_wave')
+  const image = picker.locator('[data-emoji="juno_wave"] img')
+  await expect(image).toBeVisible()
+  await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('juno_wave')
+  await expect(picker.locator('[data-emoji]')).toHaveCount(1)
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('hello_juno')
+  await expect(picker.locator('[data-emoji]')).toHaveCount(1)
+  await picker.getByRole('button', { name: ':juno_wave:', exact: true }).click()
+  await expect.poll(() => fake.calls.some((call) => call.method === 'reactions.add' && call.args['name'] === 'juno_wave' && call.args['timestamp'] === message.ts && call.ok)).toBe(true)
+  const chip = row.locator('[data-reaction="juno_wave"][aria-label="1 :juno_wave:, including you"]')
+  await expect(chip.locator('img')).toBeVisible()
+  await expect.poll(() => chip.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
+  // Now frequently used: in the menu's grid as its image, and first in the picker it turns into.
+  const menu = await juno.messageMenu.openOnRow(row)
+  await expect(menu.cell('juno_wave').locator('img')).toBeVisible()
+  await expect(menu.cell('juno_wave')).toHaveAttribute('aria-pressed', 'true')
+  await menu.more.click()
+  picker = menu.root.locator('[data-emoji-picker]')
+  await expect(picker.getByRole('heading', { name: 'Frequently used', exact: true })).toBeVisible()
+  await expect(picker.locator('[data-emoji="juno_wave"]').first()).toBeVisible()
+}

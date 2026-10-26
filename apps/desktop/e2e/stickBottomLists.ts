@@ -70,12 +70,11 @@ export async function expectLastWhole(juno: Juno, text: string): Promise<void> {
 
 export const longerThanView = (scroller: Locator) => scroller.evaluate((node) => node.scrollHeight > node.clientHeight * 1.5)
 
-/** #eng's Main with 30 more messages than the seed, open at its end. */
+/** From a synced start, #eng's Main with 30 more messages than the seed, which arrive live, open at its end. */
 export async function openLongMain(juno: Juno, fake: FakeSlack, slack: Slack): Promise<string> {
   const channel = slack.channel('eng')
-  for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Earlier message ${i}`, silent: true })
-  await juno.signIn()
-  await juno.waitForSync()
+  for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Earlier message ${i}` })
+  await juno.sidebar.row('#eng').expectPreview('Earlier message 29')
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('Earlier message 29')
   await juno.topic.toLatest()
