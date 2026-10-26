@@ -137,7 +137,8 @@ export const test = base.extend<{ ownPage: boolean; galleryDocument: string }, {
     await use(page)
     const url = page.isClosed() ? undefined : new URL(page.url())
     const same = url !== undefined && `${url.pathname}${url.search}` === galleryDocument
-      && await page.evaluate(() => '__gallerySharedDocument' in window)
+      // setContent keeps the window, so the gallery's root must be there too.
+      && await page.evaluate(() => '__gallerySharedDocument' in window && document.querySelector('#root > *') !== null)
     if (!same) {
       // The test left the document, or closed or reloaded it: the next test gets a new one.
       documents.delete(galleryDocument)

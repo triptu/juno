@@ -438,6 +438,8 @@ test.describe('the guard itself', () => {
 })
 
 test.describe('a layout-shift watch', () => {
+  // setContent pages: no gallery to share.
+  test.use({ ownPage: true })
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`
 
   test('a watch charges each shift to one check: its own action, or what moved since the last check', async ({ page }) => {
