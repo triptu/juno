@@ -11,10 +11,10 @@ import { forwardSignals } from './children.mjs'
 const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:nightly', 'test:e2e', 'specs:check', 'specs:conformance']
 // A nightly (docs/development.md, "Nightly runs"): each perf part starts a job alone, on the cores its baseline was
 // measured on (one, then two), and that job then runs serial steps: the unit tests and the DOM lane after the first,
-// the browser and Electron lanes, which share builds, after the second. The walk and the spec checks share a five-core
-// job with its lanes at once: the walk mostly waits for frames, and the spec checks fill those threads at a lower
-// priority.
-const nightlyJobs = { 'perf:part1': 'perf1', test: 'perf1', 'test:dom': 'perf1', 'perf:part2': 'perf2', 'test:browser': 'perf2', 'test:electron': 'perf2' }
+// the browser lane and conformance after the second. Conformance times out at a lower priority beside the walk. The
+// walk, then the Electron lane, share a five-core job with the spec check beside them at a lower priority: the walk
+// mostly waits for frames.
+const nightlyJobs = { 'perf:part1': 'perf1', test: 'perf1', 'test:dom': 'perf1', 'perf:part2': 'perf2', 'test:browser': 'perf2', 'specs:conformance': 'perf2' }
 const nightlyCores = { perf1: 1, perf2: 2, wide: 5 }
 
 export function runnerPlanJobs(options, env = process.env) {
