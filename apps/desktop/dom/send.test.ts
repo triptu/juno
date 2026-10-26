@@ -1,13 +1,24 @@
 // Sending from a topic (spec section 8): a message settles in place in Main when Slack's echo comes
 // before the answer, a refused send stays with Retry and Delete draft, fast Enter presses send once,
 // an edit made while the message is still sending is kept and reaches Slack once it has the message,
-// and a message deleted or quoted while its menu is open leaves the composer usable. Then sends across
+// a message deleted or quoted while its menu is open leaves the composer usable, Forward… into another
+// channel with a note goes once, and Also send to #eng sends your own reply to the channel. Then sends across
 // tabs: the last tab closed while it sends, a draft two tabs share, a send from Home that leaves the
 // tabs where they were, and a send while offline. A draft kept across a restart is in tabs.test.ts.
+import type { FakeSlack } from '@juno/fake-slack'
+import type { Juno } from './driver/juno'
 import { expect } from './expect'
 import { domTest } from './test'
 
 const POSTGRES = 'Draft plan is in the doc'
+const HANDOFF = 'Reminder: on-call handoff moves to Mondays'
+const MINE = "Good. What's the rollback if replication lags on cutover day?"
+const LEOS = 'We keep the old primary warm for 48h'
+
+async function openMain(juno: Juno): Promise<void> {
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.expectTitle('Main')
+}
 
 // One launch on #eng's Main: each step sends its own messages.
 domTest('in Main, sends settle, a refused send has Retry and Delete draft, fast Enter sends once, and edits and menus survive a send in flight', async ({ juno, fake, step }) => {
@@ -128,7 +139,10 @@ domTest('in Main, sends settle, a refused send has Retry and Delete draft, fast 
     await expect(juno.topic.composer).toHaveValue('> Keep this quote\n')
     await juno.topic.composer.press('Enter')
     await expect.poll(() => fake.messages('C0ENG').some((m) => m.text?.includes('Keep this quote'))).toBe(true)
-  })}, { timeout: 120_000 })
+  })
+  await step('Forward… shares a message into a channel with a note, and a refused forward can be retried', () => forwardMessage(juno, fake))
+  await step('Also send to #eng sends your own reply to the channel, Main shows it at once, and its title opens the thread', () => broadcast(juno, fake))
+}, { timeout: 120_000 })
 
 // The sends share a launch; each step opens the tabs it needs. The offline send goes last.
 domTest('sends across tabs: the last tab closed while it sends, a draft two tabs share, a send from Home that leaves the tabs where they were, and a send while offline', async ({ juno, fake, step }) => {
@@ -208,3 +222,87 @@ domTest('sends across tabs: the last tab closed while it sends, a draft two tabs
     await expect(juno.topic.message('Sent offline')).toHaveCount(1)
   })
 }, { timeout: 120_000 })
+
+/** Forward… on `text` in the open topic, then `destination` from the list and `note`, and Enter. */
+async function forward(juno: Juno, text: string, destination: string, note: string): Promise<void> {
+  await juno.topic.chooseInMessageMenu(text, 'forward')
+  const dialog = juno.win.locator('[data-forward-sheet]')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('[data-forward-preview]')).toContainText(text)
+  // The list is open with the sheet: typing searches at once, Enter picks and moves to the note.
+  await juno.win.getByPlaceholder('Search people and channels').fill(destination)
+  await juno.win.getByPlaceholder('Search people and channels').press('Enter')
+  await expect(dialog.getByRole('button', { name: `Send to: #${destination}` })).toBeVisible()
+  const field = dialog.getByRole('textbox', { name: 'Note' })
+  await expect(field).toBeFocused()
+  await field.fill(note)
+  await field.press('Enter')
+  await expect(dialog).toHaveCount(0)
+}
+
+async function forwardMessage(juno: Juno, fake: FakeSlack): Promise<void> {
+  await openMain(juno)
+  await forward(juno, HANDOFF, 'product', 'For the roadmap review')
+  await juno.expectToast('Forwarded to #product')
+  await juno.win.getByRole('status').getByRole('button', { name: 'Open' }).click()
+  await juno.topic.expectTitle('Main')
+  await juno.topic.expectSent('For the roadmap review')
+  const forwarded = juno.topic.message('For the roadmap review')
+  await expect(forwarded.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
+  const shares = fake.calls.filter((call) => call.method === 'chat.shareMessage')
+  expect(shares).toHaveLength(1)
+  expect(shares[0]!.args).toMatchObject({ channel: 'C0ENG', share_channel: 'C0PRODUCT', text: '' })
+  const stored = fake.messages('C0PRODUCT').at(-1)!
+  expect(stored.text).toBe('For the roadmap review')
+  expect(stored.attachments?.[0]).toMatchObject({ is_msg_unfurl: true, text: expect.stringContaining(HANDOFF) })
+
+  // Slack refuses the next one: it shows Not sent. in the destination, and Retry sends it once.
+  await openMain(juno)
+  await juno.topic.expectMessage(HANDOFF)
+  fake.forceError({ method: 'chat.shareMessage', error: 'restricted_action', times: 1 })
+  await forward(juno, HANDOFF, 'product', 'This one is refused first')
+  await juno.win.getByRole('status').getByRole('button', { name: 'Open' }).click()
+  const failed = juno.topic.failed('This one is refused first')
+  await expect(failed.row).toContainText('Not sent.')
+  await expect(failed.row.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
+  await failed.retry()
+  await juno.topic.expectSent('This one is refused first')
+  expect(fake.messages('C0PRODUCT').filter((message) => message.text === 'This one is refused first')).toHaveLength(1)
+}
+
+async function broadcast(juno: Juno, fake: FakeSlack): Promise<void> {
+  const { topic } = juno
+  await openMain(juno)
+  await topic.threadLinkUnder(POSTGRES).open()
+  await expect(topic.message(MINE)).toBeVisible({ timeout: 15_000 })
+  await juno.sidebar.row(POSTGRES, { exact: true }).open()
+  const stored = () => fake.messages('C0ENG').find((message) => message.text === MINE)
+
+  // Only your own replies have it: not someone else's, and not the root.
+  expect((await topic.chooseInMessageMenu(LEOS, null)).labels).not.toContain('Also send to #eng')
+  expect((await topic.chooseInMessageMenu(POSTGRES, null)).labels).not.toContain('Also send to #eng')
+
+  // Slack holds its answer: everything below shows before it has the change.
+  fake.holdNext({ method: 'chat.update', before: true })
+  await topic.chooseInMessageMenu(MINE, 'broadcast')
+  await expect(topic.message(MINE)).toContainText('also sent to the channel')
+
+  await openMain(juno)
+  const source = topic.message(MINE).locator('[data-broadcast-source]')
+  await expect(source).toContainText(`in ${POSTGRES}`)
+  expect(stored()?.subtype).toBeUndefined()
+
+  fake.release()
+  await expect.poll(() => stored()?.subtype).toBe('thread_broadcast')
+  const updates = fake.calls.filter((call) => call.method === 'chat.update' && call.args['reply_broadcast'] !== undefined)
+  expect(updates).toHaveLength(1)
+  expect(updates[0]!.args).toMatchObject({ channel: 'C0ENG', ts: stored()!.ts, reply_broadcast: 'true' })
+  expect(updates[0]!.args['text']).toBeUndefined()
+
+  // In Main, its "in <title>" opens the thread at the reply.
+  await source.click()
+  await expect(topic.message(POSTGRES)).toBeVisible({ timeout: 15_000 })
+  await expect(topic.message(MINE)).toContainText('also sent to the channel')
+  // Sent, the reply's menu no longer offers it.
+  expect((await topic.chooseInMessageMenu(MINE, null)).labels).not.toContain('Also send to #eng')
+}

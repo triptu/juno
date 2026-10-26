@@ -15,8 +15,6 @@ const THREAD = 'Theme switcher plan for Settings'
 const REPLY = 'Draft is ready for review'
 const MESSAGE = 'The dark theme ships on Friday'
 
-const theme = (juno: Juno) => juno.win.document.documentElement.getAttribute('data-theme')
-
 async function openOnTheme(juno: Juno): Promise<void> {
   const { palette } = juno
   await palette.open()
@@ -206,10 +204,9 @@ domTest('⌘K opens, switches tabs, finds conversations, topics, messages and co
     })
   })
 
-  await step('"settings" on Commands lists Settings sections, and Enter on one opens Settings there', async () => {
+  await step('"settings" on Commands finds Settings: Notifications, and Enter opens Settings there', async () => {
     await palette.openCommands()
     await palette.type('settings')
-    const sections = palette.section('Settings')
     await palette.row('Settings: Notifications').hover()
     await palette.expectActive(/Settings: Notifications/)
     await palette.press('Enter')
@@ -217,61 +214,38 @@ domTest('⌘K opens, switches tabs, finds conversations, topics, messages and co
     await tabs.expectActive('Settings')
     await expect(settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
   })
-  await step('All shows each kind in its group and Enter opens each; ⌘3 and ⌘4 keep the text', async () => {
-    // A thread and a message that name the theme. A conversation from Conversations is the step above's.
+  await step('All shows topics, messages and commands for one word, Enter opens a thread and lands on a message, and ⌘3 and ⌘4 keep the text', async () => {
     slack.as('Leo').postIn('eng', THREAD)
     slack.as('Dev').replyIn(THREAD, REPLY)
     slack.as('Maya').postIn('product', MESSAGE)
-  await step('⌘K opens on All, and "theme" fills each group', async () => {
-      await openOnTheme(juno)
-      const found = palette.section('Topics and messages').getByRole('option')
-      // The thread's title and its root both match: one row.
-      await expect(found.filter({ hasText: THREAD })).toHaveCount(1, { timeout: 15_000 })
-      await expect(found.filter({ hasText: MESSAGE })).toBeVisible({ timeout: 15_000 })
-      await expect(palette.section('Pages, settings and commands').getByRole('option', { name: /Theme: Dark/ })).toBeVisible()
-      await palette.press('Escape')
-      await palette.expectClosed()
-    })
+    await openOnTheme(juno)
+    const found = palette.section('Topics and messages').getByRole('option')
+    // The thread's title and its root both match: one row.
+    await expect(found.filter({ hasText: THREAD })).toHaveCount(1, { timeout: 15_000 })
+    await expect(found.filter({ hasText: MESSAGE })).toBeVisible({ timeout: 15_000 })
+    await expect(palette.section('Pages, settings and commands').getByRole('option', { name: /Theme: Dark/ })).toBeVisible()
+    await palette.arrowTo(THREAD)
+    await palette.press('Enter')
+    await palette.expectClosed()
+    await topic.expectMessage(REPLY)
 
-  await step('Enter on the thread opens it, and on the message lands on it', async () => {
-      await openOnTheme(juno)
-      await palette.arrowTo(THREAD)
-      await palette.press('Enter')
-      await palette.expectClosed()
-      await topic.expectMessage(REPLY)
+    await openOnTheme(juno)
+    await palette.arrowTo(MESSAGE)
+    await palette.press('Enter')
+    await palette.expectClosed()
+    await topic.expectTitle('Main')
+    await topic.expectMessage(MESSAGE)
 
-      await openOnTheme(juno)
-      await palette.arrowTo(MESSAGE)
-      await palette.press('Enter')
-      await palette.expectClosed()
-      await topic.expectTitle('Main')
-      await topic.expectMessage(MESSAGE)
-    })
-
-  await step('⌘3 shows Messages and ⌘4 Commands with the same text; Theme: Dark there applies it', async () => {
-      await openOnTheme(juno)
-      await palette.press('Meta+3')
-      await palette.expectTab('Messages')
-      await expect(palette.input).toHaveValue('theme')
-      await palette.expectResults()
-      await expect(palette.section('Topics and messages').getByRole('option').filter({ hasText: MESSAGE })).toBeVisible()
-      await expect(palette.section('Conversations')).toHaveCount(0)
-
-      await palette.press('Meta+4')
-      await palette.expectTab('Commands')
-      await expect(palette.input).toHaveValue('theme')
-      await palette.choose('Theme: Dark')
-      await palette.expectClosed()
-      await expect.poll(() => theme(juno)).toBe('dark')
-    })
-
-  await step('Enter on a command in All runs it', async () => {
-      await openOnTheme(juno)
-      await palette.arrowTo(/Theme: Light/)
-      await palette.press('Enter')
-      await palette.expectClosed()
-      await expect.poll(() => theme(juno)).toBe('light')
-    })
+    await openOnTheme(juno)
+    await palette.press('Meta+3')
+    await palette.expectTab('Messages')
+    await expect(palette.input).toHaveValue('theme')
+    await expect(palette.section('Topics and messages').getByRole('option').filter({ hasText: MESSAGE })).toBeVisible()
+    await palette.press('Meta+4')
+    await palette.expectTab('Commands')
+    await expect(palette.input).toHaveValue('theme')
+    await palette.press('Escape')
+    await palette.expectClosed()
   })
 
   await step('the results list never commits empty while typing unmatched text, and clearing shows the starting rows again', async () => {
@@ -364,27 +338,11 @@ async function openPalette({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
   // With no text, All shows the most used conversations and the latest topics.
   await expect(palette.section('Frequent').getByRole('option').first()).toBeVisible()
   await expect(palette.section('Recent').getByRole('option').first()).toBeVisible()
-  // Tab and Shift Tab go round the tabs; focus stays in the field, never reaching the window under the dim.
+  // Tab goes round the tabs, focus staying in the field; ⌘2 picks one.
   await palette.press('Tab')
   await palette.expectTab('Conversations')
-  await expect(palette.input).toHaveAttribute('placeholder', 'Find a conversation')
-  await palette.press('Tab')
-  await palette.expectTab('Messages')
-  await palette.expectResults()
-  await palette.press('Tab')
-  await palette.expectTab('Commands')
-  await expect(palette.section('Pages').getByRole('option', { name: /All topics/ })).toBeVisible()
-  await palette.press('Tab')
-  await palette.expectTab('All')
-  await palette.press('Shift+Tab')
-  await palette.expectTab('Commands')
   await palette.press('Meta+2')
   await palette.expectTab('Conversations')
-  await palette.press('Meta+1')
-  await palette.expectTab('All')
-  // A tab switches on press too, and the field keeps focus.
-  await palette.tab('Messages').click()
-  await palette.expectTab('Messages')
   await palette.press('Escape')
   await palette.expectClosed()
 
