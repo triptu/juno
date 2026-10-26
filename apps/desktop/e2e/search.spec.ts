@@ -238,16 +238,21 @@ async function blurred({ juno, slack }: Context): Promise<void> {
   await juno.privacy.expectBlurred(note)
 }
 
-// Each step searches for its own word, so the cards one step leaves do not match the next.
+// Each step searches for its own word in a Search tab of its own: the one before closes, with its query, chips and
+// the topic beside it.
 test('search: Tab from the field lands on a card and the topic’s edge moves with the keys; a long match folds in view and unfolds in place; Jump to latest only while newer messages are out of view', async ({ juno, slack }) => {
   await test.step('Tab from the field lands on a card, Space shows its topic, and the topic’s edge moves with the keys', () => tabAndEdge({ juno, slack }))
+  await juno.tabs.menu('close-tab')
   await test.step('a long message folds with its match in view, and Show more unfolds it in place without changing the selection', () => foldedMatch({ juno, slack }))
+  await juno.tabs.menu('close-tab')
   await test.step('the topic beside the results shows Jump to latest only while newer messages are out of view', () => jumpToLatest({ juno, slack }))
 })
 
-// The restored window needs a relaunch, so it goes last.
+// The restored window needs a relaunch, so it goes last. Each step has a Search tab of its own, as above.
 test('search: reader navigation applies the whole query beyond the message window; a result not on this Mac shows at once and held arrows load only where they stop; a held Slack answer restores a saved window beyond 200 matches', async ({ juno, slack, fake, relaunch, userData }) => {
   await test.step('reader navigation applies the whole query beyond the message window', () => navigateMatches({ juno, fake }))
+  await juno.tabs.menu('close-tab')
   await test.step('a result not on this Mac shows in the reader at once, never the last topic, and held arrows load only where they stop', () => readerWithoutCache({ juno, slack, fake }))
+  await juno.tabs.menu('close-tab')
   await test.step('a held Slack answer restores a saved window beyond 200 matches', () => restoreWindow({ juno, fake, relaunch, userData }))
 })

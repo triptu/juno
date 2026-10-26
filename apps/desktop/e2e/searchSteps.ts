@@ -110,7 +110,6 @@ export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack
   await sidebar.row('#product').expectVisible()
 
   await surface.appMenu('search-messages')
-  await page.field.fill('')
   await page.field.pressSequentially('heron')
   await expect(page.rows).toHaveCount(2)
   await page.row('Heron migration is done').click()
@@ -176,7 +175,6 @@ export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slac
 
   if (process.env.JUNO_SEARCH_SHOTS === '1') await surface.setWindowSize(1440, 900)
   await surface.appMenu('search-messages')
-  await page.field.fill('')
   await page.field.pressSequentially('gannet')
   const card = page.row('Line 1 of the launch notes')
   await expect(card).toBeVisible()
@@ -228,7 +226,6 @@ export async function jumpToLatest({ juno, slack }: Pick<Fixtures, 'juno' | 'sla
   const jump = page.reader.locator('button', { hasText: 'Jump to latest' })
 
   // A short thread opens at its match with its newest reply in view: nothing newer to jump to.
-  await page.field.fill('')
   await page.field.pressSequentially('kestrel monday')
   await page.row('Kestrel cutover moved to Monday').click()
   await expect(page.reader.getByText('Monday works for the billing team')).toBeVisible()
@@ -291,7 +288,6 @@ export async function readerWithoutCache({ juno, slack, fake }: Pick<Fixtures, '
   const old = places.map((place, index) => ({ place, text: `Osprey archive note in ${place}`, ts: slack.as('Maya').postedLongAgo(place, `Osprey archive note in ${place}`, 30 + index) }))
   await sidebar.row('#product').expectVisible()
   await surface.appMenu('search-messages')
-  await page.field.fill('')
   await page.field.pressSequentially('osprey')
   await expect(page.rows).toHaveCount(6)
   // A press on the newest result, on this Mac, shows its topic beside the list.
