@@ -67,7 +67,8 @@ test('local runs archive eligible records, refresh coverage, and preserve failed
   const dry = invoke(['--local', '--dry-run', '--nightly'])
   assert.equal(dry.status, 0, dry.stderr)
   assert.match(dry.stdout, /SPECS_SEED=\d+ specs:check --nightly/)
-  assert.match(dry.stdout, /test:desktop --grep @mac, then perf, then test:feel/)
+  assert.doesNotMatch(dry.stdout, /@mac, then perf/)
+  assert.match(invoke(['--local', '--dry-run', '--with-mac']).stdout, /test:desktop --grep @mac, then perf, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)
   assert.equal(existsSync(env.TEST_CALLS), false)
   for (const [args, failing] of [[['--local'], false], [['--local', '--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {
