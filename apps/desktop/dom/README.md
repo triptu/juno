@@ -31,7 +31,7 @@ A test here guards something a person would notice breaking: sending, editing, d
 
 - **The app.** `vite.config.ts` bundles the browser lane's page entry (`web/page/main.ts`) into one classic script; `bun web/build-host.mjs dom/dist` bundles the host (`web/host/testHost.ts`). Both go to `dom/dist/` through `build-cached` (`bun run build:dom` in `apps/desktop`). Each test gets a new window, a new fake Slack, a copy of the synced snapshot and a host from the worker's pool (`app.ts`). The renderer's module state is new for every window; its compiled code is the worker's (`realm.ts`, above).
 - **Synced start.** One snapshot per run, shared by every worker through the browser lane's lock (`e2e/browser/snapshotCache.ts`), signed in through happy-dom. A test starts where `juno.signIn()` and `juno.waitForSync()` leave it. `domTest(title, body, { synced: false })` starts signed out on an empty folder; add `fake` (the fake's `FakeSlackOptions`, such as `{ seed }`) for a seed of its own.
-- **Workers.** `bun test --parallel --no-isolate`: a worker keeps the renderer's context and its pool of loaded hosts for the whole run. Files run in a shuffled order whose seed `test:dom` prints.
+- **Workers.** `bun test --parallel --no-isolate`: a worker keeps the renderer's context and its pool of loaded hosts for the whole run. Bun collects late, so a worker runs a full collection after a test once it is past 400 MB resident (`JUNO_DOM_GC_MB`), and each host's heap is capped at 256 MB (docs/development.md, "Memory"). Files run in a shuffled order whose seed `test:dom` prints.
 
 ## Writing a test
 

@@ -1382,6 +1382,34 @@ the memory cap. Split plans release each job's cores independently.
 `JUNO_RUNNER_DESKTOP_CORES`, `JUNO_RUNNER_UNIT_CORES` and `JUNO_RUNNER_GALLERY_CORES` override a job's cores independently. These overrides change reservations, not host-derived worker quotas. One remote run at a time per agent; other projects use the same allocator.
 Use `runner list` to see their combined usage.
 
+## Memory
+
+A full run's three jobs peaked at 3.2 GB (unit), 5.8 GB (gallery) and 3.8 GB (desktop) in their cgroups on 10-26, file cache and the tmpfs workspace included. `--env JUNO_MEMORY_PROFILE=1` on `bun run remote` records every process in the job each second (`scripts/memory-profile.mjs`: resident, proportional and private memory from `/proc/<pid>/smaps_rollup`, and the cgroup's anonymous, file and tmpfs split) into `memory-profile/` in the run's reports; `bun scripts/memory-report.mjs .remote/<run>/memory-profile/*.json` prints each kind of process's largest member, the kind's summed peak and its share at the job's peak, and processes that grew over their life. `bun run remote --memory 4g` caps a job's memory below the default 3 GiB a core, to prove a run fits.
+
+What holds the memory, summed proportional memory (PSS) per kind at its peak, three jobs on the laptop (before the cuts below):
+
+| Kind | Each | Lane |
+| --- | ---: | --- |
+| Chromium renderer, a gallery page | 250–400 MB, growing over the run | gallery, 8 at once |
+| Playwright worker | 320–370 MB | gallery 8, browser 4 |
+| bun test worker | 400–560 MB | unit 4, DOM 4 |
+| Engine host (`testHost.mjs`) | 300–400 MB, growing | DOM 4, browser 4 |
+| Chromium renderer, a browser lane page | 150–600 MB (large seeds), short-lived | browser |
+| Playwright runner | 650 MB browser, 300 gallery and Electron | one per lane |
+| Build (`vite build`, `electron-vite build`) | 0.9–1.3 GB, alone, when inputs change | before each lane |
+| Electron app | main 260, renderer 200, engine and agent 100 each, GPU 70 | Electron, 3 at once |
+| Chromium browser, GPU, utility and zygotes | about 110 MB a worker | gallery, browser |
+| Apalache JVM; the Quint driver beside it | 600 MB with a 1,536 MiB heap; 800 MB | uncached spec check |
+
+Most of the Node and Bun memory is garbage the runtime had not collected yet, not live data: with a forced collection after each test a DOM worker's heap stayed near 100 MB over 40 tests, and the Playwright runner lists the browser specs in 250 MB under a 96 MB heap against 560 MB uncapped. So:
+
+- A DOM worker runs a full collection after a test once it is over 400 MB resident (`JUNO_DOM_GC_MB`, `dom/test.ts`). Bun's `--smol` changed nothing.
+- Each engine host's heap is capped at 256 MB (`JUNO_HOST_HEAP_MB`, `e2e/browser/host.ts`), and the Playwright runner's and workers' at 256 MB (`NODE_OPTIONS` in the `test:e2e`, `test:browser`, `test:electron` and gallery scripts; the Electron app under test never gets `NODE_OPTIONS`).
+
+Same seeds and builds, interleaved, on the laptop: the DOM lane (2 cores) peaked at 2.5 and 2.6 GB against 3.1 and 3.3, in 206 and 210 CPU-s against 217 and 211; the browser lane (3 cores) at 2.9 and 2.9 GB against 3.6 and 3.4, in 358 and 365 CPU-s against 344 and 343, with the same wall time (84–86 s). In the full run's jobs: unit 3.2 → 2.3 GB, desktop 3.8 → 3.1, gallery 5.8 → 5.4.
+
+**A run under a budget.** `JUNO_MEMORY_BUDGET=4g` sets each lane's workers to fit that memory, at most what its threads keep busy (`scripts/memory-budget.mjs`: a lane's memory is a fixed part plus a part per worker, from the measurements above). `bun scripts/memory-budget.mjs 4g 6` prints the settings: on six threads, 6 unit, 5 DOM, 4 browser, 3 Electron and 5 gallery workers, one Apalache JVM. Explicit worker settings win. The local full run (`verify:main --local`) uses it, with 4g by default, on all but two of the Mac's threads, so the 8 GB Mac keeps two cores and about 4 GB. Proved on the laptop on 10-26: every step of a full run in one job on three cores (six threads) capped at 4 GB, the spec check uncached, passed in 621 s of script time (279 s of it the spec check). The cgroup peaked at 3.89 GB with file cache and 0.6 GB of tmpfs; summed PSS peaked per step at 2.1 GB (unit), 2.8 (DOM), 1.5 (spec check), 1.2 (conformance), 3.8 (gallery), 3.0 (browser) and 2.7 (Electron). The numbers are Linux's; the Mac's own processes differ, so time and watch a Mac run before trusting its margin.
+
 ## Heavy jobs share one queue
 
 Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`bun run test`, `bun run test:e2e`, `bun run test:feel`, `bun run test:gallery`, `bun run gallery:shots`, `bun run specs:check`, `bun run test:agent-contracts`, `bun run test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On macOS it also waits, before taking a slot, while the 1-minute load is above the core count or free plus inactive memory (from `vm_stat`) is under 1 GB, and prints why it waits; `JUNO_HEAVY_IGNORE_LOAD=1` skips that wait. The Mac froze several times when many agents ran work at once, and the slots alone did not see work started outside the queue. On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`bun run perf`, `bun run test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging and its smoke test (`package`, `test:package`) pass `--priority release` with `--exclusive`: each moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `bun scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `bun run lint` takes one slot for its health scan (Knip and jscpd) only. `test:repo-tools`, `test:health` and `test:runner` skip the machine-wide queue. Queue tests reserve only their own temporary queues; `affected` sends all three tool suites to the laptop.
@@ -1805,7 +1833,7 @@ Quint runs only when a spec or one of its inputs changes, or when no matching su
 
 `bun run verify:main --ref origin/main --local` runs the plan on this Mac, only when Tushar asks. Without `--local`, an unreachable runner fails the run after the health check, and so do authentication, configuration and runner setup errors; nothing falls back to the Mac, and a failing remote suite never triggers a local rerun.
 
-The local plan installs the detached checkout, takes the exclusive machine-wide heavy lock and runs suites sequentially. Worker limits live in `scripts/verify-execution.mjs`: two browser workers and one Electron worker on the 8 GB Mac. Before each step it waits while load exceeds 8 (`JUNO_PLAN_MAX_LOAD` overrides that threshold; fake-command tests use `Infinity` in their child environment). The ordinary app steps skip `@mac`, matching Linux; `--with-mac` adds those tests, perf and feel. Timing suites run sequentially after the other work and hold the exclusive lock. `--dry-run --local` prints the plan without a checkout, installs, suites or a successful verification record.
+The local plan installs the detached checkout, takes the exclusive machine-wide heavy lock and runs suites sequentially. Worker limits come from a memory budget (`JUNO_MEMORY_BUDGET`, 4g by default) on all but two threads (`scripts/verify-execution.mjs`, "Memory"). Before each step it waits while load exceeds 8 (`JUNO_PLAN_MAX_LOAD` overrides that threshold; fake-command tests use `Infinity` in their child environment). The ordinary app steps skip `@mac`, matching Linux; `--with-mac` adds those tests, perf and feel. Timing suites run sequentially after the other work and hold the exclusive lock. `--dry-run --local` prints the plan without a checkout, installs, suites or a successful verification record.
 
 Every full run chooses and records a unit test order seed (`testSeed`; `bun run test --seed <n>` repeats it) and a spec check seed (`seed`; `bun run specs:check --seed <n>` repeats it, `SPECS_SEED=<n>` sets it).
 
