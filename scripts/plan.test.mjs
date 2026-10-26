@@ -76,3 +76,21 @@ test('a full run splits into its measured jobs; other plans keep two four-core j
   assert.equal(planCores('unit', { env: ['JUNO_RUNNER_UNIT_CORES=5'] }, {}, [], 3), 5)
   assert.throws(() => planCores('desktop', { env: ['JUNO_RUNNER_DESKTOP_CORES=0'] }, {}), /positive whole number/)
 })
+
+test('a full run runs Electron beside the browser lane and keeps the other jobs in order', async (t) => {
+  const { readFileSync, writeFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { runnerPlanJobs, runRunnerPlan } = await import('./remote/plan.mjs')
+  const { fullSuites } = await import('./verify-plan.mjs')
+  const { root: dir } = toolFixture(t)
+  const self = join(dir, 'remote.mjs')
+  writeFileSync(self, `require('node:fs').appendFileSync(${JSON.stringify(join(dir, 'calls'))}, JSON.stringify(process.argv.slice(2)) + '\\n')`)
+  const args = fullSuites({ 'test:dom': 'x', 'test:browser': 'x', 'test:electron': 'x' }, { seed: 1, testSeed: 2 }).flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
+  const options = { script: 'test:plan', args, env: ['JUNO_VERIFY_POLICY=1'], wait: 60 }
+  await runRunnerPlan(runnerPlanJobs(options, {}), { self, root: dir, options, log: () => {} })
+  const calls = readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n').map(JSON.parse)
+  const serial = (script) => calls.find((call) => call.includes(script)).includes('JUNO_PLAN_SERIAL=1')
+  assert.equal(serial('test:browser'), false)
+  assert.equal(serial('test:dom'), true)
+  assert.equal(serial('test:gallery'), true)
+})

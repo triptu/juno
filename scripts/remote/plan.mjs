@@ -9,9 +9,11 @@ import { forwardSignals } from './children.mjs'
 const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'specs:check', 'specs:conformance']
 
 // A full run (its gallery checks every state) splits Juno's eight cores by each step's measured CPU
-// (docs/development.md, "Job sizes"). A step not named here joins the unit job.
+// (docs/development.md, "Job sizes"). A step not named here joins the unit job. The desktop job runs
+// Electron beside the browser lane, with three and two workers on its six threads (sideBySide in
+// scripts/plan.mjs); the others run their steps in order.
 export const fullRunJobs = [
-  { kind: 'desktop', cores: 3, scripts: ['test:desktop', 'test:browser', 'test:electron', 'test:e2e'] },
+  { kind: 'desktop', cores: 3, beside: true, scripts: ['test:desktop', 'test:browser', 'test:electron', 'test:e2e'] },
   { kind: 'unit', cores: 2, scripts: ['test', 'test:dom', 'specs:check'] },
   { kind: 'gallery', cores: 3, scripts: ['specs:conformance', 'test:gallery'] },
 ]
@@ -28,7 +30,10 @@ export function runnerPlanJobs(options, env = process.env) {
     if (!groups.has(kind)) groups.set(kind, [])
     groups.get(kind).push({ ...step, index })
   }
-  return groups.size > 1 ? [...groups].map(([kind, group]) => ({ kind, steps: group, cores: fullRun ? fullRunJobs.find((job) => job.kind === kind)?.cores : undefined })) : []
+  return groups.size > 1 ? [...groups].map(([kind, group]) => {
+    const sized = fullRun ? fullRunJobs.find((job) => job.kind === kind) : undefined
+    return { kind, steps: group, cores: sized?.cores, beside: sized?.beside }
+  }) : []
 }
 
 export const planWords = (steps) => steps.flatMap((step, index) => [
@@ -56,17 +61,18 @@ export async function runRunnerPlan(jobs, { self, root, options, log, env = {} }
   let cancelled = false
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = true })
   log(`remote: SSH plan in ${jobs.length} jobs: ${jobs.map((job) => job.kind).join(', ')}; each waits for runner capacity`)
-  const codes = await Promise.all(jobs.map(({ kind, steps, cores: sized }) => new Promise((done) => {
+  const codes = await Promise.all(jobs.map(({ kind, steps, cores: sized, beside }) => new Promise((done) => {
     const cores = planCores(kind, options, process.env, steps, sized)
     const flags = [
       ...(cores !== undefined ? ['--cores', String(cores)] : []),
       '--wait', String(options.wait ?? 60),
       '--priority', options.priority ?? 'normal',
       ...options.env.flatMap((pair) => ['--env', pair]),
-      // A full run keeps each job's steps in order, as its job sizes were measured. Elsewhere a job's
-      // lanes run at once with their own workers: the gallery mostly waits for frames, and the unit
-      // and DOM steps fill those cores at a lower priority.
-      '--env', 'JUNO_RUNNER_PLAN=single', '--env', verifyRun(options) ? 'JUNO_PLAN_SERIAL=1' : 'JUNO_PLAN_OVERLAP=1',
+      // A full run's other jobs and a repair keep their steps in order, as their sizes were measured.
+      // Elsewhere a job's lanes run at once with their own workers: the gallery mostly waits for frames,
+      // and the unit and DOM steps fill those cores at a lower priority.
+      '--env', 'JUNO_RUNNER_PLAN=single',
+      ...(beside ? [] : ['--env', verifyRun(options) ? 'JUNO_PLAN_SERIAL=1' : 'JUNO_PLAN_OVERLAP=1']),
     ]
     const child = spawn(process.execPath, [self, ...flags, 'test:plan', ...planWords(steps)], {
       cwd: root, stdio: ['pipe', 'pipe', 'pipe'],
