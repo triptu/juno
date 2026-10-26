@@ -1,7 +1,7 @@
 // Attaching files in e2e specs: sample files, paste and drop as the page
 // receives them, and the composer's chips.
 import type { Locator, Page } from '@playwright/test'
-import { samplePng } from '@juno/fake-slack'
+import { samplePdf, samplePng } from '@juno/fake-slack'
 import { expect } from './fixtures'
 import type { TopicPane } from './driver/juno'
 
@@ -12,6 +12,7 @@ export interface Upload {
 }
 
 export const chart = (): Upload => ({ name: 'chart.png', mimeType: 'image/png', buffer: samplePng(640, 400) })
+export const brief = (): Upload => ({ name: 'launch-brief.pdf', mimeType: 'application/pdf', buffer: samplePdf('Launch brief', ['Freeze on Thursday.']) })
 
 /** Builds a DataTransfer holding `files` in the page. */
 function dataTransfer(win: Page, files: ReadonlyArray<Upload>) {
