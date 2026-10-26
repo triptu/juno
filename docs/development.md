@@ -641,6 +641,23 @@ All 168 files on two physical cores of the SSH laptop (four threads), the same s
 
 The run is CPU-bound (CPU 95–99% busy), so four workers, one per thread, stay the default. What changed: the crash tests start each agent program from a bundle built once per test process (`runAgent`), not from source (`recovery.test.ts` 25.0 → 5.6 s, `backup-crash.test.ts` 13.5 → 6.0 s); the mutation repair seed is 1,500 messages over two days (the large-seed test 18.9 → 5.2 s); periodic sweeps in the flow tests run on test-driven time; rate-limit tests use sub-second Retry-After values with a short `slackInteractiveMaxWaitMillis` (14.3 s → off the slowest list); first-sync, agent-host and reads start from smaller seeds or the synced template. A warm engine boot costs about 90 ms of CPU and waits on no timer, so the rest is the tests' own work; about 40 s needs a third core.
 
+### Unit job measurements, 2026-10-26
+
+The full run's unit job (two physical cores, `test` then `test:dom`, seed 606932755), single runs on the shared laptop. Single runs swing more than the change: with the same DOM lane code its step used 187 to 236 CPU-s across four runs.
+
+| Run | `test` | `test:dom` |
+| --- | --- | --- |
+| Before (`64e5fcdf6`) | 66 s, 241 CPU-s | 65 s, 236 CPU-s |
+| After | 58 s, 209 CPU-s | 58 s, 201 CPU-s |
+| Before again, interleaved | 57 s, 204 CPU-s | 59 s, 216 CPU-s |
+| After again | 61 s, 225 CPU-s | 51 s, 187 CPU-s |
+
+What changed: the engine harness kept `followPassMillis: 0`, so every engine start ran a second full follow pass right after the boot's own (the e2e profile had already dropped this). A warm start now runs 856 SQL statements, not 1,521, and the engine files used 166 → 150 CPU-s in a back-to-back pair of engine-only runs.
+
+Where the unit run's CPU goes: the engine files are about 70% of it, and engine starts (about 215 warm and 38 cold) about 60% of theirs. A warm start is about 0.25 CPU-s on the laptop, nearly all the engine's own catch-up (the boot's `getView` pass over the followed threads, the recheck of ten topics, re-indexing the topics whose event coverage ended); the fake and its seed (2 ms), copying the snapshot and building the layers are small. An idle engine uses about 13 ms of CPU a second. A per-file seed copy, a shared migrated database or a reset engine would save little: the catch-up is the cost, and a reset engine would still run it.
+
+The DOM lane: a test's start is about 0.4 CPU-s in Bun and 0.4 in the host; the bodies are the rest. The harness's queries take about 15 CPU-s of the lane (happy-dom's `querySelectorAll` about 5.6, role queries about 7). A walk in place of `querySelectorAll` was slower: happy-dom keeps a query's answer until the page changes, and most waits re-check an unchanged page. Reading inline `display` only when the style names it saved nothing measurable. A page at rest costs about 10 ms of CPU a second in each process.
+
 ### Desktop lane measurements, 2026-10-24
 
 The full measurement at `7aa940589` passed both desktop lanes on the SSH laptop: **222 s browser, 73 s Electron, 295 s combined**. It used four physical cores (eight allocated threads), eight browser workers and eight Electron workers, in sequence. Coverage and traces were off, CPU timing was on, and there were no retries, failures or skips. The job averaged 89% CPU busy (99% median), with 6.64 GB peak container memory including file cache.
