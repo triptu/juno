@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { sameIdentity } from './verify-inputs.mjs'
 import { suitePassed } from './verify-repair.mjs'
+import { fileReuseProblems } from './verify-files.mjs'
 
 export const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 export const statusFolder = (root) => resolve(root, git(root, 'rev-parse', '--git-common-dir'), '../.juno-status')
@@ -31,7 +32,10 @@ const galleryCounted = (suite) => {
   return seed === undefined || suite.walks?.sample?.seed === seed
 }
 
-/** A full run passes only when every required suite ran, skipped no tests, passed and, in the gallery, counted its sample. */
+/**
+ * A full run passes only when every required suite ran, skipped no tests, passed and, in the gallery, counted its
+ * sample, and when each test lane's file counts, sample and command agree (fileReuseProblems).
+ */
 export function assessRecord(record) {
   const required = record.version === 2 ? ['test', 'specs:check', 'specs:conformance', 'test:gallery',
     ...(record.required?.includes('test:browser') ? ['test:browser', 'test:electron'] : ['test:desktop'])] : ['test', 'specs:check', 'test:gallery', 'test:desktop']
@@ -40,6 +44,7 @@ export function assessRecord(record) {
     && required.every((name) => record.suites.some((suite) => suite.suite === name))
     && record.suites.every(suitePassed)
     && record.suites.every(galleryCounted)
+    && fileReuseProblems(record).length === 0
     && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'perf @mac', 'test:feel'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
     && (record.version !== 2 || (record.identity && record.required?.every((name) => record.suites.some((suite) => suite.suite === name))))
 }
@@ -71,6 +76,7 @@ export function releaseGate(root, commit, records = readRecords(statusFolder(roo
     return previous?.version === 2 && sameIdentity(previous.identity, record.identity)
       && isAncestor(root, previous.commit, record.commit)
       && previous.required?.every((name) => record.suites.some((suite) => suite.suite === name))
+      && fileReuseProblems(previous).length === 0
       && provenance(previous, seen)
   }
   for (const record of records) {

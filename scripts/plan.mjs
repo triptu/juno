@@ -25,7 +25,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { availableParallelism, loadavg } from 'node:os'
 import { createInterface } from 'node:readline'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { runtimeIdentity } from './verify-inputs.mjs'
+import { runtimeIdentity, toolchainIdentity } from './verify-inputs.mjs'
 import { failureMonitor } from './verify-failures.mjs'
 
 export function parsePlan(argv) {
@@ -140,6 +140,7 @@ if (import.meta.main) {
   let stopRun = false
   const identity = runtimeIdentity(process.cwd())
   console.log(`juno-runtime: ${JSON.stringify(identity)}`)
+  console.log(`juno-toolchain: ${JSON.stringify(toolchainIdentity(process.cwd()))}`)
   const guarded = process.env.JUNO_VERIFY_POLICY === '1'
   const stopChild = (child, signal) => {
     if (child.exitCode !== null || child.signalCode !== null) return

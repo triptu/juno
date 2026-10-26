@@ -31,7 +31,7 @@ import { ImportGraph } from './import-graph.mjs'
 import { galleryComponents, GALLERY_BUDGET_SECONDS, rankComponents, reachSpecs } from './affected-select.mjs'
 import { feelScenarios, guardSpecsChanged, HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
-import { bunTestScripts, unitTestItems } from './affected-tests.mjs'
+import { bunTestScripts, desktopInputs, domInputs, unitTestItems } from './affected-tests.mjs'
 import { isDomTest } from './dom-tests.mjs'
 import { inputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
 import { readRecords, statusFolder } from './release-gate.mjs'
@@ -131,8 +131,7 @@ if (unit.length > 0) plan.push({ script: 'test', args: [`--seed=${testSeed}`, ..
 
 // The DOM lane (apps/desktop/dom): each test file reaches its own imports and everything the renderer
 // bundle and the engine host it runs reach, so the import graph decides; a change to most app code runs every file.
-const domEntries = ['apps/desktop/web/page/main.ts', 'apps/desktop/web/host/testHost.ts', 'apps/desktop/dom/vite.config.ts', 'apps/desktop/renderer.vite.ts', 'apps/desktop/web/build-host.mjs']
-const domApp = new Set([...domEntries.filter((file) => files.has(file)).flatMap((file) => [...closure(file)]), 'apps/desktop/package.json', 'scripts/dom-tests.mjs', 'scripts/build-cached.mjs'])
+const domApp = domInputs(files, closure)
 const domItems = [...files].filter(isDomTest).map((file) => ({ suite: 'dom', id: file, inputs: new Set([...closure(file), ...domApp]) }))
 const domFiles = batch ? [] : pending(domItems)
 if (domFiles.length > 0) plan.push({ script: 'test:dom', args: [`--seed=${testSeed}`, ...(domFiles.length === domItems.length ? [] : ['--files', ...domFiles.map((item) => item.id)])], items: domFiles, why: `${domFiles.length} DOM lane test file(s)` })
@@ -227,14 +226,8 @@ if (components.length > 0 || gallerySpecs.length > 0) {
 
 // Desktop e2e, by spec file. Nearly every app file reaches the whole app
 // through the import graph, so a change that reaches the app runs every spec.
-const desktopEntries = [...files].filter((file) => /^apps\/desktop\/src\/(main|preload|engine|agent)\/index\.ts$/.test(file) || file === 'apps/desktop/src/renderer/main.tsx')
-// What every spec depends on: the fixtures, the driver, the build and Playwright configs, and what they reach (the fake Slack).
-const supportRoots = [...files].filter((file) => /^apps\/desktop\/e2e\/(fixtures\.ts|build\.ts|no-skips\.ts|driver\/)/.test(file) || ['apps/desktop/playwright.config.ts', 'apps/desktop/package.json', 'apps/desktop/electron.vite.config.ts', 'apps/desktop/src/renderer/index.html'].includes(file))
-const support = new Set(supportRoots.flatMap((file) => [...closure(file)]))
-const app = new Set(desktopEntries.flatMap((entry) => [...closure(entry)]))
-for (const file of [...files].filter((path) => path.startsWith('apps/desktop/src/renderer/'))) app.add(file)
-// The fake Slack's files the app also runs (the shared Slack schema) count as app files.
-for (const file of app) if (!/^(apps\/desktop\/e2e|packages\/fake-slack|packages\/agent-testing)\//.test(file) && !supportRoots.includes(file)) support.delete(file)
+// What every spec depends on: the app, and the fixtures, the driver, the build and Playwright configs, and what they reach (the fake Slack).
+const { app, support } = desktopInputs(files, closure)
 const specItems = [...files]
   .filter((file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|\/screens\//.test(file))
   .map((file) => ({ suite: 'desktop', id: file, inputs: new Set([...app, ...support, ...closure(file)]) }))
