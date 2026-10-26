@@ -1,0 +1,309 @@
+{
+  "apps/desktop/dom/actions.test.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/dom/attachments.test.ts": {
+    "read-once": 3
+  },
+  "apps/desktop/dom/composer.test.ts": {
+    "read-once": 3
+  },
+  "apps/desktop/dom/counted-work.test.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/dom/driver/juno.ts": {
+    "time-of-day": 1
+  },
+  "apps/desktop/dom/expect.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/dom/home-write.test.ts": {
+    "read-once": 2
+  },
+  "apps/desktop/dom/huddle.test.ts": {
+    "sleep": 1,
+    "read-once": 2
+  },
+  "apps/desktop/dom/input.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/dom/juno-agent/cards.test.ts": {
+    "read-once": 2
+  },
+  "apps/desktop/dom/juno-agent/connections.test.ts": {
+    "read-once": 3
+  },
+  "apps/desktop/dom/juno-agent/tool-approval.test.ts": {
+    "read-once": 4
+  },
+  "apps/desktop/dom/juno-agent/transfer.test.ts": {
+    "read-once": 2
+  },
+  "apps/desktop/dom/message-actions.test.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/dom/palette.test.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/dom/query.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/dom/send-checks.test.ts": {
+    "read-once": 2
+  },
+  "apps/desktop/dom/send.test.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/dom/socket.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/dom/strict-links.test.ts": {
+    "read-once": 3
+  },
+  "apps/desktop/dom/strict-send.test.ts": {
+    "read-once": 6
+  },
+  "apps/desktop/dom/topic.test.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/dom/work.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/attachments.spec.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/e2e/browser/snapshotCache.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/composer.spec.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/e2e/driver/juno.ts": {
+    "sleep": 2,
+    "time-of-day": 1
+  },
+  "apps/desktop/e2e/driver/slack.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/feel/after-idle.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/feel/chat.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/feel/composer.feel.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/feel/home-still.feel.ts": {
+    "sleep": 3
+  },
+  "apps/desktop/e2e/feel/home-write.feel.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/feel/interaction.feel.ts": {
+    "sleep": 7
+  },
+  "apps/desktop/e2e/feel/lazy.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/feel/long.feel.ts": {
+    "sleep": 3
+  },
+  "apps/desktop/e2e/feel/pictures.feel.ts": {
+    "sleep": 4
+  },
+  "apps/desktop/e2e/feel/recorder.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/feel/reviews.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/feel/settings.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/feel/sidebar-hold.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/feel/sidebar-motion.feel.ts": {
+    "sleep": 5
+  },
+  "apps/desktop/e2e/feel/sidebar.feel.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/feel/sign-in.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/feel/tabs.feel.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/feel/topic.feel.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/feel/welcome.feel.ts": {
+    "sleep": 2
+  },
+  "apps/desktop/e2e/file-viewer.spec.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/e2e/formatting.spec.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/e2e/huddle.spec.ts": {
+    "read-once": 2
+  },
+  "apps/desktop/e2e/huddleFake.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/idle-cpu.spec.ts": {
+    "sleep": 3,
+    "read-once": 1
+  },
+  "apps/desktop/e2e/idleJourney.ts": {
+    "sleep": 3
+  },
+  "apps/desktop/e2e/juno-agent/backup.spec.ts": {
+    "read-once": 2
+  },
+  "apps/desktop/e2e/juno-agent/chat-reactions.spec.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/juno-agent/t3.spec.ts": {
+    "read-once": 4
+  },
+  "apps/desktop/e2e/mark-unread.spec.ts": {
+    "read-once": 3
+  },
+  "apps/desktop/e2e/media.spec.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/e2e/peek.spec.ts": {
+    "read-once": 2
+  },
+  "apps/desktop/e2e/screens.spec.ts": {
+    "sleep": 12
+  },
+  "apps/desktop/e2e/screens/home-pictures-screens.spec.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/screens/home-screens.spec.ts": {
+    "sleep": 1
+  },
+  "apps/desktop/e2e/search.spec.ts": {
+    "sleep": 2,
+    "read-once": 2
+  },
+  "apps/desktop/e2e/searchSteps.ts": {
+    "sleep": 3
+  },
+  "apps/desktop/e2e/session.spec.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/e2e/sidebar-first-sync.spec.ts": {
+    "read-once": 1
+  },
+  "apps/desktop/test/notifier.test.ts": {
+    "time-of-day": 1
+  },
+  "apps/gallery/behaviour.spec.ts": {
+    "sleep": 2
+  },
+  "apps/gallery/open-state.ts": {
+    "sleep": 1
+  },
+  "apps/gallery/shots.spec.ts": {
+    "sleep": 2
+  },
+  "apps/gallery/support.ts": {
+    "sleep": 1
+  },
+  "apps/gallery/topic-art.spec.ts": {
+    "sleep": 1
+  },
+  "apps/gallery/topic-titles.spec.ts": {
+    "read-once": 1
+  },
+  "packages/agent/test/actions.test.ts": {
+    "read-once": 18
+  },
+  "packages/agent/test/codemode.test.ts": {
+    "read-once": 1
+  },
+  "packages/agent/test/codex-provider.test.ts": {
+    "read-once": 2
+  },
+  "packages/agent/test/connections.test.ts": {
+    "read-once": 1
+  },
+  "packages/agent/test/fixtures/program.ts": {
+    "sleep": 1
+  },
+  "packages/agent/test/fixtures/redaction.ts": {
+    "sleep": 1
+  },
+  "packages/agent/test/redaction.test.ts": {
+    "read-once": 4
+  },
+  "packages/agent/test/schedule-flow.test.ts": {
+    "read-once": 6
+  },
+  "packages/agent/test/serve.test.ts": {
+    "read-once": 1
+  },
+  "packages/agent/test/turns.test.ts": {
+    "read-once": 1
+  },
+  "packages/engine/test/controlledClock.ts": {
+    "sleep": 1
+  },
+  "packages/engine/test/flows/ai-jobs.flow.test.ts": {
+    "read-once": 1
+  },
+  "packages/engine/test/flows/counted-work.flow.test.ts": {
+    "sleep": 2
+  },
+  "packages/engine/test/flows/first-sync.flow.test.ts": {
+    "read-once": 1
+  },
+  "packages/engine/test/flows/home-reviews.flow.test.ts": {
+    "wall-time": 1
+  },
+  "packages/engine/test/flows/huddle-call.flow.test.ts": {
+    "wall-time": 1
+  },
+  "packages/engine/test/flows/idle.flow.test.ts": {
+    "sleep": 1
+  },
+  "packages/engine/test/flows/mutation-repair.flow.test.ts": {
+    "read-once": 1
+  },
+  "packages/engine/test/flows/notification-hours.flow.test.ts": {
+    "time-of-day": 1
+  },
+  "packages/engine/test/flows/outbox-copies.flow.test.ts": {
+    "read-once": 2
+  },
+  "packages/engine/test/flows/search-session.flow.test.ts": {
+    "sleep": 1
+  },
+  "packages/engine/test/harness.ts": {
+    "sleep": 1
+  },
+  "packages/engine/test/metadata.test.ts": {
+    "read-once": 2
+  },
+  "packages/slack/test/api.test.ts": {
+    "read-once": 1
+  },
+  "packages/slack/test/helpers.ts": {
+    "sleep": 1
+  },
+  "packages/slack/test/import.test.ts": {
+    "wall-time": 1
+  },
+  "packages/testing/src/eventually.ts": {
+    "sleep": 1
+  },
+  "packages/testing/src/layoutShift.ts": {
+    "sleep": 2
+  }
+}
