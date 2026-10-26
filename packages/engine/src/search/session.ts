@@ -74,7 +74,7 @@ export function searchSessions(client: SearchRun['client'], link: SearchRun['lin
   const matches = (input: { sessionId: string; generation: number; topicId: string; ts?: string; first?: string; last?: string }) => Effect.suspend(() => {
     const controller = active.get(input.sessionId)
     return controller?.generation === input.generation && controller.run !== undefined
-      ? searchNavigation(controller.run.resolved, input)
+      ? searchNavigation(controller.run.resolved, input, [...new Set(controller.run.pages.flatMap((page) => page.rows.filter((row) => row.topicId === input.topicId).map((row) => row.ts)))])
       : Effect.succeed(emptyNavigation)
   })
   return { stream, more, matches }
