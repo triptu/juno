@@ -5,8 +5,7 @@
 // Resolve takes Follow's place without moving the title, and menus built on OptionList have one active row under
 // the pointer and the arrow keys and open on press. What the topic shows and sends (prefetch, the divider and read
 // mark, Notify me, Follow, thread links, the switcher) is in the DOM lane (`dom/topic.test.ts`), and so are live
-// messages at the bottom (`dom/live.test.ts`) and which messages notify (`dom/notifications.test.ts`). A tab left in
-// the middle of a long topic is tab-scroll.spec.ts's.
+// messages at the bottom (`dom/live.test.ts`) and which messages notify (`dom/notifications.test.ts`).
 import type { Locator, Page } from '@playwright/test'
 import { measureLayoutShift } from '@juno/testing/layout-shift'
 import { seedWorkspace, startFakeSlack, topic300Seed, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'

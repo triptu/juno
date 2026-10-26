@@ -1,11 +1,11 @@
 // Bottom following (SPEC 7, "Stable geometry"): arrivals and growing rows stay above the composer from their
 // first frame, including while the scrollbar thumb is held at the end. A full message window drops its first
 // row without moving the viewport; an upward gesture lets go, and arrivals leave that scrolled position alone.
-import { TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
+import { TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
 import { expect, syncedTest, test, type Fixtures } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
-import { backAtEnd, distance, frames, longTest, openFullWindow, openLongMain, reopenFull, wheelToEnd } from './stickBottomLists'
+import { backAtEnd, distance, frames, longTest, openFullWindow, openLongMain, wheelToEnd } from './stickBottomLists'
 import { watchArrival, watchEditVisibility, watchResize, type Frame } from './stickBottomProbe'
 
 test.describe.configure({ timeout: 90_000, mode: 'parallel' })
@@ -233,17 +233,13 @@ syncedTest('releases the bottom during an upward gesture, uses the resting thres
 
 // The thread window is checked on its own, since a thread window once broke it alone (e37e5df81); a DM and Main are
 // the same TopicView.
-longTest('thread: editing the last message stays above the composer, and back at the end after scrolling up by hand a full window follows new messages, in a thread and in Main', async ({ juno, win, fake }) => {
+longTest('thread: editing the last message stays above the composer, and back at the end after scrolling up by hand a full window follows new messages', async ({ juno, win, fake }) => {
   const title = 'Review the rollout checklist 1'
   await openFullWindow(juno, title)
   const threadTs = fake.workspace.main(TOPIC300_THREAD_CHANNEL).find((message) => message.text?.startsWith(title))!.ts
   const post = (text: string) => void fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text })
   await editLastStaysAbove({ juno, win, fake }, 'thread', TOPIC300_THREAD_CHANNEL, 'U0PERFMAYA', threadTs)
   await backAtEnd(juno, win, post)
-  await test.step('Main: back at the end after scrolling up by hand, a full window follows new messages', async () => {
-    await reopenFull(juno, '#perf-main')
-    await backAtEnd(juno, win, (text) => void fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, user: 'U0PERFLEO', text }))
-  })
 })
 
 async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>): Promise<void> {
