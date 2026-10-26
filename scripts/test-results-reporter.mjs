@@ -13,11 +13,17 @@ export default class TestResultsReporter {
   progress(event) {
     if (process.env.JUNO_VERIFY_POLICY === '1') console.log(`juno-test: ${JSON.stringify(event)}`)
   }
-  onStepEnd(_test, _result, step) {
-    if (this.completed === 0 && step.title === 'Before Hooks' && step.error) this.progress({ setup: true, signature: errorSignature(step.error) })
+  // A fixture that skips its test (the gallery's cached rendering tests) ends Before Hooks with an error too, so a
+  // hook error counts as setup only once its test ends without being skipped.
+  hookErrors = new Map()
+  onStepEnd(test, _result, step) {
+    if (this.completed === 0 && step.title === 'Before Hooks' && step.error) this.hookErrors.set(test, step.error)
   }
   onTestEnd(test, result) {
+    const hookError = this.hookErrors.get(test)
+    this.hookErrors.delete(test)
     if (result.status === 'skipped' || result.status === 'interrupted') return
+    if (hookError && this.completed === 0) this.progress({ setup: true, signature: errorSignature(hookError) })
     this.completed++
     const failure = result.status !== test.expectedStatus
     this.progress({ failure, ...(failure ? { signature: errorSignature(result.error ?? result.errors?.[0]), setup: (test.parent?.project()?.name ?? '').startsWith('build-') } : {}) })
