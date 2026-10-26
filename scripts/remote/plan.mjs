@@ -14,8 +14,8 @@ const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:e2e',
 // scripts/plan.mjs); the others run their steps in order.
 export const fullRunJobs = [
   { kind: 'desktop', cores: 3, beside: true, scripts: ['test:desktop', 'test:browser', 'test:electron', 'test:e2e'] },
-  { kind: 'unit', cores: 2, scripts: ['test', 'test:dom', 'specs:check'] },
-  { kind: 'gallery', cores: 3, scripts: ['specs:conformance', 'test:gallery'] },
+  { kind: 'unit', cores: 2, scripts: ['test', 'test:dom'] },
+  { kind: 'gallery', cores: 3, scripts: ['specs:check', 'specs:conformance', 'test:gallery'] },
 ]
 
 export function runnerPlanJobs(options, env = process.env) {

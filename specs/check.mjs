@@ -41,8 +41,9 @@ mkdirSync(generated, { recursive: true })
 // Jobs retain individual cache entries. Single-sample schedules share one
 // parsed/typechecked Quint process per file; each still gets a fresh evaluator.
 // A passing simulation is cached under a hash of its arguments, what is checked on
-// its output, its spec file and imports, this runner and the runtime, so an unchanged
-// check is not run again. Bump cacheVersion when the checks on a result change.
+// its output, its spec file and imports, the simulation adapter and the runtime, so
+// orchestration and comment edits do not rerun it. Bump cacheVersion when the checks
+// on a result change.
 // A passing solver (Apalache) check is cached under its arguments, its spec file and
 // imports, the Quint and Apalache versions and the verify batch only, so editing
 // this runner does not rerun it; bump solverVersion when its handling here changes.
@@ -79,7 +80,16 @@ const cacheVersion = 2
 const quintVersion = require('@informalsystems/quint/package.json').version
 const solverVersion = 1
 const solverHash = sha(solverVersion, quintVersion, apalacheVersion, readFileSync(join(root, 'specs/verify-batch.mjs')))
-const runnerHash = sha(cacheVersion, quintVersion, apalacheVersion, backend, JSON.stringify(runtimeIdentity(root)), ...['check.mjs', 'simulate-batch.mjs', 'agent-checks.mjs', 'outbox-checks.mjs'].map((file) => readFileSync(join(root, 'specs', file))))
+const identity = JSON.stringify(runtimeIdentity(root))
+const runnerHash = sha(cacheVersion, quintVersion, backend, identity, readFileSync(join(root, 'specs/simulate-batch.mjs')))
+// Before the cache contract was explicit, runnerHash included every byte of this file
+// and the job-list files. These are the last hashes for the current Mac and runner
+// identities. Reuse and migrate those entries once; another runtime gets a cold cache.
+// A cacheVersion bump also disables the migration.
+const legacyRunnerHash = cacheVersion === 2 && backend === 'rust' ? ({
+  '{"runtime":"bun","version":"1.4.4","bun":"1.4.4","node":"26.11.1","platform":"darwin","arch":"arm64","electron":"44.7.0"}': '27b342776f01b1976c51a1cb2d24e13fa7f06b660f8aa3757c841fc4fb91436e',
+  '{"runtime":"bun","version":"1.4.4","bun":"1.4.4","node":"26.11.1","platform":"linux","arch":"x64","electron":"44.7.0"}': '671531351aad611bcda8322e1edbfde1612f422f6741b4b996ebb76ac5a8873c',
+})[identity] : undefined
 function specHash(file, seen = new Set()) {
   if (seen.has(file)) return ''
   seen.add(file)
@@ -197,12 +207,22 @@ async function runJob(job, lane = 0, execute = job.args[0] === 'verify' ? verify
   const key = solver ? sha(solverHash, keyed, violation, specHash(args[1]))
     : sha(runnerHash, keyed, violation, checks, specHash(args[1]))
   const cached = join(cacheDir, `${key}.json`)
-  if (cacheJob && existsSync(cached)) {
-    const saved = JSON.parse(readFileSync(cached, 'utf8'))
+  const legacy = !solver && legacyRunnerHash
+    ? join(cacheDir, `${sha(legacyRunnerHash, keyed, violation, checks, specHash(args[1]))}.json`)
+    : undefined
+  const hit = cacheJob && [cached, legacy].find((file) => file && existsSync(file))
+  if (hit) {
+    const saved = JSON.parse(readFileSync(hit, 'utf8'))
     // A read marks the entry as used, so the runner keeps it (scripts/remote/run.sh).
-    utimesSync(cached, new Date(), new Date())
+    utimesSync(hit, new Date(), new Date())
     if (trace) writeFileSync(trace, saved.trace)
     check(saved.output)
+    if (hit !== cached) {
+      mkdirSync(cacheDir, { recursive: true })
+      const temporary = `${cached}.${process.pid}-${randomUUID()}`
+      writeFileSync(temporary, JSON.stringify(saved))
+      renameSync(temporary, cached)
+    }
     measurements.push({ args, outcome: violation ? 'violation' : 'ok', cached: true, seconds: 0 })
     return `${label}\n(unchanged, passed before: cached)\n${saved.notes}`
   }
