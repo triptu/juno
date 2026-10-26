@@ -18,7 +18,7 @@ export function runnerJobSize({ script, args, cores, specsCached = false }, capa
   const files = (step) => step.args.filter((arg) => !arg.startsWith('-') && /\.[cm]?[jt]sx?$/.test(arg))
   const wide = steps.some((step) => {
     if (step.script === 'specs:conformance') return true
-    if (step.script === 'specs:check') return !specsCached || step.env.SPECS_CACHE === 'off' || step.env.SPECS_RUN_CACHE === 'off' || step.args.includes('--no-cache') || step.args.includes('--nightly')
+    if (step.script === 'specs:check') return !specsCached || step.env.SPECS_CACHE === 'off' || step.env.SPECS_RUN_CACHE === 'off' || step.args.includes('--no-cache')
     // A DOM test boots an engine host beside its renderer: more than a few want a second core.
     if (step.script === 'test:dom') return files(step).length === 0 || files(step).length > 4
     if (step.script !== 'test') return false
