@@ -4,8 +4,10 @@
 // emoji picker in one motion, growing from the corner of the menu that stays
 // put, near every edge of the window. Rows show the keys that work on a
 // focused message (T, Q, F, E, ⌫, and R on More reactions), which also choose
-// them while the menu is open.
+// them while the menu is open. Start thread on a message with no replies shows
+// it as the root at once.
 import { checkMessageMenuButton } from './messageMenuButton'
+import { startThread } from './threadRoot'
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
@@ -23,7 +25,7 @@ const boxOf = async (locator: Locator) => {
   return { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height, width: box.width, height: box.height }
 }
 
-test('a right-click opens the menu as it comes up, over the same message, with the emoji grid on top; its grid, picker and keys act on the message', async ({ juno, fake }) => {
+test('a right-click opens the menu as it comes up, over the same message, with the emoji grid on top; its grid, picker and keys act on the message; Start thread shows the root; the picker grows from the corner that stays', async ({ juno, fake }) => {
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Right-click me when it is done' })
   fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'A neighbour to let go over' })
   await juno.sidebar.expectTop('#eng')
@@ -116,6 +118,9 @@ test('a right-click opens the menu as it comes up, over the same message, with t
   await checkMessageMenuButton(juno, target, neighbour)
   await test.step('the grid reacts and takes a reaction back, More reactions picks any emoji, and R opens the picker', () => reactFromMenu(juno, fake))
   await test.step('a key the menu shows runs its row; T on a focused message in Main starts its thread, and does nothing in the thread', () => keysInMenu(juno))
+  await test.step('Start thread on a message with no replies shows it as the root at once, then the reply under it without moving it', () => startThread(juno, fake))
+  // Last: it narrows the window.
+  await test.step('More reactions grows the picker from the corner of the menu that stays put, near every edge of the window', () => corners(juno, fake))
 })
 
 /** Runs on #eng's Main, open from the first steps; ends in the thread T starts. */
@@ -321,7 +326,7 @@ async function pointOn(win: Page, row: Locator, side: 'left' | 'right') {
   return { target, position: { x, y: 10 } }
 }
 
-test('More reactions grows the picker from the corner of the menu that stays put, near every edge of the window', async ({ juno, fake }) => {
+async function corners(juno: Juno, fake: FakeSlack): Promise<void> {
   // A narrow window, so a message's words reach near its right edge.
   await juno.setWindowSize(900, 700)
   // A resize closes an open menu, so let it land first.
@@ -355,4 +360,4 @@ test('More reactions grows the picker from the corner of the menu that stays put
   await test.step('top right: down and to the left', async () => morphAt(juno, await pointOn(juno.win, upper, 'right'), 'top-right'))
   await test.step('bottom left: up and to the right', async () => morphAt(juno, await pointOn(juno.win, last, 'left'), 'bottom-left'))
   await test.step('bottom right: up and to the left', async () => morphAt(juno, await pointOn(juno.win, last, 'right'), 'bottom-right'))
-})
+}
