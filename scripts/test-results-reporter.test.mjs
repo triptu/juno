@@ -67,7 +67,7 @@ test('a real plan keeps sparse failures, stops systemic suites, stops the run on
         });`
     writeFileSync(join(dir, 'policy.spec.mjs'), `import { test as base } from '${playwright}/index.mjs'; ${source}`)
     const result = spawnSync(process.execPath, [join(root, 'scripts/plan.mjs'), 'test:browser', '+', 'test:electron'], {
-      cwd: dir, env: { ...env, JUNO_VERIFY_POLICY: '1', JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_LOAD: 'Infinity' }, encoding: 'utf8', timeout: 15_000,
+      cwd: dir, env: { ...env, JUNO_VERIFY_POLICY: '1', JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_BUSY: 'Infinity' }, encoding: 'utf8', timeout: 15_000,
     })
     const output = (result.stdout + result.stderr).replace(/^\[test:browser\] /gm, '')
     assert.equal(result.status, scenario === 'cached' ? 0 : 1, scenario + output)

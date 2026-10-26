@@ -20,9 +20,9 @@
 // result (in a remote container, after a line with the CPU its processes used);
 // the exit code is 1 if any step failed.
 
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
-import { availableParallelism, loadavg } from 'node:os'
+import { availableParallelism, cpus, loadavg } from 'node:os'
 import { createInterface } from 'node:readline'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { runtimeIdentity, toolchainIdentity } from './verify-inputs.mjs'
@@ -91,6 +91,29 @@ function processCpu() {
   // Linux reports CPU in USER_HZ, 100 a second on the runner's architectures.
   const used = (index) => [...seen.values()].reduce((sum, entry) => entry.step === String(index) ? sum + entry.ticks : sum, 0) / 100
   return { sample, used }
+}
+
+/**
+ * Cores kept busy over the last `millis`, from every core's time counters. A serial plan checks this before a step
+ * instead of the 1-minute load average, which after a step stays high for a minute or more though nothing runs:
+ * on 10-27 a local full run waited about 245 s for the load its own steps had left to decay below 8.
+ */
+export async function busyCores(millis = 2000) {
+  const total = () => cpus().reduce((sum, { times }) => {
+    const busy = times.user + times.nice + times.sys + times.irq
+    return { busy: sum.busy + busy, all: sum.all + busy + times.idle }
+  }, { busy: 0, all: 0 })
+  const before = total()
+  await sleep(millis)
+  const after = total()
+  return after.all > before.all ? (after.busy - before.busy) / (after.all - before.all) * cpus().length : 0
+}
+
+/** The processes left in a step's process group after its command exited: pid and command. */
+export function groupMembers(group) {
+  const listed = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,command='], { encoding: 'utf8', maxBuffer: 1 << 26 })
+  return (listed.stdout ?? '').split('\n').map((line) => /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line))
+    .filter((match) => match && Number(match[2]) === group).map((match) => ({ pid: Number(match[1]), command: match[3] }))
 }
 
 export const appSuites = ['test:desktop', 'test:browser', 'test:electron', 'test:gallery', 'test:e2e']
@@ -200,8 +223,18 @@ if (import.meta.main) {
         if (reason) stop(reason)
       })
       child.on('error', () => {})
-      child.on('close', (code) => {
+      child.on('close', async (code) => {
         children.delete(child)
+        // A serial plan runs the next step on a quiet machine: nothing of this step may outlive it. Pooled hosts exit
+        // when their worker goes away, so allow a few seconds; then name what is left and stop it.
+        if (serial && guarded && process.platform === 'darwin' && child.pid) {
+          for (let waited = 0; waited < 5000 && groupMembers(child.pid).length > 0; waited += 250) await sleep(250)
+          const left = groupMembers(child.pid)
+          if (left.length > 0) {
+            console.log(`plan: step ${index} ${step.script} left ${left.length} process(es) running; stopping them: ${left.map(({ pid, command }) => `${pid} ${command.slice(0, 120)}`).join('; ')}`)
+            try { process.kill(-child.pid, 'SIGKILL') } catch (error) { if (error.code !== 'ESRCH') throw error }
+          }
+        }
         if (processes) {
           processes.sample()
           console.log(`plan: step ${index} ${step.script} used ${Math.round(processes.used(index))} CPU-s, job memory peaked at ${gigabytes(memory.steps.get(index))} GB while it ran (includes file cache)`)
@@ -218,11 +251,16 @@ if (import.meta.main) {
     // The unit and spec lanes give priority to the app lane.
     for (const step of lane) {
       if (stopRun) break
-      // The local full run owns the lock, but unrelated processes may still be busy.
+      // The local full run owns the lock, but unrelated processes may still be busy. The 1-minute load is a cheap
+      // first look; above the core count, the cores busy right now say whether that is other work or the tail of
+      // this plan's last step.
       if (serial) {
-        while (loadavg()[0] > Number(process.env.JUNO_PLAN_MAX_LOAD ?? Infinity)) {
-          console.log(`plan: load ${loadavg()[0].toFixed(1)} is above ${process.env.JUNO_PLAN_MAX_LOAD}; waiting before ${step.script}`)
-          await sleep(30_000)
+        const most = Number(process.env.JUNO_PLAN_MAX_BUSY ?? Infinity)
+        while (Number.isFinite(most) && loadavg()[0] > cpus().length) {
+          const busy = await busyCores()
+          if (busy <= most) break
+          console.log(`plan: other work keeps ${busy.toFixed(1)} cores busy, more than ${most}; waiting before ${step.script}`)
+          await sleep(10_000)
         }
       }
       results.push(await run(step, index > 0 && planned.length > 1))

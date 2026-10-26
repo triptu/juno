@@ -19,7 +19,8 @@ export function verifyExecution(local, { config = runnerConfig, probe = checkRun
 // (JUNO_MEMORY_BUDGET, 4g by default) on all but two threads, so the 8 GB Mac keeps two cores and
 // about 4 GB for other use (scripts/memory-budget.mjs).
 export const localVerifyEnv = {
-  JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_LOAD: process.env.JUNO_PLAN_MAX_LOAD ?? '8',
+  // Before each step, wait while other work keeps more than half the cores busy (scripts/plan.mjs, busyCores).
+  JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_BUSY: process.env.JUNO_PLAN_MAX_BUSY ?? String(Math.max(2, Math.floor(availableParallelism() / 2))),
   ...budgetEnv(parseBudget(process.env.JUNO_MEMORY_BUDGET ?? '4g'), Math.max(1, availableParallelism() - 2)),
   SPECS_OVERLAP: '0', CI: '1',
 }
