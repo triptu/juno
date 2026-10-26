@@ -127,7 +127,9 @@ domTest('startup, a topic opened and opened again, tabs, typing, a send and a li
 
 domTest('the sidebar of 300 conversations: its first rows from the cache, and one live message renders one row', async ({ juno, app, fake, relaunch, step }) => {
   await juno.signIn()
-  await juno.waitForSync()
+  await juno.sidebar.expectRows()
+  // The first sync of 300 conversations is setup, not counted; beside a full lane's other workers it takes longer than the usual wait.
+  await juno.expectEngineLive(100_000)
 
   await step('startup: a relaunch to the first rows from the cache, at rest', async () => {
     juno = await relaunch({ beforeOpen: () => engineAtRest(fake) })
@@ -147,4 +149,4 @@ domTest('the sidebar of 300 conversations: its first rows from the cache, and on
     })
     expectWork('large sidebar live message', counts(work), { commits: 3, renders: 19, requests: 0, messages: 6, bytesIn: 8154, bytesOut: 0 }, detail(work))
   })
-}, { counted: true, synced: false, fake: { seed: largeSeed({ users: 60, topics: 150, messages: 1_500, days: 2 }) }, timeout: 120_000 })
+}, { counted: true, synced: false, fake: { seed: largeSeed({ users: 60, topics: 150, messages: 1_500, days: 2 }) }, timeout: 180_000 })
