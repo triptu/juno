@@ -8,14 +8,20 @@ cd /work
 export JUNO_RUNNER_JOB_CORES=${RUNNER_THREADS:?tstack did not provide allocated threads}
 echo "remote: allocated threads=$JUNO_RUNNER_JOB_CORES"
 export JUNO_REMOTE_INSTALL=1 JUNO_BUILD_CACHE_DIR=/cache/builds
+# Spec check and conformance results stay on the runner, shared by every job. An entry is
+# touched when it is read; one unused for 14 days is removed (compiled/ is small and stays).
+export SPECS_CACHE_DIR=${SPECS_CACHE_DIR:-/cache/specs}
+mkdir -p "$SPECS_CACHE_DIR" && find "$SPECS_CACHE_DIR" -maxdepth 1 -type f -mtime +14 -delete 2>/dev/null
 export electron_config_cache=/cache/electron
 export TMP=/tmp TEMP=/tmp XDG_RUNTIME_DIR=/tmp/juno-runtime
 mkdir -p "$XDG_RUNTIME_DIR" /cache/builds /cache/electron .remote
 chmod 700 "$XDG_RUNTIME_DIR"
 source scripts/remote/install.sh
 # Electron's first start on the container's layered filesystem copies the
-# binary up; parallel test workers starting it then fail with ETXTBSY.
-electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))" 2>/dev/null) && "$electron" --version >/dev/null 2>&1
+# binary up; parallel test workers starting it then fail with ETXTBSY. Only suites that start it pay for this.
+case " $* " in *" test:desktop "*|*" test:electron "*|*" test:e2e "*|*" test:nightly "*|*" test:gallery "*)
+  electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))" 2>/dev/null) && "$electron" --version >/dev/null 2>&1 ;;
+esac
 
 source scripts/remote/workers.sh
 script_started=$SECONDS
@@ -71,8 +77,6 @@ reports=()
 for path in specs/traces apps/desktop/test-results apps/desktop/perf-results apps/desktop/playwright-report apps/desktop/blob-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
   [ -e "$path" ] && reports+=("$path")
 done
-# The spec cache `bun run remote` brought along, with what this run added to it.
-[ -n "${SPECS_CACHE_DIR:-}" ] && [ -d "$SPECS_CACHE_DIR" ] && reports+=("${SPECS_CACHE_DIR#/work/}")
 [ -n "${JUNO_TYPECHECK_CACHE_DIR:-}" ] && [ -d "$JUNO_TYPECHECK_CACHE_DIR" ] && reports+=("${JUNO_TYPECHECK_CACHE_DIR#/work/}")
 [ ${#reports[@]} -gt 0 ] && tar -czf .remote/reports.tgz "${reports[@]}"
 exit $code

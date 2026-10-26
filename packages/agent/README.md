@@ -187,7 +187,7 @@ Behind the `agent.codemode` flag (`TurnsOptions.codemode`; in the app `AgentConf
 - **Admission.** The builder counts the `codemode` section and declaration with Juno's own; a tool only scripts call is in the section, not counted twice.
 - **Audit** (`scripts/audit.ts`, `script_calls`). Each child call's arguments are written before it runs, and its outcome when it ends: done, failed, cancelled or refused. Activity shows a run's folded line ("Ran 1 script: 4 reads, 1 cancelled") and each call with its arguments and outcome; a call still running when its run ended shows "Did not finish".
 - **Pause and AI off** stop a running script, also one waiting for a worker: its unfinished reads stop waiting (`abortable`) and are recorded as cancelled, and the model gets a fixed line saying why. There is no chat Stop (SPEC 13.2).
-- **Packaging.** The app's build writes `quickjs.wasm` and `codemode-worker.js` next to `agent.js` and passes their paths (`apps/desktop/src/agent/index.ts`). Under Playwright with the flag on, the agent runs one script at start and writes `codemode-probe.json`; the packaged smoke test and `e2e/juno-agent/codemode.spec.ts` check it.
+- **Packaging.** The app's build writes `quickjs.wasm` and `codemode-worker.js` next to `agent.js` and passes their paths (`apps/desktop/src/agent/index.ts`). Under Playwright with the flag on, the agent runs one script at start and writes `codemode-probe.json`; the packaged smoke test and the crash canary's relaunch in `e2e/juno-agent/crash.spec.ts` check it.
 - **Not yet.** Codemode is not offered through the Codex harness. `test/codemode.test.ts` covers the flows; `bench/codemode.ts` compares it with direct tools.
 
 ## Actions (WP15)

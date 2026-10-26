@@ -42,7 +42,9 @@ export function planCores(kind, options, env = process.env, steps = []) {
   return cores
 }
 
-export async function runRunnerPlan(jobs, { self, root, options, log }) {
+const verifyRun = (options) => options.env.includes('JUNO_VERIFY_POLICY=1') || process.env.JUNO_VERIFY_POLICY === '1'
+
+export async function runRunnerPlan(jobs, { self, root, options, log, env = {} }) {
   const children = new Set()
   forwardSignals(children)
   let cancelled = false
@@ -54,11 +56,14 @@ export async function runRunnerPlan(jobs, { self, root, options, log }) {
       ...(cores !== undefined ? ['--cores', String(cores)] : []),
       '--wait', String(options.wait ?? 60),
       ...options.env.flatMap((pair) => ['--env', pair]),
-      '--env', 'JUNO_RUNNER_PLAN=single', '--env', 'JUNO_PLAN_SERIAL=1',
+      // A full run keeps each job's steps in order, as its job sizes were measured. Elsewhere a job's
+      // lanes run at once with their own workers: the gallery mostly waits for frames, and the unit
+      // and DOM steps fill those cores at a lower priority.
+      '--env', 'JUNO_RUNNER_PLAN=single', '--env', verifyRun(options) ? 'JUNO_PLAN_SERIAL=1' : 'JUNO_PLAN_OVERLAP=1',
     ]
     const child = spawn(process.execPath, [self, ...flags, 'test:plan', ...planWords(steps)], {
       cwd: root, stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, JUNO_RUNNER_PLAN: 'single', JUNO_RUNNER_PARENT: '1' },
+      env: { ...process.env, ...env, JUNO_RUNNER_PLAN: 'single', JUNO_RUNNER_PARENT: '1' },
     })
     children.add(child)
     const results = new Map()

@@ -1,11 +1,14 @@
-import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions, type Rectangle } from 'electron'
+import { app, BrowserWindow, Menu, nativeTheme, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions, type Rectangle } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts, type HuddleMenu, type MenuCommand } from '@juno/contract'
-import { BACKGROUND, backgroundFor, type Launch } from './launch'
+import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts, type HuddleMenu, type MenuCommand, type Theme } from '@juno/contract'
+import { BACKGROUND, type Launch } from './launch'
 import { APP_URL } from './scheme'
 import { startupMark } from './startupMarks'
 import { wireTextMenu } from './textMenu'
 import { refitWebPanel } from './webPanel'
+
+/** The background a window paints in before the page loads. System follows macOS. */
+const backgroundFor = (theme: Theme): string => BACKGROUND[theme === 'system' ? (nativeTheme.shouldUseDarkColors ? 'dark' : 'light') : theme]
 
 /** Height of the drag strip drawn by the renderer. Keep in sync with --titlebar-height. */
 const TITLEBAR_HEIGHT = 44
