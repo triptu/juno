@@ -15,6 +15,10 @@ interface Reading {
 
 const WINDOW_MS = 4_000
 const SETTLE_MS = 1_000
+// V8 collects garbage about 8 s after a burst of allocation (its memory reducer), in every process at once, and a hidden
+// page starts Chromium's background purge. After the Juno reply that fell in the hidden window: 2 to 6 % of a core while
+// every process gave back 10 to 40 MB (10-26). The hidden state waits that out; a spin does not end.
+const AFTER_COLLECTION_MS = 10_000
 // Every process, the window and GPU process included, at rest on Linux reads 0 to 1.2 % over 4 s (10-26).
 // While the first sync waits on Slack, the syncing card is drawn and the engine read up to 9.9 %. A spin fails either.
 const BUDGET_PERCENT = 5
@@ -28,8 +32,8 @@ async function reading(running: RunningApp, millis: number): Promise<ReadonlyArr
   return running.app.evaluate((_electron, before) => (globalThis as unknown as { junoTest: { processesSince: (sample: unknown) => ReadonlyArray<Reading> } }).junoTest.processesSince(before), start)
 }
 
-async function sample(running: RunningApp, state: string, budget = BUDGET_PERCENT): Promise<ReadonlyArray<Reading>> {
-  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS))
+async function sample(running: RunningApp, state: string, budget = BUDGET_PERCENT, settle = SETTLE_MS): Promise<ReadonlyArray<Reading>> {
+  await new Promise((resolve) => setTimeout(resolve, settle))
   const values = await reading(running, WINDOW_MS)
   console.log(`idle resources, ${state}: ${JSON.stringify(values)}`)
   expect(values.length).toBeGreaterThan(0)
@@ -133,7 +137,7 @@ async function walk(running: RunningApp, fake: FakeSlack): Promise<void> {
   })
   await test.step('the window hidden', async () => {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.hide())
-    samples.push(await sample(running, 'hidden'))
+    samples.push(await sample(running, 'hidden', BUDGET_PERCENT, AFTER_COLLECTION_MS))
   })
   expectMemory(samples)
 }
