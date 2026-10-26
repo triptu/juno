@@ -1830,12 +1830,18 @@ Runs on the laptop on 2026-10-26, every test, the spec check reused (its inputs 
 | Timed 2 | `d7c597372` | 181 s | gallery | 3 | conformance 68 / 366, gallery 104 / 561 | 170 s | 90% | 5.8 GB |
 | | | | unit | 2 | test 69 / 252, test:dom 81 / 259 | 148 s | 85% | 3.4 GB |
 | | | | desktop | 3 | browser 97 / 406, Electron 40 / 170 | 134 s | 70% | 3.9 GB |
+| Traces cached (gallery waited 96 s for cores another job held) | `f5a4dc133` | 234 s | unit | 2 | test 72 / 258, test:dom 78 / 255, specs:check 0 / 0 | 150 s | 86% | 3.4 GB |
+| | | | gallery | 3 | conformance 14 / 69, gallery 107 / 574 | 121 s | 88% | 5.8 GB |
+| | | | desktop | 3 | browser 89 / 350, Electron 39 / 154 | 128 s | 66% | 3.8 GB |
+| Tried: 3/3/2, conformance in the unit job (a job waited 90 s for cores) | `914eac222` | 204 s | unit | 3 | test 49 / 270, test:dom 44 / 225, conformance 14 / 58 | 107 s | 87% | 4.3 GB |
+| | | | gallery | 2 | gallery 147 / 539 | 147 s | 91% | 3.9 GB |
+| | | | desktop | 3 | browser 95 / 390, Electron 40 / 174 | 135 s | 69% | 3.9 GB |
 
 The memory column is each step's peak in its job's cgroup, file cache included; the host's peak use was 17.0 GB of 30.5 GB. No job waited for cores in the timed runs.
 
-The critical path is the gallery job: conformance, then the gallery, about 170 s, with the unit job 20 to 30 s behind and the desktop job 35 s behind. A full run is about 2,000 CPU-s (conformance 366, gallery 560, browser 405, unit tests 255, DOM lane 255, Electron 170), so 16 threads at 90% busy cannot finish it in under about 140 s; the 2-minute aim needs less work, not a new split.
+Since conformance reuses its traces (10-26), the critical path is the unit job, about 150 s (unit tests 72 s, then the DOM lane 78 s), with the desktop job about 20 s and the gallery job about 30 s behind. Moving conformance into the unit job on three cores and leaving the gallery two (the "Tried" run) made the gallery the longest at 147 s, so the split stays 3/2/3: the gallery needs three cores, and either of the other jobs on two takes about 150 s. A full run is now about 1,650 CPU-s (gallery 560, browser 370, unit tests 260, DOM lane 240, Electron 165, conformance 65), so 16 threads at 90% busy cannot finish it in under about 115 s, and three serial jobs come to about 150 s; the 2-minute aim needs less work in the unit tests or the DOM lane, not a new split.
 
-- Conformance spends 51.5 s of its 67 s generating its 76 traces with Quint, with a fixed seed (`20261016` in `specs/conformance.mjs`), uncached by rule; the replay against the engine is the rest.
+- Conformance took 67 s, 51.5 s of it generating its 76 traces with Quint from a fixed seed (`20261016` in `specs/conformance.mjs`). Full runs now reuse the traces while their inputs are unchanged, and it takes 14 s, all of it the replay against the engine.
 - The browser lane is the largest test step: 403 CPU-s, 96 s on three cores, then Electron 40 s at 70% busy.
 - The gallery's fast check over every state took 453 CPU-s with five walkers on four threads and 556 with eight on six, in about the same wall per thread.
 - Builds run on the critical path in every job when their inputs change: DOM 14 s, web renderer 13 s, gallery 9 s, desktop about 14 s. Each build keys on its own module graph ("Build skip" above), so a commit that changes only tests, docs or repo tools reuses all four.
