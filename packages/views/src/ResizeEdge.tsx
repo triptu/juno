@@ -20,6 +20,25 @@ const write = (box: HTMLElement, next: number) => {
   box.style.width = `${next}px`
 }
 
+/**
+ * The pane's width on screen, as its owner and every drag set it on the box (`write`), rather than the `width` prop: a
+ * drag whose release never came (the window lost focus mid-drag) left the box wider or narrower than the prop, and the
+ * next drag would jump by the difference, or hide the pane.
+ */
+const shownWidth = (box: HTMLElement, fallback: number) => {
+  const shown = Number.parseFloat(box.style.width)
+  return Number.isFinite(shown) ? shown : fallback
+}
+
+/** A drag in progress: the pane's box (the edge's parent) and its width when the drag began. */
+interface Drag {
+  readonly box: HTMLElement
+  readonly startX: number
+  readonly startWidth: number
+  raw: number
+  frame: number | undefined
+}
+
 /** How far ← and → move the edge. */
 const KEY_STEP = 8
 
@@ -40,8 +59,7 @@ export interface ResizeEdgeProps {
 export function ResizeEdge({ width, min, max, label, onResize, onReset, collapseBelow, onCollapse, side = 'end' }: ResizeEdgeProps) {
   /** A move to the right widens a pane whose right edge this is, and narrows one whose left edge it is. */
   const sign: 1 | -1 = side === 'end' ? 1 : -1
-  /** The drag in progress, with the pane's box: the edge's parent. */
-  const drag = useRef<{ readonly box: HTMLElement; readonly startX: number; raw: number; frame: number | undefined } | undefined>(undefined)
+  const drag = useRef<Drag | undefined>(undefined)
   const clamp = (raw: number) => Math.round(Math.min(max, Math.max(min, raw)))
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
@@ -49,12 +67,13 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
     const box = event.currentTarget.parentElement
     if (box === null) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    drag.current = { box, startX: event.clientX, raw: width, frame: undefined }
+    const startWidth = shownWidth(box, width)
+    drag.current = { box, startX: event.clientX, startWidth, raw: startWidth, frame: undefined }
   }
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current
     if (current === undefined) return
-    current.raw = width + sign * (event.clientX - current.startX)
+    current.raw = current.startWidth + sign * (event.clientX - current.startX)
     if (current.frame !== undefined) return
     current.frame = requestAnimationFrame(() => {
       current.frame = undefined
@@ -68,13 +87,13 @@ export function ResizeEdge({ width, min, max, label, onResize, onReset, collapse
     if (current.frame !== undefined) cancelAnimationFrame(current.frame)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     // Where the button came up decides, even when the last moves before it were not delivered.
-    if (event.type === 'pointerup') current.raw = width + sign * (event.clientX - current.startX)
+    if (event.type === 'pointerup') current.raw = current.startWidth + sign * (event.clientX - current.startX)
     if (event.type === 'pointerup' && collapseBelow !== undefined && current.raw < collapseBelow) {
-      write(current.box, width)
+      write(current.box, current.startWidth)
       onCollapse?.()
       return
     }
-    const next = event.type === 'pointerup' ? clamp(current.raw) : width
+    const next = event.type === 'pointerup' ? clamp(current.raw) : current.startWidth
     write(current.box, next)
     if (next !== width) onResize?.(next)
   }
