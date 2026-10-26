@@ -101,6 +101,8 @@ test('message content paints: photos load everywhere and unfurls keep text when 
     await juno.sidebar.row('#eng').open()
     const message = juno.topic.message('us-east-1')
     await expect(message).toBeVisible({ timeout: 15_000 })
+    // The step before left the list on the previews above it.
+    await message.scrollIntoViewIfNeeded()
     const table = message.getByRole('table')
     await expect(table.getByRole('columnheader')).toHaveText(COLUMNS)
     await expect(table.getByRole('row')).toHaveCount(3)
