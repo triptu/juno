@@ -12,6 +12,16 @@ export type JunoPage = 'Scheduled' | 'What Juno remembers' | 'Memory of this cha
 /** The sections of Settings the Juno Agent's flows use. */
 export type JunoSettingsSection = 'Juno' | 'AI activity' | 'Connections' | 'Backup & This Mac'
 
+/** The Juno title button in the Juno tab's header, which opens the Juno menu. */
+const headerButton = (juno: Juno) => juno.win.locator('main [data-juno-header] button', { hasText: 'Juno' })
+
+/** A row of the open Juno menu. */
+const menuItem = (juno: Juno, label: string) => juno.win.locator('[role="menuitem"]', { hasText: label })
+
+/** A section in Settings' list: named by its text, or in the narrow rail of icons by its aria-label. */
+const settingsItem = (nav: Locator, label: string) =>
+  nav.locator('[role="button"]', { hasText: label }).or(nav.locator(`[role="button"][aria-label=${JSON.stringify(label)}]`))
+
 /** Signs in, waits for the first sync and for the agent. */
 export async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
@@ -31,7 +41,7 @@ export async function agentReady(app: ElectronApplication | AppSurface): Promise
 
 /** Opens the Juno tab and returns its chat. */
 export async function openChat(juno: Juno): Promise<JunoChatPane> {
-  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  await juno.win.locator('nav[aria-label="Pages"] [role="button"]', { hasText: /^Juno/ }).click()
   await juno.tabs.expectActive('Juno')
   return JunoChatPane.tab(juno.win)
 }
@@ -39,8 +49,8 @@ export async function openChat(juno: Juno): Promise<JunoChatPane> {
 /** Opens one of the Juno menu's pages from the Juno tab and returns the page. Connections opens in Settings. */
 export async function openPage(juno: Juno, label: JunoPage): Promise<Locator> {
   await openChat(juno)
-  await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
-  await juno.win.getByRole('menuitem', { name: label }).click()
+  await headerButton(juno).click()
+  await menuItem(juno, label).click()
   await juno.tabs.expectActive(label === 'Connections' ? 'Settings' : label)
   return juno.win.locator('main')
 }
@@ -54,13 +64,14 @@ export async function openRuns(page: Locator): Promise<void> {
 /** Opens Settings from the Juno menu, which lands on its Juno section, then goes to `section`. Returns the page. */
 export async function openSettings(juno: Juno, section: JunoSettingsSection): Promise<Locator> {
   await openChat(juno)
-  await juno.win.locator('main [data-juno-header]').getByRole('button', { name: 'Juno' }).click()
-  await juno.win.getByRole('menuitem', { name: 'Settings' }).click()
+  await headerButton(juno).click()
+  await menuItem(juno, 'Settings').click()
   await juno.tabs.expectActive('Settings')
-  const nav = juno.win.getByRole('navigation', { name: 'Settings' })
-  await expect(nav.getByRole('button', { name: 'Juno' })).toHaveAttribute('aria-current', 'page')
-  if (section !== 'Juno') await nav.getByRole('button', { name: section }).click()
-  await expect(nav.getByRole('button', { name: section })).toHaveAttribute('aria-current', 'page')
+  // Another Settings tab can be mounted, hidden.
+  const nav = juno.win.locator('nav[data-settings-nav]').filter({ visible: true })
+  await expect(settingsItem(nav, 'Juno')).toHaveAttribute('aria-current', 'page')
+  if (section !== 'Juno') await settingsItem(nav, section).click()
+  await expect(settingsItem(nav, section)).toHaveAttribute('aria-current', 'page')
   return juno.win.locator('main')
 }
 
@@ -76,21 +87,21 @@ export function card(chat: JunoChatPane, kind: string): Locator {
 export async function addServer(juno: Juno, name: string, url: string): Promise<{ readonly id: string; readonly row: Locator }> {
   const page = await openPage(juno, 'Connections')
   const add = page.locator('[data-add-server]')
-  await add.getByLabel('Name').fill(name)
-  await add.getByLabel('Address').fill(url)
-  await add.getByRole('button', { name: 'Add' }).click()
+  await add.locator('input[aria-label="Name"]').fill(name)
+  await add.locator('input[aria-label="Address"]').fill(url)
+  await add.locator('button', { hasText: 'Add' }).click()
   const row = page.locator('[data-connection-id^="server-"]').filter({ hasText: url })
   await expect(row.locator('[data-connection-name]')).toHaveText(name)
   const id = await row.getAttribute('data-connection-id')
   if (id === null) throw new Error(`No connection id for ${name}`)
-  await row.getByRole('button', { name: 'Connect' }).click()
+  await row.locator('button', { hasText: 'Connect' }).click()
   await expect(row).toHaveAttribute('data-connection', 'ready', { timeout: 20_000 })
   return { id, row }
 }
 
 /** Opens Configure on a connection's row and returns its sheet: the tools, their Enabled switches and rules. */
 export async function configure(juno: Juno, row: Locator): Promise<Locator> {
-  await row.getByRole('button', { name: 'Configure' }).click()
+  await row.locator('button', { hasText: 'Configure' }).click()
   const sheet = juno.win.locator('[data-sheet="tools"]')
   await expect(sheet).toBeVisible()
   return sheet

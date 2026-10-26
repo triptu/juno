@@ -1,0 +1,1 @@
+- 10-26 00:40 · The browser-lane driver finds elements by attribute, tag or text, never by role or accessible name, and tests no longer check accessible names · Playwright's role and name queries ran in the renderer on every expect poll; Tushar does not want accessibility checks kept at that cost. The DOM lane keeps its role queries, which cost about 1% of its CPU.

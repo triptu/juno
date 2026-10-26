@@ -108,6 +108,34 @@ export const schemeUrl = (host: string): RegExp => new RegExp(`^(?:juno://|/__ju
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+/** `text` as a quoted CSS string, for an attribute selector. */
+const cssString = (text: string) => JSON.stringify(text)
+
+/** `css` narrowed to the element whose `aria-label` is `label`: an attribute query, with no name computation. */
+const labelled = (css: string, label: string) => `${css}[aria-label=${cssString(label)}]`
+
+/** Matches an element's whole visible text, for `hasText`. */
+const whole = (text: string) => new RegExp(`^${escapeRegExp(text)}$`)
+
+/** Matches visible text that starts with the word `name`, as an option's label does. */
+const startsWord = (name: string) => new RegExp(`^${escapeRegExp(name)}(\\s|$)`)
+
+/** The dot in the corner of a quick filter's pill (`FilterPill`), beside the button. */
+const pillDot = (button: Locator) => button.locator('xpath=..').locator('[data-pill-dot]')
+
+/** A list's rows whose label (`data-option-label`, not the avatar's initials or the sub line) matches `label`. */
+const optionsLabelled = (scope: Locator, label: RegExp) => scope.locator('[role="option"]').filter({ has: scope.page().locator('[data-option-label]', { hasText: label }) })
+
+/**
+ * The sidebar, its topic list, a topic's message list and the tab strip by the attributes that name them. Role and
+ * name queries walk the page and compute names in Playwright's injected script on every `expect`
+ * poll; the driver finds everything with native queries: attributes, tags and visible text.
+ */
+const SIDEBAR = 'aside[aria-label="Sidebar"]'
+const TOPIC_LIST = '[role="group"][aria-label="Topics"]'
+const MESSAGE_LIST = '[role="list"][aria-label="Messages"]'
+const TAB_STRIP = '[data-tab-strip] [role="tablist"]'
+
 /** One row in the sidebar, found by the start of its title. */
 export class SidebarRow implements SidebarRowVerbs {
   readonly root: Locator
@@ -117,8 +145,9 @@ export class SidebarRow implements SidebarRowVerbs {
     readonly title: string,
     exact = false,
   ) {
-    // Rows are focusable list items named by their title.
-    this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}${exact ? '$' : ''}`) })
+    // Rows are focusable list items named by their title; the DOM lane finds them by that name. Here the
+    // title's own attribute finds them in one native query: expect polls this locator more than any other.
+    this.root = win.locator(`[data-topic-row]:has([data-bold-title${exact ? '' : '^'}=${cssString(title)}])`)
   }
 
   /** The presence dot on a DM's photo, while Slack shows the person active. */
@@ -202,7 +231,7 @@ export class SidebarRow implements SidebarRowVerbs {
 
   /** Main rows: "2 new threads" after the title. */
   async expectNewThreads(count: number): Promise<void> {
-    await expect(this.root.getByTitle(count === 1 ? '1 new thread' : `${count} new threads`)).toHaveText(String(count))
+    await expect(this.root.locator(`[title="${count === 1 ? '1 new thread' : `${count} new threads`}"]`)).toHaveText(String(count))
   }
 
   /** The row's laid-out height. A row sliding to its new place is moved by a transform, which a bounding box would include. */
@@ -211,7 +240,7 @@ export class SidebarRow implements SidebarRowVerbs {
   }
 
   async expectNoNewThreads(): Promise<void> {
-    await expect(this.root.getByTitle(/^\d+ new threads?$/)).toHaveCount(0)
+    await expect(this.root.locator('[title$=" new thread"], [title$=" new threads"]')).toHaveCount(0)
   }
 
   async expectVisible(): Promise<void> {
@@ -285,11 +314,11 @@ export class Sidebar implements SidebarVerbs {
   readonly root: Locator
 
   constructor(readonly win: Page) {
-    this.root = win.getByRole('complementary', { name: 'Sidebar' })
+    this.root = win.locator(SIDEBAR)
   }
 
   get list() {
-    return this.root.getByRole('group', { name: 'Topics' })
+    return this.root.locator(TOPIC_LIST)
   }
 
   /** Moves the pointer off the list, onto the workspace, so the list stops holding its order (SPEC 5). */
@@ -312,7 +341,7 @@ export class Sidebar implements SidebarVerbs {
   }
 
   section(name: SidebarSectionName) {
-    return this.list.getByRole('region', { name, exact: true })
+    return this.list.locator(labelled('section', name))
   }
 
   /** The row titles in a section, top to bottom. */
@@ -345,20 +374,25 @@ export class Sidebar implements SidebarVerbs {
 
   /** The scope chip under the filters names the channel the list is narrowed to. */
   async expectScope(name: string): Promise<void> {
-    await expect(this.root.getByTitle(`Showing ${name} only`)).toBeVisible({ timeout: 15_000 })
+    await expect(this.root.locator(`[title=${cssString(`Showing ${name} only`)}]`)).toBeVisible({ timeout: 15_000 })
   }
 
   async expectNoSection(section: SidebarSectionName): Promise<void> {
     await expect(this.section(section)).toHaveCount(0)
   }
 
-  /** A quick filter. Its name gains ", unread" while its dot shows. */
+  /** The quick filters: All, Channels, DMs, the views' pills, New view and Unread only. */
+  get quickFilters() {
+    return this.root.locator(labelled('[role="group"]', 'Quick filters'))
+  }
+
+  /** A quick filter. Its label gains ", unread" while its dot shows. */
   filterButton(name: SidebarFilterName) {
-    return this.root.getByRole('group', { name: 'Quick filters' }).getByRole('button', { name: new RegExp(`^${name}(, unread)?$`) })
+    return this.quickFilters.locator(`${labelled('button', name)}, ${labelled('button', `${name}, unread`)}`)
   }
 
   get unreadToggle() {
-    return this.root.getByRole('button', { name: 'Unread only' })
+    return this.root.locator(labelled('button', 'Unread only'))
   }
 
   async filter(name: SidebarFilterName): Promise<void> {
@@ -374,14 +408,14 @@ export class Sidebar implements SidebarVerbs {
     await expect.poll(() => this.titles()).not.toContain('')
   }
 
-  /** The unread dot after a filter, which a screen reader hears as part of the filter's name. */
+  /** The unread dot in the corner of a filter's pill. */
   async expectFilterDot(name: 'Channels' | 'DMs', shown: boolean): Promise<void> {
-    await expect(this.filterButton(name)).toHaveAccessibleName(shown ? `${name}, unread` : name)
+    await expect(pillDot(this.filterButton(name))).toHaveCount(shown ? 1 : 0)
   }
 
   /** Clears the filters from the empty state. */
   async clearFilters(): Promise<void> {
-    await this.list.getByRole('button', { name: 'Clear filters' }).click()
+    await this.list.locator('button', { hasText: whole('Clear filters') }).click()
     await expect(this.filterButton('All')).toHaveAttribute('aria-pressed', 'true')
     await expect(this.unreadToggle).toHaveAttribute('aria-pressed', 'false')
   }
@@ -390,12 +424,12 @@ export class Sidebar implements SidebarVerbs {
 
   /** The horizontally scrolling row of pills. */
   get pillRow() {
-    return this.root.getByRole('group', { name: 'Quick filters' }).locator('[data-pill-row]')
+    return this.quickFilters.locator('[data-pill-row]')
   }
 
-  /** A view's pill. Its name gains ", unread mention" while its dot shows. */
+  /** A view's pill. Its label gains ", unread mention" while its dot shows. */
   viewPill(name: string) {
-    return this.root.getByRole('group', { name: 'Quick filters' }).getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}(, unread mention)?$`) })
+    return this.quickFilters.locator(`${labelled('[data-view-pill]', name)}, ${labelled('[data-view-pill]', `${name}, unread mention`)}`)
   }
 
   /** The views' names, in pill order. */
@@ -414,7 +448,7 @@ export class Sidebar implements SidebarVerbs {
   }
 
   async expectViewDot(name: string, shown: boolean): Promise<void> {
-    await expect(this.viewPill(name)).toHaveAccessibleName(shown ? `${name}, unread mention` : name, { timeout: 10_000 })
+    await expect(pillDot(this.viewPill(name))).toHaveCount(shown ? 1 : 0, { timeout: 10_000 })
   }
 
   /** The view sheet, new or edit. */
@@ -428,10 +462,10 @@ export class Sidebar implements SidebarVerbs {
    * these out of All. A new view is selected once saved.
    */
   async createView(view: { readonly name: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
-    await this.root.getByRole('button', { name: 'New view', exact: true }).click()
+    await this.root.locator(labelled('button', 'New view')).click()
     await expect(this.viewSheet).toBeVisible()
     await this.fillViewSheet(view)
-    await this.viewSheet.getByRole('button', { name: 'Save' }).click()
+    await this.viewSheet.locator('button[type="submit"]').click()
     await expect(this.viewSheet).toHaveCount(0)
     await expect(this.viewPill(view.name)).toHaveAttribute('aria-pressed', 'true')
   }
@@ -439,15 +473,16 @@ export class Sidebar implements SidebarVerbs {
   /** Fills the open sheet. Conversations are toggled: one already chosen is removed. */
   async fillViewSheet(view: { readonly name?: string; readonly icon?: string; readonly color?: string; readonly conversations?: ReadonlyArray<string>; readonly keepOutOfAll?: boolean }): Promise<void> {
     const sheet = this.viewSheet
-    if (view.name !== undefined) await sheet.getByRole('textbox', { name: 'Name' }).fill(view.name)
-    if (view.icon !== undefined) await sheet.getByRole('radio', { name: view.icon }).click()
-    if (view.color !== undefined) await sheet.getByRole('radiogroup', { name: 'Colour' }).getByRole('radio', { name: view.color, exact: true }).click()
+    if (view.name !== undefined) await sheet.locator(labelled('input', 'Name')).fill(view.name)
+    if (view.icon !== undefined) await sheet.locator(`${labelled('[role="radiogroup"]', 'Icon')} ${labelled('[role="radio"]', view.icon)}`).click()
+    if (view.color !== undefined) await sheet.locator(`${labelled('[role="radiogroup"]', 'Colour')} ${labelled('[role="radio"]', view.color)}`).click()
     for (const conversation of view.conversations ?? []) {
-      await sheet.getByRole('combobox', { name: 'Add channels and people' }).fill(conversation)
-      await sheet.getByRole('option', { name: conversation, exact: true }).click()
-      await expect(sheet.getByRole('option', { name: conversation, exact: true })).toHaveAttribute('aria-selected', 'true')
+      await sheet.locator(labelled('input', 'Add channels and people')).fill(conversation)
+      const row = optionsLabelled(sheet, whole(conversation))
+      await row.click()
+      await expect(row).toHaveAttribute('aria-selected', 'true')
     }
-    if (view.keepOutOfAll !== undefined) await sheet.getByRole('checkbox', { name: /Keep these out of All/ }).setChecked(view.keepOutOfAll)
+    if (view.keepOutOfAll !== undefined) await sheet.locator('label', { hasText: 'Keep these out of All' }).locator('input[type="checkbox"]').setChecked(view.keepOutOfAll)
   }
 
   /** Right-click a view's pill, then `item` in its menu (inventory 15.7). Returns the menu's labels. */
@@ -459,16 +494,16 @@ export class Sidebar implements SidebarVerbs {
 
   /** The status card's title at the foot of the sidebar: the first sync, or why the list may be behind Slack. */
   get syncStatus() {
-    return this.root.getByRole('status', { name: 'Sync status' })
+    return this.root.locator(labelled('[role="status"]', 'Sync status'))
   }
 
   /** The first sync's ring in the status card; its value text is "N of M conversations". */
   get syncProgress() {
-    return this.root.getByRole('progressbar', { name: 'Sync progress' })
+    return this.root.locator(labelled('[role="progressbar"]', 'Sync progress'))
   }
 
   get restartButton() {
-    return this.root.getByRole('region', { name: 'Sync' }).getByRole('button', { name: 'Restart' })
+    return this.root.locator('[data-sync-status] button', { hasText: whole('Restart') })
   }
 
   async expectSyncStatus(text: string | RegExp): Promise<void> {
@@ -508,11 +543,11 @@ export class Sidebar implements SidebarVerbs {
   }
 
   get searchButton() {
-    return this.root.getByRole('button', { name: 'Search ⇧⌘F' })
+    return this.root.locator('header button[data-tooltip="Search"]')
   }
 
   get accountButton() {
-    return this.root.getByRole('button', { name: 'Account and settings' })
+    return this.root.locator(labelled('button', 'Account and settings'))
   }
 }
 
@@ -524,7 +559,7 @@ export class AccountMenu implements AccountMenuVerbs {
     readonly win: Page,
     readonly sidebar: Sidebar,
   ) {
-    this.root = win.getByRole('dialog', { name: 'Account' })
+    this.root = win.locator(labelled('[role="dialog"]', 'Account'))
   }
 
   async open(): Promise<void> {
@@ -540,16 +575,16 @@ export class AccountMenu implements AccountMenuVerbs {
   }
 
   get sessionStatus() {
-    return this.root.getByRole('status', { name: 'Session status' })
+    return this.root.locator(labelled('[role="status"]', 'Session status'))
   }
 
   get signOutButton() {
-    return this.root.getByRole('button', { name: 'Sign out' })
+    return this.root.locator('button', { hasText: whole('Sign out') })
   }
 
   /** Set yourself away or active, Hide message text, Notifications, Settings (inventory 2.1). */
   item(name: string | RegExp) {
-    return this.root.getByRole('menuitem', { name })
+    return this.root.locator('[role="menuitem"]', { hasText: name })
   }
 
   async choose(name: string | RegExp): Promise<void> {
@@ -565,12 +600,13 @@ export class SettingsPage implements SettingsVerbs {
   readonly nav: Locator
 
   constructor(readonly win: Page) {
-    this.root = win.getByRole('main')
-    this.nav = this.root.getByRole('navigation', { name: 'Settings' })
+    this.root = win.locator('main')
+    this.nav = this.root.locator('nav[data-settings-nav]').filter({ visible: true })
   }
 
+  /** A section in the list: by its text, or by its label when a narrow page shows only icons. */
   section(name: SettingsSectionName): Locator {
-    return this.nav.getByRole('button', { name, exact: true })
+    return this.nav.locator(labelled('[role="button"]', name)).or(this.nav.locator('[role="button"]', { hasText: whole(name) }))
   }
 
   /** Goes to a section and waits for the list to mark it. */
@@ -581,24 +617,24 @@ export class SettingsPage implements SettingsVerbs {
 
   /** About's engine line. */
   get engineStatus() {
-    return this.root.getByRole('status', { name: 'Engine status' })
+    return this.root.locator(labelled('[role="status"]', 'Engine status'))
   }
 
   get pingButton() {
-    return this.root.getByRole('button', { name: 'Ping engine' })
+    return this.root.locator('button', { hasText: whole('Ping engine') })
   }
 
   themeRadio(name: 'System' | 'Light' | 'Dark') {
-    return this.root.getByRole('radio', { name })
+    return this.root.locator(`${labelled('[role="radiogroup"]', 'Theme')} [role="radio"]`, { hasText: whole(name) })
   }
 
   densityRadio(name: 'Comfortable' | 'Compact') {
-    return this.root.getByRole('radio', { name })
+    return this.root.locator(`${labelled('[role="radiogroup"]', 'Density')} [role="radio"]`, { hasText: whole(name) })
   }
 
   /** Appearance › Sidebar › Show who is active in the sidebar. */
   get sidebarPresence(): Locator {
-    return this.root.getByRole('switch', { name: 'Show who is active in the sidebar' })
+    return this.root.locator('label', { hasText: 'Show who is active in the sidebar' }).locator('input[role="switch"]')
   }
 
   /** One ignored channel's row on the ignore list (inventory 14), by name without "#". */
@@ -607,7 +643,7 @@ export class SettingsPage implements SettingsVerbs {
   }
 
   async stopIgnoring(name: string): Promise<void> {
-    await this.ignored(name).getByRole('button', { name: `Stop ignoring ${name}` }).click()
+    await this.ignored(name).locator(labelled('button', `Stop ignoring ${name}`)).click()
   }
 
   /** The ignore list's add row: the channel select and Ignore. */
@@ -616,16 +652,16 @@ export class SettingsPage implements SettingsVerbs {
   }
 
   get ignoreSelect(): Locator {
-    return this.ignoreAdd.getByRole('button', { name: /^Channel to ignore/ })
+    return this.ignoreAdd.locator('button[aria-label^="Channel to ignore"]')
   }
 
   get ignoreButton(): Locator {
-    return this.ignoreAdd.getByRole('button', { name: 'Ignore', exact: true })
+    return this.ignoreAdd.locator('button', { hasText: whole('Ignore') })
   }
 
   /** The add row's open list of channels. */
   get ignoreOptions(): Locator {
-    return this.win.getByRole('listbox', { name: 'Channels' }).getByRole('option')
+    return this.win.locator(`${labelled('[role="listbox"]', 'Channels')} [role="option"]`)
   }
 }
 
@@ -639,17 +675,17 @@ export class NotificationsPage {
   readonly root: Locator
 
   constructor(readonly win: Page) {
-    this.root = win.getByRole('main')
+    this.root = win.locator('main')
   }
 
   /** The Notification hours or Active in Slack rows. */
   hours(which: HoursSection): Locator {
-    return this.root.getByRole('group', { name: which === 'Notifications' ? 'Notification hours' : which, exact: true })
+    return this.root.locator(labelled('[role="group"]', which === 'Notifications' ? 'Notification hours' : which))
   }
 
   /** One row's from or to. Off is the first choice in from; an off row has no to. */
   edge(which: HoursSection, row: HoursRowName, edge: 'from' | 'to'): Locator {
-    return this.hours(which).getByRole('combobox', { name: `${row} ${edge}`, exact: true })
+    return this.hours(which).locator(labelled('select', `${row} ${edge}`))
   }
 
   /** Sets a row's from and to, in minutes since midnight, or turns it off. */
@@ -672,11 +708,11 @@ export class NotificationsPage {
 
   /** The add row's field, disabled until a direction is chosen. */
   get newInstruction(): Locator {
-    return this.root.getByRole('textbox', { name: 'New instruction', exact: true })
+    return this.root.locator(labelled('input', 'New instruction'))
   }
 
   get addInstructionButton(): Locator {
-    return this.root.locator('[data-instruction-add]').getByRole('button', { name: 'Add', exact: true })
+    return this.root.locator('[data-instruction-add] button', { hasText: whole('Add') })
   }
 
   /** Chooses the direction in the add row, types the words and presses Add. */
@@ -688,12 +724,12 @@ export class NotificationsPage {
 
   /** One of the examples shown while the list is empty. */
   instructionExample(text: string): Locator {
-    return this.root.locator('[data-instruction-examples]').getByRole('button', { name: text, exact: true })
+    return this.root.locator('[data-instruction-examples] button', { hasText: whole(text) })
   }
 
   /** The add row's Notify me or Don't notify radio. */
   newInstructionDirection(direction: 'Notify me' | "Don't notify"): Locator {
-    return this.root.getByRole('radiogroup', { name: "New instruction: Notify me or Don't notify" }).getByRole('radio', { name: direction })
+    return this.root.locator(`${labelled('[role="radiogroup"]', "New instruction: Notify me or Don't notify")} [role="radio"]`, { hasText: whole(direction) })
   }
 
   /** The row of the instruction with these words. */
@@ -702,21 +738,21 @@ export class NotificationsPage {
   }
 
   async removeInstruction(text: string): Promise<void> {
-    await this.instruction(text).getByRole('button', { name: 'Remove instruction' }).click()
+    await this.instruction(text).locator(labelled('button', 'Remove instruction')).click()
   }
 
   /** The Always or Never row. */
   level(name: 'Always' | 'Never'): Locator {
-    return this.root.getByLabel(name, { exact: true })
+    return this.root.locator(labelled('[role="group"]', name))
   }
 
   async removeTag(name: string): Promise<void> {
-    await this.root.getByRole('button', { name: `Remove ${name}` }).click()
+    await this.root.locator(labelled('button', `Remove ${name}`)).click()
   }
 
   /** Today's Details, which opens the sheet of today's decisions. */
   get details(): Locator {
-    return this.root.getByRole('button', { name: 'Details', exact: true })
+    return this.root.locator('button', { hasText: whole('Details') })
   }
 }
 
@@ -728,13 +764,14 @@ export class PeekPopover {
     this.root = win.locator('[role="dialog"][aria-roledescription="peek"]')
   }
 
+  /** The popover shows, its title starting with `title`. */
   async expectShowing(title: string): Promise<void> {
     await expect(this.root).toBeVisible()
-    await expect(this.root).toHaveAccessibleName(new RegExp(`^${escapeRegExp(title)}`))
+    await expect.poll(() => this.root.evaluate((node) => document.getElementById(node.getAttribute('aria-labelledby') ?? '')?.textContent ?? '')).toMatch(new RegExp(`^${escapeRegExp(title)}`))
   }
 
   async expectMessage(text: string): Promise<void> {
-    await expect(this.root.getByRole('list', { name: 'Messages' }).getByText(text, { exact: false }).first()).toBeVisible()
+    await expect(this.root.locator(MESSAGE_LIST).getByText(text, { exact: false }).first()).toBeVisible()
   }
 
   async expectClosed(): Promise<void> {
@@ -826,7 +863,7 @@ export class Juno implements JunoVerbs {
 
   /** The toast that says `text` (inventory 16). */
   toast(text: string): Locator {
-    return this.win.getByRole('status').filter({ hasText: text })
+    return this.win.locator('[role="status"]').filter({ hasText: text })
   }
 
   async expectToast(text: string): Promise<void> {
@@ -835,7 +872,7 @@ export class Juno implements JunoVerbs {
 
   /** The Undo of the toast on screen. */
   async undoFromToast(): Promise<void> {
-    await this.win.getByRole('status').getByRole('button', { name: /^Undo/ }).click()
+    await this.win.locator('[role="status"] button', { hasText: /^Undo/ }).click()
   }
 
   /** Edit › Undo, as ⌘Z. */
@@ -900,12 +937,12 @@ export class Juno implements JunoVerbs {
 
   /** The sign-in page’s primary action. */
   get importButton() {
-    return this.win.getByRole('button', { name: "Use the Slack app's session" })
+    return this.win.locator('button', { hasText: "Use the Slack app's session" })
   }
 
   /** The quiet button beside a failed import's line. */
   get copyDetailsButton() {
-    return this.win.getByRole('button', { name: 'Copy details', exact: true })
+    return this.win.locator('button', { hasText: whole('Copy details') })
   }
 
   /** Clicks "Copy details" and returns what it put on the clipboard. */
@@ -931,7 +968,7 @@ export class Juno implements JunoVerbs {
    */
   async skipSetUp(): Promise<void> {
     await expect(this.setUp.or(this.sidebar.root).first()).toBeVisible({ timeout: 15_000 })
-    if (await this.setUp.isVisible()) await this.setUp.getByRole('button', { name: 'Skip for now' }).click()
+    if (await this.setUp.isVisible()) await this.setUp.locator('button', { hasText: whole('Skip for now') }).click()
   }
 
   /** Clicks "Use the Slack app's session" and skips "Set up Juno" unless `skipSetUp` is false (as for an import that fails). The app reads the fixture directory it was launched with. */
@@ -959,11 +996,11 @@ export class Juno implements JunoVerbs {
   }
 
   async expectSignedOut(): Promise<void> {
-    await expect(this.win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(this.win.locator('#sign-in-title', { hasText: whole("Hi, I'm Juno") })).toBeVisible({ timeout: 15_000 })
   }
 
   async expectSessionExpired(): Promise<void> {
-    await expect(this.win.getByRole('heading', { name: 'Slack signed you out', exact: true })).toBeVisible({ timeout: 15_000 })
+    await expect(this.win.locator('#sign-in-title', { hasText: whole('Slack signed you out') })).toBeVisible({ timeout: 15_000 })
   }
 
   async expectSignInError(text: string | RegExp): Promise<void> {
@@ -999,7 +1036,7 @@ export class Juno implements JunoVerbs {
     await this.expectEngineLive()
     // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
     // where a blind click would land, so wait for it and click its empty top corner, which does nothing.
-    const tabOpen = this.win.getByRole('tablist').getByRole('tab', { selected: true })
+    const tabOpen = this.win.locator(`${TAB_STRIP} [role="tab"][aria-selected="true"]`)
     await expect(this.home.root.or(tabOpen).first()).toBeVisible()
     if (await this.home.root.isVisible()) await this.home.root.click({ position: { x: 4, y: 4 } })
     else await this.win.mouse.click(900, 400)
@@ -1019,7 +1056,7 @@ export class Juno implements JunoVerbs {
   /** Settings › General › Hold to peek: ⌥ Option or Space. Closes Settings after. */
   async setPeekKey(key: PeekKeyName): Promise<void> {
     await this.openSettings('General')
-    const radio = this.settings.root.getByRole('radiogroup', { name: 'Hold to peek' }).getByRole('radio', { name: key === 'option' ? '⌥ Option' : 'Space' })
+    const radio = this.settings.root.locator(`${labelled('[role="radiogroup"]', 'Hold to peek')} [role="radio"]`, { hasText: whole(key === 'option' ? '⌥ Option' : 'Space') })
     await radio.click()
     await expect(radio).toHaveAttribute('aria-checked', 'true')
     await this.tabs.close('Settings')
@@ -1303,7 +1340,7 @@ export class MessageMenuDriver {
   }
 
   get search(): Locator {
-    return this.root.getByRole('textbox', { name: 'Search emoji' })
+    return this.root.locator(labelled('input', 'Search emoji'))
   }
 
   /** The rows' labels in order, without their keys or trailing actions: "-" for a separator, "(label)" for a disabled row. */
@@ -1345,7 +1382,7 @@ export class MessageMenuDriver {
     await this.more.click()
     await expect(this.search).toBeFocused()
     await this.search.fill(search)
-    await this.root.locator('[data-emoji-results]').getByRole('button', { name: `:${name}:`, exact: true }).click()
+    await this.root.locator(`[data-emoji-results] ${labelled('button', `:${name}:`)}`).click()
     await expect(this.root).toHaveCount(0)
   }
 
@@ -1403,12 +1440,12 @@ export class AllTopicsRow {
 
   /** The status chip in the row: Open, Resolved, Quiet or Unfollowed. */
   async expectStatus(status: Exclude<AllTopicsChipName, 'All'>): Promise<void> {
-    await expect.poll(async () => ((await this.reveal()) ? this.root.getByRole('gridcell').nth(2).textContent() : null), { timeout: 10_000 }).toBe(status)
+    await expect.poll(async () => ((await this.reveal()) ? this.root.locator('[role="gridcell"]').nth(2).textContent() : null), { timeout: 10_000 }).toBe(status)
   }
 
   async expectWhere(name: string): Promise<void> {
     await this.expectVisible()
-    await expect(this.root.getByRole('gridcell').nth(1)).toHaveText(name)
+    await expect(this.root.locator('[role="gridcell"]').nth(1)).toHaveText(name)
   }
 
   /** Opens the topic with the mouse (rows activate on mouse down); with `newTab`, ⌘-click. */
@@ -1452,15 +1489,15 @@ export class AllTopicsPane {
 
   /** The sidebar title bar's All topics button (SPEC 5). */
   get navItem(): Locator {
-    return this.win.locator('header[aria-label="Sidebar title bar"]').getByRole('button', { name: 'All topics' })
+    return this.win.locator(`header[aria-label="Sidebar title bar"] ${labelled('button', 'All topics')}`)
   }
 
   get table(): Locator {
-    return this.win.getByRole('grid', { name: 'All topics' })
+    return this.win.locator('[data-all-topics-table]')
   }
 
   get search(): Locator {
-    return this.win.getByRole('textbox', { name: 'Filter topics' })
+    return this.win.locator(labelled('input', 'Filter topics'))
   }
 
   /** Opens the page from the sidebar title bar's All topics button and waits for its rows. */
@@ -1474,7 +1511,7 @@ export class AllTopicsPane {
   }
 
   chip(name: AllTopicsChipName): Locator {
-    return this.win.getByRole('radiogroup', { name: 'Status' }).getByRole('radio', { name: new RegExp(`^${name} \\d+$`) })
+    return this.win.locator(`${labelled('[role="radiogroup"]', 'Status')} [role="radio"][aria-label^=${cssString(`${name} `)}]`)
   }
 
   async filterStatus(name: AllTopicsChipName): Promise<void> {
@@ -1488,24 +1525,24 @@ export class AllTopicsPane {
   }
 
   async filterKind(label: 'All' | 'Channels' | 'DMs'): Promise<void> {
-    const segment = this.win.getByRole('radiogroup', { name: 'Kind' }).getByRole('radio', { name: label, exact: true })
+    const segment = this.win.locator(`${labelled('[role="radiogroup"]', 'Kind')} [role="radio"]`, { hasText: whole(label) })
     await segment.click()
     await expect(segment).toHaveAttribute('aria-checked', 'true')
   }
 
   /** The place picker's button: "Where: Anywhere", "Where: design-review". */
   get placeButton(): Locator {
-    return this.win.getByRole('button', { name: /^Where: / })
+    return this.win.locator('button[aria-label^="Where: "]')
   }
 
   /** The place picker's search field, while its list is open. */
   get placeSearch(): Locator {
-    return this.win.getByRole('dialog', { name: 'Pick a place' }).getByRole('textbox')
+    return this.win.locator(`${labelled('[role="dialog"]', 'Pick a place')} input`)
   }
 
   /** The open list's row whose name starts with `name`. */
   placeOption(name: string): Locator {
-    return this.win.getByRole('dialog', { name: 'Pick a place' }).getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+    return optionsLabelled(this.win.locator(labelled('[role="dialog"]', 'Pick a place')), startsWord(name))
   }
 
   /** Opens the place picker, types `query`, and picks the row whose name starts with the word `name` ("Anywhere" clears the place). */
@@ -1514,11 +1551,11 @@ export class AllTopicsPane {
     await this.placeSearch.fill(query)
     await this.placeOption(name).click()
     await expect(this.placeSearch).toBeHidden()
-    await expect(this.placeButton).toHaveAccessibleName(new RegExp(`^Where: ${escapeRegExp(name)}(\\s|$)`))
+    await expect(this.placeButton).toHaveAttribute('aria-label', new RegExp(`^Where: ${escapeRegExp(name)}(\\s|$)`))
   }
 
   async sort(label: 'Most recent' | 'Oldest first' | 'Most messages'): Promise<void> {
-    await this.win.getByRole('combobox', { name: 'Sort' }).selectOption({ label })
+    await this.win.locator(labelled('select', 'Sort')).selectOption({ label })
   }
 
   async type(text: string): Promise<void> {
@@ -1547,7 +1584,7 @@ export class AllTopicsPane {
   }
 
   async clearFilters(): Promise<void> {
-    await this.win.getByRole('button', { name: 'Clear filters' }).click()
+    await this.table.locator('button', { hasText: whole('Clear filters') }).click()
   }
 }
 
@@ -1574,7 +1611,7 @@ export class HomeWritePane implements HomeWriteVerbs {
 
   /** The suggestion row whose name starts with `name`. */
   suggestion(name: string): Locator {
-    return this.suggestions.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+    return optionsLabelled(this.suggestions, startsWord(name))
   }
 
   /** The picked people and channels drawn as chips in the composer's field. */
@@ -1589,7 +1626,7 @@ export class HomeWritePane implements HomeWriteVerbs {
 
   /** The destination chip above the field: "Send to: Juno", "Send to: Maya Chen", "Send to: #eng". */
   get chip(): Locator {
-    return this.root.getByRole('button', { name: /^Send to: / })
+    return this.root.locator('button[aria-label^="Send to: "]')
   }
 
   /** The list a first @ or # opens while Juno is chosen. */
@@ -1598,21 +1635,21 @@ export class HomeWritePane implements HomeWriteVerbs {
   }
 
   sendToOption(name: string): Locator {
-    return this.sendTo.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+    return optionsLabelled(this.sendTo, startsWord(name))
   }
 
   /** The chip's destination list. */
   get list(): Locator {
-    return this.root.getByRole('dialog', { name: 'Send to' }).getByRole('listbox')
+    return this.root.locator(`${labelled('[role="dialog"]', 'Send to')} [role="listbox"]`)
   }
 
   get search(): Locator {
-    return this.root.getByRole('dialog', { name: 'Send to' }).getByRole('textbox')
+    return this.root.locator(`${labelled('[role="dialog"]', 'Send to')} input`)
   }
 
   /** The row in the destination list named `name`, followed by its sub line ("Direct message"). */
   option(name: string): Locator {
-    return this.list.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+    return optionsLabelled(this.list, startsWord(name))
   }
 
   async write(text: string): Promise<void> {
@@ -1634,26 +1671,26 @@ export class HomeWritePane implements HomeWriteVerbs {
 
   /** The chip names a destination starting with `label`: "Juno", "Maya" for Maya Chen, "#eng". */
   async expectDestination(label: string): Promise<void> {
-    await expect(this.chip).toHaveAccessibleName(new RegExp(`^Send to: ${escapeRegExp(label)}`))
+    await expect(this.chip).toHaveAttribute('aria-label', new RegExp(`^Send to: ${escapeRegExp(label)}`))
   }
 
   /** The topic chip right of the destination chip, while a person or channel is chosen: "Topic: Main", "Topic: <thread title>". */
   get topicChip(): Locator {
-    return this.root.getByRole('button', { name: /^Topic: / })
+    return this.root.locator('button[aria-label^="Topic: "]')
   }
 
   /** The topic chip's list: Main, then the conversation's threads. */
   get topicList(): Locator {
-    return this.root.getByRole('dialog', { name: 'Pick a topic' }).getByRole('listbox')
+    return this.root.locator(`${labelled('[role="dialog"]', 'Pick a topic')} [role="listbox"]`)
   }
 
   get topicSearch(): Locator {
-    return this.root.getByRole('dialog', { name: 'Pick a topic' }).getByRole('textbox')
+    return this.root.locator(`${labelled('[role="dialog"]', 'Pick a topic')} input`)
   }
 
   /** The row in the topic list whose title starts with `title`. */
   topicOption(title: string): Locator {
-    return this.topicList.getByRole('option', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    return optionsLabelled(this.topicList, new RegExp(`^${escapeRegExp(title)}`))
   }
 
   /** Opens the topic list, searches it, and picks the row that starts with `title`. */
@@ -1666,7 +1703,7 @@ export class HomeWritePane implements HomeWriteVerbs {
 
   /** The topic chip names `label`: "Main", or the start of a thread's title. */
   async expectTopic(label: string): Promise<void> {
-    await expect(this.topicChip).toHaveAccessibleName(new RegExp(`^Topic: ${escapeRegExp(label)}`))
+    await expect(this.topicChip).toHaveAttribute('aria-label', new RegExp(`^Topic: ${escapeRegExp(label)}`))
   }
 }
 
@@ -1682,7 +1719,7 @@ export class TopicPane implements TopicVerbs {
   }
 
   get list() {
-    return this.root.getByRole('list', { name: 'Messages' })
+    return this.root.locator(MESSAGE_LIST)
   }
 
   get scroller() {
@@ -1741,7 +1778,7 @@ export class TopicPane implements TopicVerbs {
 
   /** The suggestion row whose name starts with `name`. */
   suggestion(name: string): Locator {
-    return this.suggestions.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
+    return optionsLabelled(this.suggestions, startsWord(name))
   }
 
   /** The picked people and channels drawn as chips in the composer's field. */
@@ -1757,7 +1794,7 @@ export class TopicPane implements TopicVerbs {
   /** The link editor ⌘K opens on words selected in the composer. */
   get linkEditor() {
     const root = this.root.locator('[data-link-editor]')
-    return { root, url: root.getByRole('textbox', { name: 'Link' }), remove: root.getByRole('button', { name: 'Remove' }) }
+    return { root, url: root.locator(labelled('input', 'Link')), remove: root.locator('button', { hasText: whole('Remove') }) }
   }
 
   /** The composer's box, which must not move as rows come and go. */
@@ -1777,7 +1814,7 @@ export class TopicPane implements TopicVerbs {
     return {
       bar,
       /** Picks one of its two choices by name: Post in thread, Send to Main, Fix and send, Send as is. */
-      choose: (name: string) => bar.getByRole('button', { name: new RegExp(`^${name}`) }).click(),
+      choose: (name: string) => bar.locator('button', { hasText: new RegExp(`^${name}`) }).click(),
     }
   }
 
@@ -1797,8 +1834,8 @@ export class TopicPane implements TopicVerbs {
     const row = this.message(text).and(this.list.locator('[data-pending="failed"]'))
     return {
       row,
-      retry: () => row.getByRole('button', { name: 'Retry' }).click(),
-      discard: () => row.getByRole('button', { name: 'Delete draft' }).click(),
+      retry: () => row.locator('[data-send-failed] button', { hasText: whole('Retry') }).click(),
+      discard: () => row.locator('[data-send-failed] button', { hasText: whole('Delete draft') }).click(),
     }
   }
 
@@ -1812,7 +1849,7 @@ export class TopicPane implements TopicVerbs {
 
   /** The context pill, a button named by the channel and its kind. */
   get contextPill() {
-    return this.header.locator('[data-island="left"]').getByRole('button').first()
+    return this.header.locator('[data-island="left"] button').first()
   }
 
   /** A 1:1 DM's presence in the context pill: `active`, `away`, or none while Slack has not said. */
@@ -1820,22 +1857,20 @@ export class TopicPane implements TopicVerbs {
     const dot = this.contextPill.locator('[data-pill-presence]')
     if (presence === undefined) {
       await expect(dot).toHaveCount(0)
-      await expect(this.contextPill).not.toHaveAccessibleName(/, (active|away)\./)
       return
     }
     await expect(dot).toHaveAttribute('data-pill-presence', presence)
-    await expect(this.contextPill).toHaveAccessibleName(new RegExp(`, ${presence}\\. Show in sidebar\\.$`))
   }
 
   /** The title, a menu button inside the page's heading. */
   /** The title: opens the topic switcher; a right-click opens the topic menu. */
   get titleButton() {
-    return this.header.getByRole('heading').getByRole('button')
+    return this.header.locator('h1 button')
   }
 
   /** The right island's ⋯, which opens the topic menu. */
   get moreButton() {
-    return this.header.getByRole('button', { name: 'More', exact: true })
+    return this.header.locator(labelled('button', 'More'))
   }
 
   /**
@@ -1852,7 +1887,7 @@ export class TopicPane implements TopicVerbs {
 
   /** The right island's Follow, on a thread you do not follow: a click follows it. */
   get followButton() {
-    return this.header.getByRole('button', { name: 'Follow', exact: true })
+    return this.header.locator(labelled('button', 'Follow'))
   }
 
   /** Clicks Follow and waits for it to give way. Answers whether a native menu opened on the way (none should). */
@@ -2042,7 +2077,7 @@ export class TopicPane implements TopicVerbs {
 
   /** The "N new messages" or "Jump to latest" pill over the bottom of the list. */
   get pill() {
-    return this.root.getByRole('button', { name: /new message|Jump to latest/ })
+    return this.root.locator('button', { hasText: /new message|Jump to latest/ })
   }
 
   async expectPill(text: string): Promise<void> {
@@ -2069,14 +2104,14 @@ export class TopicPane implements TopicVerbs {
     return new ThreadLinkDriver(this.win, this.message(text).locator('[data-thread-link]'))
   }
 
-  /** A thread link by its reply count and optional first-reply preview. */
+  /** A thread link by its reply count and optional first-reply preview: part of its label, or a pattern for its visible text. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
-    return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
+    return new ThreadLinkDriver(this.win, typeof text === 'string' ? this.list.locator(`[data-thread-link][aria-label*=${cssString(text)} i]`) : this.list.locator('[data-thread-link]', { hasText: text }))
   }
 
   /** A #channel chip in a message: clicking it scopes the sidebar. */
   async clickChannel(name: string): Promise<void> {
-    await this.list.getByRole('button', { name: `#${name}` }).first().click()
+    await this.list.locator(`button[data-channel-name=${cssString(name)}]`).first().click()
   }
 
   /** Main's "Threads" button and its popover. */
@@ -2160,21 +2195,21 @@ export class TopicSwitcherDriver {
   readonly root: Locator
 
   constructor(readonly win: Page) {
-    this.root = win.getByRole('dialog', { name: 'Topics in this channel' })
+    this.root = win.locator(labelled('[role="dialog"]', 'Topics in this channel'))
   }
 
   get search(): Locator {
-    return this.root.getByRole('textbox', { name: 'Search this channel' })
+    return this.root.locator(labelled('input', 'Search this channel'))
   }
 
   /** A row, by the start of its title ("Main" for Main). */
   row(title: string): Locator {
-    return this.root.getByRole('option', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    return optionsLabelled(this.root, new RegExp(`^${escapeRegExp(title)}`))
   }
 
   /** Row titles, top to bottom. */
   titles(): Promise<string[]> {
-    return this.root.getByRole('option').evaluateAll((rows) => rows.map((row) => (row.querySelector('span span')?.textContent ?? row.textContent ?? '').trim()))
+    return this.root.locator('[role="option"]').evaluateAll((rows) => rows.map((row) => (row.querySelector('span span')?.textContent ?? row.textContent ?? '').trim()))
   }
 
   /** Mouse down on a row; with `newTab`, ⌘ held. */
@@ -2197,7 +2232,7 @@ export class TopicSwitcherDriver {
 /** The tab strip over the workspace. */
 
 /** A tab's close button: the tab's sibling in its box, not its child. */
-const closeOf = (tab: Locator): Locator => tab.locator('xpath=..').getByRole('button', { name: 'Close tab' })
+const closeOf = (tab: Locator): Locator => tab.locator('xpath=..').locator(labelled('button', 'Close tab'))
 
 export class TabStrip implements TabStripVerbs {
   readonly root: Locator
@@ -2206,11 +2241,12 @@ export class TabStrip implements TabStripVerbs {
     readonly surface: AppSurface,
     readonly win: Page,
   ) {
-    this.root = win.getByRole('tablist')
+    this.root = win.locator(TAB_STRIP)
   }
 
+  /** A tab whose label starts with `title`; `data-tooltip` holds the label the tab is named by. */
   tab(title: string): Locator {
-    return this.root.getByRole('tab', { name: new RegExp(`^${escapeRegExp(title)}`) })
+    return this.root.locator(`[role="tab"][data-tooltip^=${cssString(title)}]`)
   }
 
   /** The `index`th tab titled `title`, left to right, when several show the same place. */
@@ -2270,11 +2306,11 @@ export class TabStrip implements TabStripVerbs {
 
   /** Tab titles, left to right. */
   titles(): Promise<string[]> {
-    return this.root.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-tooltip') ?? ''))
+    return this.root.locator('[role="tab"]').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('data-tooltip') ?? ''))
   }
 
   async expectCount(count: number): Promise<void> {
-    await expect(this.root.getByRole('tab')).toHaveCount(count, { timeout: 15_000 })
+    await expect(this.root.locator('[role="tab"]')).toHaveCount(count, { timeout: 15_000 })
   }
 
   async expectActive(title: string): Promise<void> {
@@ -2307,7 +2343,7 @@ export class TabStrip implements TabStripVerbs {
 
   /** The "+" after the last tab: a new tab with Home. */
   get newTabButton() {
-    return this.win.getByRole('region', { name: 'Workspace' }).getByRole('button', { name: 'New tab ⌘T' })
+    return this.win.locator('section[aria-label="Workspace"] button[data-tooltip="New tab"]')
   }
 
   /** An item of the app menu, as its shortcut would choose it. */
@@ -2372,7 +2408,7 @@ export class WelcomeDriver {
   }
 
   get heading(): Locator {
-    return this.root.getByRole('heading', { level: 3 })
+    return this.root.locator('h3')
   }
 
   /** Hide, or Done once all three are ticked. */
@@ -2403,7 +2439,7 @@ export class WelcomeDriver {
   /** The whole card is on screen above Home's field, without scrolling. */
   async expectWholeAboveField(): Promise<void> {
     const card = await this.root.boundingBox()
-    const chip = await this.win.locator('[data-home]').filter({ visible: true }).getByRole('button', { name: /^Send to: / }).boundingBox()
+    const chip = await this.win.locator('[data-home]').filter({ visible: true }).locator('button[aria-label^="Send to: "]').boundingBox()
     const viewport = this.win.viewportSize()
     if (card === null || chip === null) throw new Error('No card or no field')
     expect(card.y).toBeGreaterThanOrEqual(0)
@@ -2427,11 +2463,11 @@ export class PaletteDriver implements PaletteVerbs {
     readonly surface: AppSurface,
     readonly win: Page,
   ) {
-    this.root = win.getByRole('dialog', { name: 'Search and commands' })
+    this.root = win.locator(labelled('[role="dialog"]', 'Search and commands'))
   }
 
   get input(): Locator {
-    return this.root.getByRole('combobox')
+    return this.root.locator('input[role="combobox"]')
   }
 
   /** ⌘K, through its app menu item (Go › Search…). */
@@ -2451,7 +2487,7 @@ export class PaletteDriver implements PaletteVerbs {
 
   /** One of the four tabs in the row under the field. */
   tab(name: PaletteTabName): Locator {
-    return this.root.getByRole('radio', { name })
+    return this.root.locator(`${labelled('[role="radiogroup"]', 'Search in')} [role="radio"]`, { hasText: whole(name) })
   }
 
   async expectTab(name: PaletteTabName): Promise<void> {
@@ -2486,7 +2522,7 @@ export class PaletteDriver implements PaletteVerbs {
 
   /** Local results now belong to the current input, rather than the held previous query. */
   async expectResults(): Promise<void> {
-    await expect(this.root.getByRole('listbox', { name: 'Results' })).toHaveAttribute('aria-busy', 'false', { timeout: 15_000 })
+    await expect(this.root.locator(labelled('[role="listbox"]', 'Results'))).toHaveAttribute('aria-busy', 'false', { timeout: 15_000 })
   }
 
   async clear(): Promise<void> {
@@ -2499,16 +2535,16 @@ export class PaletteDriver implements PaletteVerbs {
 
   /** A section of rows: Frequent, Conversations, Recent, Topics and messages, Pages settings and commands, Pages, Settings, Commands, the open topic's name, Results or Juno. */
   section(heading: string): Locator {
-    return this.root.getByRole('group', { name: heading })
+    return this.root.locator(labelled('[role="group"]', heading))
   }
 
   /** Rows whose text matches, label and sub line included. */
   row(text: string | RegExp): Locator {
-    return this.root.getByRole('option').filter({ hasText: text })
+    return this.root.locator('[role="option"]').filter({ hasText: text })
   }
 
   rows(): Locator {
-    return this.root.getByRole('option')
+    return this.root.locator('[role="option"]')
   }
 
   /** The text of the row the arrows or the pointer chose. */
@@ -2562,11 +2598,11 @@ export class Navigation {
 
   /** The visible Back button: in the sidebar's bar, or in the tab strip while the sidebar is hidden. */
   get backButton(): Locator {
-    return this.win.getByRole('button', { name: 'Back ⌘[' }).locator('visible=true')
+    return this.win.locator('button[data-tooltip="Back"]').locator('visible=true')
   }
 
   get forwardButton(): Locator {
-    return this.win.getByRole('button', { name: 'Forward ⌘]' }).locator('visible=true')
+    return this.win.locator('button[data-tooltip="Forward"]').locator('visible=true')
   }
 
   async back(): Promise<void> {
@@ -2608,8 +2644,8 @@ export class SidebarFrame {
     readonly surface: AppSurface,
     readonly win: Page,
   ) {
-    this.sidebar = win.getByRole('complementary', { name: 'Sidebar' })
-    this.edge = win.getByRole('separator', { name: 'Resize sidebar' })
+    this.sidebar = win.locator(SIDEBAR)
+    this.edge = win.locator(labelled('[role="separator"]', 'Resize sidebar'))
   }
 
   async width(): Promise<number> {
@@ -2640,7 +2676,7 @@ export class SidebarFrame {
 
   /** The title bar button that hides or shows the sidebar. */
   async toggleWithButton(): Promise<void> {
-    await this.win.getByRole('button', { name: /^(Hide|Show) sidebar/ }).locator('visible=true').click()
+    await this.win.locator('button:is([data-tooltip="Hide sidebar"], [data-tooltip="Show sidebar"])').locator('visible=true').click()
   }
 
   async toggleWithMenu(): Promise<void> {
@@ -2667,11 +2703,11 @@ export class PrivacyMode {
 
   /** The sidebar footer that says the mode is on. */
   get footer(): Locator {
-    return this.win.getByRole('complementary', { name: 'Sidebar' }).getByRole('status').filter({ hasText: 'Message text hidden' })
+    return this.win.locator(`${SIDEBAR} [data-privacy-footer]`).filter({ hasText: 'Message text hidden' })
   }
 
   get showButton(): Locator {
-    return this.footer.getByRole('button', { name: 'Show message text' })
+    return this.footer.locator(labelled('button', 'Show message text'))
   }
 
   /** The CSS filter on an element: `blur(6px)` while hidden, `none` otherwise. */
@@ -2732,7 +2768,7 @@ export class HomePane {
 
   /** The greeting; with a picture, Home's heading for screen readers only (SPEC 12, "A picture"). */
   get greeting(): Locator {
-    return this.root.getByRole('heading', { level: 2 })
+    return this.root.locator('h2')
   }
 
   /** What Home shows above its composer: the scene or picture, the greeting, the rows and the welcome card (SPEC 12). */
@@ -2752,7 +2788,7 @@ export class HomePane {
 
   /** The sidebar title bar's Home button (SPEC 5). */
   get navItem(): Locator {
-    return this.win.locator('header[aria-label="Sidebar title bar"]').getByRole('button', { name: 'Home' })
+    return this.win.locator(`header[aria-label="Sidebar title bar"] ${labelled('button', 'Home')}`)
   }
 
   /** Opens Home from the sidebar title bar, which reads the items afresh. */
@@ -2780,11 +2816,11 @@ export class HomePane {
 
   /** Clicks a row's link, which opens its topic. */
   async openItem(kind: HomeItemKind): Promise<void> {
-    await this.item(kind).getByRole('link').click()
+    await this.item(kind).locator('a[href]').click()
   }
 
   button(kind: HomeItemKind, name: 'Mark done' | 'Resolve all' | 'Move' | 'Keep in All' | 'Dismiss'): Locator {
-    return this.item(kind).getByRole('button', { name, exact: true })
+    return this.item(kind).locator('button', { hasText: whole(name) })
   }
 
   /** Tidy up's row, which opens its review sheet. */
@@ -2824,7 +2860,7 @@ export class ReviewSheetPane {
   }
 
   get title(): Locator {
-    return this.root.getByRole('heading', { level: 2 })
+    return this.root.locator('h2')
   }
 
   /** The line under the title: what the rows are, and what the action does in Slack. */

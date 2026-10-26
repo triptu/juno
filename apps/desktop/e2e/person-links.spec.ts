@@ -155,14 +155,14 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
     await tabs.expectActive(POSTGRES)
     expect(await win.evaluate(() => document.activeElement?.closest('[data-topic-view]') != null)).toBe(true)
     await tabs.select('Home')
-    await expect(juno.write.chip).toHaveAccessibleName(/^Send to: Dev/)
+    await expect(juno.write.chip).toContainText('Dev')
   })
 
   await test.step('a click on your own name addresses you in a new Home tab, as ⌘N does, since Home with Dev is in use', async () => {
     await tabs.select(POSTGRES)
     await name(juno, OWN).click()
     await tabs.expectCount(7)
-    await expect(juno.write.chip).toHaveAccessibleName(/^Send to: Tushar/)
+    await expect(juno.write.chip).toContainText('Tushar')
   })
 })
 

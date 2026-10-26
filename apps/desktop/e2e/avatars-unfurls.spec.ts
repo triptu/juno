@@ -37,7 +37,7 @@ test('photos load in messages, sidebar stacks, a DM row and the account menu, an
   const photo = row.locator(`img${schemeSrc('files')}[src*="/avatar"]`)
   await expect.poll(() => photo.evaluateAll((images) => images.some((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0))).toBe(true)
   await expect(photo).toHaveAttribute('src', /T0JUNO-U0MAYA-fakeu0maya-72$/)
-  const previewImage = row.getByRole('img', { name: 'Avery Example on X' })
+  const previewImage = row.locator('img[alt*="Avery Example on X" i]')
   await expect.poll(() => previewImage.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
   const failed = juno.topic.message('Preview failed')
   await failed.scrollIntoViewIfNeeded()
