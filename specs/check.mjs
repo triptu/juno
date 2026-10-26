@@ -90,8 +90,9 @@ function specHash(file, seen = new Set()) {
 }
 
 // Deadlines per Quint process, about four times the slowest run measured on a
-// loaded machine (docs/development.md, "Faster test runs"). A timeout is a failure.
-const deadlines = { verify: 360000, other: 60000 }
+// loaded machine (docs/development.md, "Faster test runs"): threadranges' 4,000
+// samples took 41.5 s alone in a nightly on 10-26. A timeout is a failure.
+const deadlines = { verify: 360000, other: 180000 }
 
 function quint(args, { violation = false, timeout = args[0] === 'verify' ? deadlines.verify : deadlines.other, trace, check = () => {}, checks = '' } = {}) {
   jobs.push({ args, violation, timeout, trace, check, checks })

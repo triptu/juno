@@ -63,8 +63,9 @@ async function sendReply(juno: Fixtures['juno'], fake: Fixtures['fake']): Promis
 
   // The answer waits, so the pending row is on screen until it is released.
   fake.holdNext({ method: 'chat.postMessage', before: true })
-  await expect(topic.composerField).toBeVisible()
-  const field = await topic.composerField.boundingBox()
+  // The field can mount again between a visibility check and a box read, so wait for a box.
+  let field: Awaited<ReturnType<typeof topic.composerField.boundingBox>> = null
+  await expect.poll(async () => (field = await topic.composerField.boundingBox())).not.toBeNull()
   await topic.send('Thursday works for the freeze')
   await expect(topic.message('Thursday works for the freeze')).toHaveAttribute('data-pending', 'sending')
   await expect(topic.composer).toHaveValue('')
