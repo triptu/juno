@@ -16,7 +16,7 @@ export function repairPlan({ baseline, identity, suites, affected: selected }) {
   if (baseline.suites.some((suite) => ['perf @mac', 'test:feel', 'test:desktop @mac'].includes(suite.suite)))
     throw new Error('Repair of a Mac timing run needs a fresh --with-mac full run')
   const coordinatorFailed = baseline.suites.some((suite) => ['plan', 'setup'].includes(suite.suite) && !suitePassed(suite))
-  // The laptop perf job is not part of a repair: the next nightly measures what changed.
+  // Timed perf is on demand and not part of a repair (docs/performance.md 7.3).
   const all = [...suites, ...baseline.suites.filter((previous) => !['plan', 'setup', 'perf', 'perf:part1', 'perf:part2'].includes(previous.suite) && !suites.some((suite) => suite.name === previous.suite))
     .map((previous) => ({ name: previous.suite, words: [previous.suite] }))]
   const planned = []
@@ -33,7 +33,7 @@ export function repairPlan({ baseline, identity, suites, affected: selected }) {
     const failures = completeInventory ? previous.tests.cases.filter((test) => !['expected', 'flaky'].includes(test.outcome) && test.expectedStatus !== 'skipped') : []
     const files = failures.map((test) => test.file)
     const selective = previous && (suitePassed(previous) || (completeInventory && files.length > 0 && files.every(Boolean)))
-      && (!reached || reached.args.length > 0) && /^test:(desktop|browser|electron|nightly|gallery)$/.test(suite.name)
+      && (!reached || reached.args.length > 0) && /^test:(desktop|browser|electron|gallery)$/.test(suite.name)
     if (selective) {
       const prefix = suite.name === 'test:gallery' ? 'apps/gallery/' : 'apps/desktop/'
       const args = [...new Set([...files.map((file) => file.replace(prefix, '')), ...(reached?.args ?? [])])]

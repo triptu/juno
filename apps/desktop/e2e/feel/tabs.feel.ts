@@ -23,7 +23,7 @@ const test = base.extend({
 const THREAD = 'Review the rollout checklist 1'
 const OTHERS = ['Draft plan is in the doc', 'Rina finished the onsite.', 'Proposal: cut offline mode and public', 'Can eng take the Wednesday afternoon']
 
-test('switching back to a scrolled tab restores it before the first paint', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, feel }) => {
+test('switching back to a scrolled tab restores it before the first paint', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(THREAD).open()

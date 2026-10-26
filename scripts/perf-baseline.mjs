@@ -40,7 +40,7 @@ function newestRuns(count) {
   return found
 }
 
-/** One run's metrics by runner shape, then by name: a nightly's parts run on jobs of different sizes. */
+/** One run's metrics by runner shape, then by name: a perf run's parts can run on jobs of different sizes. */
 export function readRun(files) {
   const shapes = {}
   for (const entry of files.flatMap((file) => JSON.parse(readFileSync(file, 'utf8')))) {

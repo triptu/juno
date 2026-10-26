@@ -138,7 +138,7 @@ domTest('start, mute, leave and join huddles; an incoming huddle rings, joins, d
     expect(durations.filter(([barTime, tabTime]) => barTime === null || barTime !== tabTime)).toEqual([])
     expect(new Set(durations.map(([time]) => time)).size).toBeGreaterThan(1)
   })
-}, { timeout: 150_000, tag: ['@nightly', '@nightly-huddle'] })
+}, { timeout: 150_000, tag: ['@heavy', '@heavy-huddle'] })
 
 type Context = Pick<DomContext, 'juno' | 'fake'>
 

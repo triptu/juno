@@ -215,7 +215,7 @@ test('sidebar rows stay fixed while sync fills the remaining topics', { tag: ['@
   })
 })
 
-test('cold sync fills Home with retained rows, a fixed composer and no flicker', { tag: ['@nightly', '@nightly-sync'] }, async ({ juno, win, fake }) => {
+test('cold sync fills Home with retained rows, a fixed composer and no flicker', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
   const method = 'conversations.history'
   const subscriptions = 'subscriptions.thread.getView'
   fake.holdNext({ method: subscriptions })

@@ -222,7 +222,7 @@ const renderingCaches = new Map<string, ReturnType<typeof testCache>>()
  * A test that only reads what states draw (boxes, or with `paint` also colours),
  * so it is a pure function of the components it opens. It is skipped while those
  * components, its spec and the runtime are unchanged since it last passed;
- * `GALLERY_SHIFT_ALL=1` (nightly and no-cache runs), repeats and retries run it.
+ * `GALLERY_SHIFT_ALL=1` (full and no-cache runs), repeats and retries run it.
  * Never use it for interaction timing, motion or a delayed load.
  */
 function renderingTest(kind: 'layout' | 'paint') {

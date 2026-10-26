@@ -18,11 +18,19 @@ export function readRecords(status) {
   return [...new Map(records.map((record) => [`${record.commit}:${record.finishedAt}`, record])).values()]
 }
 
-/** A full run passes only when every required suite ran and every suite passed. */
+/**
+ * Whether a record's suites skipped tests: before 10-26 a normal full run skipped the tests now tagged @heavy
+ * outside the sync and gallery areas (`JUNO_SKIP_TAGS=@nightly`). Such a record is not a full run, and no repair
+ * starts from it.
+ */
+export const skippedTests = (record) => record.suites.some((suite) => (suite.command ?? []).some((word) => /^JUNO_SKIP_TAGS=.*@nightly/.test(word)))
+
+/** A full run passes only when every required suite ran, skipped no tests and passed. */
 export function assessRecord(record) {
   const required = record.version === 2 ? ['test', 'specs:check', 'specs:conformance', 'test:gallery',
     ...(record.required?.includes('test:browser') ? ['test:browser', 'test:electron'] : ['test:desktop'])] : ['test', 'specs:check', 'test:gallery', 'test:desktop']
   return record.smoke !== true && record.passed === true
+    && !skippedTests(record)
     && required.every((name) => record.suites.some((suite) => suite.suite === name))
     && record.suites.every(suitePassed)
     && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'perf @mac', 'test:feel'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
@@ -45,26 +53,8 @@ export function compatible(root, green, commit) {
   return JSON.stringify({ ...before, version: after.version }) === JSON.stringify(after)
 }
 
-const SKIPS_NIGHTLY = /^JUNO_SKIP_TAGS=.*@nightly/
-
-/**
- * Whether a record shows the nightly tier passing at its commit: a release's nightly reach that passed (every
- * nightly file ran there, or passed before with unchanged inputs; scripts/nightly-reach.mjs), or a passing full
- * run that skipped no nightly test (a nightly run, or one from before the tier).
- */
-export function nightlyCovered(record) {
-  if (record.smoke === true) return false
-  if (record.nightlyReach) return record.nightlyReach.passed === true
-  return assessRecord(record) && !record.suites.some((suite) => (suite.command ?? []).some((word) => SKIPS_NIGHTLY.test(word)))
-}
-
-/** The newest record whose nightly tier covers `commit`, or null. */
-export function nightlyGate(root, commit, records = readRecords(statusFolder(root))) {
-  return records.find((record) => nightlyCovered(record) && compatible(root, record.commit, commit)) ?? null
-}
-
 /** A green full run that covers `commit`, or null. */
-export function fullRunGate(root, commit, records = readRecords(statusFolder(root))) {
+export function releaseGate(root, commit, records = readRecords(statusFolder(root))) {
   const provenance = (record, seen = new Set()) => {
     if (!record.repair) return true
     const key = `${record.commit}:${record.finishedAt}`
@@ -82,15 +72,8 @@ export function fullRunGate(root, commit, records = readRecords(statusFolder(roo
   return null
 }
 
-/** A release needs a green full run and the nightly tier to cover its commit. */
-export function releaseGate(root, commit, records = readRecords(statusFolder(root))) {
-  const full = fullRunGate(root, commit, records)
-  const nightly = full && nightlyGate(root, commit, records)
-  return nightly ? { ...full, nightly } : null
-}
-
 export function printGate(gate) {
-  console.log(`release gate: ${gate.commit} covered by full run ${gate.record.commit} (${gate.record.finishedAt}) and the nightly tier at ${gate.nightly.commit} (${gate.nightly.finishedAt})`)
+  console.log(`release gate: ${gate.commit} covered by full run ${gate.record.commit} (${gate.record.finishedAt})`)
 }
 
 if (import.meta.main) {
@@ -99,7 +82,7 @@ if (import.meta.main) {
   const gate = releaseGate(root, commit)
   if (gate) printGate(gate)
   else {
-    console.error(`release gate: ${fullRunGate(root, commit) ? 'no passing nightly tier (verify:main --nightly-reach-only)' : 'no eligible full-run record'} for ${commit}`)
+    console.error(`release gate: no eligible full-run record for ${commit}`)
     process.exitCode = 1
   }
 }

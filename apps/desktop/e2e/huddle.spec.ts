@@ -22,7 +22,7 @@ const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalTh
 const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
 
 // Starts signed in and synced (README, "Synced start").
-syncedTest('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@nightly', '@nightly-huddle'] }, async ({ juno, fake, win }) => {
+syncedTest('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@heavy', '@heavy-huddle'] }, async ({ juno, fake, win }) => {
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
   await test.step('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop', async () => {
@@ -115,7 +115,7 @@ syncedTest('someone shares their screen: the bar says so, the tab shows it, two 
   })
 })
 
-syncedTest('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings; quitting in a huddle asks first', { tag: ['@electron', '@nightly', '@nightly-huddle'] }, async ({ juno, fake, win, app, running }) => {
+syncedTest('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings; quitting in a huddle asks first', { tag: ['@electron', '@heavy', '@heavy-huddle'] }, async ({ juno, fake, win, app, running }) => {
   const { palette } = juno
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 

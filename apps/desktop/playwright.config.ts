@@ -4,7 +4,7 @@ import { defineConfig } from '@playwright/test'
 import type { Lane } from './e2e/fixtures'
 import { BROWSER_SPECS } from './e2e/lanes'
 
-// `@on-demand` tests (the feel scenarios outside the nightly subset, the idle walk) run only with JUNO_ON_DEMAND=1.
+// `@on-demand` tests (the feel scenarios outside the six of every full run, the idle walk) run only with JUNO_ON_DEMAND=1.
 const excludedTags = [
   ...(process.platform === 'darwin' ? [] : ['@mac']),
   ...(process.env.JUNO_ON_DEMAND === '1' ? [] : ['@on-demand']),

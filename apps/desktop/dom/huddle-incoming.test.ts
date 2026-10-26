@@ -5,7 +5,7 @@
  * and notification without the ring, and the dock bounces only while Juno is
  * not frontmost. The ring is recorded, not played, under JUNO_E2E
  * (`window.__junoHuddleRing`), and main counts the dock's bounces. Join,
- * Dismiss and a huddle that ends are in huddle.test.ts (nightly).
+ * Dismiss and a huddle that ends are in huddle.test.ts (@heavy).
  *
  * Notification hours depend on the clock, so the test first sets them around
  * now. The channels that ring are set to Always.

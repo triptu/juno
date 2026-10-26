@@ -37,7 +37,7 @@ export interface DomTestOptions<M extends Model | undefined = undefined> {
   /** The engine's frames reach the page one at a time, so counted renders do not depend on timing (`work.ts`). */
   readonly counted?: boolean
   readonly timeout?: number
-  /** Tags, as a Playwright test has them: a test with a tag JUNO_SKIP_TAGS names is skipped (`@nightly`, scripts/test-areas.mjs). */
+  /** Tags, as a Playwright test has them: a test with a tag JUNO_SKIP_TAGS names is skipped (`@heavy-huddle`, scripts/test-areas.mjs). */
   readonly tag?: ReadonlyArray<string>
 }
 

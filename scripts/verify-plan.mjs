@@ -9,22 +9,23 @@ export function planOutcomes(lines, suites, planned) {
 }
 
 /**
- * The suites of a full run. A normal run skips the nightly tier's tests (`@nightly`, scripts/test-areas.mjs) in
- * the DOM and desktop lanes; a nightly run keeps them. `skipTags` are skipped as well (`@mac` on a local run).
+ * The suites of a full run: every test, including the @heavy ones (scripts/test-areas.mjs). Conformance replays its
+ * traces uncached and the gallery checks every state with the fast check; the spec check reuses unchanged checks, as
+ * it proves the models, not Juno's code. `noCache` reruns every spec check too. `skipTags` are skipped (`@mac` on a
+ * local run).
  */
-export function fullSuites(scripts, { nightly = false, noCache = false, seed, testSeed, skipTags = [] } = {}) {
+export function fullSuites(scripts, { noCache = false, seed, testSeed, skipTags = [] } = {}) {
   const apps = scripts['test:browser'] && scripts['test:electron'] ? ['test:browser', 'test:electron'] : ['test:desktop']
-  const skipped = [...skipTags, ...(nightly || !scripts['test:nightly'] ? [] : ['@nightly'])]
-  const skip = skipped.length > 0 ? [`JUNO_SKIP_TAGS=${skipped.join(',')}`] : []
+  const skip = skipTags.length > 0 ? [`JUNO_SKIP_TAGS=${skipTags.join(',')}`] : []
+  const order = testSeed !== undefined ? [`--seed=${testSeed}`] : []
   return [
-    { name: 'test', words: ['test', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] },
+    { name: 'test', words: ['test', ...order] },
     // The DOM lane (apps/desktop/dom), in the unit job; a commit from before it has no test:dom.
-    ...(scripts['test:dom'] ? [{ name: 'test:dom', words: [...skip, 'test:dom', ...(testSeed !== undefined ? [`--seed=${testSeed}`] : [])] }] : []),
-    // The spec check proves the models, not Juno's code, so a nightly reuses its unchanged checks like any run;
-    // conformance replays traces against the engine, so a nightly runs it uncached.
+    ...(scripts['test:dom'] ? [{ name: 'test:dom', words: [...skip, 'test:dom', ...order] }] : []),
     { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
-    { name: 'specs:conformance', words: [...(noCache || nightly ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
-    { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), ...(nightly ? ['GALLERY_REAL_WALK=0'] : []), 'test:gallery'] },
+    { name: 'specs:conformance', words: ['SPECS_CACHE=off', 'specs:conformance'] },
+    // The real-input walk runs on changed states in affected plans; GALLERY_REAL_WALK=1 forces it by hand.
+    { name: 'test:gallery', words: ['GALLERY_SHIFT_ALL=1', 'GALLERY_REAL_WALK=0', 'test:gallery'] },
     ...apps.map((name) => ({ name, words: [...skip, name] })),
   ]
 }

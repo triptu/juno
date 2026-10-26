@@ -34,7 +34,7 @@ const narrowsInPlace: Check = (evidence) => {
   return { name, status: 'pass', detail: `left ${Math.round(at.x)}, bottom ${Math.round(at.y + at.height)} in every frame`, shots: [] }
 }
 
-test('typing a mention', { tag: ['@nightly', '@nightly-feel'] }, async ({ juno, win, feel }) => {
+test('typing a mention', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, win, feel }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   await juno.topic.composer.focus()

@@ -4,23 +4,17 @@
 //   bun run verify:main                 local main
 //   bun run verify:main --local --dry-run  inspect the local plan without running it
 //   bun run verify:main --ref origin/main
-//   bun run verify:main --nightly         every check uncached except unchanged spec checks, full gallery walks; laptop only
 //   bun run verify:main --repair latest   repair a failed ancestor record
-//   bun run verify:main --no-cache        rerun protocol checks and full gallery walks
+//   bun run verify:main --no-cache        also rerun every spec check
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
 //                                    then `test:feel`
-//   bun run verify:main --release       also the nightly tests the change reaches (bun run release)
-//   bun run verify:main --nightly-reach-only   only those nightly tests
 //
-// A normal run skips the nightly tier (tests tagged @nightly, scripts/test-areas.mjs);
-// --nightly runs it. With --release or --nightly-reach-only it adds a `test:nightly`
-// suite of the nightly files the change since each one last passed reaches
-// (scripts/nightly-reach.mjs) and records the result as `nightlyReach`, which the
-// release gate reads.
-//
-// It checks main out into a temporary detached worktree, so nothing local is
-// sent, and runs `test`, `specs:check` (reused while its inputs match),
-// `specs:conformance`, `test:gallery` and `test:desktop` as one plan with independent SSH jobs
+// A full run runs every test, the @heavy ones included (scripts/test-areas.mjs),
+// and is what a release needs. It checks main out into a temporary detached
+// worktree, so nothing local is sent, and runs `test`, `test:dom`, `specs:check`
+// (each check reused while its inputs match), `specs:conformance` (uncached),
+// `test:gallery` (the fast check over every state) and the browser and Electron
+// lanes as one plan with independent SSH jobs
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
@@ -37,7 +31,7 @@ import { randomInt } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { hostname } from 'node:os'
 import { reportedRuntime, writeRecord } from './verify-records.mjs'
-import { assessRecord, isAncestor, readRecords, statusFolder } from './release-gate.mjs'
+import { assessRecord, isAncestor, readRecords, skippedTests, statusFolder } from './release-gate.mjs'
 import { failureCause, testResults } from './test-results-reporter.mjs'
 import { fullSuites, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
@@ -47,18 +41,13 @@ import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
 import { ImportGraph } from './import-graph.mjs'
 import { keepReports } from './verify-reports.mjs'
 import { stopFromLog } from './verify-failures.mjs'
-import { checkoutReach } from './nightly-reach.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
 const withMac = argv.includes('--with-mac')
-const nightly = argv.includes('--nightly')
 const smoke = argv.includes('--smoke')
-const reachOnly = argv.includes('--nightly-reach-only')
-const reach = reachOnly || argv.includes('--release')
-if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
-if (reach && ['--smoke', '--repair', '--nightly'].some((flag) => argv.includes(flag))) throw new Error('--release and --nightly-reach-only cannot be combined with --smoke, --repair or --nightly (which runs every nightly test)')
+if (smoke && ['--repair', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
 const noCache = argv.includes('--no-cache')
 // Every spec simulation that runs takes a fresh seed, kept in the record: `bun run specs:check --seed <n>` repeats it.
 const seed = process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
@@ -92,12 +81,13 @@ const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
 const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }]
-  : reachOnly ? [] : fullSuites(scripts, { nightly, noCache, seed, testSeed, skipTags: local ? ['@mac'] : [] })
+  : fullSuites(scripts, { noCache, seed, testSeed, skipTags: local ? ['@mac'] : [] })
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
 const baseline = repairArg === 'latest' ? records[0] : repairArg ? JSON.parse(readFileSync(resolve(repairArg), 'utf8')) : undefined
 if (repairArg && (!baseline || baseline.version !== 2 || !isAncestor(root, baseline.commit, commit)))
   throw new Error('--repair needs a version 2 record at an ancestor of the target commit')
-if (baseline && (nightly || noCache)) throw new Error('--repair cannot be combined with --nightly or --no-cache')
+if (baseline && skippedTests(baseline)) throw new Error('--repair cannot start from a run that skipped tests; start a full run')
+if (baseline && noCache) throw new Error('--repair cannot be combined with --no-cache')
 // Reuse is provisional until this run's jobs confirm the recorded identity.
 const identity = local ? plannedIdentity : baseline?.identity ?? records.find((record) =>
   record.execution?.mode === execution.mode && record.execution.host === execution.host && record.suites.some(suitePassed))?.identity ?? plannedIdentity
@@ -105,9 +95,9 @@ const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
 let suites = required.filter((suite) => {
-  // A nightly run reuses no suite from an earlier run except the spec check, which proves the models, not the code.
-  // The spec seed is always set, and not part of any key.
-  if (baseline || !protocolRoots[suite.name] || noCache || (nightly && suite.name !== 'specs:check')) return true
+  // Only the spec check is reused from an earlier run: it proves the models, not the code. Conformance replays its
+  // traces against the engine, so it always runs. The spec seed is always set, and not part of any key.
+  if (baseline || suite.name !== 'specs:check' || !protocolRoots[suite.name] || noCache) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
     if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
@@ -127,7 +117,6 @@ if (argv.includes('--dry-run')) {
   for (const suite of reused) console.log(`Reuse ${suite.suite}: unchanged inputs and runtime (${suite.reusedFrom.commit})`)
   if (baseline) console.log(`Repair ${baseline.commit}: failed/unfinished files plus uncapped import-graph selection (resolved in the target checkout)` )
   if (withMac) console.log('On this Mac: test:desktop --grep @mac, then test:feel (exclusive heavy lock)')
-  if (reach) console.log('Then test:nightly: the nightly files the change since each last passed reaches (decided in the checkout)')
   process.exit(0)
 }
 mkdirSync(logDir, { recursive: true })
@@ -207,21 +196,6 @@ if (baseline && !installed) throw new Error(`Repair dependencies did not install
 const checkoutFiles = tracked.filter((file) => /^(apps|packages)\//.test(file))
 const graph = new ImportGraph(checkout, new Set(checkoutFiles))
 const protocols = protocolInputs(tracked, (file) => graph.closure(file))
-// The nightly files this commit must run before a release (scripts/nightly-reach.mjs).
-let nightlyReach
-if (reach) {
-  const files = scripts['test:nightly'] ? checkoutReach(checkout, commit, records, { ...process.env, JUNO_TEST_SEED: testSeed }) : []
-  for (const item of files) console.log(`verify:main: nightly ${item.file.replace('apps/desktop/', '')}: ${item.run ? 'runs' : 'not needed'}, ${item.why}`)
-  const run = files.filter((item) => item.run).map((item) => item.file)
-  if (run.length > 0) {
-    const suite = { name: 'test:nightly', words: ['test:nightly', ...run] }
-    required.push(suite)
-    suites.push(suite)
-    words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
-  }
-  nightlyReach = { files }
-}
-
 let affected
 if (baseline) {
   // A repair plans wide: no sampling or heavy exclusions.
@@ -305,21 +279,17 @@ const measured = results.map((result) => {
   }
 })
 const outcomes = [...measured, ...reused]
-if (nightlyReach) {
-  const ran = outcomes.find((suite) => suite.suite === 'test:nightly')
-  nightlyReach.passed = nightlyReach.files.every((item) => !item.run) || (ran !== undefined && suitePassed(ran))
-}
 const summary = {
-  version: 2, commit, subject, ref, identity: runtime.identity, plannedIdentity, execution, smoke, reachOnly,
+  version: 2, commit, subject, ref, identity: runtime.identity, plannedIdentity, execution, smoke,
   finishedAt: new Date().toISOString(),
   passed: !cancelled && !setupFailure && !runtimeFailure && !runtime.mismatch && outcomes.every(suitePassed),
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
-  nightly, nightlyReach, seed, testSeed,
+  seed, testSeed,
   suites: outcomes,
   seconds: (Date.now() - planStarted) / 1000,
-  allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'GALLERY', 'PERF1', 'PERF2', 'WIDE'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
+  allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'GALLERY'].map((kind) => [kind.toLowerCase(), process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
   reports: keepReports(checkout, logDir, planStarted).map((file) => join('.juno-status', relative(statusDir, file))),
 }
 writeRecord(statusDir, runId, summary)
@@ -332,7 +302,6 @@ const markdown = [
   '',
   `Unit test order seed ${testSeed}; \`bun run test --seed ${testSeed}\` repeats it.`,
   '',
-  ...(nightly ? ['Nightly tests ran in their lanes.', ''] : nightlyReach ? [`Nightly reach ${nightlyReach.passed ? 'passed' : 'FAILED'}: ${nightlyReach.files.filter((item) => item.run).length} of ${nightlyReach.files.length} nightly file(s) ran; the rest passed before with unchanged inputs.`, ''] : scripts['test:nightly'] && !smoke ? ['Nightly tests skipped (a release runs those its changes reach).', ''] : []),
   '| Suite | Result | Time | Log |',
   '| --- | --- | --- | --- |',
   ...summary.suites.map((suite) => `| \`${suite.suite}\` | ${suite.code === 0 ? 'passed' : `failed (${suite.code})`} | ${suite.seconds} s | \`${suite.log}\` |`),

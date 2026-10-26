@@ -3,7 +3,7 @@ import { formatForcedShift } from '@juno/testing/forced-shift'
 import { computedWalk, forced } from './computed-walk'
 import { claimQueue, openState, readRoutes, stateCache, test } from './support'
 
-/** Fast shift checks for changed states; GALLERY_SHIFT_ALL=1 checks every state, including on nightly runs. */
+/** Fast shift checks for changed states; GALLERY_SHIFT_ALL=1 checks every state, as a full run does. */
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
 const parts = Number(process.env.GALLERY_SHIFT_PARTS ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
