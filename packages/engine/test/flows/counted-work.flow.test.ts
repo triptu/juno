@@ -11,7 +11,7 @@ import { expectWork } from '@juno/testing/work-budget'
 import { messagesAtom, openTopic, sendMessage, type ListWindow } from '@juno/state'
 import type { MessageView, TopicRow } from '@juno/contract'
 import { controlledClock } from '../controlledClock'
-import { WAIT_MS, type EngineOptions, type RunningEngine } from '../harness'
+import { WAIT_MS, waitFor, type EngineOptions, type RunningEngine } from '../harness'
 import { mutationSeed } from '../mutationSeed'
 import { bootedEngine, quiet, tsOf, valueOf } from '../scenario'
 import { countSql, statementsSoFar, type SqlWork } from '../sqlWork'
@@ -109,10 +109,14 @@ it('the sidebar, a topic open and reopen, a send and a live message stay within 
 
   await step("opening #eng's Main: its window, its header and the fetch of what the store lacks", async () => {
     const sql = await measured(engine, time, async () => {
+      // The app mounts the window and asks for the open together, so the window's first run and the fetch's write of
+      // the range it covers land in either order: one run, or two when the write follows the first. Wait for the
+      // first run, so the count is always the slower order: the window read, then read again once the fetch covers it.
       eng = windowOf(engine, main)
+      await waitFor(eng)
       valueOf(await openTopic(engine.registry, main))
     }, () => eng()?.meta.windowCovered === true)
-    expectWork('topic open, cold', counts(sql), { statements: 36, rows: 50 }, detail(sql))
+    expectWork('topic open, cold', counts(sql), { statements: 45, rows: 66 }, detail(sql))
   })
 
   await step('opening it again: the window is still mounted, the open asks only for what is newer', async () => {

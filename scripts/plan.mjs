@@ -7,7 +7,8 @@
 // environment. The app suites (test:desktop, test:gallery, test:e2e) run one
 // after another, each with the whole machine's workers. The other suites (unit
 // tests and spec checks) run in separate lanes beside them, at a lower CPU
-// priority, so the app suites keep their timing. The lanes share the workers
+// priority, so the app suites keep their timing. test:electron runs in a lane
+// of its own beside test:browser, also at the lower priority. The lanes share the workers
 // out (sideBySide below); JUNO_PLAN_OVERLAP=1 keeps each suite's own workers.
 // JUNO_PLAN_SERIAL=1 runs every step one after another instead.
 //
@@ -54,10 +55,13 @@ export const appSuites = ['test:desktop', 'test:browser', 'test:electron', 'test
 /** The steps in lanes that run at the same time; each lane runs its steps in order. */
 export function lanes(steps, serial) {
   if (serial) return [steps]
-  const app = steps.filter((step) => appSuites.includes(step.script))
+  // With the browser lane in the plan, Electron runs beside it at the side lanes' lower priority: the browser
+  // lane leaves about a third of the threads idle while its tests wait on frames (docs/development.md, "Job sizes").
+  const electron = steps.some((step) => step.script === 'test:browser') ? steps.filter((step) => step.script === 'test:electron') : []
+  const app = steps.filter((step) => appSuites.includes(step.script) && !electron.includes(step))
   const specs = steps.filter((step) => step.script === 'specs:check')
   const rest = steps.filter((step) => !appSuites.includes(step.script) && step.script !== 'specs:check')
-  return [app, rest, specs].filter((lane) => lane.length > 0)
+  return [app, electron, rest, specs].filter((lane) => lane.length > 0)
 }
 
 /**
@@ -66,12 +70,16 @@ export function lanes(steps, serial) {
  * Gallery gets three quarters because its checks wait for the browser, and a
  * quarter when it walks only changed states (apps/gallery/playwright.config.ts).
  * Wide unit-only plans retain their inherited unit workers; app plans split them.
+ * The browser and Electron lanes side by side take half and a third of the
+ * threads: on three cores (six threads) 3 and 2 workers finished in 115 s and
+ * 591 CPU-s, 4 and 3 in 116 s and 657 (10-26, one run each).
  * A step's own KEY=VALUE words still win.
  */
 export function sideBySide(cores, wideUnit = false) {
   const galleryWorkers = String(cores === 3 ? 3 : Math.max(1, Math.floor((cores * 3) / 4)))
   return {
-    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_CACHED_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
+    app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_FAST_WORKERS: galleryWorkers, GALLERY_CACHED_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
+    desktop: { JUNO_BROWSER_WORKERS: String(Math.max(1, Math.floor(cores / 2))), JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 3))) },
     rest: wideUnit ? {} : { JUNO_TEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))) },
     specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
   }
@@ -119,7 +127,8 @@ if (import.meta.main) {
       const monitor = failureMonitor()
       let stopped
       const command = low ? ['nice', ['-n', '10', 'bun', 'run', step.script, ...step.args]] : ['bun', ['run', step.script, ...step.args]]
-      const laneEnv = appSuites.includes(step.script) ? shared?.app : step.script === 'specs:check' ? shared?.specs : shared?.rest
+      const desktopBeside = planned.some((lane) => lane[0]?.script === 'test:electron') && ['test:browser', 'test:electron'].includes(step.script)
+      const laneEnv = appSuites.includes(step.script) ? { ...shared?.app, ...(desktopBeside ? shared?.desktop : {}) } : step.script === 'specs:check' ? shared?.specs : shared?.rest
       const child = spawn(command[0], command[1], { detached: guarded && process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(steps.indexOf(step)) } })
       children.add(child)
       const prefix = `[${step.script}] `
@@ -148,6 +157,8 @@ if (import.meta.main) {
       })
     })
   console.log(`plan: ${steps.length} step(s) in ${planned.length} lane(s): ${planned.map((lane) => lane.map((step) => step.script).join(', ')).join(' | ')}`)
+  // Steps that run side by side share the cgroup, so only the whole plan's CPU is known.
+  const planCpuStart = planned.length > 1 ? cpuMicros() : undefined
   const codes = (await Promise.all(planned.map(async (lane, index) => {
     const results = []
     // The unit and spec lanes give priority to the app lane.
@@ -164,5 +175,6 @@ if (import.meta.main) {
     }
     return results
   }))).flat()
+  if (planCpuStart !== undefined) console.log(`plan: ${planned.length} lanes used ${Math.round((cpuMicros() - planCpuStart) / 1e6)} CPU-s`)
   process.exit(codes.every((code) => code === 0) ? 0 : 1)
 }

@@ -1,0 +1,1 @@
+- 10-26 20:35 · Tushar · Full fast-only gallery runs use one worker per allocated thread: six workers on three physical cores ran the same 1,835 states in 89 s, versus 99 s with eight and 95 s with four. Explicit worker overrides, real-input walk concurrency and the full-run job split stay unchanged; measurements are single runs under shared host load.

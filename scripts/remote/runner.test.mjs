@@ -120,14 +120,14 @@ test('--local runs root commands sequentially without requiring tstack or SSH', 
 
 test('workers use allocated threads and preserve explicit worker overrides', () => {
   const run = (threads, extra = {}) => {
-    const result = spawnSync('bash', ['-uc', 'source "$1" test; printf "%s %s %s" "$JUNO_TEST_WORKERS" "$GALLERY_WORKERS" "$SPECS_JOBS"', '_', resolve('scripts/remote/workers.sh')], { encoding: 'utf8', env: { ...process.env, JUNO_RUNNER_JOB_CORES: threads, JUNO_TEST_WORKERS: '', GALLERY_WORKERS: '', SPECS_JOBS: '', ...extra } })
+    const result = spawnSync('bash', ['-uc', 'source "$1" test; printf "%s %s %s %s" "$JUNO_TEST_WORKERS" "$GALLERY_WORKERS" "$SPECS_JOBS" "$GALLERY_FAST_WORKERS"', '_', resolve('scripts/remote/workers.sh')], { encoding: 'utf8', env: { ...process.env, JUNO_RUNNER_JOB_CORES: threads, JUNO_TEST_WORKERS: '', GALLERY_WORKERS: '', GALLERY_FAST_WORKERS: '', SPECS_JOBS: '', ...extra } })
     assert.equal(result.status, 0, result.stderr)
     return result.stdout
   }
   for (const threads of [1, 2, 4, 6]) {
     for (const workers of run(String(threads)).split(' ').map(Number)) assert.ok(Number.isInteger(workers) && workers > 0 && workers <= threads)
   }
-  assert.equal(run('6', { JUNO_TEST_WORKERS: '1', GALLERY_WORKERS: '2', SPECS_JOBS: '1' }), '1 2 1')
+  assert.equal(run('6', { JUNO_TEST_WORKERS: '1', GALLERY_WORKERS: '2', SPECS_JOBS: '1' }), '1 2 1 2')
 })
 
 test('artifacts return to the job directory and failed downloads cannot pass', (t) => {

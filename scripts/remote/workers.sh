@@ -38,6 +38,9 @@ export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$desktop_workers}
 # loaded page per worker, half a worker per thread ran it in the least CPU at the same wall (10-26).
 # An explicit GALLERY_WORKERS sets both.
 export GALLERY_CACHED_WORKERS=${GALLERY_CACHED_WORKERS:-${GALLERY_WORKERS:-$(at_least $(( cores / 2 )) 1)}}
+# Fast-only full runs are CPU-heavy: one worker per allocated thread beat
+# four per three threads (89 s versus 99 s on six threads, 10-26).
+export GALLERY_FAST_WORKERS=${GALLERY_FAST_WORKERS:-${GALLERY_WORKERS:-$cores}}
 export GALLERY_WORKERS=${GALLERY_WORKERS:-$gallery_workers}
 # Spec simulations run beside the Apalache checks here (on the Mac they run first).
 spec_jobs=$(at_least $(( cores / 2 )) 1)
