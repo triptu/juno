@@ -22,6 +22,7 @@ import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context'
 import { createRegistry, Harness, ROOT_CONVERSATION_ID } from '@earendil-works/pi-durable'
 import { CURRENT_SQLITE_SCHEMA_VERSION, SqliteStorage } from '@earendil-works/pi-durable/storage/sqlite'
 import { openNodeSqliteDatabase, type NodeSqliteDatabase } from '@earendil-works/pi-durable/storage/sqlite/node'
+import { durablePragmas, type DurabilityOptions } from '../store/durability'
 
 const ctx = BACKGROUND_CONTEXT
 
@@ -84,15 +85,13 @@ export type JournalOpen =
   /** The file records another incarnation: it was copied or renamed. Treated as behind the archive. */
   | { readonly _tag: 'foreign'; readonly recorded: string }
 
-export async function openJournalFile(agentDir: string, incarnation: string): Promise<JournalOpen> {
+export async function openJournalFile(agentDir: string, incarnation: string, durability: DurabilityOptions = {}): Promise<JournalOpen> {
   const path = join(agentDir, journalFileName(incarnation))
   const fresh = !existsSync(path)
   // pi's adapter waits 5 s for a file lock by default. The owner lock already excludes other processes.
   const db = await openNodeSqliteDatabase(path, { busyTimeoutMs: 0 })
   try {
-    await db.exec('PRAGMA synchronous = FULL')
-    await db.exec('PRAGMA fullfsync = ON')
-    await db.exec('PRAGMA checkpoint_fullfsync = ON')
+    for (const pragma of durablePragmas(durability)) await db.exec(pragma)
     if (!fresh) {
       const hasSchema = await db.get("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'durable_schema'")
       const version = hasSchema ? (await db.get<{ version: number }>('SELECT version FROM durable_schema WHERE singleton = 1'))?.version ?? 0 : 0

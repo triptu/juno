@@ -1,13 +1,14 @@
 /**
- * Runs an agent process to a named crash point, and simulates power loss.
+ * Runs an agent process to a named crash point, and restores commit snapshots.
  *
  * `runAgent` starts a program with `JUNO_AGENT_CRASH_AT` set and waits for it
  * to end. `crashAt` also requires that it died of SIGKILL, so a point that is
  * renamed or never reached fails the test with the spec transition it stands
  * for. A crash after a FULL commit leaves the files exactly as committed, so
  * `snapshotFiles` taken then is a snapshot at that commit boundary.
- * `restore` puts it back over a later state: that is power loss, or a restore
- * of an older file such as the journal behind the archive (spec `rollback`).
+ * `restore` puts it back over a later state to model lost writes or an older
+ * file such as the journal behind the archive (spec `rollback`). It does not
+ * discard the OS or drive cache, so it cannot verify hardware flushes.
  */
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
