@@ -1,7 +1,8 @@
-// What main keeps for the window, in one synced launch and three relaunches on its data folder: privacy mode
+// What main keeps for the window, in one synced launch and one relaunch on its data folder: privacy mode
 // (turned on by a screen share through main's screen watch, by hand, and across View › Reload), the sidebar's width
-// and hidden state, and the theme and accent, which main paints into the window before the page loads. Then
-// launch.json that is malformed, names an accent this version does not know, or a display that is gone.
+// and hidden state, the theme and accent, which main paints into the window before the page loads, and a window
+// saved on a display that is gone. How main reads a launch.json it cannot parse, or a field from another version,
+// is `test/launch.test.ts`.
 // Privacy mode's blur, notifications and footer are in the DOM lane (`dom/privacy.test.ts`).
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -39,7 +40,7 @@ function brightness(color: string): number {
   return (r + g + b) / 3
 }
 
-test('privacy mode, the sidebar, the theme and the accent survive a relaunch, and a launch.json the app cannot read still opens a usable window on screen', { tag: '@electron' }, async ({ juno, app, running, userData, fake, slackApp }) => {
+test('privacy mode, the sidebar, the theme and the accent survive a relaunch, and a window saved on a display that is gone opens on screen', { tag: '@electron' }, async ({ juno, app, running, userData, fake, slackApp }) => {
   const options: LaunchOptions = { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword }
   const { privacy, sidebar, frame } = juno
   const rina = sidebar.row(RINA)
@@ -154,6 +155,9 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
     await frame.expectHidden()
   })
   await running.close()
+  // Its saved window is on a display that is gone.
+  const saved = JSON.parse(await readFile(join(userData, 'launch.json'), 'utf8')) as Record<string, unknown>
+  await writeFile(join(userData, 'launch.json'), JSON.stringify({ ...saved, bounds: { x: -6000, y: -6000, width: 1100, height: 760 } }))
 
   const second = await launchApp(userData, options)
   try {
@@ -167,6 +171,16 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
       await expect.poll(() => resolveColorVar(second.win, '--background')).toBe(dark.background)
       await expect.poll(() => resolveColorVar(second.win, '--hl')).toBe(dark.accent)
     })
+    await test.step('after the relaunch: the window is on screen at its saved size', async () => {
+      const placed = await second.app.evaluate(({ BrowserWindow, screen }) => {
+        const bounds = BrowserWindow.getAllWindows()[0]!.getBounds()
+        const { workArea } = screen.getPrimaryDisplay()
+        return { bounds, inside: bounds.x >= workArea.x && bounds.y >= workArea.y && bounds.x + bounds.width <= workArea.x + workArea.width && bounds.y + bounds.height <= workArea.y + workArea.height }
+      })
+      expect(placed.inside).toBe(true)
+      expect(placed.bounds.width).toBe(1100)
+      expect(placed.bounds.height).toBe(760)
+    })
     await test.step('after the relaunch: the sidebar is hidden at its width, and privacy mode is on', async () => {
       await restarted.frame.expectHidden()
       await restarted.frame.toggleWithMenu()
@@ -177,41 +191,4 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
   } finally {
     await second.close()
   }
-
-  await test.step('a malformed launch.json still opens a usable window', async () => {
-    await writeFile(join(userData, 'launch.json'), '{"theme":')
-    const again = await launchApp(userData, options)
-    try {
-      const restarted = new Juno(again.app, again.win)
-      await restarted.waitForSync()
-      await restarted.sidebar.row(RINA).expectVisible()
-      await restarted.sidebar.row(RINA).open()
-      await restarted.topic.expectTitle(RINA)
-    } finally {
-      await again.close()
-    }
-  })
-
-  await test.step('an accent this version does not know keeps privacy mode and the theme, and a window saved on a display that is gone opens on screen', async () => {
-    // As after going back to an older version.
-    await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'dark', privacy: true, accent: 'ultraviolet', bounds: { x: -6000, y: -6000, width: 1100, height: 760 } }))
-    const again = await launchApp(userData, options)
-    try {
-      const restarted = new Juno(again.app, again.win)
-      await restarted.waitForSync()
-      const placed = await again.app.evaluate(({ BrowserWindow, screen }) => {
-        const bounds = BrowserWindow.getAllWindows()[0]!.getBounds()
-        const { workArea } = screen.getPrimaryDisplay()
-        return { bounds, inside: bounds.x >= workArea.x && bounds.y >= workArea.y && bounds.x + bounds.width <= workArea.x + workArea.width && bounds.y + bounds.height <= workArea.y + workArea.height }
-      })
-      expect(placed.inside).toBe(true)
-      expect(placed.bounds.width).toBe(1100)
-      expect(placed.bounds.height).toBe(760)
-      await expect(restarted.privacy.footer).toBeVisible({ timeout: 30_000 })
-      await restarted.privacy.expectBlurred(restarted.sidebar.row(RINA).preview)
-      expect(await again.win.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe('dark')
-    } finally {
-      await again.close()
-    }
-  })
 })
