@@ -41,19 +41,25 @@ const quiet = test.extend({
 
 /** Waits until the next picture is on disk, then opens a caught-up Home that shows it, and returns it from the catalog. */
 async function homeWithPicture({ juno, win, fake }: { readonly juno: Juno; readonly win: Page; readonly fake: FakeSlack }) {
+  // Juno downloads the next picture when idle after Home paints, which can be before the first sync ends: hold it,
+  // so the first caught-up Home has nothing on disk.
+  fake.holdNext({ method: 'picture:small' })
   await juno.signIn()
   await juno.waitForSync()
   const { home } = juno
   await home.open()
   await expect(home.greeting).toHaveText('All caught up.')
-  // Nothing is on disk yet: the scene and the greeting, with nothing under it, not a picture that would arrive later.
+  // Nothing is on disk yet: the scene and the greeting, with nothing under it.
   await expect(home.picture).toHaveCount(0)
   await expect(home.column).toHaveText('All caught up.')
   expect(await home.kinds()).toEqual([])
   await expect(home.root.getByRole('button', { name: 'Browse all topics' })).toHaveCount(0)
-  // When idle, Juno downloads the next picture, both sizes.
-  await expect.poll(() => fake.pictureRequests().filter((name) => name.endsWith('-small.webp')).length, { timeout: 30_000 }).toBeGreaterThan(0)
+  // The download lands while this Home is on screen, and the picture does not arrive after its first frame.
+  await expect.poll(() => fake.heldCount({ method: 'picture:small' }), { timeout: 30_000 }).toBe(1)
+  fake.release({ method: 'picture:small' })
   await expect.poll(() => win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next?.id ?? null), { timeout: 30_000 }).not.toBeNull()
+  await expect(home.picture).toHaveCount(0)
+  await expect(home.column).toHaveText('All caught up.')
   // The next caught-up Home has it in its first frame.
   await juno.openSettings('General')
   await home.open()

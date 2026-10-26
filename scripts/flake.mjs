@@ -53,7 +53,7 @@ const unit = suite.script === 'test'
 const runner = unit
   ? [`--rerun-each=${each}`, ...(options.grep ? ['-t', options.grep] : []), '--files', ...options.specs]
   : ['--retries=0', ...options.specs.map((spec) => spec.slice(suite.dir.length)), `--repeat-each=${each}`, '--trace=retain-on-failure', '--reporter=line', ...(options.grep ? ['-g', options.grep] : [])]
-const env = options.workers ? ['--env', `JUNO_E2E_WORKERS=${options.workers}`, '--env', `GALLERY_WORKERS=${options.workers}`, '--env', `JUNO_TEST_WORKERS=${options.workers}`] : []
+const env = options.workers ? ['--env', `JUNO_E2E_WORKERS=${options.workers}`, '--env', `JUNO_BROWSER_WORKERS=${options.workers}`, '--env', `GALLERY_WORKERS=${options.workers}`, '--env', `JUNO_TEST_WORKERS=${options.workers}`] : []
 // GALLERY_SHIFT_ONLY=MediaViewer bun run flake apps/gallery/shift.spec.ts: the walk covers only those components.
 if (process.env.GALLERY_SHIFT_ONLY) env.push('--env', `GALLERY_SHIFT_ONLY=${process.env.GALLERY_SHIFT_ONLY}`)
 const args = [join(root, 'scripts/remote.mjs'), ...(options.machines > 1 ? ['--shards', String(options.machines)] : []), ...env, suite.script, ...runner]

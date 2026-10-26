@@ -84,12 +84,14 @@ export interface HomeAppearance {
   readonly at: number
   /** The first Home of the day, which may show the season's scene. */
   readonly firstVisitToday: boolean
+  /** An earlier Home showed Automated's record card and the view still has it: this Home leaves it out (`markMovesShown`). */
+  readonly movesShown: boolean
 }
 
 /** Home appeared (mounted): call once per Home on screen. */
 export function homeAppears(registry: Registry): HomeAppearance {
   const now = new Date()
-  return { at: now.getTime(), firstVisitToday: homeAppeared(registry, now) }
+  return { at: now.getTime(), firstVisitToday: homeAppeared(registry, now), movesShown: registry.get(movesShownPendingAtom) }
 }
 
 /** What Home says over its rows, from the live view: the scene, the greeting and, until Home is ready, the syncing line. */
@@ -141,8 +143,24 @@ export function startVisitLog(registry: Registry): () => void {
   }
 }
 
-/** Home showed Automated's record card: it waits a day before it shows again (SPEC 12). Its moves stay. */
+/** A Home showed Automated's record card, and `home.view` has not yet come without it. */
+export const movesShownPendingAtom = Atom.make(false).pipe(Atom.keepAlive)
+
+/**
+ * Home showed Automated's record card: it waits a day before it shows again (SPEC 12). Its moves stay.
+ * Views the engine read before it stored that still have the card, and can reach the renderer after it,
+ * so until a view comes without the card a Home opened later leaves it out (`HomeAppearance.movesShown`).
+ */
 export function markMovesShown(registry: Registry): void {
+  registry.set(movesShownPendingAtom, true)
+  let release: (() => void) | undefined
+  const check = () => {
+    const result = registry.get(homeViewAtom)
+    if (result._tag !== 'Success' || result.value.items.some((item) => item.kind === 'automatedMoves')) return
+    registry.set(movesShownPendingAtom, false)
+    queueMicrotask(() => release?.())
+  }
+  release = registry.subscribe(homeViewAtom, check)
   void runCommand(registry, homeMovesShown, {})
 }
 

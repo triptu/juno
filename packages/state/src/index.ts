@@ -262,6 +262,7 @@ export {
   actOnMove,
   markMovesSeen,
   markMovesShown,
+  movesShownPendingAtom,
   setTidyUpPrefs,
   startVisitLog,
   tidyUpPrefsAtom,

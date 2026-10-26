@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { homeHuddleSeen, viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, forgetPicture, holdHome, homeAppears, homeHeading, homeItemLimit, homePicturesOnAtom, homeViewAtom, markFollowUpDone, markMovesSeen, markMovesShown, notePicture, nowAtom, peekKeyAtom, pictureUrl, preparePicture, registry, resolveAllTopics, runAction, runCommand, showToast, syncProgressAtom, takePicture, welcomeAtom, withAsks } from '@juno/state'
+import { closeWelcome, forgetPicture, holdHome, homeAppears, homeHeading, homeItemLimit, homePicturesOnAtom, homeViewAtom, markFollowUpDone, markMovesSeen, markMovesShown, movesShownPendingAtom, notePicture, nowAtom, peekKeyAtom, pictureUrl, preparePicture, registry, resolveAllTopics, runAction, runCommand, showToast, syncProgressAtom, takePicture, welcomeAtom, withAsks } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { junoAskCopy } from '@juno/agent-contract'
@@ -13,6 +13,10 @@ import { showChannelMenu } from './placeMenus'
 
 const noop = () => {}
 const NO_ITEMS: ReadonlyArray<HomeItem> = []
+
+/** `items` without Automated's record card, or `items` itself when it has none. */
+const withoutRecord = (items: ReadonlyArray<HomeItem>): ReadonlyArray<HomeItem> =>
+  items.some((item) => item.kind === 'automatedMoves') ? items.filter((item) => item.kind !== 'automatedMoves') : items
 
 /** The review sheets open only from a card, so they load after Home, when idle or on the click. */
 const reviewSheets = chunk(() => import('./HomeReview'))
@@ -253,7 +257,10 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const welcome = useWelcome()
   const picturesOn = useAtomValue(homePicturesOnAtom)
   usePicture()
-  const live = value === undefined ? NO_ITEMS : withAsks(value, asks).items
+  // Shown by an earlier Home, the card stays out while the view is one from before the engine stored that.
+  const movesShown = useAtomValue(movesShownPendingAtom) && appearance.movesShown
+  const items = value === undefined ? NO_ITEMS : withAsks(value, asks).items
+  const live = movesShown ? withoutRecord(items) : items
   const { rows, onHold, release } = useHeldRows(live, homeItemLimit(window.innerHeight, welcome !== undefined), reviewing !== undefined)
   useMovesShown(rows)
   const heading = value === undefined ? undefined : homeHeading(value, rows, appearance)
