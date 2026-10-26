@@ -2050,11 +2050,20 @@ export class TopicPane implements TopicVerbs {
       scroller.startLanding = () => { started = true }
       scroller.addEventListener('wheel', scroller.startLanding, { once: true, passive: true })
       scroller.landed = new Promise((resolve) => {
-        const landed = () => {
-          if (!started) return
-          scroller.removeEventListener('scrollend', landed)
+        // The first row whose top is in view. On a loaded machine `scrollend` can come before the list has drawn the
+        // rows it scrolled to; then the first frame that shows one counts, as nothing in view moved before it.
+        const inView = () => {
           const box = scroller.getBoundingClientRect()
-          const row = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => node.getBoundingClientRect().top >= box.top)
+          return [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => {
+            const top = node.getBoundingClientRect().top
+            return top >= box.top && top < box.bottom
+          })
+        }
+        const landed = (waited = 0) => {
+          if (!started) return
+          scroller.removeEventListener('scrollend', onEnd)
+          const row = inView()
+          if (row === undefined && waited < 60) return requestAnimationFrame(() => landed(waited + 1))
           const tops: number[] = []
           const landing = { ts: row?.dataset['messageRow'] ?? '', top: row?.getBoundingClientRect().top ?? Number.NaN, tops }
           if (row === undefined) return resolve(landing)
@@ -2066,7 +2075,8 @@ export class TopicPane implements TopicVerbs {
           if (frames === 0) resolve(landing)
           else requestAnimationFrame(tick)
         }
-        scroller.addEventListener('scrollend', landed)
+        const onEnd = () => landed()
+        scroller.addEventListener('scrollend', onEnd)
       })
     }, frames)
     return () => this.scroller.evaluate((scroller: Watched) => scroller.landed!)
