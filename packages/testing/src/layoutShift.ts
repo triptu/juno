@@ -84,13 +84,15 @@ interface PageState {
   observer: PerformanceObserver | null
   observerSupported: boolean
   root: HTMLElement
-  before: Snapshot[]
+  /** Disconnects the observers. */
+  close: () => void
+  before: Snapshot
   /** Starts the next window: the boxes, motion and video seen now are what the next action is measured from. */
-  baseline: (boxes: Snapshot[]) => void
+  baseline: (boxes: Snapshot) => void
   toEntry: (entry: PerformanceEntry) => ShiftEntry
-  snapshot: () => Snapshot[]
+  snapshot: () => Snapshot
   /** Elements whose box moved or resized between two snapshots, by the watch's tolerance and `grows`. */
-  compare: (before: Snapshot[], after: Snapshot[]) => MovedElement[]
+  compare: (before: Snapshot, after: Snapshot) => MovedElement[]
   runningMs: (endless: boolean, layoutOnly: boolean) => number
 }
 
@@ -134,18 +136,23 @@ export interface LayoutShiftWatch {
 /** Starts a watch in the page: one observer, and the boxes, motion and video seen now as the first baseline. */
 function startWatch({ root: rootSelector, key, tolerance: epsilon, grows: growsSelector }: { root: string; key: string; tolerance: number; grows: string | null }, helpers: Helpers): void {
   const w = window as unknown as Record<string, PageState | undefined>
-  w[key]?.observer?.disconnect()
+  w[key]?.close()
 
   const found = document.querySelector(rootSelector)
   const rootEl = found instanceof HTMLElement ? found : document.body
-  const snapshot = () => helpers.layoutBoxes(rootEl)
+  const reader = helpers.boxReader(rootEl)
+  const snapshot = reader.read
 
   const state: PageState = {
     entries: [],
     observer: null,
     observerSupported: PerformanceObserver.supportedEntryTypes?.includes('layout-shift') ?? false,
     root: rootEl,
-    before: [],
+    close: () => {
+      state.observer?.disconnect()
+      reader.close()
+    },
+    before: { elements: [], boxes: new Float64Array(0), rendered: new Uint8Array(0) },
     baseline: (boxes) => {
       state.before = boxes
       state.entries = []
@@ -236,7 +243,7 @@ export async function watchLayoutShift(page: Page, options: LayoutShiftOptions =
 
   const stop = () => page.evaluate((key) => {
     const w = window as unknown as Record<string, PageState | undefined>
-    w[key]?.observer?.disconnect()
+    w[key]?.close()
     delete w[key]
   }, stateKey)
 

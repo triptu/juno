@@ -71,7 +71,8 @@ async function resetShared({ page, baseline }: Shared): Promise<ReadonlyArray<st
     if (body !== baseline.body) leaks.push(`body holds ${body}, not ${baseline.body}`)
     const styles = document.querySelectorAll('style').length
     if (styles !== baseline.styles) leaks.push(`${styles - baseline.styles} style elements added`)
-    const globals = Object.keys(window).filter((key) => !baseline.globals.includes(key) && key !== '__fixtureControls')
+    // The shift guards compile their page functions once per document (`withHelpers`); they keep no state between calls.
+    const globals = Object.keys(window).filter((key) => !baseline.globals.includes(key) && key !== '__fixtureControls' && key !== '__junoHelpers')
     if (globals.length > 0) leaks.push(`window globals ${globals.join(', ')}`)
     const controls = Object.keys((window as { __fixtureControls?: object }).__fixtureControls ?? {})
     if (controls.length > 0) leaks.push(`fixture controls ${controls.join(', ')}`)

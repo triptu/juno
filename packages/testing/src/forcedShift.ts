@@ -257,13 +257,14 @@ async function runForced(arg: { root: string; targets: string; skipWithin: strin
   const pseudo = performance.now() - pseudoStarted
   const touch = h.touches(rootEl, h.focusAttributes())
   const settling = h.settler(arg.pending, new Set(document.getAnimations()), touch.syncFocus, h.forcePseudoClasses)
+  const reader = h.boxReader(rootEl)
   try {
     const picked = h.sampleTargets(rootEl, arg.targets, arg.skipWithin, arg.max)
     const drawn = new Set(picked.filter((el) => el.getClientRects().length > 0))
     const timing = { act: 0, settle: 0, boxes: 0, diff: 0, pseudo, total: 0 }
     const shifts: ForcedShift[] = []
     let touched = 0
-    let boxes = h.layoutBoxes(rootEl)
+    let boxes = reader.read()
     for (let index = arg.from; index < picked.length; index++) {
       const element = picked[index]!
       if (!element.isConnected || element.getClientRects().length === 0 || getComputedStyle(element).visibility === 'hidden') continue
@@ -273,7 +274,7 @@ async function runForced(arg: { root: string; targets: string; skipWithin: strin
       if (box.x !== was.x || box.y !== was.y) {
         // Scrolling can lay out content-visibility rows; that is not the touch's doing.
         await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-        boxes = h.layoutBoxes(rootEl)
+        boxes = reader.read()
       }
       touched++
       const x = box.x + box.width / 2
@@ -286,7 +287,7 @@ async function runForced(arg: { root: string; targets: string; skipWithin: strin
         const t1 = performance.now()
         await settling.wait()
         const t2 = performance.now()
-        const now = h.layoutBoxes(rootEl)
+        const now = reader.read()
         const t3 = performance.now()
         const moved = h.changedBoxes(boxes, now, arg.tolerance, arg.grows, h.describeNode)
         if (moved.length > 0) shifts.push({ element: index, target, step: name, moved })
@@ -311,7 +312,10 @@ async function runForced(arg: { root: string; targets: string; skipWithin: strin
     }
     timing.total = performance.now() - started
     return { shifts, touched, unforced, timing }
-  } finally { settling.close() }
+  } finally {
+    settling.close()
+    reader.close()
+  }
 }
 
 /**
