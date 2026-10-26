@@ -127,7 +127,8 @@ it('counts a page report sent before the stored leaves loaded, after an engine r
   await step('once the store reads, the stored leave goes out, the earlier report clears it, and the join goes', async () => {
     writeStoredLeaves(next.userData, next.fake.teamId, JSON.stringify([recordOf(first)]))
     await waitFor(() => (leftAttendees(next).includes(first.attendeeId) ? true : undefined), WAIT_MS, 'the stored leave sent')
-    await cleared(next, 'cleared by the report that came before the load')
+    // The join goes out right after and stores its own leave, so the list may never be seen empty: the first record is what clears.
+    await waitFor(() => ((storedLeaves(next) as Array<{ attendeeId: string }>).some((record) => record.attendeeId === first.attendeeId) ? undefined : true), WAIT_MS, 'cleared by the report that came before the load')
     expect(valueOf(await starting)._tag).toBe('joined')
     expect(callOrder(next)).toEqual(['rooms.leave', 'rooms.join'])
   })
