@@ -8,9 +8,9 @@
 //    no user-facing change since the last release, or does not descend from it.
 // 2. Prints the commits since the last release and the highlights file to write.
 // 3. Unless a green full run covers the tip, runs one on the laptop
-//    (verify:main --ref <tip>), or a repair of the newest failed run when main
-//    has changed since it. A red run stops with its failures and the repair
-//    command.
+//    (verify:main --ref <tip>, at high priority), or a repair of the newest
+//    failed run when main has changed since it. A red run stops with its
+//    failures and the repair command.
 // 4. Waits for the highlights file, which the agent writes while the full run goes.
 // 5. Bumps the patch version in a release worktree, packages, runs the packaged
 //    smoke, publishes, checks the GitHub release and main's version, and removes
@@ -58,6 +58,8 @@ try {
     if (process.env.JUNO_RELEASE === '1') throw new Error('Juno releases are unsigned; unset JUNO_RELEASE')
     if (!process.env.JUNO_UPDATE_TOKEN) throw new Error('JUNO_UPDATE_TOKEN is required for the packaged updater; pass it inline from the keychain (.claude/skills/do-release/SKILL.md)')
     locked = takeLock()
+    // The full run and the urgent gate take laptop cores before waiting normal jobs. JUNO_PRIORITY=normal opts out.
+    process.env.JUNO_PRIORITY ||= 'high'
     run('git', ['fetch', 'origin', 'main'])
   }
   await release()

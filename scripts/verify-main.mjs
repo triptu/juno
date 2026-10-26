@@ -6,6 +6,7 @@
 //   bun run verify:main --ref origin/main
 //   bun run verify:main --repair latest   repair a failed ancestor record
 //   bun run verify:main --no-cache        also rerun every spec check and regenerate the conformance traces
+//   bun run verify:main --priority high   take laptop cores before waiting normal jobs (a release does this)
 //   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
 //                                    then `test:feel`
 //
@@ -50,6 +51,9 @@ const withMac = argv.includes('--with-mac')
 const smoke = argv.includes('--smoke')
 if (smoke && ['--repair', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
 const noCache = argv.includes('--no-cache')
+// --priority high (or JUNO_PRIORITY=high) puts the laptop jobs ahead of waiting normal ones; remote.mjs reads the env.
+if (argv.includes('--priority')) process.env.JUNO_PRIORITY = argv[argv.indexOf('--priority') + 1]
+if (![undefined, '', 'normal', 'high'].includes(process.env.JUNO_PRIORITY)) throw new Error('--priority and JUNO_PRIORITY take normal or high')
 // Every spec simulation that runs takes a fresh seed, kept in the record: `bun run specs:check --seed <n>` repeats it.
 const seed = process.env.SPECS_SEED ?? String(randomInt(1, 2 ** 32))
 // The unit tests' shuffled order, kept in the record: `bun run test --seed <n>` repeats it.

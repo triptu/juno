@@ -9,6 +9,7 @@
 //   bun run affected --budget-seconds 300  estimated test time for gallery components
 //   bun run affected --wide          the wide plan: every spec the change can reach, heavy tests included
 //   bun run affected --batch --base <ref>   the batch gate: unit tests, specs:check and conformance only
+//   bun run affected --priority high   take laptop cores before waiting normal jobs
 //
 // The change is every file that differs from the merge base, committed or not,
 // plus new files. An import graph over apps/ and packages/ (relative imports,
@@ -44,6 +45,9 @@ const wide = flag('--wide')
 const batch = flag('--batch')
 const budget = argv.includes('--budget-seconds') ? Number(argv[argv.indexOf('--budget-seconds') + 1]) : GALLERY_BUDGET_SECONDS
 if (!Number.isFinite(budget) || budget < 0) throw new Error('--budget-seconds must be a non-negative number')
+// --priority high (or JUNO_PRIORITY=high) puts the laptop jobs ahead of waiting normal ones; remote.mjs reads the env.
+if (argv.includes('--priority')) process.env.JUNO_PRIORITY = argv[argv.indexOf('--priority') + 1]
+if (![undefined, '', 'normal', 'high'].includes(process.env.JUNO_PRIORITY)) throw new Error('--priority and JUNO_PRIORITY take normal or high')
 const identity = runtimeIdentity(root, !flag('--local'))
 const durations = specDurations(readRecords(statusFolder(root)), identity)
 // Branches are cut from origin/main and the local main is often behind it, so the merge base is taken with origin/main when it exists.
