@@ -77,34 +77,44 @@ syncedTest('topics and pages open without a layout shift, and a row on All topic
 // No line is held for reactions a message does not have yet (SPEC 7, "Stable geometry"). The last message's first
 // chip grows it in one step: in a list that fits the view, downwards; at the bottom of a longer one, the list keeps
 // its end and the rows above lift in the same frame, as Slack's do.
-// What must never move: the rows in view when something changes above them, and the list's end while it is held.
-// Then two late changes in Main: a sender name that resolves after the message paints, and a reply that gives a new
-// message its thread link.
-syncedTest('late changes move nothing in view: a reaction above or on the last message, a sender name, a new thread link', async ({ juno, win, slack, fake }) => {
-  await test.step('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async () => {
+// What must never move: the list's end while it is held, and the rows in view when something changes above them
+// while the user reads further up. Then two late changes in Main: a sender name that resolves after the message
+// paints, and a reply that gives a new message its thread link.
+syncedTest('late changes move nothing in view: a reaction on the last message or above a scrolled list, a sender name, a new thread link', async ({ juno, win, slack, fake }) => {
+  await test.step('a late reaction on the last message keeps the bottom, and one above the view moves no row in view', async () => {
     const channel = slack.channel('eng')
     const user = slack.as('Leo').id
     const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
-    const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true }))
+    for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true })
     const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest reply under the view check' })
     await juno.sidebar.expectTop('#eng')
     await juno.sidebar.row('#eng').open()
     await juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
     await juno.topic.expectMessage('Latest reply under the view check')
-    const above = juno.topic.list.locator(`[data-message-row="${replies[1]!.ts}"]`)
-    expect(await above.evaluate((node) => node.getBoundingClientRect().bottom < (node.closest('[data-scroll-area]')?.getBoundingClientRect().top ?? 0))).toBe(true)
-    await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
-      fake.addReaction({ channel, ts: replies[1]!.ts, name: 'eyes', user })
-      await expect(above.getByRole('list', { name: 'Reactions' })).toBeAttached()
-    })
+    // Juno heard only the root and the latest live; the 30 replies come with the thread's history.
+    await expect(juno.topic.list.locator('[data-message-row]')).toHaveCount(32)
     expect(await growingEdge(juno.topic.list)).toBe('bottom')
     const last = juno.topic.list.locator(`[data-message-row="${latest.ts}"]`)
     await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
       fake.addReaction({ channel, ts: latest.ts, name: 'eyes', user })
       await expect(last.getByRole('list', { name: 'Reactions' })).toBeVisible()
     }, { edge: 'bottom' })
+    // Away from the bottom nothing holds the end, so this is the hold on the row in view and scroll anchoring. The
+    // row two above the first one in view is off screen but laid out, so its chips change the list's height.
+    const { ts } = await juno.topic.scrollUp(400)
+    const above = await juno.topic.list.evaluate((list, ts) => {
+      const rows = [...list.querySelectorAll<HTMLElement>('[data-message-row]')]
+      return rows[rows.findIndex((row) => row.dataset['messageRow'] === ts) - 2]!.dataset['messageRow']!
+    }, ts)
+    const row = juno.topic.list.locator(`[data-message-row="${above}"]`)
+    expect(await row.evaluate((node) => node.getBoundingClientRect().bottom < node.closest('[data-scroll-area]')!.getBoundingClientRect().top && node.firstElementChild!.checkVisibility({ contentVisibilityAuto: true }))).toBe(true)
+    await expectStableAnchor(win, `[data-message-row="${ts}"]`, async () => {
+      fake.addReaction({ channel, ts: above, name: 'eyes', user })
+      await expect(row.getByRole('list', { name: 'Reactions' })).toBeAttached()
+    })
   })
 
+  // Until users.info answers, the sender is a stand-in named "Someone", so the name line is there from the first paint.
   // The time follows the name, so a name that resolves late moves the time along its line once; the message stays put.
   await test.step('a sender name resolves without moving the message', async () => {
     const person = { ...fake.workspace.users.get(slack.as('Leo').id)!, id: 'U0LATE', name: 'late', profile: { display_name: 'Leonard Alexander Park', real_name: 'Leonard Alexander Park' } }
