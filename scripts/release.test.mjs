@@ -46,12 +46,16 @@ else if (group === 'api') { state.changelog = Buffer.from(JSON.parse(fs.readFile
 else process.exit(99)
 `
 
-// The laptop's full run: takes the next outcome from a plan file and writes the record verify:main would.
+// The full run (the laptop's, or this Mac's with --local): takes the next outcome from a plan file and writes the
+// record verify:main would. It notes whether the release worktree was packaged when it started.
 const fakeVerify = (plan, calls, state) => `
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 const args = process.argv.slice(2)
 appendFileSync(${JSON.stringify(calls)}, args.join(' ') + '\\n')
+const worktrees = process.env.JUNO_WORKTREE_DIR
+const packaged = existsSync(worktrees) && readdirSync(worktrees).some((name) => existsSync(worktrees + '/' + name + '/apps/desktop/release'))
+appendFileSync(${JSON.stringify(calls)} + '-packaged', packaged + '\\n')
 const [outcome, ...rest] = readFileSync(${JSON.stringify(plan)}, 'utf8').split('\\n').filter(Boolean)
 writeFileSync(${JSON.stringify(plan)}, rest.join('\\n'))
 const commit = execFileSync('git', ['rev-parse', args[args.indexOf('--ref') + 1]], { encoding: 'utf8' }).trim()
@@ -70,8 +74,9 @@ if (process.env.JUNO_FIXTURE_WAIT_FOR_DRAFT === '1') {
 const red = outcome === 'red'
 const command = (suite) => outcome === 'skipped' ? { command: ['JUNO_SKIP_TAGS=@nightly', suite] } : {}
 const finishedAt = new Date().toISOString()
-const identity = { bun: '1', platform: 'linux', arch: 'x64', electron: '44' }
-const record = { version: 2, commit, finishedAt, passed: !red, identity, plannedIdentity: { ...identity, bun: 'canary' }, required,
+const local = args.includes('--local')
+const identity = { bun: '1', platform: local ? 'darwin' : 'linux', arch: local ? 'arm64' : 'x64', electron: '44' }
+const record = { version: 2, commit, finishedAt, passed: !red, identity, plannedIdentity: { ...identity, bun: 'canary' }, required, execution: { mode: local ? 'local' : 'remote', host: local ? 'mac' : 'laptop' },
   repair: repair && { commit: repair.commit, finishedAt: repair.finishedAt, selection: 'graph-uncapped' },
   suites: required.map((suite) => red && suite === 'test:desktop'
     ? { suite, identity, code: 1, failures: ['1) sidebar.spec.ts:40 › keeps the selected row'], log: '.juno-status/verify-main/run/test_desktop.log', cause: { category: 'test', provisional: true, evidence: 'timed out waiting for the row' } }
@@ -217,6 +222,29 @@ test('a red full run stops with its failures; after a fix, the same command veri
   assert.equal(again.code, 0, again.output)
   assert.match(again.output, /no action: no user-facing changes since the last release/)
   assert.doesNotMatch(lines('gh-calls').join('\n'), /create v0\.1\.10/)
+})
+
+test('with --local the Mac packages and smokes first, then runs the full run while the draft uploads; a red laptop run does not hold it back', { timeout: 60_000 }, async (t) => {
+  const { commit, release, github, lines, plan, file, env } = fixture(t)
+  const tip = commit('Keep your place after scrolling', { 'apps/desktop/src/app.js': 'scroll' })
+  const looked = await release(['--local', '--dry-run'])
+  assert.equal(looked.code, 0, looked.output)
+  assert.match(looked.output, new RegExp(`would run bun run verify:main --ref ${tip} --local on this Mac`))
+
+  plan('red')
+  const red = await release()
+  assert.equal(red.code, 1, red.output)
+
+  // The laptop's failed run at this build is not this Mac's to repair or refuse: the Mac runs its own.
+  env.JUNO_FIXTURE_WAIT_FOR_DRAFT = '1'
+  plan('green')
+  writeFileSync(join(file('repo'), 'notes.md'), '- Keep your place after scrolling.\n')
+  const published = await release(['--local', '--notes', 'notes.md'])
+  assert.equal(published.code, 0, published.output)
+  const build = /juno-build: (\w+)/.exec(github().releases.find((entry) => entry.tagName === 'v0.1.9').body)[1]
+  assert.equal(lines('verify-calls').at(-1), `--ref ${build} --local`)
+  assert.equal(lines('verify-calls-packaged').at(-1), 'true')
+  assert.equal(github().releases.find((entry) => entry.tagName === 'v0.1.9').isLatest, true)
 })
 
 test('a release covered by an earlier green run plus docs skips the full run; a lost main update is finished without publishing again', { timeout: 30_000 }, async (t) => {

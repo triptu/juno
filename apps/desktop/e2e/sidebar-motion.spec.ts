@@ -63,7 +63,8 @@ async function recordFrames(win: Page): Promise<void> {
       })
       if (!store.__rowFramesStop) requestAnimationFrame(tick)
     }
-    requestAnimationFrame(tick)
+    // The first sample now, before the step's change: on the next frame the change may already be painted.
+    tick()
   }, ROW)
 }
 

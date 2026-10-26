@@ -68,6 +68,8 @@ syncedTest('a narrow window keeps the tab strip and topic inside it, the destina
     await juno.expectToast('Sent to Jonas')
     await expect(write.composer).toHaveValue('')
     expect(await write.field.boundingBox()).toEqual(before)
+    // A send can finish within one frame; two more painted after it are what the field settled to.
+    await win.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
     const frames = await fields()
     expect(frames.length, 'the field must be sampled in many frames').toBeGreaterThan(1)
     expect(frames.filter((boxes) => boxes.length !== 1 || JSON.stringify(boxes[0]) !== JSON.stringify(before)), `one field at ${JSON.stringify(before)} in every frame`).toEqual([])

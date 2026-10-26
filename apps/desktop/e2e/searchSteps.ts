@@ -223,7 +223,10 @@ export async function jumpToLatest({ juno, slack }: Pick<Fixtures, 'juno' | 'sla
   slack.as('Maya').postIn('product', 'Plover review notes')
   slack.as('Leo').replyIn('Plover review notes', 'Plover review starts with billing')
   for (let i = 1; i <= 40; i++) slack.as(i % 2 === 0 ? 'Maya' : 'Leo').replyIn('Plover review notes', `Follow-up ${i} on the review order`)
-  await juno.sidebar.row('#product').expectVisible()
+  // The replies reach Juno one event at a time. One that lands after the topic opens beside the results is new to the
+  // user, and the pill counts it ("2 new messages") instead of offering Jump to latest, so wait for all 41.
+  await juno.sidebar.row('#product').open()
+  await expect(juno.topic.threadLinkUnder('Plover review notes').root).toContainText('41 replies')
   await juno.surface.appMenu('search-messages')
   const jump = page.reader.locator('button', { hasText: 'Jump to latest' })
 
@@ -290,6 +293,15 @@ export async function readerWithoutCache({ juno, slack, fake }: Pick<Fixtures, '
   const old = places.map((place, index) => ({ place, text: `Osprey archive note in ${place}`, ts: slack.as('Maya').postedLongAgo(place, `Osprey archive note in ${place}`, 30 + index) }))
   await sidebar.row('#product').expectVisible()
   await surface.appMenu('search-messages')
+  // Words only Slack finds: the list is empty when the field settles and fills when Slack answers. The cards that
+  // arrive then get the search mark too.
+  fake.holdNext({ method: SEARCH, reason: 'search' })
+  await page.field.fill('archive note')
+  await expect.poll(() => fake.heldCount({ method: SEARCH })).toBe(1)
+  fake.release({ method: SEARCH })
+  await expect(page.rows).toHaveCount(5)
+  await expect.poll(() => win.evaluate(() => CSS.highlights.get('search-card')?.size ?? 0)).toBeGreaterThan(0)
+  await page.field.fill('')
   await page.field.pressSequentially('osprey')
   await expect(page.rows).toHaveCount(6)
   // A press on the newest result, on this Mac, shows its topic beside the list.

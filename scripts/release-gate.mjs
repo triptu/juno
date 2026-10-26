@@ -45,7 +45,8 @@ export function assessRecord(record) {
     && record.suites.every(suitePassed)
     && record.suites.every(galleryCounted)
     && fileReuseProblems(record).length === 0
-    && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'perf @mac', 'test:feel'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
+    // A spec check proves the models, so a pass reused from another machine counts (its inputs pin Quint and Apalache).
+    && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'perf @mac', 'test:feel', 'specs:check'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
     && (record.version !== 2 || (record.identity && record.required?.every((name) => record.suites.some((suite) => suite.suite === name))))
 }
 

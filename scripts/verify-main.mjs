@@ -22,14 +22,15 @@
 // lanes as one plan with independent SSH jobs
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // shared .juno-status/verify-main.md and .json, each suite's lines
-// to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
+// to .juno-status/verify-main/<run>/<suite>.log; a run of a commit not on main leaves the latest summary alone and
+// writes its summary next to its logs. The exit code is 1 if any
 // suite failed. Timed perf is not part of a full run: it runs on demand
 // (`bun run perf`, docs/performance.md 7.3). On the Mac, test:feel runs only
 // with --with-mac, after the @mac tests, holding the whole machine; with the
 // plan on the laptop it starts when the plan does. The feel contact sheet is copied next to the logs.
 
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomInt } from 'node:crypto'
@@ -41,7 +42,7 @@ import { failureCause, testResults } from './test-results-reporter.mjs'
 import { describeGalleryCounts, fullSuites, galleryCounts, galleryWalk, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
-import { committedInputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
+import { committedInputKey, protocolInputs, runtimeIdentity } from './verify-inputs.mjs'
 import { checkToolchain, fileResults, FILE_SAMPLE_SHARE, freshFileRun, laneFiles, timedFiles } from './verify-files.mjs'
 import { fullRunCores, fullRunJobs } from './remote/plan.mjs'
 import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
@@ -71,6 +72,8 @@ const git = (...args) => {
 }
 
 const commit = git('rev-parse', ref)
+// Only a run of a commit on main replaces the latest summary (verify-main.json and .md); others are archived only.
+const onMain = ['origin/main', 'main'].some((branch) => isAncestor(root, commit, branch))
 const subject = git('log', '-1', '--format=%s', commit)
 const runId = new Date().toISOString().replace(/[-:]/g, '').replace('.', '')
 const statusDir = statusFolder(root)
@@ -78,7 +81,7 @@ const logDir = join(statusDir, 'verify-main', runId)
 const failedSetup = (error) => {
   const message = error instanceof Error ? error.message : String(error)
   writeRecord(statusDir, runId, { version: 2, commit, subject, ref, smoke, finishedAt: new Date().toISOString(), passed: false,
-    suites: [{ suite: 'setup', code: 1, seconds: 0, failures: [message], cause: { category: 'infrastructure', provisional: true, evidence: message } }] })
+    suites: [{ suite: 'setup', code: 1, seconds: 0, failures: [message], cause: { category: 'infrastructure', provisional: true, evidence: message } }] }, { latest: onMain || smoke })
   console.error(`verify:main: ${message}`)
   process.exit(1)
 }
@@ -89,10 +92,13 @@ const local = execution.mode === 'local'
 if (local && argv.includes('--require-remote')) throw new Error('This run requires the laptop; local fallback is disabled')
 const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
+// Walk records and test file passes are reused only on the machine that made them, so the weekly uncached walk and
+// fully fresh run count only this machine's runs: the laptop's do not stand in for this Mac's.
+const hostRecords = records.filter((record) => record.execution?.mode === execution.mode && record.execution.host === execution.host)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
 // The gallery reuses the walk records of unchanged states and walks this seed's sample of them again, unless the
 // last uncached walk is over a week old or --no-cache asks for one (galleryWalk).
-const gallery = galleryWalk(records, { noCache })
+const gallery = galleryWalk(hostRecords, { noCache })
 const gallerySample = gallery.uncached ? undefined : process.env.GALLERY_SAMPLE || String(randomInt(1, 2 ** 32))
 const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }]
   : fullSuites(scripts, { noCache, seed, testSeed, skipTags: local ? ['@mac'] : [], gallerySample, gallerySource: `full-run:${commit.slice(0, 10)}:${runId}` })
@@ -101,7 +107,7 @@ const galleryPlan = gallery.uncached ? `every state uncached (${gallery.reason})
 // The test files of the unit, DOM, browser and Electron lanes reuse their passes from earlier green full runs while
 // their inputs are unchanged, and this seed's 20% of those run again; every file runs when the last fully fresh run
 // is over a week old or with --no-cache (freshFileRun).
-let filesFresh = freshFileRun(records, { noCache })
+let filesFresh = freshFileRun(hostRecords, { noCache })
 const fileSample = filesFresh.fresh ? undefined : process.env.JUNO_FILE_SAMPLE || String(randomInt(1, 2 ** 32))
 const filePlan = () => filesFresh.fresh ? `every file fresh (${filesFresh.reason})` : `changed files, plus sample seed ${fileSample} of the rest (last fully fresh run ${filesFresh.last})`
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
@@ -116,31 +122,39 @@ const identity = local ? plannedIdentity : baseline?.identity ?? records.find((r
 const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
+// Reused results this run's jobs must agree with: all but the spec check, which may come from another machine.
+const runtimeBound = () => reused.filter((suite) => suite.suite !== 'specs:check')
 let suites = required.filter((suite) => {
   // Only the spec check is reused from an earlier run: it proves the models, not the code. Conformance replays its
-  // traces against the engine, so it always runs. The spec seed is always set, and not part of any key.
+  // traces against the engine, so it always runs. The spec seed is always set, and not part of any key. Its inputs pin
+  // Quint (bun.lock) and Apalache (specs/check.mjs), so a pass on the laptop holds on this Mac and the other way round:
+  // the key is checked under the identity the pass ran on, not this run's.
   if (baseline || suite.name !== 'specs:check' || !protocolRoots[suite.name] || noCache) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
-    if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
+    if (!previous || !suitePassed(previous) || !previous.identity || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
     if (!protocolRoots[suite.name].every((file) => previous.inputs.includes(file))) continue
-    if (previous.inputKey !== committedInputKey(root, commit, previous.inputs, identity)) continue
+    if (previous.inputKey !== committedInputKey(root, commit, previous.inputs, previous.identity)) continue
     reused.push({ ...previous, reusedFrom: { commit: record.commit, finishedAt: record.finishedAt } })
     return false
   }
   return true
 })
 mkdirSync(scratchFolder(), { recursive: true })
-const checkout = join(mkdtempSync(join(scratchFolder(), 'juno-verify-main-')), 'main')
+const checkoutParent = mkdtempSync(join(scratchFolder(), 'juno-verify-main-'))
+const checkout = join(checkoutParent, 'main')
 git('worktree', 'add', '--detach', checkout, commit)
-const removeCheckout = () => spawnSync('git', ['worktree', 'remove', '--force', checkout], { cwd: root, stdio: 'ignore' })
+const removeCheckout = () => {
+  spawnSync('git', ['worktree', 'remove', '--force', checkout], { cwd: root, stdio: 'ignore' })
+  rmSync(checkoutParent, { recursive: true, force: true })
+}
 process.on('exit', removeCheckout)
 
 // Each lane's files: which run because they changed or were sampled, and which reuse a pass, keyed in the checkout.
 // A pass is reused only from a run whose jobs reported this runtime and the toolchain the last run on this host did;
 // the jobs confirm both when they start.
 const runLabel = `${commit.slice(0, 10)}:${runId}`
-let toolchain = records.find((record) => record.toolchain && record.execution?.mode === execution.mode && record.execution.host === execution.host)?.toolchain
+let toolchain = hostRecords.find((record) => record.toolchain)?.toolchain
 const lanes = await laneFiles({ root, checkout, commit, tracked, suites: smoke || baseline ? [] : suites, records, identity, label: runLabel })
 const planLanes = () => lanes.plan({ toolchain, fresh: filesFresh.fresh, seed: fileSample })
 planLanes()
@@ -205,7 +219,7 @@ function run(suite, command, args, cwd, env = {}) {
       }
       const report = /^(?:\[runner:[^\]]+\] )?(?:\[[^\]]+\] )?juno-runtime: (.+)$/.exec(line)
       if (!report || runtimeFailure || toolchainChanged) return
-      const checked = reportedRuntime(`juno-runtime: ${report[1]}`, undefined, [...reused.map((suite) => suite.identity), ...(fileReused() ? [identity] : []), ...(liveIdentity ? [liveIdentity] : [])], baseline?.identity)
+      const checked = reportedRuntime(`juno-runtime: ${report[1]}`, undefined, [...runtimeBound().map((suite) => suite.identity), ...(fileReused() ? [identity] : []), ...(liveIdentity ? [liveIdentity] : [])], baseline?.identity)
       liveIdentity ??= checked.identity
       if (!checked.mismatch) return
       runtimeFailure = 'Job runtimes disagree with this run or its reused results; stopped every job'
@@ -299,7 +313,7 @@ if (withMac) {
 }
 let results = (await Promise.all(runs)).flat()
 const readLog = (result) => result.log && existsSync(result.log) ? readFileSync(result.log, 'utf8') : ''
-const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local || suites.length === 0 ? identity : undefined, [...reused.map((suite) => suite.identity), ...(fileReused() ? [identity] : [])], baseline?.identity)
+const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local || suites.length === 0 ? identity : undefined, [...runtimeBound().map((suite) => suite.identity), ...(fileReused() ? [identity] : [])], baseline?.identity)
 
 if (withMac && !cancelled) {
   // A local plan ran on this Mac too: feel waits for it, so it does not film a machine the other suites are using.
@@ -353,7 +367,7 @@ const summary = {
   allocation: Object.fromEntries(['DESKTOP', 'UNIT', 'GALLERY'].map((kind) => [kind.toLowerCase(), (local ? {} : sizing())[`JUNO_RUNNER_${kind}_CORES`] ?? process.env[`JUNO_RUNNER_${kind}_CORES`] ?? 'default'])),
   reports: keepReports(checkout, logDir, planStarted).map((file) => join('.juno-status', relative(statusDir, file))),
 }
-writeRecord(statusDir, runId, summary)
+writeRecord(statusDir, runId, summary, { latest: onMain || smoke })
 const markdown = [
   `# verify:main ${summary.passed ? 'passed' : 'FAILED'}`,
   '',
@@ -375,7 +389,7 @@ const markdown = [
     .flatMap((suite) => ['', `## ${suite.suite}`, '', ...suite.failures.map((failure) => `- ${failure}`)]),
   '',
 ].join('\n')
-writeFileSync(join(statusDir, smoke ? 'verify-smoke.md' : 'verify-main.md'), markdown)
+writeFileSync(onMain || smoke ? join(statusDir, smoke ? 'verify-smoke.md' : 'verify-main.md') : join(logDir, 'summary.md'), markdown)
 console.log(markdown)
 if (smoke) {
   if (assessRecord(summary)) throw new Error('A smoke record must never pass the release gate')

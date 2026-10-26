@@ -49,8 +49,11 @@ export function specDurations(records, identity) {
   return durations
 }
 
-/** Keep the old latest result during migration, then atomically replace it. */
-export function writeRecord(status, runId, summary) {
+/**
+ * Archives the record under its commit. A run of a commit on main also replaces the latest summary, keeping the old
+ * one in the archive; a run of another commit (a branch, a release's version commit) leaves it alone.
+ */
+export function writeRecord(status, runId, summary, { latest: replaceLatest = true } = {}) {
   const name = summary.smoke ? 'verify-smoke' : 'verify-main'
   const latest = join(status, `${name}.json`)
   const archive = (id, record) => {
@@ -61,6 +64,7 @@ export function writeRecord(status, runId, summary) {
     writeFileSync(temporary, `${JSON.stringify(record, null, 2)}\n`)
     renameSync(temporary, target)
   }
+  if (!replaceLatest) { archive(runId, summary); return }
   if (existsSync(latest)) {
     const previous = JSON.parse(readFileSync(latest, 'utf8'))
     if (/^[a-f0-9]{40}$/.test(previous.commit) && typeof previous.finishedAt === 'string') {

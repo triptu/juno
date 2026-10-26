@@ -88,13 +88,17 @@ const copy = {
 }
 
 export function SearchResults(props: SearchResultsProps) {
-  const { rows, listRef } = props
+  const { rows, listRef, marks } = props
+  // On the column, which is always there: the list itself is drawn only once there are rows, often after the words
+  // last changed.
+  const column = useRef<HTMLDivElement>(null)
+  useCardMarks(column, marks)
   return (
     <>
       {/* Always there, before the list, so screen readers announce the state lines as their text changes. */}
       <p role="status" data-sensitive="" {...stylex.props(styles.live)}>{stateLine(props)}</p>
       <div ref={listRef} data-scroll-area="" data-search-results="" {...stylex.props(styles.scroller)}>
-        <div {...stylex.props(styles.column)}>{rows === undefined ? <SearchRecent {...props} /> : <Results {...props} rows={rows} />}</div>
+        <div ref={column} {...stylex.props(styles.column)}>{rows === undefined ? <SearchRecent {...props} /> : <Results {...props} rows={rows} />}</div>
       </div>
     </>
   )
@@ -132,8 +136,6 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
   useNear(end, onNearEnd, '0px 0px 480px 0px', windowKey)
   useNear(start, onNearStart, '480px 0px 0px 0px', windowKey)
   const onListKey = useListKeys(props, stops)
-  const list = useRef<HTMLDivElement>(null)
-  useCardMarks(list, marks)
   // The row last warmed, so moving within one row warms it once.
   const hovered = useRef<string | undefined>(undefined)
   const empty = rows.length === 0
@@ -155,7 +157,6 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
         <EmptyNote {...props} />
       ) : (
         <div
-          ref={list}
           role="listbox"
           aria-label="Results"
           tabIndex={-1}
