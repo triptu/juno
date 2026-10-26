@@ -1124,13 +1124,15 @@ export class Juno implements JunoVerbs {
   }
 
   /**
-   * Nothing on screen moves at rest (performance.md section 1, "Idle CPU"): no
-   * looping animation runs and no frame loop asks for frames, over a second.
-   * Finite animations may still be ending when the check starts.
+   * Nothing runs at rest (performance.md section 1, "Idle CPU"): over a second no looping animation runs, no frame
+   * loop asks for frames and, in the browser lane (`countTimers`), no timer loop fires. Finite animations and a
+   * last timer may still be ending when the check starts.
    */
   async expectAtRest(): Promise<void> {
-    const second = () => this.win.evaluate(() => new Promise<{ readonly looping: ReadonlyArray<string>; readonly frames: number }>((resolve) => {
+    const second = () => this.win.evaluate(() => new Promise<{ readonly looping: ReadonlyArray<string>; readonly frames: number; readonly timers: number }>((resolve) => {
+      const g = globalThis as { __junoTimerFires?: number }
       const request = window.requestAnimationFrame
+      const timersBefore = g.__junoTimerFires ?? 0
       let frames = 0
       window.requestAnimationFrame = (callback) => { frames++; return request.call(window, callback) }
       setTimeout(() => {
@@ -1138,12 +1140,13 @@ export class Juno implements JunoVerbs {
         const looping = document.getAnimations()
           .filter((animation) => animation.playState === 'running' && animation.effect?.getTiming().iterations === Infinity)
           .map((animation) => (animation as CSSAnimation).animationName ?? 'script animation')
-        resolve({ looping, frames })
+        // Less this check's own timeout.
+        resolve({ looping, frames, timers: (g.__junoTimerFires ?? 0) - timersBefore - 1 })
       }, 1_000)
     }))
-    // A loop asks for a frame every 16 ms; a one-off paint callback asks for one or two.
-    await expect.poll(async () => { const rest = await second(); return { looping: rest.looping, frameLoop: rest.frames > 5 } }, { timeout: 6_000, intervals: [0] })
-      .toEqual({ looping: [], frameLoop: false })
+    // A loop asks for a frame every 16 ms, or fires a timer every few; a one-off paint or a debounce asks for one or two.
+    await expect.poll(async () => { const rest = await second(); return { looping: rest.looping, frameLoop: rest.frames > 5, timerLoop: rest.timers > 5 } }, { timeout: 6_000, intervals: [0] })
+      .toEqual({ looping: [], frameLoop: false, timerLoop: false })
   }
 
   /** Reads one of the app's performance measures (`@juno/state/perf`), in milliseconds. */

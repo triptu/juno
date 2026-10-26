@@ -4,7 +4,7 @@ import type { EngineOptions } from '../../web/host/testHost'
 import { Juno } from '../driver/juno'
 import { webSurface } from '../driver/surface'
 import { type RunningApp } from '../launch'
-import { startSendTrace, startSidebarTrace } from '../traces'
+import { countTimers, startSendTrace, startSidebarTrace } from '../traces'
 import type { HostPool } from './host'
 import { snapshotState, type WebSnapshot } from './snapshot'
 import { startRendererProfile } from './rprof'
@@ -34,6 +34,7 @@ export async function startWebApp(
   const host = await pool.start(fake, { userData, aliases: snapshot === undefined ? [] : [snapshot.origin], engine: options.engine })
   lap('host')
   try {
+    await page.addInitScript(countTimers)
     if (options.sidebarTrace) await page.addInitScript(startSidebarTrace)
     if (options.sendTrace) await page.addInitScript(startSendTrace)
     await page.goto(`${host.url}?e2e=1${options.tour ? "&tour=auto" : ""}`)

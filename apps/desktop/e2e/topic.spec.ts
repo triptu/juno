@@ -3,7 +3,7 @@
 // topic in two tabs keeps each tab's scroll; and a notification for a topic open in another tab focuses it, scrolls
 // to the message and flashes it. The header's controls answer hover and press, its menus open under their islands,
 // Resolve takes Follow's place without moving the title, and menus built on OptionList have one active row under
-// the pointer and the arrow keys and open on press. What the topic shows and sends (prefetch, the divider and read
+// the pointer and the arrow keys and open on press. Home and an open topic run no loop at rest. What the topic shows and sends (prefetch, the divider and read
 // mark, Notify me, Follow, thread links, the switcher) is in the DOM lane (`dom/topic.test.ts`), and so are live
 // messages at the bottom (`dom/live.test.ts`) and which messages notify (`dom/notifications.test.ts`).
 import type { Locator, Page } from '@playwright/test'
@@ -21,7 +21,16 @@ const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
 const RINA = 'Rina finished the onsite'
 
-syncedTest('the header answers hover and press, its menus open under their islands, Resolve takes Follow’s place without moving the title; menus have one active row and open on press', async ({ juno, win }) => {
+syncedTest('Home and a topic are at rest; the header answers hover and press, its menus open under their islands, Resolve takes Follow’s place without moving the title; menus have one active row and open on press', async ({ juno, win }) => {
+  // The renderer's share of idle CPU (performance.md section 1): nothing loops on the screens a person leaves open.
+  await test.step('Home, then a topic beside the sidebar, run no frame loop, looping animation or timer loop', async () => {
+    await juno.home.expectShown()
+    await juno.expectAtRest()
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.expectTitle(POSTGRES)
+    await juno.expectAtRest()
+  })
+
   await test.step('every control in the header answers hover and press', () => headerFeedback({ juno, win }))
 
   await test.step('⋯ opens the topic menu at its left edge under the right island; the title’s menu opens at the title’s left edge', async () => {
