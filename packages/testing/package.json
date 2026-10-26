@@ -10,7 +10,8 @@
     "./eventually": "./src/eventually.ts",
     "./effect": "./src/effect.ts",
     "./perf-budget": "./src/perfBudget.ts",
-    "./perf-rule": "./src/perfRule.ts"
+    "./perf-rule": "./src/perfRule.ts",
+    "./work-budget": "./src/workBudget.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
