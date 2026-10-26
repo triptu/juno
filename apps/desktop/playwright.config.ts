@@ -12,6 +12,8 @@ const excludedTags = [
 ]
 const tagPattern = (tags: ReadonlyArray<string>) => tags.map((tag) => `${tag}\\b`).join('|')
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+// A stress run (JUNO_STRESS, scripts/remote/workers.sh) slows everything down and scales the default timeouts to match.
+const scale = Number(process.env.JUNO_STRESS_SCALE ?? 1)
 
 // One Electron app at a time on the shared Mac. Each test has its own fake
 // Slack and user-data directory, so a machine of its own (bun run remote) can
@@ -62,8 +64,8 @@ export default defineConfig<object, { lane: Lane }>({
       retries: 0,
       // Each scenario films and analyses every frame; half the browser workers keep the frames coming on time.
       workers: Math.max(1, Math.ceil(browserWorkers / 2)),
-      timeout: 120_000,
-      expect: { timeout: 15_000 },
+      timeout: 120_000 * scale,
+      expect: { timeout: 15_000 * scale },
       ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
       use: {
         lane: 'web' satisfies Lane,
@@ -115,8 +117,8 @@ export default defineConfig<object, { lane: Lane }>({
     },
   ],
   globalSetup: './e2e/feel/sheet.ts',
-  timeout: 30_000,
-  expect: { timeout: 5_000 },
+  timeout: 30_000 * scale,
+  expect: { timeout: 5_000 * scale },
   workers: Math.max(electronWorkers, browserWorkers),
   fullyParallel: false,
   retries: 0,

@@ -70,7 +70,7 @@ const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
 
 export function domTest<M extends Model | undefined = undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M> = {}): void {
   const define = options.tag?.some((tag) => skipTags.includes(tag)) ? test.skip : test
-  define(title, () => run(title, body, options), options.timeout ?? 60_000)
+  define(title, () => run(title, body, options), (options.timeout ?? 60_000) * Number(process.env.JUNO_STRESS_SCALE ?? 1))
 }
 
 async function run<M extends Model | undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M>): Promise<void> {

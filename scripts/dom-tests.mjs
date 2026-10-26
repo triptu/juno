@@ -22,7 +22,8 @@ import { takeSeed } from './unit.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const app = join(root, 'apps/desktop')
 // A test boots a host and a renderer; a cold worker under load needs more than unit tests' 30 s.
-const TIMEOUT_MS = 60_000
+// A stress run (JUNO_STRESS, scripts/remote/workers.sh) scales it with the load it adds.
+const TIMEOUT_MS = 60_000 * Number(process.env.JUNO_STRESS_SCALE ?? 1)
 
 /** Whether a repo path is a DOM lane test file. */
 export const isDomTest = (file) => /^apps\/desktop\/dom\/(?!dist\/)[^.][^]*\.test\.ts$/.test(file) && !file.split('/').includes('..')

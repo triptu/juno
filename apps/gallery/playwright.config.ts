@@ -34,9 +34,13 @@ process.env.GALLERY_SHIFT_PARTS ??= String(workers)
 
 // The default Chromium headless shell is the same pinned browser locally and remotely.
 // `bunx playwright install chromium --only-shell` installs it.
+// A stress run (JUNO_STRESS, scripts/remote/workers.sh) slows everything down and scales the default timeouts to match.
+const scale = Number(process.env.JUNO_STRESS_SCALE ?? 1)
+
 export default defineConfig({
   testDir: '.',
-  timeout: 120_000,
+  timeout: 120_000 * scale,
+  expect: { timeout: 5_000 * scale },
   // Each worker loads the gallery once and its tests share that page, reset
   // between them (support.ts). The shift guard splits itself into parts to use the workers.
   workers,

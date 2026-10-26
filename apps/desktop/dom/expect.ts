@@ -10,7 +10,8 @@ import { checked, disabled, matches, nameOf, shown, type El, type TextMatch } fr
 import { Query } from './query'
 import { focusLog } from './window'
 
-const DEFAULT_TIMEOUT = 5_000
+// A stress run (JUNO_STRESS, scripts/remote/workers.sh) scales it with the load it adds.
+const DEFAULT_TIMEOUT = 5_000 * Number(process.env.JUNO_STRESS_SCALE ?? 1)
 
 interface Timeout { readonly timeout?: number }
 

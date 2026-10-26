@@ -2,6 +2,14 @@ import type { Browser, BrowserContext, Page } from '@playwright/test'
 
 type Options = Pick<Parameters<Browser['newContext']>[0] & object, 'viewport' | 'permissions'>
 
+/** In a stress run (JUNO_STRESS, scripts/remote/workers.sh), the page's renderer runs JUNO_STRESS_CPU_RATE times slower than the engine host beside it. */
+export async function throttle(page: Page): Promise<void> {
+  const rate = Number(process.env.JUNO_STRESS_CPU_RATE ?? 1)
+  if (rate <= 1) return
+  const session = await page.context().newCDPSession(page)
+  await session.send('Emulation.setCPUThrottlingRate', { rate })
+}
+
 /** Keeps immutable HTTP assets warm; every test gets a new page and empty origin storage. */
 export class WebPages {
   #context: BrowserContext | undefined
@@ -15,7 +23,9 @@ export class WebPages {
     this.#context ??= await this.browser.newContext(options)
     this.#options = key
     await this.#context.grantPermissions(options.permissions ?? [])
-    return this.#context.newPage()
+    const page = await this.#context.newPage()
+    await throttle(page)
+    return page
   }
 
   async release(page: Page): Promise<void> {

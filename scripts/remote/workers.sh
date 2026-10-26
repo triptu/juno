@@ -47,3 +47,15 @@ spec_jobs=$(at_least $(( cores / 2 )) 1)
 if [ "$1" = specs:traces ]; then spec_jobs=$cores; fi
 # check.mjs sizes Apalache lanes from allocated threads and cgroup memory.
 export SPECS_JOBS=${SPECS_JOBS:-$spec_jobs} SPECS_OVERLAP=1
+# JUNO_STRESS=1 (`bun run flake --stress`, `bun run remote --env JUNO_STRESS=1 <script>`) runs a suite the way a loaded
+# machine would: twice the workers, a CPU burner per allocated thread beside them (run.sh), the browser lane's
+# renderers throttled JUNO_STRESS_CPU_RATE times through CDP, and the default test and expect timeouts
+# JUNO_STRESS_SCALE times longer, so a failure is a test that depends on timing, not one that ran out of time
+# (docs/development.md, "Stress runs").
+if [ "${JUNO_STRESS:-}" = 1 ]; then
+  export JUNO_STRESS_SCALE=${JUNO_STRESS_SCALE:-3} JUNO_STRESS_CPU_RATE=${JUNO_STRESS_CPU_RATE:-3}
+  export JUNO_TEST_WORKERS=$(( JUNO_TEST_WORKERS * 2 )) JUNO_E2E_WORKERS=$(( JUNO_E2E_WORKERS * 2 ))
+  export JUNO_BROWSER_WORKERS=$(( ${JUNO_BROWSER_WORKERS:-$(( (cores * 5 + 4) / 8 ))} * 2 ))
+  [ -n "${JUNO_DOM_WORKERS:-}" ] && export JUNO_DOM_WORKERS=$(( JUNO_DOM_WORKERS * 2 ))
+  export GALLERY_WORKERS=$(( GALLERY_WORKERS * 2 )) GALLERY_CACHED_WORKERS=$(( GALLERY_CACHED_WORKERS * 2 )) GALLERY_FAST_WORKERS=$(( GALLERY_FAST_WORKERS * 2 ))
+fi

@@ -51,8 +51,15 @@ sampler=$!
 if [ "${JUNO_MEMORY_PROFILE:-}" = 1 ]; then
   bun scripts/memory-profile.mjs "memory-profile/${1//[^a-z0-9]/-}-$$.json" & profiler=$!
 fi
+# Under JUNO_STRESS (workers.sh), one busy loop per allocated thread takes its share of the CPU for the whole script.
+burners=()
+if [ "${JUNO_STRESS:-}" = 1 ]; then
+  for _ in $(seq "$cores"); do bun -e 'for (;;) Math.sqrt(Math.random())' & burners+=($!); done
+  echo "remote: stress: ${#burners[@]} CPU burners, test workers $JUNO_TEST_WORKERS, browser workers $JUNO_BROWSER_WORKERS, Electron workers $JUNO_E2E_WORKERS, timeouts x$JUNO_STRESS_SCALE, renderer CPU /$JUNO_STRESS_CPU_RATE" >&2
+fi
 xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' bun run "$@"
 code=$?
+[ ${#burners[@]} -gt 0 ] && kill "${burners[@]}" 2>/dev/null
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
 [ -n "${profiler:-}" ] && kill $profiler 2>/dev/null && wait $profiler 2>/dev/null
