@@ -9,9 +9,9 @@ export JUNO_RUNNER_JOB_CORES=${RUNNER_THREADS:?tstack did not provide allocated 
 echo "remote: allocated threads=$JUNO_RUNNER_JOB_CORES"
 export JUNO_REMOTE_INSTALL=1 JUNO_BUILD_CACHE_DIR=/cache/builds
 # Spec check and conformance results stay on the runner, shared by every job. An entry is
-# touched when it is read; one unused for 14 days is removed.
+# touched when it is read; one unused for 14 days is removed (compiled/ is small and stays).
 export SPECS_CACHE_DIR=${SPECS_CACHE_DIR:-/cache/specs}
-mkdir -p "$SPECS_CACHE_DIR" && find "$SPECS_CACHE_DIR" -type f -mtime +14 -delete 2>/dev/null
+mkdir -p "$SPECS_CACHE_DIR" && find "$SPECS_CACHE_DIR" -maxdepth 1 -type f -mtime +14 -delete 2>/dev/null
 export electron_config_cache=/cache/electron
 export TMP=/tmp TEMP=/tmp XDG_RUNTIME_DIR=/tmp/juno-runtime
 mkdir -p "$XDG_RUNTIME_DIR" /cache/builds /cache/electron .remote
