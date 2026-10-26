@@ -69,17 +69,17 @@ test('the desktop and unit jobs take four cores in a full run and accept overrid
   assert.throws(() => planCores('desktop', { env: ['JUNO_RUNNER_DESKTOP_CORES=0'] }, {}), /positive whole number/)
 })
 
-test('a nightly starts each perf part alone in a serial two-core job, as its baseline was measured', async () => {
+test('a nightly starts each perf part alone in a serial job of the cores its baseline was measured on', async () => {
   const { runnerPlanJobs, planCores } = await import('./remote/plan.mjs')
   const { fullSuites } = await import('./verify-plan.mjs')
   const scripts = Object.fromEntries(['test:dom', 'test:browser', 'test:electron', 'test:nightly', 'perf:part1', 'perf:part2'].map((name) => [name, '']))
   const args = fullSuites(scripts, { nightly: true, perf: true }).flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
   const jobs = runnerPlanJobs({ script: 'test:plan', args, env: ['JUNO_VERIFY_POLICY=1'] }, {})
-  for (const part of ['perf:part1', 'perf:part2']) {
+  for (const [part, cores] of [['perf:part1', 1], ['perf:part2', 2]]) {
     const job = jobs.find((candidate) => candidate.steps.some((step) => step.script === part))
     assert.equal(job.steps[0].script, part)
     assert.equal(job.overlap, false)
-    assert.equal(planCores(job.kind, { env: [] }, {}, job.steps, job.cores), 2)
+    assert.equal(planCores(job.kind, { env: [] }, {}, job.steps, job.cores), cores)
   }
   assert.equal(jobs.reduce((sum, job) => sum + job.cores, 0), 8)
   assert.deepEqual(jobs.flatMap((job) => job.steps.map((step) => step.script)).toSorted(), fullSuites(scripts, { nightly: true, perf: true }).map((suite) => suite.name).toSorted())

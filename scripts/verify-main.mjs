@@ -25,8 +25,8 @@
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
 // suite failed. --nightly adds `perf` on the laptop to the plan, in two parts
-// that each start a two-core job: every scenario and package budget, checked
-// against the laptop's baseline (docs/performance.md 7.3). On the Mac, perf (as `perf @mac`, the
+// that each start a job (one core, then two): the laptop's small set of
+// scenarios, checked against its baseline (docs/performance.md 7.3). On the Mac, perf (as `perf @mac`, the
 // absolute budgets) and test:feel run only with --with-mac, after the @mac
 // tests, each holding the whole machine; with the plan on the laptop they
 // start when it does. The feel contact sheet is copied next to the logs.
@@ -93,7 +93,7 @@ if (local && argv.includes('--require-remote')) throw new Error('This run requir
 const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
-// The laptop perf job: nightly, every scenario and package budget, in two parts of the plan (scripts/remote/plan.mjs).
+// The laptop perf job: nightly, its small set of scenarios, in two parts of the plan (scripts/remote/plan.mjs).
 const perf = nightly && !local && Boolean(scripts['perf:part1'])
 const required = smoke ? [{ name: 'test', words: ['test', `--seed=${testSeed}`, '--files', 'packages/domain/test/title.test.ts'] }]
   : reachOnly ? [] : fullSuites(scripts, { nightly, noCache, perf, seed, testSeed, skipTags: local ? ['@mac'] : [] })

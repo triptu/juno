@@ -9,11 +9,11 @@ import { forwardSignals } from './children.mjs'
 // unit tests, the DOM lane and the gallery. Smaller jobs each left one long suite on too few cores.
 // A release's nightly tests (test:nightly) join the desktop job, which has the builds.
 const desktopJob = ['test:desktop', 'test:browser', 'test:electron', 'test:nightly', 'test:e2e', 'specs:check', 'specs:conformance']
-// A nightly (docs/development.md, "Nightly runs"): each perf part starts a two-core job alone, since its baseline is
-// for two cores and one worker, and that job then runs short serial steps. The rest share a four-core job with its
-// lanes at once: the gallery walk mostly waits for frames, and the spec check fills those threads at a lower priority.
-const nightlyJobs = { 'perf:part1': 'perf1', test: 'perf1', 'test:dom': 'perf1', 'perf:part2': 'perf2', 'specs:conformance': 'perf2', 'test:electron': 'perf2' }
-const nightlyCores = { perf1: 2, perf2: 2, wide: 4 }
+// A nightly (docs/development.md, "Nightly runs"): each perf part starts a job alone, on the cores its baseline was
+// measured on (one, then two), and that job then runs serial steps. The rest share a five-core job with its lanes at
+// once: the gallery walk mostly waits for frames, and the spec check fills those threads at a lower priority.
+const nightlyJobs = { 'perf:part1': 'perf1', 'test:dom': 'perf1', 'perf:part2': 'perf2', test: 'perf2', 'specs:conformance': 'perf2', 'test:electron': 'perf2' }
+const nightlyCores = { perf1: 1, perf2: 2, wide: 5 }
 
 export function runnerPlanJobs(options, env = process.env) {
   const setting = (key) => options.env?.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
@@ -28,8 +28,8 @@ export function runnerPlanJobs(options, env = process.env) {
     const kind = nightly ? nightlyJobs[step.script] ?? 'wide'
       : fullWalk ? step.script === 'test:gallery' ? 'gallery' : 'desktop' : desktopJob.includes(step.script) ? 'desktop' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
-    // Beside the spec check, the walk gets one walker per thread of its four cores rather than six (workers.sh).
-    const env = kind === 'wide' && step.script === 'test:gallery' ? { GALLERY_WORKERS: '8', ...step.env } : step.env
+    // Beside the spec check, the walk gets one walker per thread of its five cores (workers.sh).
+    const env = kind === 'wide' && step.script === 'test:gallery' ? { GALLERY_WORKERS: '10', ...step.env } : step.env
     groups.get(kind).push({ ...step, env, index })
   }
   return groups.size > 1 ? [...groups].map(([kind, group]) => ({ kind, steps: group, ...(nightly ? { cores: nightlyCores[kind], overlap: kind === 'wide' } : {}) })) : []
@@ -66,7 +66,7 @@ export async function runRunnerPlan(jobs, { self, root, options, log, env = {} }
       '--wait', String(options.wait ?? 60),
       ...options.env.flatMap((pair) => ['--env', pair]),
       // A full run keeps each job's steps in order, as its job sizes were measured, except a nightly's
-      // four-core job. Elsewhere a job's lanes run at once with their own workers: the gallery mostly
+      // wide job. Elsewhere a job's lanes run at once with their own workers: the gallery mostly
       // waits for frames, and the unit and DOM steps fill those cores at a lower priority.
       '--env', 'JUNO_RUNNER_PLAN=single', '--env', verifyRun(options) && !overlap ? 'JUNO_PLAN_SERIAL=1' : 'JUNO_PLAN_OVERLAP=1',
     ]
