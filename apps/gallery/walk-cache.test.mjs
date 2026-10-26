@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { testCache, walkCache } from './walk-cache.mjs'
+import { sampleShare, testCache, walkCache } from './walk-cache.mjs'
 
 const tokens = [
   "import * as stylex from '@stylexjs/stylex'",
@@ -107,6 +107,28 @@ test('full runs bypass old passes; failed, incomplete and corrupt records never 
   assert.equal(cache().passed(button), true)
   writeFileSync(join(directory, check.key(button)), 'partial')
   assert.equal(cache().passed(button), false)
+})
+
+test('a full run reuses passes by the run that wrote them and walks its seed\'s sample of them again', t => {
+  const { cache, directory, button } = fixture(t)
+  const routes = Array.from({ length: 2000 }, (_, index) => ({ ...button, id: `s${index}`, route: `Button/s${index}` }))
+  const affected = cache({ kind: 'computed', source: 'gallery run at noon' })
+  for (const route of routes) affected.pass(route)
+  const picked = seed => routes.filter(route => cache({ kind: 'computed', sample: seed }).reuse(route)?.sampled).map(route => route.route)
+  const first = picked('11')
+  assert.ok(Math.abs(first.length - routes.length * sampleShare) < 40, `${first.length} of ${routes.length} sampled`)
+  assert.deepEqual(picked('11'), first, 'every worker picks the same states for one seed')
+  assert.ok(picked('12').filter(route => first.includes(route)).length < first.length / 4, 'a new seed picks other states')
+  const reuse = cache({ kind: 'computed', sample: '11' }).reuse(routes[0])
+  assert.equal(reuse.from, 'gallery run at noon')
+  // A record from before sources still counts; anything after the first line other than a source does not.
+  writeFileSync(join(directory, affected.key(button)), 'computed Button/one\n')
+  assert.equal(affected.reuse(button).from, 'an earlier run')
+  writeFileSync(join(directory, affected.key(button)), 'computed Button/one\npartial')
+  assert.equal(affected.reuse(button), undefined)
+  // The real-input walk has no sample: its records are its own.
+  cache().pass(button)
+  assert.equal(cache({ sample: undefined }).reuse(button).sampled, false)
 })
 
 test('unknown registrations fail closed to all sources; the gallery\'s compositions key on what they import', t => {

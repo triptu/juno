@@ -1,9 +1,12 @@
 import { expect, type Page } from '@playwright/test'
 import { formatForcedShift } from '@juno/testing/forced-shift'
 import { computedWalk, forced } from './computed-walk'
-import { claimQueue, openState, readRoutes, stateCache, test } from './support'
+import { claimQueue, keyMissed, noteWalk, openState, readRoutes, stateCache, test } from './support'
 
-/** Fast shift checks for changed states; GALLERY_SHIFT_ALL=1 checks every state, as a full run does. */
+/**
+ * Fast shift checks for changed states. A full run adds a sample of unchanged
+ * states (`GALLERY_SAMPLE`); GALLERY_SHIFT_ALL=1 checks every state, as its weekly uncached walk does.
+ */
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
 const parts = Number(process.env.GALLERY_SHIFT_PARTS ?? process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3))
@@ -21,21 +24,34 @@ for (let part = 0; part < parts; part++) {
     const cache = stateCache('computed', browser)
     const walk = computedWalk(page)
     const failures: string[] = []
-    let states = 0, cached = 0, elements = 0, resets = 0, unforced = 0
+    const reused: Record<string, number> = {}
+    const missed: string[] = []
+    let states = 0, cached = 0, sampled = 0, elements = 0, resets = 0, unforced = 0
     try {
       for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
-        if (cache.passed(route)) { cached++; continue }
+        const reuse = cache.reuse(route)
+        if (reuse && !reuse.sampled) {
+          cached++
+          reused[reuse.from] = (reused[reuse.from] ?? 0) + 1
+          continue
+        }
         cache.forget(route)
         const result = await walk(route)
-        states++
+        if (reuse) sampled++
+        else states++
         elements += result.elements
         resets += result.resets
         unforced = Math.max(unforced, result.unforced)
         failures.push(...result.failures.map(failure => `${route.route}: ${failure}`))
         if (result.failures.length === 0) cache.pass(route)
+        else if (reuse) {
+          missed.push(route.route)
+          failures.push(`${route.route}: ${keyMissed(reuse.from)}`)
+        }
       }
     } finally {
-      console.log(`computed shift: ${states} states, ${cached} cached, ${elements} elements, ${resets} resets, ${unforced} pseudo-class rules left unforced`)
+      console.log(`computed shift: ${states} states, ${cached} cached, ${sampled} cached states sampled, ${elements} elements, ${resets} resets, ${unforced} pseudo-class rules left unforced`)
+      noteWalk({ kind: 'states', walked: states, reused, sampled, missed })
     }
     expect(failures.join('\n\n')).toBe('')
   })

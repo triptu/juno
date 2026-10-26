@@ -194,14 +194,36 @@ function cacheOptions(browser: Browser) {
     runtime: { playwright: test.info().config.version, browser: browser.version(), platform: process.platform, arch: process.arch, os: release(), options },
     // Repeats are flake hunts: every repeat must exercise the state again.
     all: process.env.GALLERY_SHIFT_ALL === '1' || test.info().project.repeatEach > 1 || test.info().retry > 0,
+    // Set for every run in playwright.config.ts; a full run names itself.
+    source: process.env.GALLERY_RECORD_SOURCE,
+    // A full run reuses unchanged states and checks this seed's sample of them again.
+    sample: process.env.GALLERY_SAMPLE,
   }
 }
 
 export function stateCache(kind: 'shift' | 'computed', browser: Browser) {
   const options = cacheOptions(browser)
-  const all = kind === 'computed' ? options.all : process.env.GALLERY_REAL_WALK === '1' || test.info().project.repeatEach > 1 || test.info().retry > 0
-  return walkCache({ ...options, kind, all })
+  if (kind === 'computed') return walkCache({ ...options, kind })
+  const all = process.env.GALLERY_REAL_WALK === '1' || test.info().project.repeatEach > 1 || test.info().retry > 0
+  return walkCache({ ...options, kind, all, sample: undefined })
 }
+
+/**
+ * What a walk part or a cached rendering test did with its records, for the full-run record
+ * (walk-reporter.mjs): `walked` had no pass to reuse, `reused` maps each source to how many
+ * it skipped, `sampled` had a pass and was checked again, `missed` are sampled ones that failed.
+ */
+export interface WalkCounts {
+  readonly kind: 'states' | 'tests'
+  readonly walked: number
+  readonly reused: Readonly<Record<string, number>>
+  readonly sampled: number
+  readonly missed: ReadonlyArray<string>
+}
+export const noteWalk = (counts: WalkCounts) => test.info().annotations.push({ type: 'gallery-walk', description: JSON.stringify(counts) })
+
+/** The failure a sampled record adds: the same key, a different result. */
+export const keyMissed = (from: string) => `It passed before with the same walk-cache key (${from}), so the key missed an input; see apps/gallery/walk-cache.mjs`
 
 /**
  * The component a gallery address opens: `#index` for the list of states, `*`
@@ -222,7 +244,8 @@ const renderingCaches = new Map<string, ReturnType<typeof testCache>>()
  * A test that only reads what states draw (boxes, or with `paint` also colours),
  * so it is a pure function of the components it opens. It is skipped while those
  * components, its spec and the runtime are unchanged since it last passed;
- * `GALLERY_SHIFT_ALL=1` (full and no-cache runs), repeats and retries run it.
+ * a full run's sample (`GALLERY_SAMPLE`) runs it again, and `GALLERY_SHIFT_ALL=1`
+ * (a full run's weekly uncached walk, or `--no-cache`), repeats and retries run it.
  * Never use it for interaction timing, motion or a delayed load.
  */
 function renderingTest(kind: 'layout' | 'paint') {
@@ -233,11 +256,18 @@ function renderingTest(kind: 'layout' | 'paint') {
       const cache = renderingCaches.get(key)!
       const file = relative(root, info.file)
       const title = info.titlePath.slice(1).join(' › ')
-      if (cache.passed(file, title)) info.skip(true, 'Unchanged since it passed')
+      const reuse = cache.reuse(file, title)
+      if (reuse && !reuse.sampled) {
+        noteWalk({ kind: 'tests', walked: 0, reused: { [reuse.from]: 1 }, sampled: 0, missed: [] })
+        info.skip(true, 'Unchanged since it passed')
+      }
       cache.forget(file, title)
       const opened = new Set<string>()
       await use(opened)
       if (info.status === 'passed' && opened.size > 0) cache.pass(file, title, opened)
+      const missed = reuse !== undefined && !['passed', 'skipped'].includes(info.status ?? 'passed')
+      noteWalk({ kind: 'tests', walked: reuse ? 0 : 1, reused: {}, sampled: reuse ? 1 : 0, missed: missed ? [`${file}: ${title}`] : [] })
+      if (missed) throw new Error(keyMissed(reuse.from))
     }, { auto: true }],
     page: async ({ page, renderedComponents }, use) => {
       const opened = (frame: Frame) => {

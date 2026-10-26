@@ -123,7 +123,7 @@ function galleryFixtureSources(root, files) {
 /**
  * `#index`, the gallery's list of states: the registries and the fixture modules
  * and helpers that declare them. A state list built from a constant outside
- * fixture code is missed until a full run.
+ * fixture code is missed until an uncached walk (a full run's weekly one).
  */
 function stateListInputs(graph, registries, components) {
   const fixtureCode = file => /(^|\/)fixtures(\/|\.)|\.fixtures\./.test(file)
@@ -197,18 +197,41 @@ function write(cache, name, text) {
   } finally { rmSync(temporary, { force: true }) }
 }
 
-/** Immutable successful state records beside the shared build/results caches. */
-export function walkCache({ root, kind, runtime, directory, all = false }) {
+/** The share of cached states and cached rendering tests a full run checks again. */
+export const sampleShare = 0.05
+/** Whether the sample with this seed takes `name`. Every worker gets the same answer. */
+export const inSample = (seed, name) => seed !== undefined && Number.parseInt(digest(`${seed}\0${name}`).slice(0, 8), 16) < sampleShare * 2 ** 32
+
+const oneLine = text => text.replace(/\s+/g, ' ').trim()
+
+/** The run that wrote a record: its second line, or `an earlier run` for a record from before sources. */
+function recordSource(text, first) {
+  if (text === first) return 'an earlier run'
+  return text?.startsWith(first) ? /^from (.+)\n$/.exec(text.slice(first.length))?.[1] : undefined
+}
+
+/**
+ * Immutable successful state records beside the shared build/results caches.
+ * `source` names the run in each record it writes; `sample` is a full run's
+ * seed, and `reuse` reports which cached states that sample walks again.
+ */
+export function walkCache({ root, kind, runtime, directory, all = false, source = 'an earlier run', sample }) {
   const componentKey = sourceKeys(root, kind)
   const cache = cacheDirectory(directory)
   const env = environment()
   const key = route => digest(JSON.stringify({ kind, route, runtime, environment: env, source: componentKey(route.component) }))
   const record = route => `${kind} ${route.route}\n`
+  /** The state's earlier pass, if it has one: where it came from, and whether the sample checks it again. */
+  const reuse = route => {
+    const from = all ? undefined : recordSource(read(join(cache, key(route))), record(route))
+    return from === undefined ? undefined : { from, sampled: inSample(sample, `${kind} ${route.route}`) }
+  }
   return {
     key,
-    passed: route => !all && read(join(cache, key(route))) === record(route),
+    reuse,
+    passed: route => reuse(route) !== undefined,
     forget(route) { rmSync(join(cache, key(route)), { force: true }) },
-    pass(route) { write(cache, key(route), record(route)) },
+    pass(route) { write(cache, key(route), `${record(route)}from ${oneLine(source)}\n`) },
   }
 }
 
@@ -217,9 +240,10 @@ export function walkCache({ root, kind, runtime, directory, all = false }) {
  * test's identity is its title, its spec and what that imports, and the
  * runtime; its record also keys on every component it opened, which the last
  * pass wrote down beside the identity. A test never seen, or whose spec,
- * runtime or opened components changed, runs.
+ * runtime or opened components changed, runs. `source` and `sample` work as in
+ * `walkCache`.
  */
-export function testCache({ root, kind, runtime, directory, all = false }) {
+export function testCache({ root, kind, runtime, directory, all = false, source = 'an earlier run', sample }) {
   const componentKey = sourceKeys(root, kind)
   const cache = cacheDirectory(directory)
   const env = environment()
@@ -229,13 +253,17 @@ export function testCache({ root, kind, runtime, directory, all = false }) {
     const text = read(join(cache, `${id}.opened`))
     try { return text === undefined ? undefined : JSON.parse(text) } catch { return undefined }
   }
+  /** The test's earlier pass, if it has one: where it came from, and whether the sample runs it again. */
+  const reuse = (file, title) => {
+    if (all) return undefined
+    const id = identity(file, title)
+    const components = opened(id)
+    const from = Array.isArray(components) ? recordSource(read(join(cache, key(id, components))), `${kind} test ${title}\n`) : undefined
+    return from === undefined ? undefined : { from, sampled: inSample(sample, `${kind} ${file} ${title}`) }
+  }
   return {
-    passed(file, title) {
-      if (all) return false
-      const id = identity(file, title)
-      const components = opened(id)
-      return Array.isArray(components) && read(join(cache, key(id, components))) === `${kind} test ${title}\n`
-    },
+    reuse,
+    passed: (file, title) => reuse(file, title) !== undefined,
     forget(file, title) {
       const id = identity(file, title)
       const components = opened(id)
@@ -244,7 +272,7 @@ export function testCache({ root, kind, runtime, directory, all = false }) {
     },
     pass(file, title, components) {
       const id = identity(file, title)
-      write(cache, key(id, [...components]), `${kind} test ${title}\n`)
+      write(cache, key(id, [...components]), `${kind} test ${title}\nfrom ${oneLine(source)}\n`)
       write(cache, `${id}.opened`, JSON.stringify([...components].toSorted()))
     },
   }

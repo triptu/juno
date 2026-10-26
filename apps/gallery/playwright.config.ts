@@ -14,6 +14,8 @@ const port = process.env.GALLERY_TEST_PORT ? Number(process.env.GALLERY_TEST_POR
 process.env.GALLERY_TEST_PORT = String(port)
 // One id per run, set before the workers start, so the shift guard's parts share one queue.
 process.env.GALLERY_SHIFT_RUN ??= `${Date.now()}-${process.pid}`
+// The run each walk record names; a full run sets its own.
+process.env.GALLERY_RECORD_SOURCE ??= `gallery run at ${new Date().toISOString()}`
 // JUNO_SHARD=i/n (bun run remote --shards n): shard 0 runs every test; the others
 // run only the two shift guards' parts, which split the states between the shards.
 const shardIndex = Number(/^(\d+)\/\d+$/.exec(process.env.JUNO_SHARD ?? '')?.[1] ?? 0)
@@ -39,7 +41,7 @@ export default defineConfig({
   workers,
   fullyParallel: true,
   retries: 0,
-  reporter: [[process.env.CI ? 'github' : 'list'], ['json', { outputFile: 'playwright-report/results.json' }], ['../../scripts/test-results-reporter.mjs'], ['../../scripts/gallery-cpu-reporter.mjs']],
+  reporter: [[process.env.CI ? 'github' : 'list'], ['json', { outputFile: 'playwright-report/results.json' }], ['../../scripts/test-results-reporter.mjs'], ['../../scripts/gallery-cpu-reporter.mjs'], ['./walk-reporter.mjs']],
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     channel: process.env.GALLERY_BROWSER === 'chrome' ? 'chrome' : undefined,
