@@ -91,3 +91,8 @@ Juno handles a new ephemeral at the same `ts` (it replaces the stored one) and
 <id>` clicks Add them for a person who agreed to be added, and prints the
 frames. Whether a third-party app's button needs `service_id` and `app_id`:
 Juno sends `service_id` and leaves out `app_id`.
+
+**Ephemeral messages in Juno.** An ephemeral message is never in history, so
+Slack's client loses it on reload. Juno stores it for its topic only: it never
+sets a sidebar row's preview, activity, unread count or mention, never
+notifies, and the store drops it when it opens.
