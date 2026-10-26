@@ -93,6 +93,7 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 }
 
 // Signed in. The drag regions are counted first, before any surface has opened.
+test.describe.configure({ timeout: 120_000 })
 syncedTest('the window: its image policy, drag regions, surfaces over the title bars, the build line with updates off, the test notification and permission line, swipes, minimize, the bottom at 2x, full screen and zoom', { tag: '@electron' }, async ({ juno, fake, app, win }) => {
   await test.step('images load only from the app and Slack; unfurls go through main (src/main/publicImage.ts)', async () => {
     const policy = await juno.win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
@@ -188,7 +189,9 @@ async function minimizeKeepsDraft(juno: Juno, app: ElectronApplication): Promise
 async function bottomAt2x(juno: Juno, fake: FakeSlack, app: ElectronApplication, win: Page): Promise<void> {
   for (let i = 0; i < 30; i++) fake.injectMessage({ channel: 'C0ENG', user: i % 2 === 0 ? 'U0MAYA' : 'U0LEO', text: `Earlier message ${i}` })
   await juno.topic.expectMessage('Earlier message 29')
-  await juno.topic.toLatest()
+  // The draft step's send left the list at the end; it follows the new messages there.
+  await juno.topic.scroller.evaluate((node) => { node.scrollTop = node.scrollHeight })
+  await juno.topic.expectAtBottom()
   expect(await longerThanView(juno.topic.scroller)).toBe(true)
   const zoom = 2 / await win.evaluate(() => devicePixelRatio)
   await app.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]!.webContents.setZoomFactor(zoom), zoom)

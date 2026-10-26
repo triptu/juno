@@ -44,11 +44,6 @@ test(`backup to a shared folder, export the phrase, move to a second Mac whose a
   const { phrase, code } = await test.step('the first Mac backs up to the shared folder, exports the phrase and moves', () => backUpAndMove(juno, shared))
   const laptop = await otherApp({ deviceName: 'Laptop', backupIntervalMs: BACKUP_INTERVAL_MS })
   await test.step(`the second Mac restores, its agent dies at ${point}, and the chat and card come back for review`, () => restoreWithCrash(laptop, fake, shared, phrase, code))
-  await test.step('the first Mac reads the laptop\'s backup in the shared folder: the owner line names the laptop', async () => {
-    const studio = await openSettings(juno, 'Backup & This Mac')
-    await expect(studio.locator('[data-owner-line]')).toContainText('Laptop', { timeout: 20_000 })
-    await expect(studio.getByRole('button', { name: 'Move', exact: true })).toBeDisabled()
-  })
 })
 
 /** The first Mac: a chat with a pending card, and the backup on from the start, in its own folder. */

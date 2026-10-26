@@ -196,7 +196,11 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
   })
 
   await test.step('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async () => {
-    await startHuddleFromMenu(juno)
+    await juno.sidebar.row('#eng').open()
+    await juno.topic.expectTitle('Main')
+    await juno.sidebar.leave()
+    // The fake keeps the room the step above left, so the menu offers Join huddle in its place.
+    await juno.topic.chooseInMenu('huddle')
     await expect(bar).toBeVisible()
     await expect.poll(() => connection(win)).toBe('connected')
     const attendeeId = await attendee(win)

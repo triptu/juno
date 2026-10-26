@@ -140,6 +140,8 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
   let dark = { background: '', accent: '' }
   await test.step('choosing the teal accent and the dark theme in Settings › Appearance', async () => {
     const lightBackground = await resolveColorVar(juno.win, '--background')
+    // Settings is in the account menu, in the sidebar; it hides again just before quitting.
+    await frame.toggleWithMenu()
     await juno.openSettings('Appearance')
     const teal = juno.settings.root.getByRole('button', { name: 'Teal' })
     await teal.click()
@@ -148,6 +150,8 @@ test('privacy mode, the sidebar, the theme and the accent survive a relaunch, an
     await expect(juno.settings.themeRadio('Dark')).toHaveAttribute('aria-checked', 'true')
     dark = { background: await resolveColorVar(juno.win, '--background'), accent: await resolveColorVar(juno.win, '--hl') }
     expect(brightness(dark.background)).toBeLessThan(brightness(lightBackground))
+    await frame.toggleWithMenu()
+    await frame.expectHidden()
   })
   await running.close()
 
