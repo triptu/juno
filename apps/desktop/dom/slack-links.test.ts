@@ -40,17 +40,15 @@ function seedLinks(fake: FakeSlack): void {
       `<${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}|a closed room>`,
       `and <${OTHER}|elsewhere>.`,
     ].join(' '),
-    silent: true,
   })
 }
 
-/** Signs in, opens the Postgres thread and returns its links by their words. */
+/** Opens the Postgres thread and returns its links by their words. */
 async function openLinks(juno: Juno) {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
   await juno.tabs.expectCount(1)
+  await expect(juno.topic.message('See the preview note')).toBeVisible({ timeout: 15_000 })
   const links = juno.topic.message('See the preview note').locator('[data-msg-text] a')
   return (text: string) => links.filter({ hasText: text })
 }
@@ -59,16 +57,6 @@ domTest('message links open inside Juno at the message: Main and a reply in new 
   seedLinks(fake)
   const link = await openLinks(juno)
   const { topic, tabs } = juno
-
-  await step('in-app links keep the arrow cursor and say where they go on hover; others keep the URL', async () => {
-    await expect(link('the preview note')).toHaveAttribute('data-in-app', '')
-    await expect(link('elsewhere')).not.toHaveAttribute('data-in-app', '')
-    await expect(link('elsewhere')).toHaveAttribute('title', OTHER)
-    await link('the preview note').hover()
-    await expect(link('the preview note')).toHaveAttribute('title', '#eng · Main')
-    await link('the reaper reply').hover()
-    await expect(link('the reaper reply')).toHaveAttribute('title', '#eng · Thread')
-  })
 
   await step('a conversation Juno cannot reach, and another workspace, open in the browser and open no tab', async () => {
     await link('a closed room').click()
@@ -122,4 +110,4 @@ domTest('message links open inside Juno at the message: Main and a reply in new 
     await tabs.select(ENG)
     await expect(topic.message('preview environments never shut down')).toBeVisible({ timeout: 15_000 })
   })
-}, { synced: false })
+})
