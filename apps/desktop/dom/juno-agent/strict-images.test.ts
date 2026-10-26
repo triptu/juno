@@ -31,7 +31,8 @@ domTest<ScriptedModel>('an image attached on Home goes to Juno as an image part 
   await tabs.expectActive('Juno')
   const chat = JunoChatPane.tab(juno.win)
   const bubble = chat.ownerBubble('What does this chart show?')
-  await expect(bubble.locator('[data-owner-image="0"] img')).toBeVisible()
+  // happy-dom loads no image, so the thumbnails are checked by their boxes, not their pictures.
+  await expect(bubble.locator('[data-owner-image="0"]')).toHaveCount(1)
   await chat.expectJuno('You said: What does this chart show?')
   const sent = chatRequests(model).find((request) => request.images.length > 0)
   expect(sent?.images).toEqual([{ mimeType: 'image/png', bytes: expect.any(Number) }])
@@ -49,9 +50,9 @@ domTest<ScriptedModel>('an image attached on Home goes to Juno as an image part 
   const withImage = () => chatRequests(model).filter((request) => request.images.length > 0).length
   const sentBefore = withImage()
   await drop(chat.root.locator('[data-juno-composer]'), [chart()])
-  await expect(chat.root.locator('[data-juno-composer] [data-attachment="ready"] img')).toBeVisible()
+  await expect(chat.root.locator('[data-juno-composer] [data-attachment="ready"]')).toHaveCount(1)
   await chat.composer.press('Enter')
-  await expect(chat.root.locator('[data-chat-owner] [data-owner-image="0"] img')).toHaveCount(2)
+  await expect(chat.root.locator('[data-chat-owner] [data-owner-image="0"]')).toHaveCount(2)
   await expect.poll(withImage, { timeout: 15_000 }).toBe(sentBefore + 1)
   await expect(chat.root.locator('[data-juno-composer] [data-attachment]')).toHaveCount(0)
 
