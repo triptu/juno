@@ -231,7 +231,8 @@ domTest('wrong place, the audience line, local fixes and grammar after sending, 
     await juno.topic.expectSent('its broken')
     await juno.topic.send('teh plan')
     await expect(suggestion(juno).last()).toContainText('teh → the')
-    expect(posts(fake).map((call) => call.args['text'])).toEqual(['i think so too', BILL_REPLY, 'its broken', 'teh plan'])
+    // The fix line is local and can show before the post reaches Slack.
+    await expect.poll(() => posts(fake).map((call) => call.args['text'])).toEqual(['i think so too', BILL_REPLY, 'its broken', 'teh plan'])
     expect(modelRows()).toBe(asked)
   })
 
