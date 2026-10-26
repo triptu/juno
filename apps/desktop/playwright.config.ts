@@ -51,25 +51,7 @@ export default defineConfig<object, { lane: Lane }>({
   projects: [
     { name: 'build-electron', testMatch: 'setup/electron.setup.ts' },
     { name: 'build-web', testMatch: 'setup/web.setup.ts' },
-    {
-      name: 'browser',
-      outputDir: join(results, 'browser'),
-      testMatch: BROWSER_SPECS.map((file) => resolve(__dirname, 'e2e', file)),
-      dependencies: ['build-web'],
-      fullyParallel: true,
-      // A test that passes only on a second try is a bug to fix.
-      retries: 0,
-      workers: browserWorkers,
-      grepInvert: new RegExp(tagPattern(['@electron', ...excludedTags])),
-      use: {
-        lane: 'web' satisfies Lane,
-        browserName: 'chromium',
-        launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] },
-        // The Electron window's content size (src/main/window.ts).
-        viewport: { width: 1200, height: 800 },
-        permissions: ['clipboard-read', 'clipboard-write'],
-      },
-    },
+    // Before the browser project, so its long scenarios start first rather than hold the run open at its end (e2e/order.ts).
     {
       name: 'feel',
       testDir: 'e2e/feel',
@@ -87,6 +69,25 @@ export default defineConfig<object, { lane: Lane }>({
         lane: 'web' satisfies Lane,
         browserName: 'chromium',
         launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] },
+        viewport: { width: 1200, height: 800 },
+        permissions: ['clipboard-read', 'clipboard-write'],
+      },
+    },
+    {
+      name: 'browser',
+      outputDir: join(results, 'browser'),
+      testMatch: BROWSER_SPECS.map((file) => resolve(__dirname, 'e2e', file)),
+      dependencies: ['build-web'],
+      fullyParallel: true,
+      // A test that passes only on a second try is a bug to fix.
+      retries: 0,
+      workers: browserWorkers,
+      grepInvert: new RegExp(tagPattern(['@electron', ...excludedTags])),
+      use: {
+        lane: 'web' satisfies Lane,
+        browserName: 'chromium',
+        launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] },
+        // The Electron window's content size (src/main/window.ts).
         viewport: { width: 1200, height: 800 },
         permissions: ['clipboard-read', 'clipboard-write'],
       },
