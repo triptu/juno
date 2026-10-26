@@ -17,6 +17,7 @@ import type { EngineOptions } from '../web/host/testHost'
 import type { WebTestSeam } from '../web/page/testSeam'
 import { PageClock } from './clock'
 import { Dom } from './input'
+import { holdReplies } from './socket'
 import { closeWindow, DOM_BUILD, openWindow, warmRenderer } from './window'
 
 let pool: HostPool | undefined
@@ -96,6 +97,11 @@ export class DomApp {
     if (this.#tour) url.searchParams.set('tour', 'auto')
     if (ready !== undefined) url.searchParams.set('session', JSON.stringify(ready))
     return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) }, storage)
+  }
+
+  /** Holds the engine's replies to the RPC `tags` the page asks for from now on; the returned function delivers them. */
+  holdReplies(...tags: ReadonlyArray<string>): () => void {
+    return holdReplies(this.window, tags)
   }
 
   /** The page's test seam (`web/page/testSeam.ts`): menus, links and app-menu commands. */
