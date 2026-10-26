@@ -1,0 +1,1 @@
+- 10-26 20:27 · The counted scroll no longer counts style recalculations · The list's scroll-rest timer splits or joins them by frame timing (25 to 38 for the same code); layouts and mutations stay exact and still catch a style written to every row (docs/performance.md, "Counted budgets").
