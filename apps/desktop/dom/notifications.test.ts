@@ -1,7 +1,8 @@
 /**
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
  * thread or person, the OS notification and its title for a group DM, its
- * click, and the dock badge. The host's shell records OS notifications
+ * click, the dock badge, a notification's text hidden in privacy mode, and
+ * an instruction added and removed in Settings › Notifications. The host's shell records OS notifications
  * instead of showing them. Landing on a message in a long thread and the
  * Settings forms are notifications.spec.ts's.
  */
@@ -19,12 +20,48 @@ domTest('Notify me levels, which messages notify and how a click opens them, and
   const context = { juno, slack, fake, userData }
   // From a fresh start, before anything is read.
   await step('unread topics badge the dock', () => expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•'))
-  await step('Notify me on a channel lists it on the page, and removing it there has Undo', () => levels(context))
   await juno.notificationHoursNow()
+  await step('in privacy mode a notification says where it came from, not what was written', async () => {
+    await juno.sidebar.row('#eng').chooseInMenu('notify-always')
+    await juno.expectToast('#eng: Always')
+    await juno.privacy.toggleWithMenu()
+    slack.as('Leo').postIn('eng', 'Payroll export failed for 3 people')
+    await expect.poll(async () => (await juno.osNotifications()).map((shown) => shown.body), { timeout: 15_000 }).toContain('Message hidden')
+    expect((await juno.osNotifications()).some((shown) => shown.body.includes('Payroll'))).toBe(false)
+    await juno.privacy.toggleWithMenu()
+  })
+  await step('Notify me on a channel lists it on the page, and removing it there has Undo', () => levels(context))
   await step('a topic on screen in a focused window does not notify', () => focusedTopic(context))
   await step('a group DM notifies under its people\'s names, not Slack\'s internal name', () => groupDm(context))
   await step('a DM set to Always notifies, and the click opens it at the message', () => clickOpens(context))
-})
+  await step('Your instructions: one added with its direction is kept across closing Settings, and removed', async () => {
+    await juno.openNotifications()
+    const page = juno.notifications
+    const words = 'Social plans, lunch and dinner'
+
+    // There is no default direction: the field and Add wait for one.
+    await expect(page.newInstruction).toBeDisabled()
+    await expect(page.addInstructionButton).toBeDisabled()
+
+    await page.addInstruction("Don't notify", words)
+
+    const row = page.instruction(words)
+    await expect(row).toBeVisible()
+    await expect(row.getByRole('radio', { name: "Don't notify" })).toHaveAttribute('aria-checked', 'true')
+    // The add row is empty again and waits for the next direction.
+    await expect(page.newInstruction).toHaveValue('')
+    await expect(page.newInstruction).toBeDisabled()
+
+    // It is saved: close Settings and open it again.
+    await juno.tabs.close('Settings')
+    await juno.openNotifications()
+    await expect(page.instruction(words)).toBeVisible()
+
+    await page.removeInstruction(words)
+    await juno.expectToast('Instruction removed')
+    await expect(page.instruction(words)).toHaveCount(0)
+  })
+}, { timeout: 90_000 })
 
 async function levels({ juno }: Context): Promise<void> {
   // A bot channel: the Automated view holds it.
