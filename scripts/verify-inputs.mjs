@@ -1,7 +1,9 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { createRequire } from 'node:module'
+import { release, type } from 'node:os'
+import { dirname, join } from 'node:path'
 
 const json = (root, file) => existsSync(join(root, file)) ? JSON.parse(readFileSync(join(root, file), 'utf8')) : {}
 
@@ -15,6 +17,34 @@ export function runtimeIdentity(root, remote = false) {
   const node = remote ? (existsSync(docker) ? /ARG NODE_VERSION=(\S+)/.exec(readFileSync(docker, 'utf8'))?.[1] : undefined)
     : process.versions.bun ? spawnSync('node', ['--version'], { encoding: 'utf8' }).stdout?.trim().replace(/^v/, '') : process.versions.node
   return { runtime, version: runtime === 'bun' ? bun : node, bun, node, platform: remote ? 'linux' : process.platform, arch: remote ? 'x64' : process.arch, electron: desktop.devDependencies?.electron ?? desktop.dependencies?.electron ?? null }
+}
+
+/**
+ * What a job's tests run on beyond the pinned files, as the job sees it: the Bun build, Node, Playwright and its
+ * Chromium, Electron, the OS and kernel, the time zone and the locale. A full run reuses a test file's pass only from
+ * a run whose jobs reported the same (docs/development.md, "Full runs").
+ */
+export function toolchainIdentity(root) {
+  const version = (file) => { try { return JSON.parse(readFileSync(file, 'utf8')).version ?? null } catch { return null } }
+  const located = (from, name) => { try { return createRequire(from).resolve(name) } catch { return undefined } }
+  const playwright = located(join(root, 'package.json'), '@playwright/test/package.json')
+  // @playwright/test runs playwright, which runs playwright-core: its browsers.json names the Chromium build.
+  const runner = playwright && located(playwright, 'playwright/package.json')
+  const core = runner && located(runner, 'playwright-core/package.json')
+  const browsers = core && join(dirname(core), 'browsers.json')
+  const chromium = browsers ? JSON.parse(readFileSync(browsers, 'utf8')).browsers?.find((browser) => browser.name === 'chromium') : undefined
+  const os = existsSync('/etc/os-release') ? /^PRETTY_NAME="?([^"\n]*)"?$/m.exec(readFileSync('/etc/os-release', 'utf8'))?.[1] : undefined
+  const { timeZone, locale } = Intl.DateTimeFormat().resolvedOptions()
+  return {
+    bun: typeof Bun === 'undefined' ? null : `${Bun.version}+${Bun.revision}`,
+    node: spawnSync('node', ['--version'], { encoding: 'utf8' }).stdout?.trim() || null,
+    playwright: playwright ? version(playwright) : null,
+    chromium: chromium ? `${chromium.browserVersion ?? ''} r${chromium.revision}` : null,
+    electron: version(join(root, 'apps/desktop/node_modules/electron/package.json')),
+    os: os ?? type(),
+    kernel: release(),
+    timeZone, tz: process.env.TZ ?? null, locale, lang: process.env.LANG ?? null,
+  }
 }
 
 export const sameIdentity = (left, right) => left !== undefined && right !== undefined && JSON.stringify(left) === JSON.stringify(right)
