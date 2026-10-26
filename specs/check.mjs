@@ -10,6 +10,7 @@ import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
 import { outboxPairs, outboxSchedules } from './outbox-checks.mjs'
 import { runtimeIdentity } from '../scripts/verify-inputs.mjs'
 import { simulationBatch } from './simulate-batch.mjs'
+import { verifyBatch } from './verify-batch.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(import.meta.url)
@@ -45,8 +46,10 @@ mkdirSync(generated, { recursive: true })
 // its output, its spec file and imports, this runner and the runtime, so an unchanged
 // check is not run again. Bump cacheVersion when the checks on a result change.
 // A passing solver (Apalache) check is cached under its arguments, its spec file and
-// imports, the Quint and Apalache versions and the agent adapter only, so editing
+// imports, the Quint and Apalache versions and the verify batch only, so editing
 // this runner does not rerun it; bump solverVersion when its handling here changes.
+// The spec a solver check compiles for Apalache is cached under the same inputs,
+// without the step bound, and nightly runs reuse it too: it does not depend on the run.
 // The cache is shared by every worktree. SPECS_RUN_CACHE=off reruns simulations while
 // retaining deterministic results; --nightly, SPECS_CACHE=off or --no-cache runs
 // everything. The seed is left out of every key.
@@ -76,7 +79,7 @@ const sha = (...parts) => {
 const cacheVersion = 2
 const quintVersion = require('@informalsystems/quint/package.json').version
 const solverVersion = 1
-const solverHash = sha(solverVersion, quintVersion, apalacheVersion, readFileSync(join(root, 'specs/verify-agent.mjs')))
+const solverHash = sha(solverVersion, quintVersion, apalacheVersion, readFileSync(join(root, 'specs/verify-batch.mjs')))
 const runnerHash = sha(cacheVersion, quintVersion, apalacheVersion, backend, JSON.stringify(runtimeIdentity(root)), ...['check.mjs', 'simulate-batch.mjs', 'agent-checks.mjs', 'outbox-checks.mjs'].map((file) => readFileSync(join(root, 'specs', file))))
 function specHash(file, seen = new Set()) {
   if (seen.has(file)) return ''
@@ -109,7 +112,7 @@ function freePort() {
 // seconds to over a minute on a loaded machine; Quint would start one per
 // check. It starts on the first uncached Apalache check and has its own
 // two-minute deadline; each check has 360 seconds. Without a downloaded
-// Apalache, each check lets Quint start (and download) its own on a free port.
+// Apalache, the lane's verify batch lets Quint start (and download) one on its port.
 const servers = []
 function apalacheServer(lane) {
   servers[lane] ??= (async () => {
@@ -149,21 +152,11 @@ function apalacheServer(lane) {
 // check does not end up last: a simulation on the sibling thread of the same core still slows it.
 let simulationNiceness = 0
 
-function spawnQuint(args, timeout, port) {
+function spawnQuint(args, timeout) {
   processes++
-  const verify = args[0] === 'verify'
-  const commandArgs = verify ? [args[0], join(root, args[1]), ...args.slice(2), '--server-endpoint', `localhost:${port}`] : args
-  const agentVerify = verify && args[1].startsWith('specs/agent-')
-  const option = name => args[args.indexOf(name) + 1]
-  const command = agentVerify ? [join(root, 'specs/verify-agent.mjs'), JSON.stringify({
-    input: join(root, args[1]), main: option('--main'), init: 'init', step: option('--step'),
-    invariant: option('--invariant'), maxSteps: Number(option('--max-steps')),
-    apalacheVersion, verbosity: 1, backend: 'apalache', port,
-  })] : [cli, ...commandArgs]
   return new Promise(resolve => {
-    // Keep Apalache's generated directory inside the ignored trace directory.
-    const child = spawn(process.execPath, command, { cwd: verify ? generated : root, detached: process.platform !== 'win32' })
-    if (!verify && simulationNiceness > 0) setPriority(child.pid, simulationNiceness)
+    const child = spawn(process.execPath, [cli, ...args], { cwd: root, detached: process.platform !== 'win32' })
+    if (simulationNiceness > 0) setPriority(child.pid, simulationNiceness)
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', chunk => { stdout += chunk })
@@ -171,7 +164,7 @@ function spawnQuint(args, timeout, port) {
     let timedOut = false
     const timer = setTimeout(() => {
       timedOut = true
-      // Do not leave a timed-out checker or its Java child holding machine resources.
+      // Do not leave a timed-out checker holding machine resources.
       try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL') } catch { /* Already exited. */ }
     }, timeout)
     child.on('error', error => { clearTimeout(timer); resolve({ status: null, stdout, stderr, error }) })
@@ -182,7 +175,19 @@ function spawnQuint(args, timeout, port) {
   })
 }
 
-async function runJob(job, lane = 0, execute = spawnQuint) {
+// One verify batch per Apalache lane, started on its first uncached check.
+const verifiers = []
+function verifyJob(lane) {
+  return (args, timeout, port) => {
+    if (!verifiers[lane]) { processes++; verifiers[lane] = verifyBatch(root) }
+    const runOnly = ['--max-steps', '--out-itf']
+    const compiled = sha(solverHash, JSON.stringify(args.filter((arg, index) => !runOnly.includes(arg) && !runOnly.includes(args[index - 1]))), specHash(args[1]))
+    const absolute = args.map((arg, index) => index === 1 || args[index - 1] === '--out-itf' ? join(root, arg) : arg)
+    return verifiers[lane].run(absolute, timeout, port, useCache ? join(cacheDir, 'compiled', `${compiled}.json.gz`) : undefined)
+  }
+}
+
+async function runJob(job, lane = 0, execute = job.args[0] === 'verify' ? verifyJob(lane) : spawnQuint) {
   const started = Date.now()
   const { args, violation, timeout, trace, check, checks } = job
   const solver = args[0] === 'verify'
@@ -203,7 +208,7 @@ async function runJob(job, lane = 0, execute = spawnQuint) {
   const budget = 720000 - (Date.now() - startedAt)
   if (budget <= 0) throw new Error('Spec check exceeded its twelve-minute execution budget')
   if (trace) rmSync(trace, { force: true })
-  const port = args[0] !== 'verify' ? undefined : existsSync(join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`)) ? (await apalacheServer(lane)).port : await freePort()
+  const port = solver ? (await apalacheServer(lane)).port : undefined
   const result = await execute(args, Math.min(timeout, Math.max(0, 720000 - (Date.now() - startedAt))), port)
   const output = result.stdout + result.stderr
   const log = `${label}\n${output}`
@@ -263,10 +268,10 @@ async function runAll() {
   }
   // Deeper solver checks take longer, so they start first and the shallow ones fill in.
   const depth = job => Number(job.args[job.args.indexOf('--max-steps') + 1])
-  const queues = [jobs.filter(job => job.args[0] === 'verify').toSorted((a, b) => depth(b) - depth(a)).map(job => [job]), [...groups.values()].toSorted((a, b) => b.length - a.length)]
+  const queues = [jobs.filter(job => job.args[0] === 'verify').toSorted((a, b) => depth(b) - depth(a)), [...groups.values()].toSorted((a, b) => b.length - a.length)]
   console.log(`Quint: ${jobs.length} jobs; ${parallel} simulation lanes; ${apalacheLanes} Apalache lanes, heap ${apalacheHeap} each.`)
   let failed
-  const lane = async (queue, index = 0) => {
+  const lane = async (queue) => {
     while (queue.length > 0 && !failed) {
       const group = queue.shift()
       const batch = group.length > 1 ? simulationBatch(root, { niceness: simulationNiceness }) : undefined
@@ -279,7 +284,7 @@ async function runAll() {
         for (const job of group) {
           if (failed) break
           const started = Date.now()
-          console.log(`${await runJob(job, index, execute)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
+          console.log(`${await runJob(job, 0, execute)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
         }
       } catch (error) {
         failed ??= error
@@ -288,8 +293,22 @@ async function runAll() {
       }
     }
   }
+  // Each Apalache lane prefers a check of a spec its verify batch has already typechecked.
+  const checkLane = async (index) => {
+    const held = new Set()
+    while (queues[0].length > 0 && !failed) {
+      const [job] = queues[0].splice(Math.max(0, queues[0].findIndex(job => held.has(job.args[1]))), 1)
+      held.add(job.args[1])
+      try {
+        const started = Date.now()
+        console.log(`${await runJob(job, index)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
+      } catch (error) {
+        failed ??= error
+      }
+    }
+  }
   const simulations = () => Promise.all(Array.from({ length: parallel }, () => lane(queues[1])))
-  const checks = () => Promise.all(Array.from({ length: apalacheLanes }, (_, index) => lane(queues[0], index)))
+  const checks = () => Promise.all(Array.from({ length: apalacheLanes }, (_, index) => checkLane(index)))
   if (apalacheLanes > 1 || process.env.SPECS_OVERLAP === '1') {
     simulationNiceness = queues[0].length > 0 ? 10 : 0
     await Promise.all([simulations(), checks()])
@@ -299,6 +318,7 @@ async function runAll() {
     await checks()
   }
   // A lane whose checks were all cached never started a server, so the array can have holes.
+  for (const verifier of verifiers) verifier?.stop()
   for (const server of servers) if (server !== undefined) (await server.catch(() => ({ stop: () => {} }))).stop()
   writeFileSync(join(generated, 'check-results.json'), JSON.stringify({ seconds: (Date.now() - startedAt) / 1000, processes, jobs: measurements }, null, 2))
   console.log(`Quint jobs: ${measurements.length}/${jobs.length} passed, ${measurements.filter(job => job.cached).length} cached; ${processes} processes; ${measurements.reduce((sum, job) => sum + job.seconds, 0).toFixed(1)} summed job seconds.`)
@@ -335,6 +355,24 @@ function simulate(file, step, invariant, output, violation = false, randomized =
         if (state?.label !== 'finished') throw new Error(`Agent schedule did not finish its drain: ${step}`)
       }
       return `${violation ? 'Expected counterexample' : 'Example trace'}: specs/traces/${output}`
+    },
+  })
+}
+
+// A bounded Apalache check. A bug mode keeps its counterexample as an ITF trace.
+function bounded(file, main, step, invariant, depth, violation = false) {
+  const output = `specs/traces/bounded-${file}-${step}.itf.json`
+  const trace = violation ? join(root, output) : undefined
+  // The trace path is relative, so the cache key is the same in every checkout.
+  quint(['verify', `specs/${file}.qnt`, '--main', main, '--step', step, '--invariant', invariant, '--max-steps', String(depth),
+    '--apalache-version', apalacheVersion, '--verbosity', '1', ...(violation ? ['--out-itf', output] : [])], {
+    violation,
+    trace,
+    check: () => {
+      if (!trace) return ''
+      const states = JSON.parse(readFileSync(trace, 'utf8')).states
+      if (!Array.isArray(states) || states.length < 2) throw new Error(`No usable counterexample in ${trace}`)
+      return `Expected counterexample: ${output}`
     },
   })
 }
@@ -577,47 +615,30 @@ if (!huddleOnly && !tracesOnly && !outboxOnly) {
       // Each bound is the shortest one that reaches every state its rules talk about
       // (specs/README.md, "Solver bounds").
       for (const [file, step, invariant, depth] of [['follow', 'step', 'boundedSafety', 3], ['follow', 'step', 'failedCallReverted', 4], ['readstate', 'boundedStep', 'boundedSafety', 4]]) {
-        quint(['verify', `specs/${file}-bounded.qnt`, '--main', `${file}_bounded`, '--step', step,
-          '--invariant', invariant, '--max-steps', String(depth),
-          '--apalache-version', apalacheVersion, '--verbosity', '1'])
+        bounded(`${file}-bounded`, `${file}_bounded`, step, invariant, depth)
       }
       // Long recovery regressions run in the simulator. Keep symbolic races short:
       // each old rule must break `acceptedUnfollow` within its bound, the length of its
       // shortest counterexample, and its fix must not.
       for (const [schedule, depth] of [['stalePage', 5], ['lateEvent', 5], ['pendingPage', 5], ['failedLookup', 4]]) {
-        for (const [step, violation] of [[`${schedule}BugStep`, true], [`${schedule}Step`, false]]) {
-          quint(['verify', 'specs/follow-bounded.qnt', '--main', 'follow_bounded',
-            '--step', step, '--invariant', 'acceptedUnfollow', '--max-steps', String(depth),
-            '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
-        }
+        bounded('follow-bounded', 'follow_bounded', `${schedule}BugStep`, 'acceptedUnfollow', depth, true)
+        bounded('follow-bounded', 'follow_bounded', `${schedule}Step`, 'acceptedUnfollow', depth)
       }
     }
     if (!actionsOnly && !recoveryOnly) {
-      const memoryBounded = 'specs/agent-memory.qnt'
-      quint(['verify', memoryBounded, '--main', 'agent_memory_bounded',
-        '--step', 'boundedStep', '--invariant', 'boundedSafety', '--max-steps', '4',
-        '--apalache-version', apalacheVersion, '--verbosity', '1'])
-      for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
-        quint(['verify', memoryBounded, '--main', 'agent_memory_bounded',
-          '--step', step, '--invariant', 'nodeInputsCurrent', '--max-steps', '6',
-          '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
-      }
+      bounded('agent-memory', 'agent_memory_bounded', 'boundedStep', 'boundedSafety', 4)
+      bounded('agent-memory', 'agent_memory_bounded', 'boundedRaceBugStep', 'nodeInputsCurrent', 6, true)
+      bounded('agent-memory', 'agent_memory_bounded', 'boundedRaceStep', 'nodeInputsCurrent', 6)
     }
     if (!memoryOnly && !recoveryOnly) {
-      quint(['verify', 'specs/agent-actions.qnt', '--main', 'agent_actions_bounded', '--step', 'boundedStep',
-        '--invariant', 'boundedSafety', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'])
-      for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
-        quint(['verify', 'specs/agent-actions.qnt', '--main', 'agent_actions_bounded', '--step', step,
-          '--invariant', 'pauseBlocksAuthorization', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
-      }
+      bounded('agent-actions', 'agent_actions_bounded', 'boundedStep', 'boundedSafety', 4)
+      bounded('agent-actions', 'agent_actions_bounded', 'boundedRaceBugStep', 'pauseBlocksAuthorization', 4, true)
+      bounded('agent-actions', 'agent_actions_bounded', 'boundedRaceStep', 'pauseBlocksAuthorization', 4)
     }
     if (!memoryOnly && !actionsOnly) {
-      quint(['verify', 'specs/agent-recovery.qnt', '--main', 'agent_recovery_bounded', '--step', 'boundedStep',
-        '--invariant', 'boundedSafety', '--max-steps', '4', '--apalache-version', apalacheVersion, '--verbosity', '1'])
-      for (const [step, violation] of [['boundedRaceBugStep', true], ['boundedRaceStep', false]]) {
-        quint(['verify', 'specs/agent-recovery.qnt', '--main', 'agent_recovery_bounded', '--step', step,
-          '--invariant', 'singleLocalOwner', '--max-steps', '2', '--apalache-version', apalacheVersion, '--verbosity', '1'], { violation })
-      }
+      bounded('agent-recovery', 'agent_recovery_bounded', 'boundedStep', 'boundedSafety', 4)
+      bounded('agent-recovery', 'agent_recovery_bounded', 'boundedRaceBugStep', 'singleLocalOwner', 2, true)
+      bounded('agent-recovery', 'agent_recovery_bounded', 'boundedRaceStep', 'singleLocalOwner', 2)
     }
     console.log(`Mode: ${boundedOnly ? 'bounded Apalache' : 'simulator and bounded Apalache'}${memoryOnly ? ' (memory only)' : actionsOnly ? ' (actions only)' : recoveryOnly ? ' (recovery only)' : ''}.`)
     console.log('Bounded safety and races use the documented depths. Temporal liveness is typechecked only.')
