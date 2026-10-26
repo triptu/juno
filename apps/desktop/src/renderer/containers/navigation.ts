@@ -107,7 +107,7 @@ import { junoViewReady } from '@juno/state/agent'
 import type { SettingsSection } from '@juno/contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { chunk } from './chunks'
-import { forcePageFocus, wantComposerFocus } from './pageFocus'
+import { expectComposerFocus, forcePageFocus, wantComposerFocus } from './pageFocus'
 import { toggleSidebar } from './layout'
 import { paletteTakesTabNumber } from './paletteActions'
 import { togglePrivacy } from './privacy'
@@ -365,6 +365,7 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
     else switchToTab(showing.id)
     return
   }
+  if (focus) expectComposerFocus()
   // A fresh open starts at the divider or the bottom (or `snapshot`), not where it was left: `landFresh`.
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
   show(
@@ -720,6 +721,7 @@ export function goToTabEntry(index: number): void {
   const place = tab?.history.entries[index]
   if (tab === undefined || place === undefined || index === tab.history.index) return
   const topic = place.kind === 'topic' ? { id: place.topicId, view: topicView(place.viewId ?? place.topicId, tab.id), fresh: false, name: 'juno.topic-open' as const } : undefined
+  if (topic !== undefined) expectComposerFocus()
   show((current) => withComposerFocus(goToEntry(current, index)), topic)
 }
 

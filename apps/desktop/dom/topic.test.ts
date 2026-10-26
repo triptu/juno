@@ -1,6 +1,7 @@
 // Reading a topic (SPEC 6 and 7): prefetch on hover, where it opens, the context pill and a
 // #channel chip, the "N new" divider and the read mark, the topic menu's Notify me, Follow and
-// ⌘Z, Main's thread links, the title's topic switcher and a composer that mounts late.
+// ⌘Z, Main's thread links, the title's topic switcher, and a composer that mounts late or comes back
+// taking the keys typed at once.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -51,17 +52,32 @@ domTest('a topic warms on hover, opens at its "N new" divider, follows and unfol
   await juno.sidebar.root.getByRole('button', { name: 'Show everything' }).click()
 
   // The engine's draft replies are held, so each thread's composer mounts only when the test lets it.
-  await step('a composer that mounts late takes focus after a switcher pick, and leaves it on the title the user moved to', async () => {
+  await step('a composer that mounts late takes focus and the keys typed at once after a switcher pick, as does a topic opened again, and leaves focus on the title the user moved to', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await juno.topic.expectTitle('Main')
 
+    // Typed in the same turn as the pick, before the topic lands, and until its composer mounts.
     let release = app.holdReplies('drafts.get')
     let switcher = await juno.topic.openSwitcher()
     await switcher.open(CHECKOUT)
+    await juno.win.keyboard.type('on it')
     await juno.topic.expectTitle(CHECKOUT)
     await expect(juno.topic.composer).toHaveCount(0)
     release()
     await expect(juno.topic.composer).toBeFocused()
+    await expect(juno.topic.composer).toHaveValue('on it')
+    await juno.topic.composer.fill('')
+
+    switcher = await juno.topic.openSwitcher()
+    await switcher.open('Main')
+    await juno.topic.expectTitle('Main')
+    await expect(juno.topic.composer).toBeFocused()
+    switcher = await juno.topic.openSwitcher()
+    await switcher.open(CHECKOUT)
+    await juno.win.keyboard.type('again')
+    await expect(juno.topic.composer).toBeFocused()
+    await expect(juno.topic.composer).toHaveValue('again')
+    await juno.topic.composer.fill('')
 
     release = app.holdReplies('drafts.get')
     switcher = await juno.topic.openSwitcher()
