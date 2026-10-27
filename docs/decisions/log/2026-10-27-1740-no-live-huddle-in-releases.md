@@ -1,0 +1,1 @@
+- 10-27 17:40 · Releases do not join a real huddle · Tushar: "idt we should" run real Slack huddles as a release step. The live huddle check stays a manual tool (`bun run huddle:live`); the build guard `juno:node-global` blocks the bug class that broke 0.1.23 and 0.1.24.

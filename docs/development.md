@@ -1864,12 +1864,6 @@ on this Mac instead of the laptop, for when the laptop is off; like
    advancing main's version. The command checks main's version and removes
    its worktree.
 
-While the full run runs, the agent also runs the live huddle check,
-`JUNO_LIVE=1 bun run huddle:live -- --minutes 1`, and stops the release if it
-does not print `media started yes` and `sent own audio yes`. Tests use a fake
-media session, so only this check joins real Chime with the code a release
-ships; 0.1.23 and 0.1.24 shipped with every huddle join failing (10-27).
-
 `JUNO_UPDATE_TOKEN` must be in its environment; the command checks this before
 the full run. Supply it through the existing secure release setup, never in a
 command log. There is no minimum gap between releases. The version is a patch
