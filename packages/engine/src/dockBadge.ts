@@ -51,11 +51,11 @@ export function badgeStatement(policy: ReturnType<typeof badgePolicy>, self: str
   }
 }
 
-/** Settings are read only on prefs invalidation; the compiled decision table is retained for the current minute. */
+/** Settings are read only when prefs or Slack's (its schedule) change; the compiled decision table is retained for the current minute. */
 export const startDockBadge = (send: (active: boolean) => Effect.Effect<void>, self: string) => Effect.gen(function* () {
   const sql = yield* StoreReader
   let shown: boolean | undefined
-  const changes = liveQuery(['prefs'], readSettings).pipe(Stream.switchMap((configuration) => {
+  const changes = liveQuery(['prefs', 'team'], readSettings).pipe(Stream.switchMap((configuration) => {
     if (configuration._tag === 'Failure') return Stream.empty
     let minute: number | undefined
     let policy: ReturnType<typeof badgePolicy>

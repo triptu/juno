@@ -8,7 +8,7 @@ import { afterEach, expect, it } from 'bun:test'
 import { AiProvider, makeFakeAiProvider } from '@juno/ai'
 import { channelsIgnore, homeView, notificationsDecisions, notificationsSetLevel, prefsSet, readsMarkRead, viewsSave, viewsSortChannel, type HomeItem, type HomeView, type Hours, type NotificationDecisions, type TodayRow } from '@juno/contract'
 import { ChannelId, UserId, defaultNotificationSettings, localTime, millisToTs, type NotificationSettings } from '@juno/domain'
-import { makeNotifications, type Candidate, type Notification, type Notifier } from '@juno/notifications'
+import { makeNotifications, saveSettings, type Candidate, type Notification, type Notifier } from '@juno/notifications'
 import { SlackApi } from '@juno/slack'
 import { liveQuery, runCommand, sendMessage } from '@juno/state'
 import { prefs, StoreWriter, transaction } from '@juno/store'
@@ -39,10 +39,10 @@ function recorder() {
   return { shown, notifier }
 }
 
-// Mentions are read, not notified by the switch, so messages reach Juno's reading.
+// Mentions are read, not notified by the switch, so messages reach Juno's reading. Active Monday to Friday 9 to 7.
 const settings: NotificationSettings = {
   ...defaultNotificationSettings, alwaysNotify: { mentions: false }, instructions: [{ id: 'i1', direction: 'notify', text: 'the release' }],
-  notificationHours: { days: [1], from: 540, to: 1140 },
+  notificationHours: { days: [1], from: 540, to: 1140 }, presenceHours: { days: [1, 2, 3, 4, 5], from: 540, to: 1140 },
 }
 
 // The decision service alone, on a real store with Effect's TestClock.
@@ -51,7 +51,7 @@ const candidate = (ts: string, mentionsMe = true): Candidate => ({
   channel: { id: ChannelId.make('C0ENG'), kind: 'public', name: 'eng', ignored: false },
   senderId: UserId.make('U0MAYA'), mentionsMe, ts, topicId: 'm:C0ENG', text: 'Can you approve the release now?',
 })
-const setSettings = (value = settings) => transaction(prefs.set('notifications', value))
+const setSettings = (value = settings) => saveSettings(value)
 const fakeProvider = makeFakeAiProvider()
 const aiLayer = Layer.succeed(AiProvider, fakeProvider)
 

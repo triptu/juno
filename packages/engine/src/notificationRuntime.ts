@@ -10,6 +10,7 @@ import { conversationLabel } from './placeLabel'
 import { startDockBadge } from './dockBadge'
 import { HostLink } from './protocol/host'
 import { SocketEvents, type SessionStart, type SocketInput } from './socketEvents'
+import { observeWork, workWakes } from './workControl'
 
 const safe = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.catch(() => Effect.logWarning('notifications: operation failed')))
 const run = (effect: Effect.Effect<void, unknown> | undefined) => effect === undefined ? Effect.void : safe(effect)
@@ -168,6 +169,8 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
     last = result.success
     return safe(notifications.settingsChanged)
   }))
+  // A test can run the presence schedule through the same lock as the minute ticks.
+  yield* Effect.forkScoped(Stream.runForEach(workWakes('presence'), () => safe(notifications.tick).pipe(observeWork('presence'))))
   if (host.badge !== undefined) yield* startDockBadge(host.badge, session.userId)
   yield* Effect.forkScoped(Effect.gen(function* () {
     yield* safe(notifications.tick)

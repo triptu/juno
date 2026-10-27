@@ -30,10 +30,12 @@ const MON = 1
 const SAT = 6
 
 // Notifications stop at 6pm; Slack shows the owner active until 8pm (the owner's example).
+const notificationHours: Hours = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 18 * 60 }
+const presenceHours: Hours = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 20 * 60 }
 const settings: NotificationSettings = {
   ...defaultNotificationSettings,
-  notificationHours: { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 18 * 60 },
-  presenceHours: { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 20 * 60 },
+  notificationHours,
+  presenceHours,
   channels: { C0INCIDENTS: 'always', [eng.id]: 'never' },
   people: { [mayaId]: 'always', U0SAM: 'never' },
   instructions: [
@@ -238,14 +240,14 @@ describe('hours by row', () => {
 describe('presence', () => {
   it('is active inside presence hours and away outside, apart from notification hours', () => {
     // 7pm on a Monday: notifications have stopped, Slack still shows the owner active.
-    expect(inHours(at(MON, 19), settings.notificationHours)).toBe(false)
-    expect(scheduledPresence(at(MON, 19), settings.presenceHours)).toBe('active')
-    expect(scheduledPresence(at(MON, 20), settings.presenceHours)).toBe('away')
-    expect(scheduledPresence(at(SAT, 12), settings.presenceHours)).toBe('away')
+    expect(inHours(at(MON, 19), notificationHours)).toBe(false)
+    expect(scheduledPresence(at(MON, 19), presenceHours)).toBe('active')
+    expect(scheduledPresence(at(MON, 20), presenceHours)).toBe('away')
+    expect(scheduledPresence(at(SAT, 12), presenceHours)).toBe('away')
   })
 
   it('set by hand against the hours, lasts until the hours change it', () => {
-    const work = settings.presenceHours
+    const work = presenceHours
     // Away by hand inside the hours lasts until they start again.
     expect(presenceLabel(at(MON, 12), 'away', work)).toBe('Away until tomorrow 9am')
     // Active by hand before the hours runs to their end.

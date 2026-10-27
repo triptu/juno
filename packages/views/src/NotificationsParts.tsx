@@ -13,17 +13,21 @@ import { hourLabel } from './time'
 
 type HoursKind = 'notifications' | 'presence'
 
-/** Slack's own schedule, which Juno writes from the notification hours. */
+/** Slack's own schedule, which Juno follows until the owner sets notification hours, then writes from them. */
 export interface SlackScheduleState {
   /** Changed in Slack after Juno wrote it: Juno leaves it until Use Juno's hours. */
   readonly changedInSlack: boolean
-  /** The hours are still the defaults on this install, so nothing is written yet. */
+  /** Hours saved by an older version and never set on this install, so nothing is written yet. */
   readonly waitingForHours: boolean
+  /** While no notification hours are set, the hours Slack's schedule lets notifications through; null when it pauses nothing. */
+  readonly slackHours: Hours | null
 }
 
 export interface HoursProps {
-  readonly notificationHours: Hours
-  readonly presenceHours: Hours
+  /** Null until set: Slack's schedule applies. */
+  readonly notificationHours: Hours | null
+  /** Null until set: presence is not switched by hours. */
+  readonly presenceHours: Hours | null
   /** One row's hours: a from or to turns the row on, `off` turns it off. */
   readonly onHoursChange: (which: HoursKind, group: HoursGroup, hours: Partial<Span> | 'off') => void
   /** Slack's own schedule; undefined until the engine answers. */
@@ -40,7 +44,10 @@ const times = Array.from({ length: (24 * 60) / HALF_HOUR }, (_, index) => {
   return { value: String(minutes), label: hourLabel(minutes) }
 })
 const OFF = 'off'
+const ANY = 'any'
 const timesOrOff = [{ value: OFF, label: 'Off' }, ...times]
+/** A row in hours not set, which pause nothing, until a choice sets them. */
+const anyTimeOrTimes = [{ value: ANY, label: 'Any time' }, ...timesOrOff]
 const halfHour = (minutes: number) => String(Math.floor(minutes / HALF_HOUR) * HALF_HOUR)
 
 const rows: ReadonlyArray<{ readonly group: HoursGroup; readonly name: string }> = [
@@ -55,8 +62,8 @@ export function HoursSections({ notificationHours, presenceHours, onHoursChange,
     <>
       <Section headingRef={hoursRef} heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
         <Surface kind="group">
-          <HoursRows which="notifications" title="Notification hours" hours={notificationHours} onChange={onHoursChange} />
-          <SlackLine schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
+          <HoursRows which="notifications" title="Notification hours" hours={notificationHours ?? slackSchedule?.slackHours ?? null} onChange={onHoursChange} />
+          <SlackLine following={notificationHours === null} schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
         </Surface>
       </Section>
       <Section heading="Active in Slack" sub="Outside these hours you show as away.">
@@ -64,7 +71,9 @@ export function HoursSections({ notificationHours, presenceHours, onHoursChange,
           <HoursRows which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} />
           <div {...stylex.props(styles.note)}>
             <Text variant="meta" tone="muted" as="p">
-              Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.
+              {presenceHours === null
+                ? 'Until you set hours, Juno shows you active whenever you use your Mac, as Slack does.'
+                : "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."}
             </Text>
           </div>
         </Surface>
@@ -73,30 +82,33 @@ export function HoursSections({ notificationHours, presenceHours, onHoursChange,
   )
 }
 
-/** Weekdays, Saturday and Sunday, each with its from and to, or Off. The section's heading names the group. */
-function HoursRows({ which, title, hours, onChange }: { readonly which: HoursKind; readonly title: string; readonly hours: Hours; readonly onChange: HoursProps['onHoursChange'] }) {
+/** Weekdays, Saturday and Sunday, each with its from and to, or Off; each Any time while no hours are set. The section's heading names the group. */
+function HoursRows({ which, title, hours, onChange }: { readonly which: HoursKind; readonly title: string; readonly hours: Hours | null; readonly onChange: HoursProps['onHoursChange'] }) {
   return (
     <div role="group" aria-label={title} {...stylex.props(styles.rows)}>
       {rows.map(({ group, name }) => (
-        <HoursRow key={group} name={name} span={groupHours(hours, group)} onChange={(change) => onChange(which, group, change)} />
+        <HoursRow key={group} name={name} span={hours === null ? ANY : groupHours(hours, group)} onChange={(change) => onChange(which, group, change)} />
       ))}
     </div>
   )
 }
 
-/** One row: its name, then its from and to. Off is the first choice in from, and an off row has no to. */
-function HoursRow({ name, span, onChange }: { readonly name: string; readonly span: Span | undefined; readonly onChange: (change: Partial<Span> | 'off') => void }) {
+/** One row: its name, then its from and to. Off is the first choice in from, after Any time while no hours are set, and an off or any time row has no to. */
+function HoursRow({ name, span, onChange }: { readonly name: string; readonly span: Span | undefined | typeof ANY; readonly onChange: (change: Partial<Span> | 'off') => void }) {
   return (
     <div role="group" aria-label={name} {...stylex.props(styles.row)}>
       <Text variant="ui">{name}</Text>
       <Select
         size={32}
         label={`${name} from`}
-        options={timesOrOff}
-        value={span === undefined ? OFF : halfHour(span.from)}
-        onChange={(event) => onChange(event.currentTarget.value === OFF ? OFF : { from: Number(event.currentTarget.value) })}
+        options={span === ANY ? anyTimeOrTimes : timesOrOff}
+        value={span === ANY ? ANY : span === undefined ? OFF : halfHour(span.from)}
+        onChange={(event) => {
+          const value = event.currentTarget.value
+          if (value !== ANY) onChange(value === OFF ? OFF : { from: Number(value) })
+        }}
       />
-      {span === undefined ? null : (
+      {span === undefined || span === ANY ? null : (
         <>
           <Text variant="ui" tone="muted">
             to
@@ -108,8 +120,23 @@ function HoursRow({ name, span, onChange }: { readonly name: string; readonly sp
   )
 }
 
-/** Under the notification hours, only while there is something to say about Slack's schedule. The owner renders the page once the schedule is known, so it never appears late. */
-function SlackLine({ schedule, onUseJunoHours }: { readonly schedule: SlackScheduleState | undefined; readonly onUseJunoHours: () => void }) {
+/**
+ * Under the notification hours, only while there is something to say about Slack's schedule: that the hours are
+ * Slack's while none are set (`following`), or what Juno does with it. The owner renders the page once the
+ * schedule is known, so it never appears late.
+ */
+function SlackLine({ following, schedule, onUseJunoHours }: { readonly following: boolean; readonly schedule: SlackScheduleState | undefined; readonly onUseJunoHours: () => void }) {
+  if (following) {
+    return (
+      <div aria-live="polite" {...stylex.props(styles.slackLine)}>
+        <Text variant="meta" tone="muted">
+          {schedule?.slackHours == null
+            ? 'Slack has no notification schedule, so nothing is paused. Set hours here to pause notifications.'
+            : 'These are your hours in Slack. Juno follows them until you change them here.'}
+        </Text>
+      </div>
+    )
+  }
   if (schedule?.waitingForHours !== true && schedule?.changedInSlack !== true) return null
   return (
     <div aria-live="polite" {...stylex.props(styles.slackLine)}>

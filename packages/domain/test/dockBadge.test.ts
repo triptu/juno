@@ -1,5 +1,5 @@
 import { expect, it } from 'bun:test'
-import { defaultNotificationSettings, dockBadgeActive, type BadgeTopic } from '../src/index'
+import { defaultNotificationSettings, dockBadgeActive, startingHours, type BadgeTopic } from '../src/index'
 
 const context = { aiAssist: false, at: { weekday: 1 as const, minutes: 600 } }
 
@@ -43,8 +43,9 @@ it('includes ordinary channel messages set to Always, using the alert decision',
 
 it('holds a channel mention outside hours or for AI, while an unread DM in All still counts', () => {
   const outside = { ...context, at: { weekday: 0 as const, minutes: 0 } }
-  expect(dockBadgeActive([topics[2]!], defaultNotificationSettings, outside)).toBe(false)
-  expect(dockBadgeActive([topics[0]!], defaultNotificationSettings, outside)).toBe(true)
+  const weekdays = { ...defaultNotificationSettings, notificationHours: startingHours }
+  expect(dockBadgeActive([topics[2]!], weekdays, outside)).toBe(false)
+  expect(dockBadgeActive([topics[0]!], weekdays, outside)).toBe(true)
   const held = { ...topics[2]!, auto: false }
   expect(dockBadgeActive([held], { ...defaultNotificationSettings, alwaysNotify: { mentions: false } }, { ...context, aiAssist: true })).toBe(false)
 })
