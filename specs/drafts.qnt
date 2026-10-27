@@ -14,25 +14,26 @@
 // changes Slack has not acknowledged (`row`), whose generation every newer
 // change bumps. The sender sends the stored text when it goes: an update
 // with Slack's id, a create when Juno knows none, a delete for a cleared
-// draft. Slack keeps one draft per place: a
-// create there answers `attached_draft_exists`, and Juno lists before it
-// creates again, as it does after a create whose answer was lost. A message
-// sent from the draft names it (`draft_id`) and Slack retires it; only a
-// refused post leaves it, and Juno then deletes it. Slack never reuses a
-// draft id, so Juno ignores versions of the ids it deleted, sent or saw
-// deleted (`gone`): a list or event from before cannot bring one back.
+// draft. Slack keeps one draft per place: a create there answers
+// `attached_draft_exists`, and Juno lists before it creates again, as it
+// does after a create whose answer was lost; that list takes the place's
+// draft whatever its stamp while Juno links none. A message sent from the
+// draft names it (`draft_id`) and Slack retires it; only a refused post
+// leaves it, and Juno then deletes it. Slack never reuses a draft id, so
+// Juno ignores versions of the ids it deleted, sent or saw deleted (`gone`).
 //
-// A version from Slack (an event, a list entry) applies unless it is stale
-// (no newer than the newest stamp Juno has seen), of a draft that is gone,
-// the text Juno has or is sending (its
-// own echo, also of a call whose answer was lost, until a list after the
-// loss), or older than a local edit Slack has not acknowledged (then the
-// local edit stays and is saved over it; so does Juno's text over its own
-// older echo). A version applied while a save is in flight, or after one whose
-// answer was lost, is saved again, since the save may land after it. A lost
-// call landed before Juno gave up on it, or never. A draft
-// missing from a list requested after Juno last learned of it counts as
-// deleted just after the version Juno knew.
+// A version from Slack (an event, a list entry) is stale when it is no
+// newer than the newest stamp Juno has seen, or of a draft that is gone. It
+// is Juno's own when its text is the one Juno has, is sending, or sent in a
+// call whose answer was lost (until a list after the loss); Juno's text that
+// has moved on goes over it. It loses to a newer local edit Slack has not
+// acknowledged, which then goes over it. Otherwise it replaces the draft,
+// and is saved again when a save was out or lost, since that save may land
+// after it. A lost call landed before Juno gave up on it, or never. A linked
+// draft missing from a list requested after Juno linked it counts as
+// deleted just after the version Juno knew. A catch-up needs a list
+// requested after the socket came back and after Juno's link, with no call
+// out.
 //
 // The composer takes a changed stored draft at once, unless it has typing
 // not yet stored, or it has focus and was typed in since it showed: then it
