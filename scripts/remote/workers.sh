@@ -23,13 +23,12 @@ fi
 # A serial plan (a full run) runs each step alone too.
 case " $* " in *" + "*) [ "${JUNO_PLAN_SERIAL:-}" = 1 ] && gallery_workers=$(at_least $(( cores * 4 / 3 )) 1) ;; *" test:gallery "*) gallery_workers=$(at_least $(( cores * 4 / 3 )) 1) ;; esac
 export JUNO_TEST_WORKERS=${JUNO_TEST_WORKERS:-$test_workers}
-# An Electron test runs the app, its engine and a fake Slack: half a core's worth
-# of workers kept tests on time on 4 cores, one per core did not (8 cores take
-# one per core, below).
+# An Electron worker owns an app, engine and fake Slack. Leave CPU for those processes.
 desktop_workers=$(at_least $(( cores / 2 )) 2)
 if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then desktop_workers=$(at_least $(( cores / 2 )) 1); fi
-# Larger allocations can run one desktop worker per thread.
-if [ "$cores" -ge 8 ]; then desktop_workers=$cores; fi
+# Eight Electron workers on eight threads made recovery exceed the 15 s lane limit.
+# Two passed the same desktop step in 79 s against 82 s with eight (crash timing review, 10-27).
+if [ "$cores" -ge 8 ]; then desktop_workers=$(( cores / 4 )); fi
 # Standalone desktop runs can overlap one more app while another waits for I/O.
 # Plans retain their own lane budgets.
 if [ "$cores" -eq 4 ] && [ "$1" = test:desktop ]; then desktop_workers=3; fi

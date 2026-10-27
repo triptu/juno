@@ -81,3 +81,11 @@ Each temporary mutation ran only the engine journey on the laptop, one worker. A
 - Suppress give-up listeners: the dock check sees `•` instead of an empty badge (`mutation-giveup.log`).
 
 A direct check of the backoff configuration also passed: any missing e2e/fast/fake gate keeps the production 1,000 ms base and 30,000 ms cap; all three gates give 50 ms and 1,500 ms. No crash-count or crash-window code changed.
+
+## Combined desktop worker count
+
+The first `bun run affected` passed typecheck, lint and 28 DOM tests, but its combined desktop step and both changed-spec repetitions timed out the engine journey at 15 s. It launched eight Electron workers on eight allocated threads (four physical cores), alongside browser workers. The focused repeats also had eight apps competing at once. This is different from the full run’s two Electron workers with a 30 s lower-priority limit.
+
+A controlled worker-setting check used the same four-core job, tag selection, desktop step and two repetitions, with `JUNO_E2E_WORKERS=2`. Every test passed. The complete desktop step went from 82 s (one failure) to 79 s (57 passes); the engine journey took 12.20 s, durable-message recovery 2.77 s, uncertain-write recovery 5.63 s and backup 6.84 s. The repeated engine journeys took 10.50 and 10.52 s. This is one run per setting, so the wall times show no observed throughput penalty for that step, not a statistical speedup. The repeated-spec step queues more tests with two workers and takes longer, while passing its per-test limits.
+
+`scripts/remote/workers.sh` now defaults to one Electron worker per four allocated threads for jobs with at least eight threads. Smaller allocations, explicit `JUNO_E2E_WORKERS` overrides and the full plan’s own lane allocation are unchanged. The old large-allocation override to one worker per thread was incompatible with the new 15 s test limit. Logs: `affected.log` and `two-workers.log` in the scratch folder.

@@ -1,0 +1,1 @@
+- 10-27 14:54 · Tushar · Large runner allocations default to one Electron worker per four threads, preserving explicit overrides and full-plan budgets. Eight workers on eight threads timed out recovery at 15 s; two passed the same desktop step in 79 s against 82 s with eight. See [the crash timing review](reviews/2026-10-27-crash-timing.md).
