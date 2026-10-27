@@ -15,6 +15,8 @@
  * table stored as an unknown block before Juno read tables gives its
  * preview ("Table: Service, Status"). 7: a thread's unread count is exact
  * only when a proven range of its replies reaches back to the read pointer
- * (`thread_ranges`), not when the stored replies reach `reply_count`.
+ * (`thread_ranges`), not when the stored replies reach `reply_count`. 8:
+ * Juno's own posts Slack has not stored yet count as the user's messages
+ * when queued, so a send moves its topic before Slack answers.
  */
-export const INDEX_VERSION = 7
+export const INDEX_VERSION = 8

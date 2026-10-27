@@ -28,7 +28,7 @@
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
-import { postTopic, readPost, recordOwnDelete, type PendingPost } from './posts'
+import { postTopic, readPost, recordOwnDelete, reindexPostTopic, type PendingPost } from './posts'
 
 export type ActionKind = 'edit' | 'delete' | 'react' | 'broadcast'
 
@@ -229,6 +229,7 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
       // text, and Slack does not have the post: the post now carries the newest text, so the row goes.
       yield* deleteActions(actions.filter((action) => action.kind === 'edit'))
       yield* touch([postTopic(target.post)])
+      yield* reindexPostTopic(target.post)
       return undefined
     }
     const pending = actions.find((action) => action.kind === 'edit')
@@ -266,6 +267,7 @@ export const queueDelete = (input: DeleteInput): Effect.Effect<ActionRefusal | u
       const sql = yield* StoreWriter
       yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${target.post.clientMsgId}`
       yield* touch([postTopic(target.post)])
+      yield* reindexPostTopic(target.post)
       return undefined
     }
     const { channel, dependsOn, ...fields } = targetFields(target)
@@ -327,6 +329,7 @@ export const settleOnFailedPost = (action: PendingAction, post: PendingPost): Ef
     }
     yield* deleteActions([action])
     yield* touch([postTopic(post)])
+    yield* reindexPostTopic(post)
   })
 
 /**

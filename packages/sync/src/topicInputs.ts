@@ -5,11 +5,12 @@
  * `topic_inputs` in cache.db holds a marker per up-to-date topic. Triggers
  * delete it when anything the row is computed from changes in cache.db
  * (store migration `topic_inputs`). The rest is kept in the marker and
- * compared each time: the rule's version, the user the row was computed for
- * and the topic's read state, which lives in user.db, out of the triggers'
- * reach. A row that looked for a person or user group not stored gets no
- * marker (`reindex.ts`), so a marked row only ever read stored ones, and
- * storing a new one cannot change it.
+ * compared each time: the rule's version, the user the row was computed for,
+ * and the topic's read state and Juno's own posts Slack has not stored yet
+ * (`pending_messages`), which live in user.db, out of the triggers' reach.
+ * A row that looked for a person or user group not stored gets no marker
+ * (`reindex.ts`), so a marked row only ever read stored ones, and storing a
+ * new one cannot change it.
  */
 import type { Me, ReadState } from '@juno/domain'
 import { StoreWriter, type SqlError, type TopicIndexRow } from '@juno/store'
@@ -21,7 +22,11 @@ export interface TopicInputs {
   readonly reads: string
 }
 
-export const topicInputs = (me: Me, reads: ReadState): TopicInputs => ({ context: `${INDEX_VERSION} ${JSON.stringify(me)}`, reads: JSON.stringify(reads) })
+/** `pending` is what the row reads of the topic's pending posts; a topic with none keeps the marker it had before pending posts counted. */
+export const topicInputs = (me: Me, reads: ReadState, pending: ReadonlyArray<unknown> = []): TopicInputs => ({
+  context: `${INDEX_VERSION} ${JSON.stringify(me)}`,
+  reads: pending.length === 0 ? JSON.stringify(reads) : `${JSON.stringify(reads)} ${JSON.stringify(pending)}`,
+})
 
 /** The topic's stored row, and whether it was computed from `inputs` with nothing changed since. */
 export const storedRow = (

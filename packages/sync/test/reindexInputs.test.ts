@@ -14,7 +14,7 @@ import * as path from 'node:path'
 import type { Message } from '@juno/slack-schema'
 import { Invalidation, Store, StoreWriter, transaction, workspacePathsFromDir } from '@juno/store'
 import type { Me, UserId, UsergroupId } from '@juno/domain'
-import { reindexAll, reindexTopics, toMessageRow } from '../src/index'
+import { queuePost, reindexAll, reindexTopics, toMessageRow } from '../src/index'
 import { endEventCoverage, writeMessage } from '../src/write'
 
 const C = 'C0ENG'
@@ -75,6 +75,10 @@ describe('re-indexing an unchanged topic', () => {
         ['a reply from someone not stored', write(message({ ts: '1700000500.000100', thread_ts: ROOT, user: 'U0CAT', text: 'Third' })), [THREAD]],
         ['that person stored', sql`INSERT INTO users (id, name, display_name) VALUES ('U0CAT', 'cat', 'Cat')`, [THREAD]],
         ['a reply deleted', sql`DELETE FROM messages WHERE ts = '1700000500.000100'`, [THREAD]],
+        // Juno's own reply before Slack has it (`pending_messages`, in user.db, out of the triggers' reach).
+        ['a reply queued', transaction(queuePost({ clientMsgId: 'c1', channel: C, threadTs: ROOT, text: 'Mine', blocksJson: null, createdAt: 1_700_000_600_000 })), [THREAD]],
+        ['the queued reply edited', sql`UPDATE pending_messages SET text = 'Mine, edited' WHERE client_msg_id = 'c1'`, [THREAD]],
+        ['Slack stores the reply', write(message({ ts: '1700000700.000100', thread_ts: ROOT, user: ME, text: 'Mine, edited', client_msg_id: 'c1' })), [THREAD]],
       ]
       for (const [step, change, changed] of steps) {
         yield* change
