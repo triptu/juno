@@ -65,10 +65,18 @@ export class Studio {
     this.#browser = undefined
   }
 
-  /** Writes `frames/NNNN.jpg` and returns each frame's pixel statistics for the named regions. */
-  async analyse(dir: string, recording: Recording): Promise<ShotPixels[]> {
+  /** Writes `frames/NNNN.jpg`, for the filmstrip and the video. */
+  async writeFrames(dir: string, recording: Recording): Promise<void> {
     await mkdir(join(dir, 'frames'), { recursive: true })
     await Promise.all(recording.shots.map((shot) => writeFile(join(dir, 'frames', frameFile(shot.number)), shot.jpeg)))
+  }
+
+  /**
+   * Each frame's pixel statistics for the named regions. The frames go to the page with the call, not through a
+   * request each, and reach the disk only when the scenario keeps its media (`writeFrames`).
+   */
+  async analyse(dir: string, recording: Recording): Promise<ShotPixels[]> {
+    await mkdir(dir, { recursive: true })
     if (recording.shots.length === 0) return []
     const page = await this.#page(dir)
     try {
@@ -79,7 +87,7 @@ export class Studio {
             new Promise<HTMLImageElement>((done, reject) => {
               const img = new Image()
               img.addEventListener('load', () => done(img))
-              img.addEventListener('error', () => reject(new Error(`cannot load ${src}`)))
+              img.addEventListener('error', () => reject(new Error(`cannot load frame ${src.slice(0, 40)}…`)))
               img.src = src
             })
           const grey: Uint8Array[] = []
@@ -162,7 +170,7 @@ export class Studio {
             ),
           }))
         },
-        { files: recording.shots.map((shot) => `/frames/${frameFile(shot.number)}`), regions: recording.regions as Record<string, Rect>, cssWidth: first.deviceWidth, width: ANALYSE_WIDTH, delta: PIXEL_DELTA, stamp: STAMP },
+        { files: recording.shots.map((shot) => `data:image/jpeg;base64,${shot.jpeg.toString('base64')}`), regions: recording.regions as Record<string, Rect>, cssWidth: first.deviceWidth, width: ANALYSE_WIDTH, delta: PIXEL_DELTA, stamp: STAMP },
       )
     } finally {
       await page.close()
