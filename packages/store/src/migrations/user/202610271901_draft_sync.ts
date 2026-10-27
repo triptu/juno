@@ -7,23 +7,22 @@ import { SqlClient } from 'effect/sql'
  * - `draft_sync`: what Juno knows of Slack's draft for a topic: the draft
  *   it links (`slack_id`, none when it links none) and when it linked it
  *   (`seen_at`, Juno's clock), so a list requested before then cannot say
- *   the draft is gone; the text of the newest version Juno has seen of it
- *   (`slack_text`), which a send counts among Juno's texts; the newest Slack stamp seen for the place, in epoch
- *   milliseconds (`slack_stamp`); Slack's files on the draft, which every
- *   update keeps (`file_ids`, a JSON array); the `client_msg_id` Juno
- *   creates its draft with; the drafts Juno deleted, sent or saw deleted
- *   (`gone_ids`, a JSON array of the latest few), whose versions are
- *   ignored; when the draft was last emptied (`cleared_at`: Juno's clock for
- *   a local clear or send, Slack's stamp for a deletion taken from Slack),
- *   the time a cleared draft's deletion carries and is compared by; and a
- *   text that lost to the other side (`replaced`: a local edit a newer
- *   version from another device replaced before Slack had it, or another
- *   device's text on a sent draft that newer local typing went over), which
- *   ⌘Z in the composer brings back until the next local change; and the
- *   drafts whose text went as a message (`sent_json`: Slack's id or the
- *   create's `client_msg_id`, Juno's texts that can be on it, and when),
- *   whose versions with Juno's text never come back, until Slack confirms
- *   them gone, 30 days on, or past the latest 20.
+ *   the draft is gone; the newest Slack stamp seen for the place, in epoch
+ *   milliseconds (`slack_stamp`); whether the linked draft has files from
+ *   another device (`has_files`), which Juno shows but never updates or
+ *   deletes; the `client_msg_id` Juno creates its draft with; the drafts
+ *   Juno saw deleted or retired (`gone_ids`, a JSON array of the latest
+ *   few), whose versions are ignored; when the draft was last emptied
+ *   (`cleared_at`: Juno's clock for a local clear or send, Slack's stamp for
+ *   a deletion taken from Slack), the time a cleared draft's deletion
+ *   carries and is compared by; a local edit a newer version from another
+ *   device replaced before Slack had it (`replaced`), which ⌘Z in the
+ *   composer brings back until the next local change; and the texts Juno
+ *   sent from the place (`sent_json`: the text each post carried and Juno's
+ *   own texts that can be on the draft it went from, with that draft's id or
+ *   its create's `client_msg_id`), which never come back; one is forgotten
+ *   only once Slack shows its draft gone or holding another text, and then
+ *   past the latest 20.
  * - A local change Slack has not acknowledged is an `outbox` row of kind
  *   `draft` for the topic. Every draft Juno had before this is one: it was
  *   never in Slack, so it is merged with Slack's draft for its place, if
@@ -39,13 +38,12 @@ export default Effect.gen(function* () {
       slack_id TEXT,
       slack_stamp TEXT,
       seen_at TEXT,
-      file_ids TEXT,
+      has_files INTEGER NOT NULL DEFAULT 0,
       client_msg_id TEXT,
       gone_ids TEXT,
       cleared_at TEXT,
       replaced TEXT,
-      sent_json TEXT,
-      slack_text TEXT
+      sent_json TEXT
     )`
   yield* sql`CREATE INDEX IF NOT EXISTS draft_sync_slack ON draft_sync (slack_id)`
   const posts = yield* sql<{ name: string }>`SELECT name FROM pragma_table_info('pending_messages')`

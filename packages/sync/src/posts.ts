@@ -19,6 +19,7 @@
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
+import { keepFailedDraft } from './write/drafts'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
 
@@ -176,6 +177,8 @@ const move = (
         last_error = ${fields.lastError === undefined ? post.lastError : fields.lastError}
       WHERE client_msg_id = ${clientMsgId}`
     if (post.state === 'failed' || to === 'failed') yield* touch(post)
+    // Slack did not retire the draft a refused post named: it stays the place's draft.
+    if (to === 'failed' && post.draftId !== undefined) yield* keepFailedDraft(post.draftId, yield* Clock.currentTimeMillis)
     return true
   })
 

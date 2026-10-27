@@ -1,4 +1,4 @@
-import { GONE_KEPT, observeSlackDraft, parseTopicId, type DraftOutcome, type DraftState, type SentVersion, type SlackDraft } from '@juno/domain'
+import { GONE_KEPT, keptSent, observeSlackDraft, parseTopicId, type DraftOutcome, type DraftState, type SentText, type SlackDraft } from '@juno/domain'
 import { Invalidation, StoreWriter, type SqlClient, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { invalidate, type Writer } from './shared'
@@ -19,6 +19,8 @@ interface DraftPayload {
   readonly gen: number
   /** The row saves again a version taken from Slack (a save was out when it applied), not a local edit. */
   readonly resave?: boolean
+  /** A send settled the draft: the row stays only for calls still out or lost, and sends nothing. */
+  readonly quiet?: boolean
   /** The generation Slack refused for good: nothing to send until a newer change. */
   readonly refused?: number
   /** The text of the call out (`''` for a delete), so its echo is known as Juno's own. */
@@ -30,18 +32,6 @@ interface DraftPayload {
   readonly unsureAt?: number
   /** A create's answer was lost, or Slack said the place has a draft: a list looks for it before another create. */
   readonly findAt?: number
-  /**
-   * Drafts that went as messages. One the post names (`draft_id`) Slack retires when the post lands, and Juno
-   * deletes only if Slack refuses the post; one the post does not name (it went to another place) Juno deletes.
-   */
-  readonly sent?: ReadonlyArray<SentDraft>
-}
-
-/** A Slack draft that went as a message: the post's `client_msg_id`, and whether the post names it. */
-export interface SentDraft {
-  readonly id: string
-  readonly after: string
-  readonly named: boolean
 }
 
 /** A topic's pending `draft` row. */
@@ -49,13 +39,13 @@ export interface PendingDraft {
   readonly topicId: string
   readonly gen: number
   readonly resave: boolean
+  readonly quiet: boolean
   readonly refused: number
   readonly sending?: string
   readonly creating: boolean
   readonly unsure: ReadonlyArray<string>
   readonly unsureAt: number
   readonly findAt: number
-  readonly sent: ReadonlyArray<SentDraft>
   readonly attempts: number
   /** Epoch milliseconds when the sender may send it. */
   readonly nextAt: number
@@ -66,8 +56,8 @@ export interface PendingDraft {
 /** A topic's draft, what Juno knows of Slack's, and its pending row, as the rules and the sender read them. */
 export interface DraftSyncRow extends DraftState {
   readonly topicId: string
-  /** Slack's files on the draft, kept on every update. Juno does not show or change them. */
-  readonly fileIds: ReadonlyArray<string>
+  /** The linked draft has files, from another device: Juno shows its text and never updates or deletes it. */
+  readonly hasFiles: boolean
   /** The `client_msg_id` Juno creates the place's draft with. */
   readonly clientMsgId?: string
   readonly row?: PendingDraft
@@ -87,29 +77,29 @@ export const toPending = (row: Row): PendingDraft => {
     topicId: row.target_key,
     gen: payload.gen,
     resave: payload.resave === true,
+    quiet: payload.quiet === true,
     refused: payload.refused ?? 0,
     ...(payload.sending === undefined ? {} : { sending: payload.sending }),
     creating: payload.creating === true,
     unsure: payload.unsure ?? [],
     unsureAt: payload.unsureAt ?? 0,
     findAt: payload.findAt ?? 0,
-    sent: payload.sent ?? [],
     attempts: row.attempts,
     nextAt: row.next_at === null ? 0 : Number(row.next_at),
     createdAt: Number(row.created_at),
   }
 }
 
-export const payloadOf = (p: Pick<PendingDraft, 'gen' | 'resave' | 'refused' | 'sending' | 'creating' | 'unsure' | 'unsureAt' | 'findAt' | 'sent'>): string =>
+export const payloadOf = (p: Pick<PendingDraft, 'gen' | 'resave' | 'quiet' | 'refused' | 'sending' | 'creating' | 'unsure' | 'unsureAt' | 'findAt'>): string =>
   JSON.stringify({
     gen: p.gen,
     ...(p.resave ? { resave: true } : {}),
+    ...(p.quiet ? { quiet: true } : {}),
     ...(p.refused === 0 ? {} : { refused: p.refused }),
     ...(p.sending === undefined ? {} : { sending: p.sending }),
     ...(p.creating ? { creating: true } : {}),
     ...(p.unsure.length === 0 ? {} : { unsure: p.unsure, unsureAt: p.unsureAt }),
     ...(p.findAt === 0 ? {} : { findAt: p.findAt }),
-    ...(p.sent.length === 0 ? {} : { sent: p.sent }),
   } satisfies DraftPayload)
 
 /**
@@ -166,8 +156,8 @@ export const draftSyncRow = (topicId: string): Effect.Effect<DraftSyncRow, SqlEr
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const draft = (yield* sql<{ text: string; updated_at: string }>`SELECT text, updated_at FROM drafts WHERE topic_id = ${topicId}`)[0]
-    const synced = (yield* sql<{ slack_id: string | null; slack_stamp: string | null; seen_at: string | null; file_ids: string | null; client_msg_id: string | null; gone_ids: string | null; cleared_at: string | null; replaced: string | null; sent_json: string | null; slack_text: string | null }>`
-      SELECT slack_id, slack_stamp, seen_at, file_ids, client_msg_id, gone_ids, cleared_at, replaced, sent_json, slack_text FROM draft_sync WHERE topic_id = ${topicId}`)[0]
+    const synced = (yield* sql<{ slack_id: string | null; slack_stamp: string | null; seen_at: string | null; has_files: number | null; client_msg_id: string | null; gone_ids: string | null; cleared_at: string | null; replaced: string | null; sent_json: string | null }>`
+      SELECT slack_id, slack_stamp, seen_at, has_files, client_msg_id, gone_ids, cleared_at, replaced, sent_json FROM draft_sync WHERE topic_id = ${topicId}`)[0]
     const row = yield* pendingDraft(topicId)
     return {
       topicId,
@@ -177,14 +167,13 @@ export const draftSyncRow = (topicId: string): Effect.Effect<DraftSyncRow, SqlEr
       ...(synced?.slack_id == null ? {} : { slackId: synced.slack_id }),
       ...(synced?.slack_stamp == null ? {} : { slackStamp: Number(synced.slack_stamp) }),
       ...(synced?.seen_at == null ? {} : { seenAt: Number(synced.seen_at) }),
-      ...(synced?.slack_text == null ? {} : { slackText: synced.slack_text }),
-      // A row that only saves a version from Slack again is no local edit.
-      pending: row !== undefined && !row.resave,
+      // A row that only saves a version from Slack again, or one a send settled, is no local edit.
+      pending: row !== undefined && !row.resave && !row.quiet,
       ...(row?.sending === undefined ? {} : { sending: row.sending }),
       unsure: row?.unsure ?? [],
       gone: synced?.gone_ids == null ? [] : (JSON.parse(synced.gone_ids) as ReadonlyArray<string>),
-      sent: synced?.sent_json == null ? [] : (JSON.parse(synced.sent_json) as ReadonlyArray<SentVersion>),
-      fileIds: synced?.file_ids == null ? [] : (JSON.parse(synced.file_ids) as ReadonlyArray<string>),
+      sent: synced?.sent_json == null ? [] : (JSON.parse(synced.sent_json) as ReadonlyArray<SentText>),
+      hasFiles: synced?.has_files === 1,
       ...(synced?.client_msg_id == null ? {} : { clientMsgId: synced.client_msg_id }),
       ...(synced?.replaced == null ? {} : { replaced: synced.replaced }),
       ...(row === undefined ? {} : { row }),
@@ -199,7 +188,7 @@ export const linkedDrafts: Effect.Effect<ReadonlyArray<{ readonly topicId: strin
     return rows.map((row) => ({ topicId: row.topic_id, slackId: row.slack_id, seenAt: Number(row.seen_at ?? 0) }))
   })
 
-/** The topic that links Slack's draft `slackId`, remembers it gone, or sent it (by id, or by its create's `clientMsgId`). */
+/** The topic that links Slack's draft `slackId`, remembers it gone, or sent a text from it (by id, or by its create's `clientMsgId`). */
 export const topicOfSlackDraft = (slackId: string, clientMsgId?: string): Effect.Effect<string | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
@@ -208,28 +197,19 @@ export const topicOfSlackDraft = (slackId: string, clientMsgId?: string): Effect
       OR EXISTS (SELECT 1 FROM json_each(COALESCE(sent_json, '[]')) WHERE json_extract(value, '$.id') = ${slackId} OR json_extract(value, '$.clientMsgId') = ${clientMsgId ?? ''}) LIMIT 1`)[0]?.topic_id
   })
 
-/** How long, and how many, drafts whose text went as a message are remembered. Slack accepts edit times 30 days old (research section 3). */
-const SENT_KEPT_MILLIS = 30 * 86_400_000
-const SENT_KEPT = 20
-
-/** The sent drafts still remembered at `now`. */
-const keptSent = (sent: ReadonlyArray<SentVersion>, now: number): ReadonlyArray<SentVersion> => sent.filter((each) => each.at > now - SENT_KEPT_MILLIS).slice(-SENT_KEPT)
-
 /** Writes what Juno knows of Slack's draft. */
 export const writeSync = (state: DraftSyncRow): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const files = state.fileIds.length === 0 ? null : JSON.stringify(state.fileIds)
     const gone = state.gone.length === 0 ? null : JSON.stringify(state.gone)
     const sent = state.sent.length === 0 ? null : JSON.stringify(state.sent)
-    // A text Juno links no draft for is none.
-    const slackText = state.slackId === undefined ? null : (state.slackText ?? null)
-    yield* sql`INSERT INTO draft_sync (topic_id, slack_id, slack_stamp, seen_at, file_ids, client_msg_id, gone_ids, replaced, sent_json, slack_text)
+    // Files mark only a draft Juno links.
+    const files = state.slackId !== undefined && state.hasFiles ? 1 : 0
+    yield* sql`INSERT INTO draft_sync (topic_id, slack_id, slack_stamp, seen_at, has_files, client_msg_id, gone_ids, replaced, sent_json)
       VALUES (${state.topicId}, ${state.slackId ?? null}, ${state.slackStamp === undefined ? null : String(state.slackStamp)}, ${state.seenAt === undefined ? null : String(state.seenAt)},
-        ${files}, ${state.clientMsgId ?? null}, ${gone}, ${state.replaced ?? null}, ${sent}, ${slackText})
+        ${files}, ${state.clientMsgId ?? null}, ${gone}, ${state.replaced ?? null}, ${sent})
       ON CONFLICT (topic_id) DO UPDATE SET slack_id = excluded.slack_id, slack_stamp = excluded.slack_stamp, seen_at = excluded.seen_at,
-        file_ids = excluded.file_ids, client_msg_id = excluded.client_msg_id, gone_ids = excluded.gone_ids, replaced = excluded.replaced, sent_json = excluded.sent_json,
-        slack_text = excluded.slack_text`
+        has_files = excluded.has_files, client_msg_id = excluded.client_msg_id, gone_ids = excluded.gone_ids, replaced = excluded.replaced, sent_json = excluded.sent_json`
   })
 
 /** The topic's text at `editedAt`; an empty one deletes the row and keeps the time as the clear's, which its deletion carries. */
@@ -243,7 +223,7 @@ const writeText = (topicId: string, text: string, editedAt: number): Writer =>
       ON CONFLICT (topic_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at`
   })
 
-export const emptyRow = (topicId: string, now: number): PendingDraft => ({ topicId, gen: 0, resave: false, refused: 0, creating: false, unsure: [], unsureAt: 0, findAt: 0, sent: [], attempts: 0, nextAt: now, createdAt: now })
+export const emptyRow = (topicId: string, now: number): PendingDraft => ({ topicId, gen: 0, resave: false, quiet: false, refused: 0, creating: false, unsure: [], unsureAt: 0, findAt: 0, attempts: 0, nextAt: now, createdAt: now })
 
 /** Writes the pending row as given, or adds it, due at `dueAt`. */
 export const writeRow = (row: PendingDraft, dueAt: number): Writer =>
@@ -288,20 +268,20 @@ export const writeLocalDraft = (id: string, text: string, timing: { readonly now
     // Nothing for Slack: a draft cleared before it ever reached Slack.
     if (next === '' && before.slackId === undefined && before.row === undefined) return
     const row = before.row ?? emptyRow(topicId, timing.now)
-    yield* writeRow({ ...row, gen: row.gen + 1, resave: false }, Math.min(timing.dueAt, row.createdAt + timing.capMillis))
+    yield* writeRow({ ...row, gen: row.gen + 1, resave: false, quiet: false }, Math.min(timing.dueAt, row.createdAt + timing.capMillis))
   })
 
 /**
- * The topic's draft went as a message (`messages.send`), and the draft is cleared. Slack's draft for it is
- * remembered as sent, with Juno's texts that can be on it (the one sent, and those of calls still out or
- * lost), so a version with one of them never brings the text back, whatever the clocks say: the draft Juno
- * links, or, while a create is not answered, the one it may have made, by its `client_msg_id` (the next
- * create gets a new one). A linked draft with no files goes with the post when the post goes where the draft
- * was (`named`: it names the draft as `draft_id`, returned, and Slack retires it); when Slack refuses the post,
- * or the post went elsewhere, Juno deletes it, once it is sure the draft still holds only Juno's text. A draft
- * with files keeps them: Juno empties its text instead.
+ * The topic's draft went as a message (`messages.send`) carrying `text`, and the draft is cleared: a send
+ * asks Slack to delete nothing. The text is remembered as sent from the place, with Juno's own texts that can
+ * be on Slack's draft (calls still out or lost), so a version with one of them never brings it back, whatever
+ * the clocks say. When the post goes where the draft is and the draft has no files (`here`), it names the
+ * draft (`draft_id`, returned) and Slack retires it: Juno stops linking it and counts it gone, until Slack
+ * refuses the post (`keepFailedDraft`). A post that went elsewhere leaves Slack's draft where it is, and Juno
+ * stops linking it; a draft with files stays linked and untouched. A create Juno had no answer to is
+ * remembered by its `client_msg_id`, and the next create gets a new one.
  */
-export const sendDraft = (id: string, clientMsgId: string, now: number, named: boolean): Effect.Effect<string | undefined, SqlError, Services> =>
+export const sendDraft = (id: string, text: string, now: number, here: boolean): Effect.Effect<string | undefined, SqlError, Services> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const topicId = yield* draftTopicId(sql, id)
@@ -309,71 +289,79 @@ export const sendDraft = (id: string, clientMsgId: string, now: number, named: b
     yield* writeText(topicId, '', now)
     yield* draftChanged(topicId, id)
     const row = before.row
-    const texts = [...new Set([before.text, before.slackText ?? '', ...(row?.sending === undefined ? [] : [row.sending]), ...(row?.unsure ?? [])])].filter((text) => text !== '')
-    const unanswered = before.slackId === undefined && before.clientMsgId !== undefined && row !== undefined && (row.creating || row.findAt > 0 || row.unsure.length > 0)
-    const version: SentVersion | undefined =
-      before.slackId !== undefined ? { id: before.slackId, texts, at: now } : unanswered && before.clientMsgId !== undefined ? { clientMsgId: before.clientMsgId, texts, at: now } : undefined
-    const retired = before.slackId !== undefined && before.fileIds.length === 0 ? before.slackId : undefined
+    const texts = [...new Set([text, ...(row?.sending === undefined ? [] : [row.sending]), ...(row?.unsure ?? [])])].filter((each) => each !== '')
+    const unanswered = before.slackId === undefined && row !== undefined && (row.creating || row.findAt > 0 || row.unsure.length > 0) ? before.clientMsgId : undefined
+    // A text with no draft Juno knows of to hold it is settled at once.
+    const sentText: SentText = before.slackId !== undefined ? { id: before.slackId, texts } : unanswered !== undefined ? { clientMsgId: unanswered, texts } : { texts, settled: true }
+    const named = here && before.slackId !== undefined && !before.hasFiles
+    const unlinks = before.slackId !== undefined && !before.hasFiles
     const { slackId, seenAt, clientMsgId: create, ...rest } = yield* draftSyncRow(topicId)
     yield* writeSync({
       ...rest,
-      ...(retired === undefined && slackId !== undefined ? { slackId } : {}),
-      ...(retired === undefined && seenAt !== undefined ? { seenAt } : {}),
-      ...(unanswered || create === undefined ? {} : { clientMsgId: create }),
-      // Slack retires a draft the post names: nothing of it can come back.
-      gone: named && retired !== undefined ? [...rest.gone, retired].slice(-GONE_KEPT) : rest.gone,
-      sent: version === undefined ? rest.sent : keptSent([...rest.sent, version], now),
+      ...(unlinks || slackId === undefined ? {} : { slackId }),
+      ...(unlinks || seenAt === undefined ? {} : { seenAt }),
+      ...(unanswered !== undefined || create === undefined ? {} : { clientMsgId: create }),
+      // Slack retires a draft the post names: what a list took before the send cannot bring it back.
+      gone: named && slackId !== undefined ? [...rest.gone.filter((each) => each !== slackId), slackId].slice(-GONE_KEPT) : rest.gone,
+      sent: keptSent([...rest.sent, sentText]),
       replaced: undefined,
     })
-    if (retired === undefined && before.slackId === undefined && row === undefined) return undefined
-    const base = row ?? emptyRow(topicId, now)
-    yield* writeRow({ ...base, gen: base.gen + 1, resave: false, sent: retired === undefined ? base.sent : [...base.sent, { id: retired, after: clientMsgId, named }] }, now)
-    return named ? retired : undefined
+    // The send is no local edit: a row stays only for calls still out or lost, and it sends nothing.
+    if (row !== undefined) {
+      if (row.sending !== undefined || row.unsure.length > 0 || row.findAt > 0) yield* writeRow({ ...row, gen: row.gen + 1, resave: false, quiet: true }, row.nextAt)
+      else yield* dropRow(topicId)
+    }
+    return named ? before.slackId : undefined
+  })
+
+/**
+ * Slack refused the post that named draft `slackId`: the draft was not retired. It is the place's draft still,
+ * linked again (unless Juno links another), and nothing of it counts as gone; deleting the failed message
+ * changes nothing.
+ */
+export const keepFailedDraft = (slackId: string, now: number): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    const topicId = yield* topicOfSlackDraft(slackId)
+    if (topicId === undefined) return
+    const state = yield* draftSyncRow(topicId)
+    yield* writeSync({ ...state, gone: state.gone.filter((each) => each !== slackId), ...(state.slackId === undefined ? { slackId, seenAt: now } : {}) })
   })
 
 /**
  * A version of the topic's draft from Slack, applied by `observeSlackDraft`: an event, or an entry of a
  * list requested at `seenAt` (`listed`; it looks for the place's draft while the row's find is open).
- * `same` compares two texts as Slack would store them.
+ * `files` says whether it has files. `same` compares two texts as Slack would store them.
  */
 export const observeDraft = (
   topicId: string,
-  slack: SlackDraft & { readonly fileIds?: ReadonlyArray<string> },
+  slack: SlackDraft & { readonly files?: boolean },
   how: { readonly seenAt: number; readonly absent?: boolean; readonly listed?: boolean; readonly same: (a: string, b: string) => boolean },
 ): Effect.Effect<DraftOutcome, SqlError, Services> =>
   Effect.gen(function* () {
     const before = yield* draftSyncRow(topicId)
     const row = before.row
     const find = how.listed === true && row !== undefined && row.findAt > 0 && how.seenAt > row.findAt && before.slackId === undefined
-    const { state, outcome, save, cleanup } = observeSlackDraft(before, slack, { seenAt: how.seenAt, ...(how.absent === true ? { absent: true } : {}), ...(find ? { find } : {}), same: how.same })
+    const { state, outcome, save } = observeSlackDraft(before, slack, { seenAt: how.seenAt, ...(how.absent === true ? { absent: true } : {}), ...(find ? { find } : {}), same: how.same })
     if (outcome === 'stale') return outcome
-    // A deletion of the linked draft takes its files; a live draft keeps or brings them; a sent draft Juno does not link leaves them.
-    const fileIds = cleanup === 'delete' ? before.fileIds : slack.deleted && slack.id === before.slackId ? [] : slack.deleted ? before.fileIds : (slack.fileIds ?? before.fileIds)
+    // A live version of the draft Juno links says whether it has files.
+    const hasFiles = state.slackId === slack.id && !slack.deleted ? (slack.files ?? before.hasFiles) : before.hasFiles
     // Built from the rule's state, so a link it removed stays removed.
-    yield* writeSync({ ...state, topicId, fileIds, ...(before.clientMsgId === undefined ? {} : { clientMsgId: before.clientMsgId }) })
-    // A sent draft holding only Juno's text is for Juno to delete; one another device changed is not.
-    const current = row === undefined ? undefined : { ...row, sent: cleanup === 'keep' ? row.sent.filter((each) => each.id !== slack.id) : row.sent }
-    if (cleanup === 'delete') {
-      if (current?.sent.some((each) => each.id === slack.id) === true) return outcome
-      // A row only for the delete is no local edit.
-      const base = current ?? { ...emptyRow(topicId, how.seenAt), gen: 1, resave: true }
-      yield* writeRow({ ...base, sent: [...base.sent, { id: slack.id, after: '', named: false }] }, Math.min(base.nextAt, how.seenAt))
-      return outcome
-    }
+    yield* writeSync({ ...state, topicId, hasFiles, ...(before.clientMsgId === undefined ? {} : { clientMsgId: before.clientMsgId }) })
     if (outcome === 'applied') {
       yield* writeText(topicId, state.text, state.editedAt)
-      if (current !== undefined) {
-        // A save out, or one whose answer was lost, may land after this version: it goes again.
-        if (current.sending !== undefined || current.unsure.length > 0 || current.sent.length > 0) yield* writeRow({ ...current, gen: current.gen + 1, resave: true }, 0)
+      if (row !== undefined) {
+        // A save out, or one whose answer was lost, may land after this version: it goes again, an empty one as
+        // a delete of what that save wrote.
+        if (row.sending !== undefined || row.unsure.length > 0) yield* writeRow({ ...row, gen: row.gen + 1, resave: true, quiet: false }, 0)
         else yield* dropRow(topicId)
       }
       yield* draftChanged(topicId)
       yield* invalidate(['draft_reviews'])
     } else if (save) {
-      // Juno's text goes over Slack's version now.
-      const base = current ?? emptyRow(topicId, how.seenAt)
+      // Juno's local edit goes over Slack's version now.
+      const base = row ?? emptyRow(topicId, how.seenAt)
       yield* writeRow({ ...base, gen: row === undefined ? 1 : base.gen }, Math.min(base.nextAt, how.seenAt))
-    } else if (cleanup === 'keep' && current !== undefined) yield* writeRow(current, current.nextAt)
+    }
     return outcome
   })
 

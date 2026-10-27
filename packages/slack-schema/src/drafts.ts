@@ -93,13 +93,6 @@ export type DraftsDeleteArgs = typeof DraftsDeleteArgs.Type
 
 export const DraftsDeleteFields = {} as const
 
-// drafts.info: one draft, deleted and sent ones included (research section 3).
-
-export const DraftsInfoArgs = S.Struct({ draft_id: S.String })
-export type DraftsInfoArgs = typeof DraftsInfoArgs.Type
-
-export const DraftsInfoFields = { draft: Draft } as const
-
 // Socket events. Slack sends a client its own writes too.
 
 export const DraftChangedEvent = S.Struct({

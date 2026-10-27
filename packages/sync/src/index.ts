@@ -37,7 +37,6 @@ export {
   type ThreadSubRow,
 } from './write'
 export {
-  checkSentDraft,
   claimDraftSave,
   deferDraftSave,
   draftDestination,
@@ -45,7 +44,6 @@ export {
   draftTopicId,
   dropDraftSave,
   endDraftSave,
-  endSentDraft,
   linkedDrafts,
   observeAbsence,
   observeDraft,

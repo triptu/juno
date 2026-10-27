@@ -4,8 +4,8 @@
  *
  * - `drafts.update` for the draft Juno links, with the local edit time as
  *   `client_last_updated_ts`; `drafts.create` when it links none (not while a
- *   list looks for the place's draft); `drafts.delete` for a cleared draft,
- *   or an update to no text when the draft has files, which Juno keeps.
+ *   list looks for the place's draft); `drafts.delete` for a draft the user
+ *   cleared. Nothing for a draft with files: Juno never changes one.
  * - `attached_draft_exists`: the place has a draft Juno does not link; a
  *   list finds it, and the rule decides between the two.
  * - A draft Slack no longer has live (`draft_update_invalid` and the like)
@@ -14,20 +14,18 @@
  *   run the call, so a list follows. A rate limit or no session: the row
  *   waits. Any other refusal settles the generation it sent: that text stays
  *   in Juno only, and a newer edit still goes.
- * - A draft that went with a post is retired by Slack when the post lands.
- *   One Slack refused the post for, or one the post went elsewhere from, Juno
- *   deletes, after `drafts.info` shows it still holds only Juno's text: Slack
- *   has no conditional delete, and a draft another device changed stays.
+ * - Juno deletes nothing on its own: a draft that went with a post naming it
+ *   is retired by Slack, and any other stays where it is.
  */
 import { Clock, Effect } from 'effect'
 import { composeOutgoing } from '@juno/richtext'
 import type { SlackApiError } from '@juno/slack'
 import { StoreWriter, transaction, type SqlError } from '@juno/store'
-import { checkSentDraft, claimDraftSave, deferDraftSave, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, endSentDraft, refuseDraftSave, type DraftAnswer, type DraftClaim, type PendingDraft } from '@juno/sync'
+import { claimDraftSave, deferDraftSave, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, refuseDraftSave, type DraftAnswer, type DraftClaim, type PendingDraft } from '@juno/sync'
 import { WorkControl } from './workControl'
 import type { EngineTimingConfig } from './config'
 import type { MirrorError, Outbox } from './outbox'
-import { inStore, same, stampOf, versionOf, type Blocks, type Draft, type DraftDestination } from './draftVersions'
+import { inStore, stampOf, type Blocks, type Draft, type DraftDestination } from './draftVersions'
 import type { OpenWorkspace, StoreServices } from './workspace'
 
 export interface SenderDeps {
@@ -48,12 +46,11 @@ export const sendDraftRow = (deps: SenderDeps, open: OpenWorkspace, topicId: str
       const destination = yield* local(draftDestination(topicId))
       // A thread Juno started waits for its root's ts; a topic that is no place has nothing to sync.
       if (destination === undefined) return yield* local(topicId.startsWith('p:') ? later(topicId, now + deps.timing.noSessionMillis) : dropDraftSave(topicId))
-      if (!(yield* settleSent(deps, open, topicId, first.row, now))) return
       const control = yield* WorkControl
       const hold = control.onDraftWrite?.('claim', topicId, 'before')
       if (hold !== undefined) yield* Effect.promise(() => hold)
       // Read and claimed together: a version from Slack that replaced the intent meanwhile leaves nothing to send.
-      const claim = yield* local(transaction(claimDraftSave(topicId, yield* Clock.currentTimeMillis, deps.timing.retryBaseMillis, () => crypto.randomUUID())))
+      const claim = yield* local(transaction(claimDraftSave(topicId, yield* Clock.currentTimeMillis, () => crypto.randomUUID())))
       control.onDraftWrite?.('claim', topicId, 'after')
       if (claim === undefined) return
       const places: ReadonlyArray<DraftDestination> = [{ channel_id: destination.channel, ...(destination.threadTs === undefined ? {} : { thread_ts: destination.threadTs, broadcast: false }) }]
@@ -71,9 +68,9 @@ const call = (api: Parameters<Parameters<Outbox['Service']['send']>[0]>[0], clai
     case 'create':
       return Effect.map(api.call('drafts.create', { blocks: blocksOf(claim.text), client_msg_id: claim.clientMsgId!, destinations: places, file_ids: [], is_from_composer: false }, reason), (answer) => saved(answer.draft, claim.text))
     case 'update':
-    case 'clear':
+      // Juno updates only a draft with no files.
       return Effect.map(
-        api.call('drafts.update', { draft_id: claim.slackId!, client_last_updated_ts: edited, blocks: blocksOf(claim.text), destinations: places, file_ids: [...claim.fileIds], is_from_composer: false }, reason),
+        api.call('drafts.update', { draft_id: claim.slackId!, client_last_updated_ts: edited, blocks: blocksOf(claim.text), destinations: places, file_ids: [], is_from_composer: false }, reason),
         (answer) => saved(answer.draft, claim.text),
       )
     case 'delete':
@@ -97,47 +94,6 @@ const settleFailure = (deps: SenderDeps, open: OpenWorkspace, topicId: string, r
     yield* local(transaction(refuseDraftSave(topicId, claim.gen)))
   })
 
-/**
- * Drafts that went as messages: one its post names was retired by Slack once the post landed. Juno deletes
- * one Slack refused the post for, one the post went elsewhere from, and one its create made after the text
- * went, but only once `drafts.info` shows it still holds only Juno's text and no files; one another device
- * changed stays. Returns false when the row was put off.
- */
-const settleSent = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row: PendingDraft, now: number) =>
-  Effect.gen(function* () {
-    const local = inStore(open)
-    const reason = { reason: 'InputContainer:sendMessage' }
-    for (const sent of row.sent) {
-      if (sent.named) {
-        const post = yield* local(postState(sent.after))
-        if (post === undefined) {
-          yield* local(transaction(endSentDraft(topicId, sent.id)))
-          continue
-        }
-        if (post !== 'failed') continue
-      }
-      const info = yield* Effect.result(deps.outbox.send((api) => api.call('drafts.info', { draft_id: sent.id }, reason)))
-      if (info._tag === 'Failure' && !isGone(info.failure)) {
-        yield* defer(deps, open, topicId, row, info.failure, false)
-        return false
-      }
-      const draft = info._tag === 'Success' ? info.success.draft : undefined
-      if (draft === undefined || draft.is_deleted === true || draft.is_sent === true) {
-        yield* local(transaction(endSentDraft(topicId, sent.id)))
-        continue
-      }
-      const version = yield* local(versionOf(draft))
-      if (!(yield* local(transaction(checkSentDraft(topicId, version, { seenAt: yield* Clock.currentTimeMillis, same }))))) continue
-      const result = yield* Effect.result(deps.outbox.send((api) => api.call('drafts.delete', { draft_id: sent.id, client_last_updated_ts: String(now), skip_file_deletion: true }, reason)))
-      if (result._tag === 'Failure' && !isGone(result.failure)) {
-        yield* defer(deps, open, topicId, row, result.failure, false)
-        return false
-      }
-      yield* local(transaction(endSentDraft(topicId, sent.id)))
-    }
-    return true
-  })
-
 /** A transient failure: due again with backoff. A call Slack may have run (`ran`) keeps its text as Juno's own, and a list follows. */
 const defer = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row: PendingDraft, error: MirrorError, ran: boolean) =>
   Effect.gen(function* () {
@@ -146,13 +102,6 @@ const defer = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row: Pend
     const wait = error._tag === 'NotSignedIn' ? deps.timing.noSessionMillis : error._tag === 'RateLimited' ? Math.max(error.retryAfterMillis, backoff) : backoff
     yield* inStore(open)(transaction(deferDraftSave(topicId, at + wait, error._tag, at, ran)))
     if (ran) yield* deps.listSoon
-  })
-
-/** A post's state while it is not in Slack; `undefined` once Slack has it, or it was discarded. */
-const postState = (clientMsgId: string): Effect.Effect<string | undefined, SqlError, StoreServices> =>
-  Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    return (yield* sql<{ state: string }>`SELECT state FROM pending_messages WHERE client_msg_id = ${clientMsgId}`)[0]?.state
   })
 
 /** Puts a row off to `at` without a call. */
@@ -180,4 +129,4 @@ const blocksOf = (text: string): Blocks => {
 }
 
 /** Slack's answer to a save of `text`, which its draft now holds. */
-const saved = (draft: Draft, text: string): DraftAnswer => ({ kind: 'saved', id: draft.id, stamp: stampOf(draft.last_updated_ts), fileIds: draft.file_ids ?? [], clientMsgId: draft.client_msg_id, text })
+const saved = (draft: Draft, text: string): DraftAnswer => ({ kind: 'saved', id: draft.id, stamp: stampOf(draft.last_updated_ts), files: (draft.file_ids ?? []).length > 0, clientMsgId: draft.client_msg_id, text })

@@ -106,12 +106,12 @@ const placeOf = (draft: Draft): Effect.Effect<string | undefined, SqlError, Stor
   })
 
 /** Slack's draft as a version of a place's draft, its text as the composer's. A live draft of files alone has no text, and is not a deletion. */
-export const versionOf = (draft: Draft): Effect.Effect<SlackDraft & { readonly fileIds: ReadonlyArray<string> }, SqlError, StoreWriter> =>
+const versionOf = (draft: Draft): Effect.Effect<SlackDraft & { readonly files: boolean }, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const deleted = draft.is_deleted === true || draft.is_sent === true
     const blocks = draft.blocks ?? []
     const markup = deleted ? '' : draftMarkup(blocks, yield* draftLookups(blocks))
-    return { id: draft.id, text: markup.trim() === '' ? '' : markup, stamp: stampOf(draft.last_updated_ts), deleted, fileIds: draft.file_ids ?? [], clientMsgId: draft.client_msg_id }
+    return { id: draft.id, text: markup.trim() === '' ? '' : markup, stamp: stampOf(draft.last_updated_ts), deleted, files: (draft.file_ids ?? []).length > 0, clientMsgId: draft.client_msg_id }
   })
 
 const applyVersion = (topicId: string, draft: Draft, how: { readonly seenAt: number; readonly listed: boolean }) =>

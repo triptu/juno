@@ -137,12 +137,6 @@ export class DraftStore {
     return undefined
   }
 
-  /** One draft by id, deleted and sent ones included. */
-  info(draftId: string): Draft | DraftFailure {
-    const record = this.#records.get(draftId)
-    return record === undefined ? 'draft_not_found' : this.#object(record)
-  }
-
   /** A post named the draft, by its id or its `client_msg_id`: it is retired. An unknown or retired one is left alone. */
   sent(draftId: string, messageTs: string): void {
     const record = this.#records.get(draftId) ?? [...this.#records.values()].find((each) => each.clientMsgId === draftId)
