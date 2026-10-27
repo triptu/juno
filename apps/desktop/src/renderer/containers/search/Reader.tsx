@@ -94,7 +94,8 @@ export function moveReader(sessionId: string, target: SearchSelection, how: 'poi
  * A match in the window the reader shows can still leave it: a fetch filling the gap between two matches moves a
  * window that briefly reached across the gap back to the rows it fills. While the window keeps the spec it had (the
  * rows moved under it, not a scroll or another step) and the match is still the selection, the reader anchors at the
- * match if it leaves (`navigateMatches` in `e2e/searchSteps.ts`: the step stayed on the old rows in 3 of 41 runs).
+ * match if it leaves (`navigateMatches` in `e2e/searchSteps.ts` with the thread's replies held until the first step:
+ * the step stayed on the old rows in 3 of 41 runs).
  */
 function keepMatch(sessionId: string, view: string, ts: string, anchor: () => void): void {
   const spec = registry.get(messageWindowSpecAtom(view))

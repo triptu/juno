@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'bun:test'
 import { parseSearchQuery, printSearchQuery, SEARCH_WINDOW, searchCalendar, searchMore, searchQuery, viewsSortChannel, topicsRename, type SearchSnapshot, type SearchQuery } from '@juno/contract'
-import { liveQuery, runCommand, searchSnapshots } from '@juno/state'
+import { liveQuery, runCommand, searchSnapshots, searchStepsAtom } from '@juno/state'
 import { syncedEngine } from '../synced'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { valueOf } from '../scenario'
@@ -70,6 +70,18 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
     const hits = cards.groups.flatMap((g) => g.messages)
     expect(hits.find((m) => m.ts === root.ts)?.card).toMatchObject({ reply: false, sender: { id: 'U0MAYA' }, thread: { replyCount: 1, repliers: [{ id: 'U0LEO' }] }, reactions: [{ name: 'white_check_mark', count: 1, unicode: '✅' }] })
     expect(hits.find((m) => m.ts !== root.ts)?.card).toMatchObject({ reply: true, sender: { id: 'U0LEO' } })
+  })
+
+  await step('the reader counts a topic\'s matches only Slack found, so its "N of M" does not wait for them to be stored', async () => {
+    const remote = complete.groups.flatMap((g) => g.messages).find((m) => m.text.endsWith('frontiertest remote 7'))!
+    expect(remote.stored).toBe(false)
+    const atom = searchStepsAtom('frontier', 1, remote.topicId, remote.ts)
+    releases.push(engine.registry.mount(atom))
+    const nav = await waitFor(() => { const result = engine.registry.get(atom); return result._tag === 'Success' ? result.value : undefined }, WAIT_MS, 'the match count')
+    // In time order: the stored old match, the 75 Slack found (newest is remote 0), then the stored recent one.
+    expect({ count: nav.count, index: nav.index }).toEqual({ count: 77, index: 69 })
+    expect(nav.previous).toBe(complete.groups.flatMap((g) => g.messages).find((m) => m.text.endsWith('frontiertest remote 8'))!.ts)
+    expect(nav.next).toBe(complete.groups.flatMap((g) => g.messages).find((m) => m.text.endsWith('frontiertest remote 6'))!.ts)
   })
 
   await step('a completed title row keeps its anchor when an older message arrives on a later page', async () => {
