@@ -77,9 +77,10 @@ export class DraftSync extends Context.Service<
           const now = yield* Clock.currentTimeMillis
           const due = (yield* inStore(open)(pendingDrafts)).filter((row) => row.nextAt <= now)
           yield* Effect.forEach(due, (row) => sendDraftRow(deps, open, row.topicId), { concurrency: 4, discard: true })
-          const rest = yield* inStore(open)(pendingDrafts)
+          // A row waiting for a list (`next_at` at the end of time) is woken by the list, not a timer.
+          const rest = (yield* inStore(open)(pendingDrafts)).filter((row) => row.nextAt < Number.MAX_SAFE_INTEGER)
           if (rest.length === 0) return undefined
-          return Math.max(0, Math.min(...rest.map((row) => row.nextAt)) - (yield* Clock.currentTimeMillis))
+          return Math.min(timing.retryCapMillis, Math.max(0, Math.min(...rest.map((row) => row.nextAt)) - (yield* Clock.currentTimeMillis)))
         }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('drafts: pass failed', { cause }), timing.workerRetryMillis)))
 
       /** A list of Slack's drafts, and up to `LIST_AGAIN` more while one could not vouch for what it missed. */

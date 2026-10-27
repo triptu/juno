@@ -136,6 +136,10 @@ function LoadedComposer({
   })
   // The text not yet written to the store, and the timer that will write it.
   const unsaved = useRef<string | undefined>(undefined)
+  // A save went to the store since the last one sent at once: its trip to Slack still waits for a pause.
+  const toSlack = useRef(false)
+  // What this field last wrote to the store: the store coming back with it is this field's own echo.
+  const written = useRef<string | undefined>(undefined)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // `now`: Slack gets the draft without waiting for a pause in typing (the field lost focus, the tab hid, the window is closing).
@@ -143,11 +147,14 @@ function LoadedComposer({
     clearTimeout(timer.current)
     timer.current = undefined
     if (unsaved.current === undefined) {
-      // Nothing new to write: only hurry the save that is waiting. A field holding back a newer draft writes nothing.
-      if (now && encoded(text) === latestRef.current) void saveDraft(registry, id, latestRef.current, true)
+      // Nothing new to write: only hurry a save that is waiting. A field holding back a newer draft writes nothing.
+      if (now && toSlack.current && encoded(text) === latestRef.current) void saveDraft(registry, id, latestRef.current, true)
+      if (now) toSlack.current = false
       return
     }
+    written.current = unsaved.current
     void saveDraft(registry, id, unsaved.current, now)
+    toSlack.current = !now
     unsaved.current = undefined
   }
   const flushRef = useRef(flush)
@@ -162,6 +169,7 @@ function LoadedComposer({
     typedSinceShown.current = false
   }, [])
   const take = (draft: string) => {
+    written.current = undefined
     const next = decodeDraft(draft)
     picked.current = next.picks
     setPicks(next.picks)
@@ -178,7 +186,8 @@ function LoadedComposer({
   const behind = useRef(false)
   useEffect(() => {
     behind.current = false
-    if (latest === encoded(text)) return
+    // This field's own save coming back: the field may have moved on since (a link edited, more typing).
+    if (latest === encoded(text) || latest === written.current) return
     if (unsaved.current !== undefined) return
     if (document.activeElement === field.current && typedSinceShown.current) {
       behind.current = true
@@ -255,6 +264,7 @@ function LoadedComposer({
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
+    toSlack.current = false
     links.reset('', [])
     setText('')
     setPaused('')
