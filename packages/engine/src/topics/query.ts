@@ -328,7 +328,7 @@ export const listTopics = (filter: ListFilter, options: QueryOptions, cache: Row
 
     for (const entry of pinned) shaper.place(entry, 'pinned', topicStatus(entry.topic, ctx))
     for (const entry of recent.slice(0, Math.max(0, options.limit - pinned.length))) shaper.place(entry, 'recent', 'open')
-    return { ...shaper.finish(), windowCovered: yield* rowsCovered }
+    return { ...shaper.finish(), windowCovered: yield* rowsCovered, quietDays: quietDaysOf(ctx) }
   })
 
 /**

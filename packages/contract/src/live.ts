@@ -62,6 +62,8 @@ export const LiveMeta = Schema.Struct({
   total: Schema.optionalKey(Schema.Int),
   /** The initial window is covered: fetched message history, or completed cold sync for topic-list membership. */
   windowCovered: Schema.optionalKey(Schema.Boolean),
+  /** The quiet window in days a topic list was read with, so a widening reaches the renderer with the rows it brings. */
+  quietDays: Schema.optionalKey(Schema.Int),
   /** The window holds the list's newest row. A window around an anchor can, when the rows after the anchor fit in it. */
   atNewest: Schema.optionalKey(Schema.Boolean),
   /**

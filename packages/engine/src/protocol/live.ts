@@ -129,6 +129,8 @@ export interface ListRun<Row> {
   readonly rows: ReadonlyArray<Row>
   readonly total?: number
   readonly windowCovered?: boolean
+  /** The quiet window the rows were read with; see `LiveMeta.quietDays`. */
+  readonly quietDays?: number
   /** The window holds the list's newest row; see `LiveMeta.atNewest`. */
   readonly atNewest?: boolean
   /** A thread window stops at replies the store cannot prove continuous with its first row (`LiveMeta.gapBefore`). */
@@ -171,6 +173,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
 ): Stream.Stream<ListDelta<Row>, E | SE, R> {
   let seq = 0
   let windowCovered: boolean | undefined
+  let quietDays: number | undefined
   let atNewest: boolean | undefined
   let gaps = ''
   let order: ReadonlyArray<string> = []
@@ -206,7 +209,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
             ? undefined
             : { ...(people.length === 0 ? {} : { people }), ...(channels.length === 0 ? {} : { channels }), ...(art.length === 0 ? {} : { art }) }
         const runGaps = `${run.gapBefore === true ? 'b' : ''}${run.standIn === true ? 's' : ''}:${run.gapAfter ?? ''}`
-        if (windowCovered === run.windowCovered && atNewest === run.atNewest && gaps === runGaps && !reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
+        if (windowCovered === run.windowCovered && quietDays === run.quietDays && atNewest === run.atNewest && gaps === runGaps && !reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
         let encodeMs = 0
         if (options.measure) {
           const measured = measureEncode(() => upsert.map(options.encodeRow))
@@ -222,10 +225,12 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         for (const channel of channels) sentChannels.set(channel.id, channel)
         for (const drawing of art) sentArt.set(drawing.id, drawing)
         windowCovered = run.windowCovered
+        quietDays = run.quietDays
         atNewest = run.atNewest
         gaps = runGaps
         const meta: LiveMeta = {
           ...(windowCovered === undefined ? {} : { windowCovered }),
+          ...(quietDays === undefined ? {} : { quietDays }),
           ...(atNewest === undefined ? {} : { atNewest }),
           ...(run.gapBefore === true ? { gapBefore: true } : {}),
           ...(run.gapAfter === undefined ? {} : { gapAfter: run.gapAfter }),
