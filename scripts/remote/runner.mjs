@@ -71,9 +71,10 @@ export function runnerConfig(env = process.env) {
  * The laptop's power and speed, after tstack's check: its battery (`battery=<status> <percent>`) and the fastest of three
  * short busy loops (`cpuloop=<ms>`), which takes about 45 ms at full speed. On 10-27 it ran unplugged until the battery
  * read 0% and its cores ran at about 600 MHz: every desktop test took six to eight times as long, and unrelated tests
- * failed on their timeouts. Firmware throttling does not always show in cpufreq, so the loop measures it.
+ * failed on their timeouts. Firmware throttling does not always show in cpufreq, so the loop measures it; where `date` has no nanoseconds, it
+ * reports no loop.
  */
-const powerProbe = `for s in /sys/class/power_supply/BAT*; do [ -r "$s/status" ] && echo "battery=$(cat "$s/status") $(cat "$s/capacity" 2>/dev/null)"; done; best=; for i in 1 2 3; do a=$(date +%s%N); awk 'BEGIN { for (i = 0; i < 2000000; i++) s += i }'; b=$(date +%s%N); t=$(( (b - a) / 1000000 )); if [ -z "$best" ] || [ "$t" -lt "$best" ]; then best=$t; fi; done; echo "cpuloop=$best"`
+const powerProbe = `for s in /sys/class/power_supply/BAT*; do [ -r "$s/status" ] && echo "battery=$(cat "$s/status") $(cat "$s/capacity" 2>/dev/null)"; done; best=; for i in 1 2 3; do a=$(date +%s%N); case $a in *[!0-9]*) break ;; esac; awk 'BEGIN { for (i = 0; i < 2000000; i++) s += i }'; b=$(date +%s%N); t=$(( (b - a) / 1000000 )); if [ -z "$best" ] || [ "$t" -lt "$best" ]; then best=$t; fi; done; [ -n "$best" ] && echo "cpuloop=$best"`
 /** Below this charge on battery, a run waits for power. */
 const BATTERY_MIN_PERCENT = 30
 /** Over this, the cores are throttled: about three times the loop's time at full speed, well past what other jobs on the laptop add. */
