@@ -64,7 +64,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
 
 /** Web API methods that change something in Slack. Every other method Juno calls only reads. */
 const WRITE_METHODS = new Set([
-  'users.prefs.set', 'users.profile.set', 'presence.set', 'conversations.mark', 'conversations.open', 'conversations.create',
+  'users.prefs.set', 'users.profile.set', 'presence.set', 'conversations.mark', 'conversations.open', 'conversations.create', 'conversations.rename', 'conversations.invite', 'conversations.kick',
   'subscriptions.thread.mark', 'subscriptions.thread.add', 'subscriptions.thread.remove', 'chat.postMessage', 'chat.shareMessage',
   'chat.update', 'chat.delete', 'reactions.add', 'reactions.remove', 'files.getUploadURL', 'files.completeUpload', 'files.share',
   'rooms.join', 'rooms.leave',

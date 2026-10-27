@@ -658,7 +658,12 @@ export class Workspace {
     return undefined
   }
 
-  /** Creates a channel with self as its only member, as `conversations.create` does. Self gets `channel_joined` (or `group_joined`). */
+  /**
+   * Creates a channel with self as its only member, as `conversations.create`
+   * does. A public channel is announced with `channel_created`; self gets
+   * `channel_joined` with the whole channel, a private one too (seen live,
+   * research `slack-channels.md`), and `member_joined_channel`.
+   */
   create(name: string, kind: 'public' | 'private'): ConversationRecord | 'name_taken' {
     if ([...this.conversations.values()].some((c) => c.name === name)) return 'name_taken'
     const record: ConversationRecord = {
@@ -674,7 +679,9 @@ export class Workspace {
     }
     this.addConversation(record)
     this.#touchConversation(record.id)
-    this.emit({ type: kind === 'private' ? 'group_joined' : 'channel_joined', channel: this.channelObject(record), event_ts: this.eventTs() })
+    if (kind === 'public') this.emit({ type: 'channel_created', channel: { id: record.id, name, is_channel: true, created: Math.floor(record.created / 1000), creator: this.selfId }, event_ts: this.eventTs() })
+    this.emit({ type: 'channel_joined', channel: this.channelObject(record), event_ts: this.eventTs() })
+    this.emit({ type: 'member_joined_channel', user: this.selfId, channel: record.id, channel_type: kind === 'private' ? 'G' : 'C', team: this.team.id, event_ts: this.eventTs() })
     return record
   }
 

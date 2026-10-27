@@ -69,6 +69,25 @@ export function requireConversation(ctx: MethodContext, channel: string, needMem
   return conversation
 }
 
+/** Slack's code for a name it would refuse, as `conversations.create` and `.rename` check it with validation on (research `slack-channels.md`). */
+function channelNameError(name: string): string | undefined {
+  if (name === '') return 'invalid_name_required'
+  if ([...name].length > 80) return 'invalid_name_maxlength'
+  if (/\p{Extended_Pictographic}/u.test(name)) return 'invalid_emoji_not_allowed'
+  if (/[\sA-Z.,;'`~!@#$%^&*+=)(\\/:"<>?|\u2018\u2019{}[\]]/.test(name)) return 'invalid_name_specials'
+  if (/^[-_]+$/.test(name)) return 'invalid_name_punctuation'
+  return undefined
+}
+
+/** A channel the user is in and may change: not a DM, a group DM or an archived channel. */
+function requireEditable(ctx: MethodContext, channel: string) {
+  const conversation = requireConversation(ctx, channel, true)
+  if (conversation instanceof ApiError) return conversation
+  if (conversation.kind === 'im' || conversation.kind === 'mpim') return new ApiError('method_not_supported_for_channel_type')
+  if (conversation.archived) return new ApiError('is_archived')
+  return conversation
+}
+
 /** A message as pages carry it: its channel, thread fields, and reactors cut as Slack cuts them (`reactors.ts`). */
 function withChannel(ws: Workspace, channel: string, message: Message): Message {
   return ws.withThreadFields({ ...withListedReactors(message), channel })
@@ -297,9 +316,59 @@ export const coreMethods = {
   },
 
   'conversations.create': (ctx, args) => {
-    if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(args.name)) return new ApiError('invalid_name_specials')
+    const invalid = channelNameError(args.name)
+    if (invalid !== undefined) return new ApiError(invalid)
     const created = ctx.workspace.create(args.name, args.is_private === true ? 'private' : 'public')
     return created === 'name_taken' ? new ApiError('name_taken') : { channel: ctx.workspace.channelObject(created) }
+  },
+
+  'conversations.rename': (ctx, args) => {
+    const conversation = requireEditable(ctx, args.channel)
+    if (conversation instanceof ApiError) return conversation
+    if (conversation.name === 'general') return new ApiError('not_authorized')
+    const invalid = channelNameError(args.name)
+    if (invalid !== undefined) return new ApiError(invalid)
+    if ([...ctx.workspace.conversations.values()].some((c) => c.id !== conversation.id && c.name === args.name)) return new ApiError('name_taken')
+    if (conversation.name !== args.name) ctx.workspace.rename(conversation.id, args.name)
+    return { channel: ctx.workspace.channelObject(conversation) }
+  },
+
+  // Slack's `force` adds whom it can and lists the rest; without it one bad user refuses them all.
+  'conversations.invite': (ctx, args) => {
+    const conversation = requireEditable(ctx, args.channel)
+    if (conversation instanceof ApiError) return conversation
+    const users = args.users.split(',').map((u) => u.trim()).filter((u) => u !== '')
+    if (users.length === 0) return new ApiError('no_user')
+    const issues = users.flatMap((user) => {
+      const error = user === ctx.workspace.selfId ? 'cant_invite_self' : !ctx.workspace.users.has(user) ? 'user_not_found' : conversation.members.has(user) ? 'already_in_channel' : undefined
+      return error === undefined ? [] : [{ user, ok: false, error }]
+    })
+    if (issues.length > 0 && args.force !== true) return new ApiError(issues[0]!.error)
+    const added = users.filter((user) => !issues.some((issue) => issue.user === user))
+    if (added.length === 0) return new ApiError(issues[0]?.error ?? 'no_user')
+    for (const user of added) ctx.workspace.join(conversation.id, user)
+    return { channel: ctx.workspace.channelObject(conversation), ...(issues.length === 0 ? {} : { errors: issues }) }
+  },
+
+  'conversations.kick': (ctx, args) => {
+    const conversation = requireEditable(ctx, args.channel)
+    if (conversation instanceof ApiError) return conversation
+    if (args.user === ctx.workspace.selfId) return new ApiError('cant_kick_self')
+    if (conversation.name === 'general') return new ApiError('cant_kick_from_general')
+    if (!conversation.members.has(args.user)) return new ApiError('not_in_channel')
+    ctx.workspace.leave(conversation.id, args.user)
+    return {}
+  },
+
+  'conversations.members': (ctx, args) => {
+    const conversation = requireConversation(ctx, args.channel)
+    if (conversation instanceof ApiError) return conversation
+    const members = [...conversation.members].toSorted()
+    const limit = args.limit ?? 100
+    const start = args.cursor === undefined || args.cursor === '' ? 0 : Number(Buffer.from(args.cursor, 'base64').toString('utf8').slice('at:'.length))
+    const page = members.slice(start, start + limit)
+    const next = start + limit < members.length ? Buffer.from(`at:${start + limit}`).toString('base64') : ''
+    return { members: page, response_metadata: { next_cursor: next } }
   },
 
   'conversations.open': (ctx, args) => {
