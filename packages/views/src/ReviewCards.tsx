@@ -37,8 +37,8 @@ export const oldDraftsCopy = {
   about: {
     label: 'What Delete does',
     lines: [
-      'Deletes the draft in Juno. It was never sent, so nothing changes in Slack.',
-      'Undo puts it back as it was.',
+      'Deletes the draft in Juno and in Slack, on all your devices.',
+      'Undo puts it back as it was, in both.',
       'Keep stops Juno suggesting this draft. Editing it starts the two weeks again.',
     ],
     settings: settledCopy.settings,
