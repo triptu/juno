@@ -82,12 +82,14 @@ async function release() {
     say(`restored ${latest.tagName} on origin/main; no publish needed`)
     return
   }
+  // Everything that changes the shipped app: its code and assets, and how it is built and packaged.
+  const shippedPaths = ['apps/desktop/src', 'assets', ':(glob)packages/*/src/**', ':(glob)apps/desktop/*.vite.ts', 'apps/desktop/electron.vite.config.ts', 'apps/desktop/electron-builder.yml', 'apps/desktop/build', 'apps/desktop/package.json', ':(glob)packages/*/package.json', 'bun.lock']
   const tip = git(root, 'rev-parse', 'origin/main')
   const previous = latest ? previousCommit(latest.tagName) : undefined
   say(`origin/main ${tip}; last release ${latest ? `${latest.tagName} from ${previous}` : 'none'}`)
   if (tip === previous) { say('no action: origin/main is already released'); return }
   if (previous && !isAncestor(root, previous, tip)) throw new Error('origin/main does not descend from the last released source; refusing a rollback')
-  const subjects = git(root, 'log', '--no-merges', '--reverse', '--format=%s', previous ? `${previous}..${tip}` : tip, '--', 'apps/desktop/src', 'assets', ':(glob)packages/*/src/**').split('\n')
+  const subjects = git(root, 'log', '--no-merges', '--reverse', '--format=%s', previous ? `${previous}..${tip}` : tip, '--', ...shippedPaths).split('\n')
   const changes = userFacingChanges(subjects)
   if (changes.length === 0) { say('no action: no user-facing changes since the last release'); return }
   const current = JSON.parse(git(root, 'show', `${tip}:apps/desktop/package.json`)).version
