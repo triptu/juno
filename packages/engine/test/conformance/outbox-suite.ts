@@ -7,6 +7,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+
+/**
+ * A replay's own limit. Conformance is kept whatever it costs (docs/development.md, "Rules for tests"), and the unit
+ * lane's 5 s, which the preload sets for each worker's first file, is below the longest replays.
+ */
+const REPLAY_TIMEOUT_MS = 30_000
 import { readTrace, type Trace } from './itf'
 import { outboxSpec } from './outbox'
 import { explain, json, replay } from './replay'
@@ -85,13 +91,15 @@ export function outboxConformance(index: number) {
           // already in a state the corrected schedule reaches after the fork (Juno's own steps ran ahead).
           const early = outcome.to < at && corrected.states.slice(at).some((_, i) => json(outcome.actual) === json(outboxSpec.expected(corrected.states, at + i)))
           if (!(outcome.from <= at && at <= outcome.to) && !early) throw new Error(`diverged before the bug, which is at step ${at}:\n${explain(trace, outcome)}`)
-        })
+        // Slow: replays a Quint schedule through a real engine and fake, round by round (up to 5 s on the laptop).
+        }, REPLAY_TIMEOUT_MS)
       } else {
         it(`follows ${entry.file}`, async () => {
           const replayed = entry.kind === 'random' ? settled(trace) : trace
           const outcome = await replay(outboxSpec, replayed)
           if (!outcome.ok) throw new Error(explain(replayed, outcome))
-        })
+        // Slow: replays a Quint trace through a real engine and fake, step by step (1.2 s median, up to 5 s on the laptop).
+        }, REPLAY_TIMEOUT_MS)
       }
     }
   })
