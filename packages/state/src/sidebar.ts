@@ -78,6 +78,12 @@ export interface SidebarWindow extends ListWindow<TopicRow> {
   readonly held?: boolean
   /** Kept out of recency order while a sync cycle ran (`keepPainted`): it takes the true order once the cycle ends. */
   readonly kept?: boolean
+  /**
+   * The true order a kept list took when its cycle ended. Every row it moves
+   * was held for a change from elsewhere, so it slides even when the last
+   * write, kept in `meta.own`, was the user's (`sidebarSections.ts`).
+   */
+  readonly settled?: boolean
 }
 
 /**
@@ -190,6 +196,8 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
       const order = keepPainted(shown, next, status._tag === 'Success' ? status.value.startedAt : Infinity)
       return { ...next, order, filter, quietDays, ...(sameOrder(order, next.order) ? {} : { kept: true }) }
     }
+    // The settle moves only rows held for changes from elsewhere: it slides, whatever the last write was.
+    if (shown.meta === next.meta) return { ...next, filter, quietDays, ...mark, settled: true }
   }
   return { ...next, filter, quietDays, ...mark }
 })
