@@ -18,11 +18,11 @@ export const draftsFeature = {
       return typeof draft === 'string' ? new ApiError(draft) : { draft }
     },
     'drafts.update': (ctx, args) => {
-      const draft = ctx.workspace.drafts.update({ draftId: args.draft_id, blocks: args.blocks, destinations: args.destinations, fileIds: args.file_ids })
+      const draft = ctx.workspace.drafts.update({ draftId: args.draft_id, blocks: args.blocks, destinations: args.destinations, fileIds: args.file_ids, clientLastUpdatedTs: args.client_last_updated_ts })
       return typeof draft === 'string' ? new ApiError(draft) : { draft }
     },
     'drafts.delete': (ctx, args) => {
-      const failure = ctx.workspace.drafts.delete(args.draft_id)
+      const failure = ctx.workspace.drafts.delete(args.draft_id, args.client_last_updated_ts)
       return failure === undefined ? {} : new ApiError(failure)
     },
   },

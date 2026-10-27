@@ -5,8 +5,10 @@
  * kept as records that refuse updates (`draft_update_invalid`) and deletes
  * (`draft_delete_invalid`), every write echoed on the socket to the writing
  * client too, and a post that names a draft (`draft_id`, its id or its
- * `client_msg_id`) retiring it with `draft_send`. `client_last_updated_ts`
- * is accepted and not checked: live, only absurd values were refused.
+ * `client_msg_id`) retiring it with `draft_send`. An update or delete whose
+ * `client_last_updated_ts` is not a plausible epoch-milliseconds time (below
+ * 2e9, as `1000`, `0` or a time in seconds) answers `draft_has_conflict`, as
+ * live; any later value is accepted, in any order.
  */
 import type { Blocks, Draft, DraftDestination } from '@juno/slack-schema'
 import { blocksToText, textToBlocks } from './richtext.ts'
@@ -32,7 +34,10 @@ const placeKey = (destinations: ReadonlyArray<DraftDestination>): string | undef
   return first.thread_ts === undefined ? first.channel_id : `${first.channel_id}-${first.thread_ts}`
 }
 
-export type DraftFailure = 'attached_draft_exists' | 'draft_not_found' | 'draft_update_invalid' | 'draft_delete_invalid' | 'invalid_channel' | 'invalid_destinations_count'
+export type DraftFailure = 'attached_draft_exists' | 'draft_not_found' | 'draft_update_invalid' | 'draft_delete_invalid' | 'draft_has_conflict' | 'invalid_channel' | 'invalid_destinations_count'
+
+/** Live, only values below about 2e9 (not plausible milliseconds) answered `draft_has_conflict` (research section 3). */
+const plausible = (clientLastUpdatedTs: string | undefined): boolean => clientLastUpdatedTs === undefined || Number(clientLastUpdatedTs) >= 2e9
 
 export class DraftStore {
   readonly #ws: Workspace
@@ -107,9 +112,10 @@ export class DraftStore {
     return draft
   }
 
-  update(input: { readonly draftId: string; readonly blocks: Blocks; readonly destinations: ReadonlyArray<DraftDestination>; readonly fileIds: ReadonlyArray<string> }, at?: number): Draft | DraftFailure {
+  update(input: { readonly draftId: string; readonly blocks: Blocks; readonly destinations: ReadonlyArray<DraftDestination>; readonly fileIds: ReadonlyArray<string>; readonly clientLastUpdatedTs?: string }, at?: number): Draft | DraftFailure {
     const record = this.#records.get(input.draftId)
     if (record === undefined) return 'draft_not_found'
+    if (!plausible(input.clientLastUpdatedTs)) return 'draft_has_conflict'
     if (record.deleted || record.sent) return 'draft_update_invalid'
     record.blocks = input.blocks
     record.fileIds = input.fileIds
@@ -120,9 +126,10 @@ export class DraftStore {
     return draft
   }
 
-  delete(draftId: string): DraftFailure | undefined {
+  delete(draftId: string, clientLastUpdatedTs?: string): DraftFailure | undefined {
     const record = this.#records.get(draftId)
     if (record === undefined) return 'draft_not_found'
+    if (!plausible(clientLastUpdatedTs)) return 'draft_has_conflict'
     if (record.deleted || record.sent) return 'draft_delete_invalid'
     record.deleted = true
     record.lastUpdatedTs = this.#ws.nextTs()
@@ -142,16 +149,18 @@ export class DraftStore {
 
   /**
    * Another device types in the attached draft of a channel or thread: an
-   * update of the one there, or a new one. `at` backdates the write, as for a
-   * phone whose save reached Slack late.
+   * update of the one there, or a new one. `files` attaches that many
+   * invented files (a draft of files alone has `text: ''`). `at` backdates
+   * the write, as for a phone whose save reached Slack late.
    */
-  putFromElsewhere(input: { readonly channel: string; readonly threadTs?: string | undefined; readonly text: string; readonly at?: number | undefined }): Draft {
+  putFromElsewhere(input: { readonly channel: string; readonly threadTs?: string | undefined; readonly text: string; readonly files?: number | undefined; readonly at?: number | undefined }): Draft {
     const destinations: ReadonlyArray<DraftDestination> = [{ channel_id: input.channel, ...(input.threadTs === undefined ? {} : { thread_ts: input.threadTs }) }]
     const existing = this.#attachedAt(placeKey(destinations)!)
-    const blocks = textToBlocks(input.text)
+    const blocks = input.text === '' ? [] : textToBlocks(input.text)
+    const fileIds = input.files === undefined ? (existing?.fileIds ?? []) : Array.from({ length: input.files }, (_, i) => `F0DRAFT${String(this.#next * 10 + i).padStart(4, '0')}`)
     const result = existing === undefined
-      ? this.create({ clientMsgId: crypto.randomUUID(), blocks, destinations, fileIds: [], isFromComposer: false }, input.at)
-      : this.update({ draftId: existing.id, blocks, destinations: existing.destinations, fileIds: existing.fileIds }, input.at)
+      ? this.create({ clientMsgId: crypto.randomUUID(), blocks, destinations, fileIds, isFromComposer: false }, input.at)
+      : this.update({ draftId: existing.id, blocks, destinations: existing.destinations, fileIds }, input.at)
     if (typeof result === 'string') throw new Error(`putDraft: ${result}`)
     return result
   }
@@ -164,10 +173,10 @@ export class DraftStore {
     else this.delete(existing.id)
   }
 
-  /** The text of the live attached draft of a channel or thread, `undefined` when there is none. */
-  textAt(channel: string, threadTs?: string): string | undefined {
+  /** The live attached draft of a channel or thread, `undefined` when there is none. */
+  at(channel: string, threadTs?: string): { readonly text: string; readonly fileIds: ReadonlyArray<string> } | undefined {
     const record = this.#attachedAt(threadTs === undefined ? channel : `${channel}-${threadTs}`)
-    return record === undefined ? undefined : blocksToText(record.blocks)
+    return record === undefined ? undefined : { text: blocksToText(record.blocks), fileIds: record.fileIds }
   }
 
   /** How many live attached drafts there are. */

@@ -203,7 +203,7 @@ export class FakeSlack {
    * the write, as for a phone whose save reached Slack late. Emits
    * `draft_create` or `draft_update`.
    */
-  putDraft(input: { channel: string; threadTs?: string; text: string; at?: number }): Draft {
+  putDraft(input: { channel: string; threadTs?: string; text: string; files?: number; at?: number }): Draft {
     return this.workspace.drafts.putFromElsewhere(input)
   }
 
@@ -214,7 +214,12 @@ export class FakeSlack {
 
   /** The text of the live draft of a channel or thread, as Slack's other devices show it; `undefined` for none. */
   draftText(channel: string, threadTs?: string): string | undefined {
-    return this.workspace.drafts.textAt(channel, threadTs)
+    return this.workspace.drafts.at(channel, threadTs)?.text
+  }
+
+  /** The live draft of a channel or thread, with its files; `undefined` for none. */
+  draft(channel: string, threadTs?: string): { readonly text: string; readonly fileIds: ReadonlyArray<string> } | undefined {
+    return this.workspace.drafts.at(channel, threadTs)
   }
 
   /** The user groups self belongs to (`client.userBoot.subteams.self`). */
