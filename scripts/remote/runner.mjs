@@ -67,8 +67,32 @@ export function runnerConfig(env = process.env) {
   return { host, args: [...args, host], image: env.JUNO_RUNNER_IMAGE || `juno-toolchain:${imageTag()}`, build: !env.JUNO_RUNNER_IMAGE }
 }
 
+/**
+ * The laptop's power and speed, after tstack's check: its battery (`battery=<status> <percent>`) and the fastest of three
+ * short busy loops (`cpuloop=<ms>`), which takes about 45 ms at full speed. On 10-27 it ran unplugged until the battery
+ * read 0% and its cores ran at about 600 MHz: every desktop test took six to eight times as long, and unrelated tests
+ * failed on their timeouts. Firmware throttling does not always show in cpufreq, so the loop measures it.
+ */
+const powerProbe = `for s in /sys/class/power_supply/BAT*; do [ -r "$s/status" ] && echo "battery=$(cat "$s/status") $(cat "$s/capacity" 2>/dev/null)"; done; best=; for i in 1 2 3; do a=$(date +%s%N); awk 'BEGIN { for (i = 0; i < 2000000; i++) s += i }'; b=$(date +%s%N); t=$(( (b - a) / 1000000 )); if [ -z "$best" ] || [ "$t" -lt "$best" ]; then best=$t; fi; done; echo "cpuloop=$best"`
+/** Below this charge on battery, a run waits for power. */
+const BATTERY_MIN_PERCENT = 30
+/** Over this, the cores are throttled: about three times the loop's time at full speed, well past what other jobs on the laptop add. */
+const CPU_LOOP_MAX_MS = 150
+
+/** The laptop cannot run tests at its usual speed now; the run did not start. */
+export class RunnerNotReady extends Error {}
+
+/** Why the laptop's power or speed would fail tests that pass, or undefined. */
+function powerProblem(facts) {
+  const [status, percent] = (facts.battery ?? '').split(' ')
+  if (status === 'Discharging' && Number(percent) < BATTERY_MIN_PERCENT) return `the laptop is on battery at ${percent}% (a run needs power, or at least ${BATTERY_MIN_PERCENT}%)`
+  const loop = Number(facts.cpuloop)
+  if (Number.isFinite(loop) && loop > CPU_LOOP_MAX_MS) return `its CPUs are throttled: a loop that takes about 45 ms at full speed took ${loop} ms`
+  return undefined
+}
+
 export function checkRunner(config) {
-  const command = `echo __juno_runner_connected; ${hostCommand('check', [config.image])}`
+  const command = `echo __juno_runner_connected; ${hostCommand('check', [config.image])}; code=$?; ${powerProbe}; exit $code`
   const candidates = config.args[0] === '-4' ? [config.args, config.args.slice(1)] : [config.args]
   let reason
   for (const args of candidates) {
@@ -83,8 +107,10 @@ export function checkRunner(config) {
     if (!config.build && facts.image?.startsWith('missing')) throw new Error(`runner override image unavailable: ${config.image}`)
     const ready = /^(\d+) (pinned|quota)\b/.exec(facts.capacity ?? '')
     if (!ready || Number(ready[1]) < 1) throw new Error(`runner health check failed: ${facts.capacity || 'no valid core capacity'}`)
+    const problem = powerProblem(facts)
+    if (problem !== undefined) throw new RunnerNotReady(`runner not ready: ${problem}. Nothing ran; plug the laptop in and wait until \`bun run runner:check\` passes.`)
     config.args = args
-    return { reachable: true, cores: Number(ready[1]), pinned: ready[2] === 'pinned' }
+    return { reachable: true, cores: Number(ready[1]), pinned: ready[2] === 'pinned', ...(facts.cpuloop === undefined ? {} : { cpuLoopMs: Number(facts.cpuloop) }), ...(facts.battery === undefined ? {} : { battery: facts.battery }) }
   }
   return { reachable: false, reason }
 }
@@ -118,7 +144,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const config = runnerConfig()
     const health = checkRunner(config)
     if (!health.reachable) throw new Error(`runner unreachable: ${health.reason}. ${localHint}.`)
-    console.log(`runner: ready, ${health.cores} ${health.pinned ? 'physical cores' : 'CPUs'}; shared tstack allocator`)
+    console.log(`runner: ready, ${health.cores} ${health.pinned ? 'physical cores' : 'CPUs'}; shared tstack allocator${health.cpuLoopMs === undefined ? '' : `; CPU loop ${health.cpuLoopMs} ms`}${health.battery === undefined ? '' : `; battery ${health.battery}%`}`)
     if (process.argv[2] === '--prune') throw new Error('Use /tstack:runner for shared host maintenance')
   } catch (error) { console.error(error.message); process.exitCode = 1 }
 }

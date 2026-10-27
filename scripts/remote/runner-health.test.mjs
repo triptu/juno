@@ -5,7 +5,7 @@ import { test } from 'node:test'
 import { spawnSync } from 'node:child_process'
 import { toolFixture } from '../tool-test-fixture.mjs'
 
-test('.local probes try IPv4 first, keep the working transport and preserve IPv6 and strict failures', (t) => {
+test('.local probes try IPv4 first, keep the working transport and preserve IPv6 and strict failures; a flat battery or throttled cores refuse the run', (t) => {
   const { root: dir, env } = toolFixture(t)
   mkdirSync(join(dir, 'scripts/runner'), { recursive: true })
   writeFileSync(join(dir, 'scripts/runner/host.sh'), '# fixture host interface\n')
@@ -15,6 +15,8 @@ const ipv4 = process.argv.includes('-4');
 fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({ ipv4 }) + '\\n');
 if (process.env.TEST_HEALTH === 'auth') { console.error('Permission denied (publickey)'); process.exit(255); }
 if (process.env.TEST_HEALTH === 'broken') { console.log('__juno_runner_connected'); console.error('Docker unavailable'); process.exit(1); }
+if (process.env.TEST_HEALTH === 'battery') { console.log('__juno_runner_connected\\nos=Linux test\\narch=x86_64\\ndocker=28\\ncapacity=16 quota\\nbattery=Discharging 12\\ncpuloop=44'); process.exit(0); }
+if (process.env.TEST_HEALTH === 'throttled') { console.log('__juno_runner_connected\\nos=Linux test\\narch=x86_64\\ndocker=28\\ncapacity=16 quota\\nbattery=Charging 12\\ncpuloop=310'); process.exit(0); }
 if (ipv4 !== (process.env.TEST_HEALTH === 'ipv4')) { console.error('connect to host runner.local port 2222: Operation timed out'); process.exit(255); }
 console.log('__juno_runner_connected\\nos=Linux test\\narch=x86_64\\ndocker=28\\ncapacity=16 quota');
 `)
@@ -27,11 +29,13 @@ const config = runnerConfig(); const health = checkRunner(config); console.log(J
       env: { ...env, TSTACK_HOME: dir, PATH: `${dir}:${env.PATH}`, TEST_CALLS: calls, TEST_HEALTH: mode, JUNO_RUNNER_HOST: host }, encoding: 'utf8', timeout: 5000,
     })
   }
-  for (const mode of ['ipv4', 'ipv6', 'auth', 'broken']) {
+  // A flat battery or throttled cores refuse the run before it starts, with what to do.
+  const refused = { auth: /SSH configuration failed/, broken: /health check failed/, battery: /runner not ready: the laptop is on battery at 12%/, throttled: /runner not ready: its CPUs are throttled: .* took 310 ms/ }
+  for (const mode of ['ipv4', 'ipv6', 'auth', 'broken', 'battery', 'throttled']) {
     const result = probe(mode, 'user@runner.local')
-    if (mode === 'auth' || mode === 'broken') {
+    if (mode in refused) {
       assert.notEqual(result.status, 0)
-      assert.match(result.stderr, mode === 'auth' ? /SSH configuration failed/ : /health check failed/)
+      assert.match(result.stderr, refused[mode])
     } else {
       assert.equal(result.status, 0, result.stderr)
       assert.deepEqual(JSON.parse(result.stdout), { health: { reachable: true, cores: 16, pinned: false }, ipv4: mode === 'ipv4' })
