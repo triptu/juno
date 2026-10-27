@@ -104,7 +104,7 @@ export function AttachmentImage({ image, onOpen, tabIndex = -1 }: { readonly ima
   if (onOpen === undefined) return <div {...stylex.props(styles.imageBox(box.width, box.height))}>{picture}</div>
   const name = image.alt || 'Image'
   // The viewer shows it as a picture with no Slack file behind it: no Download or Open in Preview.
-  const file: FileView = { id: src, name, kind: 'image', ...(sized ? { width: image.width, height: image.height } : {}), thumb: { src, width: sized ? image.width! : box.width, height: sized ? image.height! : box.height }, full: src }
+  const file: FileView = { id: src, name, kind: 'image', ...(sized ? { width: image.width, height: image.height } : {}), thumb: { src, width: box.width, height: box.height }, full: src }
   return <button type="button" aria-label={`Open ${name}`} title={name} tabIndex={tabIndex} data-message-image="" onClick={() => onOpen(file)} {...stylex.props(styles.imageBox(box.width, box.height), styles.imageButton, focusRing.outside)}>{picture}</button>
 }
 
