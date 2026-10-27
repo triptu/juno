@@ -3,9 +3,8 @@ import { errorSignature } from './verify-failures.mjs'
 // A complete result in the suite log lets release gates distinguish test failures
 // from timeouts or worker crashes. Playwright's list reporter still shows retries.
 //
-// A test's time is its own: Playwright counts a worker fixture's setup in the duration of the test the worker starts
-// with, so the time of the worker warm-ups named here is left out of `durationMs` and kept as `warmupMs`.
-const WORKER_WARMUPS = new Set(['Fixture "warmStart"'])
+// A test's time is its own: setup it waits for but does not own (a shared synced start, apps/desktop/e2e/fixtures.ts)
+// adds a `warmup` annotation with its milliseconds, which is left out of `durationMs` and kept as `warmupMs`.
 
 export default class TestResultsReporter {
   errors = 0
@@ -21,11 +20,8 @@ export default class TestResultsReporter {
   // A fixture that skips its test (the gallery's cached rendering tests) ends Before Hooks with an error too, so a
   // hook error counts as setup only once its test ends without being skipped.
   hookErrors = new Map()
-  /** Each attempt's worker warm-up milliseconds. */
-  warmups = new Map()
-  onStepEnd(test, result, step) {
+  onStepEnd(test, _result, step) {
     if (this.completed === 0 && step.title === 'Before Hooks' && step.error) this.hookErrors.set(test, step.error)
-    if (step.category === 'fixture' && WORKER_WARMUPS.has(step.title)) this.warmups.set(result, (this.warmups.get(result) ?? 0) + step.duration)
   }
   onTestEnd(test, result) {
     const hookError = this.hookErrors.get(test)
@@ -38,8 +34,9 @@ export default class TestResultsReporter {
   }
   onEnd(result) {
     const tests = this.suite.allTests()
-    const own = (run) => Math.max(0, (run.duration ?? 0) - (this.warmups.get(run) ?? 0))
-    const warmup = (test) => test.results.reduce((sum, run) => sum + (this.warmups.get(run) ?? 0), 0)
+    const warmed = (run) => (run.annotations ?? []).filter((note) => note.type === 'warmup').reduce((sum, note) => sum + Number(note.description ?? 0), 0)
+    const own = (run) => Math.max(0, (run.duration ?? 0) - warmed(run))
+    const warmup = (test) => test.results.reduce((sum, run) => sum + warmed(run), 0)
     const describe = (test) => ({
       id: test.id, title: test.titlePath().filter(Boolean).join(' › '), tags: test.tags,
       file: test.location?.file?.replaceAll('\\', '/').replace(/^.*\/(apps|packages)\//, '$1/'),

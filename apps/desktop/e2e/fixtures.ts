@@ -1,4 +1,4 @@
-import { test as base, type Browser, type BrowserContext, type ElectronApplication, type Page } from '@playwright/test'
+import { test as base, type Browser, type BrowserContext, type ElectronApplication, type Page, type TestInfo } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { AgentOptions } from '../web/host/agent'
 import { HostPool } from './browser/host'
@@ -86,11 +86,6 @@ export interface WorkerFixtures {
   /** Loaded browser hosts; every lease starts a fresh engine on its test's data folder. */
   readonly hostPool: HostPool
   readonly webPages: () => Promise<WebPages>
-  /**
-   * Builds the default synced start (the browser's snapshot, shared by the run, or this worker's synced workspace in
-   * Electron) before the worker's first test, so no test's time includes the sign-in and first sync it is copied from.
-   */
-  readonly warmStart: void
 }
 
 type SyncOptions = Pick<LaunchOptions, 'timing' | 'fakeAiDelayMillis'>
@@ -118,6 +113,24 @@ async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<Sync
   } finally {
     await fake.close()
     await rm(appDir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Setup a test waits for but does not own: the run's browser snapshot, which the first worker to ask builds while
+ * the others wait, or this worker's synced workspace, which its first synced test builds. Its time goes back to the
+ * test's timeout, its lane's limit on the test's own time, and a `warmup` annotation keeps it out of the time the
+ * results reporter records (scripts/test-results-reporter.mjs).
+ */
+async function warmup<A>(testInfo: TestInfo, work: () => Promise<A>): Promise<A> {
+  const started = performance.now()
+  try {
+    return await work()
+  } finally {
+    const ms = Math.round(performance.now() - started)
+    // Slow: gives back only the time of setup the test does not own.
+    if (testInfo.timeout > 0) testInfo.setTimeout(testInfo.timeout + ms)
+    testInfo.annotations.push({ type: 'warmup', description: String(ms) })
   }
 }
 
@@ -180,20 +193,6 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     },
     { scope: 'worker' },
   ],
-  warmStart: [
-    // `display` first: an Electron build opens on this worker's X display.
-    async ({ display: _display, webBrowser, hostPool, syncedWorkspaces }, use, workerInfo) => {
-      const project = workerInfo.project.name
-      if (project === 'browser') await webSnapshot(await webBrowser(), hostPool, { timing: 'fast' })
-      if (project === 'electron') {
-        const options: SyncOptions = { timing: launchTiming({}) }
-        await syncedWorkspaces.get(await syncedKey(options), (dir) => buildSynced(dir, options))
-      }
-      await use()
-    },
-    // Slow: the first worker builds the browser's snapshot while the others wait for it; an Electron worker signs in and syncs once.
-    { scope: 'worker', auto: true, timeout: 120_000 },
-  ],
   freshContext: [false, { option: true }],
   webPage: async ({ lane, webPages, viewport, permissions, freshContext }, use) => {
     if (lane !== 'web') return use(undefined)
@@ -206,12 +205,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     }
   },
   synced: [false, { option: true }],
-  syncedStart: async ({ synced, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis, lane, webBrowser, hostPool }, use) => {
+  syncedStart: async ({ synced, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis, lane, webBrowser, hostPool }, use, testInfo) => {
     if (!synced) return use(undefined)
     // AI jobs keep working after the first sync, so a copy would hold titles and art a fresh sign-in has not made yet.
     if (aiJobs) throw new Error('synced: true does not combine with aiJobs: true; sign in instead.')
     if (lane === 'web') {
-      const snapshot = await webSnapshot(await webBrowser(), hostPool, { timing: timing ?? 'fast', ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) })
+      const snapshot = await warmup(testInfo, async () => webSnapshot(await webBrowser(), hostPool, { timing: timing ?? 'fast', ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }))
       const fake = await matchingWebFake(snapshot)
       try {
         if (snapshotState(fake) !== snapshot.fakeState || fake.server.sockets.size !== 0) throw new Error('The new fake does not match the synced snapshot, or already has a socket.')
@@ -223,7 +222,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     }
     const options: SyncOptions = { timing: launchTiming(timing === undefined ? {} : { timing }), ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }
     const key = await syncedKey(options)
-    let workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options))
+    let workspace = await warmup(testInfo, () => syncedWorkspaces.get(key, (dir) => buildSynced(dir, options)))
     let fake: FakeSlack
     try {
       fake = await matchingFake(workspace)
