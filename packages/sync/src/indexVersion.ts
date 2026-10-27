@@ -18,6 +18,8 @@
  * (`thread_ranges`), not when the stored replies reach `reply_count`. 8:
  * Juno's own posts Slack has not stored yet count as the user's messages
  * when queued, so a send moves its topic before Slack answers. 9: a post
- * Slack refused is no activity until it is retried.
+ * Slack refused is no activity until it is retried. 10: the draft sync
+ * change touched the files the index reads (posts, write, markup); the
+ * rows should not differ, and the bump only makes the next start check.
  */
-export const INDEX_VERSION = 9
+export const INDEX_VERSION = 10
