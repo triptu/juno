@@ -24,7 +24,7 @@ With the diagnostic patch removed, three isolated after runs all passed under th
 | Uncertain write and clean relaunch | 5.90, 5.79, 5.82 s |
 | Backup, move and restore crash | 6.48, 6.63, 6.74 s |
 
-These are test-duration observations, not a product performance benchmark. The durable-message test has no backoff to shorten and its small increase is consistent with launch variation.
+The three isolated after samples preceded the final assertion-order tightening; the two-worker checks below use that final ordering. These are test-duration observations, not a product performance benchmark. The durable-message test has no backoff to shorten and its small increase is consistent with launch variation.
 
 The overlapping runs are single observations under different shared load, not an end-to-end speedup estimate. Their job CPU busy shares were 63% and 74%; the latter also spent more time launching and syncing. The engine journey’s launch grew from 0.60 to 0.93 s and its sync waits from 0.51 to 2.01 s. In the after trace, both crash backoffs are 50–52 ms; slower total time does not come from those timers. The historical 26.6 s full-run observation was not reproduced with one Electron worker.
 
@@ -84,8 +84,10 @@ A direct check of the backoff configuration also passed: any missing e2e/fast/fa
 
 ## Combined desktop worker count
 
-The first `bun run affected` passed typecheck, lint and 28 DOM tests, but its combined desktop step and both changed-spec repetitions timed out the engine journey at 15 s. It launched eight Electron workers on eight allocated threads (four physical cores), alongside browser workers. The focused repeats also had eight apps competing at once. This is different from the full run’s two Electron workers with a 30 s lower-priority limit.
+The first `bun run affected` passed typecheck, lint and 20 DOM tests, but its combined desktop step and both changed-spec repetitions timed out the engine journey at 15 s. It launched eight Electron workers on eight allocated threads (four physical cores), alongside browser workers. The focused repeats also had eight apps competing at once. This is different from the full run’s two Electron workers with a 30 s lower-priority limit.
 
-A controlled worker-setting check used the same four-core job, tag selection, desktop step and two repetitions, with `JUNO_E2E_WORKERS=2`. Every test passed. The complete desktop step went from 82 s (one failure) to 79 s (57 passes); the engine journey took 12.20 s, durable-message recovery 2.77 s, uncertain-write recovery 5.63 s and backup 6.84 s. The repeated engine journeys took 10.50 and 10.52 s. This is one run per setting, so the wall times show no observed throughput penalty for that step, not a statistical speedup. The repeated-spec step queues more tests with two workers and takes longer, while passing its per-test limits.
+A controlled worker-setting check used the same four-core job, tag selection, desktop step and two repetitions, with `JUNO_E2E_WORKERS=2`. Every test passed. The complete desktop step went from 82 s (one failure) to 79 s (57 passes); the engine journey took 12.20 s, durable-message recovery 2.77 s, uncertain-write recovery 5.63 s and backup 6.84 s. The repeated engine journeys took 10.50 and 10.88 s. This is one run per setting, so the wall times show no observed throughput penalty for that step, not a statistical speedup. The repeated-spec step queues more tests with two workers and takes longer, while passing its per-test limits.
 
 `scripts/remote/workers.sh` now defaults to one Electron worker per four allocated threads for jobs with at least eight threads. Smaller allocations, explicit `JUNO_E2E_WORKERS` overrides and the full plan’s own lane allocation are unchanged. The old large-allocation override to one worker per thread was incompatible with the new 15 s test limit. Logs: `affected.log` and `two-workers.log` in the scratch folder.
+
+The four recovery tests passed ten stress repetitions each (40 test executions plus two setup checks). After tightening the draft assertion order, the engine journey passed ten further stress repetitions (plus two setup checks), with no retries or failures. `bun run verify:main --ref HEAD --smoke` passed after the runner change; its smoke record does not approve a release. Logs: `stress-wait.log`, `stress-final.log`, `smoke.log`.
