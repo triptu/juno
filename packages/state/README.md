@@ -21,7 +21,8 @@ The renderer's bridge to the engine: its client and every atom. The only package
   - `tabsAtom`: the signed-in workspace's tabs, read back from the `tabs` workspace preference after a restart (each tab with the place it shows; history and the reopen stack are in memory only). `updateTabs(registry, rule)` applies a rule and saves the result; nothing else changes them.
   - `tabStripAtom`: the tabs with their `TopicDetail`, for the strip and its unread dot. `historyStateAtom`: whether the active tab can go Back and Forward. `scrollSnapshotAtom(topicId)`: where a topic was scrolled, kept while the app runs.
 - `slackLink(workspaceUrl, topic)` in `src/links.ts`: a topic's Slack link, built with no API call. `messageLink(workspaceUrl, channel, ts, threadTs?)` is a message's.
-- `runAction(registry, route, payload, toast)` and `undoLast(registry)` in `src/undo.ts`: run a user's action, keep the undo the engine returned (`undoStackAtom`, at most 20) and show the toast (`toastAtom`); replay the newest undo on ⌘Z or the toast's Undo (ADR 0010).
+- `runAction(registry, route, payload, toast)` and `undoLast(registry)` in `src/undo.ts`: run a user's action, keep the undo the engine returned (`undoStackAtom`, at most 20) and show the toast (`toastAtom`); replay the newest undo on ⌘Z or the toast's Undo (ADR 0010). `offerUndo(registry, undo, toast)` does the keeping and the toast for a caller whose words depend on the command's answer (Edit channel's Save).
+- `channelSheetAtom` in `src/channels.ts`: the channel sheet (SPEC 5, "Channel sheet"), closed, a new channel with ⌘K's text, or a channel to edit with what the user may change in it.
 - `renamingAtom`, `rowRenamingAtom(id)` and `headerRenamingAtom(id)` in `src/rename.ts`: which title is a field for Rename.
 - Sidebar state in `src/sidebar.ts`, none of it persisted. The list container and its rows read only these:
   - `sidebarFilterAtom` (kind, unread, scope) and `selectedTopicAtom`.

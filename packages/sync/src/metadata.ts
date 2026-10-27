@@ -1,7 +1,7 @@
 /** Conversation snapshots keep socket observations made while their reads are in flight. */
 import type { Channel } from '@juno/slack-schema'
 import type { ConversationRow } from '@juno/store'
-import { StoreWriter } from '@juno/store'
+import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { patchConversation, setMembership, toConversationRow, upsertConversations } from './write'
 
@@ -40,6 +40,9 @@ export const observeMetadata = (fence: MetadataFence, channel: Channel) => Effec
     ...(channel.purpose === undefined ? {} : { purpose: row.purpose }),
     ...(channel.created === undefined ? {} : { created: row.created }),
     ...(channel.updated === undefined ? {} : { updated: row.updated }),
+    ...(channel.is_general === undefined ? {} : { is_general: row.is_general }),
+    ...(channel.is_ext_shared === undefined ? {} : { is_ext_shared: row.is_ext_shared }),
+    ...(channel.creator === undefined ? {} : { creator: row.creator }),
     ...(channel.is_channel === undefined && channel.is_group === undefined && channel.is_private === undefined && channel.is_im === undefined && channel.is_mpim === undefined && channel.user === undefined ? {} : { kind: row.kind }),
   }
   const sql = yield* StoreWriter
@@ -68,3 +71,20 @@ export const storeMembership = (read: MetadataRead, ids: ReadonlyArray<string>, 
     }
     yield* setMembership(ids.filter((id) => read.get(id)?.is_member === undefined), true)
   })
+
+/**
+ * Juno's own rename of a channel, stored as the socket's `channel_rename`
+ * would store it: at once when the user saves, then Slack's answer, or the
+ * old name back when Slack refuses. With `from`, only while the channel
+ * still has that name, so a rename from elsewhere since then stays.
+ */
+export const applyRenamed = (fence: MetadataFence, channel: string, name: string, from?: string): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  transaction(
+    Effect.gen(function* () {
+      const sql = yield* StoreWriter
+      const [row] = yield* sql<{ name: string | null }>`SELECT name FROM conversations WHERE id = ${channel}`
+      if (row === undefined || (from !== undefined && row.name !== from)) return false
+      if (row.name !== name) yield* patchMetadata(fence, channel, { name })
+      return true
+    }),
+  )

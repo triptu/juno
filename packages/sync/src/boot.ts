@@ -34,8 +34,8 @@
  * the followed threads over the window and checks the follows it left out;
  * `runSync` schedules it at most hourly.
  */
-import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId } from '@juno/domain'
-import type { CountEntry } from '@juno/slack-schema'
+import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId, type WorkspaceRole } from '@juno/domain'
+import type { CountEntry, User } from '@juno/slack-schema'
 import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import type { Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
@@ -87,6 +87,12 @@ export const QUICK_START_KEY = 'quickStart'
 export const HOME_READY_KEY = 'homeReady'
 /** `sync_state.me`: the user and their user groups, so a command outside the sync re-indexes with the same mention rules. */
 export const ME_KEY = 'me'
+/** `sync_state.selfRole`: the user's `WorkspaceRole`, for what a channel's menu offers (`channelEditRights`). */
+export const SELF_ROLE_KEY = 'selfRole'
+
+/** The user's place in the workspace, from `client.userBoot`'s `self`. */
+const roleOf = (self: User): WorkspaceRole =>
+  self.is_owner === true || self.is_primary_owner === true ? 'owner' : self.is_admin === true ? 'admin' : self.is_restricted === true || self.is_ultra_restricted === true ? 'guest' : 'member'
 
 /** What `sync_state.boot` records once a boot completes. */
 export interface BootState {
@@ -144,6 +150,7 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean, lane: 'interactive'
       Effect.gen(function* () {
         yield* upsertTeam(boot.team, selfId, prefs, undefined)
         yield* setSyncState(ME_KEY, ctx.me)
+        yield* setSyncState(SELF_ROLE_KEY, roleOf(boot.self))
         if (boot.team.avatar_base_url) yield* setSyncState(AVATAR_BASE_KEY, boot.team.avatar_base_url)
         yield* upsertUsers([boot.self])
         yield* storeMetadata(observed, [...boot.channels.map((c) => toConversationRow(c)), ...boot.ims.map((im) => toConversationRow(im))])

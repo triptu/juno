@@ -148,6 +148,7 @@ export {
   sendMessage,
 } from './send'
 export { forwardMessage, forwardSheetAtom, type ForwardSheetState } from './forward'
+export { channelSheetAtom, type ChannelSheetState } from './channels'
 export { errorOf } from './result'
 export {
   aiAssistOnAtom,
@@ -218,6 +219,7 @@ export { parseSlackLink, messageLink, slackLink, threadRootTs, type SlackLinkMat
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {
   dismissToast,
+  offerUndo,
   runAction,
   showToast,
   TOAST_LIFE_MS,

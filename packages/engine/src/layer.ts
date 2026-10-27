@@ -23,6 +23,7 @@ import { DevLog } from './devLog'
 import { DevLogHandlers } from './devLogRoutes'
 import { AiSpend } from './aiSpend'
 import { ArtHandlers } from './art/handlers'
+import { ChannelsHandlers } from './channels/handlers'
 import { ArtJob } from './art/job'
 import { HomeHandlers } from './home/handlers'
 import { HuddleHandlers } from './huddle/handlers'
@@ -134,6 +135,7 @@ export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHa
   Layer.merge(DevLogHandlers),
   Layer.merge(PicturesHandlers),
   Layer.merge(WhoReactedHandlers),
+  Layer.merge(ChannelsHandlers),
 )
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */

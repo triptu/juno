@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { sidebarLayoutAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Shell } from '@juno/views'
+import { Channel } from './Channel'
 import { Forward } from './Forward'
 import { HuddleSharePicker } from './huddle/slots'
 import { collapseSidebar, resetSidebarWidth, resizeSidebar } from './layout'
@@ -32,6 +33,7 @@ export function Frame({ sidebar, peek, children }: { readonly sidebar: ReactNode
           <Palette />
           <MessageMenuHost />
           <Forward />
+          <Channel />
           <HuddleSharePicker />
         </>
       }

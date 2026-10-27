@@ -120,8 +120,10 @@ export interface TopicFetcher {
   readonly newer: (topicId: string, after: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores the message `ts` in full for a jump to it (`fetchAt`). Concurrent jumps to one message share the read. */
   readonly at: (topicId: string, ts: string) => Effect.Effect<FetchReport, OpenError>
-  /** Stores a DM-open answer through the running metadata fence. */
+  /** Stores a DM-open or channel-create answer through the running metadata fence. */
   readonly opened: (channel: Parameters<typeof applyOpened>[1]) => Effect.Effect<void, SqlError>
+  /** Stores Juno's own channel rename through the running metadata fence (`applyRenamed`). False when `from` no longer matched. */
+  readonly renamed: (channel: string, name: string, from?: string) => Effect.Effect<boolean, SqlError>
   /** Stores what Juno's own send got back, in the sync's context (`applySent`). */
   readonly sent: (sent: Parameters<typeof applySent>[1]) => Effect.Effect<void, SqlError>
   /** Stores an edit, delete, reaction or broadcast Slack accepted, with `alongside` in the same transaction (`applyActed`). */

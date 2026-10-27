@@ -14,6 +14,7 @@ import * as Atom from 'effect/reactivity/Atom'
 import type { Rpc } from 'effect/rpc'
 import {
   artRestore,
+  channelsEdit,
   channelsFollowNew,
   channelsIgnore,
   channelsUnignore,
@@ -108,6 +109,12 @@ export async function runActionExit<R extends Rpc.Any>(
   return exit
 }
 
+/** Keeps an undo a command returned and shows `toast` with Undo, for a caller whose toast depends on the command's answer. */
+export function offerUndo(registry: Registry, undo: UndoCommand, toast: ToastContent): void {
+  registry.set(undoStackAtom, [...registry.get(undoStackAtom), undo].slice(-UNDO_LIMIT))
+  showToast(registry, toast, true)
+}
+
 /** Replays the newest undo and hides the toast. Resolves with false when there was nothing to undo. */
 export async function undoLast(registry: Registry): Promise<boolean> {
   const currentToast = registry.get(toastAtom)
@@ -178,5 +185,7 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, followUpsRestore, payloadOf(undo))
     case 'drafts.restore':
       return runCommand(registry, draftsRestore, payloadOf(undo))
+    case 'channels.edit':
+      return runCommand(registry, channelsEdit, payloadOf(undo))
   }
 }

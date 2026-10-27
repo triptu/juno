@@ -160,6 +160,7 @@ Observed. Source: generated fetcher registry (`vendors`, `vendors-client`, one m
 Listing conversations
 - `client.userBoot` / `client.channels` (section 2) are what the client uses. `conversations.list`, `users.conversations` are not used by the client (`conversations.list` only appears in the async vendors chunk); use userBoot + `client.counts`.
 - `client.dms` fetcher exists (DM list). `conversations.info`, `conversations.genericInfo`, `conversations.members`, `conversations.open`, `conversations.close` exist.
+- Making and editing channels (`conversations.create`, `.rename`, `.invite`, `.kick`, `.members`, and how the client decides who may) is in [slack-channels.md](slack-channels.md).
 
 History (`shared`, module with `fetchHistory`/`fetchReplies`, around `determineDefaultHistoryLimit`)
 - `conversations.history` args: `{ channel, limit (default 28), oldest?, latest?, inclusive: true, ignore_replies: true, include_pin_count: true, no_user_profile: true, include_stories: true, include_free_team_extra_messages: true, include_date_joined?, include_tombstones?, cursor?, cached_latest_updates: {[ts]: version} }`. Response: `{ messages, has_more, is_limited, pin_count, channel_actions_count, deleted: Ts[], response_metadata: { next_cursor? }, latest_updates?, unchanged_messages?: Ts[], date_joined? }`.

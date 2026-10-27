@@ -22,6 +22,7 @@ export type TopicMenuAction =
   | NotifyAction
   | 'follow-new'
   | ViewMenuAction
+  | 'edit-channel'
   | 'ignore-channel'
   | 'juno-knows'
   | 'how-auto'
@@ -36,6 +37,7 @@ export type ChannelMenuAction =
   | 'how-auto'
   | 'follow-new'
   | ViewMenuAction
+  | 'edit-channel'
   | 'ignore-channel'
   | 'ask-juno'
 export type PersonMenuAction = 'ask-juno' | 'juno-knows' | 'how-auto'
@@ -94,7 +96,12 @@ export interface TopicMenuState {
   readonly knowsAbout?: string
   /** A channel's huddle item (SPEC 20): Start huddle, or Join huddle while one runs there. Absent: no item (a DM, whose header has the control, or while you are in this huddle). */
   readonly huddle?: HuddleMenuItem
+  /** Edit channel… on a channel's Main: the user may rename it or change its members in Slack. */
+  readonly editChannel?: boolean
 }
+
+/** Edit channel… (SPEC 5, "Channel sheet"). */
+const editChannelItem = () => item('edit-channel' as const, 'Edit channel…')
 
 /** The huddle item of a channel's menus: Start huddle, or Join huddle while one runs there. */
 export type HuddleMenuItem = 'start' | 'join'
@@ -182,6 +189,7 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   items.push(notifyMenu(state.notify))
   if (isMain && state.followNew !== undefined) items.push(followNewItem(state.followNew))
   if (isMain && state.views !== undefined) items.push(addToViewMenu<TopicMenuAction>(state.views))
+  if (isMain && state.editChannel === true) items.push(editChannelItem())
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
   if (state.knowsAbout !== undefined) items.push(separator, item('juno-knows', knowsAbout(state.knowsAbout)))
   return items
@@ -200,6 +208,8 @@ export interface ChannelMenuState {
   readonly views?: ReadonlyArray<ViewChoice>
   /** Start huddle or Join huddle, as in the topic menu. Absent: no item. */
   readonly huddle?: HuddleMenuItem
+  /** The user may rename the channel or change its members in Slack: Edit channel… shows. */
+  readonly editChannel?: boolean
 }
 
 /** The channel menu (inventory 15.2): a channel row in Browse, the header's context pill, a #channel chip. */
@@ -212,6 +222,7 @@ export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuIte
   if (state.notify !== undefined) items.push(notifyMenu(state.notify))
   if (state.followNew !== undefined) items.push(followNewItem(state.followNew))
   if (state.views !== undefined) items.push(addToViewMenu<ChannelMenuAction>(state.views))
+  if (state.editChannel === true) items.push(editChannelItem())
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
   if (state.askJuno === true) items.push(separator, item('ask-juno', 'Ask Juno'))
   return items

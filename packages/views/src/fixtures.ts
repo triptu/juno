@@ -71,6 +71,7 @@ import JunoHeader from './juno-chat/JunoHeader.fixtures'
 import OwnerBubble from './juno-chat/OwnerBubble.fixtures'
 import RemoveSheet from './juno-chat/RemoveSheet.fixtures'
 import ForwardSheet from './ForwardSheet.fixtures'
+import ChannelSheet from './ChannelSheet.fixtures'
 import StatusBubble from './juno-chat/StatusBubble.fixtures'
 import ActivityPage from './juno-pages/ActivityPage.fixtures'
 import BackupSection from './juno-pages/BackupSections.fixtures'
@@ -167,6 +168,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   RemoveCard: removeCard,
   RemoveSheet,
   ForwardSheet,
+  ChannelSheet,
   ResolveCard: resolveCard,
   RestoreSheet: restoreSheet,
   ReviewPage,

@@ -28,6 +28,9 @@ export const toConversationRow = (c: Channel | Im): ConversationRow => {
     purpose: channel.purpose?.value ?? null,
     created: c.created === undefined ? null : String(c.created),
     updated: c.updated === undefined ? null : String(c.updated),
+    is_general: channel.is_general === true ? 1 : 0,
+    is_ext_shared: channel.is_ext_shared === true ? 1 : 0,
+    creator: channel.creator ?? null,
   }
 }
 
@@ -40,7 +43,8 @@ export const upsertConversations = (rows: ReadonlyArray<ConversationRow>): Write
       yield* sql`INSERT INTO conversations ${sql.insert(row as unknown as Record<string, unknown>)}
         ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, name = excluded.name, user_id = excluded.user_id,
           member_ids_json = COALESCE(excluded.member_ids_json, conversations.member_ids_json),
-          is_archived = excluded.is_archived, topic = excluded.topic, purpose = excluded.purpose, created = excluded.created, updated = excluded.updated`
+          is_archived = excluded.is_archived, topic = excluded.topic, purpose = excluded.purpose, created = excluded.created, updated = excluded.updated,
+          is_general = excluded.is_general, is_ext_shared = excluded.is_ext_shared, creator = COALESCE(excluded.creator, conversations.creator)`
     }
     yield* invalidate(syncKeys.conversations)
   })

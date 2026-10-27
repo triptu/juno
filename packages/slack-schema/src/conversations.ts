@@ -211,10 +211,44 @@ export const ConversationsMarkFields = {} as const
 export const ConversationsCreateArgs = S.Struct({
   name: S.String,
   is_private: opt(FormBoolean),
+  /** Refuse a name Slack would otherwise change, as the official client asks. */
+  validate_name: opt(FormBoolean),
 })
 export type ConversationsCreateArgs = typeof ConversationsCreateArgs.Type
 
 export const ConversationsCreateFields = { channel: Channel } as const
+
+// conversations.rename, .invite, .kick and .members (research slack-channels.md)
+
+/** `validate`: refuse a name Slack would otherwise change, as the official client asks. */
+export const ConversationsRenameArgs = S.Struct({ channel: S.String, name: S.String, validate: opt(FormBoolean) })
+export type ConversationsRenameArgs = typeof ConversationsRenameArgs.Type
+
+export const ConversationsRenameFields = { channel: Channel } as const
+
+export const ConversationsInviteArgs = S.Struct({
+  channel: S.String,
+  /** Comma-separated user ids. */
+  users: S.String,
+  /** Add the people Slack can add and list the others in `errors`, rather than refuse them all. */
+  force: opt(FormBoolean),
+})
+export type ConversationsInviteArgs = typeof ConversationsInviteArgs.Type
+
+/** One person `force` left out, with Slack's code. */
+export const InviteIssue = S.Struct({ user: opt(S.String), ok: opt(S.Boolean), error: S.String })
+
+export const ConversationsInviteFields = { channel: opt(Channel), errors: opt(S.Array(InviteIssue)) } as const
+
+export const ConversationsKickArgs = S.Struct({ channel: S.String, user: S.String })
+export type ConversationsKickArgs = typeof ConversationsKickArgs.Type
+
+export const ConversationsKickFields = {} as const
+
+export const ConversationsMembersArgs = S.Struct({ channel: S.String, limit: opt(FormNumber), cursor: opt(S.String) })
+export type ConversationsMembersArgs = typeof ConversationsMembersArgs.Type
+
+export const ConversationsMembersFields = { members: S.Array(S.String), response_metadata: opt(ResponseMetadata) } as const
 
 // conversations.open
 

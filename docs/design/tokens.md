@@ -498,7 +498,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--reactors-min-width` | 160px: the narrowest the reaction chip's card of who reacted gets; it grows to `--menu-width` |
 | `--sidebar-inset` | 10px: the sidebar's inset on both sides (title bar end, nav, filter row, rows); the list's scrollbar gutter sits inside it on the right |
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
-| `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it |
+| `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it; also the channel sheet's member and people lists |
+| `--channel-sheet-width` | 380px: the channel sheet (inventory 2.3a), at most this wide |
 | `--toast-max-width` | 352px |
 | `--peek-width` | 640px peek popover (about 75 characters of compact message text), 8px right of the sidebar or at a Main message; as tall as its messages, up to the room in the window; never wider than the window has room for |
 | `--peek-header-height` | 44px peek header: art, title and where on one line |
