@@ -90,6 +90,11 @@ module readProtocol {
   }
   // Mark read never moves the pointer back.
   action markRead(k: int, upTo: int): bool = localChange(k, if (upTo > s.local.get(k)) upTo else s.local.get(k), false)
+  // Mark as unread sets any pointer before the latest, back or forward: the
+  // topic's (the message before the latest) and a message's (the message
+  // before that one) alike. While the flag is set, the renderer's read rule
+  // sends no Mark read from the bottom; that only narrows when `markRead` is
+  // input, which this model leaves free.
   action markUnread(k: int, value: int): bool = localChange(k, value, true)
 
   // The preference changes future marks. The worker drops unsent rows when off.
