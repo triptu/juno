@@ -81,7 +81,7 @@ Run these from the repo root.
 | `JUNO_LIVE=1 bun run react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
 | `JUNO_LIVE=1 bun run forward:live` | The live forward check: in your self-DM only, posts a message and a reply, forwards them with `chat.shareMessage` with and without a note, tries a user id as the destination and a missing message, reads the history and deletes everything it made. Field names and codes only (research `slack-forward.md`). |
 | `JUNO_LIVE=1 bun run broadcast:live` | The live check of sending an existing reply to the channel: in your self-DM only, posts a message and two replies, sends one to the channel with `chat.update` and `reply_broadcast`, tries it again, on the root and with text, reads Main and the thread, records the socket frames, and deletes everything it made. Field names and codes only (research `slack-data-access.md`, "Send an existing reply to the channel"). |
-| `JUNO_LIVE=1 bun run huddle:live` | The huddle spike (`docs/plans/huddles.md`, phase 2): joins a huddle in the private test channel `juno-huddle-test` on the cached session with `rooms.join`, runs the answer through the Chime SDK in a local Chromium page with a fake microphone, prints a status line every 10 s for `--minutes N` (default 5), and always sends `rooms.leave`. `--create-only` finds or creates the channel and exits; `--socket` also prints room frames from the socket; `--headed` shows the window so you can hear the huddle. Writes only that channel's create, join and leave. Field names, codes and counts only. `-- --fake` stops after `rooms.join`. |
+| `JUNO_LIVE=1 bun run huddle:live` | The huddle spike (`docs/plans/huddles.md`, phase 2): joins a huddle in the private test channel `juno-huddle-test` on the cached session with `rooms.join`, runs the answer through Juno's Chime session, built as the app builds its renderer (`buildLikeRenderer` in `apps/desktop/renderer.vite.ts`), in a local Chromium page with a fake microphone, prints a status line every 10 s for `--minutes N` (default 5), and always sends `rooms.leave`. `--create-only` finds or creates the channel and exits; `--socket` also prints room frames from the socket; `--headed` shows the window so you can hear the huddle. Writes only that channel's create, join and leave. Field names, codes and counts only. `-- --fake` stops after `rooms.join`. |
 | `JUNO_LIVE=1 bun scripts/dnd-live.ts` | Reads Slack's notification schedule (the `dnd_*` prefs) on the cached session and prints it. `--apply` writes Juno's notification hours into it once (`--days 1,2,3,4,5 --from 540 --to 1140`, defaults otherwise) and reads them back; `--restore '<json>'` writes a printed schedule back. Calls only `users.prefs.get` and `users.prefs.set`, and writes only schedule prefs. Your own account only (research section 7, "Live write"). |
 | `JUNO_LIVE=1 bun scripts/ephemeral-live.ts` | The live check of Slackbot's note about people mentioned outside a channel: in the private test channel `juno-ephemeral-test` only (made if missing), mentions one member who is not in it, records the note's shape and buttons, presses Dismiss with `chat.attachmentAction` and records the frames that follow, then deletes its post. `--add-them --user <id>` presses Add them instead, for a person who agreed to be added. Field names, button names and frame types only (research `integration-shapes.md`, "Buttons on a Slackbot message"). |
 | `bun run ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live bun run ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `bun run ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
@@ -1023,7 +1023,11 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   imports a lazy-only module puts it on the first screen even when nothing there calls it.
   `juno:inline-token-reads` turns a token read such as `colors['--background-subtle']` into its
   `var()` value, since Rolldown keeps a whole token group that a chunk imports
-  (`docs/performance.md`, "Vite 8 first screen").
+  (`docs/performance.md`, "Vite 8 first screen"). Rollup's CommonJS plugin rewrote a
+  dependency's reads of Node's `global`; Rolldown leaves them, and the page has no `global`.
+  Chime reads it as a call starts, so from 0.1.23 every huddle join failed (10-27).
+  `juno:node-global` defines `global` as `globalThis` in every renderer build and fails the
+  build if a chunk still reads a `global` it does not declare.
 
 Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md` ("Pitfalls") and
 `.claude/skills/stylex/SKILL.md`.
@@ -1823,6 +1827,12 @@ on this Mac instead of the laptop, for when the laptop is off; like
 7. The publisher checks the published release's assets and latest mark before
    advancing main's version. The command checks main's version and removes
    its worktree.
+
+While the full run runs, the agent also runs the live huddle check,
+`JUNO_LIVE=1 bun run huddle:live -- --minutes 1`, and stops the release if it
+does not print `media started yes` and `sent own audio yes`. Tests use a fake
+media session, so only this check joins real Chime with the code a release
+ships; 0.1.23 and 0.1.24 shipped with every huddle join failing (10-27).
 
 `JUNO_UPDATE_TOKEN` must be in its environment; the command checks this before
 the full run. Supply it through the existing secure release setup, never in a
