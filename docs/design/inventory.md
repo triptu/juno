@@ -779,6 +779,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
 | Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Always and Auto follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built M10] Through `notifications.setLevel`: on a thread the engine follows or unfollows it and keeps Always as its level; on Main it sets the channel's or DM's level |
+| Follow new threads | | checkmark while on | Main only | the channel's or DM's Follow new threads (SPEC §5), as in §15.2 |
 | Add to view | `stack` | | Main only | submenu §15.8 for the row's channel or DM |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 | — | | | | |
@@ -798,12 +799,13 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | Mark channel as unread | `circle-dot` | | always (marks the latest topic unread) |
 | — | | | |
 | Notify me | `bell` | | always (submenu §15.3) |
+| Follow new threads | | checkmark while on | always (channels, DMs and group DMs). Choosing it turns the setting on or off through `channels.followNew`, with the toast "Following new threads in #eng" or "Stopped following new threads in #eng" and Undo. While on, Juno follows each new thread in the conversation (SPEC §5) |
 | Add to view | `stack` | | always (submenu §15.8) |
 | Ignore channel | `ban` | Hide in Juno | not DM |
 | — | | | |
 | Ask Juno | `sparkle` | | AI assist on (opens the Juno panel with an "About #eng" chip, §12.1) |
 
-[built WP14] Right-clicking the header's context pill or a #channel chip shows this menu, with Notify me set from the channel's level. Mark channel as read and as unread show disabled until the engine has a channel-wide read command.
+[built WP14] Right-clicking the header's context pill or a #channel chip shows this menu, with Notify me set from the channel's level and Follow new threads from `notifications.settings` (`followNewThreads`). Mark channel as read and as unread show disabled until the engine has a channel-wide read command.
 
 ### 15.3 Notify me submenu
 
