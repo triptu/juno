@@ -138,8 +138,9 @@ function LoadedComposer({
   const unsaved = useRef<string | undefined>(undefined)
   // A save went to the store since the last one sent at once: its trip to Slack still waits for a pause.
   const toSlack = useRef(false)
-  // What this field last wrote to the store: the store coming back with it is this field's own echo.
-  const written = useRef<string | undefined>(undefined)
+  // What this field wrote to the store since the store last agreed with it: the store coming back with any
+  // of them is this field's own echo, maybe trailing quicker saves.
+  const written = useRef(new Set<string>())
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // `now`: Slack gets the draft without waiting for a pause in typing (the field lost focus, the tab hid, the window is closing).
@@ -152,7 +153,7 @@ function LoadedComposer({
       if (now) toSlack.current = false
       return
     }
-    written.current = unsaved.current
+    written.current.add(unsaved.current)
     void saveDraft(registry, id, unsaved.current, now)
     toSlack.current = !now
     unsaved.current = undefined
@@ -169,7 +170,7 @@ function LoadedComposer({
     typedSinceShown.current = false
   }, [])
   const take = (draft: string) => {
-    written.current = undefined
+    written.current.clear()
     const next = decodeDraft(draft)
     picked.current = next.picks
     setPicks(next.picks)
@@ -187,7 +188,8 @@ function LoadedComposer({
   useEffect(() => {
     behind.current = false
     // This field's own save coming back: the field may have moved on since (a link edited, more typing).
-    if (latest === encoded(text) || latest === written.current) return
+    if (latest === encoded(text)) return written.current.clear()
+    if (written.current.has(latest)) return
     if (unsaved.current !== undefined) return
     if (document.activeElement === field.current && typedSinceShown.current) {
       behind.current = true
