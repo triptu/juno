@@ -5,11 +5,17 @@
  * engine's frames handed to the page one at a time.
  */
 import type { Window } from 'happy-dom'
+import { ENGINE_SOCKET_PATH } from '../web/paths'
 import { meterOf } from './work'
 
 /** Windows `closeWindow` has closed, and each window's open sockets. */
 const closed = new WeakSet<Window>()
 const sockets = new WeakMap<Window, Set<WebSocket>>()
+
+/** Windows whose engine socket is down and cannot dial again (`engineOffline`). */
+const offline = new WeakSet<Window>()
+
+const isEngine = (url: string | URL) => new URL(url).pathname === ENGINE_SOCKET_PATH
 
 /** Windows whose engine frames reach the page one at a time (`serialFrames`). */
 const serial = new WeakSet<Window>()
@@ -145,6 +151,8 @@ export function pageSocket(window: Window): typeof WebSocket {
       super(url, protocols)
       live.add(this)
       this.addEventListener('close', () => live.delete(this))
+      // A redial while offline fails as a dropped connection would; a throw here would end the client's retries.
+      if (offline.has(window) && isEngine(url)) this.close()
       super.addEventListener('message', (event) => {
         const data = (event as MessageEvent).data
         const messages = typeof data === 'string' ? rpcMessages(data) : []
@@ -206,6 +214,16 @@ export function holdReplies(window: Window, tags: ReadonlyArray<string>): () => 
     if (held.get(window) === hold) held.delete(window)
     for (const frame of hold.frames.splice(0)) frame()
   }
+}
+
+/**
+ * Closes `window`'s engine socket, as when the engine goes away, and refuses
+ * the page's redials until the returned function lets the next one through.
+ */
+export function engineOffline(window: Window): () => void {
+  offline.add(window)
+  for (const socket of sockets.get(window) ?? []) if (isEngine(socket.url)) socket.close()
+  return () => offline.delete(window)
 }
 
 /** Whether `closeWindow` has closed `window`. */
