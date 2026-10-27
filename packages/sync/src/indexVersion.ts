@@ -1,4 +1,8 @@
 /**
+ * `bun run lint` checks reindex.ts and its transitive local dependencies
+ * against the branch point with main and requires a higher version when
+ * they change, including preview and richtext rules.
+ *
  * The meaning of `topic_index` rows. Bump it when a stored column changes
  * meaning or the rule would give a stored topic a different row; the next
  * start re-indexes every stored topic from local messages instead of
