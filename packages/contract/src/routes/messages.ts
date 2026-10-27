@@ -9,7 +9,9 @@
  *   Main's header, the topic switcher and Home's topic chip, as
  *   `ThreadSummary` rows.
  *
- * Commands, which call Slack on the interactive lane:
+ * Commands, which call Slack on the interactive lane (older and newer pages,
+ * and an open's pages after its first, on its `paging` class, which yields
+ * to an open's first page and a jump):
  * - `topics.open`: fetch what the store is missing for a topic that is being
  *   opened, back to its read pointer (at most `OPEN_FETCH_MAX` messages).
  *   Call it once when a tab shows the topic; prefetch never calls it.
@@ -312,7 +314,7 @@ export type OlderResult = typeof OlderResult.Type
 
 /**
  * Makes sure the page of messages before `before` (a message ts) is
- * stored, fetching it on the interactive lane when it is not. The window
+ * stored, fetching it when it is not, as paging on the interactive lane. The window
  * itself does not move; the container then widens `messages.list`.
  */
 export const messagesLoadOlder = Rpc.make('messages.loadOlder', {
@@ -330,7 +332,7 @@ export type NewerResult = typeof NewerResult.Type
 
 /**
  * Makes sure the replies after `after` (a thread's last shown row) are
- * stored, fetching one page on the interactive lane when the store cannot
+ * stored, fetching one page, as paging on the interactive lane, when the store cannot
  * prove them. Main answers `cached`: its window ends at its newest message.
  * The container then widens `messages.list`.
  */

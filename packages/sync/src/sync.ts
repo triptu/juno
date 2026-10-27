@@ -107,9 +107,11 @@ export interface RunSyncOptions {
 /**
  * Fetches for opened topics (`open.ts`), run in the sync's context so they
  * share its queues: stub roots get fetched and unknown senders named, both
- * in the background. On the interactive lane; when Slack rate-limits the
- * call, the same fetch is queued on the background lane and the error is
- * returned, so the caller shows what the store has.
+ * in the background. An open's first page and a jump run on the interactive
+ * lane; older and newer pages and an open's later pages on `paging`, which
+ * yields to them. When Slack rate-limits the call, the same fetch is queued
+ * on the background lane and the error is returned, so the caller shows
+ * what the store has.
  */
 export interface TopicFetcher {
   readonly open: (topicId: string) => Effect.Effect<FetchReport, OpenError>

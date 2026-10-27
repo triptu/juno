@@ -32,7 +32,9 @@
  *
  * Nothing here is called by a live query: only the engine's `topics.open`,
  * `messages.loadOlder`, `messages.loadNewer` and `messages.loadAt` commands
- * and the reconnect step do.
+ * and the reconnect step do. Each runs on the lane it is given (`FetchLane`);
+ * an open's calls after its first page run on `laterLane`, so they yield to
+ * the user's next call.
  */
 import { compareTs, parseTopicId } from '@juno/domain'
 import { SlackApi } from '@juno/slack'
@@ -40,7 +42,7 @@ import type { Message } from '@juno/slack-schema'
 import { transaction, type SqlError, StoreWriter } from '@juno/store'
 import { Effect } from 'effect'
 import type { SyncContext } from './context'
-import { HISTORY_START, MAIN_FIRST_PAGE, nowTs, OPEN_FETCH_MAX, OPEN_PAGE, storedInFull, unknownSenders, type FetchLane, type FetchReport, type OpenError, type OpenServices } from './openShared'
+import { HISTORY_START, laterLane, MAIN_FIRST_PAGE, nowTs, OPEN_FETCH_MAX, OPEN_PAGE, storedInFull, unknownSenders, type FetchLane, type FetchReport, type OpenError, type OpenServices } from './openShared'
 import { fetchThread, newerThread, olderThread, threadAt } from './openThread'
 import { applyPage, mainTopicOf } from './pages'
 import { addSyncedRange, latestSyncedRange, readState } from './write'
@@ -136,7 +138,7 @@ const fetchMain = (ctx: SyncContext, channel: string, lane: FetchLane): Effect.E
       let cursor: string | undefined
       let from = newest.from_ts
       while (true) {
-        const page = yield* historyPage(ctx, channel, { oldest: newest.to_ts, inclusive: false, limit: OPEN_PAGE, ...(cursor === undefined ? {} : { cursor }) }, lane)
+        const page = yield* historyPage(ctx, channel, { oldest: newest.to_ts, inclusive: false, limit: OPEN_PAGE, ...(cursor === undefined ? {} : { cursor }) }, cursor === undefined ? lane : laterLane(lane))
         messages.push(...page.messages)
         if (!page.more) break
         from = page.from
@@ -151,7 +153,7 @@ const fetchMain = (ctx: SyncContext, channel: string, lane: FetchLane): Effect.E
     const pointer = reads.lastReadTs
     const short = (from: string) => pointer !== undefined && from !== HISTORY_START && compareTs(from, pointer) > 0
     while (short(coveredFrom) && messages.length < OPEN_FETCH_MAX) {
-      const page = yield* historyPage(ctx, channel, { oldest: pointer!, latest: coveredFrom, inclusive: true, limit: OPEN_PAGE }, lane)
+      const page = yield* historyPage(ctx, channel, { oldest: pointer!, latest: coveredFrom, inclusive: true, limit: OPEN_PAGE }, laterLane(lane))
       messages.push(...page.messages)
       coveredFrom = page.from
       if (!page.more) break

@@ -15,9 +15,9 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
   /** Names the senders an open fetch found unknown, through `nameUsers`. */
   const nameSenders = (report: FetchReport) => Effect.sync(() => wantUsers(ctx, report.unknownUsers))
   const services = yield* Effect.context<SyncServices>()
-  const fetched = (fetch: (lane: FetchLane) => Effect.Effect<FetchReport, OpenError, SyncServices>, label: string): Effect.Effect<FetchReport, OpenError> => {
+  const fetched = (fetch: (lane: FetchLane) => Effect.Effect<FetchReport, OpenError, SyncServices>, label: string, lane: FetchLane = 'interactive'): Effect.Effect<FetchReport, OpenError> => {
     const run = (lane: FetchLane) => trackFetch(ctx, fetch(lane))
-    return run('interactive').pipe(
+    return run(lane).pipe(
       Effect.tap(nameSenders),
       Effect.tapError((error) =>
         error._tag === 'SlackRateLimited'
@@ -59,8 +59,9 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
           FiberSet.run(background, queueTopicFiles(ctx, topicId).pipe(Effect.catchCause((cause) => Effect.logWarning('sync: topic files not checked', { cause })), Effect.provide(services))).pipe(Effect.asVoid),
         ),
       ),
-    older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
-    newer: (topicId, after) => fetched((lane) => fetchNewer(ctx, topicId, after, lane), 'newer page'),
+    // Pages near a view's edge are read ahead of the user: they yield to an open or a jump.
+    older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page', 'paging'),
+    newer: (topicId, after) => fetched((lane) => fetchNewer(ctx, topicId, after, lane), 'newer page', 'paging'),
     at: (topicId, ts) => fetched((lane) => fetchAt(ctx, topicId, ts, lane), 'message page'),
     opened: (channel) => applyOpened(ctx.metadata, channel).pipe(Effect.provide(services)),
     sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),

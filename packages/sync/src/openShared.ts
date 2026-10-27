@@ -19,7 +19,17 @@ export const MAIN_FIRST_PAGE = 50
 /** The `from_ts` of a synced range that reaches the start of a conversation. */
 export const HISTORY_START = '0000000000.000000'
 
-export type FetchLane = 'interactive' | 'background'
+/**
+ * The Slack lane a fetch runs on. `interactive` for what the user asked
+ * for now: an open's first page and a jump to a message. `paging` for pages
+ * read ahead of them: older and newer pages near a view's edge, an open's
+ * later pages, the refresh of open topics after a reconnect. It yields to
+ * `interactive` (`@juno/slack` `RequestQueue`).
+ */
+export type FetchLane = 'interactive' | 'paging' | 'background'
+
+/** The lane for an open's calls after its first: they yield to the user's next call. */
+export const laterLane = (lane: FetchLane): FetchLane => (lane === 'interactive' ? 'paging' : lane)
 
 export type OpenError = SlackApiError | SqlError
 export type OpenServices = SlackApi | StoreWriter | Invalidation

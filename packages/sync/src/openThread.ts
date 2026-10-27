@@ -9,7 +9,7 @@ import type { Message } from '@juno/slack-schema'
 import { StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { connectionOf, stillConnected, type SyncContext } from './context'
-import { nowTs, OPEN_FETCH_MAX, OPEN_PAGE, storedInFull, unknownSenders, type FetchLane, type FetchReport, type OpenError, type OpenServices } from './openShared'
+import { laterLane, nowTs, OPEN_FETCH_MAX, OPEN_PAGE, storedInFull, unknownSenders, type FetchLane, type FetchReport, type OpenError, type OpenServices } from './openShared'
 import { applyPage, threadTopicOf } from './pages'
 import { continuous, pageRange, provenToEnd, rangeHolding, type ThreadRange } from './threadRanges'
 import { addThreadRange, readMessage, readState, threadRanges } from './write'
@@ -27,8 +27,9 @@ interface RepliesRange {
  * Pages of `conversations.replies` forward from `range.oldest` (the root
  * when absent), at most `max` messages. Each page lands with the range it
  * proved (`threadRanges.ts`) in one transaction, or with `atOnce` all of
- * them in one after the last. Returns what it stored and whether it reached
- * the end of the range.
+ * them in one after the last. The first call runs on `lane`, the rest on
+ * `later`. Returns what it stored and whether it reached the end of the
+ * range.
  */
 const pageReplies = (
   ctx: SyncContext,
@@ -37,7 +38,7 @@ const pageReplies = (
   range: RepliesRange,
   max: number,
   lane: FetchLane,
-  atOnce = false,
+  { atOnce = false, later = lane }: { readonly atOnce?: boolean; readonly later?: FetchLane } = {},
 ): Effect.Effect<{ readonly messages: ReadonlyArray<Message>; readonly reachedEnd: boolean }, OpenError, OpenServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
@@ -56,6 +57,7 @@ const pageReplies = (
     let cursor: string | undefined
     // Where the next page starts: after the last reply of the one before.
     let from = range.oldest
+    let onLane = lane
     while (true) {
       const requestedAt = yield* nowTs
       const connection = connectionOf(ctx)
@@ -70,8 +72,9 @@ const pageReplies = (
           ...(range.latest === undefined ? {} : { latest: range.latest }),
           ...(cursor === undefined ? {} : { cursor }),
         },
-        { lane, reason: 'open' },
+        { lane: onLane, reason: 'open' },
       )
+      onLane = later
       cursor = page.response_metadata?.next_cursor
       // More without a cursor is the end of what can be read, not of the thread: it proves only up to its last reply.
       const more = page.has_more && cursor !== undefined && cursor !== ''
@@ -143,17 +146,17 @@ export const fetchThread = (ctx: SyncContext, channel: string, threadTs: string,
     const messages: Array<Message> = []
     const newest = newestRange(before.ranges)
     if (newest === undefined) {
-      const first = yield* pageReplies(ctx, channel, threadTs, floor === undefined || floor === threadTs ? {} : { oldest: floor }, OPEN_FETCH_MAX, lane, true)
+      const first = yield* pageReplies(ctx, channel, threadTs, floor === undefined || floor === threadTs ? {} : { oldest: floor }, OPEN_FETCH_MAX, lane, { atOnce: true, later: laterLane(lane) })
       messages.push(...first.messages)
     } else {
       // From the range's edge, also while its tail is live: the replies that came as events then have a page's proof.
-      const tail = yield* pageReplies(ctx, channel, threadTs, { oldest: newest.to_ts }, OPEN_FETCH_MAX, lane)
+      const tail = yield* pageReplies(ctx, channel, threadTs, { oldest: newest.to_ts }, OPEN_FETCH_MAX, lane, { later: laterLane(lane) })
       messages.push(...tail.messages)
       const ranges = yield* pageRanges(channel, threadTs)
       const after = newestRange(ranges)
       if (floor !== undefined && after !== undefined && compareTs(after.from_ts, floor) > 0 && messages.length < OPEN_FETCH_MAX) {
         const start = rangeHolding(ranges, floor)?.to_ts ?? floor
-        const back = yield* pageReplies(ctx, channel, threadTs, { ...(start === threadTs ? {} : { oldest: start }), latest: after.from_ts }, OPEN_FETCH_MAX - messages.length, lane)
+        const back = yield* pageReplies(ctx, channel, threadTs, { ...(start === threadTs ? {} : { oldest: start }), latest: after.from_ts }, OPEN_FETCH_MAX - messages.length, laterLane(lane))
         messages.push(...back.messages)
       }
     }
