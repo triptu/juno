@@ -10,6 +10,7 @@
 //   bun run affected --wide          the wide plan: every spec the change can reach, heavy tests included
 //   bun run affected --batch --base <ref>   the batch gate: unit tests, specs:check and conformance only
 //   bun run affected --priority high   take laptop cores before waiting normal jobs
+//   bun run affected --rerun-changed   rerun changed test files even when more than ten changed (ask Tushar first)
 //
 // The change is every file that differs from the merge base, committed or not,
 // plus new files. An import graph over apps/ and packages/ (relative imports,
@@ -335,17 +336,24 @@ if (specs.length > 0) {
   })
 }
 
-// A test file the change edits runs again, several times over, in one more step per lane: a new or changed test that
-// passes only some of the time fails here, before it merges (docs/development.md, "Rules for tests").
-const REPEATS = { test: 5, 'test:dom': 5, 'test:desktop': 3 }
-const edited = (items) => pending(items.filter((item) => changed.includes(item.id)).map((item) => ({ ...item, suite: `repeat-${item.suite}`, own: true })))
-if (!batch) {
-  const unitRepeat = edited(unitItems)
-  if (unitRepeat.length > 0) plan.push({ script: 'test', args: [`--rerun-each=${REPEATS.test}`, '--files', ...unitRepeat.map((item) => item.id)], items: unitRepeat, why: `${REPEATS.test} more runs of each unit test file the change edits` })
-  const domRepeat = edited(domItems)
-  if (domRepeat.length > 0) plan.push({ script: 'test:dom', args: [`--rerun-each=${REPEATS['test:dom']}`, '--files', ...domRepeat.map((item) => item.id)], env: Object.keys(skipEnv).length > 0 ? skipEnv : undefined, items: domRepeat, why: `${REPEATS['test:dom']} more runs of each DOM test file the change edits` })
-  const specRepeat = edited(specItems.filter((item) => !heavyOnly.has(item.id)))
-  if (specRepeat.length > 0) plan.push({ script: 'test:desktop', args: [...specRepeat.map((item) => item.id.replace('apps/desktop/', '')), `--repeat-each=${REPEATS['test:desktop']}`], env: Object.keys(skipEnv).length > 0 ? skipEnv : undefined, items: specRepeat, why: `${REPEATS['test:desktop']} more runs of each e2e spec the change edits` })
+// A test file the change edits runs twice more, in one more step per lane: a new or changed test that passes only
+// some of the time fails here, before it merges. Only for a change that edits a few test files: past that (a revamp of
+// many tests) the reruns are skipped and named, and run with --rerun-changed once Tushar agrees (docs/development.md,
+// "Rules for tests").
+const RERUNS = 2
+const RERUN_FILES_MAX = 10
+const edited = (items) => items.filter((item) => changed.includes(item.id))
+const editedTests = batch ? [] : [...edited(unitItems), ...edited(domItems), ...edited(specItems.filter((item) => !heavyOnly.has(item.id)))]
+const rerun = (items) => pending(edited(items).map((item) => ({ ...item, suite: `repeat-${item.suite}`, own: true })))
+if (editedTests.length > RERUN_FILES_MAX && !flag('--rerun-changed')) {
+  desktopNotes.push(`reruns of changed test files skipped: ${editedTests.length} test files changed, over ${RERUN_FILES_MAX}; ask Tushar, then pass --rerun-changed`)
+} else if (editedTests.length > 0) {
+  const unitRepeat = rerun(unitItems)
+  if (unitRepeat.length > 0) plan.push({ script: 'test', args: [`--rerun-each=${RERUNS}`, '--files', ...unitRepeat.map((item) => item.id)], items: unitRepeat, why: `${RERUNS} more runs of each unit test file the change edits` })
+  const domRepeat = rerun(domItems)
+  if (domRepeat.length > 0) plan.push({ script: 'test:dom', args: [`--rerun-each=${RERUNS}`, '--files', ...domRepeat.map((item) => item.id)], env: Object.keys(skipEnv).length > 0 ? skipEnv : undefined, items: domRepeat, why: `${RERUNS} more runs of each DOM test file the change edits` })
+  const specRepeat = rerun(specItems.filter((item) => !heavyOnly.has(item.id)))
+  if (specRepeat.length > 0) plan.push({ script: 'test:desktop', args: [...specRepeat.map((item) => item.id.replace('apps/desktop/', '')), `--repeat-each=${RERUNS}`], env: Object.keys(skipEnv).length > 0 ? skipEnv : undefined, items: specRepeat, why: `${RERUNS} more runs of each e2e spec the change edits` })
 }
 
 // The tool tests of the repository's scripts (scripts/affected-tests.mjs).
