@@ -36,7 +36,7 @@ export const claimDraftSave = (topicId: string, now: number, retryMillis: number
     const state = yield* draftSyncRow(topicId)
     const row = state.row
     if (row === undefined || row.nextAt > now) return undefined
-    const retiring = state.slackId !== undefined && (yield* sql`SELECT 1 FROM pending_messages WHERE draft_id = ${state.slackId} AND state != 'failed' LIMIT 1`).length > 0
+    const retiring = state.slackId !== undefined && (yield* sql`SELECT 1 FROM pending_messages WHERE draft_id = ${state.slackId} LIMIT 1`).length > 0
     if (retiring) {
       yield* sql`UPDATE outbox SET next_at = ${String(now + retryMillis)} WHERE kind = 'draft' AND target_key = ${topicId}`
       return undefined
@@ -96,7 +96,7 @@ export const endDraftSave = (topicId: string, gen: number, answer: DraftAnswer, 
         const sent = keptSent(before.sent.map((each) => (each.id === answer.id && !each.texts.includes(answer.text) ? { ...each, settled: true } : each)))
         if (goneSave) settled = false
         // A create whose text went as a message: remembered by id, and settled at once when its draft is already gone.
-        if (sentCreate) state = { ...before, sent: keptSent(before.sent.map((each) => (each.clientMsgId === answer.clientMsgId ? { ...each, id: answer.id, settled: goneSave } : each))) }
+        if (sentCreate) state = { ...before, sent: keptSent(before.sent.map((each) => (each.clientMsgId === answer.clientMsgId ? { ...each, id: answer.id, seenAt: at, settled: goneSave } : each))) }
         else if (!goneSave && !older) {
           state = {
             ...before,

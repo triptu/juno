@@ -61,7 +61,7 @@ export interface PendingPost {
   readonly files: ReadonlyArray<PendingFile>
   /** Set for a forward; its text and blocks are the note. */
   readonly share: PendingShare | undefined
-  /** Slack's draft this message was, which the post names (`draft_id`) so Slack's other devices drop it. */
+  /** Slack's draft this message was, which the post names (`draft_id`) so Slack's other devices drop it; cleared once the post fails. */
   readonly draftId: string | undefined
   /** Epoch millis. */
   readonly createdAt: number
@@ -157,7 +157,9 @@ export const pendingPosts: Effect.Effect<ReadonlyArray<PendingPost>, SqlError, S
 /**
  * Moves a row from `from` to `to`, with the fields given. Answers whether
  * the row was in `from`: a row the echo reconciled meanwhile is gone, and a
- * row the user changed is in another state.
+ * row the user changed is in another state. A failed row no longer names
+ * Slack's draft: Juno may write to the draft meanwhile, so a retry posts
+ * without `draft_id` and the draft stays.
  */
 const move = (
   clientMsgId: string,
@@ -173,7 +175,8 @@ const move = (
         state = ${to},
         attempts = ${post.attempts + (fields.attempt === true ? 1 : 0)},
         next_at = ${fields.nextAt ?? post.nextAt},
-        last_error = ${fields.lastError === undefined ? post.lastError : fields.lastError}
+        last_error = ${fields.lastError === undefined ? post.lastError : fields.lastError},
+        draft_id = ${to === 'failed' ? null : (post.draftId ?? null)}
       WHERE client_msg_id = ${clientMsgId}`
     if (post.state === 'failed' || to === 'failed') yield* touch(post)
     return true

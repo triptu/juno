@@ -76,11 +76,13 @@ export interface DraftState {
 /**
  * Texts Juno sent from the place: the text the post carried, and Juno's own texts that can be on the draft
  * it went from (calls still out, lost, or an unanswered create's). The draft is Slack's `id`, or, for a create
- * Juno had no answer to, its `clientMsgId`. Settled once Slack shows that draft gone or holding another text;
- * only settled ones are forgotten.
+ * Juno had no answer to, its `clientMsgId`. Settled once Slack shows that draft gone or holding another text,
+ * or a complete list requested after Juno learned of it lacks it; only settled ones are forgotten.
  */
 export interface SentText {
   readonly id?: string
+  /** When Juno learned of draft `id`, on its clock. */
+  readonly seenAt?: number
   readonly clientMsgId?: string
   readonly texts: ReadonlyArray<string>
   readonly settled?: boolean
@@ -143,7 +145,7 @@ export function observeSlackDraft(state: DraftState, slack: SlackDraft, how: Obs
   if (stale) return { state, outcome: 'stale', save: false }
   const from = (each: SentText) => each.id === slack.id || (slack.clientMsgId !== undefined && each.clientMsgId === slack.clientMsgId)
   if (!slack.deleted && state.sent.some((each) => each.texts.some((text) => how.same(text, slack.text)))) {
-    const sent = state.sent.map((each) => (from(each) && each.id === undefined ? { ...each, id: slack.id } : each))
+    const sent = state.sent.map((each) => (from(each) && each.id === undefined ? { ...each, id: slack.id, seenAt: how.seenAt } : each))
     if (state.slackId !== slack.id && how.find !== true) return { state: { ...state, sent }, outcome: 'hidden', save: false }
     const link = { ...state, sent, slackId: slack.id, seenAt: state.slackId === slack.id && state.seenAt !== undefined ? state.seenAt : how.seenAt, slackStamp: Math.max(state.slackStamp ?? 0, slack.stamp) }
     return { state: link, outcome: 'linked', save: state.pending && !how.same(state.text, slack.text) }

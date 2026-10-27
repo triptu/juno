@@ -9,7 +9,7 @@ import { parseTopicId, type SlackDraft } from '@juno/domain'
 import { composeOutgoing, draftMarkup, type Lookups } from '@juno/richtext'
 import type { SocketEvent } from '@juno/slack'
 import { StoreWriter, transaction, type SqlError } from '@juno/store'
-import { draftTopicId, linkedDrafts, observeAbsence, observeDraft, pendingDrafts, settleDraftFinds, topicOfSlackDraft } from '@juno/sync'
+import { draftTopicId, linkedDrafts, observeAbsence, observeDraft, pendingDrafts, settleAbsentSent, settleDraftFinds, topicOfSlackDraft } from '@juno/sync'
 import { WorkControl } from './workControl'
 import type { Outbox, MirrorError } from './outbox'
 import type { OpenWorkspace, StoreServices } from './workspace'
@@ -49,8 +49,8 @@ export const applyDraftEvent = (frame: DraftFrame, seenAt: number): Effect.Effec
   })
 
 /**
- * Slack's live drafts, each applied, and the linked ones a complete list no longer has applied as deleted.
- * Returns whether another list is needed: a call was out, a draft was linked after the request, the list
+ * Slack's live drafts, each applied, and the linked ones a complete list no longer has applied as deleted;
+ * texts sent from drafts a complete list no longer has are settled. Returns whether another list is needed: a call was out, a draft was linked after the request, the list
  * was cut short, or a find or a lost call's text is still open (it began no earlier than the request, in
  * the same millisecond included).
  */
@@ -84,6 +84,7 @@ export const listDrafts = (open: OpenWorkspace, outbox: Outbox['Service']): Effe
         yield* local(transaction(observeAbsence(link.topicId, link.slackId, requestedAt, same)))
         control.onDraftWrite?.('absence', link.topicId, 'after')
       }
+      yield* local(transaction(settleAbsentSent(new Set(drafts.map((draft) => draft.id)), requestedAt)))
     }
     yield* local(transaction(settleDraftFinds(requestedAt)))
     const rows = yield* local(pendingDrafts)

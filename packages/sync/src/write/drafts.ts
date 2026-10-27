@@ -293,7 +293,8 @@ export const sendDraft = (id: string, text: string, now: number, here: boolean):
     const texts = [...new Set([text, ...(row?.sending === undefined ? [] : [row.sending]), ...(row?.unsure ?? [])])].filter((each) => each !== '')
     const unanswered = before.slackId === undefined && row !== undefined && (row.creating || row.findAt > 0 || row.unsure.length > 0) ? before.clientMsgId : undefined
     // A text with no draft Juno knows of to hold it is settled at once.
-    const sentText: SentText = before.slackId !== undefined ? { id: before.slackId, texts } : unanswered !== undefined ? { clientMsgId: unanswered, texts } : { texts, settled: true }
+    const sentText: SentText = before.slackId !== undefined ? { id: before.slackId, ...(before.seenAt === undefined ? {} : { seenAt: before.seenAt }), texts }
+      : unanswered !== undefined ? { clientMsgId: unanswered, texts } : { texts, settled: true }
     const named = here && before.slackId !== undefined && !before.hasFiles
     const leaves = !here && before.slackId !== undefined && !before.hasFiles
     const { slackId, seenAt, clientMsgId: create, ...rest } = yield* draftSyncRow(topicId)
@@ -361,4 +362,22 @@ export const observeAbsence = (topicId: string, slackId: string, requestedAt: nu
     const state = yield* draftSyncRow(topicId)
     if (state.slackId !== slackId || (state.seenAt ?? 0) >= requestedAt) return 'stale'
     return yield* observeDraft(topicId, { id: slackId, text: '', stamp: state.slackStamp ?? 0, deleted: true }, { seenAt: requestedAt, absent: true, same })
+  })
+
+/**
+ * A complete list requested at `requestedAt` holds only the live drafts in `live`. A draft a text went from that
+ * Juno learned of before the request, and the list lacks, is gone (Slack never reuses an id), so its record is
+ * settled: no event may come for a draft Juno no longer links. A create Juno has no answer to, known by its
+ * `client_msg_id` alone, stays unsettled.
+ */
+export const settleAbsentSent = (live: ReadonlySet<string>, requestedAt: number): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const topics = yield* sql<{ topic_id: string }>`SELECT topic_id FROM draft_sync WHERE EXISTS (SELECT 1 FROM json_each(COALESCE(sent_json, '[]'))
+      WHERE json_extract(value, '$.id') IS NOT NULL AND COALESCE(json_extract(value, '$.settled'), 0) = 0)`
+    for (const { topic_id: topicId } of topics) {
+      const state = yield* draftSyncRow(topicId)
+      const gone = (each: SentText) => each.settled !== true && each.id !== undefined && each.seenAt !== undefined && each.seenAt < requestedAt && !live.has(each.id)
+      if (state.sent.some(gone)) yield* writeSync({ ...state, sent: keptSent(state.sent.map((each) => (gone(each) ? { ...each, settled: true } : each))) })
+    }
   })
