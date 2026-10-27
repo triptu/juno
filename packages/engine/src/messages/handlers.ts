@@ -19,7 +19,7 @@
  * the interactive lane and report Slack's answer as an outcome, never as a
  * failure: the topic shows what the store has.
  */
-import { Clock, Effect, Schema, type Scope, Semaphore, Stream } from 'effect'
+import { Clock, Effect, Schema, type Scope, Stream } from 'effect'
 import {
   MESSAGE_WINDOW_BEFORE,
   MESSAGE_WINDOW_MAX,
@@ -91,8 +91,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           if (open === undefined) return Stream.empty
           const opened = Effect.gen(function* () {
             const query = yield* setup
-            const lane = Semaphore.makeUnsafe(1)
-            return liveQuery(keys, lane.withPermit(timed(query)))
+            return liveQuery(keys, timed(query))
           })
           return Stream.scoped(Stream.unwrap(opened).pipe(Stream.provide(open.context)))
         }),

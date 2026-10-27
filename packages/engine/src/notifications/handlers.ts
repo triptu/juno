@@ -143,15 +143,8 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       workspace.changes.pipe(
         Stream.switchMap((open) => {
           if (open === undefined) return Stream.empty
-          const run = timed(query)
-          if (tick === undefined) return liveQuery(keys, run).pipe(Stream.provide(open.context))
-          // One run at a time, for a change or a tick alike, so a run that read older values never sends after a newer one.
-          // Triggers that arrive during a run collapse into one more run.
-          return Stream.merge(liveQuery(keys, Effect.void), tick).pipe(
-            Stream.buffer({ capacity: 1, strategy: 'sliding' }),
-            Stream.mapEffect(() => Effect.result(run)),
-            Stream.provide(open.context),
-          )
+          // A tick is one more trigger of the live query, so a run that read older values never sends after a newer one.
+          return liveQuery(keys, timed(query), { triggers: tick }).pipe(Stream.provide(open.context))
         }),
       )
 

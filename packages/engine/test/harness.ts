@@ -155,6 +155,10 @@ export interface RunningEngine {
    * `reached` once it waits there, `release()` to let it write, `written` once the write is done.
    */
   readonly holdDraftWrite: (step: DraftWriteStep, topicId: string) => DraftWriteHold
+  /** Holds the next run of a minute-ticked live list (`topics.list`) after it read the store: `reached` once it waits there, `release()` to let it send. */
+  readonly holdLiveRead: (route: string) => { readonly reached: Promise<void>; readonly release: () => void }
+  /** Times the minute asked that live list for a run. */
+  readonly liveTicks: (route: string) => number
   /** Passes started so far by each worker that has run, for counting work at rest. */
   readonly passes: () => ReadonlyMap<WorkName, number>
   /** Number of actions that passed preflight and requested the send lane. */
@@ -249,6 +253,8 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let barrierSeen = 0
   const work = new Map<WorkName, { started: number; finished: number; wake?: Effect.Effect<void> }>()
   const drafts = draftHolds()
+  const liveTicks = new Map<string, number>()
+  const liveHolds = new Map<string, { readonly reach: () => void; readonly gate: Promise<void> }>()
   const stateOf = (name: WorkName) => {
     let state = work.get(name)
     if (state === undefined) { state = { started: 0, finished: 0 }; work.set(name, state) }
@@ -267,6 +273,17 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       },
       onWake: (name, wake) => { const state = stateOf(name); if (wake === undefined) delete state.wake; else state.wake = wake },
       onDraftWrite: drafts.onDraftWrite,
+      onLiveRun: (route, event) => {
+        if (event === 'tick') {
+          liveTicks.set(route, (liveTicks.get(route) ?? 0) + 1)
+          return undefined
+        }
+        const hold = liveHolds.get(route)
+        if (hold === undefined) return undefined
+        liveHolds.delete(route)
+        hold.reach()
+        return hold.gate
+      },
     },
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
@@ -346,6 +363,15 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     },
     actionsReady: () => actionsReady,
     holdDraftWrite: drafts.hold,
+    holdLiveRead: (route) => {
+      let reach = () => {}
+      let release = () => {}
+      const reached = new Promise<void>((resolve) => { reach = resolve })
+      const gate = new Promise<void>((resolve) => { release = resolve })
+      liveHolds.set(route, { reach, gate })
+      return { reached, release }
+    },
+    liveTicks: (route) => liveTicks.get(route) ?? 0,
     pendingCommands: (key) => commands.get(key) ?? 0,
     passes: () => new Map([...work].map(([name, state]) => [name, state.started])),
     workPass: async (name) => {

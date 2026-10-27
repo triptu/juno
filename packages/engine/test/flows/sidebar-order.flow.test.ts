@@ -3,7 +3,8 @@
 // moves its row while a sync cycle runs. The first window that shows the new words has the row on top:
 // the move never lags the content. An own send undone during a cycle (refused, deleted) moves its row
 // back, and rows a cycle kept in place take their true order once it ends, sliding as changes from
-// elsewhere do even when the last write was the user's.
+// elsewhere do even when the last write was the user's. The minute's run never sends a list older than
+// one already sent.
 import { afterEach, expect, it } from 'bun:test'
 import { topicsRename } from '@juno/contract'
 import {
@@ -19,6 +20,7 @@ import {
   sidebarSectionsAtom,
   type SidebarWindow,
 } from '@juno/state'
+import { controlledSleep } from '../controlledClock'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { readDb, valueOf } from '../scenario'
 import { step } from '../step'
@@ -190,4 +192,34 @@ it('during a catch-up an own send that is refused or deleted moves its row back,
     // The rows the catch-up held move as changes from elsewhere do: they slide (SPEC 5, "Letting go").
     expect(changes.find((change) => change.recent.indexOf(id) < before.indexOf(id))?.moves).toBe('animate')
   })
+})
+
+it('a run the minute asks for while a change is being read never sends the list from before that change', async () => {
+  const minute = await controlledSleep(60_000)
+  try {
+    const engine = await syncedEngine(engines, { clock: minute.clock })
+    const { registry } = engine
+    const atom = engine.topicsAtom()
+    const first = await engine.topics()
+    const id = first.order.find((other) => other.startsWith('t:'))!
+    const titles: Array<string | undefined> = []
+    unmounts.push(registry.subscribe(atom, (result) => { if (result._tag === 'Success') titles.push(result.value.rows.get(id)?.title) }))
+    const rename = async (title: string) => valueOf(await runCommand(registry, topicsRename, { id, title }))
+
+    // The run for the first rename has read it and waits; the second rename and the minute land meanwhile.
+    const held = engine.holdLiveRead('topics.list')
+    await rename('First name')
+    await held.reached
+    await rename('Second name')
+    await minute.fire()
+    await waitFor(() => engine.liveTicks('topics.list') > 0 || undefined, WAIT_MS, 'the minute asking for a run')
+    held.release()
+
+    // Both names are sent and the second is the last; once it is shown, it stays.
+    await waitFor(() => (titles.includes('First name') && titles.at(-1) === 'Second name') || undefined, WAIT_MS, 'both names sent, the second last')
+    expect(titles.slice(titles.indexOf('Second name'))).toEqual(['Second name'])
+  } finally {
+    for (const engine of engines.splice(0).toReversed()) await engine.stop()
+    await minute.close()
+  }
 })
