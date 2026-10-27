@@ -154,17 +154,18 @@ async function beforeKill({ juno, badge, clearBadge }: Journey): Promise<void> {
   await badge('')
 }
 
-async function screenKept({ juno }: Journey): Promise<void> {
+async function screenKept({ juno }: Journey, fake: FakeSlack): Promise<void> {
+  // A fresh message proves the renderer has reconnected before checking its retained state.
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Back after the restart.' })
+  await juno.topic.expectMessage('Back after the restart.')
   await juno.topic.expectTitle('Main')
   await expect(juno.topic.composer).toHaveValue('Half a thought')
   await juno.sidebar.expectRows()
   await juno.sidebar.expectNoSyncStatus()
 }
 
-async function liveAndSend({ juno }: Journey, fake: FakeSlack): Promise<void> {
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Back after the restart.' })
-  await juno.topic.expectMessage('Back after the restart.')
-  await juno.topic.send('Half a thought')
+async function sendKeptDraft({ juno }: Journey): Promise<void> {
+  await juno.topic.composer.press('Enter')
   await juno.topic.expectSent('Half a thought')
 }
 
@@ -227,12 +228,12 @@ restartTest('after one engine kill, main gives the new engine the AI key and its
     await expect.poll(() => hooks(app, 'enginePid'), { timeout: 15_000, intervals: [50] }).not.toBe(engine)
     await expect.poll(() => hooks(app, 'engineState'), { timeout: 15_000, intervals: [50] }).toBe('ready')
 
-    await test.step('nothing on screen was rebuilt: the tab, its draft and the rows are as they were', () => screenKept(run))
     await test.step('the new engine sets the dock dot again', async () => {
       await juno.waitForSync()
       await run.badge('•')
     })
-    await test.step('the new engine’s port carries live updates and a send', () => liveAndSend(run, fake))
+    await test.step('a live message reaches the new window port; the tab, its draft and the rows are as they were', () => screenKept(run, fake))
+    await test.step('the new engine’s port sends the kept draft', () => sendKeptDraft(run))
     await test.step('main sends the key again: a new topic gets its AI title', async () => {
       const afterRestart = run.post('Kafka retention. The consumer lag alert keeps firing overnight.')
       await expect(afterRestart).toHaveAttribute('data-title-source', 'ai', { timeout: 30_000 })
