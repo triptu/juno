@@ -17,10 +17,13 @@
  *   it assumes they agree to within a few seconds, and within that both
  *   edits were made at nearly the same moment.
  * - Otherwise Juno's draft takes it. When a save is out, or one whose
- *   answer was lost, it is saved again: that save may land after it. A
- *   local text Slack had not acknowledged that it replaces is kept
- *   (`replaced`): on a clock running behind Slack's it may be the newer
- *   edit, and ⌘Z in the composer brings it back.
+ *   answer was lost, it is saved again: that save may land after it (that
+ *   resave is no local edit). A local edit Slack had not acknowledged that
+ *   it replaces is kept (`replaced`): on a clock running behind Slack's it
+ *   may be the newer edit, and ⌘Z in the composer brings it back. The kept
+ *   text stays until a local change lets it go (typing, ⌘Z, a send, a
+ *   clear); a later version never replaces it, so text from Slack is never
+ *   kept over it.
  *
  * A composer being typed in keeps its text whatever this decides: the
  * renderer leaves a focused field that was typed in alone, and its next edit
@@ -49,7 +52,7 @@ export interface DraftState {
   readonly slackStamp?: number
   /** When Juno linked `slackId`, on its clock. */
   readonly seenAt?: number
-  /** A local change Slack has not acknowledged. */
+  /** A local edit Slack has not acknowledged. A save that only puts a version from Slack back is not one. */
   readonly pending: boolean
   /** The text of the call out, `''` for a delete. */
   readonly sending?: string
@@ -57,6 +60,8 @@ export interface DraftState {
   readonly unsure: ReadonlyArray<string>
   /** Slack drafts Juno deleted, sent or saw deleted. */
   readonly gone: ReadonlyArray<string>
+  /** Juno's local edit, not yet in Slack, that a version from another device replaced; ⌘Z brings it back. */
+  readonly replaced?: string
 }
 
 /** A version of the place's draft from Slack. */
@@ -83,8 +88,6 @@ export interface ObservedDraft {
   readonly outcome: DraftOutcome
   /** Juno's text must go to Slack: a pending row is needed, and is due now. */
   readonly save: boolean
-  /** Juno's local text, not yet in Slack, that the version replaced. */
-  readonly replaced?: string
 }
 
 export interface ObserveHow {
@@ -125,8 +128,8 @@ export function observeSlackDraft(state: DraftState, slack: SlackDraft, how: Obs
     return { state: link, outcome: same ? 'linked' : own ? 'linked' : 'kept', save: !same }
   }
   const text = deleted ? '' : slack.text
-  const replaced = state.pending && state.text !== '' && !how.same(state.text, text) ? state.text : undefined
-  return { state: { ...link, text, editedAt: slack.stamp, pending: state.pending }, outcome: 'applied', save: false, ...(replaced === undefined ? {} : { replaced }) }
+  const replaced = state.replaced ?? (state.pending && state.text !== '' && !how.same(state.text, text) ? state.text : undefined)
+  return { state: { ...link, text, editedAt: slack.stamp, pending: false, ...(replaced === undefined ? {} : { replaced }) }, outcome: 'applied', save: false }
 }
 
 function withoutLink(state: DraftState): DraftState {

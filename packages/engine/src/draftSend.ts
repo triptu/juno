@@ -12,7 +12,8 @@
  *   is gone for Juno; text still to save goes as a new draft.
  * - A lost answer or a dropped connection: the row stays, and Slack may have
  *   run the call, so a list follows. A rate limit or no session: the row
- *   waits. Any other refusal ends the row; the draft stays in Juno only.
+ *   waits. Any other refusal settles the generation it sent: that text stays
+ *   in Juno only, and a newer edit still goes.
  * - A draft that went with a post is retired by Slack when the post lands,
  *   and deleted when Slack refused the post.
  */
@@ -20,7 +21,7 @@ import { Clock, Effect } from 'effect'
 import { composeOutgoing } from '@juno/richtext'
 import type { SlackApiError } from '@juno/slack'
 import { StoreWriter, transaction, type SqlError } from '@juno/store'
-import { claimDraftSave, deferDraftSave, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, endSentDraft, type DraftAnswer, type DraftClaim, type PendingDraft } from '@juno/sync'
+import { claimDraftSave, deferDraftSave, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, endSentDraft, refuseDraftSave, type DraftAnswer, type DraftClaim, type PendingDraft } from '@juno/sync'
 import { WorkControl } from './workControl'
 import type { EngineTimingConfig } from './config'
 import type { MirrorError, Outbox } from './outbox'
@@ -91,7 +92,7 @@ const settleFailure = (deps: SenderDeps, open: OpenWorkspace, topicId: string, r
     // Slack doubts the edit time: the list that follows lets the rule decide.
     if (error.code === 'draft_has_conflict') return yield* defer(deps, open, topicId, row, error, true)
     yield* Effect.logWarning('drafts: Slack refused a draft', { code: error.code })
-    yield* local(transaction(dropDraftSave(topicId)))
+    yield* local(transaction(refuseDraftSave(topicId, claim.gen)))
   })
 
 /**

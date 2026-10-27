@@ -48,8 +48,9 @@ export const applyDraftEvent = (frame: DraftFrame, seenAt: number): Effect.Effec
 
 /**
  * Slack's live drafts, each applied, and the linked ones a complete list no longer has applied as deleted.
- * Returns whether another list is needed: a call was out, a draft was linked after the request, or the
- * list was cut short.
+ * Returns whether another list is needed: a call was out, a draft was linked after the request, the list
+ * was cut short, or a find or a lost call's text is still open (it began no earlier than the request, in
+ * the same millisecond included).
  */
 export const listDrafts = (open: OpenWorkspace, outbox: Outbox['Service']): Effect.Effect<boolean, MirrorError> =>
   Effect.gen(function* () {
@@ -85,7 +86,7 @@ export const listDrafts = (open: OpenWorkspace, outbox: Outbox['Service']): Effe
     yield* local(transaction(settleDraftFinds(requestedAt)))
     const rows = yield* local(pendingDrafts)
     const links = yield* local(linkedDrafts)
-    return !complete || rows.some((row) => row.sending !== undefined) || links.some((link) => link.seenAt >= requestedAt)
+    return !complete || rows.some((row) => row.sending !== undefined || row.findAt > 0 || row.unsure.length > 0) || links.some((link) => link.seenAt >= requestedAt)
   })
 
 /** The topic an attached draft of a known conversation sits in; `undefined` for any other draft (composer, scheduled, stashed). */

@@ -24,7 +24,8 @@ export interface DraftClaim {
  * Reads the topic's row and claims it for one call, in one transaction (run it in one): what the stored
  * draft needs now, marked as sending so its echo is known. Nothing is claimed when the row is gone or not
  * due, when a create must wait for a list to find the place's draft (the list makes the row due again), or
- * when nothing is owed: the row then waits for sent drafts' posts, or ends. A caller that gets no claim
+ * when nothing is owed (no text change, or one Slack refused for good): the row then waits for sent drafts'
+ * posts, or ends. A caller that gets no claim
  * sends nothing. `fresh` makes the `client_msg_id` of a first create; `now` is Juno's clock.
  */
 export const claimDraftSave = (topicId: string, now: number, retryMillis: number, fresh: () => string): Effect.Effect<DraftClaim | undefined, SqlError, Services> =>
@@ -33,9 +34,10 @@ export const claimDraftSave = (topicId: string, now: number, retryMillis: number
     const state = yield* draftSyncRow(topicId)
     const row = state.row
     if (row === undefined || row.nextAt > now) return undefined
-    const op = state.text !== '' ? (state.slackId !== undefined ? 'update' : 'create') : state.slackId === undefined ? undefined : state.fileIds.length > 0 ? 'clear' : 'delete'
+    const op = row.refused === row.gen ? undefined : state.text !== '' ? (state.slackId !== undefined ? 'update' : 'create') : state.slackId === undefined ? undefined : state.fileIds.length > 0 ? 'clear' : 'delete'
     if (op === undefined || (op === 'create' && row.findAt > 0)) {
-      const later = row.findAt > 0 ? Number.MAX_SAFE_INTEGER : row.sent.length > 0 ? now + retryMillis : undefined
+      // A refused text stays a local edit: its row waits, so an older version from Slack does not replace it.
+      const later = row.findAt > 0 ? Number.MAX_SAFE_INTEGER : row.sent.length > 0 ? now + retryMillis : row.refused === row.gen ? Number.MAX_SAFE_INTEGER : undefined
       if (later === undefined) yield* dropRow(topicId)
       else yield* sql`UPDATE outbox SET next_at = ${String(later)} WHERE kind = 'draft' AND target_key = ${topicId}`
       return undefined
@@ -68,9 +70,10 @@ export type DraftAnswer =
 
 /**
  * Slack answered the call for generation `gen` at `at` (Juno's clock). A save links its draft, unless Juno
- * saw it deleted since (the text then goes again) or linked a newer one since. The row ends when no newer
- * change replaced its intent and nothing else is owed; otherwise it is due again at once. Returns whether it
- * ended.
+ * saw it deleted since (the text then goes again) or linked a newer one since; its files and stamp count only
+ * when it is newer than what Juno has seen of that draft, since a version that came after it (another
+ * device's files) may have applied before a slow answer. The row ends when no newer change replaced its
+ * intent and nothing else is owed; otherwise it is due again at once. Returns whether it ended.
  */
 export const endDraftSave = (topicId: string, gen: number, answer: DraftAnswer, at: number): Effect.Effect<boolean, SqlError, Services> =>
   Effect.gen(function* () {
@@ -81,9 +84,10 @@ export const endDraftSave = (topicId: string, gen: number, answer: DraftAnswer, 
     switch (answer.kind) {
       case 'saved': {
         const goneSave = before.gone.includes(answer.id)
-        const newerLink = before.slackId !== undefined && before.slackId !== answer.id && answer.stamp < (before.slackStamp ?? 0)
+        // The answer is older than what Juno knows: of a draft it no longer links, or of the one it links.
+        const older = before.slackId !== undefined && (before.slackId === answer.id ? answer.stamp <= (before.slackStamp ?? 0) : answer.stamp < (before.slackStamp ?? 0))
         if (goneSave) settled = false
-        else if (!newerLink) {
+        else if (!older) {
           state = {
             ...before,
             slackId: answer.id,
@@ -143,8 +147,22 @@ export const recoverDraftSaves = (at: number): Writer =>
     for (const row of yield* pendingDrafts) if (row.sending !== undefined) yield* deferDraftSave(row.topicId, row.nextAt, 'restart', at, true)
   })
 
-/** Slack refused the call for good: the row ends and the draft stays in Juno only. */
+/** The topic is no place in Slack: the row ends and the draft stays in Juno only. */
 export const dropDraftSave = (topicId: string): Writer => dropRow(topicId)
+
+/**
+ * Slack refused the call for generation `gen` for good: that text stays in Juno only, and still counts as a
+ * local edit Slack has not acknowledged, so its row stays, sending nothing (`claimDraftSave`), and an older
+ * version from Slack does not replace it. A newer change still goes (due at once), and sent drafts still
+ * wait to be deleted.
+ */
+export const refuseDraftSave = (topicId: string, gen: number): Writer =>
+  Effect.gen(function* () {
+    const row = yield* pendingDraft(topicId)
+    if (row === undefined) return
+    const { sending: _, ...rest } = row
+    yield* writeRow({ ...rest, creating: false, attempts: 0, refused: row.gen === gen ? gen : row.refused }, 0)
+  })
 
 /** A sent draft's post landed (Slack retired it) or Slack refused it and Juno deleted it: it leaves the row, which the sender looks at again. */
 export const endSentDraft = (topicId: string, slackId: string): Writer =>

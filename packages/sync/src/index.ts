@@ -50,6 +50,7 @@ export {
   observeDraft,
   pendingDrafts,
   recoverDraftSaves,
+  refuseDraftSave,
   sendDraft,
   settleDraftFinds,
   topicOfSlackDraft,
