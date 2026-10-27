@@ -37,9 +37,8 @@ export {
   type ThreadSubRow,
 } from './write'
 export {
-  beginDraftSave,
+  claimDraftSave,
   deferDraftSave,
-  draftClientMsgId,
   draftDestination,
   draftSyncRow,
   draftTopicId,
@@ -47,6 +46,7 @@ export {
   endDraftSave,
   endSentDraft,
   linkedDrafts,
+  observeAbsence,
   observeDraft,
   pendingDrafts,
   recoverDraftSaves,
@@ -55,7 +55,7 @@ export {
   topicOfSlackDraft,
   writeLocalDraft,
   type DraftAnswer,
-  type DraftSyncRow,
+  type DraftClaim,
   type PendingDraft,
 } from './write'
 

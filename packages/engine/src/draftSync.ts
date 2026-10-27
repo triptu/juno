@@ -36,9 +36,6 @@ import { hurry, sendDraftRow, type SenderDeps } from './draftSend'
 import { applyDraftEvent, inStore, isDraftFrame, listDrafts } from './draftVersions'
 import { Workspace, type OpenWorkspace } from './workspace'
 
-/** Lists in a row after one that could not vouch for a draft linked while it was out. */
-const LIST_AGAIN = 3
-
 export class DraftSync extends Context.Service<
   DraftSync,
   {
@@ -83,14 +80,18 @@ export class DraftSync extends Context.Service<
           return Math.min(timing.retryCapMillis, Math.max(0, Math.min(...rest.map((row) => row.nextAt)) - (yield* Clock.currentTimeMillis)))
         }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('drafts: pass failed', { cause }), timing.workerRetryMillis)))
 
-      /** A list of Slack's drafts, and up to `LIST_AGAIN` more while one could not vouch for what it missed. */
-      const listing = (again: number): Effect.Effect<void> =>
+      /**
+       * A list of Slack's drafts. While one fails, or cannot vouch for what it missed (a call was out, a draft
+       * was linked after it was asked for), another follows with backoff, for as long as that lasts: a create
+       * waiting for a list to find the place's draft is never left parked.
+       */
+      const listing = (attempt: number): Effect.Effect<number | undefined> =>
         Effect.gen(function* () {
           const open = yield* workspace.current
-          if (open === undefined) return
+          if (open === undefined) return undefined
           const more = yield* listDrafts(open, outbox).pipe(Effect.catch((error) => Effect.as(Effect.logWarning('drafts: could not list drafts', { error: error._tag }), true)))
           yield* wake
-          if (more && again < LIST_AGAIN) yield* Effect.delay(Queue.offer(lists, again + 1), timing.retryBaseMillis)
+          return more ? Math.min(timing.retryBaseMillis * 2 ** attempt, timing.retryCapMillis) : undefined
         })
 
       ;(yield* WorkControl).onWake?.('draft', wake)
@@ -108,7 +109,8 @@ interface Loops {
   readonly lists: Queue.Queue<number>
   readonly wake: Effect.Effect<void>
   readonly pass: (open: OpenWorkspace) => Effect.Effect<number | undefined>
-  readonly listing: (again: number) => Effect.Effect<void>
+  /** One list; returns how long to wait before the next one, when another is needed. */
+  readonly listing: (attempt: number) => Effect.Effect<number | undefined>
 }
 
 /** The sender's loop, the lists, what wakes them, the socket's draft events, and the last sends when the engine stops. */
@@ -132,7 +134,14 @@ const run = ({ workspace, link, timing, signal, lists, wake, pass, listing }: Lo
         yield* Effect.raceFirst(Queue.take(signal), wait === undefined ? Effect.never : Effect.sleep(wait))
       }
     }))
-    yield* Effect.forkScoped(Effect.forever(Effect.flatMap(Queue.take(lists), listing)))
+    // A catch-up's list starts the backoff over; a list still owed follows after its wait.
+    yield* Effect.forkScoped(Effect.gen(function* () {
+      let attempt = yield* Queue.take(lists)
+      while (true) {
+        const wait = yield* listing(attempt)
+        attempt = wait === undefined ? yield* Queue.take(lists) : yield* Effect.raceFirst(Queue.take(lists), Effect.as(Effect.sleep(wait), attempt + 1))
+      }
+    }))
     // A workspace that opens (a sign-in, a restart) may hold rows from before; a call that was out then counts as lost.
     yield* Effect.forkScoped(Stream.runForEach(workspace.changes, (open) => open === undefined ? Effect.void : Effect.gen(function* () {
       yield* inStore(open)(transaction(recoverDraftSaves(yield* Clock.currentTimeMillis)))

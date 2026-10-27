@@ -7,12 +7,53 @@ import { draftSyncRow, dropRow, payloadOf, pendingDraft, pendingDrafts, writeRow
 // The sender's side of a topic's `draft` row (`drafts.ts`, specs/drafts.qnt): a call going out, its answer,
 // a lost answer, and what a list settles.
 
-/** The call for generation `gen` goes now with `text` (`''` for a delete): its echo is known by it. */
-export const beginDraftSave = (topicId: string, gen: number, text: string, creating: boolean): Writer =>
+/** The call a claimed row makes, with what it sends, read in the transaction that claimed it. */
+export interface DraftClaim {
+  readonly op: 'create' | 'update' | 'clear' | 'delete'
+  readonly gen: number
+  /** The text it saves; `''` for a delete or a clear. */
+  readonly text: string
+  /** The local edit's time, sent as `client_last_updated_ts`. */
+  readonly editedAt: number
+  readonly slackId?: string
+  readonly fileIds: ReadonlyArray<string>
+  readonly clientMsgId?: string
+}
+
+/**
+ * Reads the topic's row and claims it for one call, in one transaction (run it in one): what the stored
+ * draft needs now, marked as sending so its echo is known. Nothing is claimed when the row is gone or not
+ * due, when a create must wait for a list to find the place's draft (the list makes the row due again), or
+ * when nothing is owed: the row then waits for sent drafts' posts, or ends. A caller that gets no claim
+ * sends nothing. `fresh` makes the `client_msg_id` of a first create; `now` is Juno's clock.
+ */
+export const claimDraftSave = (topicId: string, now: number, retryMillis: number, fresh: () => string): Effect.Effect<DraftClaim | undefined, SqlError, Services> =>
   Effect.gen(function* () {
-    const row = yield* pendingDraft(topicId)
-    if (row === undefined || row.gen !== gen) return
-    yield* writeRow({ ...row, sending: text, creating }, row.nextAt)
+    const sql = yield* StoreWriter
+    const state = yield* draftSyncRow(topicId)
+    const row = state.row
+    if (row === undefined || row.nextAt > now) return undefined
+    const op = state.text !== '' ? (state.slackId !== undefined ? 'update' : 'create') : state.slackId === undefined ? undefined : state.fileIds.length > 0 ? 'clear' : 'delete'
+    if (op === undefined || (op === 'create' && row.findAt > 0)) {
+      const later = row.findAt > 0 ? Number.MAX_SAFE_INTEGER : row.sent.length > 0 ? now + retryMillis : undefined
+      if (later === undefined) yield* dropRow(topicId)
+      else yield* sql`UPDATE outbox SET next_at = ${String(later)} WHERE kind = 'draft' AND target_key = ${topicId}`
+      return undefined
+    }
+    const clientMsgId = op === 'create' ? (state.clientMsgId ?? fresh()) : undefined
+    if (clientMsgId !== undefined && state.clientMsgId === undefined) yield* writeSync({ ...state, clientMsgId })
+    const text = op === 'update' || op === 'create' ? state.text : ''
+    yield* writeRow({ ...row, sending: text, creating: op === 'create' }, row.nextAt)
+    return {
+      op,
+      gen: row.gen,
+      text,
+      // A draft with no time of its own (from before the clear time was kept) goes with now.
+      editedAt: state.editedAt > 0 ? state.editedAt : now,
+      ...(state.slackId === undefined ? {} : { slackId: state.slackId }),
+      fileIds: state.fileIds,
+      ...(clientMsgId === undefined ? {} : { clientMsgId }),
+    }
   })
 
 /** What Slack answered a draft call. */
@@ -121,14 +162,4 @@ export const settleDraftFinds = (requestedAt: number): Writer =>
       const findAt = requestedAt > row.findAt ? 0 : row.findAt
       if (unsure.length !== row.unsure.length || findAt !== row.findAt) yield* writeRow({ ...row, unsure, findAt }, Math.min(row.nextAt, requestedAt))
     }
-  })
-
-/** Assigns the `client_msg_id` Juno creates the topic's draft with, once. */
-export const draftClientMsgId = (topicId: string, fresh: () => string): Effect.Effect<string, SqlError, Services> =>
-  Effect.gen(function* () {
-    const state = yield* draftSyncRow(topicId)
-    if (state.clientMsgId !== undefined) return state.clientMsgId
-    const clientMsgId = fresh()
-    yield* writeSync({ ...state, clientMsgId })
-    return clientMsgId
   })

@@ -10,9 +10,14 @@ import { SqlClient } from 'effect/sql'
  *   the draft is gone; the newest Slack stamp seen for the place, in epoch
  *   milliseconds (`slack_stamp`); Slack's files on the draft, which every
  *   update keeps (`file_ids`, a JSON array); the `client_msg_id` Juno
- *   creates its draft with; and the drafts Juno deleted, sent or saw
- *   deleted (`gone_ids`, a JSON array of the latest few), whose versions
- *   are ignored.
+ *   creates its draft with; the drafts Juno deleted, sent or saw deleted
+ *   (`gone_ids`, a JSON array of the latest few), whose versions are
+ *   ignored; when the draft was last emptied (`cleared_at`: Juno's clock for
+ *   a local clear or send, Slack's stamp for a deletion taken from Slack),
+ *   the time a cleared draft's deletion carries and is compared by; and a
+ *   local text not yet in Slack that lost to a newer version from another
+ *   device (`replaced`), which ⌘Z in the composer brings back until the next
+ *   local change.
  * - A local change Slack has not acknowledged is an `outbox` row of kind
  *   `draft` for the topic. Every draft Juno had before this is one: it was
  *   never in Slack, so it is merged with Slack's draft for its place, if
@@ -30,7 +35,9 @@ export default Effect.gen(function* () {
       seen_at TEXT,
       file_ids TEXT,
       client_msg_id TEXT,
-      gone_ids TEXT
+      gone_ids TEXT,
+      cleared_at TEXT,
+      replaced TEXT
     )`
   yield* sql`CREATE INDEX IF NOT EXISTS draft_sync_slack ON draft_sync (slack_id)`
   const posts = yield* sql<{ name: string }>`SELECT name FROM pragma_table_info('pending_messages')`

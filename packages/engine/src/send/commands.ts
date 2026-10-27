@@ -54,10 +54,10 @@ export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendErr
     const now = yield* Clock.currentTimeMillis
     const topicId = yield* transaction(
       Effect.gen(function* () {
-        // Slack's draft goes with the post when the post goes where the draft was; otherwise it is deleted once the post has settled.
-        const slackDraft = input.draftOf === undefined ? undefined : yield* sendDraft(input.draftOf, input.clientMsgId, now)
-        const here = input.draftOf !== undefined && input.draftOf === (threadTs === undefined ? mainTopicId(channel as ChannelId) : threadTs.startsWith('pending:') ? `p:${channel}:${threadTs.slice(8)}` : threadTopicId(channel as ChannelId, threadTs as Ts))
-        const text = yield* queueText({ clientMsgId: input.clientMsgId, channel, threadTs, text: input.text, files, createdAt: now, ...(here && input.startThread !== true ? { draftId: slackDraft } : {}) })
+        // Slack's draft goes with the post (`draft_id`) when the post goes where the draft was; a post sent elsewhere leaves it for Juno to delete.
+        const here = input.draftOf !== undefined && input.startThread !== true && input.draftOf === (threadTs === undefined ? mainTopicId(channel as ChannelId) : threadTs.startsWith('pending:') ? `p:${channel}:${threadTs.slice(8)}` : threadTopicId(channel as ChannelId, threadTs as Ts))
+        const draftId = input.draftOf === undefined ? undefined : yield* sendDraft(input.draftOf, input.clientMsgId, now, here)
+        const text = yield* queueText({ clientMsgId: input.clientMsgId, channel, threadTs, text: input.text, files, createdAt: now, ...(draftId === undefined ? {} : { draftId }) })
         if (input.startThread === true && threadTs === undefined) {
           const sql = yield* StoreWriter
           const conversation = (yield* sql<{ kind: string }>`SELECT kind FROM conversations WHERE id = ${channel}`)[0]

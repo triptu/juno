@@ -20,7 +20,8 @@ import { Clock, Effect } from 'effect'
 import { composeOutgoing } from '@juno/richtext'
 import type { SlackApiError } from '@juno/slack'
 import { StoreWriter, transaction, type SqlError } from '@juno/store'
-import { beginDraftSave, deferDraftSave, draftClientMsgId, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, endSentDraft, type DraftAnswer, type DraftSyncRow, type PendingDraft } from '@juno/sync'
+import { claimDraftSave, deferDraftSave, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, endSentDraft, type DraftAnswer, type DraftClaim, type PendingDraft } from '@juno/sync'
+import { WorkControl } from './workControl'
 import type { EngineTimingConfig } from './config'
 import type { MirrorError, Outbox } from './outbox'
 import { inStore, stampOf, type Blocks, type Draft, type DraftDestination } from './draftVersions'
@@ -32,12 +33,6 @@ export interface SenderDeps {
   /** Asks for a list of Slack's drafts soon. */
   readonly listSoon: Effect.Effect<void>
 }
-
-type Op = 'create' | 'update' | 'clear' | 'delete' | 'nothing'
-
-/** The call the stored draft needs: what to do with Slack's draft for the text Juno has now. */
-const opOf = (state: DraftSyncRow): Op =>
-  state.text !== '' ? (state.slackId !== undefined ? 'update' : 'create') : state.slackId === undefined ? 'nothing' : state.fileIds.length > 0 ? 'clear' : 'delete'
 
 /** One call for the topic's row, if it is due, and its answer. */
 export const sendDraftRow = (deps: SenderDeps, open: OpenWorkspace, topicId: string) =>
@@ -51,54 +46,48 @@ export const sendDraftRow = (deps: SenderDeps, open: OpenWorkspace, topicId: str
       // A thread Juno started waits for its root's ts; a topic that is no place has nothing to sync.
       if (destination === undefined) return yield* local(topicId.startsWith('p:') ? later(topicId, now + deps.timing.noSessionMillis) : dropDraftSave(topicId))
       if (!(yield* settleSent(deps, open, topicId, first.row, now))) return
-      const state = yield* local(draftSyncRow(topicId))
-      const row = state.row
-      if (row === undefined) return
-      const op = opOf(state)
-      if (op === 'nothing' || (op === 'create' && row.findAt > 0)) {
-        // A create, or the end of the row, waits for a list to find the place's draft; the list makes it due.
-        if (row.findAt > 0) return yield* local(later(topicId, Number.MAX_SAFE_INTEGER))
-        // A sent draft's post is still going: look again shortly.
-        if (row.sent.length > 0) return yield* local(later(topicId, now + deps.timing.retryBaseMillis))
-        return yield* local(transaction(dropDraftSave(topicId)))
-      }
+      const control = yield* WorkControl
+      const hold = control.onDraftWrite?.('claim', topicId, 'before')
+      if (hold !== undefined) yield* Effect.promise(() => hold)
+      // Read and claimed together: a version from Slack that replaced the intent meanwhile leaves nothing to send.
+      const claim = yield* local(transaction(claimDraftSave(topicId, yield* Clock.currentTimeMillis, deps.timing.retryBaseMillis, () => crypto.randomUUID())))
+      control.onDraftWrite?.('claim', topicId, 'after')
+      if (claim === undefined) return
       const places: ReadonlyArray<DraftDestination> = [{ channel_id: destination.channel, ...(destination.threadTs === undefined ? {} : { thread_ts: destination.threadTs, broadcast: false }) }]
-      const clientMsgId = op === 'create' ? yield* local(transaction(draftClientMsgId(topicId, () => crypto.randomUUID()))) : undefined
-      yield* local(transaction(beginDraftSave(topicId, row.gen, op === 'update' || op === 'create' ? state.text : '', op === 'create')))
-      const result = yield* Effect.result(deps.outbox.send((api) => call(api, op, state, places, clientMsgId)))
+      const result = yield* Effect.result(deps.outbox.send((api) => call(api, claim, places)))
       const answeredAt = yield* Clock.currentTimeMillis
-      if (result._tag === 'Success') return yield* local(transaction(endDraftSave(topicId, row.gen, result.success, answeredAt)))
-      yield* settleFailure(deps, open, topicId, row, op, state, result.failure, answeredAt)
+      if (result._tag === 'Success') return yield* local(transaction(endDraftSave(topicId, claim.gen, result.success, answeredAt)))
+      yield* settleFailure(deps, open, topicId, first.row, claim, result.failure, answeredAt)
     }),
   )
 
-const call = (api: Parameters<Parameters<Outbox['Service']['send']>[0]>[0], op: Exclude<Op, 'nothing'>, state: DraftSyncRow, places: ReadonlyArray<DraftDestination>, clientMsgId: string | undefined): Effect.Effect<DraftAnswer, SlackApiError> => {
-  const edited = String(Math.round(state.editedAt))
+const call = (api: Parameters<Parameters<Outbox['Service']['send']>[0]>[0], claim: DraftClaim, places: ReadonlyArray<DraftDestination>): Effect.Effect<DraftAnswer, SlackApiError> => {
+  const edited = String(Math.round(claim.editedAt))
   const reason = { reason: 'MessageInput:updateDraft' }
-  switch (op) {
+  switch (claim.op) {
     case 'create':
-      return Effect.map(api.call('drafts.create', { blocks: blocksOf(state.text), client_msg_id: clientMsgId!, destinations: places, file_ids: [], is_from_composer: false }, reason), (answer) => saved(answer.draft))
+      return Effect.map(api.call('drafts.create', { blocks: blocksOf(claim.text), client_msg_id: claim.clientMsgId!, destinations: places, file_ids: [], is_from_composer: false }, reason), (answer) => saved(answer.draft))
     case 'update':
     case 'clear':
       return Effect.map(
-        api.call('drafts.update', { draft_id: state.slackId!, client_last_updated_ts: edited, blocks: blocksOf(op === 'clear' ? '' : state.text), destinations: places, file_ids: [...state.fileIds], is_from_composer: false }, reason),
+        api.call('drafts.update', { draft_id: claim.slackId!, client_last_updated_ts: edited, blocks: blocksOf(claim.text), destinations: places, file_ids: [...claim.fileIds], is_from_composer: false }, reason),
         (answer) => saved(answer.draft),
       )
     case 'delete':
-      return Effect.as(api.call('drafts.delete', { draft_id: state.slackId!, client_last_updated_ts: edited, skip_file_deletion: true }, reason), { kind: 'deleted', id: state.slackId! } as const)
+      return Effect.as(api.call('drafts.delete', { draft_id: claim.slackId!, client_last_updated_ts: edited, skip_file_deletion: true }, reason), { kind: 'deleted', id: claim.slackId! } as const)
   }
 }
 
 /** What a refused or failed call means for the row. */
-const settleFailure = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row: PendingDraft, op: Exclude<Op, 'nothing'>, state: DraftSyncRow, error: MirrorError, at: number) =>
+const settleFailure = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row: PendingDraft, claim: DraftClaim, error: MirrorError, at: number) =>
   Effect.gen(function* () {
     const local = inStore(open)
     if (error._tag !== 'Rejected') return yield* defer(deps, open, topicId, row, error, error._tag === 'Offline')
-    if (op === 'create' && error.code === 'attached_draft_exists') {
-      yield* local(transaction(endDraftSave(topicId, row.gen, { kind: 'exists' }, at)))
+    if (claim.op === 'create' && error.code === 'attached_draft_exists') {
+      yield* local(transaction(endDraftSave(topicId, claim.gen, { kind: 'exists' }, at)))
       return yield* deps.listSoon
     }
-    if (op !== 'create' && isGone(error)) return yield* local(transaction(endDraftSave(topicId, row.gen, op === 'delete' ? { kind: 'deleted', id: state.slackId! } : { kind: 'gone', id: state.slackId! }, at)))
+    if (claim.op !== 'create' && isGone(error)) return yield* local(transaction(endDraftSave(topicId, claim.gen, claim.op === 'delete' ? { kind: 'deleted', id: claim.slackId! } : { kind: 'gone', id: claim.slackId! }, at)))
     // Slack doubts the edit time: the list that follows lets the rule decide.
     if (error.code === 'draft_has_conflict') return yield* defer(deps, open, topicId, row, error, true)
     yield* Effect.logWarning('drafts: Slack refused a draft', { code: error.code })
@@ -106,19 +95,22 @@ const settleFailure = (deps: SenderDeps, open: OpenWorkspace, topicId: string, r
   })
 
 /**
- * Drafts that went with posts: one whose post landed was retired by Slack, one whose post Slack refused is
- * deleted. Returns false when the row was put off.
+ * Drafts that went as messages: one its post names was retired by Slack once the post landed, and is
+ * deleted when Slack refused the post; one its post does not name (sent to another place) is deleted.
+ * Returns false when the row was put off.
  */
 const settleSent = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row: PendingDraft, now: number) =>
   Effect.gen(function* () {
     const local = inStore(open)
     for (const sent of row.sent) {
-      const post = yield* local(postState(sent.after))
-      if (post === undefined) {
-        yield* local(transaction(endSentDraft(topicId, sent.id)))
-        continue
+      if (sent.named) {
+        const post = yield* local(postState(sent.after))
+        if (post === undefined) {
+          yield* local(transaction(endSentDraft(topicId, sent.id)))
+          continue
+        }
+        if (post !== 'failed') continue
       }
-      if (post !== 'failed') continue
       const result = yield* Effect.result(deps.outbox.send((api) => api.call('drafts.delete', { draft_id: sent.id, client_last_updated_ts: String(now), skip_file_deletion: true }, { reason: 'InputContainer:sendMessage' })))
       if (result._tag === 'Failure' && !isGone(result.failure)) {
         yield* defer(deps, open, topicId, row, result.failure, false)

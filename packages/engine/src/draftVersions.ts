@@ -9,7 +9,8 @@ import { parseTopicId, type SlackDraft } from '@juno/domain'
 import { composeOutgoing, draftMarkup, type Lookups } from '@juno/richtext'
 import type { SocketEvent } from '@juno/slack'
 import { StoreWriter, transaction, type SqlError } from '@juno/store'
-import { draftSyncRow, draftTopicId, linkedDrafts, observeDraft, pendingDrafts, settleDraftFinds, topicOfSlackDraft } from '@juno/sync'
+import { draftTopicId, linkedDrafts, observeAbsence, observeDraft, pendingDrafts, settleDraftFinds, topicOfSlackDraft } from '@juno/sync'
+import { WorkControl } from './workControl'
 import type { Outbox, MirrorError } from './outbox'
 import type { OpenWorkspace, StoreServices } from './workspace'
 
@@ -42,7 +43,7 @@ export const applyDraftEvent = (frame: DraftFrame, seenAt: number): Effect.Effec
     }
     const topicId = yield* topicOfSlackDraft(frame.draft_id)
     if (topicId === undefined) return
-    yield* transaction(observeDraft(topicId, { id: frame.draft_id, text: '', stamp: frame.event_ts === undefined ? seenAt : stampOf(frame.event_ts) }, { seenAt, same }))
+    yield* transaction(observeDraft(topicId, { id: frame.draft_id, text: '', stamp: frame.event_ts === undefined ? seenAt : stampOf(frame.event_ts), deleted: true }, { seenAt, same }))
   })
 
 /**
@@ -71,10 +72,14 @@ export const listDrafts = (open: OpenWorkspace, outbox: Outbox['Service']): Effe
       yield* local(transaction(applyVersion(place, draft, { seenAt: requestedAt, listed: true })))
     }
     if (complete) {
+      const control = yield* WorkControl
       for (const link of yield* local(linkedDrafts)) {
         if (listed.has(link.slackId) || link.seenAt >= requestedAt) continue
-        const state = yield* local(draftSyncRow(link.topicId))
-        yield* local(transaction(observeDraft(link.topicId, { id: link.slackId, text: '', stamp: state.slackStamp ?? 0 }, { seenAt: requestedAt, absent: true, same })))
+        const hold = control.onDraftWrite?.('absence', link.topicId, 'before')
+        if (hold !== undefined) yield* Effect.promise(() => hold)
+        // The link is read again in the transaction: a draft linked since the read above is left alone.
+        yield* local(transaction(observeAbsence(link.topicId, link.slackId, requestedAt, same)))
+        control.onDraftWrite?.('absence', link.topicId, 'after')
       }
     }
     yield* local(transaction(settleDraftFinds(requestedAt)))
@@ -97,17 +102,14 @@ const placeOf = (draft: Draft): Effect.Effect<string | undefined, SqlError, Stor
     return yield* draftTopicId(sql, id)
   })
 
-/** A version of a place's draft, as the composer's text. */
+/** A version of a place's draft, as the composer's text. A live draft of files alone has no text, and is not a deletion. */
 const applyVersion = (topicId: string, draft: Draft, how: { readonly seenAt: number; readonly listed: boolean }) =>
   Effect.gen(function* () {
-    const removed = draft.is_deleted === true || draft.is_sent === true
+    const deleted = draft.is_deleted === true || draft.is_sent === true
     const blocks = draft.blocks ?? []
-    const markup = removed ? '' : draftMarkup(blocks, yield* draftLookups(blocks))
-    const text = markup.trim() === '' ? '' : markup
-    const version: SlackDraft & { readonly fileIds: ReadonlyArray<string> } = { id: draft.id, text, stamp: stampOf(draft.last_updated_ts), fileIds: draft.file_ids ?? [] }
-    // A draft of files alone has no text in Juno, but is the place's draft: it is linked, not taken as deleted.
-    const filesOnly = !removed && text === '' && version.fileIds.length > 0
-    return yield* observeDraft(topicId, version, { ...how, same: filesOnly ? (a, b) => a === b : same })
+    const markup = deleted ? '' : draftMarkup(blocks, yield* draftLookups(blocks))
+    const version: SlackDraft & { readonly fileIds: ReadonlyArray<string> } = { id: draft.id, text: markup.trim() === '' ? '' : markup, stamp: stampOf(draft.last_updated_ts), deleted, fileIds: draft.file_ids ?? [] }
+    return yield* observeDraft(topicId, version, { ...how, same })
   })
 
 /** Names for the people, channels and user groups a draft mentions, so the composer shows them as picks. */
