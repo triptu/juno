@@ -1,6 +1,6 @@
 // The lists the stick-bottom tests start from, and the ways a user reaches their end.
 import { expect, type Locator, type Page } from '@playwright/test'
-import { startFakeSlack, topic300Seed, type FakeSlack } from '@juno/fake-slack'
+import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import type { Slack } from './driver/slack'
 import { test } from './fixtures'
@@ -82,15 +82,8 @@ export async function openLongMain(juno: Juno, fake: FakeSlack, slack: Slack): P
   return channel
 }
 
-/** The topic300 seed: Main and a thread of 300 messages each, twice the 150 rows a topic read to its end opens with. */
-export const longTest = test.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: (workspace, avatars) => void topic300Seed()(workspace, avatars) })
-    await use(fake)
-    await fake.close()
-  },
-})
+/** A synced start on the topic300 seed: Main and a thread of 300 messages each, twice the 150 rows a topic read to its end opens with. */
+export const longTest = test.extend({ synced: true, syncedSeed: 'topic300' })
 
 /**
  * After a scroll up by hand back to the end, a full window follows new messages: after the wheel, with the scrollbar
@@ -143,11 +136,9 @@ export async function backAtEnd(juno: Juno, win: Page, post: (text: string) => v
   })
 }
 
-/** Opens `title` read to its end and then again, so it shows its newest 150 rows and each arrival drops the first. `synced` runs once the first sync is done, before the topic opens. */
-export async function openFullWindow(juno: Juno, title: string, synced?: () => Promise<void>): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
-  await synced?.()
+/** From a synced start (`longTest`), opens `title` read to its end and then again, so it shows its newest 150 rows and each arrival drops the first. `before` runs first. */
+export async function openFullWindow(juno: Juno, title: string, before?: () => Promise<void>): Promise<void> {
+  await before?.()
   // The first open reads the topic. Opened again, it shows its newest 150 rows, so each message that arrives drops
   // the first row, and scroll anchoring lowers scrollTop by that row's height.
   const row = juno.sidebar.row(title)

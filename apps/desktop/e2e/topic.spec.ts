@@ -8,7 +8,7 @@
 // messages at the bottom (`dom/live.test.ts`) and which messages notify (`dom/notifications.test.ts`).
 import type { Locator, Page } from '@playwright/test'
 import { measureLayoutShift } from '@juno/testing/layout-shift'
-import { seedWorkspace, startFakeSlack, topic300Seed, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
+import { TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { watchFlashes } from './driver/flashes'
 import type { Juno, Landing } from './driver/juno'
 import { expect, syncedTest, test, type Fixtures } from './fixtures'
@@ -68,32 +68,16 @@ function expectStill(landing: Landing): void {
   expect(landing.tops.filter((top) => Math.abs(top - landing.top) >= 0.5), `row ${landing.ts} must stay at ${landing.top}`).toEqual([])
 }
 
-// The topic300 seed beside the default one, which has Rina's thread for the notification's other tab.
-const longTest = test.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
-    const fake = await startFakeSlack({
-      seed: (workspace, avatars) => {
-        seedWorkspace(workspace, avatars)
-        topic300Seed()(workspace, avatars)
-      },
-    })
-    await use(fake)
-    await fake.close()
-  },
-})
+// A synced start on the topic300 seed beside the default one, which has Rina's thread for the notification's other tab.
+const longTest = test.extend({ synced: true, syncedSeed: 'withTopic300' })
 const THREAD = 'Review the rollout checklist 1'
 
 longTest('a long thread opens 80px below the band and loads older pages in place; scrolled up a reply waits unread', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await test.step('opens with the first new reply 80px below the header band, and older pages load without moving what is on screen', () => opensAtDivider(juno, slack))
   await test.step('scrolled up, a reply shows "1 new message" and stays unread until Jump to latest', () => scrolledUp(juno, slack))
 })
 
 longTest('a long thread: each of two tabs keeps its scroll; a notification for it focuses its tab, scrolls and flashes', async ({ juno, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(THREAD).open()
   await juno.topic.expectAtBottom()
   await test.step('one topic in two tabs: each tab keeps its own scroll position, and comes back there after messages arrive while it is hidden', () => twoTabs(juno, fake, THREAD))

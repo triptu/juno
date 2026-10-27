@@ -14,6 +14,7 @@ import { join } from 'node:path'
 import { beforeAll, test } from 'bun:test'
 import type { FakeSlack, FakeSlackOptions } from '@juno/fake-slack'
 import { DOM_LIMIT_MS, stressScale } from '@juno/testing/limits'
+import type { SyncedSeed } from '../e2e/seeds'
 import { Slack } from '../e2e/driver/slack'
 import type { EngineOptions } from '../web/host/testHost'
 import { DomApp, domSnapshot, startDomApp, tempUserData, warmWorker } from './app'
@@ -41,7 +42,9 @@ interface Model {
 export interface DomTestOptions<M extends Model | undefined = undefined> {
   /** Start signed in and synced from the snapshot (default), or signed out on an empty folder. */
   readonly synced?: boolean
-  /** The fake's own options, as a seed of its own; only with `synced: false`, since the snapshot is of the default seed. */
+  /** The seed a synced start is built on (`e2e/seeds.ts`); the default seed unless named. */
+  readonly seed?: SyncedSeed
+  /** The fake's own options, as a seed of its own; only with `synced: false`, since a snapshot is of a named seed. */
   readonly fake?: FakeSlackOptions
   readonly engine?: EngineOptions
   /** Install the test clock before the page loads, at this time or now; the engine's clock follows its jumps. */
@@ -87,15 +90,15 @@ const scale = stressScale()
  * What the worker and the run share (a loaded host, the renderer's compiled bundle, the synced snapshot, which the
  * first worker to ask builds while the others wait) is made before a file's tests, so a test's time is its own.
  */
-async function warm(synced: boolean): Promise<void> {
+async function warm(synced: boolean, seed: SyncedSeed | undefined): Promise<void> {
   await warmWorker()
-  if (synced) await domSnapshot(signIn)
+  if (synced) await domSnapshot(signIn, seed)
 }
 
 export function domTest<M extends Model | undefined = undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M> = {}): void {
   const skipped = options.tag?.some((tag) => skipTags.includes(tag)) === true
   // Slow: the synced snapshot is a sign-in and a first sync, built once per run while the other workers wait for it.
-  if (!skipped) beforeAll(() => warm(options.synced !== false), 120_000 * scale)
+  if (!skipped) beforeAll(() => warm(options.synced !== false, options.seed), 120_000 * scale)
   const define = skipped ? test.skip : test
   define(title, () => run(title, body, options), (options.timeout ?? DOM_LIMIT_MS) * scale)
 }
@@ -111,7 +114,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
     const engine: EngineOptions = { ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }), ...options.engine }
     if (options.fake !== undefined && options.synced !== false) throw new Error('A fake of its own needs `synced: false`: the snapshot is of the default seed.')
     await warmWorker()
-    const snapshot = options.synced === false ? undefined : await domSnapshot(signIn)
+    const snapshot = options.synced === false ? undefined : await domSnapshot(signIn, options.seed)
     const ready = meter.lap()
     const started = await startDomApp({ snapshot, engine, counted: options.counted === true, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
     const warm = meter.lap()

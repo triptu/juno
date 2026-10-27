@@ -6,7 +6,7 @@
 // keystroke, a payload that doubled, a subscription opened twice. The engine's frames reach the page one
 // at a time (`counted`), so the counts do not depend on timing. Budgets are today's counts plus a little
 // headroom; `JUNO_WORK_COUNTS=1` prints the counts.
-import { largeSeed, type FakeSlack } from '@juno/fake-slack'
+import type { FakeSlack } from '@juno/fake-slack'
 import { expectWork, type Counts } from '@juno/testing/work-budget'
 import type { DomApp } from './app'
 import type { Juno } from './driver/juno'
@@ -127,9 +127,7 @@ domTest('startup, a topic opened and opened again, tabs, typing, a send and a li
 }, { counted: true })
 
 domTest('the sidebar of 300 conversations: its first rows from the cache, and one live message renders one row', async ({ juno, app, fake, relaunch, step }) => {
-  // The first sync of 300 conversations is setup, not counted: the app quits once signed in, and the engine
-  // finishes the sync with no page open, which would draw every row as it came, before the page opens again.
-  await juno.signIn()
+  // The first sync of 300 conversations is setup, not counted: the run's synced start of that seed.
   await juno.allHoursNow()
 
   await step('startup: a relaunch to the first rows from the cache, at rest', async () => {
@@ -150,4 +148,4 @@ domTest('the sidebar of 300 conversations: its first rows from the cache, and on
     })
     expectWork('large sidebar live message', counts(work), { commits: 3, renders: 19, requests: 0, messages: 6, bytesIn: 8154, bytesOut: 0 }, detail(work))
   })
-}, { counted: true, synced: false, fake: { seed: largeSeed({ users: 60, topics: 150, messages: 1_500, days: 2 }) }, timeout: 180_000 })
+}, { counted: true, seed: 'conversations300' })

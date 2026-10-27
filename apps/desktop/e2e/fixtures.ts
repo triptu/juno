@@ -1,4 +1,4 @@
-import { test as base, type Browser, type BrowserContext, type ElectronApplication, type Page, type TestInfo } from '@playwright/test'
+import { test as base, type Browser, type BrowserContext, type ElectronApplication, type Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { AgentOptions } from '../web/host/agent'
 import { HostPool } from './browser/host'
@@ -13,6 +13,8 @@ import { startFakeSlack, type FakeSlack } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
 import { Slack } from './driver/slack'
 import { startDisplay } from './display'
+import { seedKey, seedOption, type SyncedSeed } from './seeds'
+import { warmup } from './warmup'
 import { copySynced, fakeState, syncedKey, SyncedWorkspaces, type SyncedWorkspace } from './synced'
 import { attachSendTrace, attachSidebarTrace } from './traces'
 import { cpuAll, cpuMeter, printCpuSince } from './cpu'
@@ -49,6 +51,8 @@ export interface Fixtures {
    * Tests of sign-in, first sync and boot keep the default, a real sign-in.
    */
   readonly synced: boolean
+  /** The seed a synced start is built on (`seeds.ts`): the default, or the 300-message thread alone or beside it. */
+  readonly syncedSeed: SyncedSeed
   /** Under `synced`, the workspace the test starts from and the fake that matches it (Electron), or the snapshot (browser). */
   readonly syncedStart: { readonly workspace?: SyncedWorkspace; readonly snapshot?: WebSnapshot; readonly fake: FakeSlack } | undefined
   /** A fake Slack per test. */
@@ -96,11 +100,11 @@ export interface RelaunchOptions extends Pick<LaunchOptions, 'aiJobs' | 'cacheMi
 }
 
 /** Signs in to a fresh default seed on `dir` and syncs, for `SyncedWorkspaces`. */
-async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<SyncedWorkspace, 'dir'>> {
+async function buildSynced(dir: string, options: SyncOptions, seed: SyncedSeed): Promise<Omit<SyncedWorkspace, 'dir'>> {
   const started = performance.now()
   const startedCpu = cpuAll()
   const seedTime = Date.now()
-  const fake = await startFakeSlack({ seedTime })
+  const fake = await startFakeSlack({ seedTime, ...seedOption(seed) })
   const appDir = await mkdtemp(join(process.env.JUNO_TEST_SCRATCH ?? tmpdir(), 'juno-slack-app-'))
   try {
     const slackApp = await writeSlackApp(fake, appDir)
@@ -109,30 +113,13 @@ async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<Sync
     await juno.signIn().then(() => juno.waitForSync()).finally(running.close)
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: synced-build ${Math.round(performance.now() - started)} ms`)
     printCpuSince('synced-build', startedCpu)
-    return { port: Number(new URL(fake.url).port), seedTime, sessions: fake.sessions(), fakeState: fakeState(fake) }
+    return { port: Number(new URL(fake.url).port), seedTime, sessions: fake.sessions(), fakeState: fakeState(fake), ...seedKey(seed) }
   } finally {
     await fake.close()
     await rm(appDir, { recursive: true, force: true })
   }
 }
 
-/**
- * Setup a test waits for but does not own: the run's browser snapshot, which the first worker to ask builds while
- * the others wait, or this worker's synced workspace, which its first synced test builds. Its time goes back to the
- * test's timeout, its lane's limit on the test's own time, and a `warmup` annotation keeps it out of the time the
- * results reporter records (scripts/test-results-reporter.mjs).
- */
-async function warmup<A>(testInfo: TestInfo, work: () => Promise<A>): Promise<A> {
-  const started = performance.now()
-  try {
-    return await work()
-  } finally {
-    const ms = Math.round(performance.now() - started)
-    // Slow: gives back only the time of setup the test does not own.
-    if (testInfo.timeout > 0) testInfo.setTimeout(testInfo.timeout + ms)
-    testInfo.annotations.push({ type: 'warmup', description: String(ms) })
-  }
-}
 
 /** A fixture Slack-app directory with one of the fake's sessions; `remove` deletes it. */
 async function slackAppFor(fake: FakeSlack): Promise<SlackAppFixture & { readonly remove: () => Promise<void> }> {
@@ -142,7 +129,7 @@ async function slackAppFor(fake: FakeSlack): Promise<SlackAppFixture & { readonl
 
 /** A fake that makes the synced workspace's seed again, on its port, accepting its sessions. */
 function matchingFake(workspace: SyncedWorkspace): Promise<FakeSlack> {
-  return startFakeSlack({ port: workspace.port, seedTime: workspace.seedTime, sessions: workspace.sessions })
+  return startFakeSlack({ port: workspace.port, seedTime: workspace.seedTime, sessions: workspace.sessions, ...seedOption(workspace.seed) })
 }
 
 /** Launches the app once per test with a fresh user-data directory, against its own fake Slack. */
@@ -205,12 +192,13 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     }
   },
   synced: [false, { option: true }],
-  syncedStart: async ({ synced, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis, lane, webBrowser, hostPool }, use, testInfo) => {
+  syncedSeed: ['default', { option: true }],
+  syncedStart: async ({ synced, syncedSeed, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis, lane, webBrowser, hostPool }, use, testInfo) => {
     if (!synced) return use(undefined)
     // AI jobs keep working after the first sync, so a copy would hold titles and art a fresh sign-in has not made yet.
     if (aiJobs) throw new Error('synced: true does not combine with aiJobs: true; sign in instead.')
     if (lane === 'web') {
-      const snapshot = await warmup(testInfo, async () => webSnapshot(await webBrowser(), hostPool, { timing: timing ?? 'fast', ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }))
+      const snapshot = await warmup(testInfo, async () => webSnapshot(await webBrowser(), hostPool, { timing: timing ?? 'fast', ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }, syncedSeed))
       const fake = await matchingWebFake(snapshot)
       try {
         if (snapshotState(fake) !== snapshot.fakeState || fake.server.sockets.size !== 0) throw new Error('The new fake does not match the synced snapshot, or already has a socket.')
@@ -221,8 +209,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       return
     }
     const options: SyncOptions = { timing: launchTiming(timing === undefined ? {} : { timing }), ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }
-    const key = await syncedKey(options)
-    let workspace = await warmup(testInfo, () => syncedWorkspaces.get(key, (dir) => buildSynced(dir, options)))
+    const key = await syncedKey({ ...options, ...seedKey(syncedSeed) })
+    let workspace = await warmup(testInfo, () => syncedWorkspaces.get(key, (dir) => buildSynced(dir, options, syncedSeed)))
     let fake: FakeSlack
     try {
       fake = await matchingFake(workspace)
@@ -230,7 +218,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       // Something else took the port since the build: build again on a new one.
       if (!(error instanceof Error) || !('code' in error) || error.code !== 'EADDRINUSE') throw error
       syncedWorkspaces.forget(key)
-      workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options))
+      workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options, syncedSeed))
       fake = await matchingFake(workspace)
     }
     try {
