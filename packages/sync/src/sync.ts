@@ -118,7 +118,7 @@ export interface TopicFetcher {
   readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
   /** The replies after `after` in a thread, when the store cannot prove them (`fetchNewer`). */
   readonly newer: (topicId: string, after: string) => Effect.Effect<FetchReport, OpenError>
-  /** Stores the message `ts` in full for a jump to it (`fetchAt`). */
+  /** Stores the message `ts` in full for a jump to it (`fetchAt`). Concurrent jumps to one message share the read. */
   readonly at: (topicId: string, ts: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores a DM-open answer through the running metadata fence. */
   readonly opened: (channel: Parameters<typeof applyOpened>[1]) => Effect.Effect<void, SqlError>

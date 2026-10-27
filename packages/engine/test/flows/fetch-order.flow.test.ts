@@ -1,7 +1,7 @@
 // Which topic fetch Slack is asked first (architecture 5.1 and 5.5): the user's own open and jump go
 // before the pages read ahead of them. Here the search reader has stepped through three long threads,
 // whose opens read their later pages, and the user jumps to a reply far into the last one. Slack holds
-// every later page; the jump is answered while they are still held.
+// every later page; the jump is answered while they are still held, and asked twice it reads once.
 import type { FakeSlack } from '@juno/fake-slack'
 import { loadMessageAt, messagesAtom, openTopic } from '@juno/state'
 import { afterEach, expect, it } from 'bun:test'
@@ -47,15 +47,18 @@ it("a jump far into a thread is answered while the opens' later pages are held",
 
   const last = threads[2]!
   const target = last.replies[199]!.ts
-  await step('the jump is answered while every later page is still held, and its window shows the reply', async () => {
-    let answered = false
-    const jump = loadMessageAt(engine.registry, last.id, target).then((exit) => {
-      answered = true
+  await step('the jump, asked twice as the reader does, is answered while every later page is still held, reads its pages once, and its window shows the reply', async () => {
+    const asked = apiCalls(engine, 'conversations.replies').length
+    let answered = 0
+    const jumps = [loadMessageAt(engine.registry, last.id, target), loadMessageAt(engine.registry, last.id, target)].map((jump) => jump.then((exit) => {
+      answered += 1
       return exit
-    })
-    await waitFor(() => (answered ? true : undefined), WAIT_MS, 'the jump answered')
-    expect(valueOf(await jump).outcome).toBe('fetched')
+    }))
+    await waitFor(() => (answered === 2 ? true : undefined), WAIT_MS, 'both jumps answered')
+    for (const jump of jumps) expect(valueOf(await jump).outcome).toBe('fetched')
     expect(engine.fake.gated().filter((call) => call.stage === 'before').length).toBeGreaterThanOrEqual(2)
+    // The page up to the reply and the page from it, once.
+    expect(apiCalls(engine, 'conversations.replies').slice(asked).filter((call) => call.args['ts'] === last.root.ts)).toHaveLength(2)
     const atom = messagesAtom(last.id, { anchor: target, before: 50, limit: 150 })
     unmounts.push(engine.registry.mount(atom))
     await waitFor(() => {
