@@ -155,7 +155,7 @@ const THREAD_ROW = '[data-thread]'
 /** What in a row handles its own click and ⌘-click: links, people, chips, files, pictures, reactions, buttons. */
 const CONTROL = 'a, button, input, textarea, select, audio, video, [role="button"], [role="link"], [data-opens-person], [data-thumbnail], [data-reaction], [data-file-card], [data-message-more]'
 
-/** The row a ⌘-press on `target` opens: one pressed on itself, not on a control in it, and not being edited. */
+/** The row a ⌘-press opens: one pressed on itself, not on a control in it, and not being edited. */
 function plainRow(event: MouseEvent<HTMLElement>): string | undefined {
   const target = event.target
   if (!event.metaKey || event.button !== 0 || !(target instanceof Element)) return undefined
