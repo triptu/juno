@@ -7,10 +7,12 @@ import { millisToTs, type IndexMessage, type UserId } from '@juno/domain'
 import type { Block, File } from '@juno/slack-schema'
 import { StoreWriter, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
+import type { PostState } from './posts'
 
-/** A pending post as the rule reads it (`posts.ts`). */
+/** A pending post as the rule reads it (`posts.ts`). Its state is part of the topic's mark (`topicInputs.ts`). */
 export interface PendingRow {
   readonly client_msg_id: string
+  readonly state: PostState
   readonly text: string
   readonly blocks_json: string | null
   readonly file_ids_json: string | null
@@ -21,12 +23,21 @@ export interface PendingRow {
 export const pendingPosts = (channel: string, threadTs: string | undefined): Effect.Effect<ReadonlyArray<PendingRow>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    return yield* sql<PendingRow>`SELECT client_msg_id, text, blocks_json, file_ids_json, created_at FROM pending_messages
+    return yield* sql<PendingRow>`SELECT client_msg_id, state, text, blocks_json, file_ids_json, created_at FROM pending_messages
       WHERE channel = ${channel} AND thread_ts IS ${threadTs ?? null} ORDER BY created_at, client_msg_id`
   })
 
+/**
+ * The posts that count as the user's messages: every one but those Slack
+ * refused. A refused post stays in its topic with "Not sent." (SPEC 8,
+ * "Sending"), but Slack never had it, so it is no activity; Retry makes it
+ * count again.
+ */
+export const ownMessages = (pending: ReadonlyArray<PendingRow>, me: UserId) =>
+  pending.filter((post) => post.state !== 'failed').map((post) => ownMessage(post, me))
+
 /** A pending post as the user's message at the time it was queued. Its files are named by their staged names until Slack has them. */
-export const ownMessage = (post: PendingRow, me: UserId): IndexMessage & { readonly text: string } => ({
+const ownMessage = (post: PendingRow, me: UserId): IndexMessage & { readonly text: string } => ({
   ts: millisToTs(Number(post.created_at)),
   userId: me,
   text: post.text,

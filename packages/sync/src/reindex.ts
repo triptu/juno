@@ -28,8 +28,8 @@
  *   activity `client.counts` reported, so a search preview does not move it down.
  * - Ephemeral messages are left out: they never set a row's preview,
  *   activity, unread count or mention.
- * - Juno's own posts Slack has not stored yet count as the user's messages
- *   when queued (`ownPosts.ts`), so a send moves its topic before Slack answers.
+ * - Juno's own posts Slack has not stored or refused count as the user's
+ *   messages when queued (`ownPosts.ts`): a send moves its topic at once.
  */
 import {
   compareTs,
@@ -50,7 +50,7 @@ import { Invalidation, StoreWriter, type MessageRow, type SqlError, type TopicIn
 import { Effect } from 'effect'
 import { messageTopics, syncKeys } from './keys'
 import { countExact } from './threadRanges'
-import { ownMessage, pendingPosts } from './ownPosts'
+import { ownMessages, pendingPosts } from './ownPosts'
 import { markUpToDate, storedRow, topicInputs } from './topicInputs'
 import { latestSyncedRange, readState, threadMessages, threadRanges } from './write'
 
@@ -146,7 +146,7 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const live = rows.filter((r) => r.deleted === 0 && r.ephemeral !== 1)
     let latest: MessageRow | undefined
     for (const row of live) if (latest === undefined || compareTs(row.ts, latest.ts) > 0) latest = row
-    const own = pending.map((post) => ownMessage(post, options.me.userId))
+    const own = ownMessages(pending, options.me.userId)
     const lastOwn = own.at(-1)
     // What the preview reads: the newest message, a pending post when it is newer than every stored one.
     const head = lastOwn !== undefined && (latest === undefined || compareTs(lastOwn.ts, latest.ts) > 0) ? { user_id: options.me.userId, bot_name: null, text: lastOwn.text } : latest

@@ -78,6 +78,9 @@ describe('re-indexing an unchanged topic', () => {
         // Juno's own reply before Slack has it (`pending_messages`, in user.db, out of the triggers' reach).
         ['a reply queued', transaction(queuePost({ clientMsgId: 'c1', channel: C, threadTs: ROOT, text: 'Mine', blocksJson: null, createdAt: 1_700_000_600_000 })), [THREAD]],
         ['the queued reply edited', sql`UPDATE pending_messages SET text = 'Mine, edited' WHERE client_msg_id = 'c1'`, [THREAD]],
+        // A refused post is no activity (`ownPosts.ts`); Retry makes it count again.
+        ['Slack refuses the reply', sql`UPDATE pending_messages SET state = 'failed' WHERE client_msg_id = 'c1'`, [THREAD]],
+        ['the reply retried', sql`UPDATE pending_messages SET state = 'queued' WHERE client_msg_id = 'c1'`, [THREAD]],
         ['Slack stores the reply', write(message({ ts: '1700000700.000100', thread_ts: ROOT, user: ME, text: 'Mine, edited', client_msg_id: 'c1' })), [THREAD]],
       ]
       for (const [step, change, changed] of steps) {
