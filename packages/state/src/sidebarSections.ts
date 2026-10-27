@@ -59,7 +59,8 @@ const trackedSectionsAtom = Atom.make((get): TrackedSections => {
   const next = { ready, pinned, recent, total: window.meta.total, filter: window.filter, retained: window.retained, instant }
   const before = Option.getOrUndefined(get.self<TrackedSections>())
   const changed = before === undefined || !sameSections(before, next)
-  const own = window.meta.own === true || before?.instant !== instant
+  // A settle after a sync cycle carries the last write's `meta`, but moves only rows held for changes from elsewhere.
+  const own = (window.meta.own === true && window.settled !== true) || before?.instant !== instant
   return { ...next, moves: changed ? moves?.(before, next, own, window.building === true) ?? 'instant' : before.moves }
 })
 
