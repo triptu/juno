@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState, type ReactNode } from 'react'
-import type { BodyBlock, BodyInline, FileKind } from '@juno/contract'
+import type { BodyBlock, BodyInline, FileKind, FileView } from '@juno/contract'
 import { colors, spacing, text, tints, layout, radii } from '@juno/tokens/tokens.stylex'
-import { Button, Icon, Text } from '@juno/ui'
+import { Button, focusRing, Icon, Text } from '@juno/ui'
 import { fileIcon } from './FileCard'
 import { kindIcon } from './look'
 import { thumbnailBox } from './MediaGrid'
@@ -87,11 +87,32 @@ function fieldParts(item: ReadonlyArray<BodyInline>): { readonly label?: string;
   return { label: lead.map((inline) => (inline.kind === 'text' ? inline.text : '')).join(''), value: item.slice(end + 1) }
 }
 
-export function AttachmentImage({ image }: { readonly image: Extract<BodyBlock, { kind: 'image' }> }) {
+type ImageBlock = Extract<BodyBlock, { kind: 'image' }>
+
+/**
+ * A picture a message links to (an unfurl's, a bot's image block), in the
+ * box its size gives. An animated GIF plays, as Slack plays it. With
+ * `onOpen` it is a button that opens it in the media viewer.
+ */
+export function AttachmentImage({ image, onOpen, tabIndex = -1 }: { readonly image: ImageBlock; readonly onOpen?: ((file: FileView) => void) | undefined; readonly tabIndex?: 0 | -1 }) {
   const [failed, setFailed] = useState<string>()
   if (failed === image.url) return null
-  const box = image.width && image.height && image.width > 0 && image.height > 0 ? thumbnailBox(image.width, image.height) : thumbnailBox()
-  return <div {...stylex.props(styles.imageBox(box.width, box.height))}><img src={imageSource(image.url)} alt={image.alt} onError={() => setFailed(image.url)} loading="lazy" decoding="async" {...stylex.props(styles.image)} /></div>
+  const sized = image.width !== undefined && image.height !== undefined && image.width > 0 && image.height > 0
+  const box = sized ? thumbnailBox(image.width, image.height) : thumbnailBox()
+  const src = imageSource(image.url)
+  const picture = <img src={src} alt={image.alt} onError={() => setFailed(image.url)} loading="lazy" decoding="async" {...stylex.props(styles.image)} />
+  if (onOpen === undefined) return <div {...stylex.props(styles.imageBox(box.width, box.height))}>{picture}</div>
+  const name = image.alt || 'Image'
+  // The viewer shows it as a picture with no Slack file behind it: no Download or Open in Preview.
+  const file: FileView = { id: src, name, kind: 'image', ...(sized ? { width: image.width, height: image.height } : {}), thumb: { src, width: box.width, height: box.height }, full: src }
+  return <button type="button" aria-label={`Open ${name}`} title={name} tabIndex={tabIndex} data-message-image="" onClick={() => onOpen(file)} {...stylex.props(styles.imageBox(box.width, box.height), styles.imageButton, focusRing.outside)}>{picture}</button>
+}
+
+/** A context block's image element: a small icon before its text, as Slack draws it. */
+export function ContextIcon({ url, alt }: { readonly url: string; readonly alt: string }) {
+  const [failed, setFailed] = useState<string>()
+  if (failed === url) return null
+  return <img src={imageSource(url)} alt={alt} onError={() => setFailed(url)} decoding="async" draggable={false} {...stylex.props(styles.contextIcon)} />
 }
 
 function imageSource(url: string): string {
@@ -134,6 +155,9 @@ const styles = stylex.create({
   // The ratio sets the height, so a picture narrowed to fit the column keeps its shape.
   imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
   image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
+  imageButton: { display: 'block', padding: 0, borderWidth: 0, font: 'inherit', color: 'inherit', cursor: 'default' },
+  // Sized before the bytes arrive, on the line's text, so the line never moves.
+  contextIcon: { display: 'inline-block', width: spacing['--space-4'], height: spacing['--space-4'], objectFit: 'contain', verticalAlign: 'text-bottom', marginInlineEnd: spacing['--space-1'], borderRadius: radii['--radius-xs'] },
 })
 // The bar is the card's only colour, so it takes the status colour itself:
 // the pale tint fills vanish against the dark background.

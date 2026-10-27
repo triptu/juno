@@ -1,7 +1,7 @@
 /** Slack `blocks` → `MessageBody`. `rich_text` is rendered faithfully; layout blocks get a plain rendering. */
 import { Schema } from 'effect'
 import { Block as SlackBlockSchema, type Block as SlackBlock, type RichTextElement, type RichTextInline, type RichTextListStyle, type TableBlock, type TableCell, type TableColumnSetting, type TextObject } from '@juno/slack-schema'
-import type { ContentBlock as Block, Inline, ListStyle, Lookups, TableColumn } from './model'
+import type { ContentBlock as Block, ContextIcon, Inline, ListStyle, Lookups, TableColumn } from './model'
 import { channelInline, dateInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
 import { emojiInline } from './emoji'
 import { codeBlock } from './code'
@@ -120,19 +120,25 @@ function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
       return children.length === 0 ? [] : [{ kind: 'heading', children }]
     }
     case 'context': {
+      // An image element is a small icon, as Slack draws it; its alt text is not part of the line.
       const children: Inline[] = []
+      const icons: ContextIcon[] = []
       for (const el of block.elements) {
-        if (el.type === 'image') { children.push(...textRuns(el.alt_text)); continue }
+        if (el.type === 'image') { if (el.image_url) icons.push({ url: el.image_url, alt: el.alt_text }); continue }
         if (el.type === 'unknown') { children.push(...textRuns(unknownText(el.raw))); continue }
         if (children.length > 0) children.push({ kind: 'text', text: ' ' })
         children.push(...textObjectInlines(el, lookups))
       }
-      return children.length ? [{ kind: 'context', children: normalize(children) }] : []
+      if (children.length === 0 && icons.length === 0) return []
+      return [{ kind: 'context', children: normalize(children), ...(icons.length > 0 ? { icons } : {}) }]
     }
     case 'divider':
       return [{ kind: 'divider' }]
-    case 'image':
-      return block.image_url ? [{ kind: 'image', url: block.image_url, alt: block.alt_text }] : paragraphOf(textRuns(block.alt_text))
+    case 'image': {
+      if (!block.image_url) return paragraphOf(textRuns(block.alt_text))
+      const { image_width: width, image_height: height } = block
+      return [{ kind: 'image', url: block.image_url, alt: block.alt_text, ...(width && height && width > 0 && height > 0 ? { width, height } : {}) }]
+    }
     case 'table':
       return tableBlocks(block, lookups)
     case 'unknown': {

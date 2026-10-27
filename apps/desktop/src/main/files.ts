@@ -15,13 +15,16 @@
  *   anything. The PDF frame itself is sandboxed with only scripts allowed.
  * - `juno://uploads/<id>.<ext>`: an image the composer staged, from the
  *   engine's `uploads/` folder, for its chip and the pending row.
+ * - `juno://images/?url=…`: a picture a message links to (an unfurl, a
+ *   bot's image block). A Slack file goes the `juno://files` way; any other
+ *   host is fetched with no credentials (`publicImage.ts`).
  * - `downloadFile`: Download, into ~/Downloads, then shown in Finder.
  * - `openFile`: the viewer's Open in browser for an HTML file, into a
  *   temporary folder, then opened in the default app.
  * - `quickLook`: Quick Look on a file card or in the viewer, into the same
  *   temporary folder, then shown in the macOS preview window.
- * - `copyImage`: the viewer's Copy image, from a `juno://files` or
- *   `juno://uploads` url, onto the clipboard as an image.
+ * - `copyImage`: the viewer's Copy image, from a `juno://files`,
+ *   `juno://uploads` or `juno://images` url, onto the clipboard as an image.
  */
 import { createHash } from 'node:crypto'
 import { app, clipboard, ClipboardItem, nativeImage, session as electronSession, shell, type BrowserWindow, type DownloadItem } from 'electron'
@@ -29,6 +32,7 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { readdir, readFile, rm } from 'node:fs/promises'
 import { join, parse } from 'node:path'
 import type { DownloadResult } from '@juno/contract'
+import { publicImage } from './publicImage'
 import { SLACK_PARTITION } from './slackSession'
 
 const SLACK_FILE_HOSTS = ['files.slack.com', 'slack-files.com', 'secure.gravatar.com']
@@ -280,7 +284,17 @@ export const fileTestHooks = {
   copiedImages: () => copiedForTests.images,
 }
 
-/** Copy image in the viewer: the bytes behind a `juno://files` or `juno://uploads` url, onto the clipboard. */
+/** A `juno://images` request: a Slack file on the Slack session, any other picture from its public host. */
+export async function serveImage(request: URL, fakeOrigin?: string): Promise<Response> {
+  try {
+    if (thumbnailUrl(request, fakeOrigin) !== undefined) return await serveThumbnail(request, fakeOrigin)
+    return await publicImage(new URL(request.searchParams.get('url') ?? ''))
+  } catch {
+    return new Response('Not found', { status: 404 })
+  }
+}
+
+/** Copy image in the viewer: the bytes behind a `juno://files`, `juno://uploads` or `juno://images` url, onto the clipboard. */
 export async function copyImage(src: string, extraOrigin: string | undefined, e2e: boolean): Promise<'copied' | 'failed'> {
   let url: URL
   try {
@@ -289,7 +303,10 @@ export async function copyImage(src: string, extraOrigin: string | undefined, e2
     return 'failed'
   }
   if (url.protocol !== 'juno:') return 'failed'
-  const response = url.host === 'files' && url.pathname !== '/avatar' ? await serveThumbnail(url, extraOrigin) : url.host === 'uploads' ? await serveUpload(url, app.getPath('userData')) : undefined
+  const response = url.host === 'files' && url.pathname !== '/avatar' ? await serveThumbnail(url, extraOrigin)
+    : url.host === 'uploads' ? await serveUpload(url, app.getPath('userData'))
+    : url.host === 'images' ? await serveImage(url, extraOrigin)
+    : undefined
   if (response === undefined || !response.ok) return 'failed'
   const image = nativeImage.createFromBuffer(Buffer.from(await response.arrayBuffer()))
   if (image.isEmpty()) return 'failed'

@@ -228,6 +228,8 @@ export const Message = memo(function Message({
           const viewing = viewingOf(message.files, file.id, name, message.at)
           if (viewing !== undefined) onOpenMedia(viewing)
         }
+  // A picture the message links to is not one of its files: it opens on its own.
+  const openImage = onOpenMedia === undefined ? undefined : (file: FileView) => onOpenMedia({ items: [file], index: 0, sender: name, at: message.at })
   // A shared message's files are drawn in its card; the rest under the body.
   const carded = cardFileIds(message)
   const own = carded === undefined ? message.files : message.files.filter((file) => !carded.has(file.id))
@@ -304,7 +306,7 @@ export const Message = memo(function Message({
         {editor !== undefined ? (
           editor
         ) : message.kind === 'message' ? (
-          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabbable={tabbable} renderFiles={renderFiles} onButton={onButton} />
+          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabbable={tabbable} renderFiles={renderFiles} onButton={onButton} onOpenImage={openImage} />
         ) : (
           <Text variant="body" tone="muted" as="p" sx={styles.placeholder}>
             {message.kind === 'deleted' ? 'This message was deleted.' : 'Loading message'}

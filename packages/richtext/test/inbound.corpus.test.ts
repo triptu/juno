@@ -237,14 +237,16 @@ const rows: ReadonlyArray<Row> = [
 
   // Bot layout blocks.
   {
-    name: 'a bot message: header, mrkdwn section, divider, context',
+    name: 'a bot message: header, section, divider, then a /giphy post: the sized GIF, and its logo as an icon, not words', hides: ['logo'],
     slack: { blocks: [
-      { type: 'header', text: { type: 'plain_text', text: 'Deploy finished' } }, { type: 'section', text: { type: 'mrkdwn', text: '*prod* is on <https://example.com/r/42|release 42>' } },
-      { type: 'divider' }, { type: 'context', elements: [{ type: 'image', alt_text: 'avatar' }, { type: 'mrkdwn', text: 'by <@U0LEO>' }] },
+      { type: 'header', text: { type: 'plain_text', text: 'Deploy finished' } }, { type: 'section', text: { type: 'mrkdwn', text: '*prod* is on <https://example.com/r/42|release 42>' } }, { type: 'divider' },
+      { type: 'image', image_url: 'https://example.test/cat.gif', alt_text: 'cat', title: { type: 'plain_text', text: 'cat' }, image_width: 480, image_height: 270, image_bytes: 9, is_animated: true, fallback: '480x270px image' },
+      { type: 'context', elements: [{ type: 'image', image_url: 'https://example.test/logo.png', alt_text: 'logo' }, { type: 'mrkdwn', text: 'by <@U0LEO>' }] },
     ] },
     blocks: [
-      { kind: 'heading', children: [text('Deploy finished')] }, para(text('prod', bold), text(' is on '), { kind: 'link', url: 'https://example.com/r/42', text: 'release 42' }),
-      { kind: 'divider' }, { kind: 'context', children: [text('avatar by '), { kind: 'user', id: 'U0LEO', name: 'Leo Park', isMe: false }] },
+      { kind: 'heading', children: [text('Deploy finished')] }, para(text('prod', bold), text(' is on '), { kind: 'link', url: 'https://example.com/r/42', text: 'release 42' }), { kind: 'divider' },
+      { kind: 'image', url: 'https://example.test/cat.gif', alt: 'cat', width: 480, height: 270 },
+      { kind: 'context', children: [text('by '), { kind: 'user', id: 'U0LEO', name: 'Leo Park', isMe: false }], icons: [{ url: 'https://example.test/logo.png', alt: 'logo' }] },
     ],
   },
   {

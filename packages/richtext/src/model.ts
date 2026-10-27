@@ -55,7 +55,8 @@ export type ContentBlock =
   | { readonly kind: 'heading'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'divider' }
   | { readonly kind: 'fields'; readonly items: ReadonlyArray<ReadonlyArray<Inline>> }
-  | { readonly kind: 'context'; readonly children: ReadonlyArray<Inline> }
+  /** A context line. `icons` are its image elements (an app's logo, a person's photo), drawn small before the text. */
+  | { readonly kind: 'context'; readonly children: ReadonlyArray<Inline>; readonly icons?: ReadonlyArray<ContextIcon> }
   | { readonly kind: 'image'; readonly url: string; readonly alt: string; readonly width?: number; readonly height?: number }
   | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
   /** An attachment's buttons, in Slack's order; `attachment` is its `id`. A button with a link is a link instead. */
@@ -74,6 +75,12 @@ export type ContentBlock =
       readonly caption?: string
       readonly showCaption?: true
     }
+
+/** An image element of a context block; `alt` names it for a screen reader, never in the line. */
+export interface ContextIcon {
+  readonly url: string
+  readonly alt: string
+}
 
 /**
  * A legacy attachment's button that goes back to its app. `id` names it in

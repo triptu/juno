@@ -39,8 +39,16 @@ const sharedFiles: BodyBlock = { ...shared, blocks: [{ kind: 'file', id: 'F0REC'
 // A place Juno does not know keeps Slack's footer, as the link.
 const sharedElsewhere: BodyBlock = { ...sharedWords, footer: [{ kind: 'link', url: permalink, text: 'Thread in Slack conversation' }, { kind: 'text', text: ' · ' }, sharedDate] }
 
+// A /giphy post: the GIF in the box its size gives, then the context line with the app's logo as an icon and the GIF's author.
+const gif = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="480" height="270"%3E%3Crect width="480" height="270" fill="lightgray"/%3E%3Ccircle cx="240" cy="135" r="70" fill="gray"/%3E%3C/svg%3E'
+const giphy: BodyBlock[] = [
+  { kind: 'image', url: gif, alt: 'dancing cat', width: 480, height: 270 },
+  { kind: 'context', icons: [{ url: icon, alt: 'app logo' }], children: [{ kind: 'text', text: 'Posted using /giphy | GIF by ' }, { kind: 'link', url: 'https://example.test/studio', text: 'Example Studio' }] },
+]
+
 export default defineFixtures(MessageBody, {
   pr: state(pr),
+  giphy: fixture<MessageBodyProps>({ ...state(...giphy).props, onOpenImage: () => {} }),
   'x-image': state({ ...tweet, blocks: [...tweet.blocks, { kind: 'image', url: previewImage, alt: 'Experiment results', width: 600, height: 400 }] }),
   'x-text': state(tweet),
   'shared-message': state({ kind: 'paragraph', children: [{ kind: 'text', text: 'Worth a look' }] }, shared),

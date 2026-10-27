@@ -167,6 +167,9 @@ export const ImageBlock = S.Struct({
   alt_text: S.String,
   title: opt(TextObject),
   slack_file: opt(S.Unknown),
+  // Slack adds the picture's size on read (a /giphy GIF has them), so its box is known before the bytes.
+  image_width: opt(S.Number),
+  image_height: opt(S.Number),
 })
 
 /**
