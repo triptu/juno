@@ -91,11 +91,15 @@ export async function navigateMatches({ juno, fake }: Pick<Fixtures, 'juno' | 'f
     if (match) matches.push(row.ts)
   }
   const page = searchPage(juno.win)
+  // With none of the thread fetched (the results' warm-up starts as they show), the count still takes in both of
+  // Slack's matches. Then the steps run while the first fetch lands: the reader asks its window again after each load.
+  fake.holdNext({ method: 'conversations.replies', times: 100 })
   await juno.surface.appMenu('search-messages')
   await page.field.fill('navigationprobe has:file ')
   await expect(page.rows).toHaveCount(2)
   await page.row('navigationprobe entry 640').click()
   await expect(page.reader.locator('[data-match-count]')).toHaveText('2 of 2')
+  fake.release({ method: 'conversations.replies' })
   await page.reader.locator('button[aria-label^="Previous match (2 of 2)"]').click()
   await expect(page.reader.locator(`[data-message-row="${matches[0]}"]`)).toBeVisible()
   await expect(page.reader.locator('[data-match-count]')).toHaveText('1 of 2')

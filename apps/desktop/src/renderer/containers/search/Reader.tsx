@@ -78,13 +78,31 @@ export function moveReader(sessionId: string, target: SearchSelection, how: 'poi
   const ts = target.ts
   if (ts === undefined) return
   const land = () => {
-    if (!registry.get(messageListAtom(view)).rows.has(ts)) registry.set(messageWindowSpecAtom(view), matchWindow(ts))
+    const anchor = () => registry.set(messageWindowSpecAtom(view), matchWindow(ts))
+    if (!registry.get(messageListAtom(view)).rows.has(ts)) anchor()
+    else keepMatch(sessionId, view, ts, anchor)
     flashMessage(registry, target.topicId, ts)
   }
   if (target.stored !== false) return land()
   // A match only Slack found is fetched first, and landed on if it is still the selection.
   void loadMessageAt(registry, target.topicId, ts).then(() => {
     if (registry.get(searchSessionAtom(sessionId)).selected?.ts === ts) land()
+  })
+}
+
+/**
+ * A match in the window the reader shows can still leave it: a fetch filling the gap between two matches moves a
+ * window that briefly reached across the gap back to the rows it fills. While the window keeps the spec it had (the
+ * rows moved under it, not a scroll or another step) and the match is still the selection, the reader anchors at the
+ * match if it leaves (`navigateMatches` in `e2e/searchSteps.ts`: the step stayed on the old rows in 3 of 41 runs).
+ */
+function keepMatch(sessionId: string, view: string, ts: string, anchor: () => void): void {
+  const spec = registry.get(messageWindowSpecAtom(view))
+  const off = registry.subscribe(messageListAtom(view), (list) => {
+    if (registry.get(messageWindowSpecAtom(view)) !== spec || registry.get(searchSessionAtom(sessionId)).selected?.ts !== ts) return off()
+    if (list.rows.has(ts)) return
+    off()
+    anchor()
   })
 }
 
