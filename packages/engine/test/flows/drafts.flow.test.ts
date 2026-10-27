@@ -47,6 +47,8 @@ const owed = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => db.pre
 /** What Juno sent from the Main, with the draft each text went from. */
 const sentRecords = (engine: RunningEngine) =>
   readDb(engine, 'user.db', (db) => JSON.parse((db.prepare('SELECT sent_json FROM draft_sync WHERE topic_id = ?').get(MAIN) as { sent_json: string | null } | undefined)?.sent_json ?? '[]') as ReadonlyArray<{ readonly id?: string; readonly settled?: boolean }>)
+/** The post made after the first `before`, once it reaches Slack. */
+const nextPost = (engine: RunningEngine, before: number) => waitFor(() => apiCalls(engine, 'chat.postMessage')[before], 15_000, 'the post at Slack')
 const postFailed = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => db.prepare("SELECT 1 FROM pending_messages WHERE state = 'failed'").get() !== undefined)
 /** The local text Juno keeps for ⌘Z. */
 const kept = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => (db.prepare('SELECT replaced FROM draft_sync WHERE topic_id = ?').get(MAIN) as { replaced: string | null } | undefined)?.replaced ?? undefined)
@@ -111,10 +113,11 @@ it('drafts reach Slack after a pause, come back from other devices, keep newer t
     await type(engine, '', true)
     await engine.workPass('draft')
     await type(engine, 'Sent from the files draft', true)
+    const posts = apiCalls(engine, 'chat.postMessage').length
     await send(engine, 'Sent from the files draft')
+    expect((await nextPost(engine, posts)).args['draft_id']).toBeUndefined()
     await engine.workPass('draft')
     expect(draftCalls(engine).slice(before)).toEqual([])
-    expect(apiCalls(engine, 'chat.postMessage').at(-1)?.args['draft_id']).toBeUndefined()
     expect(fake.draft('C0ENG')).toEqual({ text: 'Caption from the phone', fileIds: draft.file_ids ?? [] })
     // The phone removes it, which leaves the Main with no draft for the steps after.
     fake.removeDraft({ channel: 'C0ENG' })
@@ -127,11 +130,12 @@ it('drafts reach Slack after a pause, come back from other devices, keep newer t
     // The phone writes on the draft as the send goes; Juno hears it after.
     fake.holdFrames({ types: ['draft_update'] })
     fake.putDraft({ channel: 'C0ENG', text: 'Phone text written meanwhile' })
+    const posts = apiCalls(engine, 'chat.postMessage').length
     await send(engine, 'Meant for the thread', tsOf(threadId(fake, 'C0ENG', THREAD)))
     fake.releaseFrames()
+    expect((await nextPost(engine, posts)).args['draft_id']).toBeUndefined()
     await waitFor(() => (stored(engine) === 'Phone text written meanwhile' ? true : undefined), 15_000, 'the phone’s text in the Main')
     expect(fake.draftText('C0ENG')).toBe('Phone text written meanwhile')
-    expect(apiCalls(engine, 'chat.postMessage').at(-1)?.args['draft_id']).toBeUndefined()
     await waitFor(() => settled(engine), 15_000, 'the draft linked')
   })
 
