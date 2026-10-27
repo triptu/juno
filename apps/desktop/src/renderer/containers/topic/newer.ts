@@ -39,12 +39,14 @@ export function useNewerPages(position: Position, id: string, view: string, list
         if (!entries.some((entry) => entry.isIntersecting)) return
         observer.disconnect()
         setLoading(true)
+        const asked = registry.get(messageWindowSpecAtom(view))
         void loadNewerMessages(registry, id, last).then((exit) => {
           const outcome = exit._tag === 'Success' ? exit.value.outcome : undefined
           const answered = outcome === 'fetched' || outcome === 'cached'
           settle(last, answered, outcome === 'fetched')
           const spec = registry.get(messageWindowSpecAtom(view))
-          if (answered && spec.anchor !== undefined) {
+          // A window moved meanwhile (a jump, a search step) is not the one this page widens.
+          if (answered && spec === asked && spec.anchor !== undefined) {
             const next = widened(spec, registry.get(messageListAtom(view)).order)
             if (next.anchor !== spec.anchor) {
               const inView = pinRef.current?.kind === 'bottom' ? undefined : rowInView(scroller)
