@@ -74,7 +74,10 @@ export interface SidebarWindow extends ListWindow<TopicRow> {
   readonly building?: boolean
   /** Shown in a held order (`sidebarListAtom`). */
   readonly held?: boolean
-  /** Kept out of recency order while a sync cycle ran (`keepPainted`): it takes the true order once the cycle ends. */
+  /**
+   * Kept out of recency order while a sync cycle ran (`keepPainted`): it takes the true order once the cycle ends.
+   * A widening of the quiet window does not set it: its rows stay last until the list next changes.
+   */
   readonly kept?: boolean
   /**
    * The true order a kept list took when its cycle ended. Every row it moves
@@ -191,10 +194,13 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
     const keeping = (syncing && !building) || widened
     // Nothing new, unless a cycle kept the list out of order and has ended: then the rows settle to their true order.
     if (shown.meta === next.meta && (keeping || shown.kept !== true)) return shown
-    // A cycle keeps a painted list in place, except for live activity (`keepPainted`).
+    // A cycle or a widening keeps a painted list in place, except for live activity (`keepPainted`). Rows a cycle
+    // kept settle when it ends; the rows a widening adds stay last until the list next changes, even when raising
+    // the window started a cycle.
     if (keeping) {
       const order = keepPainted(shown, next, status._tag === 'Success' ? status.value.startedAt : Infinity)
-      return { ...next, order, filter, ...(sameOrder(order, next.order) ? {} : { kept: true }) }
+      const kept = shown.kept === true || (!widened && !sameOrder(order, next.order))
+      return { ...next, order, filter, ...(kept ? { kept: true } : {}) }
     }
     // The settle moves only rows held for changes from elsewhere: it slides, whatever the last write was.
     if (shown.meta === next.meta) return { ...next, filter, ...mark, settled: true }
