@@ -4,7 +4,7 @@ The two SQLite databases of one workspace and how to read and write them. See `d
 
 - FTS indexes: `messages_fts`, `topic_titles_fts` (root text), `channels_fts` and `people_fts` in cache.db, and `overlay_titles_fts` (manual and AI titles) in user.db. Triggers keep them in the same transaction as their source rows.
 - `cache.db`: the Slack mirror. Updates keep it: new migrations run on the existing file. It is deleted and rebuilt only when `CACHE_RESET_EPOCH` changes or SQLite cannot open or migrate the existing cache. Recovery keeps `user.db`, including preferences and the outbox.
-- `user.db`: Juno's own state (overlay, reads, outbox, prefs). Durable; migrations are incremental and never edited once shipped.
+- `user.db`: Juno's own state (overlay, reads, drafts and `draft_sync`, outbox, prefs). Durable; migrations are incremental and never edited once shipped.
 
 The unused `topic_overlay.tracked` column remains from the initial migration. Reply tracking was removed on 10-14; no code reads or writes this column, and shipped migrations stay unchanged.
 

@@ -19,13 +19,12 @@ import { Clock, Effect } from 'effect'
 import { MAX_FILES_PER_MESSAGE, NotFound, NotSignedIn, Rejected, type SendError, type SendResult, type SendTarget } from '@juno/contract'
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { StoreWriter, transaction } from '@juno/store'
-import { discardPost, readPost, retryPost, startThread } from '@juno/sync'
+import { discardPost, readPost, retryPost, sendDraft, startThread } from '@juno/sync'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
 import { queueText } from '../postQueue'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
-import { clearDraft } from './drafts'
 
 export interface SendInput {
   readonly startThread?: boolean
@@ -55,8 +54,11 @@ export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendErr
     const now = yield* Clock.currentTimeMillis
     const topicId = yield* transaction(
       Effect.gen(function* () {
-        const text = yield* queueText({ clientMsgId: input.clientMsgId, channel, threadTs, text: input.text, files, createdAt: now })
-        if (input.draftOf !== undefined) yield* clearDraft(input.draftOf)
+        // Slack's draft goes with the post (`draft_id`) when the post goes where the draft was; a post sent elsewhere leaves it for Juno to delete.
+        const here = input.draftOf !== undefined && input.startThread !== true && input.draftOf === (threadTs === undefined ? mainTopicId(channel as ChannelId) : threadTs.startsWith('pending:') ? `p:${channel}:${threadTs.slice(8)}` : threadTopicId(channel as ChannelId, threadTs as Ts))
+        // The draft remembers the text this post carries, so that text never comes back as the draft.
+        const draftId = input.draftOf === undefined ? undefined : yield* sendDraft(input.draftOf, input.text, now, here)
+        const text = yield* queueText({ clientMsgId: input.clientMsgId, channel, threadTs, text: input.text, files, createdAt: now, ...(draftId === undefined ? {} : { draftId }) })
         if (input.startThread === true && threadTs === undefined) {
           const sql = yield* StoreWriter
           const conversation = (yield* sql<{ kind: string }>`SELECT kind FROM conversations WHERE id = ${channel}`)[0]

@@ -1,12 +1,13 @@
 /**
  * Handlers for the send routes (`contract/src/routes/send.ts`). The commands
  * write locally and wake `PostWorker` and `ActionWorker`; `drafts.get` follows the open
- * workspace and never calls Slack. `messages.precheck` asks the route model; `messages.check` reads its answer.
+ * workspace and never calls Slack, and `drafts.set` hands the draft to `DraftSync`, which keeps it in step
+ * with Slack's. `messages.precheck` asks the route model; `messages.check` reads its answer.
  * `messages.postcheck` and `messages.grammar` check a sent message afterwards (`checks.ts`, `grammar.ts`).
  * `messages.attachmentAction` sends a button press straight to Slack (`buttons.ts`).
  */
 import { decodeDraft, NotSignedIn, SendRoutes } from '@juno/contract'
-import { liveQuery, transaction } from '@juno/store'
+import { liveQuery } from '@juno/store'
 import { AiProvider } from '@juno/ai'
 import { Clock, Effect, Stream } from 'effect'
 import { EngineConfig } from '../config'
@@ -23,7 +24,8 @@ import { checkMessage, dailyBudget, grammarForSent, postcheckMessage, precheckMe
 import { grammarChecks } from './grammar'
 import { discardMessage, retryMessage, sendMessage } from './commands'
 import { forwardMessage } from './forward'
-import { draftKeys, readDraft, writeDraft } from './drafts'
+import { draftKeys, readDraft } from './drafts'
+import { DraftSync } from '../draftSync'
 import { PostWorker } from './worker'
 
 /** How long after a send its checks may still answer (SPEC section 8). A later grammar answer is dropped. */
@@ -40,6 +42,7 @@ export const SendHandlers = SendRoutes.toLayer(
     const ai = yield* AiProvider
     const config = yield* EngineConfig
     const session = yield* SessionClient
+    const drafts = yield* DraftSync
     const sent = new Map<string, { text: string; at: number; workspace: unknown }>()
     const routeBudget = dailyBudget(ROUTE_DAILY_BUDGET)
     const grammar = grammarChecks()
@@ -55,6 +58,8 @@ export const SendHandlers = SendRoutes.toLayer(
       )
     return {
       'messages.send': (payload) => provide(sendMessage(payload)).pipe(Effect.tap(() => Effect.gen(function* () {
+        // The draft went with the message: its row may owe Slack a change.
+        if (payload.draftOf !== undefined) yield* drafts.wake
         const at = yield* Clock.currentTimeMillis
         for (const [id, entry] of sent) if (at - entry.at >= SENT_CHECK_WINDOW_MILLIS) sent.delete(id)
         // Checked as the field showed it, the form the edit field opens with, not as Slack encodes it.
@@ -92,11 +97,10 @@ export const SendHandlers = SendRoutes.toLayer(
             Stream.switchMap((open) => (open === undefined ? Stream.empty : liveQuery(draftKeys(topicId), timed(readDraft(topicId))).pipe(Stream.provide(open.context)))),
           ),
         ).pipe(retryFirstRun('drafts.get'), Stream.orDie),
-      'drafts.set': ({ topicId, text }) =>
+      'drafts.set': ({ topicId, text, now }) =>
         Effect.gen(function* () {
-          const open = yield* workspace.current
-          if (open === undefined) return yield* new NotSignedIn()
-          yield* transaction(writeDraft(topicId, text)).pipe(Effect.provide(open.context), Effect.orDie)
+          if ((yield* workspace.current) === undefined) return yield* new NotSignedIn()
+          yield* drafts.save(topicId, text, now === true)
         }),
     }
   }),

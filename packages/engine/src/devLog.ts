@@ -21,7 +21,7 @@ import { DEV_LOG_CAPACITY, type DevLogDetail, type DevLogFilter, type DevLogRow,
 import type { SlackCallEnd, SlackCallOutcome, SlackCallStart, SlackTraceShape, SocketEvent } from '@juno/slack'
 import type { SyncPhase, SyncStep } from '@juno/sync'
 import { Context, Effect, Layer, Queue, Stream } from 'effect'
-import { capLines, clean, cleanLine, summarise, type Line } from './devLogText'
+import { capLines, clean, cleanLine, cleanParam, summarise, type Line } from './devLogText'
 
 interface Entry {
   row: DevLogRow
@@ -149,7 +149,7 @@ const slackTrace = (ring: Ring): SlackTraceShape => ({
     const request = section('Request', [
       { label: 'lane', value: call.lane },
       ...(call.reason === undefined ? [] : [cleanLine('reason', call.reason)]),
-      ...call.params.map(([name, value]) => cleanLine(name, value)),
+      ...call.params.map(([name, value]) => cleanParam(name, value)),
     ])
     const entry = ring.add({ at: call.startedAt, kind: 'slack', name: clean(call.method, 80), context, durationMs: null, outcome: 'running', failed: false }, [request])
     return (end: SlackCallEnd) => {

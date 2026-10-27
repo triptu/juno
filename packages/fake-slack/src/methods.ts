@@ -465,6 +465,7 @@ export const coreMethods = {
       ...(args.reply_broadcast === undefined ? {} : { broadcast: args.reply_broadcast }),
       clientMsgId: args.client_msg_id,
     })
+    if (args.draft_id !== undefined) ws.drafts.sent(args.draft_id, message.ts)
     return { channel: args.channel, ts: message.ts, message: withChannel(ws, args.channel, message) }
   },
 
@@ -612,7 +613,7 @@ export const coreMethods = {
     }
     const files = stored.map((file) => fileObject(ctx.baseUrl, file, conversation.kind === 'public'))
     const text = args.comment ?? (args.blocks === undefined ? undefined : blocksToText(args.blocks))
-    ws.post({
+    const posted = ws.post({
       channel: args.channel,
       user: ws.selfId,
       ...(text === undefined ? {} : { text }),
@@ -622,6 +623,7 @@ export const coreMethods = {
       clientMsgId: args.client_msg_id,
       files,
     })
+    if (args.draft_id !== undefined) ws.drafts.sent(args.draft_id, posted.ts)
     return { files }
   },
 

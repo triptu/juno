@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref } from 'react'
 import { audienceCheck, decodeDraft, encodeDraft, moveLinks, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendCheckPrefsAtom, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
@@ -49,9 +49,13 @@ export function withQuote(draft: string, text: string): string {
 
 /**
  * The composer of a topic tab (spec section 8). The draft is the topic's
- * (`drafts.get`), read once when the composer mounts and written back after
- * a pause in typing and when the tab hides, so it survives tab switches and
- * restarts. Until the draft has loaded, the `ComposerSlot` holds the place.
+ * (`drafts.get`), read when the composer mounts and written back after a
+ * pause in typing, and at once when the field loses focus, the tab hides or
+ * the window closes, so it survives tab switches and restarts; the engine
+ * keeps it in step with Slack's draft for the place (`DraftSync`). A draft
+ * changed in another tab or on another device fills the field, except while
+ * the field has focus and was typed in. Until the draft has loaded, the
+ * `ComposerSlot` holds the place.
  * While typing pauses in a Main, the model is asked whether the draft is a
  * reply to a recent topic (`messages.precheck`). Enter runs the checks on
  * send (`messages.check`, spec section 8), which use that answer only if it
@@ -75,13 +79,14 @@ export function TopicComposer({ detail, onSent, handle, takeFocus, onArrowUpTop,
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpTop={onArrowUpTop} onEscape={onEscape} dropping={dropping} />
+  return <LoadedComposer detail={detail} initial={stored.value.text} latest={stored.value.text} {...(stored.value.replaced === undefined ? {} : { replaced: stored.value.replaced })} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpTop={onArrowUpTop} onEscape={onEscape} dropping={dropping} />
 }
 
 function LoadedComposer({
   detail,
   initial,
   latest,
+  replaced,
   placeholder,
   onSent,
   handle,
@@ -89,7 +94,7 @@ function LoadedComposer({
   onArrowUpTop,
   onEscape,
   dropping = false,
-}: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly placeholder: string }) {
+}: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly replaced?: string; readonly placeholder: string }) {
   const id = detail.id
   const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
@@ -125,15 +130,33 @@ function LoadedComposer({
     element.setSelectionRange(element.value.length, element.value.length)
     element.scrollTop = element.scrollHeight
   }, [quotedAt])
+  // The stored draft as last drawn.
+  const latestRef = useRef(latest)
+  useLayoutEffect(() => {
+    latestRef.current = latest
+  })
   // The text not yet written to the store, and the timer that will write it.
   const unsaved = useRef<string | undefined>(undefined)
+  // A save went to the store since the last one sent at once: its trip to Slack still waits for a pause.
+  const toSlack = useRef(false)
+  // What this field wrote to the store since the store last agreed with it: the store coming back with any
+  // of them is this field's own echo, maybe trailing quicker saves.
+  const written = useRef(new Set<string>())
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const flush = () => {
+  // `now`: Slack gets the draft without waiting for a pause in typing (the field lost focus, the tab hid, the window is closing).
+  const flush = (now = false) => {
     clearTimeout(timer.current)
     timer.current = undefined
-    if (unsaved.current === undefined) return
-    void saveDraft(registry, id, unsaved.current)
+    if (unsaved.current === undefined) {
+      // Nothing new to write: only hurry a save that is waiting. A field holding back a newer draft writes nothing.
+      if (now && toSlack.current && encoded(text) === latestRef.current) void saveDraft(registry, id, latestRef.current, true)
+      if (now) toSlack.current = false
+      return
+    }
+    written.current.add(unsaved.current)
+    void saveDraft(registry, id, unsaved.current, now)
+    toSlack.current = !now
     unsaved.current = undefined
   }
   const flushRef = useRef(flush)
@@ -141,26 +164,76 @@ function LoadedComposer({
     flushRef.current = flush
   })
   // The tab hid or closed: write what is typed now.
-  useEffect(() => () => flushRef.current(), [])
+  useEffect(() => () => flushRef.current(true), [])
   // Typed in since this tab last showed: a draft change from the store is then this field's own echo.
   const typedSinceShown = useRef(false)
   useEffect(() => {
     typedSinceShown.current = false
   }, [])
-  // The draft is the topic's, one for every tab that shows it. Another tab on the topic changed it: take its
-  // text when this tab shows again, unless this field has typing of its own. A field that has focus takes it
-  // only until it is typed in, so a tab whose press gave it focus still takes the other tab's newer draft.
-  useEffect(() => {
-    if (unsaved.current !== undefined || (document.activeElement === field.current && typedSinceShown.current) || latest === encoded(text)) return
-    const next = decodeDraft(latest)
+  const take = (draft: string) => {
+    written.current.clear()
+    const next = decodeDraft(draft)
     picked.current = next.picks
     setPicks(next.picks)
     links.reset(next.text, next.links)
     setText(next.text)
     setPaused(next.text)
+  }
+  // The draft is the topic's, one for every tab that shows it, and Slack's: another tab or another device
+  // changed it. The field takes the new text at once, unless it has typing of its own: typing not yet saved
+  // is newer and is saved over it, and a field with focus that was typed in since it showed is left alone so
+  // its caret never moves. That field takes the new text when it loses focus with nothing typed since; typing
+  // first saves the field's text over it. A field that has focus takes it until it is typed in, so a tab whose
+  // press gave it focus still takes the other tab's newer draft.
+  const behind = useRef(false)
+  useEffect(() => {
+    behind.current = false
+    // This field's own save coming back: the field may have moved on since (a link edited, more typing).
+    if (latest === encoded(text)) return written.current.clear()
+    if (written.current.has(latest)) return
+    if (unsaved.current !== undefined) return
+    if (document.activeElement === field.current && typedSinceShown.current) {
+      behind.current = true
+      return
+    }
+    take(latest)
     // Only a change of the stored draft is taken, not this field's own edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest])
+  // Leaving the field saves it to Slack at once, or takes the newer draft it held back.
+  useEffect(() => {
+    const element = field.current
+    if (element === null) return
+    const blurred = () => {
+      if (behind.current && unsaved.current === undefined) {
+        behind.current = false
+        take(latestRef.current)
+        return
+      }
+      flushRef.current(true)
+    }
+    const closing = () => flushRef.current(true)
+    element.addEventListener('blur', blurred)
+    window.addEventListener('pagehide', closing)
+    return () => {
+      element.removeEventListener('blur', blurred)
+      window.removeEventListener('pagehide', closing)
+    }
+    // The field and the window live as long as this composer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // ⌘Z right after another device's newer draft filled the field brings back the text it replaced, which had
+  // not reached Slack (a clock running behind Slack's can make the newer edit look older). It is typing again.
+  const recover = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    const undo = event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey
+    if (!undo || replaced === undefined || unsaved.current !== undefined || encoded(text) !== latestRef.current) return false
+    event.preventDefault()
+    take(replaced)
+    typedSinceShown.current = true
+    unsaved.current = replaced
+    flush()
+    return true
+  }
   const precheck = (value: string) => {
     if (routeChecked && value.trim() !== '') precheckMessage(registry, detail.channel.id, value)
   }
@@ -180,6 +253,8 @@ function LoadedComposer({
   function change(next: string) {
     links.moved(next)
     typedSinceShown.current = true
+    // Typed after a newer draft arrived: this text is newer, and is saved over it.
+    behind.current = false
     setText(next)
     // Editing closes the bar and drops a check still running: Enter checks the new text.
     setBar(undefined)
@@ -204,6 +279,7 @@ function LoadedComposer({
     // The send clears the stored draft; a save still waiting must not write it back.
     clearTimeout(timer.current)
     unsaved.current = undefined
+    toSlack.current = false
     links.reset('', [])
     setText('')
     setPaused('')
@@ -298,7 +374,7 @@ function LoadedComposer({
     <Composer
       value={text}
       {...mentions}
-      onFieldKey={(event) => markup.onKey(event, marks) || mentions.onFieldKey(event)}
+      onFieldKey={(event) => recover(event) || markup.onKey(event, marks) || mentions.onFieldKey(event)}
       marks={marks}
       {...markup.format(text, marks)}
       onPasteText={links.onPasteText}

@@ -1,6 +1,7 @@
 import missedHuddles from './202610201700_missed_huddles'
 import notificationDecidedBy from './202610232300_notification_decided_by'
 import followNewThreads from './202610271900_follow_new_threads'
+import draftSync from './202610271901_draft_sync'
 import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
 import dropForYouCards from './202610160200_drop_for_you_cards'
@@ -75,4 +76,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610201700_missed_huddles': missedHuddles,
   '202610232300_notification_decided_by': notificationDecidedBy,
   '202610271900_follow_new_threads': followNewThreads,
+  '202610271901_draft_sync': draftSync,
 }

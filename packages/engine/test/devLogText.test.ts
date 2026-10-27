@@ -84,6 +84,20 @@ describe('developer log buffer', () => {
     expect(detail?.sections.map((part) => part.title)).toEqual(['Request', 'Timing', 'Response'])
   })
 
+  it('keeps what someone wrote in a draft or a message only as its length, in the request and the answer', () => {
+    const log = makeDevLog()
+    const marker = 'MARKER-draft-text-7f3a'
+    const blocks = JSON.stringify([{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: marker }] }] }])
+    const end = log.slack.started({ method: 'drafts.update', lane: 'send', reason: 'MessageInput:updateDraft', params: [['draft_id', 'Dr0000000001'], ['blocks', blocks], ['text', marker], ['client_last_updated_ts', '1792000000000']], startedAt: 0 })
+    end({ outcome: { _tag: 'ok' }, durationMs: 1, waitMs: 0, attempts: 1, retryAfterMillis: 0, size: 2, response: { ok: true, draft: { id: 'Dr0000000001', blocks: JSON.parse(blocks) } } })
+    const detail = log.detail('0')
+    expect(JSON.stringify(detail)).not.toContain(marker)
+    expect(JSON.stringify(log.rows({ kinds: [], errorsOnly: false, text: '' }, 10))).not.toContain(marker)
+    const request = detail?.sections.find((part) => part.title === 'Request')?.lines
+    expect(request).toContainEqual({ label: 'blocks', value: `[${blocks.length} characters]` })
+    expect(request).toContainEqual({ label: 'draft_id', value: 'Dr0000000001' })
+  })
+
   it('filters by kind, errors and text', () => {
     const log = makeDevLog()
     log.slack.started({ method: 'conversations.history', lane: 'background', reason: undefined, params: [], startedAt: 0 })({

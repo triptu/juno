@@ -51,6 +51,12 @@ export interface EngineTimingConfig {
   readonly actionDeadlineMillis: number
   /** Read mark coalescing window. */
   readonly markDelayMillis: number
+  /** Pause in typing before a draft goes to Slack (SPEC 8, "Drafts"). */
+  readonly draftSaveMillis: number
+  /** Longest a draft waits for a pause in typing after its first unsaved change. */
+  readonly draftSaveCapMillis: number
+  /** Time drafts still waiting may take to reach Slack when the app quits. */
+  readonly draftQuitMillis: number
   /** Quiet window before writing notification hours to Slack. */
   readonly slackScheduleDebounceMillis: number
   /** Quiet window before a title pass. */
@@ -130,6 +136,9 @@ export const productionTiming: EngineTimingConfig = {
   actionStallMillis: 3_000,
   actionDeadlineMillis: 300_000,
   markDelayMillis: 400,
+  draftSaveMillis: 2_000,
+  draftSaveCapMillis: 30_000,
+  draftQuitMillis: 1_500,
   slackScheduleDebounceMillis: 1_000,
   titleDebounceMillis: 1_500,
   titleTickMillis: 30_000,

@@ -220,7 +220,7 @@ it('keeps a draft and a post whose answer a restart cut off, and never posts it 
     const unmount = engine.registry.mount(atom)
     const draft = () => {
       const result = engine.registry.get(atom)
-      return result._tag === 'Success' ? result.value : undefined
+      return result._tag === 'Success' ? result.value.text : undefined
     }
     try {
       await waitFor(() => (draft() === 'Half a thought' ? true : undefined), WAIT_MS, 'the draft back')

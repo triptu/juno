@@ -54,7 +54,7 @@ export const enginePing = Rpc.make('engine.ping', {
 })
 
 export const OutboxCount = Schema.Struct({
-  kind: Schema.Literals(['post', 'mark', 'edit', 'delete', 'react', 'broadcast']),
+  kind: Schema.Literals(['post', 'mark', 'edit', 'delete', 'react', 'broadcast', 'draft']),
   state: Schema.Literals(['queued', 'sending', 'unknown', 'failed', 'retrying', 'waiting']),
   count: Schema.Int,
 })

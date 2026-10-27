@@ -67,7 +67,7 @@ const WRITE_METHODS = new Set([
   'users.prefs.set', 'users.profile.set', 'presence.set', 'conversations.mark', 'conversations.open', 'conversations.create', 'conversations.rename', 'conversations.invite', 'conversations.kick',
   'subscriptions.thread.mark', 'subscriptions.thread.add', 'subscriptions.thread.remove', 'chat.postMessage', 'chat.shareMessage',
   'chat.update', 'chat.delete', 'reactions.add', 'reactions.remove', 'files.getUploadURL', 'files.completeUpload', 'files.share',
-  'rooms.join', 'rooms.leave',
+  'rooms.join', 'rooms.leave', 'drafts.create', 'drafts.update', 'drafts.delete',
 ])
 
 /** The calls since the `since`-th that wrote to Slack. Background reads may land at any time, so "nothing was written" is the check that holds. */

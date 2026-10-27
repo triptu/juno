@@ -1,3 +1,4 @@
+import { draftHolds, type DraftWriteHold, type DraftWriteStep } from './draftHolds'
 import { timed } from './profile'
 import { Effect, Record } from 'effect'
 import type { WorkName } from '../src/workControl'
@@ -149,6 +150,11 @@ export interface RunningEngine {
   readonly socketIdle: () => Promise<void>
   /** Requests and awaits a complete pass through its normal serial worker. */
   readonly workPass: (name: WorkName) => Promise<void>
+  /**
+   * Holds draft sync before its next write of `step` for `topicId` (a save's claim, a list's absence):
+   * `reached` once it waits there, `release()` to let it write, `written` once the write is done.
+   */
+  readonly holdDraftWrite: (step: DraftWriteStep, topicId: string) => DraftWriteHold
   /** Passes started so far by each worker that has run, for counting work at rest. */
   readonly passes: () => ReadonlyMap<WorkName, number>
   /** Number of actions that passed preflight and requested the send lane. */
@@ -242,6 +248,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let barrierSent = 0
   let barrierSeen = 0
   const work = new Map<WorkName, { started: number; finished: number; wake?: Effect.Effect<void> }>()
+  const drafts = draftHolds()
   const stateOf = (name: WorkName) => {
     let state = work.get(name)
     if (state === undefined) { state = { started: 0, finished: 0 }; work.set(name, state) }
@@ -259,6 +266,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
         else state.finished = state.started
       },
       onWake: (name, wake) => { const state = stateOf(name); if (wake === undefined) delete state.wake; else state.wake = wake },
+      onDraftWrite: drafts.onDraftWrite,
     },
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
@@ -337,6 +345,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       await waitFor(() => barrierSeen >= id || !online ? true : undefined, WAIT_MS, 'socket frames consumed')
     },
     actionsReady: () => actionsReady,
+    holdDraftWrite: drafts.hold,
     pendingCommands: (key) => commands.get(key) ?? 0,
     passes: () => new Map([...work].map(([name, state]) => [name, state.started])),
     workPass: async (name) => {

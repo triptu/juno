@@ -356,7 +356,8 @@ const request = (api: SlackApiShape, row: PendingPost, fileIds: ReadonlyArray<st
       undefined,
     )
   }
-  if (fileIds.length === 0) return api.call('chat.postMessage', { channel: row.channel, text: row.text, ...(blocks === undefined ? {} : { blocks }), client_msg_id: row.clientMsgId, ...threadTs })
+  const draft = row.draftId === undefined ? {} : { draft_id: row.draftId }
+  if (fileIds.length === 0) return api.call('chat.postMessage', { channel: row.channel, text: row.text, ...(blocks === undefined ? {} : { blocks }), client_msg_id: row.clientMsgId, ...threadTs, ...draft })
   return Effect.as(
     api.call(
       'files.share',
@@ -367,6 +368,7 @@ const request = (api: SlackApiShape, row: PendingPost, fileIds: ReadonlyArray<st
         client_msg_id: row.clientMsgId,
         resharing_aware: true,
         ...threadTs,
+        ...draft,
       },
       { reason: 'send_message_with_files' },
     ),

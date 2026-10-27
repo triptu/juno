@@ -11,16 +11,20 @@
  *
  * `home.visit`, `home.markDone`, `home.movesShown` and `home.movesSeen` are
  * small local writes, as are the reviews' commands on follow-ups and drafts; each of
- * those returns the undo that puts the row back as it was stored.
+ * those returns the undo that puts the row back as it was stored. Deleting an old draft
+ * deletes it in Slack too, and its Undo puts it back in both (`DraftSync`).
  */
 import { AiProvider, tasks } from '@juno/ai'
 import { HomeRoutes, NotSignedIn, TIDY_UP_PREF, tidyUpPrefsOf, type CommandResult, type UndoCommand } from '@juno/contract'
 import { Invalidation, keys, liveQuery, prefs, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
+import { writeLocalDraft } from '@juno/sync'
 import { Clock, Effect, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { aiJobsOn } from '../ai'
 import { aiWakes } from '../aiCredentials'
 import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
+import { DraftSync } from '../draftSync'
+import { EngineTiming } from '../config'
 import { decideAndStore, HOME_DAILY_BUDGET, recentMessages, usedToday } from './assist'
 import { MOVES_SHOWN_PREF } from './moves'
 import { readHome, type HomeRun } from './query'
@@ -62,6 +66,8 @@ const REWRITE_MESSAGES = 8
 export const HomeHandlers = HomeRoutes.toLayer(
   Effect.gen(function* () {
     const workspace = yield* Workspace
+    const drafts = yield* DraftSync
+    const timing = yield* EngineTiming
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
     const jobs = yield* aiJobsOn
@@ -234,12 +240,13 @@ export const HomeHandlers = HomeRoutes.toLayer(
           Effect.gen(function* () {
             const row = yield* draft(topicId)
             if (row === undefined || row.updated_at !== updatedAt) return undefined
-            const sql = yield* StoreWriter
-            yield* sql`DELETE FROM drafts WHERE topic_id = ${topicId}`
+            const now = yield* Clock.currentTimeMillis
+            // Deleted in Slack too, at once.
+            yield* writeLocalDraft(topicId, '', { now, dueAt: now, capMillis: timing.draftSaveCapMillis })
             yield* draftsChanged(topicId)
             return draftUndo(topicId, row)
           }),
-        ),
+        ).pipe(Effect.tap(() => drafts.wake)),
       'drafts.keep': ({ topicId, updatedAt }) =>
         command(
           Effect.gen(function* () {
@@ -257,13 +264,16 @@ export const HomeHandlers = HomeRoutes.toLayer(
             const sql = yield* StoreWriter
             // A draft typed in the topic since the review acted wins over the one put back.
             const current = yield* draft(topicId)
-            if (current === undefined || current.updated_at === updatedAt)
-              yield* sql`INSERT INTO drafts (topic_id, text, updated_at, kept_at) VALUES (${topicId}, ${text}, ${updatedAt}, ${keptAt})
-                ON CONFLICT (topic_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at, kept_at = excluded.kept_at`
+            if (current === undefined || current.updated_at === updatedAt) {
+              // Back in Slack too, as a new draft, with the time it had.
+              const now = yield* Clock.currentTimeMillis
+              yield* writeLocalDraft(topicId, text, { now, dueAt: now, capMillis: timing.draftSaveCapMillis }, Number(updatedAt))
+              yield* sql`UPDATE drafts SET kept_at = ${keptAt} WHERE topic_id = ${topicId}`
+            }
             yield* draftsChanged(topicId)
             return undefined
           }),
-        ),
+        ).pipe(Effect.tap(() => drafts.wake)),
     }
   }),
 )
