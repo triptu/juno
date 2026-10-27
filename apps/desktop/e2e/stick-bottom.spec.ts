@@ -1,11 +1,13 @@
 // Bottom following (SPEC 7, "Stable geometry"): arrivals and growing rows stay above the composer from their
-// first frame, including while the scrollbar thumb is held at the end. A full message window drops its first
+// first frame, including while the scrollbar thumb is held at the end, and after a notification for the newest
+// message is clicked. A full message window drops its first
 // row without moving the viewport; an upward gesture lets go, and arrivals leave that scrolled position alone.
 import { TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
+import { watchFlashes } from './driver/flashes'
 import { expect, syncedTest, test, type Fixtures } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
-import { backAtEnd, distance, frames, longTest, openFullWindow, openLongMain, wheelToEnd } from './stickBottomLists'
+import { backAtEnd, distance, frames, longerThanView, longTest, openFullWindow, openLongMain, wheelToEnd } from './stickBottomLists'
 import { watchArrival, watchEditVisibility, watchResize, type Frame } from './stickBottomProbe'
 
 test.describe.configure({ mode: 'parallel' })
@@ -228,6 +230,65 @@ syncedTest('releases the bottom during an upward gesture, uses the resting thres
   })
   // The probe scrolls to the end itself, so the step above does not change what it checks.
   await test.step('a resting bottom survives growth during a coalesced scrollend', () => expectRestSurvivesGrowth(topic.scroller, '[data-message-row]'))
+})
+
+// A clicked notification shows its topic at the message and flashes it. A DM already on screen at its bottom, as it
+// is while the window is in the background, keeps holding the bottom: until this was fixed the flash held the
+// message's row instead, so a first reaction on the newest message grew below the fold and stayed there. Each step
+// has its own DM, since a conversation notifies once in ten seconds.
+syncedTest('a DM at its bottom keeps it after a notification for its newest message is clicked: a reaction from either side shows whole', async ({ juno, win, slack, fake }) => {
+  const { topic } = juno
+  await juno.notificationHoursNow()
+
+  /** `name`'s DM, longer than the view, open at its bottom, set to notify Always. Returns its channel. */
+  const openLongDm = async (name: string): Promise<string> => {
+    const person = slack.as(name)
+    const channel = [...fake.workspace.conversations].find(([, conversation]) => conversation.kind === 'im' && conversation.members.has(person.id))![0]
+    for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: i % 2 === 0 ? person.id : fake.workspace.selfId, text: `Earlier with ${name} ${i}`, silent: true })
+    await juno.sidebar.row(name, { exact: true }).open()
+    await topic.expectMessage(`Earlier with ${name} 29`)
+    await expect.poll(() => longerThanView(topic.scroller)).toBe(true)
+    await wheelToEnd(win, topic.scroller)
+    await topic.chooseInMessageMenu(`Earlier with ${name} 28`, 'notify-always', { onSender: true })
+    await juno.expectToast(`${name}: Always`)
+    return channel
+  }
+
+  /** With the window in the background, `name` writes `text`; the DM follows it, and its notification is clicked. */
+  const notifiedAndClicked = async (name: string, text: string): Promise<string> => {
+    const flashes = await watchFlashes(win)
+    await juno.blurWindow()
+    await expect.poll(() => juno.surface.system('viewing')).toBe(null)
+    const ts = slack.as(name).dm(text)
+    await topic.expectMessage(text)
+    await topic.expectAtBottom()
+    await expect.poll(async () => (await juno.osNotifications()).map((shown) => shown.body), { timeout: 15_000 }).toContain(text)
+    await juno.clickOsNotification((await juno.osNotifications()).findIndex((shown) => shown.body === text))
+    await juno.focusWindow()
+    // The flash comes after the position to hold is chosen, in the same callback.
+    await expect.poll(flashes).toContainEqual(expect.stringContaining(text))
+    return ts
+  }
+
+  await test.step('a reaction from Maya on the message the notification showed shows whole', async () => {
+    const channel = await openLongDm('Maya')
+    const text = 'Are we still on for the review?'
+    const ts = await notifiedAndClicked('Maya', text)
+    fake.addReaction({ channel, ts, name: 'eyes', user: slack.as('Maya').id })
+    await expect(topic.message(text).getByRole('button', { name: '1 👀' })).toBeInViewport({ ratio: 1 })
+    await expect.poll(() => distance(topic.scroller)).toBeLessThanOrEqual(1)
+  })
+
+  await test.step('the user’s own reaction on the message the notification showed shows whole', async () => {
+    await openLongDm('Sam')
+    const text = 'Can you look at the on-call doc?'
+    await notifiedAndClicked('Sam', text)
+    const row = topic.message(text)
+    const menu = await juno.messageMenu.openOnRow(row, { scroll: false })
+    await menu.react('+1')
+    await expect(row.getByRole('button', { name: '1 👍, including you' })).toBeInViewport({ ratio: 1 })
+    await expect.poll(() => distance(topic.scroller)).toBeLessThanOrEqual(1)
+  })
 })
 
 // The thread window is checked on its own, since a thread window once broke it alone (e37e5df81); a DM and Main are
