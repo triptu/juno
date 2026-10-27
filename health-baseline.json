@@ -8,7 +8,7 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 4,
-    "oversizedFiles": 43,
+    "oversizedFiles": 44,
     "oversizedFunctions": 107
   },
   "clonedLines": 76,
@@ -34,6 +34,7 @@
     "packages/engine/src/messages/query.ts",
     "packages/engine/src/topics/query.ts",
     "packages/engine/test/agent-host.test.ts",
+    "packages/engine/test/harness.ts",
     "packages/fake-slack/src/fixtures.ts",
     "packages/fake-slack/src/index.ts",
     "packages/fake-slack/src/methods.ts",
