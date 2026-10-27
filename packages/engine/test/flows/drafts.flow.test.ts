@@ -4,10 +4,11 @@
 // it (with the edit time Slack checks), a draft with files from another device is shown but never changed, a
 // send that went elsewhere leaves Slack's draft and the phone's newer text on it, a save or a list's absence
 // never acts on what changed under it, an edit made offline reaches Slack once Juno is back, after a restart
-// too, local text another device replaced stays kept for ⌘Z, a refused save never stops a newer edit, a sent
-// text never comes back from its create's late echo, even after many more sends, and a failed create is found
-// or made again when its first list starts in the same millisecond. Juno deletes a draft only when the user
-// clears it. The fake refuses an implausible `client_last_updated_ts`, as Slack does. Steps start warm on the
+// too, local text another device replaced stays kept for ⌘Z, a refused save never stops a newer edit, a late
+// save after another device emptied the draft stays and deletes nothing, a draft changed while a send naming it
+// waits stays the place's draft when Slack refuses the post, a sent text never comes back from its create's late
+// echo, even after many more sends, a create whose draft was deleted before its text went is settled, and a failed create is found or made again when its first list starts in
+// the same millisecond. Juno deletes a draft only when the user clears it. The fake refuses an implausible `client_last_updated_ts`, as Slack does. Steps start warm on the
 // synced default workspace and go on from the step before.
 import { afterEach, expect, it } from 'bun:test'
 import { draftsSet, messagesSend } from '@juno/contract'
@@ -43,6 +44,10 @@ const draftCalls = (engine: RunningEngine) => engine.fake.calls.filter((call) =>
 const linked = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => (db.prepare('SELECT slack_id FROM draft_sync WHERE topic_id = ?').get(MAIN) as { slack_id: string | null } | undefined)?.slack_id ?? undefined)
 /** Whether the Main has a pending `draft` row. */
 const owed = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => db.prepare("SELECT 1 FROM outbox WHERE kind = 'draft' AND target_key = ?").get(MAIN) !== undefined)
+/** What Juno sent from the Main, with the draft each text went from. */
+const sentRecords = (engine: RunningEngine) =>
+  readDb(engine, 'user.db', (db) => JSON.parse((db.prepare('SELECT sent_json FROM draft_sync WHERE topic_id = ?').get(MAIN) as { sent_json: string | null } | undefined)?.sent_json ?? '[]') as ReadonlyArray<{ readonly id?: string; readonly settled?: boolean }>)
+const postFailed = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => db.prepare("SELECT 1 FROM pending_messages WHERE state = 'failed'").get() !== undefined)
 /** The local text Juno keeps for ⌘Z. */
 const kept = (engine: RunningEngine) => readDb(engine, 'user.db', (db) => (db.prepare('SELECT replaced FROM draft_sync WHERE topic_id = ?').get(MAIN) as { replaced: string | null } | undefined)?.replaced ?? undefined)
 const THREAD = 'Draft plan is in the doc'
@@ -85,6 +90,8 @@ it('drafts reach Slack after a pause, come back from other devices, keep newer t
     await waitFor(() => (fake.draftText('C0ENG') === undefined ? true : undefined), 15_000, 'the draft gone from Slack')
     expect(apiCalls(engine, 'chat.postMessage').at(-1)?.args['draft_id']).toBe(draftId)
     expect(stored(engine)).toBeUndefined()
+    // Slack retiring the draft settles the record of the text sent from it, so it can be forgotten.
+    await waitFor(() => (sentRecords(engine).find((each) => each.id === draftId)?.settled === true ? true : undefined), 15_000, 'the sent record settled')
   })
 
   await step('clearing a draft deletes it in Slack, with the time of the clear', async () => {
@@ -202,6 +209,48 @@ it('drafts reach Slack after a pause, come back from other devices, keep newer t
     await waitFor(() => settled(engine), 15_000, 'the draft linked')
   })
 
+  await step('a late save after the phone emptied the draft stays in Slack, and the phone’s next text is not deleted', async () => {
+    const before = draftCalls(engine).length
+    engine.fake.gate((method) => method === 'drafts.update' || method === 'drafts.delete')
+    await type(engine, 'Saved late, after the phone emptied it', true)
+    const update = await waitFor(() => engine.fake.gated().find((call) => call.method === 'drafts.update' && call.stage === 'before'), 15_000, 'the save at Slack')
+    // The phone empties the draft, keeping a file, and Juno takes that.
+    engine.fake.putDraft({ channel: 'C0ENG', text: '', files: 1 })
+    await waitFor(() => (stored(engine) === undefined ? true : undefined), 15_000, 'the emptied draft in Juno')
+    // Juno's save lands after it.
+    engine.fake.decide(update.id, 'run')
+    await waitFor(() => engine.fake.gated().find((call) => call.id === update.id && call.stage === 'answer'), 15_000, 'the late save made')
+    engine.fake.decide(update.id, 'answer')
+    await waitFor(() => (!owed(engine) || engine.fake.gated().some((call) => call.method === 'drafts.delete') ? true : undefined), 15_000, 'the late save answered')
+    // The phone writes again, and Juno hears it late.
+    engine.fake.holdFrames({ types: ['draft_update'] })
+    engine.fake.putDraft({ channel: 'C0ENG', text: 'Phone text after the late save' })
+    engine.fake.gate()
+    engine.fake.releaseFrames()
+    await waitFor(() => (stored(engine) === 'Phone text after the late save' ? true : undefined), 15_000, 'the phone’s text in Juno')
+    expect(engine.fake.draftText('C0ENG')).toBe('Phone text after the late save')
+    expect(draftCalls(engine).slice(before).filter((call) => call.method === 'drafts.delete')).toEqual([])
+  })
+
+  await step('a draft the phone changes while a send naming it waits stays the place’s draft, file and all, when Slack refuses the post', async () => {
+    await type(engine, 'Sent, then refused', true)
+    await waitFor(() => settled(engine), 15_000, 'the draft linked')
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    await send(engine, 'Sent, then refused')
+    const post = await waitFor(() => engine.fake.gated().find((call) => call.method === 'chat.postMessage' && call.stage === 'before'), 15_000, 'the post at Slack')
+    // While the post waits, the phone changes the caption and attaches a file.
+    engine.fake.putDraft({ channel: 'C0ENG', text: 'Caption the phone wrote meanwhile', files: 1 })
+    await waitFor(() => (stored(engine) === 'Caption the phone wrote meanwhile' ? true : undefined), 15_000, 'the phone’s caption in Juno')
+    engine.fake.decide(post.id, { error: 'msg_too_long' })
+    engine.fake.gate()
+    await waitFor(() => (postFailed(engine) ? true : undefined), 15_000, 'the post refused')
+    // A draft with files is never written to, so its file stays.
+    const before = draftCalls(engine).length
+    await type(engine, 'Typed after the refusal', true)
+    await engine.workPass('draft')
+    expect(draftCalls(engine).slice(before)).toEqual([])
+    expect(engine.fake.draft('C0ENG')?.fileIds.length).toBe(1)
+  })
 })
 
 it('a sent text never comes back from its create’s late echo, on a clock running behind', async () => {
@@ -239,6 +288,25 @@ it('a create unanswered when its text went is still known by its client_msg_id a
   await engine.socketIdle()
   expect(stored(engine)).toBeUndefined()
   expect(linked(engine)).toBeUndefined()
+})
+
+it('a create whose draft the phone deleted before its text went leaves no record to keep', async () => {
+  const engine = await syncedEngine(engines, { timing: { draftSaveMillis: PAUSE } })
+  const { fake } = engine
+  fake.holdFrames({ types: ['draft_create'] })
+  fake.holdNext({ method: 'drafts.create' })
+  await type(engine, 'Deleted on the phone before it went', true)
+  await waitFor(() => (fake.heldCount({ method: 'drafts.create' }) === 1 ? true : undefined), 15_000, 'the create made')
+  // The phone deletes the new draft, and Juno hears of it before its create's answer.
+  fake.removeDraft({ channel: 'C0ENG' })
+  await engine.socketIdle()
+  await send(engine, 'Deleted on the phone before it went')
+  fake.release({ method: 'drafts.create' })
+  await waitFor(() => (owed(engine) ? undefined : true), 15_000, 'the create answered')
+  fake.releaseFrames()
+  await engine.socketIdle()
+  // The draft the text went from is gone, so the record of it is settled and can be forgotten.
+  expect(sentRecords(engine).map((each) => each.settled)).toEqual([true])
 })
 
 it('a create that fails on the way is found or made again when its first list starts in the same millisecond', async () => {
