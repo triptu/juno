@@ -5,7 +5,7 @@
  * when the text matches them, or all of them after a leading ">". Each
  * reuses the action the rest of the app runs: the sidebar's pages, the Juno
  * menu's pages, Settings by section, the theme and accent of Settings ›
- * Appearance, the New tab and New message commands, the account menu's presence
+ * Appearance, the New tab, New message and New channel commands, the account menu's presence
  * and privacy, the topic menu, and the huddle's controls and header button.
  */
 import { useEffect, useState } from 'react'
@@ -33,6 +33,7 @@ import { junoPageTitles } from '@juno/agent-contract'
 import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
 import { muteShortcut } from '@juno/huddle-views'
 import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, shareFull, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
+import { openNewChannel } from './channelActions'
 import { closeJunoPanel, openPanel } from './juno/actions'
 import { openAllTopics, openGallery, openDevLog, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
@@ -175,6 +176,8 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: '⌘T' }),
     // ⌘N: Home's composer with the destination list open (SPEC 12).
     row('new-message', 'new-message', 'New message', 'write compose dm send chat', () => newMessage(), { hint: '⌘N' }),
+    // The channel sheet (SPEC 5, "Channel sheet"); ⌘K is the only place that makes a channel.
+    row('new-channel', 'public', 'New channel…', 'create make add start', () => openNewChannel()),
     // Hidden: the developer log shows only for "developer" or "dev log".
     row('dev-log', 'settings', 'Open developer log', 'dev', () => openDevLog(), { hidden: true }),
     // The welcome card (SPEC 4) again, as Help › Show the Tour brings it.

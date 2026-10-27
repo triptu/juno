@@ -30,6 +30,7 @@ import { COMMAND_DELAY_MS, nowAtom, PALETTE_RECENT, PALETTE_RESULTS, paletteConv
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
 import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from '@juno/views'
+import { newChannelName, openNewChannel } from './channelActions'
 import { junoCommands, openJunoTab } from './juno/actions'
 import { newMessage, openTopic, openTopicAt, warmTopic } from './navigation'
 import { closePalette, notePaletteText } from './paletteActions'
@@ -238,6 +239,9 @@ export function OpenPalette() {
   const conversationsValue = conversations._tag === 'Success' ? conversations.value : undefined
   const messagesValue = messages._tag === 'Success' ? messages.value : undefined
   const conversationRows = (conversationsValue ?? []).map(conversationRow)
+  // The last Conversations row when the text names no channel there (SPEC 10).
+  const newChannel = newChannelName(shownText, conversationsValue)
+  const withNewChannel = (rows: ReadonlyArray<Row>): ReadonlyArray<Row> => (newChannel === undefined ? rows : [...rows, { id: 'new-channel', icon: 'public', label: `New channel “#${newChannel}”…`, compact: true, run: () => openNewChannel(shownText) }])
   const matches = matchRows(messagesValue ?? [])
   const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
   let sections: ReadonlyArray<PaletteSection & { readonly items: ReadonlyArray<Row> }>
@@ -253,7 +257,7 @@ export function OpenPalette() {
       // The open topic's commands first, then the global ones as the Commands tab orders them.
       const commandRows = [...(topic === undefined ? [] : matchCommands(topic.rows, shownText)), ...globalSections(globalRows, shownText).flatMap((section) => section.items)]
       sections = [
-        { heading: 'Conversations', hint: '⌘2', items: conversationRows.slice(0, ALL_CONVERSATIONS) },
+        { heading: 'Conversations', hint: '⌘2', items: withNewChannel(conversationRows.slice(0, ALL_CONVERSATIONS)) },
         { heading: 'Topics and messages', hint: '⌘3', items: matches.slice(0, ALL_MATCHES) },
         { key: 'commands', heading: 'Pages, settings and commands', hint: '⌘4', items: commandRows.slice(0, ALL_COMMANDS) },
         { heading: 'Juno', items: juno },
@@ -261,7 +265,7 @@ export function OpenPalette() {
       break
     }
     case 'conversations':
-      sections = shownText === '' ? [{ heading: 'Frequent', items: conversationRows }] : [{ heading: 'Conversations', items: conversationRows }, { heading: 'Juno', items: juno }]
+      sections = shownText === '' ? [{ heading: 'Frequent', items: conversationRows }] : [{ heading: 'Conversations', items: withNewChannel(conversationRows) }, { heading: 'Juno', items: juno }]
       break
     case 'messages': {
       const max = shownText === '' ? PALETTE_RECENT : juno.length > 0 ? RESULTS_UNDER_COMMAND : PALETTE_RESULTS

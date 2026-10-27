@@ -117,6 +117,7 @@ export { IgnoreReview, UnfollowReview } from './SuggestionReviews'
 export { type ReviewStatus } from './reviewModel'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
+export { ChannelSheet } from './ChannelSheet'
 export type { ViewIconName } from '@juno/ui'
 
 export { UpdateSettings, type UpdateStatus, type WhatsNew } from './UpdateSettings'

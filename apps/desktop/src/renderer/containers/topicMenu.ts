@@ -5,6 +5,7 @@ import { redrawTopic, showToast, type RedrawProblem, canRedraw, currentNotificat
 import { choiceFor, nativeMenu } from './notifyActions'
 import { viewChoices } from './viewActions'
 import { huddleMenuItem } from './huddle/menuItem'
+import { canEditChannel } from './channelActions'
 import { labelOf, isLinkable, notifyTarget, runTopicAction } from './topicActions'
 import type { ActionTopic } from './topicSource'
 
@@ -20,6 +21,8 @@ const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.ch
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
   // Redraw art shows only when a drawing can be made: asked beside the settings, within a fraction of a second.
   const drawable = canRedraw(registry)
+  // Edit channel… on a channel's Main, asked of the store beside the settings.
+  const editable = topic.kind === 'main' ? canEditChannel(topic.channel) : Promise.resolve(false)
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const notify = notifyTarget(topic)
   const huddle = huddleMenuItem(topic.channel)
@@ -34,6 +37,7 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     // Add to view (inventory 15.8) is on Main: the row's channel or DM.
     ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
     ...(huddle === undefined ? {} : { huddle }),
+    ...((await editable) ? { editChannel: true } : {}),
     ...(dmPartner(topic) !== undefined && registry.get(junoAvailableAtom) ? { knowsAbout: dmPartner(topic)!.name } : {}),
   }
   const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => isLinkable(topic) || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined

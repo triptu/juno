@@ -1,7 +1,8 @@
 /**
  * The channel menu (inventory 15.2) on the header's context pill and a
  * #channel chip. Its Notify me sets the channel's level; Ask Juno opens the
- * Juno panel, or the Juno tab, with an About chip (SPEC 7). Mark channel as
+ * Juno panel, or the Juno tab, with an About chip (SPEC 7). Edit channel…
+ * opens the channel sheet where the user may change something. Mark channel as
  * read and unread wait for an engine command, so they show disabled. Add to
  * view (inventory 15.8) adds the channel to a sidebar view or removes it. The
  * person menu is `notifyActions.showPersonMenu`.
@@ -11,6 +12,7 @@ import { currentNotificationSettings, ignoreChannel, junoAvailableAtom, loadNoti
 import { scopeToChannel, type MenuChannel } from './placeMenus'
 import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
 import { askJunoAbout } from './juno/actions'
+import { canEditChannel, editChannel } from './channelActions'
 import { openTopic } from './navigation'
 import { openNotificationsAt } from './notificationsAnchor'
 import { choiceFor, nativeMenu, setNotifyLevel } from './notifyActions'
@@ -22,6 +24,7 @@ const isNotify = (action: ChannelMenuAction): action is NotifyAction => action.s
 
 /** Shows the menu at the pointer, or at `at`. Resolves with the chosen action once it has run. */
 export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt): Promise<ChannelMenuAction | undefined> {
+  const editable = canEditChannel(channel)
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'channel', id: channel.id }
   const huddle = huddleMenuItem(channel)
@@ -32,6 +35,7 @@ export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt):
     views: viewChoices(channel.id),
     askJuno: registry.get(junoAvailableAtom),
     ...(huddle === undefined ? {} : { huddle }),
+    ...((await editable) ? { editChannel: true } : {}),
   })
   const chosen = (await popupContextMenu(nativeMenu(items, (id) => !pending.has(id)), at)) as ChannelMenuAction | undefined
   if (chosen !== undefined) await runChannelAction(chosen, channel, target)
@@ -52,6 +56,8 @@ async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel,
       return
     case 'ignore-channel':
       return void ignoreChannel(registry, channel)
+    case 'edit-channel':
+      return editChannel(channel)
     case 'ask-juno':
       return askJunoAbout({ _tag: 'channel', channelId: channel.id, name: channel.name, tint: channel.tint })
   }

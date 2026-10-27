@@ -1026,6 +1026,8 @@ export const layout = stylex.defineVars({
   '--filter-pill-max-width': '120px',
   // The view sheet's conversation list (inventory 2.3), which scrolls past this.
   '--view-sheet-list-max-height': '200px',
+  // The channel sheet (inventory 2.3a): a name, a switch and a people list, with room for a long name.
+  '--channel-sheet-width': '380px',
   // The peek popover: about 75 characters of message text in compact rows;
   // never wider than the room left in the window.
   '--peek-width': '640px',
