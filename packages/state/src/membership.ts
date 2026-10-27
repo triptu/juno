@@ -6,18 +6,12 @@
  * needs an invite.
  */
 import { Exit } from 'effect'
-import * as Atom from 'effect/reactivity/Atom'
 import { channelsJoin, channelsLeave, channelsMembership, type ChannelMembership, type CommandResult } from '@juno/contract'
 import { runCommand } from './atoms'
 import type { Registry } from './client'
 import { errorOf } from './result'
+import type { MembershipChannel } from './channels'
 import { runActionExit, showToast } from './undo'
-
-/** A channel as the toasts name it: `label` is "#eng". */
-export interface MembershipChannel {
-  readonly id: string
-  readonly label: string
-}
 
 /** Why Slack, or Juno for it, said no, in plain words. */
 function reason(error: { readonly _tag: string; readonly code?: string } | undefined): string {
@@ -57,14 +51,6 @@ export async function leaveChannel(registry: Registry, channel: MembershipChanne
   else if (exit.value.undo === undefined) showToast(registry, { text })
   return Exit.isSuccess(exit)
 }
-
-/** Leave channel… on a private channel, waiting for its answer (SPEC 5): the channel, and where the menu opened. */
-export interface LeaveConfirm {
-  readonly channel: MembershipChannel
-  readonly at: { readonly x: number; readonly y: number }
-}
-
-export const leaveConfirmAtom = Atom.make<LeaveConfirm | undefined>(undefined).pipe(Atom.keepAlive)
 
 /** What a channel's menus need for Leave channel, from the store; undefined when the engine could not say. */
 export async function channelMembership(registry: Registry, channel: string): Promise<ChannelMembership | undefined> {

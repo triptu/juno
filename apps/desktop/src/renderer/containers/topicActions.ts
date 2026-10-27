@@ -45,7 +45,6 @@ import { openNotificationsAt } from './notificationsAnchor'
 import { followsNew, setFollowNew, setNotifyLevel } from './notifyActions'
 import { showWhatJunoKnows } from './juno/actions'
 import { joinHuddleFromMenu } from './huddle/menuItem'
-import { editChannel } from './channelActions'
 import { headerOf, rowOf, topicOf, type ActionTopic } from './topicSource'
 
 /** How a toast names a topic: its title, or the channel label for Main ("#eng"). */
@@ -165,7 +164,8 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
       flushSidebar(registry)
       return void ignoreChannel(registry, topic.channel)
     case 'edit-channel':
-      return void editChannel(topic.channel)
+      // Loaded on use: the channel sheet's actions are not part of the first screen.
+      return void import('./channelActions').then(({ editChannel }) => editChannel(topic.channel))
     case 'juno-knows': {
       const partner = dmPartner(topic)
       return partner === undefined ? undefined : void showWhatJunoKnows(partner)

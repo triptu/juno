@@ -148,7 +148,7 @@ export {
   sendMessage,
 } from './send'
 export { forwardMessage, forwardSheetAtom, type ForwardSheetState } from './forward'
-export { channelSheetAtom, type ChannelSheetState } from './channels'
+export { channelSheetAtom, leaveConfirmAtom, type ChannelSheetState, type LeaveConfirm, type MembershipChannel } from './channels'
 export { errorOf } from './result'
 export {
   aiAssistOnAtom,
@@ -170,7 +170,7 @@ export {
   applyJunoHours,
 } from './notifications'
 export { ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, stopIgnoring } from './ignored'
-export { channelMembership, joinChannel, leaveChannel, leaveConfirmAtom, type LeaveConfirm, type MembershipChannel } from './membership'
+export { channelMembership, joinChannel, leaveChannel } from './membership'
 export { acquireRendererPort } from './port'
 export {
   accentAtom,

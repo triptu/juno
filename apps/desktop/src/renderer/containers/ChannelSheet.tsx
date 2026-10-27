@@ -13,7 +13,8 @@ import { channelsCreate, channelsMembers, normalizeChannelName, type Person, typ
 import { errorOf, pickConversationsAtom, registry, runCommand, sessionStatusAtom, showToast, type ChannelSheetState } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { ChannelSheet as ChannelSheetView } from '@juno/views'
-import { channelErrorText, closeChannelSheet, createdText, saveChannel } from './channelActions'
+import { closeChannelSheet } from './channelActions'
+import { channelErrorText, createdText, saveChannel } from './channelSheetActions'
 import { openTopic } from './navigation'
 
 const NONE: ReadonlyArray<PickConversation> = []
