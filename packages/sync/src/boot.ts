@@ -34,7 +34,7 @@
  * the followed threads over the window and checks the follows it left out;
  * `runSync` schedules it at most hourly.
  */
-import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId, type WorkspaceRole } from '@juno/domain'
+import { compareTs, maxTs, millisToTs, type Ts, type UsergroupId, type WorkspaceRole } from '@juno/domain'
 import type { CountEntry, User } from '@juno/slack-schema'
 import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import type { Message } from '@juno/slack-schema'
@@ -53,6 +53,7 @@ import { threadViewPageUnchanged, viewRange, type ViewObservation } from './thre
 import { pageRange } from './threadRanges'
 import { decodeThreadViewPage } from './threadViewDecode'
 import { fillUsers, nameFirst } from './users'
+import { ME_KEY } from './me'
 import {
   addSyncedRange,
   AVATAR_BASE_KEY,
@@ -85,10 +86,9 @@ export const QUICK_START_KEY = 'quickStart'
  * (`BOOT_KEY`) means the same.
  */
 export const HOME_READY_KEY = 'homeReady'
-/** `sync_state.me`: the user and their user groups, so a command outside the sync re-indexes with the same mention rules. */
-export const ME_KEY = 'me'
 /** `sync_state.selfRole`: the user's `WorkspaceRole`, for what a channel's menu offers (`channelEditRights`). */
 export const SELF_ROLE_KEY = 'selfRole'
+export { ME_KEY, storedMe } from './me'
 
 /** The user's place in the workspace, from `client.userBoot`'s `self`. */
 const roleOf = (self: User): WorkspaceRole =>
@@ -111,20 +111,6 @@ export type BootServices = SlackApi | SlackEdge | SlackSession | StoreWriter | I
 const DAY = 24 * 60 * 60 * 1000
 
 export const bootState = (): Effect.Effect<BootState | undefined, SqlError, StoreWriter> => getSyncState<BootState>(BOOT_KEY)
-
-/**
- * The user as the last boot saw them, with their user groups, for a
- * command that re-indexes outside the sync. Before any boot, the team's
- * self id without groups; `undefined` when the store has neither.
- */
-export const storedMe: Effect.Effect<Me | undefined, SqlError, StoreWriter> = Effect.gen(function* () {
-  const me = yield* getSyncState<Me>(ME_KEY)
-  if (me !== undefined) return me
-  const sql = yield* StoreWriter
-  const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
-  const self = team[0]?.self_user_id
-  return self === null || self === undefined ? undefined : { userId: self as Me['userId'] }
-})
 
 const windowStartMillis = (ctx: SyncContext) => Effect.map(Clock.currentTimeMillis, (now) => now - ctx.config.quietDays * DAY)
 const nowTs = Effect.map(Clock.currentTimeMillis, (now) => millisToTs(now))

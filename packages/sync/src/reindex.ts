@@ -28,6 +28,8 @@
  *   activity `client.counts` reported, so a search preview does not move it down.
  * - Ephemeral messages are left out: they never set a row's preview,
  *   activity, unread count or mention.
+ * - Juno's own posts Slack has not stored yet count as the user's messages
+ *   when queued (`ownPosts.ts`), so a send moves its topic before Slack answers.
  */
 import {
   compareTs,
@@ -48,6 +50,7 @@ import { Invalidation, StoreWriter, type MessageRow, type SqlError, type TopicIn
 import { Effect } from 'effect'
 import { messageTopics, syncKeys } from './keys'
 import { countExact } from './threadRanges'
+import { ownMessage, pendingPosts } from './ownPosts'
 import { markUpToDate, storedRow, topicInputs } from './topicInputs'
 import { latestSyncedRange, readState, threadMessages, threadRanges } from './write'
 
@@ -122,7 +125,8 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const channel = parsed.channel
 
     const reads = yield* readState(id)
-    const inputs = topicInputs(options.me, reads)
+    const pending = yield* pendingPosts(channel, parsed.kind === 'thread' ? parsed.threadTs : undefined)
+    const inputs = topicInputs(options.me, reads, pending)
     const { row: existing, upToDate } = yield* storedRow(id, inputs)
     if (upToDate) return false
     // Set when the row looked for someone not stored: it gets no marker, so the next re-index looks again.
@@ -142,14 +146,18 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     const live = rows.filter((r) => r.deleted === 0 && r.ephemeral !== 1)
     let latest: MessageRow | undefined
     for (const row of live) if (latest === undefined || compareTs(row.ts, latest.ts) > 0) latest = row
+    const own = pending.map((post) => ownMessage(post, options.me.userId))
+    const lastOwn = own.at(-1)
+    // What the preview reads: the newest message, a pending post when it is newer than every stored one.
+    const head = lastOwn !== undefined && (latest === undefined || compareTs(lastOwn.ts, latest.ts) > 0) ? { user_id: options.me.userId, bot_name: null, text: lastOwn.text } : latest
     const userIds = new Set<string>()
     const channelIds = new Set<string>()
     const usergroupIds = new Set<string>()
-    if (latest !== undefined) {
-      if (latest.user_id !== null) userIds.add(latest.user_id)
-      for (const match of latest.text.matchAll(MENTION)) userIds.add(match[1]!)
-      for (const match of latest.text.matchAll(CHANNEL_MENTION)) channelIds.add(match[1]!)
-      for (const match of latest.text.matchAll(USERGROUP_MENTION)) usergroupIds.add(match[1]!)
+    if (head !== undefined) {
+      if (head.user_id !== null) userIds.add(head.user_id)
+      for (const match of head.text.matchAll(MENTION)) userIds.add(match[1]!)
+      for (const match of head.text.matchAll(CHANNEL_MENTION)) channelIds.add(match[1]!)
+      for (const match of head.text.matchAll(USERGROUP_MENTION)) usergroupIds.add(match[1]!)
     }
     const users = new Map<string, string>()
     const loadUsers = (ids: ReadonlyArray<string>) =>
@@ -237,6 +245,7 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
         return row.files_json === null ? undefined : (JSON.parse(row.files_json) as ReadonlyArray<File>)
       },
     }))
+    messages.push(...own)
     let indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete, includeAttention: true })
     if (asked.size > 0) {
       const requested = [...asked]
@@ -272,14 +281,14 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     }
 
     const activity = indexed.activity
-    const namesakeCheck = latest?.bot_name == null && latest?.user_id != null ? yield* senderNamesakes(latest.user_id, live, options.me.userId) : undefined
+    const namesakeCheck = head?.bot_name == null && head?.user_id != null ? yield* senderNamesakes(head.user_id, live, options.me.userId) : undefined
     if (namesakeCheck?.complete === false) complete = false
     const sakes = namesakeCheck?.names ?? []
     const rootText = root !== undefined && root.deleted === 0 ? indexed.rootText?.slice(0, ROOT_TEXT_CHARS) : undefined
     const preview: StoredPreview = {
-      sender: latest?.bot_name ?? indexed.preview?.sender ?? '',
+      sender: head?.bot_name ?? indexed.preview?.sender ?? '',
       text: indexed.preview?.text ?? '',
-      ...(latest?.bot_name != null || latest?.user_id === null || latest?.user_id === undefined ? {} : { senderId: latest.user_id }),
+      ...(head?.bot_name != null || head?.user_id === null || head?.user_id === undefined ? {} : { senderId: head.user_id }),
       ...(rootText === undefined ? {} : { rootText }),
       ...(sakes.length === 0 ? {} : { namesakes: sakes }),
     }

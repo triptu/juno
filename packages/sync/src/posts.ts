@@ -19,6 +19,8 @@
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
+import { storedMe } from './me'
+import { reindexTopics } from './reindex'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
 
@@ -106,7 +108,21 @@ const toPost = (row: PostRow): PendingPost => ({
 export const postTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): string =>
   post.threadTs === undefined ? mainTopicId(post.channel as ChannelId) : post.threadTs.startsWith('pending:') ? `p:${post.channel}:${post.threadTs.slice(8)}` : threadTopicId(post.channel as ChannelId, post.threadTs as Ts)
 
-const touch = (post: Pick<PendingPost, 'channel' | 'threadTs'>) => Invalidation.use((i) => i.invalidate({ messages: [postTopic(post), `channel:${post.channel}`] }))
+/** The post's topic shows it: in its list, and in its sidebar row's activity and preview (`reindex.ts`). */
+const touch = (post: Pick<PendingPost, 'channel' | 'threadTs'>) =>
+  Invalidation.use((i) => i.invalidate({ messages: [postTopic(post), `channel:${post.channel}`] })).pipe(Effect.andThen(reindexPostTopic(post)))
+
+/**
+ * Re-indexes the topic a post shows in, whose row counts it (`reindex.ts`).
+ * A thread Juno started and Slack has not answered is indexed on its own
+ * (`startedThreads.ts`).
+ */
+export const reindexPostTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    if (post.threadTs?.startsWith('pending:') === true) return
+    const me = yield* storedMe
+    if (me !== undefined) yield* reindexTopics([postTopic(post)], { me })
+  })
 
 /** The pending post with this `client_msg_id`, if any. */
 export const readPost = (clientMsgId: string): Effect.Effect<PendingPost | undefined, SqlError, StoreWriter> =>
