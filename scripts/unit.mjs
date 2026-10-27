@@ -80,6 +80,15 @@ function isolateFlag(args) {
   return env === '1' ? '--isolate' : '--no-isolate'
 }
 
+/**
+ * The environment for `bun test`: this one without the variables by which Bun knows an agent runs it (`CLAUDECODE`,
+ * `AGENT`, `REPL_ID`), since then it prints only failing tests and a full run's record needs every test's time.
+ */
+export function bunTestEnv(env = process.env) {
+  const { CLAUDECODE: _claude, AGENT: _agent, REPL_ID: _repl, ...rest } = env
+  return rest
+}
+
 function defaultWorkers() {
   const workers = Number(process.env.JUNO_TEST_WORKERS ?? Math.max(1, Math.floor(availableParallelism() / 2)))
   if (!Number.isSafeInteger(workers) || workers < 1) throw new Error('JUNO_TEST_WORKERS must be a positive integer')
@@ -89,7 +98,7 @@ function defaultWorkers() {
 if (import.meta.main) {
   const { seed, args } = unitCommand(process.argv.slice(2), process.cwd())
   console.log(`unit: test order seed ${seed}; \`bun run test --seed ${seed}\` repeats it`)
-  const child = spawn('bun', args, { stdio: 'inherit' })
+  const child = spawn('bun', args, { stdio: 'inherit', env: bunTestEnv() })
   forwardSignals(new Set([child]))
   child.on('error', (error) => console.error(error.message))
   child.on('close', (code, signal) => { process.exitCode = signal ? 130 : code ?? 1 })

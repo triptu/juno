@@ -17,7 +17,7 @@ import { availableParallelism } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { forwardSignals } from './remote/children.mjs'
-import { takeSeed } from './unit.mjs'
+import { bunTestEnv, takeSeed } from './unit.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const app = join(root, 'apps/desktop')
@@ -56,7 +56,7 @@ if (import.meta.main) {
   const profile = process.env.JUNO_DOM_PROFILE === '1'
   const dir = join(app, 'test-results/dom-profile')
   const command = profile ? [args[0], '--preload=./dom/profile.ts', ...args.slice(1).filter((arg) => !arg.startsWith('--parallel'))] : args
-  const child = spawn('bun', command, { cwd: app, stdio: 'inherit', env: profile ? { ...process.env, JUNO_E2E_HOST_PROFILE: join(dir, 'host') } : process.env })
+  const child = spawn('bun', command, { cwd: app, stdio: 'inherit', env: profile ? { ...bunTestEnv(), JUNO_E2E_HOST_PROFILE: join(dir, 'host') } : bunTestEnv() })
   forwardSignals(new Set([child]))
   child.on('error', (error) => console.error(error.message))
   child.on('close', (code, signal) => { process.exitCode = signal ? 130 : code ?? 1 })

@@ -43,7 +43,7 @@ import { describeGalleryCounts, fullSuites, galleryCounts, galleryWalk, planOutc
 import { scratchFolder } from './worktree-folder.mjs'
 import { localVerifyEnv, RunnerNotReady, verifyExecution } from './verify-execution.mjs'
 import { committedInputKey, protocolInputs, runtimeIdentity } from './verify-inputs.mjs'
-import { checkToolchain, fileResults, FILE_SAMPLE_SHARE, freshFileRun, laneFiles, timedFiles } from './verify-files.mjs'
+import { bunLaneTimes, checkToolchain, fileResults, FILE_SAMPLE_SHARE, freshFileRun, laneFiles, slowestSection, timedFiles } from './verify-files.mjs'
 import { fullRunCores, fullRunJobs } from './remote/plan.mjs'
 import { mergeRepairTests, repairPlan, suitePassed } from './verify-repair.mjs'
 import { ImportGraph } from './import-graph.mjs'
@@ -346,7 +346,7 @@ const measured = results.map((result) => {
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
     failures: code === 0 ? [] : stop ? [`${stop.rule}: ${stop.signature ?? `${stop.failed}/${stop.completed} tests failed`}`] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused']
       : [...missed.length ? [`Sampled gallery records failed, so the walk-cache key missed an input: ${missed.join(', ')}`] : [],
-        ...missedFiles.length ? [`Sampled reused test files failed, so the reuse key missed an input: ${missedFiles.join(', ')}`] : [], ...failures(result.log)], tests, walks, files: timedFiles(ownFiles, ran?.seconds),
+        ...missedFiles.length ? [`Sampled reused test files failed, so the reuse key missed an input: ${missedFiles.join(', ')}`] : [], ...failures(result.log)], tests, times: bunLaneTimes(result.suite, log, tests), walks, files: timedFiles(ownFiles, ran?.seconds),
     cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch || stop ? 'infrastructure' : undefined), note: stop ? JSON.stringify(stop) : mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
   }
 })
@@ -388,6 +388,7 @@ const markdown = [
   ...summary.suites
     .filter((suite) => suite.failures.length > 0)
     .flatMap((suite) => ['', `## ${suite.suite}`, '', ...suite.failures.map((failure) => `- ${failure}`)]),
+  ...slowestSection(measured),
   '',
 ].join('\n')
 writeFileSync(onMain || smoke ? join(statusDir, smoke ? 'verify-smoke.md' : 'verify-main.md') : join(logDir, 'summary.md'), markdown)
