@@ -2,7 +2,7 @@
 import { Effect } from 'effect'
 import { millisToTs } from '@juno/domain'
 import { Invalidation, StoreWriter, type MessageRow } from '@juno/store'
-import { indexStartedThread } from './reindex'
+import { ROOT_TEXT_CHARS } from './reindex'
 
 const startedTopicId = (channel: string, clientMsgId: string) => `p:${channel}:${clientMsgId}`
 
@@ -40,4 +40,16 @@ export const acknowledgeStartedThread = (message: MessageRow) => Effect.gen(func
   }
   yield* indexStartedThread({ id, channel: message.channel, root: message.ts, at: message.ts, text: message.text, userId: message.user_id ?? '', previous: started.topic_id })
   return { ...message, thread_ts: message.ts }
+})
+
+/** The initial projection of a locally started thread, before its first sync reindex. */
+export const indexStartedThread = (input: {
+  readonly id: string; readonly channel: string; readonly root: string; readonly at: string
+  readonly text: string; readonly userId: string; readonly previous?: string
+}) => Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  if (input.previous !== undefined) yield* sql`DELETE FROM topic_index WHERE topic_id = ${input.previous}`
+  yield* sql`INSERT INTO topic_index (topic_id, channel, kind, root_ts, last_activity_ts, message_count, participants_json, unread_count, unread_exact, mentions_me, preview_json, rev)
+    VALUES (${input.id}, ${input.channel}, 'thread', ${input.root}, ${input.at}, 1, ${JSON.stringify([input.userId])}, 0, 1, 0,
+      ${JSON.stringify({ sender: 'You', senderId: input.userId, text: input.text, rootText: input.text.slice(0, ROOT_TEXT_CHARS) })}, 1) ON CONFLICT DO NOTHING`
 })
