@@ -24,8 +24,8 @@ import { forwardSignals } from './remote/children.mjs'
  * command line too. Loaded only to run, since the tool tests copy `scripts/` without the packages.
  */
 async function unitTimeout() {
-  const { stressScale, UNIT_LIMIT_MS } = await import('../packages/testing/src/limits.ts')
-  return UNIT_LIMIT_MS * stressScale()
+  const { limitScale, UNIT_LIMIT_MS } = await import('../packages/testing/src/limits.ts')
+  return UNIT_LIMIT_MS * limitScale()
 }
 
 const runsBunTest = (root, dir) => /^bun test\b/.test(JSON.parse(readFileSync(resolve(root, dir, 'package.json'), 'utf8')).scripts?.test ?? '')

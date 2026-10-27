@@ -8,7 +8,7 @@ import type { WorkName } from '../src/workControl'
  */
 import { productionTiming, type EngineTimingConfig } from '../src/config'
 import { appendFileSync } from 'node:fs'
-import { stressScale } from '@juno/testing/limits'
+import { limitScale } from '@juno/testing/limits'
 import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -37,7 +37,7 @@ import { memoryTransport, type MessagePortLike, type Transport } from '../src/pr
  * (`@juno/testing/limits`), so a step that waits too long fails with its label
  * before the test times out.
  */
-export const WAIT_MS = 4_000 * stressScale()
+export const WAIT_MS = 4_000 * limitScale()
 
 /** Polls a condition, awaiting async predicates before deciding whether to poll again. */
 export async function waitFor<A>(f: () => A | undefined | Promise<A | undefined>, timeoutMs = WAIT_MS, label = 'condition'): Promise<Exclude<A, undefined>> {

@@ -1,7 +1,7 @@
 import { cpus } from 'node:os'
 import { join, resolve } from 'node:path'
 import { defineConfig } from '@playwright/test'
-import { BROWSER_LIMIT_MS, ELECTRON_LIMIT_MS } from '@juno/testing/limits'
+import { BROWSER_LIMIT_MS, ELECTRON_LIMIT_MS, limitScale } from '@juno/testing/limits'
 import type { Lane } from './e2e/fixtures'
 import { BROWSER_SPECS } from './e2e/lanes'
 
@@ -70,7 +70,7 @@ export default defineConfig<object, { lane: Lane }>({
       retries: 0,
       // Each scenario films and analyses every frame; half the browser workers keep the frames coming on time.
       workers: Math.max(1, Math.ceil(browserWorkers / 2)),
-      timeout: BROWSER_LIMIT_MS * scale,
+      timeout: BROWSER_LIMIT_MS * limitScale(),
       expect: { timeout: 15_000 * scale },
       ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
       use: {
@@ -90,7 +90,7 @@ export default defineConfig<object, { lane: Lane }>({
       // A test that passes only on a second try is a bug to fix.
       retries: 0,
       workers: browserWorkers,
-      timeout: BROWSER_LIMIT_MS * scale,
+      timeout: BROWSER_LIMIT_MS * limitScale(),
       grepInvert: new RegExp(tagPattern(['@electron', ...excludedTags])),
       use: {
         lane: 'web' satisfies Lane,
@@ -109,7 +109,7 @@ export default defineConfig<object, { lane: Lane }>({
       // Each test is its own group, so one file's tests spread over the workers; the slowest start first (e2e/order.ts).
       fullyParallel: true,
       workers: electronWorkers,
-      timeout: ELECTRON_LIMIT_MS * scale,
+      timeout: ELECTRON_LIMIT_MS * limitScale(),
       grep: electronGrep,
       ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
     },

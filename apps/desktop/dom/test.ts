@@ -13,7 +13,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { beforeAll, test } from 'bun:test'
 import type { FakeSlack, FakeSlackOptions } from '@juno/fake-slack'
-import { DOM_LIMIT_MS, stressScale } from '@juno/testing/limits'
+import { DOM_LIMIT_MS, limitScale } from '@juno/testing/limits'
 import type { SyncedSeed } from '../e2e/seeds'
 import { Slack } from '../e2e/driver/slack'
 import type { EngineOptions } from '../web/host/testHost'
@@ -84,7 +84,7 @@ const signIn = async (app: DomApp) => {
 
 const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
 
-const scale = stressScale()
+const scale = limitScale()
 
 /**
  * What the worker and the run share (a loaded host, the renderer's compiled bundle, the synced snapshot, which the

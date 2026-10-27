@@ -23,8 +23,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const app = join(root, 'apps/desktop')
 /** The DOM lane's limit on one test's time (packages/testing/src/limits.ts), loaded only to run, as in `unit.mjs`. */
 async function domTimeout() {
-  const { DOM_LIMIT_MS, stressScale } = await import('../packages/testing/src/limits.ts')
-  return DOM_LIMIT_MS * stressScale()
+  const { DOM_LIMIT_MS, limitScale } = await import('../packages/testing/src/limits.ts')
+  return DOM_LIMIT_MS * limitScale()
 }
 
 /** Whether a repo path is a DOM lane test file. */

@@ -22,7 +22,7 @@
 import { Database } from 'bun:sqlite'
 import { mock, setDefaultTimeout } from 'bun:test'
 import { existsSync } from 'node:fs'
-import { stressScale, UNIT_LIMIT_MS } from './limits'
+import { limitScale, UNIT_LIMIT_MS } from './limits'
 
 // Process kills and snapshot restores cannot discard the drive cache. Keep WAL + FULL,
 // but skip macOS's hardware flush in tests and their children. Set 1 to use the app settings.
@@ -32,7 +32,7 @@ process.env.JUNO_TEST_FULLFSYNC ??= '0'
 // packages/engine/test/harness.ts) are most of it, so a slow step fails with its label.
 // A preload runs once per Bun process, and this reaches only the first file the process runs, so the
 // test scripts (scripts/unit.mjs, each package's `test`) also pass `--timeout=5000`.
-setDefaultTimeout(UNIT_LIMIT_MS * stressScale())
+setDefaultTimeout(UNIT_LIMIT_MS * limitScale())
 
 const fullSqlite =
   process.platform !== 'darwin'
