@@ -60,6 +60,7 @@ const PEEK_THREAD_LINKS = { onOpenThread: openThreadInNewTab, onOpenReply: openR
 const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
 const openPersonDm = (id: string, behind: boolean) => void openPerson(id, behind)
 const DeactivatedNote = chunk(() => import('./topic/deactivated')).component((module) => module.DeactivatedNote)
+const NotMemberNote = chunk(() => import('./topic/notMember')).component((module) => module.NotMemberNote)
 
 const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
 const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
@@ -251,7 +252,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
   const older = useOlderPages(position, detail.id, view, list, loading.fetchState)
   useNewerPages(position, detail.id, view, list, loading.fetchState)
   const { used, use, escape, activity } = useReaderUse(reader)
-  useMarkRead(detail.id, readOnly || !used, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
+  useMarkRead(detail.id, readOnly || !used || detail.notMember !== undefined, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
   const header = useTopicHeader(detail, readOnly, position.drawnAll, reader?.header)
   const composer = useRef<ComposerHandle>(null)
   const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer, readOnly })
@@ -296,7 +297,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
     <TopicViewFrame
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
-      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpTop={messageActions.selectNewest} onEscape={escape(messageActions.selectHovered)} dropping={files.dropping} />}
+      composer={detail.notMember !== undefined ? <Suspense><NotMemberNote detail={detail} /></Suspense> : detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpTop={messageActions.selectNewest} onEscape={escape(messageActions.selectHovered)} dropping={files.dropping} />}
       floating={messageActions.floating}
       viewer={files.viewer}
       onFiles={(dropped) => attach(id, dropped)}

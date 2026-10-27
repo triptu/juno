@@ -169,6 +169,7 @@ export {
   applyJunoHours,
 } from './notifications'
 export { ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, stopIgnoring } from './ignored'
+export { channelMembership, joinChannel, leaveChannel, leaveConfirmAtom, type LeaveConfirm, type MembershipChannel } from './membership'
 export { acquireRendererPort } from './port'
 export {
   accentAtom,

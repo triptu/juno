@@ -6,6 +6,7 @@ import { choiceFor, followsNew, nativeMenu } from './notifyActions'
 import { viewChoices } from './viewActions'
 import { huddleMenuItem } from './huddle/menuItem'
 import { labelOf, isLinkable, notifyTarget, runTopicAction } from './topicActions'
+import { leaveFromMenu, leaveMenuItem } from './channelMembership'
 import type { ActionTopic } from './topicSource'
 
 const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.channel.partner : undefined
@@ -20,7 +21,10 @@ const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.ch
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
   // Redraw art shows only when a drawing can be made: asked beside the settings, within a fraction of a second.
   const drawable = canRedraw(registry)
+  // Leave channel is on a channel's Main (SPEC 5).
+  const leaving = topic.kind === 'main' ? leaveMenuItem(topic.channel) : undefined
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
+  const leave = await leaving
   const notify = notifyTarget(topic)
   const huddle = huddleMenuItem(topic.channel)
   const state = {
@@ -34,10 +38,12 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     // Follow new threads and Add to view (inventory 15.8) are on Main: the row's channel or DM.
     ...(topic.kind === 'main' ? { followNew: followsNew(settings, topic.channel.id), views: viewChoices(topic.channel.id) } : {}),
     ...(huddle === undefined ? {} : { huddle }),
+    ...(leave === undefined ? {} : { leave }),
     ...(dmPartner(topic) !== undefined && registry.get(junoAvailableAtom) ? { knowsAbout: dmPartner(topic)!.name } : {}),
   }
   const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => isLinkable(topic) || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
-  if (chosen !== undefined) runTopicAction(topic, chosen, from)
+  if (chosen === 'leave-channel') leaveFromMenu(topic.channel, at)
+  else if (chosen !== undefined) runTopicAction(topic, chosen, from)
 }
 
 

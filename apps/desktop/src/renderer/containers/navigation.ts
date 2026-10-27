@@ -167,6 +167,12 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
   return next
 }
 
+/** The active tab's composer takes focus when it next mounts, as after Join channel puts it in a preview's place. */
+export function focusComposerWhenShown(): void {
+  const view = activeView(registry.get(tabsAtom))
+  if (view !== undefined) wantComposerFocus(view)
+}
+
 /** A topic now on screen in the active tab focuses its composer once it loads, so typing can start at once. */
 function withComposerFocus(next: Tabs): Tabs {
   const view = activeView(next)

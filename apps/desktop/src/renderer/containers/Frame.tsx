@@ -5,6 +5,7 @@ import { Shell } from '@juno/views'
 import { Forward } from './Forward'
 import { HuddleSharePicker } from './huddle/slots'
 import { collapseSidebar, resetSidebarWidth, resizeSidebar } from './layout'
+import { LeaveConfirmHost } from './LeaveConfirm'
 import { MessageMenuHost } from './messageMenu'
 import { Palette } from './Palette'
 import { Toasts } from './Toasts'
@@ -33,6 +34,7 @@ export function Frame({ sidebar, peek, children }: { readonly sidebar: ReactNode
           <MessageMenuHost />
           <Forward />
           <HuddleSharePicker />
+          <LeaveConfirmHost />
         </>
       }
     >

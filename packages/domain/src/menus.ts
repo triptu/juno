@@ -23,6 +23,7 @@ export type TopicMenuAction =
   | 'follow-new'
   | ViewMenuAction
   | 'ignore-channel'
+  | 'leave-channel'
   | 'juno-knows'
   | 'how-auto'
 
@@ -37,6 +38,7 @@ export type ChannelMenuAction =
   | 'follow-new'
   | ViewMenuAction
   | 'ignore-channel'
+  | 'leave-channel'
   | 'ask-juno'
 export type PersonMenuAction = 'ask-juno' | 'juno-knows' | 'how-auto'
 
@@ -94,7 +96,17 @@ export interface TopicMenuState {
   readonly knowsAbout?: string
   /** A channel's huddle item (SPEC 20): Start huddle, or Join huddle while one runs there. Absent: no item (a DM, whose header has the control, or while you are in this huddle). */
   readonly huddle?: HuddleMenuItem
+  /** Leave channel on a channel's Main (SPEC 5). Absent: no item. */
+  readonly leave?: LeaveMenuItem
 }
+
+/**
+ * Leave channel, on a channel you are in that Slack lets you leave (not #general): `now` for a public one, which
+ * leaves at once with Undo; `ask` for a private one, which asks first ("Leave channel…").
+ */
+export type LeaveMenuItem = 'now' | 'ask'
+
+const leaveItem = (leave: LeaveMenuItem) => item('leave-channel' as const, leave === 'ask' ? 'Leave channel…' : 'Leave channel')
 
 /** The huddle item of a channel's menus: Start huddle, or Join huddle while one runs there. */
 export type HuddleMenuItem = 'start' | 'join'
@@ -183,6 +195,7 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   if (isMain && state.followNew !== undefined) items.push(followNewItem(state.followNew))
   if (isMain && state.views !== undefined) items.push(addToViewMenu<TopicMenuAction>(state.views))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
+  if (isMain && state.leave !== undefined) items.push(leaveItem(state.leave))
   if (state.knowsAbout !== undefined) items.push(separator, item('juno-knows', knowsAbout(state.knowsAbout)))
   return items
 }
@@ -200,6 +213,8 @@ export interface ChannelMenuState {
   readonly views?: ReadonlyArray<ViewChoice>
   /** Start huddle or Join huddle, as in the topic menu. Absent: no item. */
   readonly huddle?: HuddleMenuItem
+  /** Leave channel, as in the topic menu. Absent: no item. */
+  readonly leave?: LeaveMenuItem
 }
 
 /** The channel menu (inventory 15.2): a channel row in Browse, the header's context pill, a #channel chip. */
@@ -213,6 +228,7 @@ export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuIte
   if (state.followNew !== undefined) items.push(followNewItem(state.followNew))
   if (state.views !== undefined) items.push(addToViewMenu<ChannelMenuAction>(state.views))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
+  if (state.leave !== undefined) items.push(leaveItem(state.leave))
   if (state.askJuno === true) items.push(separator, item('ask-juno', 'Ask Juno'))
   return items
 }

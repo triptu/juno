@@ -18,6 +18,7 @@ export {
   viewPillMenuItems,
   type ChannelMenuAction,
   type HuddleMenuItem,
+  type LeaveMenuItem,
   type ViewChoice,
   type ViewMenuAction,
   type ViewPillAction,
