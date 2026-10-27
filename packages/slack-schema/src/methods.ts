@@ -38,6 +38,8 @@ import {
   DraftsCreateArgs,
   DraftsDeleteArgs,
   DraftsDeleteFields,
+  DraftsInfoArgs,
+  DraftsInfoFields,
   DraftsListArgs,
   DraftsListFields,
   DraftsUpdateArgs,
@@ -136,6 +138,7 @@ export const Methods = {
   'drafts.create': method(DraftsCreateArgs, DraftWriteFields),
   'drafts.update': method(DraftsUpdateArgs, DraftWriteFields),
   'drafts.delete': method(DraftsDeleteArgs, DraftsDeleteFields),
+  'drafts.info': method(DraftsInfoArgs, DraftsInfoFields),
 } as const
 
 export type Methods = typeof Methods

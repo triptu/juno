@@ -21,6 +21,10 @@ export const draftsFeature = {
       const draft = ctx.workspace.drafts.update({ draftId: args.draft_id, blocks: args.blocks, destinations: args.destinations, fileIds: args.file_ids, clientLastUpdatedTs: args.client_last_updated_ts })
       return typeof draft === 'string' ? new ApiError(draft) : { draft }
     },
+    'drafts.info': (ctx, args) => {
+      const draft = ctx.workspace.drafts.info(args.draft_id)
+      return typeof draft === 'string' ? new ApiError(draft) : { draft }
+    },
     'drafts.delete': (ctx, args) => {
       const failure = ctx.workspace.drafts.delete(args.draft_id, args.client_last_updated_ts)
       return failure === undefined ? {} : new ApiError(failure)
