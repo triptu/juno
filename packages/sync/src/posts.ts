@@ -61,6 +61,8 @@ export interface PendingPost {
   readonly files: ReadonlyArray<PendingFile>
   /** Set for a forward; its text and blocks are the note. */
   readonly share: PendingShare | undefined
+  /** Slack's draft this message was, which the post names (`draft_id`) so Slack's other devices drop it. */
+  readonly draftId: string | undefined
   /** Epoch millis. */
   readonly createdAt: number
   readonly state: PostState
@@ -78,6 +80,7 @@ interface PostRow {
   readonly blocks_json: string | null
   readonly file_ids_json: string | null
   readonly share_json: string | null
+  readonly draft_id: string | null
   readonly created_at: string
   readonly state: PostState
   readonly attempts: number
@@ -85,7 +88,7 @@ interface PostRow {
   readonly last_error: string | null
 }
 
-const COLUMNS = 'client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, share_json, created_at, state, attempts, next_at, last_error'
+const COLUMNS = 'client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, share_json, draft_id, created_at, state, attempts, next_at, last_error'
 
 const toPost = (row: PostRow): PendingPost => ({
   clientMsgId: row.client_msg_id,
@@ -95,6 +98,7 @@ const toPost = (row: PostRow): PendingPost => ({
   blocksJson: row.blocks_json,
   files: row.file_ids_json === null ? [] : (JSON.parse(row.file_ids_json) as ReadonlyArray<PendingFile>),
   share: row.share_json === null ? undefined : (JSON.parse(row.share_json) as PendingShare),
+  draftId: row.draft_id ?? undefined,
   createdAt: Number(row.created_at),
   state: row.state,
   attempts: row.attempts,
@@ -125,6 +129,7 @@ export const queuePost = (post: {
   readonly blocksJson: string | null
   readonly files?: ReadonlyArray<PendingFile>
   readonly share?: PendingShare
+  readonly draftId?: string | undefined
   readonly createdAt: number
 }): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
@@ -136,8 +141,8 @@ export const queuePost = (post: {
     }
     const files = post.files === undefined || post.files.length === 0 ? null : JSON.stringify(post.files)
     const share = post.share === undefined ? null : JSON.stringify(post.share)
-    yield* sql`INSERT INTO pending_messages (client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, share_json, created_at, state, attempts, next_at)
-      VALUES (${post.clientMsgId}, ${post.channel}, ${threadTs ?? null}, ${post.text}, ${post.blocksJson}, ${files}, ${share}, ${String(post.createdAt)}, 'queued', 0, ${post.createdAt})
+    yield* sql`INSERT INTO pending_messages (client_msg_id, channel, thread_ts, text, blocks_json, file_ids_json, share_json, draft_id, created_at, state, attempts, next_at)
+      VALUES (${post.clientMsgId}, ${post.channel}, ${threadTs ?? null}, ${post.text}, ${post.blocksJson}, ${files}, ${share}, ${post.draftId ?? null}, ${String(post.createdAt)}, 'queued', 0, ${post.createdAt})
       ON CONFLICT (client_msg_id) DO NOTHING`
     yield* touch({ channel: post.channel, threadTs })
   })

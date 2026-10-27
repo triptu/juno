@@ -36,6 +36,28 @@ export {
   writeLocalMark,
   type ThreadSubRow,
 } from './write'
+export {
+  beginDraftSave,
+  deferDraftSave,
+  draftClientMsgId,
+  draftDestination,
+  draftSyncRow,
+  draftTopicId,
+  dropDraftSave,
+  endDraftSave,
+  endSentDraft,
+  linkedDrafts,
+  observeDraft,
+  pendingDrafts,
+  recoverDraftSaves,
+  sendDraft,
+  settleDraftFinds,
+  topicOfSlackDraft,
+  writeLocalDraft,
+  type DraftAnswer,
+  type DraftSyncRow,
+  type PendingDraft,
+} from './write'
 
 export {
   claimPost,

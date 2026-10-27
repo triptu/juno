@@ -17,7 +17,7 @@ import { MARKER_OF, type MarkupStyle } from './markup'
 const ORDER: ReadonlyArray<MarkupStyle> = ['bold', 'italic', 'strike', 'code']
 
 /** What an element reads as in the field. */
-function fieldText(element: RichTextInline, lookups: Lookups): string {
+export function fieldText(element: RichTextInline, lookups: Lookups): string {
   switch (element.type) {
     case 'text':
       return element.text
@@ -42,37 +42,41 @@ function fieldText(element: RichTextInline, lookups: Lookups): string {
   }
 }
 
+/** How an element is written: as the edit field shows it (`fieldText`), or as a draft stores it. */
+export type ElementText = (element: RichTextInline, lookups: Lookups) => string
+
 /** Adjacent equal styles share markers, including mentions, links and emoji. */
-export function inlineMarkup(elements: ReadonlyArray<RichTextInline>, lookups: Lookups): string {
+export function inlineMarkup(elements: ReadonlyArray<RichTextInline>, lookups: Lookups, text: ElementText = fieldText): string {
   const runs: Array<{ markers: string; text: string }> = []
   for (const element of elements) {
     const style = 'style' in element ? element.style : undefined
     const markers = ORDER.filter((name) => style?.[name] === true).map((name) => MARKER_OF[name]).join('')
     const previous = runs.at(-1)
-    if (previous?.markers === markers) previous.text += fieldText(element, lookups)
-    else runs.push({ markers, text: fieldText(element, lookups) })
+    if (previous?.markers === markers) previous.text += text(element, lookups)
+    else runs.push({ markers, text: text(element, lookups) })
   }
-  return runs.map(({ markers, text }) => text.split('\n').map((line) => {
+  return runs.map((run) => run.text.split('\n').map((line) => {
+    const markers = run.markers
     const core = line.trim()
     if (core === '') return line
     return line.slice(0, line.length - line.trimStart().length) + markers + core + [...markers].toReversed().join('') + line.slice(line.trimEnd().length)
   }).join('\n')).join('')
 }
 
-export function elementMarkup(element: RichTextElement, lookups: Lookups): string | undefined {
+export function elementMarkup(element: RichTextElement, lookups: Lookups, text: ElementText = fieldText): string | undefined {
   switch (element.type) {
     case 'rich_text_section':
     case 'rich_text_header':
-      return inlineMarkup(element.elements, lookups)
+      return inlineMarkup(element.elements, lookups, text)
     case 'rich_text_quote':
-      return inlineMarkup(element.elements, lookups)
+      return inlineMarkup(element.elements, lookups, text)
         .split('\n')
         .map((line) => `> ${line}`)
         .join('\n')
     case 'rich_text_preformatted':
-      return `\`\`\`\n${element.elements.map((el) => fieldText(el, lookups)).join('')}\n\`\`\``
+      return `\`\`\`\n${element.elements.map((el) => text(el, lookups)).join('')}\n\`\`\``
     case 'rich_text_list':
-      return element.elements.map((item) => inlineMarkup(item.elements, lookups)).join('\n')
+      return element.elements.map((item) => inlineMarkup(item.elements, lookups, text)).join('\n')
     case 'rich_text_divider':
       return undefined
     case 'unknown':
