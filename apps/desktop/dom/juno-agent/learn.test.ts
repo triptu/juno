@@ -90,4 +90,4 @@ domTest('Home offers to learn, the pass fills the memory page with sources, the 
   await expect(style).toContainText(STYLE)
   await expect(style).not.toContainText(STYLE_EDITED)
   await expect(page.locator('[data-memory-change="update"][data-memory-undone]')).toHaveCount(1)
-}, { model: () => startScriptedModel({ answer: learnAnswer }), timeout: 180_000 })
+}, { model: () => startScriptedModel({ answer: learnAnswer }) })

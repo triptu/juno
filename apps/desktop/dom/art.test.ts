@@ -87,4 +87,4 @@ domTest('a new thread gets an AI title and art, Redraw art undoes, AI activity s
     await postgres.chooseInMenu('redraw')
     await juno.expectToast(`Redrawn · ${POSTGRES}`)
   })
-}, { synced: false, engine: { fakeAiRequiresKey: true, aiJobs: true }, model: () => startFakeOpenRouter(), timeout: 180_000 })
+}, { synced: false, engine: { fakeAiRequiresKey: true, aiJobs: true }, model: () => startFakeOpenRouter() })

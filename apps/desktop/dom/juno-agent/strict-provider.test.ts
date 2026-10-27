@@ -62,4 +62,4 @@ domTest('after Skip for now the tab and the panel say Juno needs a model, and Ad
   await chat.expectJuno('You said: what is on today?')
   expect(model.requests.at(-1)?.key).toBe(KEY)
   expect(model.requests.filter((request) => !request.model.includes('haiku')).at(-1)?.model).toBe('anthropic/claude-opus-5.5')
-}, { synced: false, model: () => startFakeOpenRouter({ answer }), engine: { agent: false }, timeout: 90_000 })
+}, { synced: false, model: () => startFakeOpenRouter({ answer }), engine: { agent: false } })

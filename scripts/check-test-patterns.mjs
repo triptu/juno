@@ -53,7 +53,7 @@ const rules = [
   {
     name: 'timeout',
     marker: 'Slow:',
-    pattern: /\b(?:test|testInfo|info\(\))\.setTimeout\(|\btest\.slow\(|describe\.configure\(\{[^}]*\btimeout\b|\bsetDefaultTimeout\(|^\s*\}\s*,\s*\{[^}]*\btimeout\s*:[^}]*\}\s*\)\s*;?\s*$/,
+    pattern: /\b(?:test|testInfo|info\(\))\.setTimeout\(|\btest\.slow\(|describe\.configure\(\{[^}]*\btimeout\b|\bsetDefaultTimeout\(|^\s*\}\s*,\s*\{.*\btimeout\s*:\s*[\d_]+.*\}\s*\)\s*;?\s*$/,
     // In bun test files, a number after a test's body is its timeout too.
     bunPattern: /^\s*\}\s*,\s*[\d_]+\s*\)\s*;?\s*$/,
     advice: 'find what the test waits on and fix that, so it fits its lane\'s limit',

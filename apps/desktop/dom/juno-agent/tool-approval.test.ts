@@ -108,4 +108,4 @@ domTest('a search with no read-only mark runs under Auto, an approved call runs 
   } finally {
     await close()
   }
-}, { model: () => startFakeOpenRouter({ answer }), timeout: 120_000 })
+}, { model: () => startFakeOpenRouter({ answer }) })

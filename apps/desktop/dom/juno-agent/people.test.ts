@@ -181,4 +181,4 @@ domTest('the pass builds files for the top DM partners, a DM run gets the file a
   await panel.send('what does Maya need from me this week?')
   await panel.expectJuno('You said: what does Maya need from me this week?')
   expect(askedWith(model, 'what does Maya need from me').memory).toContain('Relationship: Manager (set by the owner)')
-}, { model: () => startScriptedModel({ answer: scripted() }), timeout: 180_000 })
+}, { model: () => startScriptedModel({ answer: scripted() }) })
