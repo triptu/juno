@@ -14,7 +14,7 @@ export { mergeMessage, mergeRootCounters, mergeTombstone, stubRoot, toMessageRow
 export { continuous, provenToEnd, rangeHolding, type ThreadRange } from './threadRanges'
 export { imagesWithoutThumbs } from './files'
 export { reindexAll, reindexTopics, type StoredPreview } from './reindex'
-export { BOOT_KEY, HOME_READY_KEY, QUICK_START_KEY, storedMe } from './boot'
+export { BOOT_KEY, HOME_READY_KEY, QUICK_START_KEY, SELF_ROLE_KEY, storedMe } from './boot'
 export {
   beginPendingFollow,
   clearThreadSub,

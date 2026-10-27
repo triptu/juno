@@ -2,6 +2,7 @@ import searchDates from './202610241600_search_dates'
 import threadRanges from './202610242200_thread_ranges'
 import messageInteraction from './202610261600_message_interaction'
 import topicInputs from './202610271500_topic_inputs'
+import channelRights from './202610272130_channel_rights'
 import messageAttention from './202610201300_message_attention'
 import mutationRepair from './202610190100_mutation_repair'
 import dmPartnerIndex from './202610201301_dm_partner_index'
@@ -63,4 +64,5 @@ export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlCli
   '202610242200_thread_ranges': threadRanges,
   '202610261600_message_interaction': messageInteraction,
   '202610271500_topic_inputs': topicInputs,
+  '202610272130_channel_rights': channelRights,
 }

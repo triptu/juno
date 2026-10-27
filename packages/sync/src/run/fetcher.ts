@@ -2,6 +2,7 @@ import { Effect, FiberSet } from 'effect'
 import { trackFetch } from '../context'
 import { applyActed } from '../acted'
 import { applyOpened, applySent } from '../events'
+import { applyRenamed } from '../metadata'
 import { fetchAt, fetchNewer, fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
 import { wantUsers } from '../users'
 import { fetchFullReactions } from '../whoReacted'
@@ -63,6 +64,7 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
     newer: (topicId, after) => fetched((lane) => fetchNewer(ctx, topicId, after, lane), 'newer page'),
     at: (topicId, ts) => fetched((lane) => fetchAt(ctx, topicId, ts, lane), 'message page'),
     opened: (channel) => applyOpened(ctx.metadata, channel).pipe(Effect.provide(services)),
+    renamed: (channel, name, from) => applyRenamed(ctx.metadata, channel, name, from).pipe(Effect.provide(services)),
     sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
     acted: (acted, alongside) => applyActed(ctx, acted, alongside).pipe(Effect.provide(services)),
     wantUsers: (ids) => Effect.sync(() => wantUsers(ctx, ids)),

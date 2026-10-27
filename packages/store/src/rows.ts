@@ -54,6 +54,12 @@ export interface ConversationRow {
   readonly purpose: string | null
   readonly created: string | null
   readonly updated: string | null
+  /** The workspace's general channel. Absent is 0. */
+  readonly is_general?: Flag
+  /** Shared with another organisation (Slack Connect). Absent is 0. */
+  readonly is_ext_shared?: Flag
+  /** Who made the channel. */
+  readonly creator?: string | null
 }
 
 /** A user group, by its `S…` id. `deleted` groups keep their last handle. */
