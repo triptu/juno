@@ -32,7 +32,7 @@ export function createTurnSession(store: Store, options: TurnsOptions, running: 
     unsubscribe()
     await old.close()
     deleteRetiredJournals(options.agentDir, incarnation)
-    const next = await openJournalFile(options.agentDir, incarnation)
+    const next = await openJournalFile(options.agentDir, incarnation, options.durability)
     if (next._tag !== 'opened') throw new Error(`a new journal could not be opened (${next._tag})`)
     attach(await next.file.start({ ...settings, model: running() }))
     journal!.resume()

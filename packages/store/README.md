@@ -24,6 +24,8 @@ To change a schema, add a timestamped migration file in `src/migrations/<db>/` a
 
 ### Cache migrations
 
+The next cache migration id must be later than `202610272130` (and any newer id on main). Earlier ids are skipped by caches that have already applied that migration.
+
 `cache.db` migrations run on a populated cache, the same way as `user.db`'s, so an update does not sync everything from Slack again (ADR 0008, note of 10-16). Each one:
 
 - Is additive where it can be: a new table, a new column with a default, a new index. It keeps every existing row.

@@ -1,3 +1,4 @@
+import type { DurabilityOptions } from '../store/durability'
 import type { Pins } from '@juno/agent-memory'
 import { ACTIONS_MIGRATIONS, type Actions, type ActionsOptions } from '../actions'
 import { createBackup, type Backup, type BackupKeychain } from '../backup/backup'
@@ -80,6 +81,7 @@ export interface ModelRef {
 }
 
 export interface TurnsOptions {
+  readonly durability?: DurabilityOptions
   readonly agentDir: string
   /**
    * Builds the guarded provider on the opened store (`createOpenRouter`, or
@@ -221,6 +223,7 @@ export async function openTurns(options: TurnsOptions): Promise<Turns | UpdateNe
   let backup: Backup | undefined
   const relay = { notify: noop }
   return openCore({
+    ...(options.durability ? { durability: options.durability } : {}),
     agentDir: options.agentDir,
     ...(options.now ? { now: options.now } : {}),
     migrations: [SPEND_MIGRATIONS, TURNS_MIGRATIONS, JOBS_MIGRATIONS, SETTINGS_MIGRATIONS, ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS, VIEW_MIGRATIONS, SCRIPT_MIGRATIONS, REDACTION_MIGRATIONS, BACKUP_MIGRATIONS, OWNERSHIP_MIGRATIONS, MEMORY_DOCS_MIGRATIONS, ...(options.migrations ?? []).filter((set) => set.name !== SCHEDULE_MIGRATIONS.name)],

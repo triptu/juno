@@ -1,3 +1,5 @@
+// Must run before any module captures a test switch.
+import './environment'
 import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'

@@ -11,6 +11,7 @@ const checks = [
   ['bun lint', [process.execPath, ['lint', '--no-script', '--deny-warnings', '.']]],
   ['decision log', bun('decision-log.mjs', '--check')],
   ['cache epoch', bun('check-cache-epoch.mjs')],
+  ['index version', bun('check-index-version.mjs')],
   ['migration order', bun('check-migration-order.mjs')],
   ['cursor rule', bun('check-no-pointer-cursor.mjs')],
   ['test timing', bun('check-test-patterns.mjs')],

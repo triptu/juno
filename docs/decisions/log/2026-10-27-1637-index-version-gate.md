@@ -1,0 +1,1 @@
+- 10-27 16:37 · Tushar · Lint requires a higher INDEX_VERSION when reindex.ts or a transitive local dependency changes against the branch point with main, including preview and richtext rules. Unchanged topic inputs skip boot recomputation, so changed rules must invalidate stored rows. The next cache migration must be later than 202610272130 and any newer shipped id.

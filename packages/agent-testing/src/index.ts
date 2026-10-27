@@ -35,3 +35,5 @@ export { CRASH_POINTS, type CrashPoint } from './crash/points'
 export { agentDatabaseFiles, crashAt, journalFiles, runAgent, snapshotFiles } from './crash/harness'
 export { testTool } from './crash/tool'
 export { TEST_CHANNEL, fakeActionHost, type FakeActionHost } from './host/actions'
+
+export { testDurability } from './durability'

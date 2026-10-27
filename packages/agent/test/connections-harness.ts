@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // MCP connections on the real turn engine, for the connection and T3 flow tests: the manager and its
 // model tools, the scripted chat model, the fake decision model for the auto-review and, with `t3`,
 // the T3 Code adapter with a poll clock the test moves by hand. Each test file calls
@@ -104,6 +105,7 @@ async function openEngine(dir: string, options: ConnectionsOptions, parts: {
   const review = options.review === null ? {} : { review: parts.reviewer.model }
   const timeout = options.reviewTimeoutMs === undefined ? {} : { reviewTimeoutMs: options.reviewTimeoutMs }
   const turns = await openTurns({
+    durability: testDurability,
     agentDir: dir, model: SONNET, migrations: [MCP_MIGRATIONS],
     provider: (store) => {
       manager = createMcpManager({ store, credentials: parts.credentials, ...(options.defaults ? { defaults: options.defaults } : {}) })

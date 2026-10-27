@@ -19,6 +19,7 @@
  *   its records" and writes nothing.
  * - Before pi resumes, every open authorization becomes `unknown` (§6.5).
  */
+import type { DurabilityOptions } from '../store/durability'
 import { classifyAtStartup } from '../store/ledger'
 import type { Store } from '../store/store'
 import { openJournalFile, type JournalFile } from '../runtime/journal'
@@ -32,10 +33,10 @@ export type Recovery =
   /** The journal needs a newer Juno. Nothing was written. */
   | { readonly _tag: 'updateNeeded'; readonly version: number }
 
-export async function recover(store: Store, agentDir: string): Promise<Recovery> {
+export async function recover(store: Store, agentDir: string, durability: DurabilityOptions = {}): Promise<Recovery> {
   let incarnation = ensureIncarnation(store)
   deleteRetiredJournals(agentDir, incarnation)
-  const opened = await openJournalFile(agentDir, incarnation)
+  const opened = await openJournalFile(agentDir, incarnation, durability)
   if (opened._tag === 'unsupported') return { _tag: 'updateNeeded', version: opened.version }
   const behind = opened._tag === 'foreign' || opened.file.lastCommitted < resumeFloor(store, incarnation)
   if (!behind && opened._tag === 'opened') {
@@ -46,7 +47,7 @@ export async function recover(store: Store, agentDir: string): Promise<Recovery>
   const from = incarnation
   incarnation = commitRotation(store, 'rollback')
   deleteRetiredJournals(agentDir, incarnation)
-  const fresh = await openJournalFile(agentDir, incarnation)
+  const fresh = await openJournalFile(agentDir, incarnation, durability)
   if (fresh._tag !== 'opened') throw new Error(`a new journal could not be opened (${fresh._tag})`)
   const classified = classifyAtStartup(store)
   return { _tag: 'rotated', file: fresh.file, classified, from }

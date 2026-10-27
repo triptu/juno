@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // The turn engine with cards as a process, for the action crash tests. Opens the engine on a directory
 // (recovery runs) with the fake host, whose record and Slack messages persist in `<dir>/slack.json`,
 // runs the commands, prints the ledger as JSON and closes. The scripted model proposes a Send message
@@ -29,6 +30,7 @@ fake.script(Array.from({ length: 8 }, () => reply((context) => {
 
 const slack = fakeActionHost({ file: join(dir, 'slack.json') })
 const turns = await openTurns({
+  durability: testDurability,
   agentDir: dir,
   provider: (store) => createProviderGuard({ store, transport: fake.models }),
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },

@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // The turn engine with removal as a process, for the removal crash tests. Opens the engine on a directory
 // (recovery runs) with compaction and a fake backup whose deletion record and generations persist in
 // `<dir>/backup.json`, runs the commands, prints what still holds the marker as JSON and closes. The
@@ -32,6 +33,7 @@ const leaks = (turns: Turns) =>
 
 let opened: Turns | undefined
 const turns = await openTurns({
+  durability: testDurability,
   agentDir: dir,
   provider: (store) => createProviderGuard({ store, transport: fake.models }),
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },

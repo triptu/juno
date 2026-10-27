@@ -12,6 +12,7 @@
  * projection finishes, `agent.sqlite` closes, and only then is the owner
  * lock released.
  */
+import type { DurabilityOptions } from '../store/durability'
 import { join } from 'node:path'
 import { accept, nextAccepted, settle, unsettled, type Accept, type InboxKind } from '../inbox/inbox'
 import { deliver } from '../inbox/bridge'
@@ -31,6 +32,7 @@ export const AGENT_DATABASE_FILE = 'agent.sqlite'
 export const ROTATION_AGE_MS = 30 * 24 * 60 * 60 * 1000
 
 export interface CoreOptions extends JournalSettings {
+  readonly durability?: DurabilityOptions
   readonly agentDir: string
   /** Migration sets of other folders (spend, backup), applied after `core`. */
   readonly migrations?: ReadonlyArray<MigrationSet>
@@ -63,7 +65,7 @@ export interface Core {
   readonly close: () => Promise<void>
 }
 
-type OpenStorage = Pick<CoreOptions, 'agentDir' | 'migrations' | 'now'>
+type OpenStorage = Pick<CoreOptions, 'agentDir' | 'migrations' | 'now' | 'durability'>
 
 /** Startup hooks run under the owner lock. The router starts pi only after recovery. */
 interface CoreRouter<Running> {
@@ -92,7 +94,7 @@ export async function openCore<Running>(options: CoreOptions | RoutedOptions<Run
   try {
     if (router.beforeOpen !== undefined) await router.beforeOpen()
     try {
-      db = openDatabase(join(options.agentDir, AGENT_DATABASE_FILE), options.migrations ?? [], now)
+      db = openDatabase(join(options.agentDir, AGENT_DATABASE_FILE), options.migrations ?? [], now, options.durability)
     } catch (error) {
       if (error instanceof StoreTooNew) {
         router.stop?.()
@@ -103,7 +105,7 @@ export async function openCore<Running>(options: CoreOptions | RoutedOptions<Run
     const store: Store = { db, now }
     initialize(store)
     if (router.beforeRecovery !== undefined) await router.beforeRecovery(store)
-    const recovery = await recover(store, options.agentDir)
+    const recovery = await recover(store, options.agentDir, options.durability)
     if (recovery._tag === 'updateNeeded') {
       router.stop?.()
       db.close()
@@ -167,7 +169,7 @@ function running(store: Store, first: Journal, options: CoreOptions, opened: 're
     unsubscribe()
     await old.close()
     deleteRetiredJournals(options.agentDir, incarnation)
-    const next = await openJournalFile(options.agentDir, incarnation)
+    const next = await openJournalFile(options.agentDir, incarnation, options.durability)
     if (next._tag !== 'opened') throw new Error(`a new journal could not be opened (${next._tag})`)
     journal = await next.file.start(options)
     projection = projector(store, journal)

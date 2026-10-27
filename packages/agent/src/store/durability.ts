@@ -1,10 +1,10 @@
 export interface DurabilityOptions {
-  /** Flush the drive cache on macOS. Defaults to ON outside the test preload. */
+  /** Flush the drive cache on macOS. Defaults to ON. */
   readonly fullfsync?: boolean
 }
 
 /** Shared by the agent store and pi journal, before either writes. */
-export function durablePragmas({ fullfsync = process.env.JUNO_TEST_FULLFSYNC !== '0' }: DurabilityOptions = {}): ReadonlyArray<string> {
+export function durablePragmas({ fullfsync = true }: DurabilityOptions = {}): ReadonlyArray<string> {
   const flush = fullfsync ? 'ON' : 'OFF'
   return [
     'PRAGMA journal_mode = WAL',

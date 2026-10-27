@@ -607,9 +607,9 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `bun run gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `bun run remote test:desktop --project=feel` (the six of every full run; `--env JUNO_ON_DEMAND=1` for all); `bun run test:feel` on the Mac for every scenario and the videos |
 
-Unit tests run on `bun test` with the preload in `packages/testing/src/preload.ts` (Node-compatible SQLite, a 30 s test timeout, and `JUNO_TEST_FULLFSYNC=0`). The agent store and pi journal read that switch in `packages/agent/src/store/durability.ts`, turning off only `fullfsync` and `checkpoint_fullfsync`; WAL and `synchronous=FULL` remain enabled. Both openers also accept an explicit `fullfsync` option. The app defaults to ON; `JUNO_TEST_FULLFSYNC=1 bun run test` retains its settings in tests.
+Unit tests run on `bun test` with the preload in `packages/testing/src/preload.ts` (Node-compatible SQLite and the unit lane's timeout). Agent test harnesses pass the explicit `testDurability` option from `@juno/agent-testing` through store opening, recovery and journal rotation. It turns off only `fullfsync` and `checkpoint_fullfsync`; WAL and `synchronous=FULL` remain enabled. Production defaults to ON and never reads `JUNO_TEST_FULLFSYNC`. `JUNO_TEST_FULLFSYNC=1 bun run test` tells the test helper to retain hardware flushes, including in crash-test children.
 
-SQLite's [fullfsync](https://sqlite.org/pragma.html#pragma_fullfsync) uses macOS's `F_FULLFSYNC` to flush the drive cache for power-loss durability; it has no effect on Linux. [Committed transactions survive a process crash](https://sqlite.org/pragma.html#pragma_synchronous) without that hardware flush. The crash/recovery harness kills processes with `SIGKILL` and restores snapshots of committed files, including in tests named "power loss". It never discards the OS or drive cache, so those tests keep the same recovery coverage with fullfsync off. The preload's switch is inherited by child processes. The engine's workspace store does not enable either full-flush pragma and needs no override.
+SQLite's [fullfsync](https://sqlite.org/pragma.html#pragma_fullfsync) uses macOS's `F_FULLFSYNC` to flush the drive cache for power-loss durability; it has no effect on Linux. [Committed transactions survive a process crash](https://sqlite.org/pragma.html#pragma_synchronous) without that hardware flush. The crash/recovery harness kills processes with `SIGKILL` and restores snapshots of committed files, including in tests named "power loss". It never discards the OS or drive cache, so those tests keep the same recovery coverage with fullfsync off. Crash-test fixtures pass the same explicit durability option as in-process harnesses. The engine's workspace store does not enable either full-flush pragma and needs no override.
 
 **Order and isolation.** Every `bun test` run is shuffled: the files, and the tests in each file. `bun run test` picks a seed, prints it first (`unit: test order seed <n>`) and passes it to Bun; `bun run test --seed <n>` (or `JUNO_TEST_SEED=<n>`) repeats that order, with `--files` too. `verify:main` keeps the seed in its record (`testSeed`, and a line in `verify-main.md`) and `affected` in the unit step's arguments. Elsewhere `randomize = true` in each `bunfig.toml` and `--randomize` in each package's `test` script shuffle the order, and Bun prints `--seed=<n>` at the end. A test that fails only in some orders has a fault: fix its cause, do not pin an order.
 
@@ -1055,7 +1055,7 @@ TypeScript 7.0.2 remains installed for the manual `bun run typecheck:tsc` path a
 
 **Type stripping.** Node runs some TypeScript from source by stripping types: the scripts that open the store (see "Runtimes") and the agent's crash and recovery fixtures, which reach the engine and most packages under it. Node cannot strip syntax that emits code, such as parameter properties (`constructor(private readonly x)`), enums or namespaces, and fails at load time. So every package such code reaches sets `erasableSyntaxOnly` in its `tsconfig.json`, and `bun run typecheck` reports that syntax: all of `packages/` except `ui`, `views`, `tokens` and `testing`, and `scripts/tsconfig.json`. The desktop app, `ui` and `views` are bundled by Vite and may use it. A package that Node starts to run from source needs the flag too; the flag applies to every file in a project's program, so a bundled package it imports must follow the rule as well.
 
-`bun run lint` runs its eleven checks at once through `scripts/lint.mjs`: `bun lint`, the decision log, the cache epoch, the migration order, the cursor rule, the duotone icons (`check-duotone.mjs`), tokens, `check-deps`, the fixture check, the LFS check and the health ratchet. None depends on another. Each check's output is printed as one group, under a line with its name, result and time, when it finishes. Lint fails if any check fails, and its last line names the ones that did.
+`bun run lint` runs its independent checks at once through `scripts/lint.mjs`: `bun lint`, the decision log, the cache epoch, the topic index version, the migration order, the cursor rule, the duotone icons (`check-duotone.mjs`), tokens, `check-deps`, the fixture check, the LFS check and the health ratchet. None depends on another. Each check's output is printed as one group, under a line with its name, result and time, when it finishes. Lint fails if any check fails, and its last line names the ones that did.
 
 Measured on 10-17 on this Mac, eight alternating runs of each while other agents kept the load at 5.5 to 7.3 on 8 cores, so the numbers vary a lot. The checks one after another with `&&` took 5.5 s median (fastest 3.0 s). At once they took 4.8 s median (fastest 2.2 s). In the parallel run every check except health finishes within 0.7 s. Health takes 2.6 s, and knip alone takes 1.9 to 2.0 s, so knip sets the floor. Making lint faster than that means making knip faster.
 
@@ -1165,6 +1165,42 @@ bun run remote --env GALLERY_SHIFT_ONLY=Button,Chip,TopicHeader test:gallery shi
 ```
 
 The full commands are `bun run remote --env JUNO_E2E_TIMINGS=1 test:desktop` and `bun run remote test:gallery`.
+
+### Packaged runtime environment
+
+`src/main/environment.ts` runs first, before main imports capture switches or fork the engine and agent. Packaged launches discard test switches unless both `JUNO_E2E=1` and an absolute `JUNO_USER_DATA` point to a separate profile. The comparison resolves symlinks, including existing parents of a new directory. An unreadable path cannot opt in. The utility processes inherit this filtered environment. Development launches keep their test switches. Packaged smoke tests already use a temporary profile.
+
+The following inventory covers Juno-owned runtime reads in main, the engine, the agent, and their imported packages (2026-10-27). It excludes environment handling inside third-party libraries, Electron and Node.
+
+| Environment variable | Classification and reader |
+| --- | --- |
+| `JUNO_USER_DATA` | Production profile override; main and shared logging. On its own it enables no test behaviour. |
+| `JUNO_AGENT_CODEMODE` | Production feature flag; main passes it to the agent. |
+| `ELECTRON_RENDERER_URL` | Development only; main's window and IPC explicitly ignore it when packaged. |
+| `OPENROUTER_API_KEY` | Development only; main explicitly ignores it when packaged. |
+| `PATH`, `HOME`, `TMPDIR` | OS environment; main and agent copy only these into their Codex subprocess environment. |
+| `SYSTEMROOT` | OS environment; the agent also copies this for Codex on Windows. |
+| `JUNO_E2E` | Test master switch; main, supervisors, IPC, browser, window, startup marks and logging. Controls plaintext secrets, fake media/AI, test hooks and disabled notifications/updates. Requires the packaged profile gate above. |
+| `JUNO_AI` | Test-only fake AI override; main's engine supervisor. Filtered by the same packaged gate even without `JUNO_E2E`. |
+| `JUNO_AGENT_CRASH_AT` | Test-only process kill; agent runtime. Filtered before the agent inherits it. |
+| `JUNO_FAKE_SLACK_URL` | Test endpoint; main and restart backoff, under E2E. |
+| `JUNO_SLACK_APP_DIR`, `JUNO_SLACK_SAFE_STORAGE_PASSWORD` | Test Slack session import; main, under E2E. |
+| `JUNO_FAKE_OPENROUTER_URL` | Test endpoint; main's agent supervisor, under E2E. |
+| `JUNO_FAKE_AI_DELAY_MS`, `JUNO_FAKE_AI_REQUIRES_KEY` | Test AI behaviour; main's engine supervisor, under E2E. |
+| `JUNO_E2E_FAST_TIMING` | Test scheduling; engine and restart backoff, also requiring fake Slack. |
+| `JUNO_E2E_OPENROUTER_KEY` | Test credential; main. |
+| `JUNO_E2E_SCREEN_SHARED`, `JUNO_E2E_SCREEN_PROBE` | Test screen state/probe; main. |
+| `JUNO_E2E_DEV_NOTIFICATIONS`, `JUNO_E2E_NOTIFICATION_INITIAL`, `JUNO_E2E_NOTIFICATION_RESPONSE` | Test notification delivery and permission; main and notification test hooks. |
+| `JUNO_E2E_TOUR` | Test tour control; main's window. |
+| `JUNO_E2E_STARTUP_TRACE` | Test startup tracing; main's startup marks. |
+| `JUNO_E2E_UPDATE_SERVER` | Test update endpoint; main's release feed. |
+| `JUNO_E2E_CODEX` | Test executable; main's Codex setup. |
+| `JUNO_E2E_DEVICE_NAME`, `JUNO_E2E_BACKUP_INTERVAL_MS`, `JUNO_E2E_PEOPLE_REFRESH` | Test agent settings; main's agent supervisor. |
+| `JUNO_E2E_CACHE_MIGRATION`, `JUNO_E2E_FAKE_PACED`, `JUNO_E2E_AI_JOBS` | Test engine settings; main's engine supervisor. |
+
+All `JUNO_E2E_*` reads require E2E; the packaged gate also removes the entire `JUNO_E2E*`, `JUNO_FAKE_*`, `JUNO_TEST_*` and `JUNO_STRESS*` families when tests are not allowed. `JUNO_TEST_FULLFSYNC` is now read only by `@juno/agent-testing`, never shipped code. `JUNO_SQLITE`, `JUNO_WORK_COUNTS`, `JUNO_FAKE_CODEX_DIR`, build/release variables and runner timing variables are likewise outside shipped runtime code. `CODEX_HOME` is constructed from Juno's profile, never read from the inherited environment. `WS_NO_BUFFER_UTIL` is a fixed build-time define. `TZ` and `LANG` have no Juno-owned read; the runtime may honour them.
+
+`bun run lint` also checks `reindex.ts` and every transitive local dependency against the branch point with main. A source change in those inputs requires a higher `INDEX_VERSION`; the check deliberately includes refactors and type-only dependencies so a newly imported preview helper cannot escape the gate. It checks committed and uncommitted work and fails if Git history is unavailable. Fetch main before the final check and merge.
 
 ### Rules for tests
 

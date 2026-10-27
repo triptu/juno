@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // The Juno chat as the renderer holds it: `@juno/state/agent`'s atoms and actions over a Node
 // MessageChannel to the agent's real renderer server, on the real turn engine with the scripted
 // fake model. The same port shape main brokers between the renderer and the agent process.
@@ -35,6 +36,7 @@ async function agentChat() {
   const dir = await mkdtemp(join(tmpdir(), 'juno-state-agent-'))
   const fake = fakeProvider()
   const opened = await openTurns({
+    durability: testDurability,
     agentDir: dir,
     provider: (store) => createProviderGuard({ store, transport: fake.models }),
     model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },
