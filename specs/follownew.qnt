@@ -8,6 +8,8 @@
 // nothing about the thread (row -1), follows it, in one transaction.
 // -1 is Unknown (no stored row), 0 is unfollowed, 1 is followed. The
 // follow's mirror to Slack is `follow.qnt`'s; here a follow is its local row.
+// `ignored` is the conversation being ignored or left (a channel the user is
+// not in): either way a pass records its new threads without following them.
 // `mode` switches the protocol off in three ways for the bug schedules:
 // "noClaim" follows any seen thread not followed, "split" decides and writes
 // in two steps a user command can come between, and "anyRoot" ignores the
