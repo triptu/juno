@@ -2,12 +2,16 @@
 // to the top before Slack answers, from Main and from a thread under the pointer, and a live reply or DM
 // moves its row while a sync cycle runs. The first window that shows the new words has the row on top:
 // the move never lags the content. An own send undone during a cycle (refused, deleted) moves its row
-// back, and rows a cycle kept in place take their true order once it ends.
+// back, and rows a cycle kept in place take their true order once it ends, sliding as changes from
+// elsewhere do even when the last write was the user's.
 import { afterEach, expect, it } from 'bun:test'
+import { topicsRename } from '@juno/contract'
 import {
   defaultTopicListFilter,
   deleteMessage,
   engineStatusAtom,
+  loadSidebarMoves,
+  runCommand,
   sendMessage,
   setSidebarEngaged,
   sidebarFilterAtom,
@@ -164,16 +168,26 @@ it('during a catch-up an own send that is refused or deleted moves its row back,
     }, WAIT_MS, 'the held post stored')
   })
 
-  await step('activity from before the launch keeps its row in place during the catch-up, and the rows take their true order when it ends', async () => {
+  await step('activity from before the launch keeps its row in place during the catch-up, and the rows slide to their true order when it ends, after a rename of yours', async () => {
+    await loadSidebarMoves()
     const id = lowest('m:C')
     const before = recent()
     // Dated a minute before the engine started: newer than the rows above it, but not live.
     fake.workspace.post({ channel: id.slice(2), user: 'U0LEO', text: 'Written before the launch', at: engineStatus(engine)!.startedAt - 60_000 })
     await waitFor(() => row(id)?.preview.text === 'Written before the launch' || undefined, WAIT_MS, 'the message in the row')
     expect(recent()).toEqual(before)
+    // Your rename is the last write before the catch-up ends; it moves no row.
+    const renamed = recent().find((other) => other.startsWith('t:'))!
+    valueOf(await runCommand(registry, topicsRename, { id: renamed, title: 'Renamed during the catch-up' }))
+    await waitFor(() => row(renamed)?.title === 'Renamed during the catch-up' || undefined, WAIT_MS, 'the rename in the row')
+    expect(recent()).toEqual(before)
+    const changes: Array<{ readonly recent: ReadonlyArray<string>; readonly moves: string }> = []
+    unmounts.push(registry.subscribe(sidebarSectionsAtom, (sections) => changes.push({ recent: sections.recent, moves: sections.moves })))
     fake.release({ method: 'client.counts' })
     await waitFor(() => (engineStatus(engine)?.syncing === false) || undefined, WAIT_MS, 'the sidebar seeing the catch-up end')
     const activity = recent().map((other) => row(other)!.lastActivityAt)
     expect(activity).toEqual(activity.toSorted((a, b) => b - a))
+    // The rows the catch-up held move as changes from elsewhere do: they slide (SPEC 5, "Letting go").
+    expect(changes.find((change) => change.recent.indexOf(id) < before.indexOf(id))?.moves).toBe('animate')
   })
 })
