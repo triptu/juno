@@ -6,12 +6,12 @@
  * lets Chromium keep the V8 code cache for the bundle between launches.
  * `juno://files/` serves message thumbnails and media viewer files on the Slack session; `juno://uploads/` serves staged composer images. `corsEnabled` lets the page read text files with fetch; main allows only the app origin.
  * `juno://pictures/` serves Home pictures from the engine cache.
+ * `juno://images/` serves pictures a message links to: Slack files on the session, other hosts' without credentials.
  */
 import { app, net, protocol } from 'electron'
 import { resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { serveThumbnail, serveUpload } from './files'
-import { serveImage } from './images'
+import { serveImage, serveThumbnail, serveUpload } from './files'
 import { servePicture } from './pictures'
 import { startupMark } from './startupMarks'
 

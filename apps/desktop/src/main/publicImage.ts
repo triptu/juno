@@ -1,4 +1,4 @@
-// Unfurl images from public hosts for `juno://images/` (images.ts). Main fetches
+// Unfurl images from public hosts for `juno://images/` (`serveImage` in files.ts). Main fetches
 // them itself, so the renderer's CSP can stay closed to the open web; the
 // address checks keep that fetch off this Mac and its network.
 import { lookup } from 'node:dns'
