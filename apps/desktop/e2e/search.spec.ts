@@ -37,7 +37,7 @@ async function pickFrom(juno: Juno, name: string): Promise<void> {
 
 type Context = Pick<Fixtures, 'juno' | 'slack' | 'fake'>
 
-test('search: from: chip, local cards first, Slack merges below, Space shows the topic and it follows the arrows, it marks read only when used, Esc hides it, Enter and Back; hidden text blurs; reader navigation beyond the message window', async ({ juno, slack, fake }) => {
+test('search: from: chip, local cards first, Slack merges below, Space shows the topic and it follows the arrows, it marks read only when used, Esc hides it, Enter and Back; hidden text blurs', async ({ juno, slack, fake }) => {
   const context = { juno, slack, fake }
   await shotSize(juno)
   for (let i = 1; i <= 24; i++) slack.as('Maya').postIn('incidents', `Flamingo note ${i} on the pager`)
