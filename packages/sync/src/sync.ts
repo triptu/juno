@@ -120,6 +120,8 @@ export interface TopicFetcher {
   readonly at: (topicId: string, ts: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores a DM-open answer through the running metadata fence. */
   readonly opened: (channel: Parameters<typeof applyOpened>[1]) => Effect.Effect<void, SqlError>
+  /** Stores Juno's own join or leave through the running metadata fence (`applyMembership`). */
+  readonly membership: (channel: string, member: boolean) => Effect.Effect<void, SqlError>
   /** Stores what Juno's own send got back, in the sync's context (`applySent`). */
   readonly sent: (sent: Parameters<typeof applySent>[1]) => Effect.Effect<void, SqlError>
   /** Stores an edit, delete, reaction or broadcast Slack accepted, with `alongside` in the same transaction (`applyActed`). */

@@ -265,6 +265,15 @@ export const applyOpened = (fence: MetadataFence, channel: Channel): Effect.Effe
     }),
   )
 
+/**
+ * Juno's own join or leave (`channels.join`, `channels.leave`), stored as the
+ * socket's `channel_joined` or `channel_left` would store it, so a snapshot
+ * read in flight keeps it (`specs/metadata.qnt`). The event changes nothing
+ * when it comes.
+ */
+export const applyMembership = (fence: MetadataFence, channel: string, member: boolean): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  transaction(patchMetadata(fence, channel, { is_member: member ? 1 : 0 }))
+
 /** An edited message (`message_changed`, or Juno's own edit answered). */
 export const writeChanged = (ctx: SyncContext, channel: string, message: Message, eventTs: string): Effect.Effect<void, SqlError, Services> =>
   Effect.gen(function* () {

@@ -24,6 +24,7 @@ export const toConversationRow = (c: Channel | Im): ConversationRow => {
     member_ids_json: members === undefined ? null : JSON.stringify(members),
     is_member: 0,
     is_archived: channel.is_archived === true ? 1 : 0,
+    is_general: channel.is_general === true ? 1 : 0,
     topic: channel.topic?.value ?? null,
     purpose: channel.purpose?.value ?? null,
     created: c.created === undefined ? null : String(c.created),
@@ -40,7 +41,7 @@ export const upsertConversations = (rows: ReadonlyArray<ConversationRow>): Write
       yield* sql`INSERT INTO conversations ${sql.insert(row as unknown as Record<string, unknown>)}
         ON CONFLICT (id) DO UPDATE SET kind = excluded.kind, name = excluded.name, user_id = excluded.user_id,
           member_ids_json = COALESCE(excluded.member_ids_json, conversations.member_ids_json),
-          is_archived = excluded.is_archived, topic = excluded.topic, purpose = excluded.purpose, created = excluded.created, updated = excluded.updated`
+          is_archived = excluded.is_archived, is_general = excluded.is_general, topic = excluded.topic, purpose = excluded.purpose, created = excluded.created, updated = excluded.updated`
     }
     yield* invalidate(syncKeys.conversations)
   })

@@ -50,6 +50,8 @@ export interface ConversationRow {
   readonly member_ids_json: string | null
   readonly is_member: Flag
   readonly is_archived: Flag
+  /** The workspace's #general, which no one can leave. */
+  readonly is_general: Flag
   readonly topic: string | null
   readonly purpose: string | null
   readonly created: string | null

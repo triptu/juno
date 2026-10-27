@@ -36,6 +36,7 @@ export const observeMetadata = (fence: MetadataFence, channel: Channel) => Effec
     ...(channel.user === undefined ? {} : { user_id: row.user_id }),
     ...(channel.members === undefined ? {} : { member_ids_json: row.member_ids_json }),
     ...(channel.is_archived === undefined ? {} : { is_archived: row.is_archived }),
+    ...(channel.is_general === undefined ? {} : { is_general: row.is_general }),
     ...(channel.topic === undefined ? {} : { topic: row.topic }),
     ...(channel.purpose === undefined ? {} : { purpose: row.purpose }),
     ...(channel.created === undefined ? {} : { created: row.created }),
