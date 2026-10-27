@@ -38,6 +38,10 @@ import { traceSend } from './sendTrace'
 import { offerSentSuggestion } from './sentSuggestions'
 import { releaseSidebarTopic } from './sidebar'
 
+/** The topic a send to a conversation lands in, before the engine answers (architecture 4.4); undefined for a person, or a thread not yet in Slack. */
+const targetTopic = (to: SendTarget): string | undefined =>
+  to.kind !== 'channel' ? undefined : to.threadTs === undefined ? `m:${to.channelId}` : to.threadTs.startsWith('pending:') ? undefined : `t:${to.channelId}:${to.threadTs}`
+
 /**
  * Queues the text, and any staged `files`, for `to`. With `draftOf`, that topic's draft is cleared with it.
  * Resolves with the `Exit`; on success, the topic.
@@ -46,13 +50,17 @@ export const sendMessage = async (registry: Registry, to: SendTarget, text: stri
   const clientMsgId = crypto.randomUUID()
   const sentAt = performance.now()
   traceSend('send asked', () => ({ clientMsgId: clientMsgId.slice(0, 8), to }))
+  // Your own send moves its row at once, even while the sidebar holds its order: released before the engine's
+  // list can show it, so the row never shows the words in its held place first.
+  const known = targetTopic(to)
+  if (known !== undefined) releaseSidebarTopic(registry, known)
   const exit = await runCommand(registry, messagesSend, {
     to, text, startThread, clientMsgId,
     ...(draftOf === undefined ? {} : { draftOf }),
     ...(files === undefined || files.length === 0 ? {} : { files }),
   })
   traceSend('send answered', () => ({ clientMsgId: clientMsgId.slice(0, 8), ok: exit._tag === 'Success', ...(exit._tag === 'Success' ? { topicId: exit.value.topicId } : {}) }))
-  // Your own send moves its row at once, even while the sidebar holds its order.
+  // A new DM's topic, or a thread you started, is known only now.
   if (exit._tag === 'Success') releaseSidebarTopic(registry, exit.value.topicId)
   // The line belongs to the text as the field showed it, which is what the message's edit text is.
   if (exit._tag === 'Success' && sendChecksApply(text)) void checkSent(registry, { clientMsgId, original: decodeDraft(text).text, sentAt })
