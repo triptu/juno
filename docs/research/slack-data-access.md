@@ -158,7 +158,7 @@ Unknown
 Observed. Source: generated fetcher registry (`vendors`, `vendors-client`, one module per method, e.g. `(0,N.r)("conversationsHistoryFetcher","conversations.history")`), plus the call sites named below. 405 distinct method strings were found across the core bundles; this table lists the ones Juno needs.
 
 Listing conversations
-- `client.userBoot` / `client.channels` (section 2) are what the client uses. `conversations.list`, `users.conversations` are not used by the client (`conversations.list` only appears in the async vendors chunk); use userBoot + `client.counts`.
+- `client.userBoot` / `client.channels` (section 2) are what the client uses. `conversations.list`, `users.conversations` are not used by the client (`conversations.list` only appears in the async vendors chunk); use userBoot + `client.counts`. Channels the user is not in come from `search.modules.channels` (below, "Browsing, previewing, joining and leaving channels").
 - `client.dms` fetcher exists (DM list). `conversations.info`, `conversations.genericInfo`, `conversations.members`, `conversations.open`, `conversations.close` exist.
 
 History (`shared`, module with `fetchHistory`/`fetchReplies`, around `determineDefaultHistoryLimit`)
@@ -223,7 +223,7 @@ Users, channels, emoji, usergroups via the Edge ("Flannel") API (`shared`, metho
 - **`emojis/list` results, observed live 2026-10-16** (`bun run probe:live --only emoji`, key census only): `name`, `value`, `updated`, and on some `collection_id`. `value` is the image URL, `alias:<name>` for an alias, or an object of per-vendor URLs (`apple`, `google`). Aliases also carry `alias` (the target name) and `is_alias: true`; an alias can name a standard emoji, not only a custom one. There is no `url` or `alias_for` field: Juno read those until 2026-10-16, so every custom emoji was stored without an image and showed as `:name:`. Unknown: what other `value` object keys exist.
 
 Search (`shared`, `createThunkSearchModules` area: `` `search.modules.${module}` ``)
-- Method is `search.modules.<module>` with module in `messages | files | people | channels | dms | shortcuts | workflows | salesforce | agents | default`. Args: `{ module, query, page, cursor, client_req_id?, search_session_id?, browse_session_id?, extracts: 1, highlight: 1, max_extract_len: 200, extra_message_data: 1, no_user_profile: 1, count (20/21/50), file_title_only, query_rewrite_disabled, … }`. `search.messages` is not used.
+- Method is `search.modules.<module>` with module in `messages | files | people | channels | dms | shortcuts | workflows | salesforce | agents | default`. Args: `{ module, query, page, cursor, client_req_id?, search_session_id?, browse_session_id?, browse? (`"standard"` when browsing with an empty query), extracts: 1, highlight: 1, max_extract_len: 200, extra_message_data: 1, no_user_profile: 1, count (20/21/50), file_title_only, query_rewrite_disabled, … }`. `search.messages` is not used.
 
 Permalinks
 - No API call. `constructMsgPermalink(channel, ts, threadTs)` → `/archives/<C>/p<ts without dot>` plus `?thread_ts=<root>&cid=<C>` for replies; absolute form `https://<team domain>.slack.com/archives/...` (`shared`, `constructAbsoluteMsgPermalink`). `chat.getPermalink` is never called.
@@ -284,6 +284,61 @@ Unknown
 
 - Full response schema of `conversations.view`, `client.dms`, and the edge `results` object fields for emoji (`name`, `url`, `alias_for` are referenced elsewhere). Selected `activity.feed` item shapes were observed on 10-18 in [catch-up research](slack-catchup.md); other entry types remain unknown.
 
+### Browsing, previewing, joining and leaving channels (2026-10-27)
+
+Source: build 134909 (`data-version-ts="1792532253"`), the newest Service Worker cache entry on 10-27 (`gantry-1792532253`, 623 entries), extracted the way section 0 describes into `/Volumes/AgentWork/scratch/juno-re-joinleave/`. Short names in this subsection: `cb` = `client-boot.c7150e67f4bccc17.min.js`, `bs` = `gantry-v2-async-client-boot-shared.35cfcda49f6375c9.min.js`, `br` = `gantry-v2-async-client-boot-render.5e213601c2e4c669.min.js`, `v` = `gantry-v2-vendors.5955d74ca8ca84ac.min.js`. Static reading, then one live probe (below, "Live").
+
+Browse (Observed)
+- "Browse channels" and the channel search both call `search.modules.channels`. `conversations.list` is not used. The browser (`cb`, `getSearchAPIParams` under `fetchBrowserEntity`) sends `{ module: "channels", query, page, cursor, count: 50, max_filter_suggestions: 10, sort, sort_dir, channel_type, exclude_my_channels: 0|1, search_only_my_channels, search_only_team?, external_shared_team_ids?, extra_message_data: 0, browse_session_id }`. With an empty query it adds `browse: "standard"`, `highlight: 0`, `extracts: 0`; with a query, `highlight: 1`, `extracts: 1`.
+- `channel_type` is `exclude_archived` for the "all" filter with no query, else `all`, `private_exclude` (public only), `private`, `archived`, or `external_shared`, `external_shared_private`, `external_shared_archived` (`cb` module `4MqP`). Sorts: `name` asc or desc, `member_count` desc or asc, `created`, `relevant`, and `recommended`, which adds `recommend_source` and `count: 100`.
+- The smallest form, the onboarding "Join channels" fallback (`br`, "Get directory channels as a fallback for the Join Channels modal"): `{ module: "channels", query: "", browse: "standard", count, exclude_my_channels: 1, channel_type: "exclude_archived" }`.
+- Items are channel objects. Before storing them as channels the client drops `iid`, `justification` and `score`, and strips U+E000/U+E001 from `name` and `purpose.value` (`cb`, `convertSearchChannelsToRegularChannels`). Item keys seen live on 10-24 (section 10): `context_team_id, id, iid, is_archived, is_member, is_private, member_count, name, purpose, timestamp`.
+- A result row (`bs`, `BaseChannelSearchResult`, `renderJoinOrLeaveText`, `getLeaveChannelReasonContext`) shows "Join" when the user may join, "Joined" when a member (it reads "Leave" on hover or focus when the user may leave), or a disabled label with a tooltip: "Archived" / "You can't join an archived channel, but you can view and search its contents."; for #general and org-mandatory channels, "Required" / "Your organization requires everyone to be in this channel."; for guests, "Can't leave" / "As a guest, you can't leave the channel you were invited to." or "As a guest, you need to be in at least one channel."; otherwise "Can't leave" / "For some reason, you can't currently change your membership for {channelName}." Join from a row (`cb`, `joinChannelFromSearch`) sends `request_in_background: true` and does not open the channel.
+- `canUserJoinChannel` (`bs` module `ybRJ`) is false for guests (`is_restricted`) and archived channels, true for public channels and record channels. A private channel is never joinable; it needs an invite.
+
+Preview (Observed)
+- A public channel the user is not in opens in the normal message pane with its history; the history call has no preview flag. "Previewing" is derived as public and not `is_member` (`br`, `isPreviewing` on attachment actions, which are disabled). On opening it the client refreshes the channel object from the edge (`cb`, `fetchAndUpsertChannelsFromFlannel`). When the user moves away it removes all of that channel's history, where a member channel's is only trimmed (`bs`, `onChannelChange`). On join it resets and reloads the history (`bs`, `maybeResetChannelHistoryOnJoin`).
+- The composer is replaced by `JoinChannelPane` (`bs` module `NJsJ`): the channel name, its purpose and shared-org line, and the buttons "Details" and "Join Channel". A newer variant shows "Join {channel}", a face pile with "{names} are here." or "{names}, and # more people are here.", and a "Join…" menu (Just for today, For 48 hours, For 1 week) for a temporary join. In a thread it reads "To reply to this thread, join {channel}". Offline the button is disabled with "Go online to join this channel". The member count comes from the edge `users/counts` `{ channel, as_admin }`, answering `{ counts: { members, people, guests, by_team, apps, agents, invited } }` (`cb` modules `mw4v`, `I+V5`).
+- "You are viewing {channel}" now appears only for archived channels: "You are viewing {channel}, an archived channel" (`br`).
+
+Join (Observed)
+- `conversations.join` (`v` module `Hpad`; `cb` `submitJoin` in module `FRBq`) sends `{ channel, request_in_background: false|true, expiration_ts? }` with the caller's `_x_reason` (for example `search_channel_view`). `joinConversationApi` (`bs` module `VY8r`) refuses guests ("Account is restricted") and a second join of the same channel in flight, upserts `response.channel` when present, and on `too_many_members` shows "You can't join this channel. Channel membership limit reached." No other join error has its own copy.
+- `channel_joined`, `group_joined` and `mpim_joined` (`br`, `channelJoined`) carry the full `channel` plus `old_channel_id?`, `temp_membership_expiration_ts?` and `is_visitor?`; the handler sets `is_member: true` and upserts. `member_joined_channel` about the user only starts welcome UI (`br`, `memberJoinedChannel`).
+- Sending into a public channel the user is not in joins it; the composer page warns "You'll join this channel when you send this message." (`unjoined_channels`, `br`).
+
+Leave (Observed)
+- `conversations.leave` (`v` module `XctP`; `cb` `submitLeave`) sends `{ channel }` only. `submitLeave` rejects with `restricted_action`, without a call, when the user may not leave. `conversations.leave` is on the persisted-call list (`cb` module `J6Mn`, `canPersistMethod`), so a leave made offline is queued and sent later; `conversations.join` is not on it.
+- `canUserLeaveChannelWithReason` (`cb` module `yZl2`) checks in this order: no channel or a file channel, `channel_not_found`; a single-channel guest outside DMs, `user_is_ultra_restricted`; `is_general`, `cant_leave_general`; `is_org_mandatory`, `cant_leave_mandatory_shared_channel`; a multi-channel guest: frontline, `user_is_frontline`; a public channel, `user_is_restricted`; no other open channel, `user_is_restricted_last_channel`. `last_member` comes only from the server.
+- `maybeLeaveChannel` (`bs` module `5DzK`): a blocked reason opens the error dialog without a call. A public channel is left at once, with no confirmation, shared or archived alike. For a private channel: archived, it is only closed; Slack Connect (`is_ext_shared`), it asks first; otherwise the client reads a fresh member count, and at 1 opens the archive dialog ("leave and archive") instead of asking. The store marks `is_member: false` before the call, except for Slack Connect.
+- The private confirmation (`LeaveChannel`): title "Leave {channel}", body "When you leave a private channel, you'll no longer be able to see any of its messages. To rejoin this channel later, you'll need to be invited.", buttons "Cancel" and "Leave Channel" (danger). External-limited users read "You'll no longer have access to any messages or files in this channel. To rejoin the channel, you'll need to be added again."; record channels, "By leaving this channel, you may need to request to rejoin later."
+- The error dialog (`LeaveChannelError`), titled "Couldn't leave {channel}" unless noted:
+  - `cant_leave_general`: titled "Membership is required in {channel}"; "Every workspace has one channel that contains all the members of this workspace — this is that channel for you."
+  - `cant_leave_mandatory_shared_channel`: the same title; "Everyone in {orgName} is required to be a member of this channel."
+  - `user_is_restricted`: "As a guest you can leave private channels, but you'll need to ask an admin to remove you from any public channels."
+  - `user_is_restricted_last_channel` and `user_is_ultra_restricted`: "On a guest account, you need to be a member of at least one channel."
+  - `user_is_frontline`: "As a frontline member you'll need to ask an admin to remove you from channels."
+  - `last_member` (the last person from the team in a Slack Connect channel): titled "To leave this channel, it needs to be unshared"; an admin reads "Since you're the last person from {teamName}, you'll need to stop sharing this channel before you can leave it.", others are told to invite an admin and ask them to unshare and archive it.
+  - anything else: "Hmm, something went wrong. Try again?" with "Retry".
+- #general: channel details shows "Leave channel" only for a member of a channel the user may leave (`bs`, `BaseChannelInfo`, `canLeaveChannel`), so it is hidden for #general and org-mandatory channels.
+- `channel_left` and `group_left` carry the channel id (`br`, `channelLeft`); the handler marks `is_member: false`, and for a private channel removes the channel and its history.
+- `method_not_supported_for_channel_type`: the client raises it itself when asked to close something that is not a DM (`cb`, `submitClose`), and the invite and topic flows word it ("A valid channel name is required.", "It's not possible to set a topic here, unfortunately."). Join and leave have no copy for it; it gets the default error.
+
+Inferred
+- `conversations.join` answers `{ ok, channel, … }`: the client reads `response.channel`. Slack's public API reference adds a `warning` of `already_in_channel` on a repeat join, and `{ ok, not_in_channel: true }` from `conversations.leave` when the user was not a member; the client reads neither.
+
+Live (2026-10-27, `JUNO_LIVE=1 bun run probe:live -- --only joinleave`, `joinLeaveOnly`; status, codes, key names and counts only)
+- `search.modules.channels` with the browser's empty-query arguments (`exclude_my_channels: 1`, `channel_type: "exclude_archived"`, `count: 20`) answered `ok` with 20 items, none of them the user's, private or archived. So Juno's session can browse.
+- `conversations.history` with `limit: 1` on one of those public channels answered `ok` with one message: a public channel the user is not in can be read, so a preview works with Juno's session.
+- `conversations.create` of the private channel `juno-test-join-leave` answered `ok` with the full channel object (`is_member: true`, `is_general` among its keys).
+- `conversations.join` on that private channel, while a member, answered `method_not_supported_for_channel_type`: a private channel is never joined by this call, member or not.
+- `conversations.leave` on it, as its only member, answered `last_member`: Slack refuses the last member's leave of a private channel outside Slack Connect too, where the client opens its archive dialog first. The channel is still there with the user in it; nothing was archived. The probe ran twice by mistake; the second run's create answered with the name taken and its join and leave were refused the same way.
+
+Unknown
+- The live shape of a successful `conversations.join` and `conversations.leave` answer: the probe's only channel was private, so both were refused. To check, join and leave a public test channel created for it (not done: the allowed write is a private test channel).
+- Which socket events reach the joiner and in what order against the join answer (`channel_joined`, `member_joined_channel`, both). To check: keep the socket open during a join and record event types only.
+- Browse item keys beyond the 10-24 sample (for example `created`, `creator`, `topic`, `is_general`); the probe's `browseItems.keys` prints them, and the 10-27 run's census was not kept.
+- What the server does with `request_in_background` and `expiration_ts`.
+
 ## 4. Real-time (websocket)
 
 Observed (`boot-async`: `EndpointManager`, `getSocketUrl`, `BaseSocketManager`; `shared`: `Kot3` `SlackSocket`, `LtEM` RTM handler registry, `iPXF` socket flannel)
@@ -311,7 +366,9 @@ Event types with payloads relevant to Juno (handlers in `boot-async` unless note
 { type:"reaction_added" | "reaction_removed", reaction: string, user, item_user?, item: { type:"message", channel, ts } | { type:"file", file } , event_ts, url? }
 { type:"user_typing", channel, user, thread_ts? }            // batched
 { type:"presence_change", presence: "active"|"away", users: string[] }   // batched; manual_presence_change for self
-{ type:"channel_joined" | "channel_left" | "channel_created" | "channel_rename" | "channel_archive" | "channel_unarchive" | "channel_deleted" | "channel_converted_to_shared", channel: Channel | id }
+{ type:"channel_joined" | "group_joined" | "mpim_joined", channel: Channel, old_channel_id?, temp_membership_expiration_ts?, is_visitor? }
+{ type:"channel_left" | "group_left", channel: id }
+{ type:"channel_created" | "channel_rename" | "channel_archive" | "channel_unarchive" | "channel_deleted" | "channel_converted_to_shared", channel: Channel | id }
 { type:"im_open" | "im_close" | "im_created" | "mpim_open" | "mpim_close", channel, user? }
 { type:"member_joined_channel" | "member_left_channel", user, channel }  // batched
 { type:"desktop_notification", channel, ts | msg, thread_ts?, user?, title, subtitle, content, is_shared?, is_channel_invite?, launchUri?, imageUri?, avatarImage?, event_ts, trace_ctx? }
