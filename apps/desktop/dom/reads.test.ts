@@ -1,8 +1,10 @@
 // Reading (spec sections 7 and 14): a reply that arrives while the topic is open at the bottom shows and
 // counts as read, unless the window is in the background; and read marks in Slack ("Mark messages read in
 // Slack too"): on by default, a peek marks nothing and an open marks once; switched off, opening marks
-// nothing; switched back on, "Mark earlier reads in Slack" catches up what was read meanwhile. Scrolled up,
-// behind "N new messages", is the browser lane's (topic.spec.ts).
+// nothing; switched back on, "Mark earlier reads in Slack" catches up what was read meanwhile. Mark unread
+// on a message makes it and everything after it unread and holds while you stay, as the topic's Mark as
+// unread does (e2e/mark-unread.spec.ts). Scrolled up, behind "N new messages", is the browser lane's
+// (topic.spec.ts).
 import { expect } from './expect'
 import { domTest } from './test'
 
@@ -12,6 +14,11 @@ const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const SWITCH = 'Mark messages read in Slack too'
 const CATCH_UP = 'Mark earlier reads in Slack'
+// The Postgres thread's sixth and seventh messages (its root, five replies, then this one).
+const SIXTH = 'Thursday works'
+const SEVENTH = 'Booked 2–4pm'
+// Longer than every read timer and observer in the topic view.
+const STAY_MS = 3_000
 
 domTest('live replies keep an open topic read unless the window is behind, a peek marks nothing, and marks in Slack switch off and catch up', async ({ juno, slack, step }) => {
   const postgres = juno.sidebar.row(POSTGRES)
@@ -77,3 +84,65 @@ domTest('live replies keep an open topic read unless the window is behind, a pee
     await expect(juno.settings.root.getByText('Earlier reads are in Slack')).toBeVisible()
   })
 })
+
+domTest('Mark unread on a message makes it and the rest unread, holds while you stay, and Undo puts the read state back', async ({ juno, slack, clock, step }) => {
+  const postgres = juno.sidebar.row(POSTGRES)
+  const { topic } = juno
+  // Ten messages: the seed's seven, then three more, one mentioning you. Opened, left and opened again, it is read with no divider.
+  slack.as('Leo').replyIn(POSTGRES, 'Replica sizing is in the doc.')
+  slack.as('Dev').replyIn(POSTGRES, '<@U0TUSHAR> the dry run is green, can you sign off?')
+  slack.as('Leo').replyIn(POSTGRES, 'Cutover is Tuesday at 9.')
+  const root = slack.root(POSTGRES)
+  const replies = slack.fake.workspace.replies(root.channel, root.ts)
+  const tsOf = (text: string) => replies.find((reply) => reply.text?.startsWith(text))?.ts
+  const slackPointer = () => slack.fake.workspace.subscription(root.channel, root.ts)?.lastRead
+  const tenth = replies.at(-1)?.ts
+  const firstNew = topic.root.locator('[data-new-divider] + [data-message-row]')
+  await postgres.open()
+  await topic.expectMessage('Cutover is Tuesday at 9.')
+  await juno.sidebar.row(RINA).open()
+  await topic.expectTitle(RINA)
+  await postgres.open()
+  await topic.expectMessage('Cutover is Tuesday at 9.')
+  await postgres.expectRead()
+  await expect.poll(() => slackPointer()).toBe(tenth)
+  await expect(topic.root.locator('[data-new-divider]')).toHaveCount(0)
+
+  await step('Mark unread on the seventh: the divider is before it, four unread with the mention, and Slack reads to the sixth', async () => {
+    await topic.chooseInMessageMenu(SEVENTH, 'mark-unread')
+    await juno.expectToast(`Marked as unread · ${POSTGRES}`)
+    await postgres.expectUnread(4)
+    await postgres.expectMention()
+    await expect(firstNew).toContainText(SEVENTH)
+    await expect(topic.root.locator('[data-new-divider]')).toHaveText('4 new')
+    await expect.poll(() => slackPointer()).toBe(tsOf(SIXTH))
+  })
+
+  await step('staying at the bottom, with the window losing and regaining focus, leaves it unread', async () => {
+    slack.resetCalls()
+    await juno.blurWindow()
+    await juno.focusWindow()
+    await clock.fastForward(STAY_MS)
+    await slack.expectNoMarks()
+    await postgres.expectUnread(4)
+  })
+
+  await step('Undo puts it back as it was: read, with no divider, here and in Slack', async () => {
+    await juno.undoFromToast()
+    await postgres.expectRead()
+    await expect(topic.root.locator('[data-new-divider]')).toHaveCount(0)
+    await expect.poll(() => slackPointer()).toBe(tenth)
+  })
+
+  await step('U on the seventh does the same, and leaving and coming back marks it read', async () => {
+    await topic.message(SEVENTH).press('u')
+    await postgres.expectUnread(4)
+    await expect(firstNew).toContainText(SEVENTH)
+    await expect.poll(() => slackPointer()).toBe(tsOf(SIXTH))
+    await juno.sidebar.row(RINA).open()
+    await topic.expectTitle(RINA)
+    await postgres.open()
+    await postgres.expectRead()
+    await expect.poll(() => slackPointer()).toBe(tenth)
+  })
+}, { clock: true })

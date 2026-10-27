@@ -32,14 +32,19 @@ const withCustom: ReadonlyArray<GridReaction> = [{ name: 'ship-it', unicode: ':s
 const S: MessageMenuEntry = { separator: true }
 /** Copy Slack link, at the end of Open in Slack. */
 const copyLink = { id: 'copy-link', label: 'Copy Slack link', icon: 'link' } as const
+/** Forward…, Mark unread and Open in Slack, after Copy, on every message Slack has. */
+const shared: ReadonlyArray<MessageMenuEntry> = [
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
+  { id: 'mark-unread', label: 'Mark unread', icon: 'unread', shortcut: 'U' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
+]
 /** Someone else's message in a thread. */
 const others: ReadonlyArray<MessageMenuEntry> = [
   { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
+  ...shared,
 ]
 /** Someone else's message in Main, with text selected in it. */
 const mainSelection: ReadonlyArray<MessageMenuEntry> = [
@@ -48,8 +53,7 @@ const mainSelection: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
+  ...shared,
 ]
 /** Your own reply in a thread. */
 const own: ReadonlyArray<MessageMenuEntry> = [
@@ -57,8 +61,7 @@ const own: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
+  ...shared,
   S,
   { id: 'broadcast', label: 'Also send to #eng', icon: 'broadcast' },
   { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell' },
@@ -73,8 +76,7 @@ const ownMain: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
-  { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', trailing: copyLink },
+  ...shared,
   S,
   { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell', disabled: true },
   S,
@@ -87,6 +89,7 @@ const pending: ReadonlyArray<MessageMenuEntry> = [
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
   { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F', disabled: true },
+  { id: 'mark-unread', label: 'Mark unread', icon: 'unread', shortcut: 'U', disabled: true },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack' },
   S,
   { id: 'edit', label: 'Edit', icon: 'edit', shortcut: 'E' },

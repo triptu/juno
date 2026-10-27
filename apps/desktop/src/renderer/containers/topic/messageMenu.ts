@@ -13,7 +13,7 @@ import type { ComposerHandle } from '../messageActions'
 import { openMessageMenu } from '../messageMenu'
 import { isOwnEditable, landedTs, opensThread } from '../messageRows'
 import { showPersonMenu } from '../notifyActions'
-import { broadcastLabel, openTopicInSlack } from '../topicActions'
+import { broadcastLabel, markUnreadFrom, openTopicInSlack } from '../topicActions'
 import type { ActionTopic } from '../topicSource'
 import { rowOf, textOf, type Latest } from './messageCommands'
 
@@ -36,9 +36,9 @@ export interface MenuFacts {
 
 /**
  * The rows, in groups: Start thread or Open thread (Main), Quote, Ask Juno;
- * Copy text, Forward…, Open in Slack with Copy Slack link at its end; on your own, Also send
+ * Copy text, Forward…, Mark unread, Open in Slack with Copy Slack link at its end; on your own, Also send
  * to #eng (a thread reply) and Tell me if nobody replies; then Edit and Delete….
- * Rows whose key works on a focused message show it (`rowKeyAction`): T, Q, F, E and ⌫; R, More reactions,
+ * Rows whose key works on a focused message show it (`rowKeyAction`): T, Q, F, U, E and ⌫; R, More reactions,
  * names its key in its tooltip.
  */
 export function topicMenuItems({ topic, message, editable, own, selection, juno, mayWatch }: MenuFacts): ReadonlyArray<MessageMenuEntry> {
@@ -53,6 +53,7 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
     SEPARATOR,
     item('copy', selection === undefined ? 'Copy text' : 'Copy', 'copy'),
     item('forward', 'Forward…', 'forward', !forwardable(message), 'F'),
+    item('mark-unread', 'Mark unread', 'unread', !markableUnread(message), 'U'),
     // The channel opens in Slack; the link copied is the message's.
     { id: 'open-in-slack', label: 'Open in Slack', icon: 'slack', ...(linkable ? { trailing: { id: 'copy-link', label: 'Copy Slack link', icon: 'link' } } : {}) },
     ...(broadcastable || (own && linkable) ? [SEPARATOR] : []),
@@ -86,6 +87,9 @@ function selectWords(scroller: HTMLElement | null, ts: string): void {
 
 /** Only a message Slack has, with words or files, can be forwarded. */
 export const forwardable = (message: MessageView) => message.pending === undefined && message.kind === 'message'
+
+/** Only a message Slack has can be where the topic becomes unread from. */
+const markableUnread = (message: MessageView) => message.pending === undefined
 
 /** Forward… opens the sheet with the message as the list shows it, its sender and where it was posted (SPEC 7, "Forward"). */
 function openForward(channel: string, message: MessageView, { list, detail }: NonNullable<Latest['current']>): void {
@@ -130,6 +134,8 @@ function choose(id: string, now: MessageView, input: MenuInput, selection: strin
       return void copyText(text())
     case 'forward':
       return forwardable(now) ? openForward(channel, now, latest.current) : undefined
+    case 'mark-unread':
+      return markableUnread(now) ? markUnreadFrom(detail.id, now.ts) : undefined
     case 'open-in-slack':
       return openTopicInSlack(detail)
     case 'copy-link':

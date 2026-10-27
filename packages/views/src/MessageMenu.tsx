@@ -4,6 +4,7 @@ import { ArrowBendUpRight } from '@phosphor-icons/react/dist/icons/ArrowBendUpRi
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { Copy } from '@phosphor-icons/react/dist/icons/Copy'
+import { EnvelopeSimple } from '@phosphor-icons/react/dist/icons/EnvelopeSimple'
 import { Link } from '@phosphor-icons/react/dist/icons/Link'
 import { Megaphone } from '@phosphor-icons/react/dist/icons/Megaphone'
 import { PencilSimple } from '@phosphor-icons/react/dist/icons/PencilSimple'
@@ -31,6 +32,7 @@ const ICONS: Record<MessageMenuIcon, PhosphorIcon> = {
   juno: Sparkle,
   copy: Copy,
   forward: ArrowBendUpRight,
+  unread: EnvelopeSimple,
   bell: Bell,
   edit: PencilSimple,
   delete: Trash,

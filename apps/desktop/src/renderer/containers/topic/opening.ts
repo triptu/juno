@@ -32,13 +32,16 @@ export function useWindowFocused(): boolean {
 
 /**
  * The "N new" divider. It sits where the read pointer was when the tab first showed the topic, so marking
- * read does not move it; Mark as unread moves it to the new pointer. `at` is the first unread row's index;
- * a preview has none.
+ * read does not move it; Mark as unread (of the topic or from a message) moves it to the new pointer, and
+ * once the topic is read again while the tab stays (Undo, Mark as read, a send) it goes back to where it was
+ * at open. `at` is the first unread row's index; a preview has none.
  */
 export function useDivider(id: string, lastReadTs: string | undefined, markedUnread: boolean, list: MessageWindow, readOnly: boolean) {
-  // The read pointer when this tab first showed the topic, or when the topic was last marked unread, for the divider.
-  const [readAtOpen, setReadAtOpen] = useState(() => ({ lastReadTs }))
-  if (markedUnread && lastReadTs !== readAtOpen.lastReadTs) setReadAtOpen({ lastReadTs })
+  // The read pointer when this tab first showed the topic, or when the topic was last marked unread, for the
+  // divider; `atOpen` keeps the first while a Mark as unread holds.
+  const [readAtOpen, setReadAtOpen] = useState<{ readonly lastReadTs: string | undefined; readonly atOpen?: string | undefined }>(() => ({ lastReadTs }))
+  if (markedUnread && lastReadTs !== readAtOpen.lastReadTs) setReadAtOpen({ lastReadTs, atOpen: 'atOpen' in readAtOpen ? readAtOpen.atOpen : readAtOpen.lastReadTs })
+  else if (!markedUnread && 'atOpen' in readAtOpen) setReadAtOpen({ lastReadTs: readAtOpen.atOpen })
   const at = readOnly ? -1 : dividerIndex(list.order, readAtOpen.lastReadTs, (ts) => list.rows.get(ts)?.fromMe === true)
   const dividerBefore = at > 0 ? list.order[at] : undefined
 

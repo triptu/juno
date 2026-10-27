@@ -16,11 +16,13 @@
  * The undo is computed from the state before the change: Mark read undoes
  * as Mark as unread from the first message that was unread (with the tag
  * back when it cleared one), and Mark as unread undoes as Mark read back to
- * the old pointer.
+ * the old pointer, or, when it moved the pointer forward or the topic was
+ * already marked unread, as Mark as unread from the first message that was
+ * unread.
  */
 import { Clock, Effect } from 'effect'
 import { NotFound, NotSignedIn, type CommandResult, type EngineConfig as Config, type ReadError, type UndoCommand } from '@juno/contract'
-import { markReadLocally, markUnreadLocally, millisToTs, parseTopicId, tsBefore, type ParsedTopicId, type ReadState, type Ts } from '@juno/domain'
+import { compareTs, markReadLocally, markUnreadLocally, millisToTs, parseTopicId, tsBefore, type ParsedTopicId, type ReadState, type Ts } from '@juno/domain'
 import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { patchOverlay, readMessage, readState, reindexTopics, storedMe, threadSub, writeLocalMark } from '@juno/sync'
 import { EngineConfig, EngineTiming } from './config'
@@ -78,8 +80,10 @@ export const markUnreadStep = (id: string, topic: Topic, from: string | undefine
       const pointer = (yield* messageBefore(topic, first)) ?? tsBefore(first)
       const next = markUnreadLocally(before, pointer, at, mirrors)
       if (next === undefined) return undefined
+      // Mark read never moves the pointer back, so a mark that moved it forward (from a message after the old
+      // pointer) undoes as Mark as unread from the first message that was unread.
       const undo: UndoCommand =
-        before.lastReadTs !== undefined && !before.markedUnread
+        before.lastReadTs !== undefined && !before.markedUnread && compareTs(pointer, before.lastReadTs) <= 0
           ? { _tag: 'reads.markRead', id, upTo: before.lastReadTs }
           : { _tag: 'reads.markUnread', id, from: (yield* firstAfter(topic, before.lastReadTs)) ?? first }
       // A thread's mark unread is sent as "unread from this reply".
