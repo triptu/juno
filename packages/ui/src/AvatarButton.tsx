@@ -20,7 +20,7 @@ export interface AvatarButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   readonly open?: boolean
   /** Whether Slack shows you as active, drawn as a dot on the avatar's corner. Omitted while unknown. */
   readonly presence?: 'active' | 'away'
-  /** "Paused until 9am" while notifications are paused: the dot becomes a moon and the description says so. */
+  /** "Paused until 9am" while notifications are paused: the dot becomes a snooze badge, green while active, and the description says so. */
   readonly paused?: string
 }
 
@@ -32,7 +32,7 @@ const HOVER = '@media (hover: hover)'
  * The title bar's account button: a 24px avatar inside a 30px round ghost
  * button. Instant hover fill and the keyboard focus ring come from the
  * shared interactive styles. With `presence`, a dot on the avatar's corner
- * shows whether Slack shows you as active; with `paused`, it becomes a moon. The
+ * shows whether Slack shows you as active; with `paused`, it becomes a snooze badge. The
  * button's description gives both in words.
  */
 export function AvatarButton({ label, initials, hue = 'rose', src, open = false, presence, paused, type = 'button', ...rest }: AvatarButtonProps) {
@@ -56,7 +56,7 @@ export function AvatarButton({ label, initials, hue = 'rose', src, open = false,
   )
 }
 
-/** "Away. Notifications paused until 9am": the dot and the moon in words. */
+/** "Away. Notifications paused until 9am": the dot and the badge in words. */
 function description(presence: AvatarButtonProps['presence'], paused: string | undefined): string {
   const words = presence === undefined ? [] : [presence === 'active' ? 'Active' : 'Away']
   if (paused !== undefined) words.push(`Notifications ${paused.charAt(0).toLowerCase()}${paused.slice(1)}`)

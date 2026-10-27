@@ -102,7 +102,7 @@ export function startEngine(transport: Transport | SocketTransport, config: Conf
       return {
         config,
         wake: () => Effect.runPromise(notifications.wake),
-        setPresence: (value: Presence) => Effect.runPromise(notifications.setPresence(value)),
+        setPresence: (value: Presence) => Effect.runPromise(Effect.asVoid(notifications.setPresence(value))),
         currentPresence: () => Effect.runPromise(notifications.currentPresence),
         stop: () => Effect.runPromise(Scope.close(scope, Exit.void)),
         commandIdle: () => Effect.runPromise(outbox.idle),

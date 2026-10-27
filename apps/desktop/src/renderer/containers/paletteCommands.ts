@@ -192,8 +192,8 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
       ? []
       : [
           presence === 'away'
-            ? row('presence', 'presence', 'Set yourself active', 'status presence online', () => setPresence(registry, 'active'), stays)
-            : row('presence', 'presence', 'Set yourself away', 'status presence offline', () => setPresence(registry, 'away'), stays),
+            ? row('presence', 'presence', 'Set yourself active', 'status presence online', () => void setPresence(registry, 'active'), stays)
+            : row('presence', 'presence', 'Set yourself away', 'status presence offline', () => void setPresence(registry, 'away'), stays),
         ]),
   ]
 }

@@ -309,6 +309,16 @@ export function nextHoursStart(at: number, hours: Hours): number | undefined {
   return undefined
 }
 
+/** When `hours` next start or end after `at`, within a week. Minutes are added on the local clock, so a daylight saving change keeps the switch's local time. */
+export function nextSwitchTime(at: number, hours: Hours): number | undefined {
+  const next = nextSwitch(localTime(at), hours)
+  if (next === undefined) return undefined
+  const date = new Date(at)
+  date.setSeconds(0, 0)
+  date.setMinutes(date.getMinutes() + next.inMinutes)
+  return date.getTime()
+}
+
 /** What an incoming huddle may do (SPEC 20, "Incoming huddles"): ring and notify, or show its card quietly. */
 export type HuddleAlertDecision = 'ring' | 'quiet'
 

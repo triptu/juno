@@ -23,7 +23,7 @@ export interface PresenceDotProps {
   /** Slack shows the person as active. A green dot when true, a hollow ring when false (nothing on a row). */
   readonly active: boolean
   readonly surface: PresenceDotSurface | RowSurface | InlineSurface
-  /** Notifications are paused: a snooze badge (a "z" in an open circle) takes the dot's place, as Slack shows it. Not on a row. */
+  /** Notifications are paused: a snooze badge (a "z" in an open circle) takes the dot's place, as Slack shows it, green while active. Not on a row. */
   readonly paused?: boolean
 }
 
@@ -49,8 +49,9 @@ const GLYPH = 10
  * the avatar alone in a `position: relative` box. Screen readers skip
  * the dot. The owner gives the state in words, as the menu's "Active" line
  * and the button's description do. While notifications are paused a
- * snooze badge takes the dot's place, as Slack shows it; presence is then
- * given in words only.
+ * snooze badge takes the dot's place, as Slack shows it: green while
+ * active and in the text colour while away, so it still agrees with the
+ * words.
  */
 export function PresenceDot({ active, surface, paused = false }: PresenceDotProps) {
   if (surface === 'inline') {
@@ -61,7 +62,7 @@ export function PresenceDot({ active, surface, paused = false }: PresenceDotProp
   }
   if (paused) {
     return (
-      <span aria-hidden data-paused {...stylex.props(styles.dot, styles.badge, rings[surface], fills[surface])}>
+      <span aria-hidden data-paused data-presence={active ? 'active' : 'away'} {...stylex.props(styles.dot, styles.badge, rings[surface], fills[surface], active && styles.badgeActive)}>
         <Snooze />
       </span>
     )
@@ -106,7 +107,7 @@ const styles = stylex.create({
   inlineAway: {
     boxShadow: 'inset 0 0 0 1px currentColor', // tokens-allow: The inset ring is a 1px hairline.
   },
-  // Paused says nothing about presence, so the glyph takes the text colour, never the presence green.
+  // Away, the glyph takes the text colour; active, the presence green (`badgeActive`).
   badge: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -116,6 +117,9 @@ const styles = stylex.create({
     width: BADGE,
     height: BADGE,
     color: colors['--foreground-default'],
+  },
+  badgeActive: {
+    color: colors['--presence-active'],
   },
 })
 

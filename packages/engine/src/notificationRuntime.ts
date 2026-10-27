@@ -23,7 +23,8 @@ export interface NotificationHost {
 export class NotificationControl extends Context.Service<NotificationControl, {
   readonly attach: (notifications: Notifications | undefined) => Effect.Effect<void>
   readonly wake: Effect.Effect<void>
-  readonly setPresence: (presence: Presence) => Effect.Effect<void>
+  /** Set yourself away or active. Whether Slack took it; false while signed out. */
+  readonly setPresence: (presence: Presence) => Effect.Effect<boolean>
   /** Slack's presence for the user as the boot read it (`runSync`'s `onSelfPresence`). */
   readonly seedPresence: (presence: Presence) => Effect.Effect<void>
   readonly currentPresence: Effect.Effect<Presence | undefined>
@@ -41,7 +42,9 @@ export class NotificationControl extends Context.Service<NotificationControl, {
     const control = NotificationControl.of({
       attach: (next) => SubscriptionRef.set(active, next),
       wake,
-      setPresence: (value) => Effect.flatMap(current, (notifications) => run(notifications?.setPresence(value))),
+      setPresence: (value) => Effect.flatMap(current, (notifications) => notifications === undefined ? Effect.succeed(false) : notifications.setPresence(value).pipe(
+        Effect.catch(() => Effect.as(Effect.logWarning('notifications: presence not set'), false)),
+      )),
       seedPresence: (value) => Effect.flatMap(current, (notifications) => run(notifications?.seedPresence(value))),
       currentPresence: Effect.flatMap(current, (notifications) => notifications?.currentPresence ?? Effect.succeed(undefined)),
       presence: SubscriptionRef.changes(active).pipe(

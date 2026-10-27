@@ -40,7 +40,7 @@ What Juno decides: whether a message on Auto needs the owner. What the owner dec
 
 - Slack has `presence.set` for the self user (`docs/research/slack-data-access.md`, Presence). `away` is a manual away that holds on every client until set back; `auto` lets Slack decide from activity. There is no `getPresence`; Juno learns its own state from `manual_presence_change` events on the socket.
 - At the start of the active hours Juno sets `auto`; at the end, `away`. "Active" always means `auto`, so an idle owner still shows as away.
-- Juno can switch presence only while it runs. On launch and on wake from sleep, it applies what the schedule says for now. If the Mac sleeps through the end of the day, Slack's own idle away covers it. If Juno is closed when the active hours start, the owner stays away until it opens. The page says this in one line.
+- Juno can switch presence only while it runs. On launch and on wake from sleep, it applies what the schedule says for now, or the manual change while one holds. If the Mac sleeps through the end of the day, Slack's own idle away covers it. If Juno is closed when the active hours start, the owner stays away until it opens. The page says this in one line.
 - A manual change in the official Slack client is respected until the next switch in the schedule, the same as a manual change in Juno.
 
 ## The page

@@ -18,6 +18,8 @@ export default defineFixtures(
     Presence: {
       active: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' } }),
       'away-paused': fixture({ ...base, presence: { active: false, seen: false, label: 'Away until 9am' }, paused: 'Paused until 9am' }),
+      // Outside notification hours while active: the snooze badge is green, as the line says.
+      'active-paused': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, paused: 'Paused until 9am' }),
       'active-by-hand': fixture({ ...base, presence: { active: true, seen: true, label: 'Active until 8pm' } }),
       // Set active, but Slack shows colleagues away: the dot follows Slack, the toggle the setting.
       'active-shown-away': fixture({ ...base, presence: { active: true, seen: false, label: 'Active. Slack shows you away' } }),

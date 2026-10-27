@@ -20,7 +20,7 @@ export default defineFixtures(
       'active-hover': fixture({ ...base, presence: 'active' }, { hover: 'button' }),
       'away-open': fixture({ ...base, presence: 'away', open: true }),
     },
-    // Notifications paused: the dot becomes a moon in its colour.
+    // Notifications paused: the dot becomes a snooze badge, green while active.
     Paused: {
       active: fixture({ ...base, src: photo, presence: 'active', paused: 'Paused until 9am' }),
       away: fixture({ ...base, src: photo, presence: 'away', paused: 'Paused until 9am' }),

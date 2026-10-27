@@ -149,9 +149,11 @@ export function setHuddleRing(registry: Registry, enabled: boolean): void {
   void runCommand(registry, notificationsSetHuddleRing, { enabled })
 }
 
-/** Set yourself away or active: holds until the next switch in the active hours. */
-export function setPresence(registry: Registry, presence: PresenceValue): void {
-  void runCommand(registry, notificationsSetPresence, { presence })
+/** Set yourself away or active: shows at once and holds until the next switch in the active hours. */
+export async function setPresence(registry: Registry, presence: PresenceValue): Promise<void> {
+  const exit = await runCommand(registry, notificationsSetPresence, { presence })
+  if (Exit.isSuccess(exit) && exit.value.sent) return
+  showToast(registry, { text: presence === 'away' ? "Couldn't set you away. Try again." : "Couldn't set you active. Try again." })
 }
 
 /** Use Juno's hours: writes the notification hours to Slack's schedule again after it was changed in Slack. */
