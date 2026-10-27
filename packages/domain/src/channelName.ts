@@ -7,7 +7,7 @@
 /** Slack's longest channel name, in graphemes. */
 export const CHANNEL_NAME_MAX = 80
 
-const segmenter = new Intl.Segmenter()
+let segmenter: Intl.Segmenter | undefined
 
 /**
  * Lowercase, spaces to hyphens, and only letters, digits, hyphens and
@@ -24,8 +24,14 @@ export function normalizeChannelName(typed: string): { readonly name: string; re
     .toLowerCase()
     .replace(/\s/g, '-')
     .replace(/[^\p{L}\p{M}\p{N}_-]/gu, '')
-  // Slack counts graphemes, as its own field does.
-  const graphemes = [...segmenter.segment(kept)]
-  const name = graphemes.length > CHANNEL_NAME_MAX ? graphemes.slice(0, CHANNEL_NAME_MAX).map((part) => part.segment).join('') : kept
+  // A grapheme is at least one code unit, so a short name needs no counting.
+  const name = kept.length <= CHANNEL_NAME_MAX ? kept : graphemesUpTo(kept, CHANNEL_NAME_MAX)
   return { name, changed: name !== withoutHash }
+}
+
+/** The first `max` graphemes, as Slack counts a name. The segmenter is made on first use, not at startup. */
+function graphemesUpTo(text: string, max: number): string {
+  segmenter ??= new Intl.Segmenter()
+  const graphemes = [...segmenter.segment(text)]
+  return graphemes.length <= max ? text : graphemes.slice(0, max).map((part) => part.segment).join('')
 }
