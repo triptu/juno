@@ -94,13 +94,13 @@ export function useOpenPosition(position: Position, view: string, readOnly: bool
 
 /**
  * A Juno source link or a notification asked for a message: once the topic is positioned and the row is in its
- * window, it is scrolled into view if it is not, and flashes. Each request is taken once, so showing a hidden tab
- * again (`<Activity>` runs its effects again) does not jump back to it. A row above the first frame's is not drawn
- * until `drawnAll`, so the request waits for that too.
+ * window, it is scrolled into view if it is not, flashes and is held there, or at the list's bottom the bottom is,
+ * so a reaction on the newest message stays in view. Each request is taken once, so showing a hidden tab again
+ * (`<Activity>` runs its effects again) does not jump back to it. A row above the first frame's waits for `drawnAll`.
  */
 export function useMessageFlash(position: Position, id: string, readOnly: boolean, list: MessageWindow) {
   'use no memo'
-  const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll, setHeldAt } = position
+  const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll, setHeldAt, atEndRef } = position
   const flash = useAtomValue(messageFlashAtom(id))
   const flashTaken = useRef(0)
   useEffect(() => {
@@ -119,12 +119,12 @@ export function useMessageFlash(position: Position, id: string, readOnly: boolea
         pinRef.current = undefined
         row.scrollIntoView({ block: 'center', behavior: 'instant' })
       }
-      pinRef.current = { kind: 'row', element: row, offset: row.getBoundingClientRect().top - view.top }
+      pinRef.current = atEndRef.current && distanceFromBottom(scroller) <= BOTTOM_SLACK ? { kind: 'bottom' } : { kind: 'row', element: row, offset: row.getBoundingClientRect().top - view.top }
       pinnedTopRef.current = scroller.scrollTop
       flashChatRow(row)
     })
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- The requested row may enter the DOM only when the eager frame expands.
-  }, [id, readOnly, flash, positioned, drawnAll, list.rows, scrollRef, pinRef, pinnedTopRef, setHeldAt])
+  }, [id, readOnly, flash, positioned, drawnAll, list.rows, scrollRef, pinRef, pinnedTopRef, setHeldAt, atEndRef])
   return flash
 }
 
