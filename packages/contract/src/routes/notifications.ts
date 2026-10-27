@@ -24,10 +24,14 @@
  *   channel.
  * - `notifications.setHuddleRing` is Ring for huddles (SPEC 20).
  * - `notifications.setPresence` is Set yourself away or active. It shows at
- *   once and holds until the next switch in the active hours; `sent` is
+ *   once and holds until the next switch in the active hours (without them,
+ *   Slack holds it until the next choice); `sent` is
  *   false when Slack refused it and the presence before came back.
  * - `notifications.useJunoHours` writes the notification hours to Slack's
  *   schedule again after it was changed in Slack.
+ * - Hours start not set: the notification hours are then Slack's schedule,
+ *   and presence is not switched by hours. Setting a row of hours not set
+ *   starts from the hours shown, or Monday to Friday 9 to 7.
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
@@ -82,8 +86,10 @@ export const Instruction = Schema.Struct({ id: Schema.String, direction: Instruc
 export type Instruction = typeof Instruction.Type
 
 export const NotificationSettingsView = Schema.Struct({
-  notificationHours: Hours,
-  presenceHours: Hours,
+  /** Null until the owner sets them: Slack's own schedule is in effect (`SlackScheduleView.slackHours`). */
+  notificationHours: Schema.NullOr(Hours),
+  /** Null until the owner sets them: presence is not switched by hours. */
+  presenceHours: Schema.NullOr(Hours),
   channels: Schema.Record(Schema.String, NotifyLevel),
   people: Schema.Record(Schema.String, NotifyLevel),
   threads: Schema.Record(Schema.String, NotifyLevel),
@@ -155,12 +161,14 @@ export type NotificationDecisions = typeof NotificationDecisions.Type
 
 export const notificationsDecisions = liveValueRoute('notifications.decisions', { value: NotificationDecisions })
 
-/** Slack's own notification schedule, which Juno writes from the notification hours (SPEC 14). */
+/** Slack's own notification schedule, which Juno follows until the owner sets notification hours, then writes from them (SPEC 14). */
 export const SlackScheduleView = Schema.Struct({
   /** The schedule was changed in Slack after Juno wrote it. Juno leaves it until the hours change in Juno or Use Juno's hours. */
   changedInSlack: Schema.Boolean,
-  /** The hours are still Juno's defaults on this install: nothing is written until the owner sets them. */
+  /** The hours were saved by an older version and never set on this install: nothing is written until the owner sets them. */
   waitingForHours: Schema.Boolean,
+  /** While the owner has set no notification hours, the hours Slack's schedule lets notifications through; null when it pauses nothing or they are set. */
+  slackHours: Schema.NullOr(Hours),
 })
 export type SlackScheduleView = typeof SlackScheduleView.Type
 

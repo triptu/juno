@@ -4,7 +4,7 @@ import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Semaphore, SubscriptionRef } from 'effect'
 import { exchangesWith, readConversation, type Conversation } from './conversation'
 import { Candidate, StoredReading, type Notifier } from './model'
-import { presenceHold, readSettings, type PresenceHold } from './settings'
+import { oldSettings, presenceHold, readSettings, saveOldSettings, type PresenceHold } from './settings'
 
 /** The reading waits this long; then the decision goes on without it. */
 const READING_MILLIS = 2000
@@ -110,28 +110,56 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   const readHold = presenceHold.read.pipe(Effect.provide(storeContext))
   const writeHold = (hold: PresenceHold | undefined) => presenceHold.write(hold).pipe(Effect.provide(storeContext))
 
-  /** Holds `value` until the next switch in the active hours. */
+  /**
+   * Holds `value` until the next switch in the active hours. Without active hours nothing is held: Slack keeps a
+   * choice itself until the next one, and Juno never changes it.
+   */
   const hold = (value: Presence) => Effect.gen(function* () {
-    const { settings } = yield* configuration
+    const { settings: { presenceHours } } = yield* configuration
     const now = yield* Clock.currentTimeMillis
-    yield* writeHold({ presence: value, until: nextSwitchTime(now, settings.presenceHours) ?? null, hours: settings.presenceHours })
+    yield* writeHold(presenceHours === undefined ? undefined : { presence: value, until: nextSwitchTime(now, presenceHours) ?? null, hours: presenceHours })
   })
 
   /** The choice by hand while it holds; one that ended, or whose active hours changed since, is removed. */
   const heldPresence = (settings: NotificationSettings, now: number) => Effect.gen(function* () {
     const saved = yield* readHold
     if (saved === undefined) return undefined
-    if (sameHours(saved.hours, settings.presenceHours) && (saved.until === null || now < saved.until)) return saved.presence
+    if (settings.presenceHours !== undefined && sameHours(saved.hours, settings.presenceHours) && (saved.until === null || now < saved.until)) return saved.presence
     yield* writeHold(undefined)
     return undefined
   })
 
-  /** Applies the choice by hand while it holds, else the active hours; `force` sends it even when unchanged. */
+  /**
+   * Settings saved before 2026-10-27 kept active hours never set as Monday to Friday 9 to 7, and Juno set the owner
+   * away by them. Those hours now read as not set, so once, unless a choice by hand still holds, Slack's automatic
+   * mode comes back. False when Slack refused it, to try again at the next tick.
+   */
+  const handBack = Effect.gen(function* () {
+    const saved = yield* readHold
+    const now = yield* Clock.currentTimeMillis
+    if (saved !== undefined && (saved.until === null || now < saved.until)) return true
+    if (!(yield* setPresence('active'))) return false
+    applied = 'active'
+    yield* SubscriptionRef.set(current, 'active')
+    return true
+  })
+  let handedBack = false
+
+  /**
+   * Applies the choice by hand while it holds, else the active hours; `force` sends it even when unchanged.
+   * Without active hours and a choice, it sends nothing: presence is Slack's, as in Slack's own app.
+   */
   const tick = (force: boolean) => Effect.gen(function* () {
+    if (!handedBack) {
+      const old = yield* oldSettings.pipe(Effect.provide(storeContext))
+      if (old?.presenceUnset === true && !(yield* handBack)) return
+      if (old !== undefined) yield* saveOldSettings.pipe(Effect.provide(storeContext))
+      handedBack = true
+    }
     const { settings } = yield* configuration
     const now = yield* Clock.currentTimeMillis
-    const next = (yield* heldPresence(settings, now)) ?? scheduledPresence(localTime(now), settings.presenceHours)
-    if (!force && next === applied) return
+    const next = (yield* heldPresence(settings, now)) ?? (settings.presenceHours === undefined ? undefined : scheduledPresence(localTime(now), settings.presenceHours))
+    if (next === undefined || (!force && next === applied)) return
     if (yield* setPresence(next)) {
       applied = next
       yield* SubscriptionRef.set(current, next)

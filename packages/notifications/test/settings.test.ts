@@ -2,10 +2,10 @@
 // rest of the pipeline runs against the fake Slack in
 // engine/test/flows/notifications.flow.test.ts.
 import { expect, it } from 'bun:test'
-import { defaultNotificationSettings } from '@juno/domain'
+import { defaultNotificationSettings, type Hours } from '@juno/domain'
 import { settingsOf } from '../src/settings'
 
-const hours = { days: [1, 2, 3, 4, 5], from: 540, to: 1080 }
+const hours: Hours = { days: [1, 2, 3, 4, 5], from: 540, to: 1080 }
 
 it('reads levels stored before Always and Auto as they are now: every is Always, matters is Auto', () => {
   const settings = settingsOf({
@@ -22,6 +22,12 @@ it('reads levels stored before Always and Auto as they are now: every is Always,
     threads: { 't:C1:2.000001': 'never' },
   })
   expect(settings.channels).not.toHaveProperty('C2')
+})
+
+it('reads hours saved before 2026-10-27 as the ones every install started with as never set, and any others as set; since then, hours stored are as set', () => {
+  const starting: Hours = { days: [1, 2, 3, 4, 5], from: 540, to: 1140 }
+  expect(settingsOf({ notificationHours: starting, presenceHours: hours, channels: {}, people: {} })).toEqual({ presenceHours: hours, channels: {}, people: {} })
+  expect(settingsOf({ notificationHours: starting, presenceHours: starting, channels: {}, people: {}, hoursAsSet: true })).toEqual({ notificationHours: starting, presenceHours: starting, channels: {}, people: {} })
 })
 
 it.each<[string, unknown]>([

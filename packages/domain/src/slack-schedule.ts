@@ -1,6 +1,7 @@
 /**
  * Slack's own notification schedule (its Do Not Disturb hours) from Juno's
- * notification hours (spec section 14). The schedule is a set of user prefs,
+ * notification hours, and the hours it holds while Juno has none of its own
+ * (spec section 14). The schedule is a set of user prefs,
  * read with `users.prefs.get` and written with `users.prefs.set`
  * (docs/research/slack-data-access.md section 7).
  *
@@ -10,7 +11,7 @@
  * the stop, and `dnd_enabled_<day>` is `partial` (those hours), `all_day`
  * (no notifications) or `disabled` (no pause).
  */
-import { hoursOn, type Hours, type Weekday } from './notifications'
+import { hoursOn, normalHours, type DayHours, type Hours, type Weekday } from './notifications'
 
 /** The schedule prefs Juno reads and writes, as Slack holds them. */
 export type SlackSchedulePrefs = Readonly<Record<string, string | boolean>>
@@ -87,4 +88,51 @@ export function slackScheduleSnapshot(current: Readonly<Record<string, unknown>>
     if (typeof value === 'string' || typeof value === 'boolean') snapshot[key] = value
   }
   return snapshot
+}
+
+/** Where Slack's page draws a day without a pause to end: 23:59. */
+const ALL_DAY_TO = 23 * 60 + 59
+
+/** Minutes since midnight from `H:MM` or `HH:MM`, or undefined for anything else. */
+const minutesOf = (value: unknown) => {
+  const match = typeof value === 'string' ? /^(\d{1,2}):(\d\d)$/.exec(value) : null
+  if (match === null) return undefined
+  const minutes = Number(match[1]) * 60 + Number(match[2])
+  return minutes < 24 * 60 ? minutes : undefined
+}
+
+/**
+ * The hours Slack's schedule lets notifications through, or undefined when it
+ * pauses nothing: off, never set, or values Juno does not know. `weekdays`
+ * pauses the whole weekend. On custom days, `all_day` is a day without hours
+ * and `disabled` a day without a pause, which Slack's page draws as 00:00 to
+ * 23:59.
+ */
+export function slackScheduleHours(prefs: Readonly<Record<string, unknown>>): Hours | undefined {
+  if (prefs['dnd_enabled'] !== true) return undefined
+  const days = prefs['dnd_days']
+  if (days === 'every_day' || days === 'weekdays') {
+    const from = minutesOf(prefs['dnd_end_hour'])
+    const to = minutesOf(prefs['dnd_start_hour'])
+    if (from === undefined || to === undefined || from === to) return undefined
+    return { days: days === 'every_day' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5], from, to }
+  }
+  if (days !== 'custom') return undefined
+  const own: Array<DayHours> = []
+  for (const [index, day] of dayNames.entries()) {
+    const weekday = index as Weekday
+    const enabled = prefs[`dnd_enabled_${day}`]
+    if (enabled === 'all_day') continue
+    if (enabled === 'disabled') {
+      own.push({ day: weekday, from: 0, to: ALL_DAY_TO })
+      continue
+    }
+    const from = minutesOf(prefs[`dnd_before_${day}`])
+    const to = minutesOf(prefs[`dnd_after_${day}`])
+    if (enabled !== 'partial' || from === undefined || to === undefined) return undefined
+    if (from < to) own.push({ day: weekday, from, to })
+  }
+  const allDay = (span: DayHours) => span.from === 0 && span.to === ALL_DAY_TO
+  if (own.length === 7 && own.every(allDay)) return undefined
+  return normalHours({ days: own.map((span) => span.day), from: own[0]?.from ?? 0, to: own[0]?.to ?? 0, dayHours: own })
 }

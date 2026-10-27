@@ -17,7 +17,7 @@
  * its state; Use Juno's hours is served here.
  */
 import { randomUUID } from 'node:crypto'
-import { Clock, Effect, Schema, Semaphore, Stream } from 'effect'
+import { Clock, Effect, Semaphore, Stream } from 'effect'
 import { AiProvider, tasks } from '@juno/ai'
 import {
   NotFound,
@@ -38,14 +38,15 @@ import {
   presenceLabel,
   scheduledPresence,
   seenNote,
+  startingHours,
   threadNotifyChoice,
   withGroupHours,
   type NotificationSettings,
   type NotifyChoice,
   type NotifyLevel,
 } from '@juno/domain'
-import { NotificationSettingsSchema, readSettings } from '@juno/notifications'
-import { liveQuery, prefs, StoreReader, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
+import { readOwnSettings, readSettings, saveSettings, slackHours } from '@juno/notifications'
+import { liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
 import { NotificationControl } from '../notificationRuntime'
 import { SelfPresence } from '../selfPresence'
 import { Outbox } from '../outbox'
@@ -57,14 +58,16 @@ import { Workspace, type StoreServices } from '../workspace'
 import { tagsFor, todayCounts, todayDecisions } from './pageQueries'
 
 const SETTINGS_KEYS: InvalidationKeys = ['prefs', 'follow_new_threads']
+/** Slack's schedule, in its cached prefs, is the notification hours until the owner sets them. */
+const STATUS_KEYS: InvalidationKeys = ['prefs', 'team']
 const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team', 'topic_overlay']
 const DECISION_KEYS: InvalidationKeys = ['notification_log']
 /** People and channels an instruction names that the rule check is shown, at most. */
 const NAMED_LIMIT = 5
 
 const viewOf = (settings: NotificationSettings, aiAssist: boolean, followNewThreads: ReadonlyArray<string>): NotificationSettingsView => ({
-  notificationHours: settings.notificationHours,
-  presenceHours: settings.presenceHours,
+  notificationHours: settings.notificationHours ?? null,
+  presenceHours: settings.presenceHours ?? null,
   channels: settings.channels,
   people: settings.people,
   threads: settings.threads ?? {},
@@ -157,24 +160,24 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     const updateSettings = (change: (settings: NotificationSettings) => NotificationSettings) =>
       inWorkspace(
         Effect.gen(function* () {
-          const { settings } = yield* readSettings
-          const next = Schema.decodeUnknownSync(NotificationSettingsSchema)(change(settings))
-          yield* transaction(prefs.set('notifications', next))
-          return { before: settings, after: next }
+          const { settings } = yield* readOwnSettings
+          yield* saveSettings(change(settings))
         }).pipe(Effect.orDie),
       ).pipe(writes.withPermit)
 
+    /** Hours not set start from the ones shown: Slack's schedule for the notification hours, else Monday to Friday 9 to 7. */
     const changeHours = (which: 'notifications' | 'presence', change: (hours: Hours) => Hours) =>
       Effect.gen(function* () {
+        const slack = which === 'notifications' ? yield* inWorkspace(slackHours.pipe(Effect.orDie)) : undefined
         yield* updateSettings((settings) => (which === 'notifications'
-          ? { ...settings, notificationHours: change(settings.notificationHours) }
-          : { ...settings, presenceHours: change(settings.presenceHours) }))
+          ? { ...settings, notificationHours: change(settings.notificationHours ?? slack ?? startingHours) }
+          : { ...settings, presenceHours: change(settings.presenceHours ?? startingHours) }))
         // Only hours the owner set reach Slack's schedule (`../slackSchedule.ts`).
         if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
       })
 
     const settingsView = Effect.gen(function* () {
-      const { settings, aiAssist } = yield* readSettings
+      const { settings, aiAssist } = yield* readOwnSettings
       return viewOf(settings, aiAssist, yield* followNewChannels)
     })
 
@@ -183,7 +186,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       const { settings } = yield* readSettings
       const presence = (yield* control.currentPresence) ?? null
       const seen = yield* selfPresence.current
-      const shown = presence ?? scheduledPresence(now, settings.presenceHours)
+      const shown = presence ?? (settings.presenceHours === undefined ? 'active' : scheduledPresence(now, settings.presenceHours))
       const label = presenceLabel(now, shown, settings.presenceHours)
       const note = presence === null ? undefined : seenNote(presence, seen)
       const paused = pausedLabel(now, settings.notificationHours)
@@ -246,7 +249,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         serveLiveValue(
           // The presence stream starts with the current value, which can be newer than what the first
           // run read (the two start together), so it is not dropped: it costs one more run.
-          runs(SETTINGS_KEYS, status, Stream.merge(Stream.merge(control.presence, selfPresence.changes), Stream.tick('1 minute').pipe(Stream.drop(1)))),
+          runs(STATUS_KEYS, status, Stream.merge(Stream.merge(control.presence, selfPresence.changes), Stream.tick('1 minute').pipe(Stream.drop(1)))),
         ).pipe(retryFirstRun('notifications.status'), Stream.orDie),
       'notifications.setGroupHours': ({ which, group, hours }) => changeHours(which, (saved) => withGroupHours(saved, group, hours)),
       'notifications.setAlwaysNotify': ({ which, enabled }) =>

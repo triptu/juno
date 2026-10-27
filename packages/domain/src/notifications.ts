@@ -82,10 +82,13 @@ export interface Instruction {
 }
 
 export interface NotificationSettings {
-  /** When the Mac (and Slack's own schedule) may notify. */
-  readonly notificationHours: Hours
-  /** When Slack shows the owner as active. Outside them, away. */
-  readonly presenceHours: Hours
+  /**
+   * When the Mac (and Slack's own schedule) may notify; undefined pauses nothing. As saved, undefined until the
+   * owner sets them, and then Slack's own schedule is in effect (`readSettings` in `@juno/notifications`).
+   */
+  readonly notificationHours?: Hours
+  /** When Slack shows the owner as active, outside them away. Undefined until the owner sets them: Slack's automatic mode. */
+  readonly presenceHours?: Hours
   /** By channel or DM id. */
   readonly channels: Readonly<Record<string, NotifyLevel>>
   /** By user id. */
@@ -105,12 +108,11 @@ export interface NotificationSettings {
 const weekdays: ReadonlyArray<Weekday> = [1, 2, 3, 4, 5]
 const allWeekdays: ReadonlyArray<Weekday> = [0, 1, 2, 3, 4, 5, 6]
 
-export const defaultNotificationSettings: NotificationSettings = {
-  notificationHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
-  presenceHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
-  channels: {},
-  people: {},
-}
+/** Neither set of hours is set until the owner sets it (SPEC 14). */
+export const defaultNotificationSettings: NotificationSettings = { channels: {}, people: {} }
+
+/** Monday to Friday, 9am to 7pm: what the rows start from when the owner first sets hours that were not set. */
+export const startingHours: Hours = { days: weekdays, from: 9 * 60, to: 19 * 60 }
 
 const DAY = 24 * 60
 
@@ -259,10 +261,10 @@ function nextBoundary(at: LocalTime, hours: Hours, starts: boolean): Switch | un
  * 9am", or "Active until 8pm" when a change by hand runs past the end of
  * the active hours. `presence` is what Slack shows now.
  */
-export function presenceLabel(at: LocalTime, presence: Presence, presenceHours: Hours): string {
-  if (presence === 'active' && scheduledPresence(at, presenceHours) === 'active') return 'Active'
-  const next = nextBoundary(at, presenceHours, presence === 'away')
+export function presenceLabel(at: LocalTime, presence: Presence, presenceHours: Hours | undefined): string {
   const name = presence === 'active' ? 'Active' : 'Away'
+  if (presenceHours === undefined || (presence === 'active' && scheduledPresence(at, presenceHours) === 'active')) return name
+  const next = nextBoundary(at, presenceHours, presence === 'away')
   return next === undefined ? name : `${name} ${until(at, next.inMinutes, next.at)}`
 }
 
@@ -277,9 +279,14 @@ export function seenNote(setting: Presence, seen: Presence | undefined): string 
   return seen === setting ? undefined : `Slack shows you ${seen}`
 }
 
+/** Whether notifications are paused at `at`: outside the notification hours, never when there are none. */
+export function notificationsPaused(at: LocalTime, notificationHours: Hours | undefined): boolean {
+  return notificationHours !== undefined && !inHours(at, notificationHours)
+}
+
 /** The avatar menu's hint on Notifications: "Paused until 9am" outside notification hours, nothing inside. */
-export function pausedLabel(at: LocalTime, notificationHours: Hours): string | undefined {
-  if (inHours(at, notificationHours)) return undefined
+export function pausedLabel(at: LocalTime, notificationHours: Hours | undefined): string | undefined {
+  if (notificationHours === undefined || inHours(at, notificationHours)) return undefined
   const next = nextBoundary(at, notificationHours, true)
   return next === undefined ? 'Paused' : `Paused ${until(at, next.inMinutes, next.at)}`
 }
@@ -334,7 +341,7 @@ export function decideHuddleAlert(
   huddle: { readonly channelId: string; readonly startedBy: string; readonly at: LocalTime },
   settings: NotificationSettings,
 ): HuddleAlertDecision {
-  if (!inHours(huddle.at, settings.notificationHours)) return 'quiet'
+  if (notificationsPaused(huddle.at, settings.notificationHours)) return 'quiet'
   const levels = [settings.channels[huddle.channelId], settings.people[huddle.startedBy]]
   return levels.includes('always') || !levels.includes('never') ? 'ring' : 'quiet'
 }

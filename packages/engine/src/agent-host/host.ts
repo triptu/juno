@@ -19,7 +19,7 @@ import { Clock, Context, Effect, Layer, Option, Result, Stream, SubscriptionRef 
 import { AgentHostError, type HostSendState, type Place } from '@juno/agent-contract'
 import { JunoHost, type Account, type AccountId, type Attempt, type AttemptRecord, type Message, type PostOutcome, type Presence } from '@juno/agent-juno'
 import type { EnginePhase } from '@juno/contract'
-import { defaultNotificationSettings, inHours, type NotificationSettings, type Ts } from '@juno/domain'
+import { defaultNotificationSettings, inHours, notificationsPaused, type NotificationSettings, type Ts } from '@juno/domain'
 import { readSettings } from '@juno/notifications'
 import { liveQuery, StoreReader, transaction, type SqlError } from '@juno/store'
 import { AiSpend } from '../aiSpend'
@@ -71,13 +71,13 @@ const readAccount = Effect.gen(function* () {
 
 type Hours = Pick<NotificationSettings, 'notificationHours' | 'presenceHours'>
 
-/** Whether `millis` is outside notification hours, and inside active hours, in local time. */
+/** Whether `millis` is outside notification hours, and not outside active hours, in local time. */
 const hoursAt = (millis: number, hours: Hours) => {
   const date = new Date(millis)
   const at = { weekday: date.getDay() as 0, minutes: date.getHours() * 60 + date.getMinutes() }
   return {
-    quietHours: !inHours(at, hours.notificationHours),
-    ownerActive: inHours(at, hours.presenceHours),
+    quietHours: notificationsPaused(at, hours.notificationHours),
+    ownerActive: hours.presenceHours === undefined || inHours(at, hours.presenceHours),
   }
 }
 

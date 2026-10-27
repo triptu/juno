@@ -8,7 +8,7 @@
  */
 import { channelLabel, firstName, isDm, type ChannelInfo } from './channel'
 import type { UserId } from './ids'
-import { alwaysNotifyOf, inHours, type LocalTime, type NotificationSettings, type NotifyLevel } from './notifications'
+import { alwaysNotifyOf, notificationsPaused, type LocalTime, type NotificationSettings, type NotifyLevel } from './notifications'
 
 /** What the store knows about the conversation when a message arrives. Missing facts count as false. */
 export interface ConversationFacts {
@@ -144,7 +144,7 @@ interface Names {
 }
 
 function decideOnce(candidate: NotificationCandidate, settings: NotificationSettings, context: DecisionContext, reading: Reading | 'failed' | undefined): NotificationDecision | NeedsReading {
-  if (!inHours(candidate.at, settings.notificationHours)) return { outcome: 'stay', decidedBy: 'hours', reason: 'Outside your notification hours.' }
+  if (notificationsPaused(candidate.at, settings.notificationHours)) return { outcome: 'stay', decidedBy: 'hours', reason: 'Outside your notification hours.' }
   const name = context.userName?.(candidate.senderId)
   const names: Names = { sender: name ?? candidate.senderId, first: name === undefined ? 'Someone' : firstName(name), where: channelLabel(candidate.channel) }
   const direct = isDm(candidate.channel.kind) || candidate.mentionsMe

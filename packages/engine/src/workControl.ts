@@ -1,7 +1,7 @@
 import { Context, Effect, Queue, Stream } from 'effect'
 
 /** Completed passes, including passes that decide there is nothing to do. */
-export type WorkName = 'post' | 'action' | 'mark' | 'title' | 'art' | 'home' | 'automated' | 'slackSchedule'
+export type WorkName = 'post' | 'action' | 'mark' | 'title' | 'art' | 'home' | 'automated' | 'slackSchedule' | 'presence'
 
 /** Optional harness observation; no queues or extra passes in the app. */
 export interface WorkControlOptions {

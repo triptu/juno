@@ -7,10 +7,12 @@
  * 2026-10-23 (`enabled`, `saved`) are left and not read. A pass runs, after a debounce,
  * when a pref or Slack's cached prefs change and when a catch-up ends, but
  * not before this session's first catch-up, so it reads Slack's prefs as
- * the boot left them. Nothing is written until the hours are the owner's
- * own on this install: set on the page (`hoursSet`) or confirmed with Use
- * Juno's hours (`hoursChosen`). Default hours never
- * reach Slack, so a fresh or dev install leaves the schedule alone.
+ * the boot left them. Until the owner sets notification hours, Juno has
+ * none of its own and follows Slack's schedule (`readSettings` in
+ * `@juno/notifications`), so nothing is written. Nothing is written either
+ * until the hours are set on this install: on the page (`hoursSet`) or
+ * confirmed with Use Juno's hours (`hoursChosen`), so hours saved by an
+ * older version and never set here stay out of Slack.
  * After that, it writes only when the notification hours differ
  * from the hours it last applied, and only when Slack does not hold the
  * schedule already. So a restart, its own `pref_change` echo and an
@@ -24,9 +26,9 @@
 import { observeWork, workWakes } from './workControl'
 import { Context, Duration, Effect, Layer, Ref, Schema, Semaphore, Stream } from 'effect'
 import type { SlackScheduleView } from '@juno/contract'
-import { sameHours, slackScheduleFor, slackScheduleKeys, slackScheduleMatches, slackScheduleSnapshot, type SlackSchedulePrefs } from '@juno/domain'
-import { NotificationSettingsSchema, readSettings } from '@juno/notifications'
-import { invalidate, liveQuery, prefs, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
+import { sameHours, slackScheduleFor, slackScheduleHours, slackScheduleKeys, slackScheduleMatches, slackScheduleSnapshot, type SlackSchedulePrefs } from '@juno/domain'
+import { NotificationSettingsSchema, readOwnSettings, slackPrefs } from '@juno/notifications'
+import { invalidate, liveQuery, prefs, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { EngineTiming } from './config'
 import { Outbox } from './outbox'
 import { SyncLink } from './syncLink'
@@ -39,7 +41,7 @@ const State = Schema.Struct({
   /** The owner set the notification hours on this install, or chose Use Juno's hours. Until then nothing is written. */
   hoursChosen: Schema.optionalKey(Schema.Boolean),
   /** The notification hours Juno last applied. */
-  appliedFor: Schema.optionalKey(NotificationSettingsSchema.fields.notificationHours),
+  appliedFor: NotificationSettingsSchema.fields.notificationHours,
   /** The prefs Juno last applied. */
   applied: Schema.optionalKey(SchedulePrefs),
 })
@@ -51,14 +53,6 @@ const readState = Effect.gen(function* () {
 })
 
 const writeState = (state: State) => transaction(prefs.set(PREF, state))
-
-/** Slack's prefs as the sync last stored them, or undefined before the first boot. */
-const cachedPrefs = Effect.gen(function* () {
-  const sql = yield* StoreReader
-  const rows = yield* sql<{ prefs_json: string | null }>`SELECT prefs_json FROM team LIMIT 1`
-  const json = rows[0]?.prefs_json
-  return json == null ? undefined : (JSON.parse(json) as Record<string, unknown>)
-})
 
 /** Keeps the cache in step with what Slack now holds, as a `pref_change` would. */
 const storePrefs = (changes: Readonly<Record<string, unknown>>) =>
@@ -75,9 +69,12 @@ const storePrefs = (changes: Readonly<Record<string, unknown>>) =>
 /** What the Notifications page shows about Slack's schedule. */
 export const slackScheduleView: Effect.Effect<SlackScheduleView, SqlError, StoreServices> = Effect.gen(function* () {
   const state = yield* readState
-  const cached = yield* cachedPrefs
+  const cached = yield* slackPrefs
+  if ((yield* readOwnSettings).settings.notificationHours === undefined) {
+    return { changedInSlack: false, waitingForHours: false, slackHours: (cached === undefined ? undefined : slackScheduleHours(cached)) ?? null }
+  }
   const changedInSlack = state.applied !== undefined && cached !== undefined && !slackScheduleMatches(cached, state.applied)
-  return { changedInSlack, waitingForHours: state.hoursChosen !== true }
+  return { changedInSlack, waitingForHours: state.hoursChosen !== true, slackHours: null }
 })
 
 export class SlackSchedule extends Context.Service<
@@ -107,9 +104,9 @@ export class SlackSchedule extends Context.Service<
         if (!(yield* Ref.get(caughtUp))) return
         const state = yield* readState
         if (state.hoursChosen !== true) return
-        const hours = (yield* readSettings).settings.notificationHours
-        if (state.appliedFor !== undefined && sameHours(state.appliedFor, hours)) return
-        const cached = yield* cachedPrefs
+        const hours = (yield* readOwnSettings).settings.notificationHours
+        if (hours === undefined || (state.appliedFor !== undefined && sameHours(state.appliedFor, hours))) return
+        const cached = yield* slackPrefs
         if (cached === undefined) return
         const target = slackScheduleFor(hours)
         // The cache can be behind Slack: read the schedule itself before writing over it.
@@ -124,7 +121,7 @@ export class SlackSchedule extends Context.Service<
         Effect.catch((error) =>
           error._tag === 'Rejected'
             // Slack refused these values: do not ask again until the hours change.
-            ? Effect.flatMap(readState, (state) => Effect.flatMap(readSettings, ({ settings }) => writeState({ ...state, appliedFor: settings.notificationHours })))
+            ? Effect.flatMap(readState, (state) => Effect.flatMap(readOwnSettings, ({ settings: { notificationHours } }) => writeState(notificationHours === undefined ? state : { ...state, appliedFor: notificationHours })))
               .pipe(Effect.andThen(Effect.logWarning('slack schedule: Slack refused the write', { code: error.code })), Effect.ignore)
             : Effect.logWarning('slack schedule: not applied', { error: error._tag }),
         ),

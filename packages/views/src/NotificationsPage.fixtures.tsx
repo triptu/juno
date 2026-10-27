@@ -69,7 +69,7 @@ export const notificationsBase: NotificationsPageProps = {
   notificationHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
   presenceHours: { days: weekdays, from: 9 * 60, to: 20 * 60 },
   onHoursChange: noop,
-  slackSchedule: { changedInSlack: false, waitingForHours: false },
+  slackSchedule: { changedInSlack: false, waitingForHours: false, slackHours: null },
   onUseJunoHours: noop,
   aiAssist: true,
   alwaysNotify: { dms: false, groupDms: false, mentions: true, startedThreads: false, followedThreads: false },
@@ -178,8 +178,11 @@ export default defineFixtures(
       nothing: fixture({ ...notificationsBase, notifiedToday: 0, stayedToday: 0, decisions: [] }),
     },
     'Slack schedule': {
-      'changed-in-slack': fixture({ ...notificationsBase, slackSchedule: { changedInSlack: true, waitingForHours: false } }),
-      'waiting-for-hours': fixture({ ...notificationsBase, slackSchedule: { changedInSlack: false, waitingForHours: true } }),
+      'changed-in-slack': fixture({ ...notificationsBase, slackSchedule: { changedInSlack: true, waitingForHours: false, slackHours: null } }),
+      'waiting-for-hours': fixture({ ...notificationsBase, slackSchedule: { changedInSlack: false, waitingForHours: true, slackHours: null } }),
+      // No hours set: the notification hours are Slack's, and presence is Slack's automatic mode.
+      'following-slack': fixture({ ...notificationsBase, notificationHours: null, presenceHours: null, slackSchedule: { changedInSlack: false, waitingForHours: false, slackHours: { days: weekdays, from: 540, to: 1080 } } }),
+      'no-slack-schedule': fixture({ ...notificationsBase, notificationHours: null, presenceHours: null }),
     },
     Permission: {
       'badges-off': fixture({ ...notificationsBase, permission: { authorization: 'allowed', badges: 'disabled' } }),
