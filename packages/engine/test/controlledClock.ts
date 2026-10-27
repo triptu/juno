@@ -1,5 +1,10 @@
 import { Clock, Duration, Effect, Exit, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
+import type { EngineTimingConfig } from '../src/config'
+
+const DAY = 86_400_000
+/** Keeps periodic work (the socket's keep-alive, the title, Home and Automated ticks) out of steps on frozen time: its phase depends on how long boot took. */
+export const noTicks = { socketPingMillis: DAY, socketPongTimeoutMillis: DAY, socketTickleMillis: DAY, titleTickMillis: DAY, homeTickMillis: DAY, automatedTickMillis: DAY } satisfies Partial<EngineTimingConfig>
 
 /** Boots with live I/O, then freezes engine time for a scheduling assertion. */
 export async function controlledClock() {

@@ -13,8 +13,8 @@ import { afterEach, it } from 'bun:test'
 import { expectWork } from '@juno/testing/work-budget'
 import { messagesAtom, openTopic, sendMessage, type ListWindow } from '@juno/state'
 import type { MessageView, TopicRow } from '@juno/contract'
-import { controlledClock } from '../controlledClock'
-import { startTestEngine, WAIT_MS, waitFor, type EngineOptions, type RunningEngine } from '../harness'
+import { controlledClock, noTicks } from '../controlledClock'
+import { startTestEngine, WAIT_MS, waitFor, type RunningEngine } from '../harness'
 import { mutationSeed } from '../mutationSeed'
 import { bootedEngine, quiet, tsOf, valueOf } from '../scenario'
 import { countSql, statementsSoFar, type SqlWork } from '../sqlWork'
@@ -29,10 +29,6 @@ afterEach(async () => {
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
   for (const clock of clocks.splice(0)) await clock.close()
 })
-
-const DAY = 86_400_000
-/** Keeps periodic work (the socket's keep-alive, the title, Home and Automated ticks) out of the frozen steps: its phase depends on how long boot took. */
-const noTicks: EngineOptions['timing'] = { socketPingMillis: DAY, socketPongTimeoutMillis: DAY, socketTickleMillis: DAY, titleTickMillis: DAY, homeTickMillis: DAY, automatedTickMillis: DAY }
 
 type Time = Awaited<ReturnType<typeof controlledClock>>
 
