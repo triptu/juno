@@ -6,6 +6,7 @@ import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import type { TestHost } from './browser/host'
 import { cpuAll, printCpuSince } from './cpu'
+import { copySpellDictionary } from './spellDictionary'
 import { startSendTrace, startSidebarTrace } from './traces'
 
 /**
@@ -141,6 +142,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   const openRouterUrl = options.fakeOpenRouterUrl ?? ownOpenRouter?.origin
   if (openRouterUrl !== undefined) env.JUNO_FAKE_OPENROUTER_URL = openRouterUrl
 
+  await copySpellDictionary(userData)
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
   const app = await electron.launch({
