@@ -1,7 +1,8 @@
 /**
  * The developer log's text rules (`devLog.ts`): the one place that removes
  * secrets, cuts values short and summarises a Slack response. Everything an
- * entry keeps passes through `clean`.
+ * entry keeps passes through `clean`; what people wrote (a message's or a
+ * draft's text and blocks) is kept only as its length (`cleanParam`).
  */
 
 /** A value is cut to this many characters. */
@@ -44,6 +45,14 @@ export interface Line {
 /** A named value as the log keeps it: removed outright when the name says secret, else cleaned. */
 export function cleanLine(label: string, value: string): Line {
   return { label: clean(label, 80), value: SECRET_NAME.test(label) ? REMOVED : clean(value) }
+}
+
+/** Request fields that carry what someone wrote: a message's or a draft's text and blocks. */
+const CONTENT_NAME = /^(text|blocks|markdown_text|comment|attachments)$/
+
+/** A request field as the log keeps it: what someone wrote only by its length, anything else as `cleanLine`. */
+export function cleanParam(label: string, value: string): Line {
+  return CONTENT_NAME.test(label) ? { label: clean(label, 80), value: `[${value.length} characters]` } : cleanLine(label, value)
 }
 
 /**
