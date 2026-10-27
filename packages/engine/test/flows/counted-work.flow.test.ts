@@ -131,7 +131,8 @@ it('the sidebar, a topic open and reopen, a send and a live message stay within 
     const sql = await measured(engine, time, async () => {
       valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0ENG' }, 'Counting the work of a send', main))
     }, () => texts(eng()).includes('Counting the work of a send') && engine.fake.messages('C0ENG').some((message) => message.text === 'Counting the work of a send'))
-    expectWork('send', counts(sql), { statements: 112, rows: 127 }, detail(sql))
+    // The queued post re-indexes its topic, so the sidebar moves it before Slack answers, and the sidebar reads once more.
+    expectWork('send', counts(sql), { statements: 138, rows: 176 }, detail(sql))
   })
 
   await step('a message arriving on the socket: one event, the sidebar and the open window', async () => {

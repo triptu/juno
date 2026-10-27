@@ -114,7 +114,8 @@ domTest('startup, a topic opened and opened again, tabs, typing, a send and a li
       await juno.topic.composer.press('Enter')
       await juno.topic.expectSent('counting each key now')
     })
-    expectWork('send', counts(work), { commits: 10, renders: 286, requests: 6, messages: 14, bytesIn: 6364, bytesOut: 567 }, detail(work))
+    // The queued post moves its sidebar row before Slack answers: one more sidebar delta, and the open topic's reads of its row.
+    expectWork('send', counts(work), { commits: 11, renders: 359, requests: 6, messages: 19, bytesIn: 10931, bytesOut: 567 }, detail(work))
   })
 
   await step('a reply arriving in the open topic', async () => {

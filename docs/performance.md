@@ -447,7 +447,7 @@ Measured 10-26: the engine's counts were the same in three runs (and, after the 
 | Topic open again | 31 / 40 → 35 / 44 | 5 / 316; 4 / 5; 470 / 489 B → 7 / 348; 6 / 7; 517 / 538 | |
 | Tab switch | | 3 / 58; 3 / 4; 492 / 507 B → 5 / 64; 5 / 6; 542 / 558 | |
 | Typing 21 keys | | 42 / 105; no request → 47 / 116; 0 / 0; then one draft save | 44 layouts, 25 styles, 45 mutations → 49 / 28 / 50 |
-| Send | 102 / 115 → 112 / 127 (10-27; 107 / 134 → 118 / 148 before unchanged messages were no longer rewritten) | 8 / 260; 4 / 12; 5,785 / 515 B → 10 / 286; 6 / 14; 6,364 / 567 | |
+| Send | 125 / 160 → 138 / 176 (10-27, when the queued post began to re-index its topic so the sidebar moves it before Slack answers: one re-index and one more sidebar read; 102 / 115 → 112 / 127 before, and 107 / 134 → 118 / 148 before unchanged messages were no longer rewritten) | 10 / 326; 4 / 17; 9,937 / 515 B → 11 / 359; 6 / 19; 10,931 / 567 (10-27, the sidebar row moving when the post is queued; 8 / 260; 4 / 12; 5,785 / 515 B before) | |
 | A live message or reply | Message 49 / 92 → 54 / 102; reply 103 / 156 → 114 / 172 | Reply: 6 / 250; 1 / 13; 8,167 / 92 B → 8 / 275; 3 / 15; 8,984 / 102 | |
 | Warm start of the default workspace, to rest (a relaunch against the fake that made the first sync, so the stored URLs keep its port) | 737 / 866 → 815 / 950 (10-27; 872 / 1,134 before topic marks, which fails it; 784 with a fake on another port) | | |
 | Scrolling a message list, 12 steps of 180 px | | | 6 layouts, 1 mutation → 8 / 3 |
