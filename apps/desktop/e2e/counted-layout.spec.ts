@@ -8,8 +8,8 @@
 // and mutations are the same in every run. The scroll's style recalculations are not counted: the list's
 // 100 ms scroll-rest timer commits before or after a frame by timing, which splits or joins a recalculation,
 // so the same code read 25 to 38. A style written to every row still shows, as mutations. Work that comes by
-// timing stays out: counting starts once Slack shows the user active, which the shell's 10 s activity poll
-// sets off (the test polls at once), and mutations are counted in the open topic only, not in the sidebar,
+// timing stays out: counting starts once Slack shows the user active, which the hours taking the user in sets off
+// at once (packages/engine/src/activity.ts), and mutations are counted in the open topic only, not in the sidebar,
 // whose sync cycles mark it busy on their own schedule. Budgets are today's counts plus a little headroom; a
 // failure prints the counts and the mutations.
 import type { CDPSession, Page } from '@playwright/test'

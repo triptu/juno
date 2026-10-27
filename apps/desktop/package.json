@@ -16,7 +16,7 @@
     "build:dom": "vite build -c dom/vite.config.ts && bun web/build-host.mjs dom/dist",
     "start": "bun ../../scripts/without-run-as-node.mjs electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json && tsc -p tsconfig.dom.json",
-    "test": "bun test --randomize --timeout=30000",
+    "test": "bun test --randomize --timeout=5000",
     "test:e2e": "NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" bun ../../scripts/without-run-as-node.mjs playwright test",
     "test:browser": "NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" bun ../../scripts/without-run-as-node.mjs playwright test --project=browser --project=feel",
     "test:electron": "NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" bun ../../scripts/without-run-as-node.mjs playwright test --project=electron",

@@ -268,7 +268,7 @@ it('reads DMs (unread first), then mentions, then unread followed threads, then 
   for (const group of groups) expect(positions(group).length).toBeGreaterThan(0)
   // Each group is read before the next one starts.
   for (let i = 0; i + 1 < groups.length; i++) expect(Math.max(...positions(groups[i]!))).toBeLessThan(Math.min(...positions(groups[i + 1]!)))
-}, 150_000)
+})
 
 it("with the app's pacing, reads thread previews and emoji beside history, not after it", async () => {
   // Pacing thirty times faster than the app's, every method alike, so the methods keep their real ratios; live calls took
@@ -284,7 +284,7 @@ it("with the app's pacing, reads thread previews and emoji beside history, not a
   expect(Math.min(...previews.map((call) => call.at))).toBeLessThan(lastHistory)
   expect(emoji.length).toBeGreaterThan(0)
   expect(Math.min(...emoji.map((call) => call.at))).toBeLessThan(lastHistory)
-}, 60_000)
+})
 
 it("on Grid, keys the workspace by enterprise and team, keeps a Main alive by an old thread's reply, and decodes Slack's escaping", async () => {
   let escaped: SeededThread | undefined

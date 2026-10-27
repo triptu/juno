@@ -16,8 +16,6 @@ test.use({ synced: true })
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
 test.use({ sidebarTrace: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 /** The Recent section's topic ids, top to bottom. */
 function recentIds(juno: Juno): Promise<string[]> {
   return juno.sidebar.section('Recent').locator('[data-topic-row]').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-topic-id') ?? ''))

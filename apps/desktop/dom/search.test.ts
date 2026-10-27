@@ -150,4 +150,4 @@ domTest('search opens results behind, scopes to a thread, hides apps until asked
     await expect(page.chips.filter({ hasText: 'U0MAYA' })).toBeVisible()
     await expect(page.row('Cormorant budget is approved')).toBeVisible()
   })
-}, { timeout: 90_000 })
+})

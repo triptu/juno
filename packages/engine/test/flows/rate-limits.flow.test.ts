@@ -50,7 +50,7 @@ describe('rate limits', () => {
     expectWaitedOut(engine, 'client.counts', 0.1, 2)
     expectWaitedOut(engine, 'subscriptions.thread.getView', 0.1, 1)
     expectWaitedOut(engine, 'search.modules.messages', 0.1, 1)
-  }, 60_000)
+  })
 
   it("a 429 on history during a paced first sync waits out its Retry-After, while previews go on, and the boot completes", async () => {
     // The app's pacing thirty times faster, with live latency scaled the same way (first-sync.flow.test.ts).
@@ -68,5 +68,5 @@ describe('rate limits', () => {
     expect(apiCalls(engine, 'conversations.replies').filter((call) => call.args['_x_reason'] === 'thread-preview').length).toBeGreaterThanOrEqual(4)
     const channels = new Set(apiCalls(engine, 'conversations.history').filter((call) => call.status === 200 && call.args['_x_reason'] === 'history').map((call) => call.args['channel']))
     expect(channels.size).toBeGreaterThanOrEqual(8)
-  }, 60_000)
+  })
 })

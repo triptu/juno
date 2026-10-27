@@ -162,7 +162,7 @@ domTest("a relaunch keeps every tab, pinned ones first, their topic drafts, each
     await expect(again.row('pelican step two is done')).toHaveAttribute('aria-selected', 'true')
     await expect(again.reader.getByText('pelican step two is done')).toBeVisible()
   })
-}, { timeout: 120_000 })
+})
 
 domTest('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno

@@ -1,14 +1,11 @@
 // The T3 Code adapter (src/t3/README.md) on the real engine against a loopback fake T3 server with
 // synthetic schemas: the Start card, the session's grant, questions, Stop, removal and the watcher.
 // The watcher's waits run on a clock the test moves (`pollClock`), so no test waits for a real poll.
-import { afterEach, expect, setDefaultTimeout, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import { json, reply, startFakeMcpServer, type FakeTool } from '@juno/agent-testing'
 import { T3 } from '../src/mcp'
 import { callTool, callsOf, closeAfter, closeConnections, connections, until } from './connections-harness'
 import { deferred } from './turns-harness'
-
-// Each test opens the engine; a run takes under a second, but a loaded machine can stretch it past bun's 5 s.
-setDefaultTimeout(30_000)
 
 afterEach(closeConnections)
 

@@ -305,5 +305,5 @@ describe('convergence', () => {
       reindexAll({ me: { userId: UserId.make(fake.selfId) } }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
     )
     expect(changed).toEqual([])
-  }, 180_000)
+  })
 })

@@ -7,7 +7,7 @@ import { expectStableAnchor } from './shiftProbe'
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
 test.use({ sidebarTrace: true })
 
-test.describe.configure({ timeout: 60_000, mode: 'parallel' })
+test.describe.configure({ mode: 'parallel' })
 
 const POSTGRES = 'Draft plan is in the doc'
 
@@ -25,7 +25,6 @@ const QUIET = 'Lag alerts are firing on the'
 // Each path opens a topic or page this test has not opened before, from Home as at launch, so the first message row
 // the probe finds is the new topic's. The Home path opens the topic it leaves from first.
 syncedTest('topics and pages open without a layout shift, and a row on All topics opens its topic', async ({ juno, win, fake }) => {
-  test.setTimeout(120_000)
   for (const [index, path] of (['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const).entries()) {
     await test.step(`stable open: ${path}`, async () => {
       if (index > 0) await juno.home.open()

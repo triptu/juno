@@ -4,14 +4,17 @@
  * hands the body the driver, the fake Slack and the people in it, and
  * closes everything after, pass or fail. With JUNO_E2E_TIMINGS=1 each test
  * prints a `dom timing:` line: wall time, and the CPU of this Bun worker
- * (test, fake, renderer) and of the hosts it forked (engine, agent), and
- * the memory of both: the worker's peak and now, the hosts' now.
+ * (test, fake, renderer) and of the hosts it forked (engine, agent), the
+ * memory of both (the worker's peak and now, the hosts' now) and each step's
+ * wall milliseconds.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { test } from 'bun:test'
+import { beforeAll, test } from 'bun:test'
 import type { FakeSlack, FakeSlackOptions } from '@juno/fake-slack'
+import { DOM_LIMIT_MS, limitScale } from '@juno/testing/limits'
+import type { SyncedSeed } from '../e2e/seeds'
 import { Slack } from '../e2e/driver/slack'
 import type { EngineOptions } from '../web/host/testHost'
 import { DomApp, domSnapshot, startDomApp, tempUserData, warmWorker } from './app'
@@ -39,7 +42,9 @@ interface Model {
 export interface DomTestOptions<M extends Model | undefined = undefined> {
   /** Start signed in and synced from the snapshot (default), or signed out on an empty folder. */
   readonly synced?: boolean
-  /** The fake's own options, as a seed of its own; only with `synced: false`, since the snapshot is of the default seed. */
+  /** The seed a synced start is built on (`e2e/seeds.ts`); the default seed unless named. */
+  readonly seed?: SyncedSeed
+  /** The fake's own options, as a seed of its own; only with `synced: false`, since a snapshot is of a named seed. */
   readonly fake?: FakeSlackOptions
   readonly engine?: EngineOptions
   /** Install the test clock before the page loads, at this time or now; the engine's clock follows its jumps. */
@@ -48,6 +53,7 @@ export interface DomTestOptions<M extends Model | undefined = undefined> {
   readonly model?: () => Promise<M & Model>
   /** The engine's frames reach the page one at a time and the page's time stands still, so counted renders do not depend on timing (`work.ts`). */
   readonly counted?: boolean
+  /** The test's own timeout, over the lane's limit (`@juno/testing/limits`); it needs a `// Slow:` reason. */
   readonly timeout?: number
   /** Tags, as a Playwright test has them: a test with a tag JUNO_SKIP_TAGS names is skipped (`@heavy-huddle`, scripts/test-areas.mjs). */
   readonly tag?: ReadonlyArray<string>
@@ -78,9 +84,23 @@ const signIn = async (app: DomApp) => {
 
 const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
 
+const scale = limitScale()
+
+/**
+ * What the worker and the run share (a loaded host, the renderer's compiled bundle, the synced snapshot, which the
+ * first worker to ask builds while the others wait) is made before a file's tests, so a test's time is its own.
+ */
+async function warm(synced: boolean, seed: SyncedSeed | undefined): Promise<void> {
+  await warmWorker()
+  if (synced) await domSnapshot(signIn, seed)
+}
+
 export function domTest<M extends Model | undefined = undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M> = {}): void {
-  const define = options.tag?.some((tag) => skipTags.includes(tag)) ? test.skip : test
-  define(title, () => run(title, body, options), (options.timeout ?? 60_000) * Number(process.env.JUNO_STRESS_SCALE ?? 1))
+  const skipped = options.tag?.some((tag) => skipTags.includes(tag)) === true
+  // Slow: the synced snapshot is a sign-in and a first sync, built once per run while the other workers wait for it.
+  if (!skipped) beforeAll(() => warm(options.synced !== false, options.seed), 120_000 * scale)
+  const define = skipped ? test.skip : test
+  define(title, () => run(title, body, options), (options.timeout ?? DOM_LIMIT_MS) * scale)
 }
 
 async function run<M extends Model | undefined>(title: string, body: (context: DomContext<M>) => Promise<void>, options: DomTestOptions<M>): Promise<void> {
@@ -93,12 +113,13 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
     const clock = options.clock === undefined || options.clock === false ? (options.counted === true ? fixedClock() : undefined) : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())
     const engine: EngineOptions = { ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }), ...options.engine }
     if (options.fake !== undefined && options.synced !== false) throw new Error('A fake of its own needs `synced: false`: the snapshot is of the default seed.')
-    warmWorker()
-    const snapshot = options.synced === false ? undefined : await domSnapshot(signIn)
+    await warmWorker()
+    const snapshot = options.synced === false ? undefined : await domSnapshot(signIn, options.seed)
     const ready = meter.lap()
     const started = await startDomApp({ snapshot, engine, counted: options.counted === true, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
     const warm = meter.lap()
     const others: Array<{ app: DomApp | undefined; readonly userData: string }> = []
+    const steps: Array<{ readonly name: string; readonly ms: number }> = []
     try {
       const context: DomContext<M> = {
         juno: new Juno(started.app),
@@ -124,11 +145,14 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
           return context.juno
         },
         step: async (name, inner) => {
+          const started = performance.now()
           try {
             return await inner()
           } catch (error) {
             if (error instanceof Error) error.message = `step "${name}": ${error.message}`
             throw error
+          } finally {
+            steps.push({ name, ms: Math.round(performance.now() - started) })
           }
         },
       }
@@ -143,7 +167,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
         try { await other.app?.close() } finally { await rm(other.userData, { recursive: true, force: true }) }
       }
       await started.close()
-      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total(), memory: memoryMB() })}`)
+      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`dom timing: ${JSON.stringify({ title, snapshot: ready, start: warm, ...meter.lap(), total: meter.total(), memory: memoryMB(), steps })}`)
       // Bun collects late: a worker's heap is about 100 MB after a full collection, but without one its
       // resident memory grew to 550 MB over a run. Collect once it passes JUNO_DOM_GC_MB (docs/development.md, "Memory").
       if (process.memoryUsage.rss() > gcAboveBytes) (globalThis as unknown as { Bun: { gc: (force: boolean) => void } }).Bun.gc(true)

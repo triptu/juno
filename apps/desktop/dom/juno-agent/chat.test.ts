@@ -173,7 +173,7 @@ domTest('the Juno tab sends at once, shows answers, reactions and replies, copie
     await switchTo(juno, 'main', 'Chat')
     await chat.expectJuno('You said: hello there')
   })
-}, { model, timeout: 120_000 })
+}, { model })
 
 /** Picks `label` from the switcher of the Juno header inside `where`. */
 async function switchTo(juno: Juno, where: 'aside[data-juno-panel]' | 'main', label: string): Promise<void> {

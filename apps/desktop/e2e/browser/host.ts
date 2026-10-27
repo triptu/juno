@@ -193,9 +193,10 @@ export class HostPool {
     return child
   }
 
-  /** Forks the first process before the first lease asks, so its load overlaps other work. */
-  warm(): void {
+  /** Forks the first process before the first lease asks, so its load overlaps other work; settles once one has loaded. */
+  async warm(): Promise<void> {
     if (this.#children.size === 0) this.#idle.push(this.#fork())
+    await this.#idle.at(-1)?.loaded
   }
 
   async start(fake: FakeSlack, start: Omit<HostStart, 'fakeUrl' | 'webRoot'>): Promise<TestHost> {

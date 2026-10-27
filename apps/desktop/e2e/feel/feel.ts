@@ -16,6 +16,11 @@ import { currentLoad, encodeVideo, REPORT_DIR, Studio, writeResult } from './stu
 const FAILED_MEDIA_ONLY = process.env.JUNO_FEEL_MEDIA === 'failed'
 const LONG_FRAMES_WARN = process.env.JUNO_FEEL_LONG_FRAMES === 'warn'
 
+/** Under JUNO_E2E_TIMINGS=1, where a scenario's time went, as the phases `e2e/timings.ts` sums. */
+const phase = (name: string, since: number) => {
+  if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: feel-${name} ${Math.round(performance.now() - since)} ms`)
+}
+
 export interface Scenario {
   /** Folder name and id in the contact sheet. */
   readonly name: string
@@ -40,6 +45,7 @@ export class Feel {
     // `--repeat-each` runs a scenario in parallel with itself: each repeat writes a folder of its own.
     const repeat = base.info().repeatEachIndex
     const dir = join(REPORT_DIR, repeat === 0 ? scenario.name : `${scenario.name}-repeat${repeat}`)
+    let since = performance.now()
     const recorder = await Recorder.start(this.win, { probes: scenario.probes, regions: scenario.regions ?? {} })
     let failure: unknown
     try {
@@ -48,7 +54,11 @@ export class Feel {
       failure = error
     }
     const recording = await recorder.stop(scenario.settleMs)
+    phase('record', since)
+    since = performance.now()
     const pixels = await this.studio.analyse(dir, recording)
+    phase('analyse', since)
+    since = performance.now()
     // The probes and pixels without the images, so a check can be run again on them, or on a copy with a bug put back.
     await writeFile(join(dir, 'recording.json'), JSON.stringify({ recording: { ...recording, shots: recording.shots.map((shot) => ({ number: shot.number, t: shot.t, deviceWidth: shot.deviceWidth, deviceHeight: shot.deviceHeight })) }, pixels }))
     const verdicts: Verdict[] = scenario.checks.map((check) => {
@@ -63,10 +73,12 @@ export class Feel {
     const failed = verdicts.filter((v) => v.status === 'fail')
     // On a shared machine a passing scenario keeps only its checks.
     const media = !FAILED_MEDIA_ONLY || failed.length > 0
-    if (!media) await rm(join(dir, 'frames'), { recursive: true, force: true })
+    if (media) await this.studio.writeFrames(dir, recording)
+    else await rm(join(dir, 'frames'), { recursive: true, force: true })
     const filmstrip = media ? await this.studio.filmstrip(dir, `${scenario.name}: ${scenario.title}`, recording, pixels, verdicts) : null
     const video = media ? await encodeVideo(dir, recording) : { file: null, note: 'Frames, filmstrip and video are kept only for a failed scenario in this run.' }
     const t0 = recording.shots[0]?.t ?? 0
+    phase('report', since)
     await writeResult(dir, {
       name: scenario.name,
       title: scenario.title,

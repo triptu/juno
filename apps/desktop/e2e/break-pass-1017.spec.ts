@@ -11,8 +11,6 @@ import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 import { recordBoxes } from './shiftProbe'
 
-test.describe.configure({ timeout: 120_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'

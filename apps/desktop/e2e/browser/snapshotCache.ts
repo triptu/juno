@@ -4,9 +4,10 @@ import { cp, mkdir, mkdtemp, readdir, readFile, rename, rm, rmdir, stat, writeFi
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startFakeSlack, type Credentials, type FakeSlack } from '@juno/fake-slack'
+import { seedOption, type SyncedSeed } from '../seeds'
 
 /**
- * A data folder signed in to the default seed and synced, for the browser
+ * A data folder signed in to a seed (`../seeds.ts`, the default unless named) and synced, for the browser
  * and DOM lanes' synced starts (e2e README, "Synced start"). It is built
  * once per run for each key, by whichever worker needs it first while the
  * others wait on a lock, and every worker copies it. A fake made to match
@@ -23,6 +24,8 @@ export interface WebSnapshot {
   readonly sessions: ReadonlyArray<Credentials>
   /** `snapshotState` of that fake once the app had synced. */
   readonly fakeState: string
+  /** The seed it was made on; absent for the default. */
+  readonly seed?: SyncedSeed
   readonly builtAt: number
 }
 
@@ -118,5 +121,5 @@ export function copySnapshot(snapshot: WebSnapshot, userData: string): Promise<v
 
 /** A fake that makes the snapshot's seed again, on a port of its own, accepting its sessions. */
 export function matchingFake(snapshot: WebSnapshot): Promise<FakeSlack> {
-  return startFakeSlack({ seedTime: snapshot.seedTime, sessions: snapshot.sessions })
+  return startFakeSlack({ seedTime: snapshot.seedTime, sessions: snapshot.sessions, ...seedOption(snapshot.seed) })
 }

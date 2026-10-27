@@ -224,4 +224,4 @@ domTest('Home from the keyboard: ⌘N, "+", fast keys, keys on its chips, a past
     await write.expectDestination('Maya')
     await expect(write.composer).toBeFocused()
   })
-}, { timeout: 120_000 })
+})

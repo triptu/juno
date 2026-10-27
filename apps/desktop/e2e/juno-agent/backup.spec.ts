@@ -37,9 +37,10 @@ const test = base.extend<{ readonly shared: string; readonly model: FakeOpenRout
 // The first Mac starts from the synced workspace (README, "Synced start"); the second signs in.
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 180_000 })
-
 const point = 'restore.swapped'
+
+// Slow: two apps, a backup, a move and an agent killed during the restore and started again.
+test.describe.configure({ timeout: 60_000 })
 
 const lastBackupAt = async (juno: Juno) => Number((await juno.win.locator('main [data-last-backup]').getAttribute('data-last-backup')) || 0)
 

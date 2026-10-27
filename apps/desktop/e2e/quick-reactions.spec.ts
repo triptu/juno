@@ -10,8 +10,6 @@
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
-test.describe.configure({ timeout: 120_000 })
-
 const CHOSEN = ['rocket', 'pray', '+1', 'eyes', 'tada']
 
 const pills = (juno: Juno) => juno.settings.root.locator('[data-quick-reaction]')
@@ -90,7 +88,6 @@ test('the picker marks the chosen quick reactions and choosing one does not reco
     await expect.poll(() => fake.messages('C0ENG').find((m) => m.ts === ts)?.reactions?.map((r) => r.name)).toEqual(['rocket'])
   })
 })
-
 
 /**
  * Frequently used in Settings' picker, then Esc. Each open keeps the list it

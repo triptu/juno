@@ -23,4 +23,4 @@ domTest('a boot Slack answers with data Juno cannot read shows the sync failure 
   expect(copied).toMatch(/on (macOS|linux|darwin)/)
   expect(copied).toContain('Sync: failed (SlackDecodeError, client.userBoot)')
   expect(copied).toMatch(line)
-}, { synced: false, timeout: 90_000 })
+}, { synced: false })

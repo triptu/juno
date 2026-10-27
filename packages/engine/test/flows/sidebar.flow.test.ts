@@ -217,7 +217,7 @@ it('the sidebar across filters, a profile change, a busy thread, own changes and
     // Views are Juno's own.
     expect(slackWrites(engine, since)).toEqual([])
   })
-}, 60_000)
+})
 
 // Cold: the people, messages and closed group DM must be in the fake before the first sync.
 it('previews name people and label an image, and a group DM shows as soon as someone posts in it', async () => {
@@ -361,7 +361,7 @@ it('Automated holds bot channels, asks about an unclear one, records its own mov
     await afterAPass()
     expect(automatedOf(await viewsUntil(engine, () => true, 'views'))).toBeUndefined()
   })
-}, 60_000)
+})
 
 it('keeps a channel where people start the conversations in All, however much a bot replies in its threads', async () => {
   // People ask the coding bot in top-level posts; it answers in each thread, many times.

@@ -289,7 +289,7 @@ domTest('wrong place, the audience line, local fixes and grammar after sending, 
       [TYPOS_AFTER, undefined],
     ])
   })
-}, { clock: true, timeout: 120_000 })
+}, { clock: true })
 
 // The model answers five seconds after it is asked, on the test clock.
 domTest('Enter never waits for a slow model, and a slow grammar fix joins the local one when it comes, even after leaving the topic', async ({ juno, app, fake, userData, clock, step }) => {

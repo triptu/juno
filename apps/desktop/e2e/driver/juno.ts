@@ -1093,14 +1093,13 @@ export class Juno implements JunoVerbs {
 
   /**
    * Notification and Active in Slack hours around now on every day, saved, and Settings closed: Slack shows the
-   * owner active and the account button its dot rather than the paused badge, whatever the time and day. Outside
-   * the old hours the engine skipped main's last activity reading, so Slack hears at the next one, within main's
-   * 10 s poll (`src/main/activity.ts`).
+   * owner active and the account button its dot rather than the paused badge, whatever the time and day. The engine
+   * tickles with main's last activity reading as the hours take the owner in (`packages/engine/src/activity.ts`).
    */
   async allHoursNow(): Promise<void> {
     await this.#hoursNow(['Notifications', 'Active in Slack'], {})
     await this.tabs.close('Settings')
-    await expect(this.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1, { timeout: 15_000 })
+    await expect(this.sidebar.accountButton.locator('[data-presence="active"]')).toHaveCount(1)
   }
 
   async #hoursNow(sections: ReadonlyArray<HoursSection>, options: { readonly outside?: boolean }): Promise<void> {

@@ -14,8 +14,6 @@ import { expectStableAnchor } from './shiftProbe'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 90_000 })
-
 const endOwnSource = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.endOwnSource())
 
 /** Starts a huddle in #eng with Maya in it, and returns the bar. */

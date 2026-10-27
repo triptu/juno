@@ -82,7 +82,7 @@ domTest('a mention\'s fix line opens as the field showed it; Enter while a file 
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
   await staging({ juno, fake, clock, userData, step })
-}, { clock: true, timeout: 120_000 })
+}, { clock: true })
 
 async function staging({ juno, fake, clock, userData, step }: Pick<DomContext, 'juno' | 'fake' | 'clock' | 'userData' | 'step'>): Promise<void> {
   const { topic } = juno

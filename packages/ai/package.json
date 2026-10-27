@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "bun test --randomize --timeout=30000",
+    "test": "bun test --randomize --timeout=5000",
     "eval": "bun eval/run.ts",
     "eval:title-privacy": "bun eval/title-privacy.ts",
     "bench": "bun eval/bench.ts",

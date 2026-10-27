@@ -9,8 +9,6 @@ import { expect, syncedTest, test, type Fixtures } from './fixtures'
 import { chart, paste, staged } from './attach'
 import { expectStableAnchor } from './shiftProbe'
 
-test.describe.configure({ timeout: 120_000 })
-
 const ENG_MAIN = '#eng'
 
 /** The size of the picture at `src`, loaded as an image in the page. */

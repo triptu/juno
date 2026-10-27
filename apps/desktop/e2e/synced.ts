@@ -3,9 +3,10 @@ import { cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Credentials, FakeSlack } from '@juno/fake-slack'
+import type { SyncedSeed } from './seeds'
 
 /**
- * A user-data directory signed in to the default seed and synced, with what a
+ * A user-data directory signed in to a seed (`seeds.ts`, the default unless named) and synced, with what a
  * fake needs to match it: the seed's time, the port its URLs name, and the
  * sessions the app holds. README, "Synced start".
  */
@@ -16,6 +17,8 @@ export interface SyncedWorkspace {
   readonly sessions: ReadonlyArray<Credentials>
   /** `fakeState` of the fake once the app had synced. */
   readonly fakeState: string
+  /** The seed it was made on; absent for the default. */
+  readonly seed?: SyncedSeed
 }
 
 /** The build marker covers the bundled source (schema, migrations, engine and sync), toolchain and output bytes; the seed loads once per run in this process. */

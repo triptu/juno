@@ -8,6 +8,7 @@ import type { WorkName } from '../src/workControl'
  */
 import { productionTiming, type EngineTimingConfig } from '../src/config'
 import { appendFileSync } from 'node:fs'
+import { limitScale } from '@juno/testing/limits'
 import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -32,11 +33,11 @@ import { memoryHost, startEngine, type EngineHandle, type EngineHostOptions } fr
 import { memoryTransport, type MessagePortLike, type Transport } from '../src/protocol/transport'
 
 /**
- * How long a harness wait allows by default: half the test timeout
- * (`setDefaultTimeout` in packages/testing/src/preload.ts), so a slow step on a
- * loaded machine still fails with the step's label before the test times out.
+ * How long a harness wait allows by default: most of the unit lane's limit
+ * (`@juno/testing/limits`), so a step that waits too long fails with its label
+ * before the test times out.
  */
-export const WAIT_MS = 15_000
+export const WAIT_MS = 4_000 * limitScale()
 
 /** Polls a condition, awaiting async predicates before deciding whether to poll again. */
 export async function waitFor<A>(f: () => A | undefined | Promise<A | undefined>, timeoutMs = WAIT_MS, label = 'condition'): Promise<Exclude<A, undefined>> {

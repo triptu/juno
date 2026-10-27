@@ -12,8 +12,6 @@ import { hooks } from './hooks'
 import { addRemote, attendee, chimeDrops, connection, huddleMenuItem, localMuted, microphoneAccess, openEng, openEngMain, playing, sharesReady, startHuddleFromMenu, startShare, stopShare } from './huddleFake'
 import { expectStableAnchor } from './shiftProbe'
 
-test.describe.configure({ timeout: 90_000 })
-
 /** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
 interface QuitHooks {
   readonly junoTest: { huddleQuitAsked: () => ReadonlyArray<{ title: string; detail: string; confirm: string }>; huddleQuitAnswer: (answer: 'confirm' | 'cancel') => void }

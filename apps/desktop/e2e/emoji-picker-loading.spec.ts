@@ -9,7 +9,6 @@ import { holdWorkspaceEmoji } from './emojiDelay'
 test.use({ synced: true })
 
 test('a cold picker paints Frequently used complete and keeps its first cell still; workspace emoji are found by name and alias, react by name and show their image', async ({ fake, relaunch, userData }) => {
-  test.setTimeout(120_000)
   // The gate below holds the workspace emoji, so a few hundred stand for a large workspace; perf.spec.ts times 20,000.
   for (let i = 0; i < 300; i++) fake.addEmoji({ name: `cold_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
   // An alias of an emoji that does not exist, and one whose image does not load.

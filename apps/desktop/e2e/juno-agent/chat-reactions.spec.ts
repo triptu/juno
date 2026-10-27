@@ -11,8 +11,6 @@ import { expect, JunoChatPane, test } from './chat'
 
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 
 async function ready(juno: Juno): Promise<void> {

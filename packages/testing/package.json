@@ -11,7 +11,8 @@
     "./effect": "./src/effect.ts",
     "./perf-budget": "./src/perfBudget.ts",
     "./perf-rule": "./src/perfRule.ts",
-    "./work-budget": "./src/workBudget.ts"
+    "./work-budget": "./src/workBudget.ts",
+    "./limits": "./src/limits.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

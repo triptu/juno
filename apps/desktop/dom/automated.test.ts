@@ -132,4 +132,4 @@ domTest('Home asks about an unclear channel and Move, Ignore and Keep in All sti
     await home.open()
     expect(await home.kinds()).not.toContain('automatedMoves')
   })
-}, { synced: false, engine: { aiJobs: true }, timeout: 150_000 })
+}, { synced: false, engine: { aiJobs: true } })

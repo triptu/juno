@@ -251,7 +251,7 @@ it('Home, titles and drawings with AI assist off, then on: Redraw and undo, hidd
     for (const engine of engines.splice(0).toReversed()) await engine.stop()
     await time.close()
   }
-}, 60_000)
+})
 
 it('titles cost one call each: a key change asks nothing again, a refusal goes to the fallback model or waits for the thread to change, and the daily budget holds', async () => {
   const engine = await syncedEngine(engines, { aiJobs: true })

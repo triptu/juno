@@ -25,8 +25,6 @@ import { chart, chip, chips, paste } from './attach'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 180_000 })
-
 const ENG_MAIN = '#eng'
 
 type Kind = 'pdf' | 'html' | 'markdown' | 'csv' | 'json' | 'audio' | 'voice' | 'zip'

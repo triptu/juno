@@ -8,9 +8,6 @@ import { expectStableAnchor } from './shiftProbe'
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
 test.use({ sidebarTrace: true })
 
-// Every test signs in and waits for the sync before it looks at rows.
-test.describe.configure({ timeout: 60_000 })
-
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 

@@ -163,4 +163,4 @@ domTest('Pause, Resume and Delete work on the Scheduled page and the card, a sch
     await expect(after.getByText('Nothing scheduled')).toBeVisible()
   })
   // Undo first: it leaves nothing scheduled, so the second watch is the only one.
-}, { model, timeout: 180_000 })
+}, { model })

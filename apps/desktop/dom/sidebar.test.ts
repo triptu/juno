@@ -115,7 +115,7 @@ domTest('shows sidebar rows and unread people, filters and clears the list, keep
     await postgres.expectFocused()
     await postgres.expectSelected(false)
   })
-}, { timeout: 90_000 })
+})
 
 async function initialRows(juno: Juno): Promise<void> {
   const { sidebar } = juno

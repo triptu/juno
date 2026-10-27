@@ -87,4 +87,4 @@ domTest('a move restores the chat and pending cards for review', async ({ juno, 
   } finally {
     await rm(shared, { recursive: true, force: true })
   }
-}, { model, engine: { backupIntervalMs: 1_000 }, timeout: 180_000 })
+}, { model, engine: { backupIntervalMs: 1_000 } })

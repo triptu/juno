@@ -33,7 +33,8 @@ it('starts no work pass at rest, and one action pass per retry while an edit bac
     clock: time.clock,
     timing: { retryBaseMillis: productionTiming.retryBaseMillis, retryCapMillis: productionTiming.retryCapMillis, socketPingMillis: 86_400_000, socketPongTimeoutMillis: 86_400_000 },
   })
-  // Steps of engine time, each followed by a moment of live time for the fake's answers.
+  // Steps of engine time, each followed by a moment of live time for the fake's answers. At rest a step of 10 s still
+  // shows a worker that runs again at once or on a timer: either starts far more passes than AT_REST.
   const pass = async (millis: number, step: number) => {
     for (let elapsed = 0; elapsed < millis; elapsed += step) {
       await time.advance(step)
@@ -48,7 +49,7 @@ it('starts no work pass at rest, and one action pass per retry while an edit bac
     await time.freeze()
 
     const atRest = engine.passes()
-    await pass(10 * 60_000, 1_000)
+    await pass(10 * 60_000, 10_000)
     expect(sum(passesSince(engine, atRest)), 'passes in ten idle minutes').toBeLessThanOrEqual(AT_REST)
 
     // An error the client does not retry itself, so only the outbox backoff waits.
@@ -64,16 +65,16 @@ it('starts no work pass at rest, and one action pass per retry while an edit bac
     expect(passesSince(engine, waiting).action ?? 0, 'action passes while the first edit waits out its backoff').toBe(0)
 
     // Each edit fails after five tries, a backoff apart.
-    await pass(60_000, 100)
+    await pass(60_000, 250)
     const unfailed = () => readDb(engine, 'user.db', (db) => db.prepare(`SELECT count(*) AS n FROM outbox WHERE kind = 'edit' AND json_extract(payload_json, '$.failed') IS NULL`).get() as { n: number })
     await waitFor(() => (unfailed().n === 0 ? true : undefined), WAIT_MS, 'both edits given up')
     expect(passesSince(engine, waiting).action ?? 0, 'action passes for ten tries').toBeLessThanOrEqual(14)
 
     const afterFailure = engine.passes()
-    await pass(10 * 60_000, 1_000)
+    await pass(10 * 60_000, 10_000)
     expect(sum(passesSince(engine, afterFailure)), 'passes in ten idle minutes after the failures').toBeLessThanOrEqual(AT_REST)
   } finally {
     await stop(engine)
     await time.close()
   }
-}, 60_000)
+})

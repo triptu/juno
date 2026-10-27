@@ -11,8 +11,6 @@ import { savedTabs, threadId } from './driver/userDb'
 
 test.use({ freshContext: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'

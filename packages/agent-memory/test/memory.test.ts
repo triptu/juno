@@ -196,7 +196,7 @@ test('due order agrees with rollback push at every t from 0 through 20,000', () 
     }
     expect(lines.map(l => l.kind === 'node' ? l.node.ref.a : l.key.a), `t=${t}`).toEqual(starts);
   }
-}, 30000);
+});
 
 test('a whole tool result is sent in full up to its own limit, and paged past it', () => {
   const at = (text: string, whole?: boolean) => buildRequest({ rev: 1, gen: 1, pins: { revision: 0, active: [] }, lines: [], covered: 0, h: 0, cutoff: 2,

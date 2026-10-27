@@ -203,7 +203,7 @@ domTest('the chat while Juno works, when a run fails, when storage fails, offlin
   await step('Pause in Settings › Juno holds a message until Resume', () => pause(states))
 
   await step('a message over the size limit is marked too long, one at the limit is kept when request framing makes it too large, and neither reaches the model', () => overLimit(states))
-}, { model, timeout: 180_000 })
+}, { model })
 
 // Two relaunches in one test: an interrupted reply first, then records from a newer build, which leave the chat disabled.
 domTest('an interrupted reply keeps the owner message and Try again answers it once, and records newer than this build show Update needed', async ({ juno, model, relaunch, userData, step }) => {
@@ -243,4 +243,4 @@ domTest('an interrupted reply keeps the owner message and Try again answers it o
     await expect(chip).toHaveText(chatCopy.banner.updateNeeded.chip, { timeout: 30_000 })
     await expect(JunoChatPane.tab(later.win).composer).toBeDisabled()
   })
-}, { model, timeout: 180_000 })
+}, { model })

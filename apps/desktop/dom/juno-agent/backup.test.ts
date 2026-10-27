@@ -140,4 +140,4 @@ domTest('backup to a shared folder, export the phrase, restore on a second Mac, 
   } finally {
     await rm(shared, { recursive: true, force: true })
   }
-}, { model: () => startFakeOpenRouter({ answer }), engine: { deviceName: 'Studio', backupIntervalMs: BACKUP_INTERVAL_MS }, timeout: 180_000 })
+}, { model: () => startFakeOpenRouter({ answer }), engine: { deviceName: 'Studio', backupIntervalMs: BACKUP_INTERVAL_MS } })

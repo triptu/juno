@@ -79,4 +79,4 @@ it('Home is ready once DMs, mentions and unread followed threads have history, b
   } finally {
     unmount()
   }
-}, 60_000)
+})

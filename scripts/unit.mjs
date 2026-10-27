@@ -18,10 +18,15 @@ import { join, resolve } from 'node:path'
 import { unitTestMatcher } from './affected-tests.mjs'
 import { forwardSignals } from './remote/children.mjs'
 
-// The default test timeout. The preload's setDefaultTimeout reaches only the
-// first file a Bun process runs, so it is passed on the command line too.
-// A stress run (JUNO_STRESS, scripts/remote/workers.sh) scales it with the load it adds.
-const TIMEOUT_MS = 30_000 * Number(process.env.JUNO_STRESS_SCALE ?? 1)
+/**
+ * The default test timeout: the unit lane's limit on one test's time (packages/testing/src/limits.ts), scaled in a
+ * stress run. The preload's setDefaultTimeout reaches only the first file a Bun process runs, so it is passed on the
+ * command line too. Loaded only to run, since the tool tests copy `scripts/` without the packages.
+ */
+async function unitTimeout() {
+  const { limitScale, UNIT_LIMIT_MS } = await import('../packages/testing/src/limits.ts')
+  return UNIT_LIMIT_MS * limitScale()
+}
 
 const runsBunTest = (root, dir) => /^bun test\b/.test(JSON.parse(readFileSync(resolve(root, dir, 'package.json'), 'utf8')).scripts?.test ?? '')
 
@@ -33,11 +38,11 @@ function testRoot(root, dir) {
 }
 
 /** The `bun test` arguments for a run (every package, or the files after `--files`) and its order seed. */
-export function unitCommand(given, root, { workers = defaultWorkers() } = {}) {
+export function unitCommand(given, root, { workers = defaultWorkers(), timeout } = {}) {
   const { seed, rest } = takeSeed(given)
   const isolate = isolateFlag(rest)
   const args = rest.filter((arg) => arg !== '--isolate' && arg !== '--no-isolate' && arg !== '--randomize')
-  const run = (paths, extra, count) => ({ seed, args: ['test', `--parallel=${count}`, isolate, `--seed=${seed}`, `--timeout=${TIMEOUT_MS}`, ...extra, ...paths] })
+  const run = (paths, extra, count) => ({ seed, args: ['test', `--parallel=${count}`, isolate, `--seed=${seed}`, ...(timeout === undefined ? [] : [`--timeout=${timeout}`]), ...extra, ...paths] })
   const at = args.indexOf('--files')
   if (at === -1) {
     const { workspaces } = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
@@ -80,6 +85,15 @@ function isolateFlag(args) {
   return env === '1' ? '--isolate' : '--no-isolate'
 }
 
+/**
+ * The environment for `bun test`: this one without the variables by which Bun knows an agent runs it (`CLAUDECODE`,
+ * `AGENT`, `REPL_ID`), since then it prints only failing tests and a full run's record needs every test's time.
+ */
+export function bunTestEnv(env = process.env) {
+  const { CLAUDECODE: _claude, AGENT: _agent, REPL_ID: _repl, ...rest } = env
+  return rest
+}
+
 function defaultWorkers() {
   const workers = Number(process.env.JUNO_TEST_WORKERS ?? Math.max(1, Math.floor(availableParallelism() / 2)))
   if (!Number.isSafeInteger(workers) || workers < 1) throw new Error('JUNO_TEST_WORKERS must be a positive integer')
@@ -87,9 +101,9 @@ function defaultWorkers() {
 }
 
 if (import.meta.main) {
-  const { seed, args } = unitCommand(process.argv.slice(2), process.cwd())
+  const { seed, args } = unitCommand(process.argv.slice(2), process.cwd(), { timeout: await unitTimeout() })
   console.log(`unit: test order seed ${seed}; \`bun run test --seed ${seed}\` repeats it`)
-  const child = spawn('bun', args, { stdio: 'inherit' })
+  const child = spawn('bun', args, { stdio: 'inherit', env: bunTestEnv() })
   forwardSignals(new Set([child]))
   child.on('error', (error) => console.error(error.message))
   child.on('close', (code, signal) => { process.exitCode = signal ? 130 : code ?? 1 })

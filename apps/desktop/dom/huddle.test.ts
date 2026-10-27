@@ -139,7 +139,7 @@ domTest('start, mute, leave and join huddles; an incoming huddle rings, joins, d
     expect(durations.filter(([barTime, tabTime]) => barTime === null || barTime !== tabTime)).toEqual([])
     expect(ticked()).toBe(true)
   })
-}, { timeout: 150_000, tag: ['@heavy', '@heavy-huddle'] })
+}, { tag: ['@heavy', '@heavy-huddle'] })
 
 type Context = Pick<DomContext, 'juno' | 'fake'>
 

@@ -10,8 +10,6 @@ import { chart, chip, chips, paste } from './attach'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 const ENG_MAIN = '#eng'
 
 test('a pasted image goes with the message and shows in it at its final size', async ({ juno, fake }) => {

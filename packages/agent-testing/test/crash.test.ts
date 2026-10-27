@@ -3,12 +3,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, beforeEach, expect, it, setDefaultTimeout } from 'bun:test'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { CRASH_POINTS, crashAt, journalFiles, runAgent, snapshotFiles } from '../src/index'
-
-// Each test starts two to four agent processes that fsync SQLite. On a loaded machine a start has stalled
-// past 20 s; this leaves room for the harness's own 30 s limit, which reports the agent's stderr.
-setDefaultTimeout(40_000)
 
 const program = fileURLToPath(new URL('./fixtures/agent.ts', import.meta.url))
 let dir: string

@@ -15,6 +15,7 @@ const connection = (page: Page) => page.evaluate(() => (window as unknown as { _
 
 test('the web shell reads, sends and reacts through the engine socket, and its host rejects foreign origins', async ({ page, context }) => {
   // The host's start, and the first load, which transforms the renderer's modules in the host's Vite.
+  // Slow: builds and serves the web shell; the `web` project, not the browser or Electron lane.
   test.setTimeout(210_000)
   const shell = await launchWebShell()
   try {

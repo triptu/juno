@@ -1,7 +1,7 @@
 // Codemode for reads (docs/research/codemode.md), on the real engine with the scripted model:
 // a script reads Slack through the host, its child calls are audited and shown in Activity,
 // citations resolve, writes are refused, the caps hold, and Pause stops a running script.
-import { afterEach, expect, it, setDefaultTimeout } from 'bun:test'
+import { afterEach, expect, it } from 'bun:test'
 import { reply, startFakeNotion } from '@juno/agent-testing'
 import { createMcpManager, MCP_MIGRATIONS, mcpTools, NOTION, type McpManagerApi } from '../src/mcp'
 import type { HostReads } from '../src/index'
@@ -9,9 +9,6 @@ import { activityPage } from '../src/serve/pages'
 import { credentials } from './connections-harness'
 import { deferred, say, turnsHarness } from './turns-harness'
 import { searchPage } from './fixtures/search'
-
-// Each test opens the engine; a run takes under a second, but a loaded machine can stretch it past bun's 5 s.
-setDefaultTimeout(30_000)
 
 type Harness = Awaited<ReturnType<typeof turnsHarness>>
 const open: Harness[] = []

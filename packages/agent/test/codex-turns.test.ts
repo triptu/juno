@@ -1,16 +1,13 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it, setDefaultTimeout } from 'bun:test'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeProvider, startFakeCodex } from '@juno/agent-testing'
 import { createProviderGuard, openTurns } from '../src/index'
 import { defineTool } from '../src/request/tool'
 import { createJunoSettings } from '../src/settings/settings'
 import { modelPicker } from '../src/providers/picker'
 import { providerConnection } from '../src/providers/connection'
-
-// Each test starts the fake Codex as child processes, which a loaded machine slows.
-setDefaultTimeout(30_000)
 
 const cleanup: Array<() => Promise<void> | void> = []
 afterEach(async () => { for (const close of cleanup.splice(0).toReversed()) await close() })

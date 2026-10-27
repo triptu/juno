@@ -18,8 +18,6 @@ import { expect, test, type Fixtures } from './fixtures'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 180_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 
 type Json = Record<string, unknown>

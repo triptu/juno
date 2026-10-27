@@ -5,7 +5,6 @@ import { expect, test } from './fixtures'
 test.use({ synced: true })
 
 test('frequently used emoji survive a restart and an update from their first picker paint', async ({ juno, fake, relaunch }) => {
-  test.setTimeout(120_000)
   const used = JSON.stringify({
     eyes: 5, tada: 20, hello_juno: 30, '+1::skin-tone-3': 12, thumbsup: 10,
     missing_emoji: 100, deleted_custom: 90,

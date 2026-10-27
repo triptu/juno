@@ -114,7 +114,7 @@ domTest('adds a server, signs in, configures its tools, uses a read in chat, tur
   } finally {
     await mcp.close()
   }
-}, { model: () => startFakeOpenRouter({ answer }), timeout: 180_000 })
+}, { model: () => startFakeOpenRouter({ answer }) })
 
 async function offeredRows(juno: Juno, page: Query): Promise<void> {
   // Notion, Littlebird and T3 Code are offered as compact rows, off until connected; T3 Code is on this Mac.

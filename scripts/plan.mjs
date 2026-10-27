@@ -206,7 +206,9 @@ if (import.meta.main) {
       const desktopBeside = planned.some((lane) => lane[0]?.script === 'test:electron') && ['test:browser', 'test:electron'].includes(step.script)
       const laneEnv = appSuites.includes(step.script) ? { ...shared?.app, ...(desktopBeside ? shared?.desktop : {}) } : step.script === 'specs:check' ? shared?.specs : shared?.rest
       // JUNO_PLAN_STEP marks the step's processes for processCpu.
-      const child = spawn(command[0], command[1], { detached: guarded && process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(index) } })
+      // A lane at the lower priority gets the CPU the app lane leaves, and twice its tests' limit (@juno/testing/limits).
+      const beside = low ? { JUNO_TEST_TIME_SCALE: '2' } : {}
+      const child = spawn(command[0], command[1], { detached: guarded && process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...beside, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(index) } })
       children.add(child)
       const prefix = `[${step.script}] `
       console.log(`${prefix}juno-runtime: ${JSON.stringify(identity)}`)

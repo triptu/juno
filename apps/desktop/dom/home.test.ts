@@ -123,7 +123,7 @@ domTest('Home shows what waits from the sidebar, each row opens its topic, and a
     .poll(async () => {
       await freshHome(juno, OFFSITE)
       return home.meta('waiting').textContent()
-    }, { timeout: 30_000 })
+    })
     .toMatch(/^Maya /)
 }, { ...AI, clock: true })
 

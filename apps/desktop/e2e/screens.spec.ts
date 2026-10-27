@@ -11,6 +11,7 @@ const screens = resolve(__dirname, '../../../docs/design/screens')
 test.skip(process.env['JUNO_SCREENS'] !== '1', 'set JUNO_SCREENS=1 to write the design screenshots')
 
 test('the sidebar, light and dark', async ({ juno, win }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -32,6 +33,7 @@ test('the sidebar, light and dark', async ({ juno, win }) => {
 })
 
 test('sidebar views: the pill row with views, a mention dot and the view sheet, light and dark', async ({ juno, win, fake }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(180_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -59,6 +61,7 @@ test('sidebar views: the pill row with views, a mention dot and the view sheet, 
 })
 
 test('peek, light and dark', async ({ juno, win }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -80,6 +83,7 @@ test('peek, light and dark', async ({ juno, win }) => {
 })
 
 test('Home writing to a destination, with the destination list open, light and dark', async ({ juno, win }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -102,6 +106,7 @@ test('Home writing to a destination, with the destination list open, light and d
 })
 
 test('the topic header over a thread and a Main, light and dark', async ({ juno, win }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -126,6 +131,7 @@ test('the topic header over a thread and a Main, light and dark', async ({ juno,
 })
 
 test('sending in a Main: a failed send, a send on its way and a draft, light and dark', async ({ juno, win, fake }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -153,6 +159,7 @@ test('sending in a Main: a failed send, a send on its way and a draft, light and
 })
 
 test('the checks on send: the wrong-place bar, the clarity bar and the audience line, light and dark', async ({ juno, win }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(180_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -188,6 +195,7 @@ test('the checks on send: the wrong-place bar, the clarity bar and the audience 
 })
 
 test('All topics, light and dark', async ({ juno, win }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()

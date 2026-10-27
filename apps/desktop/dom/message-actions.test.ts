@@ -57,7 +57,7 @@ domTest('edits, deletes, reacts, quotes and opens threads from Main', async ({ j
   await step('Quote puts the message in the composer as "> " lines; a selection quotes only itself', () => quoteMessage(context))
   await step('Edit and Delete from the menus, and Edit after the message changed elsewhere', () => menuActions(context))
   await step('Open thread and Start thread from Main open the message’s thread, and ⌘-click opens it in a background tab', () => threads(context))
-}, { timeout: 120_000 })
+})
 
 async function keyboardActions({ juno, fake, step }: Context): Promise<void> {
   await juno.topic.composer.fill('')

@@ -37,6 +37,7 @@ fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:proces
 if (suite === 'install') { fs.writeFileSync('installed', 'yes'); if (!fs.existsSync('node_modules')) fs.symlinkSync(${JSON.stringify(resolve(import.meta.dirname, '../node_modules'))}, 'node_modules', 'dir'); process.exit(0); }
 if (!fs.existsSync('installed')) process.exit(9);
 console.log('fixture '+suite);
+if (suite === 'test') console.log('packages/fixture/test/slow.test.ts:\\n(pass) a journey > reaches the end [4321.50ms]');
 const counts = { walked: 1, reused: { 'an earlier run': 1 }, sampled: 0, missed: [] };
 if (suite === 'test:gallery') console.log('juno-gallery-walk: ' + JSON.stringify({ uncached: process.env.GALLERY_SHIFT_ALL === '1', sample: process.env.GALLERY_SAMPLE ? { seed: process.env.GALLERY_SAMPLE, share: 0.05 } : null, states: counts, tests: counts }));
 if (process.env.JUNO_VERIFY_POLICY === '1') console.log('juno-test: ' + JSON.stringify({failure: suite === process.env.TEST_FAIL_SUITE}));
@@ -81,6 +82,9 @@ test('local runs archive eligible records and preserve failed suites; an unreach
     assert.equal(summary.passed, !failing)
     assert.deepEqual(summary.suites.filter((s) => summary.required.includes(s.suite)).map((s) => s.suite).toSorted(), ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop'].toSorted())
     assert.ok(summary.suites.every((s) => s.host === hostname()))
+    // bun test's lanes keep every test's time from their log, and the summary lists each lane's slowest.
+    assert.deepEqual(summary.suites.find((s) => s.suite === 'test').times, [{ file: 'packages/fixture/test/slow.test.ts', title: 'a journey > reaches the end', seconds: 4.322 }])
+    assert.match(readFileSync(join(root, '.juno-status/verify-main.md'), 'utf8'), /## Slowest tests\n\ntest:\n\n- 4\.3 s packages\/fixture\/test\/slow\.test\.ts: a journey > reaches the end\n/)
     const calls = readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse)
     const desktop = calls.find((c) => c.suite === 'test:desktop')
     assert.equal(desktop.skip, '@mac')

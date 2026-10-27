@@ -119,7 +119,7 @@ domTest('with AI assist on, Mark done and Resolve all take their row away at onc
     // The kept topic is not suggested again until someone writes in it, and the resolved one is gone.
     expect(await freshHome(juno)).not.toContain('tidyUp')
   })
-}, { synced: false, engine: { aiJobs: true }, timeout: 150_000 })
+}, { synced: false, engine: { aiJobs: true } })
 
 domTest('⌘T during the first sync opens a usable Home, and a new item shows while Home is on screen but waits while the pointer is over the rows', async ({ juno, fake, slack, step }) => {
   await step('⌘T during the first sync opens a usable Home, each with its own draft', async () => {

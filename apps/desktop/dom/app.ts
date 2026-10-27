@@ -13,6 +13,7 @@ import type { Window } from 'happy-dom'
 import { startFakeSlack, type FakeSlack, type FakeSlackOptions } from '@juno/fake-slack'
 import { HostPool, type TestHost } from '../e2e/browser/host'
 import { copySnapshot, matchingFake, sharedSnapshot, snapshotKey, snapshotState, type SnapshotMade, type WebSnapshot } from '../e2e/browser/snapshotCache'
+import { seedKey, seedOption, type SyncedSeed } from '../e2e/seeds'
 import type { EngineOptions } from '../web/host/testHost'
 import type { WebTestSeam } from '../web/page/testSeam'
 import { PageClock } from './clock'
@@ -25,9 +26,10 @@ let pool: HostPool | undefined
 const hostPool = () => (pool ??= new HostPool(DOM_BUILD))
 
 /** Loads the worker's first host and compiles the renderer, while it waits for the synced snapshot. */
-export function warmWorker(): void {
-  hostPool().warm()
+export async function warmWorker(): Promise<void> {
+  const host = hostPool().warm()
   warmRenderer()
+  await host
 }
 
 /** Ends the worker's hosts, so each writes its CPU profile (`profile.ts`). */
@@ -149,9 +151,9 @@ export class DomApp {
 /** Signs in through the page and waits for the first sync, for a snapshot. */
 type SignIn = (app: DomApp) => Promise<void>
 
-async function makeSnapshot(dir: string, signIn: SignIn): Promise<SnapshotMade> {
+async function makeSnapshot(dir: string, signIn: SignIn, seed: SyncedSeed): Promise<SnapshotMade> {
   const seedTime = Date.now()
-  const fake = await startFakeSlack({ seedTime })
+  const fake = await startFakeSlack({ seedTime, ...seedOption(seed) })
   try {
     const app = await within(DomApp.start(fake, dir), 15_000, 'snapshot: host start')
     try {
@@ -159,15 +161,15 @@ async function makeSnapshot(dir: string, signIn: SignIn): Promise<SnapshotMade> 
     } finally {
       await app.close()
     }
-    return { origin: new URL(fake.url).origin, seedTime, sessions: fake.sessions(), fakeState: snapshotState(fake) }
+    return { origin: new URL(fake.url).origin, seedTime, sessions: fake.sessions(), fakeState: snapshotState(fake), ...seedKey(seed) }
   } finally {
     await fake.close()
   }
 }
 
-/** The DOM lane's synced snapshot, shared by every worker of the run (`sharedSnapshot`). */
-export async function domSnapshot(signIn: SignIn): Promise<WebSnapshot> {
-  return sharedSnapshot(`dom-${await snapshotKey(DOM_BUILD, DEFAULT_ENGINE)}`, (dir) => makeSnapshot(dir, signIn))
+/** The DOM lane's synced snapshot of a seed, shared by every worker of the run (`sharedSnapshot`). */
+export async function domSnapshot(signIn: SignIn, seed: SyncedSeed = 'default'): Promise<WebSnapshot> {
+  return sharedSnapshot(`dom-${await snapshotKey(DOM_BUILD, { ...DEFAULT_ENGINE, ...seedKey(seed) })}`, (dir) => makeSnapshot(dir, signIn, seed))
 }
 
 export interface Started {

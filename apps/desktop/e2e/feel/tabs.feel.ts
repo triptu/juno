@@ -1,31 +1,17 @@
 // Switching back to a scrolled tab, while it is still mounted and after it
 // was unmounted for being older than the 4 most recent (performance 4.3).
-import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { contentHoldsStill, firstFrameRight, neverBlank, noFlicker, noLayoutShift, switchesOnce } from './checks'
 import { expect, test as base } from './feel'
 import { edgeKey, header, paneRegions, topEdgeNow, topicProbes } from './pane'
 import type { Probe, ProbeFrame } from './recorder'
 
-const test = base.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
-    const fake = await startFakeSlack({
-      seed: (workspace, avatars) => {
-        seedWorkspace(workspace, avatars)
-        topic300Seed()(workspace, avatars)
-      },
-    })
-    await use(fake)
-    await fake.close()
-  },
-})
+// A synced start on the topic300 seed beside the default one.
+const test = base.extend({ synced: true, syncedSeed: 'withTopic300' })
 
 const THREAD = 'Review the rollout checklist 1'
 const OTHERS = ['Draft plan is in the doc', 'Rina finished the onsite.', 'Proposal: cut offline mode and public', 'Can eng take the Wednesday afternoon']
 
 test('switching back to a scrolled tab restores it before the first paint', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, feel }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(THREAD).open()
   await juno.topic.expectAtBottom()
   await juno.topic.scrollUp(2_500)

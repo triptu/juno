@@ -56,6 +56,7 @@ function expectMemory(samples: ReadonlyArray<ReadonlyArray<Reading>>): void {
 
 /** A small real-process walk, the body of the idle test in idle-cpu.spec.ts. App diagnostics remain the primary evidence for idle spins in the field. */
 export async function idleJourney(): Promise<void> {
+  // Slow: the idle walk measures over performance.md's 20 s windows; on demand only (JUNO_ON_DEMAND=1).
   test.setTimeout(90_000)
   const fake = await startFakeSlack({ seed: largeSeed({ topics: 200, messages: 2_000, users: 80, channels: { public: 12, private: 4, dms: 8, mpims: 4 } }) })
   const model = await startFakeOpenRouter({ answer })

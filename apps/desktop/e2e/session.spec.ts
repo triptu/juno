@@ -131,7 +131,6 @@ test('a relaunch whose session Slack no longer accepts shows "Slack signed you o
 
 // macOS has not been asked about notifications yet, and the user says no when it asks.
 test('sign-in: the preload and a second launch, importing the Slack app’s session, a relaunch that opens on the shell, signing out, and Slack expiring the session', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
-  test.setTimeout(120_000)
   const options: LaunchOptions = { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, notificationInitial: 'notDetermined', notificationResponse: 'denied' }
   const first = await launchApp(userData, options)
   try {

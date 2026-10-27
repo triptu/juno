@@ -35,4 +35,4 @@ domTest('after sign-in, Set up Juno takes an OpenRouter key and the default mode
   await chat.send('what is on today?')
   await chat.expectJuno('You said: what is on today?')
   expect(model.requests.at(-1)?.key).toBe(KEY)
-}, { synced: false, model: () => startFakeOpenRouter({ answer }), engine: { agent: false }, timeout: 90_000 })
+}, { synced: false, model: () => startFakeOpenRouter({ answer }), engine: { agent: false } })

@@ -141,11 +141,12 @@ it('Use Juno’s hours writes nothing when Slack holds them; a change made in Sl
   })
 })
 
-it('hours saved by an older version load; Saturday reaches Slack as a custom day, Weekdays sets all five, and the Active in Slack rows set presence by the day', async () => {
+it('hours saved by an older version load; Saturday reaches Slack as a custom day, Weekdays sets all five, and the Active in Slack rows set presence by the day and show the owner active at once', async () => {
   // Presence follows the local day and time, so the engine reads noon whenever the test runs.
   const noon = localNoon()
   const engine = await synced({ clock: clockAt(noon) })
   const rowOf = (day: number): HoursGroup => (day === 6 ? 'saturday' : day === 0 ? 'sunday' : 'weekdays')
+  const today = new Date(noon).getDay()
 
   await step('hours saved before the rows, Monday to Thursday with one from and to, load as they were', async () => {
     const old = { notificationHours: { days: [1, 2, 3, 4], from: 600, to: 1020 }, presenceHours: { days: [1, 2, 3, 4, 5], from: 540, to: 1140 }, channels: {}, people: {} } as const
@@ -181,7 +182,6 @@ it('hours saved by an older version load; Saturday reaches Slack as a custom day
   await step('the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async () => {
     const status = (predicate: (value: NotificationStatus) => boolean, label: string) =>
       liveUntil<NotificationStatus, NotificationStatus>(engine, liveQuery(notificationsStatus)(undefined), (value) => (predicate(value) ? value : undefined), label)
-    const today = new Date(noon).getDay()
     await setRow(engine, 'presence', rowOf(today), { from: 660, to: 780 })
     expect((await status((value) => value.presence === 'active', 'active by today\'s row')).presenceLabel).toMatch(/^Active/)
     // Every row off but the weekend day that is not today, 11am to 2pm.
@@ -191,5 +191,11 @@ it('hours saved by an older version load; Saturday reaches Slack as a custom day
     const away = await status((value) => value.presence === 'away', 'away by the rows')
     expect(away.presenceLabel).toMatch(new RegExp(`^Away until (tomorrow|${weekend === 'saturday' ? 'Sat' : 'Sun'}) 11am`))
     expect(apiSince(engine, 'presence.set', since).map((call) => call.args['presence'])).toEqual(['away'])
+  })
+
+  await step('main says the owner is at the Mac while the rows keep them away; when today\'s row takes them in, Slack shows them active without waiting for main\'s next reading', async () => {
+    engine.main.host.deliver({ _tag: 'active' })
+    await setRow(engine, 'presence', rowOf(today), { from: 660, to: 780 })
+    await waitFor(() => (engine.fake.selfPresence() === 'active' ? true : undefined), WAIT_MS, 'Slack shows the owner active')
   })
 })

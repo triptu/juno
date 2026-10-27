@@ -283,25 +283,51 @@ export function checkToolchain(line, { live, expected, reused }) {
 export function fileResults(log, tests) {
   const failing = new Set()
   const seconds = {}
-  const add = (file, value) => { seconds[file] = (seconds[file] ?? 0) + value }
-  if (tests?.cases) {
-    for (const test of tests.cases.filter((item) => item.file)) {
-      add(test.file, (test.durationMs ?? 0) / 1000)
-      if (test.outcome === 'unexpected' || test.attempts?.some((run) => run.status === 'interrupted')) failing.add(test.file)
-    }
-    return { failing, seconds }
+  for (const test of testTimes(log, tests)) {
+    seconds[test.file] = (seconds[test.file] ?? 0) + test.seconds
+    if (test.failed) failing.add(test.file)
   }
+  return { failing, seconds }
+}
+
+/**
+ * Every test a lane's run reports, with its file, title, seconds and whether it failed: from Playwright's structured
+ * results, or from bun test's `(pass)` and `(fail)` lines (bun prints those only when it does not see an agent's
+ * environment, so `scripts/unit.mjs` and `dom-tests.mjs` leave that out).
+ */
+export function testTimes(log, tests) {
+  if (tests?.cases) {
+    return tests.cases.filter((item) => item.file).map((test) => ({ file: test.file, title: test.title, seconds: Math.round(test.durationMs ?? 0) / 1000,
+      failed: test.outcome === 'unexpected' || test.attempts?.some((run) => run.status === 'interrupted') }))
+  }
+  const found = []
   let current
   for (const line of log.split('\n')) {
     if (/^\d+ tests? failed:$/.test(line)) break
     const header = /^(?:\.\/)?((?:apps|packages|dom)\/\S+\.test\.[cm]?[jt]sx?):$/.exec(line)
     if (header) current = header[1].startsWith('dom/') ? `apps/desktop/${header[1]}` : header[1]
-    const result = current && /^\((pass|fail)\) .*?(?: \[([\d.]+)(ms|s)\])?$/.exec(line)
+    const result = current && /^\((pass|fail)\) (.*?)(?: \[([\d.]+)(ms|s)\])?$/.exec(line)
     if (!result) continue
-    if (result[1] === 'fail') failing.add(current)
-    add(current, result[2] ? Number(result[2]) / (result[3] === 'ms' ? 1000 : 1) : 0)
+    found.push({ file: current, title: result[2], seconds: result[3] ? Math.round(Number(result[3]) * (result[4] === 'ms' ? 1 : 1000)) / 1000 : 0, failed: result[1] === 'fail' })
   }
-  return { failing, seconds }
+  return found
+}
+
+/** The lanes run by bun test, whose only results are their log lines. */
+const bunLanes = new Set(['test', 'test:dom'])
+
+/** For a bun test lane, every test's time for its record (Playwright's cases keep their own); otherwise undefined. */
+export function bunLaneTimes(suite, log, tests) {
+  if (tests?.cases || !bunLanes.has(suite)) return undefined
+  return testTimes(log).map(({ failed, ...test }) => (failed ? { ...test, failed } : test))
+}
+
+/** The summary's slowest ten tests of each lane that ran tests in this run. */
+export function slowestSection(suites) {
+  const lanes = suites.map((suite) => ({ suite: suite.suite, times: suite.times ?? testTimes('', suite.tests) })).filter((lane) => lane.times.length > 0)
+  if (lanes.length === 0) return []
+  const line = (test) => `- ${test.seconds.toFixed(1)} s ${test.file}: ${test.title}${test.failed ? ' (failed)' : ''}`
+  return ['', '## Slowest tests', '', ...lanes.flatMap((lane) => [`${lane.suite}:`, '', ...lane.times.toSorted((a, b) => b.seconds - a.seconds).slice(0, 10).map(line), ''])]
 }
 
 /** A lane's files with each file that ran timed, for sizing later runs (`runShare`). */

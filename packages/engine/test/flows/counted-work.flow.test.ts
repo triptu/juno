@@ -169,7 +169,8 @@ it('the sidebar of 300 conversations reads its window, not the workspace', async
     }, () => rowsOf(engine).some((row) => row.preview.text === 'Counting one live message'))
     expectWork('large sidebar live message', counts(sql), { statements: 56, rows: 681 }, detail(sql))
   })
-})
+// Slow: its setup is a first sync of all 300 conversations, which the counts need; CPU, not a wait (2 s on a Mac, 4 to 5 s in the laptop's full run).
+}, 10_000)
 
 it('a warm start re-indexes only the topics whose inputs changed', async () => {
   // A relaunch on a copy of a first sync's folder, against the same fake. The shared template (`synced.ts`) gets a fake

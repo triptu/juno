@@ -161,4 +161,4 @@ domTest('an old unapproved card expires, and Ask again creates a fresh card with
   await expect(card(pane, 'sendMessage')).toHaveCount(2)
   await expect(card(pane, 'sendMessage').last()).toHaveAttribute('data-card-status', 'open')
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
-}, { model, timeout: 150_000 })
+}, { model })
