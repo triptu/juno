@@ -39,6 +39,9 @@ test.use({ synced: true })
 
 const point = 'restore.swapped'
 
+// Slow: two apps, a backup, a move and an agent killed during the restore and started again.
+test.describe.configure({ timeout: 60_000 })
+
 const lastBackupAt = async (juno: Juno) => Number((await juno.win.locator('main [data-last-backup]').getAttribute('data-last-backup')) || 0)
 
 test(`backup to a shared folder, export the phrase, move to a second Mac whose agent dies at ${point}, review the restored chat and pending card, and the first Mac turns read-only`, { tag: ['@heavy', '@heavy-crash'] }, async ({ juno, fake, otherApp, shared }) => {

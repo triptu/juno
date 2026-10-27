@@ -21,6 +21,9 @@ const DIVIDER_OFFSET = 148
 const FILE_DELAY_MS = 1_200
 
 test('a long thread with late images', { tag: ['@heavy', '@heavy-feel'] }, async ({ juno, slack, win, feel }) => {
+  // Slow: a feel scenario that signs in to the 300-message thread (its first open is what it films) and films six
+  // runs, with 8 s of waits they need: images 1.2 s late, the settles, and two wheel gestures.
+  test.setTimeout(45_000)
   await juno.signIn()
   await juno.waitForSync()
   slack.fake.delayFiles({ ms: FILE_DELAY_MS })
