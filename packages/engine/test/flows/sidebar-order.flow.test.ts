@@ -149,7 +149,8 @@ it('during a catch-up an own send that is refused or deleted moves its row back,
     fake.holdNext({ method: 'chat.postMessage', before: true })
     valueOf(await sendMessage(registry, { kind: 'channel', channelId: channel }, 'Holding the channel'))
     valueOf(await sendMessage(registry, { kind: 'channel', channelId: channel, threadTs }, 'Taking this back'))
-    await waitFor(() => recent()[0] === thread || undefined, WAIT_MS, 'the reply moving its thread up')
+    // Both posts can be queued in one millisecond, so the thread and its channel's Main may tie at the top.
+    await waitFor(() => recent().filter((id) => id !== main)[0] === thread || undefined, WAIT_MS, 'the reply moving its thread up')
     const reply = pending('Taking this back')!
     expect(reply.state).toBe('queued')
     valueOf(await deleteMessage(registry, { channelId: channel, ts: `pending:${reply.id}`, clientMsgId: reply.id }))
