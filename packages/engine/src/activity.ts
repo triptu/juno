@@ -7,11 +7,14 @@
  * On each one, and when the socket connects within 20 s of one, the running
  * session sends a socket `tickle`, which `SlackSocket` paces to one per 19 s, as the
  * official client does. Nothing is sent while the owner's presence is away
- * (Set yourself away, or outside active hours), so Slack keeps them away.
+ * (Set yourself away, or outside active hours), so Slack keeps them away. When
+ * it stops being away (Set yourself active, or the active hours start or are
+ * changed to include now), main's last reading tickles at once, rather than
+ * Slack hearing at main's next one.
  * When the Mac goes idle the tickles stop and Slack's own timeout shows the
  * owner away; when Juno quits, the socket closes.
  */
-import { Clock, Context, Effect, Layer, Stream, SubscriptionRef } from 'effect'
+import { Clock, Context, Effect, Layer, Option, Stream, SubscriptionRef } from 'effect'
 import { SlackSocket } from '@juno/slack'
 import { NotificationControl } from './notificationRuntime'
 import { HostLink } from './protocol/host'
@@ -48,6 +51,8 @@ const sessionActivity = (lastActiveAt: SubscriptionRef.SubscriptionRef<number | 
     yield* socket.tickle('polling')
   })
   yield* Effect.forkScoped(Stream.runForEach(SubscriptionRef.changes(lastActiveAt), () => tickle))
+  yield* Effect.forkScoped(Stream.runForEach(Stream.zipWithPrevious(control.presence), ([before, now]) =>
+    Option.getOrUndefined(before) === 'away' && now !== undefined && now !== 'away' ? tickle : Effect.void))
   // `Overflowed` needs nothing: the next `active` from main tickles anyway.
   return (input) => input._tag === 'Connected' ? tickle : Effect.void
 })
