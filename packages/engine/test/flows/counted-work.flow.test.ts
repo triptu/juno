@@ -16,7 +16,7 @@ import type { MessageView, TopicRow } from '@juno/contract'
 import { controlledClock, noTicks } from '../controlledClock'
 import { startTestEngine, WAIT_MS, waitFor, type RunningEngine } from '../harness'
 import { mutationSeed } from '../mutationSeed'
-import { bootedEngine, quiet, tsOf, valueOf } from '../scenario'
+import { bootedEngine, DAY, quiet, tsOf, valueOf } from '../scenario'
 import { countSql, statementsSoFar, type SqlWork } from '../sqlWork'
 import { step } from '../step'
 import { syncedEngine } from '../synced'
@@ -184,7 +184,10 @@ it('a warm start re-indexes only the topics whose inputs changed', async () => {
   await cp(first.userData, copy, { recursive: true })
   await rm(first.userData, { recursive: true, force: true })
   const { sql } = await countSql(async () => {
-    const engine = await startTestEngine({ timing: noTicks, reuse: { userData: copy, fake: first.fake, credentials: { ...first.fake.sessions()[0]!, url: first.fake.url } } })
+    // Automated and the Slack schedule each run a pass a moment after the boot's writes, which used to land before
+    // `quiet` returned on a slow machine and after it on a fast one (805 to 816 statements). Here they wait for no
+    // timer and each runs once, below, inside the count.
+    const engine = await startTestEngine({ timing: { ...noTicks, automatedWindowMillis: DAY, slackScheduleDebounceMillis: DAY }, reuse: { userData: copy, fake: first.fake, credentials: { ...first.fake.sessions()[0]!, url: first.fake.url } } })
     engines.push({ ...engine, stop: async () => {
       await engine.stop()
       await first.fake.close()
@@ -193,7 +196,9 @@ it('a warm start re-indexes only the topics whose inputs changed', async () => {
     await engine.status('ready')
     await engine.phase('live')
     await quiet(engine)
+    await engine.workPass('automated')
+    await engine.workPass('slackSchedule')
     return engine
   }, (engine) => engine.userData)
-  expectWork('warm start', counts(sql), { statements: 815, rows: 950 }, detail(sql))
+  expectWork('warm start', counts(sql), { statements: 892, rows: 981 }, detail(sql))
 })
