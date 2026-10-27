@@ -1,5 +1,7 @@
 export * from './ids'
 export * from './channel'
+export * from './channelName'
+export * from './channelRights'
 export * from './topic'
 export * from './status'
 export * from './title'

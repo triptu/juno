@@ -254,6 +254,8 @@ export const UndoCommand = Schema.Union([
   // A follow-up or a draft from Home's reviews, put back as stored.
   Schema.TaggedStruct('followUps.restore', FollowUpRestore.fields),
   Schema.TaggedStruct('drafts.restore', DraftRestore.fields),
+  // A channel's rename and member changes, put back (`channels.edit` with the old name and the opposite changes).
+  Schema.TaggedStruct('channels.edit', { channel: Schema.String, name: Schema.optionalKey(Schema.String), add: Schema.Array(Schema.String), remove: Schema.Array(Schema.String) }),
 ])
 export type UndoCommand = typeof UndoCommand.Type
 
