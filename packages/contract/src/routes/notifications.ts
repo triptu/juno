@@ -23,8 +23,9 @@
  *   when one is added, whether it is really a rule about one person or
  *   channel.
  * - `notifications.setHuddleRing` is Ring for huddles (SPEC 20).
- * - `notifications.setPresence` is Set yourself away or active. It holds
- *   until the next switch in the active hours.
+ * - `notifications.setPresence` is Set yourself away or active. It shows at
+ *   once and holds until the next switch in the active hours; `sent` is
+ *   false when Slack refused it and the presence before came back.
  * - `notifications.useJunoHours` writes the notification hours to Slack's
  *   schedule again after it was changed in Slack.
  */
@@ -264,7 +265,7 @@ export const notificationsSetLevel = Rpc.make('notifications.setLevel', {
 
 export const notificationsSetPresence = Rpc.make('notifications.setPresence', {
   payload: { presence: PresenceValue },
-  success: Schema.Void,
+  success: Schema.Struct({ sent: Schema.Boolean }),
   error: NotSignedIn,
 })
 

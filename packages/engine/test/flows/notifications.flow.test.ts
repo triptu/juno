@@ -130,14 +130,14 @@ itEffect('decides with the settings read after the reading, and a later settings
   expect(record.shown).toHaveLength(0)
 }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer))))
 
-itEffect('with AI assist off, held messages stay held, and presence follows the hours and the owner through Slack', () => Effect.gen(function* () {
+itEffect('with AI assist off, held messages stay held, and presence follows the hours, the owner through Slack, and a choice by hand until the next switch', () => Effect.gen(function* () {
   const fake = yield* fakeSlack
   yield* Effect.gen(function* () {
     yield* TestClock.setTime(monday(8))
     yield* setSettings()
     yield* transaction(prefs.set('aiAssist', false))
     const api = yield* SlackApi
-    const setPresence = (presence: 'active' | 'away') => api.call('presence.set', { presence }).pipe(Effect.as(true), Effect.orDie)
+    const setPresence = (presence: 'active' | 'away') => api.call('presence.set', { presence }).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
     const record = recorder()
     const service = yield* makeNotifications(record.notifier, setPresence)
     yield* service.wake
@@ -145,11 +145,12 @@ itEffect('with AI assist off, held messages stay held, and presence follows the 
     yield* TestClock.setTime(monday(9))
     yield* service.tick
     expect(record.shown).toHaveLength(0)
+    // Away set in Slack holds as one set in Juno: a wake says it again, and the end of the hours takes over.
     yield* service.observePresence('away')
     yield* service.tick
     expect(yield* service.currentPresence).toBe('away')
     yield* service.wake
-    expect(yield* service.currentPresence).toBe('active')
+    expect(yield* service.currentPresence).toBe('away')
     yield* TestClock.setTime(monday(19))
     yield* service.tick
     expect(yield* service.currentPresence).toBe('away')
@@ -158,7 +159,26 @@ itEffect('with AI assist off, held messages stay held, and presence follows the 
     yield* fresh.setPresence('active')
     yield* fresh.tick
     expect(yield* fresh.currentPresence).toBe('active')
-    expect(fake.callCount('presence.set')).toBe(5)
+    expect(fake.callCount('presence.set')).toBe(4)
+    // Away by hand inside the hours holds through a wake and a new session, which say it again, until the hours end.
+    yield* TestClock.setTime(new Date(2026, 9, 13, 10).getTime())
+    yield* fresh.tick
+    yield* fresh.setPresence('away')
+    yield* fresh.wake
+    expect(yield* fresh.currentPresence).toBe('away')
+    const restarted = yield* makeNotifications(record.notifier, setPresence)
+    yield* restarted.tick
+    expect(yield* restarted.currentPresence).toBe('away')
+    yield* TestClock.setTime(new Date(2026, 9, 14, 9).getTime())
+    yield* restarted.tick
+    expect(yield* restarted.currentPresence).toBe('active')
+    // A choice Slack refuses shows the presence before again and holds nothing: a wake applies the hours.
+    fake.forceError({ method: 'presence.set', error: 'invalid_presence' })
+    expect(yield* restarted.setPresence('away')).toBe(false)
+    expect(yield* restarted.currentPresence).toBe('active')
+    yield* restarted.wake
+    // Settled: each tick, wake and set above returned after its presence.set answered.
+    expect(fake.calls.filter((call) => call.method === 'presence.set').slice(4).map((call) => call.args['presence'])).toEqual(['away', 'away', 'away', 'active', 'away', 'active'])
   }).pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundMinIntervalMillis: 0 } })))
 }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer))))
 

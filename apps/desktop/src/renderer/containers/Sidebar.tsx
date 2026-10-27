@@ -132,7 +132,7 @@ export function Sidebar() {
     if (action === 'notifications') return openSettings('notifications')
     if (action === 'settings') return openSettings()
     if (action === 'privacy') return setPrivacy(!privacy)
-    setPresence(registry, presence?.active === false ? 'active' : 'away')
+    void setPresence(registry, presence?.active === false ? 'active' : 'away')
   }
 
   const toggleUnread = () => {

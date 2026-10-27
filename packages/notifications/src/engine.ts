@@ -1,10 +1,10 @@
 import { AiProvider, notificationReading, type NotificationReadingInput } from '@juno/ai'
-import { channelLabel, decideNotification, localTime, scheduledPresence, type Instruction, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
+import { channelLabel, decideNotification, localTime, nextSwitchTime, sameHours, scheduledPresence, type Instruction, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Semaphore, SubscriptionRef } from 'effect'
 import { exchangesWith, readConversation, type Conversation } from './conversation'
 import { Candidate, StoredReading, type Notifier } from './model'
-import { readSettings } from './settings'
+import { presenceHold, readSettings, type PresenceHold } from './settings'
 
 /** The reading waits this long; then the decision goes on without it. */
 const READING_MILLIS = 2000
@@ -42,10 +42,13 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   /** The Notifications page's Today and its Details read the log. */
   const logChanged = invalidation.invalidate(['notification_log'])
   const ai = yield* AiProvider
-  const settingsContext = yield* Effect.context<StoreReader>()
-  const configuration = readSettings.pipe(Effect.provide(settingsContext))
+  const storeContext = yield* Effect.context<StoreReader | StoreWriter | Invalidation>()
+  const configuration = readSettings.pipe(Effect.provide(storeContext))
   const lock = yield* Semaphore.make(1)
-  let scheduled: Presence | undefined
+  /** Presence has its own permit, so a choice by hand never waits behind a decision's reading. */
+  const presenceLock = yield* Semaphore.make(1)
+  /** What Juno last told Slack; undefined until it has, so each session applies presence once. */
+  let applied: Presence | undefined
   const current = yield* SubscriptionRef.make<Presence | undefined>(undefined)
 
   /** Stores the decision and, for a banner, claims and shows it. */
@@ -104,36 +107,76 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     yield* logChanged
   })
 
+  const readHold = presenceHold.read.pipe(Effect.provide(storeContext))
+  const writeHold = (hold: PresenceHold | undefined) => presenceHold.write(hold).pipe(Effect.provide(storeContext))
+
+  /** Holds `value` until the next switch in the active hours. */
+  const hold = (value: Presence) => Effect.gen(function* () {
+    const { settings } = yield* configuration
+    const now = yield* Clock.currentTimeMillis
+    yield* writeHold({ presence: value, until: nextSwitchTime(now, settings.presenceHours) ?? null, hours: settings.presenceHours })
+  })
+
+  /** The choice by hand while it holds; one that ended, or whose active hours changed since, is removed. */
+  const heldPresence = (settings: NotificationSettings, now: number) => Effect.gen(function* () {
+    const saved = yield* readHold
+    if (saved === undefined) return undefined
+    if (sameHours(saved.hours, settings.presenceHours) && (saved.until === null || now < saved.until)) return saved.presence
+    yield* writeHold(undefined)
+    return undefined
+  })
+
+  /** Applies the choice by hand while it holds, else the active hours; `force` sends it even when unchanged. */
   const tick = (force: boolean) => Effect.gen(function* () {
     const { settings } = yield* configuration
-    const next = scheduledPresence(localTime(yield* Clock.currentTimeMillis), settings.presenceHours)
-    if (force || next !== scheduled) {
-      if (yield* setPresence(next)) {
-        scheduled = next
-        yield* SubscriptionRef.set(current, next)
-      }
+    const now = yield* Clock.currentTimeMillis
+    const next = (yield* heldPresence(settings, now)) ?? scheduledPresence(localTime(now), settings.presenceHours)
+    if (!force && next === applied) return
+    if (yield* setPresence(next)) {
+      applied = next
+      yield* SubscriptionRef.set(current, next)
     }
   })
 
   return {
     receive: (candidate: Candidate) => receive(candidate).pipe(lock.withPermit),
     /** The log is history: a settings change re-decides nothing already logged. It can move the presence schedule. */
-    settingsChanged: tick(false).pipe(lock.withPermit),
-    tick: tick(false).pipe(lock.withPermit),
-    wake: tick(true).pipe(lock.withPermit),
+    settingsChanged: tick(false).pipe(presenceLock.withPermit),
+    tick: tick(false).pipe(presenceLock.withPermit),
+    wake: tick(true).pipe(presenceLock.withPermit),
     currentPresence: SubscriptionRef.get(current),
     /** What Slack shows, once known, then every change. */
     presenceChanges: SubscriptionRef.changes(current),
-    observePresence: (value: Presence) => SubscriptionRef.set(current, value),
+    /**
+     * `manual_presence_change` for the owner. One Juno did not just send is a choice made in Slack, and holds as
+     * one made in Juno does. It waits for a set in flight, so that set's own echo is not taken for one.
+     */
+    observePresence: (value: Presence) => Effect.gen(function* () {
+      yield* SubscriptionRef.set(current, value)
+      if (value === applied) return
+      applied = value
+      yield* hold(value)
+    }).pipe(presenceLock.withPermit),
     /** Slack's value at boot (`client.userBoot` `self.manual_presence`), kept only while nothing newer is known: a set or an event wins. */
     seedPresence: (value: Presence) => SubscriptionRef.update(current, (known) => known ?? value),
+    /**
+     * Set yourself away or active. It shows at once, then holds until the next switch in the active hours,
+     * through a wake and a new session. When Slack refuses it, the presence before comes back. Whether Slack took it.
+     */
     setPresence: (value: Presence) => Effect.gen(function* () {
-      if (!(yield* setPresence(value))) return
-      yield* SubscriptionRef.set(current, value)
-      // A change by hand holds until the next switch, even when it comes before the first tick.
-      const { settings } = yield* configuration
-      scheduled = scheduledPresence(localTime(yield* Clock.currentTimeMillis), settings.presenceHours)
-    }).pipe(lock.withPermit),
+      const before = yield* SubscriptionRef.getAndSet(current, value)
+      return yield* Effect.gen(function* () {
+        const held = yield* readHold
+        yield* hold(value)
+        if (yield* setPresence(value)) {
+          applied = value
+          return true
+        }
+        yield* writeHold(held)
+        yield* SubscriptionRef.set(current, before)
+        return false
+      }).pipe(presenceLock.withPermit)
+    }),
   }
 })
 export type Notifications = Effect.Success<ReturnType<typeof makeNotifications>>

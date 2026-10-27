@@ -287,7 +287,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       'notifications.setPresence': ({ presence }) =>
         Effect.gen(function* () {
           if ((yield* workspace.current) === undefined) return yield* new NotSignedIn()
-          yield* control.setPresence(presence)
+          return { sent: yield* control.setPresence(presence) }
         }),
       'notifications.useJunoHours': () => inWorkspace(slackSchedule.useJunoHours.pipe(Effect.orDie)),
     }

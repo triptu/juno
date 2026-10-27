@@ -66,3 +66,24 @@ export const readSettings = Effect.gen(function* () {
   const aiAssist = (yield* prefs.get('aiAssist')) !== false
   return { settings, aiAssist }
 })
+
+/**
+ * Set yourself away or active (SPEC 14, "Away by hand"): what was chosen, until
+ * the next switch in the active hours it was chosen under (null when they never
+ * switch). Saved, so a wake or a new session keeps it rather than applying the
+ * hours over it.
+ */
+const PresenceHoldSchema = Schema.Struct({
+  presence: Schema.Literals(['active', 'away']),
+  until: Schema.NullOr(Schema.Number),
+  hours,
+})
+export type PresenceHold = typeof PresenceHoldSchema.Type
+
+const HOLD_PREF = 'presenceHold'
+const decodeHold = Schema.decodeUnknownOption(PresenceHoldSchema)
+
+export const presenceHold = {
+  read: Effect.map(prefs.get(HOLD_PREF), (raw) => Option.getOrUndefined(decodeHold(raw))),
+  write: (hold: PresenceHold | undefined) => prefs.set(HOLD_PREF, hold ?? null),
+}
