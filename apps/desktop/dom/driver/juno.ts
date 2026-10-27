@@ -230,6 +230,13 @@ export class Juno implements JunoVerbs {
     await this.tabs.close('Settings')
   }
 
+  /** Active in Slack hours around now and notification hours away from now, on every day, saved, and Settings closed: the hours keep the owner active while notifications are paused. */
+  async activeWhilePaused(): Promise<void> {
+    await this.#hoursNow(['Active in Slack'], {})
+    await this.#hoursNow(['Notifications'], { outside: true })
+    await this.tabs.close('Settings')
+  }
+
   async #hoursNow(sections: ReadonlyArray<HoursSection>, options: { readonly outside?: boolean }): Promise<void> {
     await this.openNotifications()
     const now = new this.dom.window.Date()
