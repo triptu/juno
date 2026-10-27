@@ -486,7 +486,7 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
       ['filesOnly', 'drainBound'], ['listsFail', 'drainBound'], ['behindClock', 'typedNeverLost', 'initBehind'], ['quitTyping', 'quitKeepsTyping'],
       ['copyTwice', 'copyKept'], ['staleAnswer', 'deletesOnlyOnClear'], ['refusedEdit', 'quietAgreement'], ['sameMillisList', 'drainBound'],
       ['lateEcho', 'sentStaysGone', 'initBehind'], ['manySends', 'sentStaysGone'], ['sentElsewhere', 'deletesOnlyOnClear'], ['filesHandsOff', 'deletesOnlyOnClear'],
-      ['lateSave', 'deletesOnlyOnClear'], ['refusedSend', 'quietAgreement'], ['retireSettles', 'retiredSettles'],
+      ['lateSave', 'deletesOnlyOnClear'], ['refusedSend', 'quietAgreement'], ['retireSettles', 'retiredSettles'], ['retryAfterEdit', 'typedNeverLost'],
     ]) {
       simulate('drafts', `${schedule}Step`, 'invariants', `drafts-${schedule}.itf.json`, false, false,
         { init, samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })

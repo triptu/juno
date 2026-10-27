@@ -118,7 +118,7 @@ module draftsProtocol {
     clearTime: bool, claimRead: bool, absenceRecheck: bool, liveFiles: bool, keepListing: bool,
     keepReplaced: bool, quitStores: bool, copyOnce: bool, freshAnswer: bool, refusalByGen: bool,
     listWhileOwed: bool, hideSent: bool, keepUnresolved: bool, sendAsksNothing: bool, filesHandsOff: bool,
-    clearOnly: bool, retireOnConfirm: bool
+    clearOnly: bool, retireOnConfirm: bool, refusalUnnames: bool
   }
   type State = {
     clock: int, skew: int, nextText: int, nextId: int, nextCmid: int, nextSeq: int,
@@ -128,8 +128,9 @@ module draftsProtocol {
     events: Set[Version], fetching: bool, fetchAt: int, fetched: Slot,
     absence: { on: bool, id: int, at: int },
     connected: bool, catchup: bool, connectedAt: int, listsLeft: int,
-    // A message posted from the draft, naming Slack's draft (0 for none).
-    posting: bool, postDraft: int, postAt: int,
+    // A message posted from the draft, naming Slack's draft (0 for none); a refused one waits for Retry
+    // (`failed`), with the draft a retry names, and when Slack refused it; `retried`: the post is a retry.
+    posting: bool, postDraft: int, postAt: int, failed: bool, failedDraft: int, failedAt: int, retried: bool,
     // The composer.
     focused: bool, typed: bool, field: int, unsaved: bool, behind: bool,
     sealed: bool, label: str,
@@ -156,7 +157,7 @@ module draftsProtocol {
     clearTime: true, claimRead: true, absenceRecheck: true, liveFiles: true, keepListing: true,
     keepReplaced: true, quitStores: true, copyOnce: true, freshAnswer: true, refusalByGen: true,
     listWhileOwed: true, hideSent: true, keepUnresolved: true, sendAsksNothing: true, filesHandsOff: true,
-    clearOnly: true, retireOnConfirm: true
+    clearOnly: true, retireOnConfirm: true, refusalUnnames: true
   }
   // Lists that may fail in a row before a sender without `keepListing` stops asking.
   pure val listTries = 2
@@ -176,7 +177,7 @@ module draftsProtocol {
         read: noRead, call: noCall, gone: Set(),
         events: Set(), fetching: false, fetchAt: 0, fetched: none, absence: noAbsence,
         connected: true, catchup: true, connectedAt: 3, listsLeft: listTries,
-        posting: false, postDraft: 0, postAt: 0,
+        posting: false, postDraft: 0, postAt: 0, failed: false, failedDraft: 0, failedAt: 0, retried: false,
         focused: false, typed: false, field: juno, unsaved: false, behind: false,
         sealed: false, label: "init",
         decidedAt: Map(), retiredAt: Map(), sentTexts: Set(), lost: Set(),
@@ -342,17 +343,21 @@ module draftsProtocol {
         row: if (not(r.sendAsksNothing) and l.id != 0 and not(named)) { ...s.row, on: true, gen: s.row.gen + 1, resave: false, quiet: false }
           else if (s.row.on and calls) { ...s.row, gen: s.row.gen + 1, resave: false, quiet: true }
           else { ...s.row, on: false },
-        posting: true, postDraft: if (named) l.id else 0, postAt: s.clock + 1, editedSinceStart: true, label: "send" }
+        posting: true, postDraft: if (named) l.id else 0, postAt: s.clock + 1, failed: false, retried: false, editedSinceStart: true, label: "send" }
     }
   }
   action send = sendWith(true, rules)
   // Slack takes the post and retires the draft it names (`draft_send`).
   action postLands = {
     val drops = s.postDraft != 0 and s.slack.id == s.postDraft
+    // A retry retired the draft as it was written after Slack refused the post: that text, or file, is gone.
+    val stale = drops and s.retried and s.slack.chosen > s.failedAt
     all {
       s.posting,
       s' = { ...s, clock: s.clock + 1, posting: false, postDraft: 0,
         slack: if (drops) none else s.slack,
+        lost: if (stale and s.slack.text != 0) s.lost.union(Set(s.slack.text)) else s.lost,
+        wrongWrite: s.wrongWrite or (stale and s.slack.files),
         // Slack retired the draft with the post: nothing from before the send may come back.
         retiredAt: if (drops) s.retiredAt.put(s.postDraft, s.postAt) else s.retiredAt,
         events: if (s.connected and drops) s.events.union(Set({ id: s.postDraft, text: 0, stamp: s.clock + 1, deleted: true, files: false, chosen: s.clock + 1, cmid: s.slack.cmid })) else s.events,
@@ -361,17 +366,27 @@ module draftsProtocol {
   }
   // Slack refuses the post: its draft was not retired, and is the place's
   // draft as Juno last saw it; deleting the failed message changes nothing.
+  // The post waits for Retry and no longer names the draft, which Juno may
+  // write to meanwhile; without `refusalUnnames` a retry names it still.
   // Without `retireOnConfirm` Juno links it again and counts it not gone, but
   // what came of it meanwhile was dropped.
-  action postRefusedWith(r: Rules): bool = all {
+  action postRefusedWith(r: Rules): bool = {
+    val failed = { ...s, posting: false, postDraft: 0, failed: true, failedDraft: if (r.refusalUnnames) 0 else s.postDraft, failedAt: s.clock }
+    all {
     not(s.sealed), s.posting,
-    s' = if (r.retireOnConfirm) { ...s, posting: false, postDraft: 0, label: "postRefused" }
-      else { ...s, posting: false, postDraft: 0,
+    s' = if (r.retireOnConfirm) { ...failed, label: "postRefused" }
+      else { ...failed,
         gone: s.gone.exclude(Set(s.postDraft)),
         local: if (s.postDraft != 0 and s.local.id == 0) { ...s.local, id: s.postDraft, seenAt: s.clock } else s.local,
         label: "postRefused" }
+    }
   }
   action postRefused = postRefusedWith(rules)
+  // Retry on the failed message: it goes again, naming the draft the refusal left it.
+  action retry = all {
+    not(s.sealed), s.failed, not(s.posting),
+    s' = { ...s, clock: s.clock + 1, failed: false, posting: true, postDraft: s.failedDraft, retried: true, label: "retry" }
+  }
 
   // Another device types in Slack's draft, attaches files to it, empties its
   // text keeping its files, or deletes it (clearing or sending it).
@@ -685,7 +700,7 @@ module draftsProtocol {
   action listOwed = all { s.catchup, startListAny }
   action work = any { read, claim, accept, respondAny, pause, blur, postLands, listOwed, finishList, applyAbsence, deliverAny, reconnect }
   action input = any {
-    typeText(false), typeText(true), focus, recover, send, sendWith(false, rules), postRefused, startListAny,
+    typeText(false), typeText(true), focus, recover, send, sendWith(false, rules), postRefused, retry, startListAny,
     phoneType, phoneAttach, phoneEmpty, phoneDelete, loseAny, refuseCall, failList, disconnect, quit, crash, seal,
   }
   action tick(a: bool): bool = all {
@@ -1195,6 +1210,33 @@ module draftsProtocol {
   )
   action retireSettlesStep = retireSettles(rules)
   action retireSettlesBugStep = retireSettles({ ...rules, retireOnConfirm: false })
+
+  // Juno sends the draft in its place and Slack refuses the post; the user
+  // types a new text, which Juno saves to the same draft, then retries the
+  // message. Without the refusal dropping the draft from the post, the retry
+  // retires the draft holding the new text.
+  action retryAfterEdit(r: Rules): bool = tick(
+    if (s.sealed) progress else
+    if (s.label == "init") startList else
+    if (s.label == "startList") finishList else
+    if (s.label == "finishList") focus else
+    if (s.label == "focus") typeText(false) else
+    if (s.label == "type") pause else
+    if (s.label == "store") read else
+    if (s.label == "read") claim else
+    if (s.label == "claim") accept else
+    if (s.label == "accept") respond else
+    if (s.label == "respond") deliver else
+    if (s.label == "deliver" and s.failed and s.events.size() == 0) retry else
+    if (s.label == "deliver" and s.sentTexts.size() == 0 and s.events.size() == 0) sendWith(true, r) else
+    if (s.label == "send") postRefusedWith(r) else
+    if (s.label == "postRefused") typeText(false) else
+    if (s.label == "retry") postLands else
+    if ((s.label == "postLands" or s.label == "deliver") and s.events.size() > 0) deliver else
+    seal
+  )
+  action retryAfterEditStep = retryAfterEdit(rules)
+  action retryAfterEditBugStep = retryAfterEdit({ ...rules, refusalUnnames: false })
 
   // The first run: Juno's old draft and a newer one in Slack for the same
   // place. Juno's create answers that the place has a draft; the list that
