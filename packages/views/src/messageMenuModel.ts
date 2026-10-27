@@ -20,7 +20,7 @@ export interface GridReaction {
 export const GRID_REACTIONS = 11
 
 /** The icons a menu row may have, by name, so containers need no icon set. */
-export type MessageMenuIcon = 'thread' | 'reply' | 'quote' | 'juno' | 'copy' | 'forward' | 'bell' | 'edit' | 'delete' | 'pin' | 'broadcast' | 'slack' | 'link'
+export type MessageMenuIcon = 'thread' | 'reply' | 'quote' | 'juno' | 'copy' | 'forward' | 'unread' | 'bell' | 'edit' | 'delete' | 'pin' | 'broadcast' | 'slack' | 'link'
 
 /**
  * A row of the message menu, or a separator between groups. `shortcut` is

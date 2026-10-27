@@ -54,7 +54,7 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     expect((await menu.grid()).slice(0, 3)).toEqual(['+1', 'white_check_mark', 'eyes'])
     // Ask Juno shows while AI assist is on.
     const labels = (await menu.labels()).filter((label) => label !== 'Ask Juno')
-    expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Open in Slack'])
+    expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Mark unread', 'Open in Slack'])
     // The message takes its faint fill while its menu is open.
     await expect(target).toHaveAttribute('data-popover-active', '')
     await menu.close()
@@ -133,7 +133,7 @@ async function keysInMenu(juno: Juno): Promise<void> {
 
   await test.step('E in the open menu edits, and types nothing', async () => {
     await menu.openOnRow(row)
-    expect(await menu.shortcuts()).toEqual({ reply: 'T', quote: 'Q', forward: 'F', edit: 'E', delete: '⌫' })
+    expect(await menu.shortcuts()).toEqual({ reply: 'T', quote: 'Q', forward: 'F', 'mark-unread': 'U', edit: 'E', delete: '⌫' })
     await juno.win.keyboard.press('e')
     await expect(menu.root).toHaveCount(0)
     const field = topic.list.getByRole('textbox', { name: 'Edit message' })
@@ -191,7 +191,7 @@ async function keysInMenu(juno: Juno): Promise<void> {
     await expect(root).toBeFocused()
     await topic.expectTitle(/Keys in the menu/)
     await menu.openOnRow(root)
-    expect(await menu.shortcuts()).toEqual({ quote: 'Q', forward: 'F', edit: 'E', delete: '⌫' })
+    expect(await menu.shortcuts()).toEqual({ quote: 'Q', forward: 'F', 'mark-unread': 'U', edit: 'E', delete: '⌫' })
     // T is no key here: it only jumps to a row by its name, and the menu stays open.
     await juno.win.keyboard.press('t')
     await expect(menu.root).toBeVisible()

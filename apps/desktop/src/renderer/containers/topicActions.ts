@@ -74,6 +74,15 @@ export function toggleResolved(id: string): void {
   else resolveTopic(id)
 }
 
+/**
+ * Mark unread on a message (the message menu and U): that message and everything after it are unread, with
+ * the topic held unread while it stays open, as the topic's Mark as unread (SPEC 7).
+ */
+export function markUnreadFrom(id: string, ts: string): void {
+  releaseSidebarTopic(registry, id)
+  void runAction(registry, readsMarkUnread, { id, from: ts }, { text: 'Marked unread' })
+}
+
 /** Rename saved: the engine clears the manual title for an empty one or the AI title. */
 export function renameTopic(id: string, title: string): void {
   registry.set(renamingAtom, undefined)

@@ -11,6 +11,7 @@ import type { ComposerHandle } from '../messageActions'
 import { withMenus } from '../messageMenu'
 import { isOwnEditable, opensThread, refOf } from '../messageRows'
 import { openTopic, openTopicInBackground } from '../navigation'
+import { markUnreadFrom } from '../topicActions'
 import type { MenuInput } from './messageMenu'
 
 const ROW = '[data-message-row]'
@@ -173,6 +174,9 @@ function rowKeyAction(event: RowKey, message: MessageView, { actions, latest, sc
       const row = rowOf(scrollRef.current, message.ts)
       return row !== null && message.kind === 'message' ? () => actions.menu(message, anchorFor(row, undefined), false, true) : undefined
     }
+    // U marks the topic unread from it, as the menu's Mark unread does, when Slack has it.
+    case 'u':
+      return message.pending === undefined ? () => markUnreadFrom(latest.current.detail.id, message.ts) : undefined
     // T starts or opens the message's thread, as the menu's row does, where it has that row.
     case 't':
       return opensThread(latest.current.detail.kind, message) ? () => actions.reply(message) : undefined
