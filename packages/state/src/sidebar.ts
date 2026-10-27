@@ -130,7 +130,8 @@ export function retainOpenTopics(
     const old = shown.rows.get(id)!
     if (!shown.filter.unreadOnly && !shown.retained?.has(id) && old.unreadCount === 0 && !old.mentionsMe) continue
     const detail = details.get(id)
-    if (detail === null || (detail !== undefined && (detail.resolved && !detail.pinned || old.subscribed && !detail.subscribed))) continue
+    // Resolved, unfollowed or no longer a channel you are in: the row goes even while its tab shows it.
+    if (detail === null || (detail !== undefined && (detail.notMember !== undefined || detail.resolved && !detail.pinned || old.subscribed && !detail.subscribed))) continue
     retained.add(id)
     // The filtered query no longer carries this row. Its open topic's live
     // header supplies read state, including marks from another Slack client.
