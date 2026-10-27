@@ -24,10 +24,6 @@ import { mock, setDefaultTimeout } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { limitScale, UNIT_LIMIT_MS } from './limits'
 
-// Process kills and snapshot restores cannot discard the drive cache. Keep WAL + FULL,
-// but skip macOS's hardware flush in tests and their children. Set 1 to use the app settings.
-process.env.JUNO_TEST_FULLFSYNC ??= '0'
-
 // The unit lane's limit on one test's time (limits.ts). The harness's own waits (`WAIT_MS` in
 // packages/engine/test/harness.ts) are most of it, so a slow step fails with its label.
 // A preload runs once per Bun process, and this reaches only the first file the process runs, so the

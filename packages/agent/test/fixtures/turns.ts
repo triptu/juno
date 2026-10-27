@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // The turn engine as a process for the crash tests. Opens the engine on a directory (recovery
 // runs), runs the commands, prints its state as JSON and closes. The model is the scripted fake:
 // a request whose last message is the owner's answers with a call to `slack_search`; a request
@@ -38,6 +39,7 @@ const host: HostReads = {
 
 const events: TurnEvent[] = []
 const turns = await openTurns({
+  durability: testDurability,
   agentDir: dir,
   provider: (store) => createProviderGuard({ store, transport: fake.models }),
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },

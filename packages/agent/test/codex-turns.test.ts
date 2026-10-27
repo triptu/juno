@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -26,7 +27,7 @@ it('runs a picked Codex turn through durable tools, shows waiting, and never rep
     model: { provider: 'openai-codex', modelId: 'gpt-6.1-sol' },
     tools: () => [defineTool({ name: 'test_action', description: 'Test action', parameters: { type: 'object', properties: {} }, replay: 'unsafe', status: () => 'Running test action', run: async () => { actions++; return { text: 'done' } } })],
   }
-  let turns = await openTurns(options)
+  let turns = await openTurns({ ...options, durability: testDurability })
   if (turns._tag !== 'running') throw new Error('not running')
   cleanup.push(() => turns.close())
   const connection = providerConnection()
@@ -65,7 +66,7 @@ it('runs a picked Codex turn through durable tools, shows waiting, and never rep
   expect(settings.page().chatModels.find(row => row.provider === 'codex')?.price).toContain('2 turns today')
   settings.close()
   await turns.close()
-  turns = await openTurns(options)
+  turns = await openTurns({ ...options, durability: testDurability })
   if (turns._tag !== 'running') throw new Error('not running')
   await turns.idle()
   expect(actions).toBe(1)

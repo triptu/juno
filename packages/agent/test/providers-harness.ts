@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,7 +12,7 @@ export async function providerHarness() {
   let now = new Date(2026, 9, 14, 12).getTime()
   const options = { agentDir: dir, models: fake.models, model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },
     migrations: [SPEND_MIGRATIONS], now: () => now }
-  let core = await openCore(options)
+  let core = await openCore({ ...options, durability: testDurability })
   if (core._tag !== 'running') throw new Error('Fresh core did not open')
   const running = (): Core => {
     if (core._tag !== 'running') throw new Error('Core did not reopen')
@@ -24,7 +25,7 @@ export async function providerHarness() {
     spend: () => createSpend(running().store),
     guard: () => createProviderGuard({ store: running().store, transport: fake.models }),
     nextDay: () => { now += 24 * 60 * 60 * 1000 },
-    reopen: async () => { await core.close(); core = await openCore(options) },
+    reopen: async () => { await core.close(); core = await openCore({ ...options, durability: testDurability }) },
     close: async () => { await core.close(); await rm(dir, { recursive: true, force: true }) },
   }
 }

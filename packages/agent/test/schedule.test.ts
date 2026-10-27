@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,7 +18,7 @@ afterEach(() => { for (const close of cleanups.splice(0)) close() })
 function harness() {
   const dir = mkdtempSync(join(tmpdir(), 'juno-schedule-'))
   let now = Date.UTC(2026, 9, 16, 12)
-  let db = openDatabase(join(dir, 'agent.sqlite'), [ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS])
+  let db = openDatabase(join(dir, 'agent.sqlite'), [ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS], Date.now, testDurability)
   const store = { get db() { return db }, now: () => now }
   initialize(store)
   let replies: Reply[] = []
@@ -31,7 +32,7 @@ function harness() {
   }
   cleanups.push(() => { db.close(); rmSync(dir, { recursive: true, force: true }) })
   return { store, get scheduler() { return scheduler }, create, advance: (ms: number) => { now += ms }, reply: (reply: Reply) => { replies.push(reply) },
-    restart: () => { db.close(); db = openDatabase(join(dir, 'agent.sqlite'), [ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS]); scheduler = createScheduler(options) } }
+    restart: () => { db.close(); db = openDatabase(join(dir, 'agent.sqlite'), [ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS], Date.now, testDurability); scheduler = createScheduler(options) } }
 }
 it('persists one occurrence and admits and starts it once across restart', async () => {
   const h = harness(); h.create(); h.advance(1000)

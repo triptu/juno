@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // The turn engine in-process for the flow tests: the real store, pi journal, router, compactor and
 // guard, with the scripted fake provider behind the guard and fake Slack reads behind the host port.
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -52,6 +53,7 @@ export async function turnsHarness(options: HarnessOptions = {}) {
   const fake = fakeProvider(options.fake)
   const reports: unknown[] = []
   const opened = await openTurns({
+    durability: testDurability,
     agentDir: dir,
     ...(options.online ? { online: options.online } : {}),
     ...(options.now ? { now: options.now } : {}),

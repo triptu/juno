@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // The agent's durable core as a process for the crash tests. Opens the core
 // on a directory (recovery runs), runs the commands, prints its state as JSON
 // and closes. The model is the scripted fake; every chat request is answered
@@ -57,6 +58,7 @@ const act = testTool({
 })
 
 const core = await openCore({
+  durability: testDurability,
   agentDir: dir,
   models: fake.models,
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },

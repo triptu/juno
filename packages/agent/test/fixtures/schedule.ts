@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 import { join } from 'node:path'
 import { openDatabase } from '../../src/store/database'
 import { initialize } from '../../src/store/store'
@@ -6,7 +7,7 @@ import { SCHEDULE_MIGRATIONS } from '../../src/schedule/schema'
 import { createScheduler } from '../../src/schedule/scheduler'
 const [dir, phase] = process.argv.slice(2)
 if (dir === undefined) throw new Error('Missing test directory')
-const db = openDatabase(join(dir, 'agent.sqlite'), [ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS])
+const db = openDatabase(join(dir, 'agent.sqlite'), [ACTIONS_MIGRATIONS, SCHEDULE_MIGRATIONS], Date.now, testDurability)
 const store = { db, now: () => 1000 }
 initialize(store)
 const scheduler = createScheduler({ store, changed: () => {}, replies: async () => ({ owner: 'owner', messages: [] }) })

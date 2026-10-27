@@ -1,3 +1,4 @@
+import { testDurability } from '@juno/agent-testing'
 // One Mac's turn engine with a backup, as a process, for the backup crash tests. The keychain is a JSON
 // file beside the agent directory, so a restarted process reads it again. Runs the commands, prints a
 // summary as JSON and closes.
@@ -19,6 +20,7 @@ const fake = fakeProvider()
 fake.script(Array.from({ length: 8 }, () => reply('<say>Noted.</say>')))
 const keychain = fakeKeychain({}, `${dir}.keychain.json`)
 const turns = await openTurns({
+  durability: testDurability,
   agentDir: dir,
   provider: (store) => createProviderGuard({ store, transport: fake.models }),
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },
