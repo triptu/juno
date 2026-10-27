@@ -2,7 +2,7 @@
 
 These specs describe the protocols and their limits. The model checks test the specs; `bun run specs:conformance` checks that the engine follows `outbox.qnt` ("Conformance" below).
 
-`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation, and edits, deletes and reaction toggles on Juno's own posts. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs. `catchup.qnt` models messages that other clients post, edit, delete and react to while the socket is down, and the recheck after the reconnect; `catchupProtocol` takes constants and `catchup` supplies three messages. `threadranges.qnt` models which replies of a thread the store has proven it holds ("Thread coverage" below).
+`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation, and edits, deletes and reaction toggles on Juno's own posts. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs. `catchup.qnt` models messages that other clients post, edit, delete and react to while the socket is down, and the recheck after the reconnect; `catchupProtocol` takes constants and `catchup` supplies three messages. `threadranges.qnt` models which replies of a thread the store has proven it holds ("Thread coverage" below). `follownew.qnt` models Follow new threads on top of the follow command ("Follow new threads" below).
 
 ## Quiet-window rules and assumptions
 
@@ -48,6 +48,18 @@ The four reported differences are intentional protocol changes: separate clocks,
 | `invariants` | Passing safety and drain properties for that protocol. Follow includes `acceptedUnfollow`. |
 
 The follow drain covers three pending calls and their refreshes, eight events, two responses, reconnect, three window pages and three absent-root pages. The read drain covers two pending marks with coalesced resends, eight events, two responses, lookups and the reconnect refresh within 48 transitions. Raising queue or topic limits requires revisiting the budgets.
+
+## Follow new threads
+
+`follownew.qnt` models one conversation with Follow new threads (SPEC 5) and three threads. The setting stores the time it was turned on. A root is posted at a clock time; it becomes a thread when it gets a reply, and Juno sees the thread when that reply is stored, live or by a catch-up, in any order and after any delay. A pass (`auto`) takes a seen thread whose root is at or after the turn-on time and that it has not had its go at, records it, and follows it only when Slack has said nothing about the thread (no stored row), all in one transaction, as `setSubscribed` with `how: 'auto'` does in `@juno/engine`. While the channel is ignored the pass records the thread without following it. The user's Notify me (`userSet`) and Slack's follow on a mention (`mention`) can come at any point. A follow here is its local row: its mirror to Slack, failures and lookups are `follow.qnt`'s.
+
+| Quint name | Plain meaning |
+| --- | --- |
+| `atMostOnce` | Follow new threads follows a thread at most once. |
+| `neverBeforeOn` | It never follows a thread whose root came before the setting was turned on, even when the first reply comes after. |
+| `unfollowKept` | After the user's Never, the thread stays unfollowed until the user or Slack follows it again; a pass never overrides it. |
+
+Each property has a directed pair: `refollow` (Never after the auto-follow, then more replies; the `noClaim` bug follows it again), `splitRace` (Never between the pass's decision and its write; the `split` bug writes over it) and `olderRoot` (a root from before the setting gets its first reply after it; the `anyRoot` bug follows it). The model does not cover turning the setting off and on again: a new turn-on time starts a new set of new threads, and threads already recorded stay recorded.
 
 ## Read rules and assumptions
 
