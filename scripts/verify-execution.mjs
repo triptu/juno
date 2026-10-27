@@ -2,6 +2,8 @@ import { availableParallelism, hostname } from 'node:os'
 import { budgetEnv, parseBudget } from './memory-budget.mjs'
 import { checkRunner, runnerConfig } from './remote/runner.mjs'
 
+export { RunnerNotReady } from './remote/runner.mjs'
+
 /**
  * Probe once before starting work. An unreachable runner fails the run: heavy
  * suites never move to this Mac on their own, because it hangs under them.

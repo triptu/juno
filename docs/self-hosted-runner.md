@@ -25,6 +25,9 @@ for capacity. Do not override these folders for that tstack machine.
 `runner list` includes Juno jobs under project `juno`.
 For `.local` hosts Juno probes IPv4 first, then dual stack on transport failure.
 Authentication errors and connected-host failures stop the run.
+The same check reads the laptop's battery and times a short busy loop (about 45 ms at full speed). On battery below 30%,
+or with the loop over 150 ms (throttled cores), every remote run refuses to start and says why; `verify:main` then
+writes no record. `bun run runner:check` prints the loop's time and the battery.
 
 ```sh
 bun run runner:check

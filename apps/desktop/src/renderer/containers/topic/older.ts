@@ -44,11 +44,14 @@ export function useOlderPages(position: Position, id: string, view: string, list
         if (!entries.some((entry) => entry.isIntersecting)) return
         observer.disconnect()
         setLoadingOlder(true)
+        const asked = registry.get(messageWindowSpecAtom(view))
         void loadOlderMessages(registry, id, first).then((exit) => {
           if (exit._tag === 'Success' && exit.value.complete) registry.set(topicStartKnownAtom(id), true)
           const outcome = exit._tag === 'Success' ? exit.value.outcome : undefined
           settle(first, outcome === 'fetched' || outcome === 'cached', outcome === 'fetched')
           const spec = registry.get(messageWindowSpecAtom(view))
+          // A window moved meanwhile (a jump, a search step) is not the one this page widens, and `first` is not its row.
+          if (spec !== asked) return setLoadingOlder(false)
           // Up to the cap the window grows at the top; past it, it holds the 500 rows from the new page down.
           const next =
             spec.anchor === undefined && spec.limit + OLDER_PAGE <= MESSAGE_WINDOW_MAX

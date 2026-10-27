@@ -6,12 +6,15 @@
 // Engine time is frozen after boot and moves only in fixed steps (`measured`), so timers and the live
 // queries' debounce fire at the same points in every run and the counts are the same on any machine.
 // Budgets are today's counts plus a little headroom; `JUNO_WORK_COUNTS=1` prints the counts.
+import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, it } from 'bun:test'
 import { expectWork } from '@juno/testing/work-budget'
 import { messagesAtom, openTopic, sendMessage, type ListWindow } from '@juno/state'
 import type { MessageView, TopicRow } from '@juno/contract'
 import { controlledClock } from '../controlledClock'
-import { WAIT_MS, waitFor, type EngineOptions, type RunningEngine } from '../harness'
+import { startTestEngine, WAIT_MS, waitFor, type EngineOptions, type RunningEngine } from '../harness'
 import { mutationSeed } from '../mutationSeed'
 import { bootedEngine, quiet, tsOf, valueOf } from '../scenario'
 import { countSql, statementsSoFar, type SqlWork } from '../sqlWork'
@@ -169,10 +172,28 @@ it('the sidebar of 300 conversations reads its window, not the workspace', async
 })
 
 it('a warm start re-indexes only the topics whose inputs changed', async () => {
-  // The first start in a process syncs the template it copies; the counted one starts from a copy, as a relaunch does.
-  await (await syncedEngine([], { timing: noTicks })).stop()
+  // A relaunch on a copy of a first sync's folder, against the same fake. The shared template (`synced.ts`) gets a fake
+  // on another port when another file's fake holds the template's: the stored URLs then differ, and the start rewrote
+  // people and their topics (784 statements with the port held, 860 once on the Mac, against 736).
+  const first = await startTestEngine({ fakeOptions: { seedTime: Date.now() }, initial: (fake) => fake.signIn() })
+  await first.status('ready')
+  await first.phase('live')
+  await quiet(first)
+  const copy = await mkdtemp(join(tmpdir(), 'juno-engine-test-'))
+  // Stopping closes the store, which checkpoints the WAL into the files copied here; the fake stays up.
+  first.registry.dispose()
+  await first.handle.stop()
+  await cp(first.userData, copy, { recursive: true })
+  await rm(first.userData, { recursive: true, force: true })
   const { sql } = await countSql(async () => {
-    const engine = await syncedEngine(engines, { timing: noTicks })
+    const engine = await startTestEngine({ timing: noTicks, reuse: { userData: copy, fake: first.fake, credentials: { ...first.fake.sessions()[0]!, url: first.fake.url } } })
+    engines.push({ ...engine, stop: async () => {
+      await engine.stop()
+      await first.fake.close()
+      await rm(copy, { recursive: true, force: true })
+    } })
+    await engine.status('ready')
+    await engine.phase('live')
     await quiet(engine)
     return engine
   }, (engine) => engine.userData)

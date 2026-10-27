@@ -41,7 +41,7 @@ import { assessRecord, isAncestor, readRecords, skippedTests, statusFolder } fro
 import { failureCause, testResults } from './test-results-reporter.mjs'
 import { describeGalleryCounts, fullSuites, galleryCounts, galleryWalk, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
-import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
+import { localVerifyEnv, RunnerNotReady, verifyExecution } from './verify-execution.mjs'
 import { committedInputKey, protocolInputs, runtimeIdentity } from './verify-inputs.mjs'
 import { checkToolchain, fileResults, FILE_SAMPLE_SHARE, freshFileRun, laneFiles, timedFiles } from './verify-files.mjs'
 import { fullRunCores, fullRunJobs } from './remote/plan.mjs'
@@ -87,7 +87,8 @@ const failedSetup = (error) => {
 }
 process.on('uncaughtException', failedSetup)
 process.on('unhandledRejection', failedSetup)
-const execution = verifyExecution(argv.includes('--local'))
+// A laptop on a flat battery or throttled cores would fail tests that pass: the run refuses to start and leaves no record.
+const execution = (() => { try { return verifyExecution(argv.includes('--local')) } catch (error) { if (!(error instanceof RunnerNotReady)) throw error; console.error(`verify:main: ${error.message}`); return process.exit(1) } })()
 const local = execution.mode === 'local'
 if (local && argv.includes('--require-remote')) throw new Error('This run requires the laptop; local fallback is disabled')
 const plannedIdentity = runtimeIdentity(root, !local)

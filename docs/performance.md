@@ -449,7 +449,7 @@ Measured 10-26: the engine's counts were the same in three runs (and, after the 
 | Typing 21 keys | | 42 / 105; no request → 47 / 116; 0 / 0; then one draft save | 44 layouts, 25 styles, 45 mutations → 49 / 28 / 50 |
 | Send | 102 / 115 → 112 / 127 (10-27; 107 / 134 → 118 / 148 before unchanged messages were no longer rewritten) | 8 / 260; 4 / 12; 5,785 / 515 B → 10 / 286; 6 / 14; 6,364 / 567 | |
 | A live message or reply | Message 49 / 92 → 54 / 102; reply 103 / 156 → 114 / 172 | Reply: 6 / 250; 1 / 13; 8,167 / 92 B → 8 / 275; 3 / 15; 8,984 / 102 | |
-| Warm start of the synced default workspace, to rest | 736 / 865 → 815 / 950 (10-27; 872 / 1,134 before topic marks, which fails it) | | |
+| Warm start of the default workspace, to rest (a relaunch against the fake that made the first sync, so the stored URLs keep its port) | 737 / 866 → 815 / 950 (10-27; 872 / 1,134 before topic marks, which fails it; 784 with a fake on another port) | | |
 | Scrolling a message list, 12 steps of 180 px | | | 6 layouts, 1 mutation → 8 / 3 |
 | Sidebar of 300 conversations | First run 8 / 348 → 10 / 383; one live message 51 / 619 → 56 / 681 | Startup 34–36 / 2,821–2,829; 43 / 43–44 → 40 / 3,112; 48 / 49; one live message 1 / 17; 0 / 4; 7,412 B → 3 / 19; 0 / 6; 8,154 | |
 
