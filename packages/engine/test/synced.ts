@@ -1,8 +1,9 @@
 /**
  * A workspace the default seed has already synced, for tests whose first sync
- * is only setup. The first call in a test process cold-boots one engine on a
- * fake made at a fixed seed time, waits until it is quiet, stops it and keeps a
- * copy of its user-data folder. Each `syncedEngine` then starts a fresh fake on
+ * is only setup. Once per test process, in a `beforeAll` of the first test file
+ * that imports this module, it cold-boots one engine on a fake made at a fixed
+ * seed time, waits until it is quiet, stops it and keeps a copy of its
+ * user-data folder, so no test's own time includes that first sync. Each `syncedEngine` then starts a fresh fake on
  * the same seed time and port (so stored ids, timestamps and avatar URLs match)
  * and a fresh engine on its own copy of that folder: a warm start, the same as
  * a relaunch of the app. When another process holds the port by then, the fake
@@ -13,11 +14,13 @@
  * `--parallel`, or several files on one `--parallel` worker) share it, and
  * nothing outlives the run. Tests of the first sync itself use `bootedEngine`.
  */
+import { beforeAll } from 'bun:test'
 import { cp, mkdtemp, rm } from 'node:fs/promises'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startFakeSlack, type Credentials } from '@juno/fake-slack'
+import { limitScale } from '@juno/testing/limits'
 import { startTestEngine, type EngineOptions, type RunningEngine } from './harness'
 import { quiet } from './scenario'
 
@@ -67,19 +70,25 @@ async function makeSynced(): Promise<Synced> {
   }
 }
 
+const template = () => (synced ??= makeSynced())
+
+// Slow: a cold first sync of the default seed, once per test process, outside every test's own time. Later files in
+// the same process find it made; a file run with `--isolate` finds it through the marker.
+beforeAll(() => template().then(() => undefined), 60_000 * limitScale())
+
 export type SyncedOptions = Omit<EngineOptions, 'initial' | 'fakeOptions' | 'enterpriseId' | 'reuse'>
 
 /** An engine live on a copy of the synced default workspace. `track` collects engines for `afterEach` to stop. */
 export async function syncedEngine(track: Array<RunningEngine>, options: SyncedOptions = {}): Promise<RunningEngine> {
-  const template = await (synced ??= makeSynced())
-  const start = (port: number) => startFakeSlack({ port, seedTime: template.seedTime, sessions: template.sessions })
-  const fake = await start(template.port).catch((error: unknown) => {
+  const made = await template()
+  const start = (port: number) => startFakeSlack({ port, seedTime: made.seedTime, sessions: made.sessions })
+  const fake = await start(made.port).catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
     return start(0)
   })
   const userData = await mkdtemp(join(tmpdir(), 'juno-engine-test-'))
-  await cp(template.dir, userData, { recursive: true })
-  const engine = await startTestEngine({ ...options, reuse: { userData, fake, credentials: { ...template.sessions[0]!, url: fake.url } } })
+  await cp(made.dir, userData, { recursive: true })
+  const engine = await startTestEngine({ ...options, reuse: { userData, fake, credentials: { ...made.sessions[0]!, url: fake.url } } })
   const owned: RunningEngine = {
     ...engine,
     stop: async () => {
