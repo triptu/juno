@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, it } from 'bun:test'
 import { expectWork } from '@juno/testing/work-budget'
+import { limitScale } from '@juno/testing/limits'
 import { messagesAtom, openTopic, sendMessage, type ListWindow } from '@juno/state'
 import type { MessageView, TopicRow } from '@juno/contract'
 import { controlledClock, noTicks } from '../controlledClock'
@@ -167,7 +168,7 @@ it('the sidebar of 300 conversations reads its window, not the workspace', async
     expectWork('large sidebar live message', counts(sql), { statements: 56, rows: 681 }, detail(sql))
   })
 // Slow: its setup is a first sync of all 300 conversations, which the counts need; CPU, not a wait (2 s on a Mac, 4 to 5 s in the laptop's full run).
-}, 10_000)
+}, 10_000 * limitScale())
 
 it('a warm start re-indexes only the topics whose inputs changed', async () => {
   // A relaunch on a copy of a first sync's folder, against the same fake. The shared template (`synced.ts`) gets a fake
