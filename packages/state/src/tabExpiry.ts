@@ -45,7 +45,7 @@ async function holdsDraft(registry: Registry, tab: Tab): Promise<boolean> {
   if (place.kind === 'home') return !untouched(registry.get(homeDraftAtom(tab.id)))
   if (place.kind !== 'topic') return false
   const draft = await settled(registry, draftAtom(place.topicId))
-  return draft === undefined || draft.trim() !== ''
+  return draft === undefined || draft.text.trim() !== ''
 }
 
 /** Closes the tabs not viewed in the chosen time. */

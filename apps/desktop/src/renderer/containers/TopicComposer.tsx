@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref } from 'react'
 import { audienceCheck, decodeDraft, encodeDraft, moveLinks, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendCheckPrefsAtom, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
@@ -79,13 +79,14 @@ export function TopicComposer({ detail, onSent, handle, takeFocus, onArrowUpTop,
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpTop={onArrowUpTop} onEscape={onEscape} dropping={dropping} />
+  return <LoadedComposer detail={detail} initial={stored.value.text} latest={stored.value.text} {...(stored.value.replaced === undefined ? {} : { replaced: stored.value.replaced })} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpTop={onArrowUpTop} onEscape={onEscape} dropping={dropping} />
 }
 
 function LoadedComposer({
   detail,
   initial,
   latest,
+  replaced,
   placeholder,
   onSent,
   handle,
@@ -93,7 +94,7 @@ function LoadedComposer({
   onArrowUpTop,
   onEscape,
   dropping = false,
-}: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly placeholder: string }) {
+}: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly replaced?: string; readonly placeholder: string }) {
   const id = detail.id
   const files = useAttachments(id)
   const aiAssist = useAtomValue(aiAssistOnAtom)
@@ -221,6 +222,18 @@ function LoadedComposer({
     // The field and the window live as long as this composer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  // ⌘Z right after another device's newer draft filled the field brings back the text it replaced, which had
+  // not reached Slack (a clock running behind Slack's can make the newer edit look older). It is typing again.
+  const recover = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    const undo = event.key.toLowerCase() === 'z' && (event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey
+    if (!undo || replaced === undefined || unsaved.current !== undefined || encoded(text) !== latestRef.current) return false
+    event.preventDefault()
+    take(replaced)
+    typedSinceShown.current = true
+    unsaved.current = replaced
+    flush()
+    return true
+  }
   const precheck = (value: string) => {
     if (routeChecked && value.trim() !== '') precheckMessage(registry, detail.channel.id, value)
   }
@@ -361,7 +374,7 @@ function LoadedComposer({
     <Composer
       value={text}
       {...mentions}
-      onFieldKey={(event) => markup.onKey(event, marks) || mentions.onFieldKey(event)}
+      onFieldKey={(event) => recover(event) || markup.onKey(event, marks) || mentions.onFieldKey(event)}
       marks={marks}
       {...markup.format(text, marks)}
       onPasteText={links.onPasteText}

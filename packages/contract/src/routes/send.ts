@@ -47,7 +47,8 @@
  * Drafts, kept per topic in `user.db` so they outlive the app, and synced
  * with Slack's drafts for the topic's conversation or thread (SPEC 8):
  * - `drafts.get`: the topic's draft, `''` when it has none (a live value).
- *   A draft changed on another device shows here.
+ *   A draft changed on another device shows here, with the local text it
+ *   replaced when that text had not reached Slack yet.
  * - `drafts.set`: replaces it; `''` deletes it. The change goes to Slack
  *   after a pause in typing, or at once with `now` (the field lost focus,
  *   the tab hid, the window is closing).
@@ -217,8 +218,14 @@ export const messagesGrammar = Rpc.make('messages.grammar', {
   success: SendCheck,
 })
 
-/** The draft of one topic, `''` when it has none. */
-export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Schema.String }, value: Schema.String })
+/**
+ * The draft of one topic: its text, `''` when it has none, and a local text not yet in Slack that a newer
+ * version from another device replaced (`replaced`), which ⌘Z in the composer brings back.
+ */
+export const StoredDraft = Schema.Struct({ text: Schema.String, replaced: Schema.optionalKey(Schema.String) })
+export type StoredDraft = typeof StoredDraft.Type
+
+export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Schema.String }, value: StoredDraft })
 
 /** Replaces a topic's draft; an empty or blank text deletes it. With `now`, Slack gets it without waiting for a pause in typing. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String, now: Schema.optionalKey(Schema.Boolean) }, success: Schema.Void, error: NotSignedIn })
