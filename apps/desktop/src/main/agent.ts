@@ -40,9 +40,8 @@ import { Schema } from 'effect'
 import { AgentToMain, type AgentConfig, type AgentProvider, type CredentialRequest, type HostHello, type MainToAgent, type SecretRequest } from '@juno/agent-contract'
 import { Events } from '@juno/contract/channels'
 import type { PortRequestResult } from '@juno/contract'
+import { restartBackoff } from './restartBackoff'
 
-const BACKOFF_BASE_MS = 1_000
-const BACKOFF_CAP_MS = 30_000
 const CRASH_WINDOW_MS = 120_000
 const CRASH_LIMIT = 5
 
@@ -247,7 +246,7 @@ export class AgentSupervisor {
       return
     }
     this.state = 'restarting'
-    const delay = Math.min(BACKOFF_BASE_MS * 2 ** this.attempt, BACKOFF_CAP_MS)
+    const delay = restartBackoff(this.attempt)
     this.attempt++
     console.warn(`main: agent exited with code ${code}; restarting in ${delay} ms`)
     this.restartTimer = setTimeout(() => {
