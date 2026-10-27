@@ -20,12 +20,24 @@ export type TopicMenuAction =
   | 'copy-link'
   | 'open-in-slack'
   | NotifyAction
+  | 'follow-new'
   | ViewMenuAction
   | 'ignore-channel'
   | 'juno-knows'
   | 'how-auto'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'huddle' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | 'how-auto' | ViewMenuAction | 'ignore-channel' | 'ask-juno'
+export type ChannelMenuAction =
+  | 'show-topics'
+  | 'open-main'
+  | 'huddle'
+  | 'mark-channel-read'
+  | 'mark-channel-unread'
+  | NotifyAction
+  | 'how-auto'
+  | 'follow-new'
+  | ViewMenuAction
+  | 'ignore-channel'
+  | 'ask-juno'
 export type PersonMenuAction = 'ask-juno' | 'juno-knows' | 'how-auto'
 
 /** Add to view (inventory 15.8): add to or remove from a view by id, or a new view with the conversation in it. */
@@ -72,6 +84,8 @@ export interface TopicMenuState {
   readonly resolved: boolean
   /** The thread's Notify me choice; on Main, its channel's or DM's. */
   readonly notify: NotifyChoice
+  /** On Main: whether Juno follows the conversation's new threads. Absent: no item. */
+  readonly followNew?: boolean
   /** The views, in pill order, for Add to view on a Main row. Absent: no item. */
   readonly views?: ReadonlyArray<ViewChoice>
   /** Art can be drawn (spec section 5): AI assist on and an OpenRouter key. At the daily AI limit Redraw art still shows and says why it cannot draw. */
@@ -142,6 +156,11 @@ function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<Notify
   return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('always'), choice('auto'), choice('never'), separator, item('how-auto', 'How Auto decides…')] }
 }
 
+/** Follow new threads (spec section 5): checked while Juno follows every new thread in the conversation. */
+function followNewItem(on: boolean): MenuItem<'follow-new'> {
+  return { type: 'item', id: 'follow-new', label: 'Follow new threads', checked: on }
+}
+
 /** How a toast names a choice: "#design-review: Never". */
 export function notifyChoiceLabel(choice: NotifyChoice): string {
   return notifyLabels[choice]
@@ -161,6 +180,7 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   items.push(state.resolved ? item('reopen', 'Reopen') : item('resolve', 'Resolve'))
   items.push(separator, item('copy-link', 'Copy Slack link'), item('open-in-slack', 'Open in Slack'))
   items.push(notifyMenu(state.notify))
+  if (isMain && state.followNew !== undefined) items.push(followNewItem(state.followNew))
   if (isMain && state.views !== undefined) items.push(addToViewMenu<TopicMenuAction>(state.views))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
   if (state.knowsAbout !== undefined) items.push(separator, item('juno-knows', knowsAbout(state.knowsAbout)))
@@ -172,6 +192,8 @@ export interface ChannelMenuState {
   readonly hasMain: boolean
   /** The channel's Notify me choice; the submenu shows when it is given. */
   readonly notify?: NotifyChoice
+  /** Whether Juno follows the conversation's new threads; the item shows when it is given. */
+  readonly followNew?: boolean
   /** The Juno Agent is on: Ask Juno shows (SPEC 7). */
   readonly askJuno?: boolean
   /** The views, in pill order, for Add to view. Absent: no item. */
@@ -186,8 +208,9 @@ export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuIte
   if (state.hasMain) items.push(item('open-main', 'Open Main'))
   if (state.huddle !== undefined) items.push(huddleItem(state.huddle))
   items.push(separator, item('mark-channel-read', 'Mark channel as read'), item('mark-channel-unread', 'Mark channel as unread'))
-  if (state.notify !== undefined || state.views !== undefined || !isDm(state.channel.kind)) items.push(separator)
+  if (state.notify !== undefined || state.followNew !== undefined || state.views !== undefined || !isDm(state.channel.kind)) items.push(separator)
   if (state.notify !== undefined) items.push(notifyMenu(state.notify))
+  if (state.followNew !== undefined) items.push(followNewItem(state.followNew))
   if (state.views !== undefined) items.push(addToViewMenu<ChannelMenuAction>(state.views))
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
   if (state.askJuno === true) items.push(separator, item('ask-juno', 'Ask Juno'))

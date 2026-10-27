@@ -20,7 +20,8 @@
  * backoff and the renderer keeps what it shows until a run succeeds.
  *
  * The follow commands (`../follow.ts`, shared with notifications) write the current store and mirror
- * to Slack through the `Outbox` seam. The topic actions (`actions.ts`) are
+ * to Slack through the `Outbox` seam. Follow new threads (`../followNew.ts`) is a local setting; its
+ * job makes the follows. The topic actions (`actions.ts`) are
  * local; a resolve that queued a read mark wakes `MarkWorker`.
  */
 import { Clock, Effect, Schema, type Scope, Semaphore, Stream } from 'effect'
@@ -34,6 +35,7 @@ import { Workspace, type StoreServices } from '../workspace'
 import { keepSuggested, keepTopicOpen, renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from '../topicActions'
 import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
 import { setSubscribed } from '../follow'
+import { setFollowNew } from '../followNew'
 import { countTopics, forgetUsergroups, forgetUsers, listTopics, makeRowCache } from './query'
 import { listIgnorableChannels, listIgnoredChannels } from './ignored'
 
@@ -143,6 +145,7 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
       'topics.restore': ({ id, overlay, unreadFrom }) => act(restoreTopic(id, overlay, unreadFrom)),
       'channels.ignore': ({ channel }) => setChannelIgnored(channel, true).pipe(Effect.provideService(Workspace, workspace)),
       'channels.unignore': ({ channel }) => setChannelIgnored(channel, false).pipe(Effect.provideService(Workspace, workspace)),
+      'channels.followNew': ({ channel, on, since }) => setFollowNew(channel, on, since).pipe(Effect.provideService(Workspace, workspace)),
       'channels.ignored': () =>
         serveLiveValue(runs(IGNORED_KEYS, Effect.succeed(listIgnoredChannels), false), { measure }).pipe(retryFirstRun('channels.ignored'), Stream.orDie),
       'channels.ignorable': () =>

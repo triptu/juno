@@ -49,6 +49,8 @@ Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (l
 
 ⌘K's Conversations ranking reads recent own sends through the partial `messages_sender_ts (user_id, ts, channel) WHERE deleted = 0` index.
 
+`follow_new_threads` in user.db holds the conversations with Follow new threads on and the time each was turned on; `auto_followed` holds the threads it has had its one go at. The partial index `messages_thread_roots (channel, ts) WHERE reply_count > 0` in cache.db lists a channel's thread roots.
+
 `started_threads` in user.db maps a root sent from Home: its outbox ID and pending topic ID to its acknowledged Slack root timestamp. The mapping survives reconciliation and keeps pending replies and saved tab views addressable.
 
 `topic_inputs` in cache.db marks the `topic_index` rows that are up to date with what `reindexTopics` (`@juno/sync`) reads, so a re-index of an unchanged topic stops after one read. Triggers on `messages`, `thread_ranges`, `synced_ranges`, `channel_reads`, `topic_index`, `users`, `usergroups` and `conversations` delete a topic's mark when one of its inputs changes; a changed name or a conversation's kind clears every mark. A new column that `reindexTopics` reads needs its trigger here.

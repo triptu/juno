@@ -33,6 +33,14 @@
  * The undo is computed from the state before the change: a change returns
  * the opposite command, no change returns nothing.
  *
+ * Follow new threads (`followNew.ts`) subscribes with `how: 'auto'`: the
+ * same three steps on the background lane, but the first transaction also
+ * records the thread in `auto_followed` and changes nothing when it was
+ * recorded before or Slack has already said something about the thread
+ * (followed or not). So each thread is followed this way at most once, and
+ * never over an unfollow, even one the user makes while the follow waits
+ * its turn (specs/follownew.qnt).
+ *
  * The state is Slack's follow flag in `thread_subs`. The pure rules in
  * `@juno/domain` read it (`isFollowed`, `sidebarPlacement`).
  */
@@ -56,8 +64,11 @@ import { Workspace, type StoreServices } from './workspace'
 
 type Services = Workspace | Outbox
 
+/** Who follows: the user's command, or Follow new threads. */
+export type FollowedBy = 'command' | 'auto'
+
 /** `topics.subscribe` when `subscribed`, `topics.unsubscribe` otherwise. */
-export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<CommandResult, SubscribeError, Services> =>
+export const setSubscribed = (id: string, subscribed: boolean, how: FollowedBy = 'command'): Effect.Effect<CommandResult, SubscribeError, Services> =>
   Effect.gen(function* () {
     const workspace = yield* Workspace
     const open = yield* workspace.current
@@ -101,11 +112,12 @@ export const setSubscribed = (id: string, subscribed: boolean): Effect.Effect<Co
       Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis
         const stamp = millisToTs(now)
-        const before = yield* local(transaction(setThreadSubscribed(channel, threadTs, id, subscribed, stamp, now)))
+        const before = yield* local(transaction(setThreadSubscribed(channel, threadTs, id, subscribed, stamp, now, how)))
         if (before === 'missing') return yield* new NotFound({ kind: 'topic', id })
         if (before === 'unchanged') return {}
         const args = { channel, thread_ts: threadTs, last_read: before.lastRead }
-        const result = yield* Effect.result(outbox.send((api) => api.call(subscribed ? 'subscriptions.thread.add' : 'subscriptions.thread.remove', args)))
+        const send = how === 'auto' ? outbox.sendBackground : outbox.send
+        const result = yield* Effect.result(send((api) => api.call(subscribed ? 'subscriptions.thread.add' : 'subscriptions.thread.remove', args)))
         const endedAt = yield* Clock.currentTimeMillis
         const ended = millisToTs(endedAt)
         const seen = yield* local(transaction(endPendingFollow(channel, threadTs, ended)))
@@ -135,11 +147,13 @@ const setThreadSubscribed = (
   subscribed: boolean,
   stamp: Ts,
   now: number,
+  how: FollowedBy,
 ): Effect.Effect<ThreadBefore | 'missing' | 'unchanged', SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const root = yield* readMessage(channel, threadTs)
     if (root === undefined) return 'missing'
     const previous = yield* threadSub(channel, threadTs)
+    if (how === 'auto' && (!(yield* claimAutoFollow(channel, threadTs)) || previous !== undefined)) return 'unchanged'
     if ((previous?.subscribed ?? false) === subscribed) return 'unchanged'
     yield* setThreadSub(channel, threadTs, subscribed, undefined, { kind: 'command', at: stamp })
     yield* beginPendingFollow(channel, threadTs, subscribed, now)
@@ -147,6 +161,15 @@ const setThreadSubscribed = (
     // the change never marks replies read in Slack that the user has not seen.
     const reads = yield* readState(topicId)
     return { previous, lastRead: (reads.lastReadTs ?? root.ts) as Ts }
+  })
+
+/** Records that Follow new threads has had its one go at a thread. False when it had it before. */
+export const claimAutoFollow = (channel: string, threadTs: string): Effect.Effect<boolean, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const added = yield* sql<{ channel: string }>`INSERT INTO auto_followed (channel, thread_ts) VALUES (${channel}, ${threadTs})
+      ON CONFLICT DO NOTHING RETURNING channel`
+    return added.length > 0
   })
 
 /**

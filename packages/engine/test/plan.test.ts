@@ -5,7 +5,7 @@ import { parseSearchQuery } from '@juno/domain'
 // topic_index, reactions or topic_overlay, which grow with the workspace. Which index each one picks is
 // the planner's business; only a full scan fails. The list names the statements of every live query:
 // the sidebar and its counts, the dock badge, All topics, the topic view, who reacted, a channel's
-// threads, the New chat pickers, the ignore list, the @ and # suggestions, Home and ⌘K's local search.
+// threads, the New chat pickers, the ignore list, Follow new threads, the @ and # suggestions, Home and ⌘K's local search.
 import { countsStatement } from '../src/sidebarUnread'
 import { badgeStatement, badgePolicy } from '../src/dockBadge'
 import { defaultNotificationSettings } from '@juno/domain'
@@ -24,6 +24,7 @@ import { whoReactedStatements } from '../src/messages/reactors'
 import { homeStatements } from '../src/home/query'
 import { suggestedStatements } from '../src/home/suggested'
 import { staleStatement } from '../src/home/job'
+import { candidatesStatement } from '../src/followNew'
 import { automatedStatements } from '../src/automatedView'
 import { movesStatements } from '../src/home/moves'
 import { activityStatement, frequentConversationsStatement, frequentSendsStatement, pickerStatements } from '../src/newchat/query'
@@ -111,6 +112,7 @@ function statements(): ReadonlyArray<readonly [string, Statement]> {
     ['New chat activity', activityStatement(['C0ENG', 'D0MAYA'])],
     ['New chat recent', pickerStatements(cutoff).recent],
     ['ignore list', { sql: ignorableStatement, params: [] }],
+    ['Follow new threads', candidatesStatement(50)],
     ['@ thread posters', mentionStatements.threadPosters('C0ENG', '1700000000.000100')],
     ['@ channel posters', mentionStatements.channelPosters('C0ENG')],
     ['@ recent contacts', mentionStatements.recentContacts(cutoff)],

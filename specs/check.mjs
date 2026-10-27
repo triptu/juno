@@ -415,6 +415,9 @@ const regressions = [
   ['follow', 'missedFollow', 'quietAgreement', 'single-page'],
   ['follow', 'reorderedEvents', 'latestEventWins', 'reordered-follow-events', 'eventOrderSafety'],
   ['follow', 'fallbackObservation', 'fallbackKeepsLatestEvent', 'fallback-observation'],
+  ['follownew', 'refollow', 'unfollowKept', 'follownew-refollow'],
+  ['follownew', 'splitRace', 'unfollowKept', 'follownew-split-race'],
+  ['follownew', 'olderRoot', 'neverBeforeOn', 'follownew-older-root'],
   ['readstate', 'lateMark', 'acceptedUnreadProtected', 'late-read-event'],
   ['readstate', 'latePage', 'acceptedUnreadProtected', 'late-read-page'],
   ['readstate', 'pendingPage', 'acceptedUnreadProtected', 'pending-read-page'],
@@ -450,7 +453,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors', 'threadranges'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'follownew', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors', 'threadranges'])) {
     // Thread coverage posts at most six replies: 4,000 traces of 60 transitions reach their interleavings within the job budget.
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : file === 'threadranges' ? { steps: 60, samples: 4000 } : {})
