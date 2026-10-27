@@ -1,0 +1,1 @@
+- 10-27 15:42 · Tushar · Start bundle budget raised to 1200 KB (from 1100 KB), after the channel and giphy merges used the last of it; the renderer JS stays a lazy-chunk-first design.
