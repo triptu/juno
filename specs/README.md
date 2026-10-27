@@ -313,40 +313,66 @@ The stale-page regression (`stale-follow-page`) is the older race: a page reques
 
 ## Draft sync
 
-`drafts.qnt` models one topic's draft in Juno, its composer, and Slack's attached draft for the same channel or thread, which a phone also edits (SPEC 8, "Drafts"; research `slack-drafts.md`). Texts are integers and every edit makes a new one; 0 is no draft. One `clock` stamps typing on both devices and Slack's update stamps: the rule that compares a local edit with Slack's stamp assumes Juno's clock and Slack's agree, and the model makes them one clock.
+`drafts.qnt` models one topic's draft in Juno, its composer, and Slack's attached draft for the same channel or thread, which a phone also edits and attaches files to (SPEC 8, "Drafts"; research `slack-drafts.md`). Texts are integers and every edit makes a new one; 0 is no text. `clock` is real time: typing on both devices and Slack's update stamps read it. Juno's clock reads `clock - skew`, where `skew` is 0 or 2 (Juno running behind). The rule that compares a local edit with Slack's stamp is right only while the clocks agree; when Juno runs behind, a newer local edit can lose, and its text is kept for ⌘Z.
 
 Rules and assumptions:
 
-- Slack keeps one attached draft per place. A create there answers `attached_draft_exists`; deleted and sent drafts refuse updates and deletes; a post that names a draft retires it with `draft_send`; every write is echoed on the socket, to the writer too.
-- A local change (`pause`, `send`) writes the stored draft and bumps the generation of the topic's one pending row. The sender (`request`) sends the stored text when it goes: update for the linked draft, create when Juno links none, delete for a cleared draft. `accept` is Slack running the call, `respond` its answer; the row ends only when no newer change replaced its intent, no find is open, and a delete's answer covers the draft Juno links.
-- A version from Slack (`deliver`, `finishList`) is stale when it is no newer than the newest stamp Juno has seen, or of a draft that is gone (deleted, sent or seen deleted; Slack never reuses an id). It is Juno's own when its text is the one Juno has, is sending, or sent in a call whose answer was lost (until a list after the loss); Juno's own text that has moved on goes over it. It loses to a local edit Slack has not acknowledged when the edit is newer; the edit then goes back to Slack. Otherwise it replaces the draft, and is saved again when a save was out or lost, since that save may land after it.
+- Slack keeps one attached draft per place. A create there answers `attached_draft_exists`; deleted and sent drafts refuse updates and deletes; an update or delete without a plausible edit time answers `draft_has_conflict`; a post that names a draft retires it with `draft_send`; every write is echoed on the socket, to the writer too.
+- A local change (`pause`, `send`) writes the stored draft and bumps the generation of the topic's one pending row. A clear keeps a time of its own, which its deletion carries. The sender reads the row (`read`) and later claims it in one transaction that reads the stored draft again (`claim`): update for the linked draft, create when Juno links none, delete for a cleared draft, or an update to no text when the draft has files. A version from Slack that replaced the intent in between leaves nothing to send. `accept` is Slack running the call, `respond` its answer; the row ends only when no newer change replaced its intent, no find is open, and a delete's answer covers the draft Juno links.
+- A version from Slack (`deliver`, `finishList`) is stale when it is no newer than the newest stamp Juno has seen, or of a draft that is gone (deleted, sent or seen deleted; Slack never reuses an id). A deletion says so; a live draft of files alone is not one, and keeps its link and files. It is Juno's own when its text is the one Juno has, is sending, or sent in a call whose answer was lost (until a list after the loss); Juno's own text that has moved on goes over it. It loses to a local edit Slack has not acknowledged when the edit is newer; the edit then goes back to Slack. Otherwise it replaces the draft, keeps Juno's replaced pending text for ⌘Z (`recover`), and is saved again when a save was out or lost, since that save may land after it.
 - `lose` is a lost answer or a call that failed on the way; a lost call landed before Juno gave up on it, or never. A lost create, or `attached_draft_exists`, opens a find: no create, and no end of the row, until a list requested after it; that list takes the place's draft whatever its stamp while Juno links none.
-- A list (`startList`, `finishList`) is a snapshot taken when it was requested. A linked draft missing from it counts as deleted just after the version Juno knew, but only when the list was requested after Juno linked it. A catch-up needs a list requested after the socket came back, after Juno's current link, and with no call out.
-- The composer takes a changed stored draft unless it has typing not yet stored or it has focus and was typed in since it showed (`behind`); a field held back takes the stored draft on `blur` with nothing typed since. `restart` keeps the store and the row; a call that was out counts as lost.
-- `seal` stops typing, the phone, losses, disconnects and restarts; work, lists, delivery and a final `blur` drain. The full instance holds six socket events.
+- A list (`startList`, `finishList`, `failList`) is a snapshot taken when it was requested. Its entry applies when it finishes. A linked draft missing from it becomes a pending absence that a later step (`applyAbsence`) writes after reading the link again: only a draft still linked, and linked before the request, counts as deleted, just after the version Juno knew. A list can fail; while a find, a loss or a catch-up is owed, another follows. A catch-up needs a list requested after the socket came back, after Juno's current link, and with no call out.
+- A send names Slack's draft when it goes to the draft's place and the draft has no files Juno knows of; Slack retires it. A refused post's draft, or one sent to another place, is deleted by Juno. A draft with files keeps them: sending or clearing it empties its text.
+- The composer takes a changed stored draft unless it has typing not yet stored or it has focus and was typed in since it showed (`behind`); a field held back takes the stored draft on `blur` with nothing typed since. `quit` stores typing first; `crash` loses typing not yet stored. Both keep the store and the row; a call that was out counts as lost.
+- `seal` stops typing, the phone, losses, failed lists, disconnects and restarts; work, owed lists, delivery and a final `blur` drain. The full instance holds six socket events.
 
 | Quint name | Plain meaning |
 | --- | --- |
-| `typedNeverLost` | Juno's text is replaced only by a version typed after it, and a draft the user changed or sent in Juno never takes back a version from before that. |
+| `typedNeverLost` | Juno's text is replaced only by a version chosen after it (while Juno's clock runs behind it may be, and is then kept for ⌘Z), and, while the clocks agree, a draft the user changed or sent in Juno never takes back a version chosen before that. A version is chosen when its writer made it: the phone's write, or Juno's store of the text it saved. |
 | `focusKept` | A focused composer that was typed in is never overwritten. |
-| `sentStaysGone` | A sent text never comes back to Juno's draft or composer. |
+| `sentStaysGone` | A sent text never comes back to Juno's draft or composer, unless another device writes it again. |
 | `firstRunMerged` | On the first run, Juno's old draft and Slack's draft for the place are merged by the same rule: the newer one stays. |
-| `quietAgreement` | Once all is quiet, Juno's draft, the composer and Slack's draft agree. |
+| `filesKept` | Juno never deletes files it knows a draft has. Files another device attached since Juno last saw the draft can go with a send or a save, as Slack has no conditional write. |
+| `quitKeepsTyping` | A graceful quit keeps what was typed. |
+| `quietAgreement` | Once all is quiet, Juno's draft, the composer and Slack's draft agree, drafts of files alone included. |
 | `drainBound` | After input stops, agreement within 48 transitions. |
 
-Each race has a directed schedule from `initFresh` (no draft on either side) and a bug mode that switches off the one rule it shows: `echoRace` (Juno's echo arrives after newer typing; without the echo check the typing is replaced, `typedNeverLost`), `inflightApply` (the phone's edit applies while Juno's update is out and lands after it; without saving it again Slack keeps Juno's older text, `quietAgreement`), `sentReturns` (a list from before a send holds the phone's older version of the sent draft; without remembering gone drafts it comes back, `typedNeverLost`), `focusedRemote` (the phone edits while the field has focus and typing; without holding back the field changes under the caret, `focusKept`) and `staleList` (a list from before Juno's create says no draft; without the guard on when Juno linked it the draft is deleted in Juno only, `quietAgreement`). `firstRunStep` (from `initFirstRun`: Juno's old draft and a newer one in Slack) and `offlineRestartStep` must reach agreement. Writing the spec found eleven rules the first design lacked; each is in the list above, and a random run without it fails.
+Each race has a directed schedule from `initFresh` (no draft on either side) and a bug mode that switches off the one rule it shows:
+
+| Schedule | Race | Without the rule | Property |
+| --- | --- | --- | --- |
+| `echoRace` | Juno's echo arrives after newer typing | the typing is replaced | `typedNeverLost` |
+| `inflightApply` | The phone's edit applies while Juno's update is out and lands after it | Slack keeps Juno's older text | `quietAgreement` |
+| `sentReturns` | A list from before a send holds the phone's older version of the sent draft | it comes back | `typedNeverLost` |
+| `focusedRemote` | The phone edits while the field has focus and typing | the field changes under the caret | `focusKept` |
+| `staleList` | A list from before Juno's create says no draft | the draft is deleted in Juno only | `quietAgreement` |
+| `clearStamp` | Juno clears a linked draft | the deletion has no time, Slack refuses it and keeps the draft | `drainBound` |
+| `staleClaim` | The phone's newer draft lands between the sender's read and its claim | Juno's older text overwrites it | `quietAgreement` |
+| `staleAbsence` | A list misses a deleted draft; the phone's new draft is linked before the absence is written | the absence deletes the new draft | `quietAgreement` |
+| `filesOnly` | The phone makes a draft of files alone; Juno types in the topic | Juno takes it for a deletion, and its creates meet `attached_draft_exists` for ever | `drainBound` |
+| `filesSend` | Juno sends the text of a draft with files | the post retires the draft, files and all | `filesKept` |
+| `sentElsewhere` | A draft is sent into another place | Slack keeps the sent text as the place's draft | `quietAgreement` |
+| `listsFail` | A create's answer and echo are lost, and the lists that should find its draft fail twice | the row waits for a list that never comes | `drainBound` |
+| `behindClock` | From `initBehind`: the phone's earlier edit carries a later stamp and replaces Juno's typing | the typing is gone; with the rule ⌘Z brings it back | `typedNeverLost` |
+| `quitTyping` | Juno quits with typing not yet stored | it is lost | `quitKeepsTyping` |
+
+`firstRunStep` (from `initFirstRun`: Juno's old draft and a newer one in Slack) and `offlineRestartStep` must reach agreement. Writing the spec found eleven rules the first design lacked; the review of the first build found eight more, each now a schedule above.
 
 | Draft action | Engine or fake Slack event |
 | --- | --- |
 | `typeText`, `pause`, `blur` | Typing in `TopicComposer`, its 400 ms store (`drafts.set`), leaving the field |
-| `send` | `messages.send` with `draftOf`: `sendDraft` in its transaction, `draft_id` on the post |
-| `request`, `accept`, `respond` | `sendDraftRow` (`engine/src/draftSend.ts`): `beginDraftSave`, the `drafts.*` call, `endDraftSave` |
+| `recover` | ⌘Z in the field after another device's draft filled it (`drafts.get` returns `replaced`) |
+| `send` | `messages.send` with `draftOf`: `sendDraft` in its transaction, `draft_id` on the post when it goes to the draft's place |
+| `read`, `claim` | `sendDraftRow` (`engine/src/draftSend.ts`): its first read, then `claimDraftSave` in one transaction (test hook `onDraftWrite('claim')`) |
+| `accept`, `respond` | The `drafts.*` call, `endDraftSave` |
 | `lose` | A transport error or lost answer: `deferDraftSave` with `ran` |
-| `postLands`, `postRefused` | The post's answer; a refused post's draft is deleted by `settleSent` |
-| `phoneType`, `phoneDelete` | `fake.putDraft`, `fake.removeDraft` |
+| `postLands`, `postRefused` | The post's answer; `settleSent` deletes a refused post's draft and one sent elsewhere |
+| `phoneType`, `phoneAttach`, `phoneEmpty`, `phoneDelete` | `fake.putDraft` (with `files`), `fake.removeDraft` |
 | `deliver` | A `draft_*` frame: `applyDraftEvent` (`engine/src/draftVersions.ts`), `observeDraft` |
-| `startList`, `finishList` | `listDrafts`: `drafts.list { is_active }` pages, absences, `settleDraftFinds` |
-| `disconnect`, `reconnect`, `restart` | The socket's drop and catch-up; an engine restart with `recoverDraftSaves` |
+| `startList`, `failList`, `finishList` | `listDrafts`: `drafts.list { is_active }` pages, `settleDraftFinds`; a failed list is retried with backoff while one is owed (`draftSync.ts`) |
+| `applyAbsence` | `observeAbsence` in its own transaction (test hook `onDraftWrite('absence')`) |
+| `disconnect`, `reconnect` | The socket's drop and catch-up |
+| `quit`, `crash` | Quitting, after the composer stores its typing on `pagehide`; a crash, without that; the next start runs `recoverDraftSaves` |
 
 ## Run the checks and bounds
 

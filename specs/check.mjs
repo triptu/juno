@@ -479,11 +479,16 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
     simulate('readstate', 'mirrorCatchUpBugStep', 'catchUpNeverBackwards', 'read-mirror-catchup-bug.itf.json', true)
     simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
-    // Draft sync: each race starts from no draft on either side; its bug mode breaks the property it names.
-    for (const [schedule, invariant] of [['echoRace', 'typedNeverLost'], ['inflightApply', 'quietAgreement'], ['sentReturns', 'typedNeverLost'], ['focusedRemote', 'focusKept'], ['staleList', 'quietAgreement']]) {
+    // Draft sync: each race starts from no draft on either side (Juno's clock behind for `behindClock`); its bug mode breaks the property it names.
+    for (const [schedule, invariant, init = 'initFresh'] of [
+      ['echoRace', 'typedNeverLost'], ['inflightApply', 'quietAgreement'], ['sentReturns', 'typedNeverLost'], ['focusedRemote', 'focusKept'],
+      ['staleList', 'quietAgreement'], ['clearStamp', 'drainBound'], ['staleClaim', 'quietAgreement'], ['staleAbsence', 'quietAgreement'],
+      ['filesOnly', 'drainBound'], ['filesSend', 'filesKept'], ['sentElsewhere', 'quietAgreement'], ['listsFail', 'drainBound'],
+      ['behindClock', 'typedNeverLost', 'initBehind'], ['quitTyping', 'quitKeepsTyping'],
+    ]) {
       simulate('drafts', `${schedule}Step`, 'invariants', `drafts-${schedule}.itf.json`, false, false,
-        { init: 'initFresh', samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
-      simulate('drafts', `${schedule}BugStep`, invariant, `drafts-${schedule}-bug.itf.json`, true, false, { init: 'initFresh' })
+        { init, samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
+      simulate('drafts', `${schedule}BugStep`, invariant, `drafts-${schedule}-bug.itf.json`, true, false, { init })
     }
     for (const [schedule, init] of [['firstRun', 'initFirstRun'], ['offlineRestart', 'initFresh']]) {
       simulate('drafts', `${schedule}Step`, 'invariants', `drafts-${schedule}.itf.json`, false, false,
