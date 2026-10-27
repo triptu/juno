@@ -32,9 +32,9 @@ What Juno decides: whether a message on Auto needs the owner. What the owner dec
 
 ## Hours and presence
 
-1. **Notification hours.** Outside them the Mac does not notify. Juno always writes the same hours to Slack's own schedule, so the phone goes quiet too (SPEC 14, "Slack's notification schedule"). It writes only when the hours change, never its defaults, and leaves a schedule changed in Slack alone until Use Juno's hours.
-2. **Active in Slack.** Inside them Slack shows the owner as active; outside, away. Both sets of hours default to weekdays, 9am to 7pm, and can differ.
-3. **Away by hand.** The avatar menu has "Set yourself away" or "Set yourself active". It changes presence only, and lasts until the next switch in the active hours.
+1. **Notification hours.** Outside them the Mac does not notify. Juno always writes the same hours to Slack's own schedule, so the phone goes quiet too (SPEC 14, "Slack's notification schedule"). It writes only when the hours change, and leaves a schedule changed in Slack alone until Use Juno's hours. Until the owner sets them, the notification hours are Slack's own schedule, and Juno writes nothing.
+2. **Active in Slack.** Inside them Slack shows the owner as active; outside, away. Until the owner sets them there are none, and presence works as in Slack's own app. The two sets of hours can differ.
+3. **Away by hand.** The avatar menu has "Set yourself away" or "Set yourself active". It changes presence only, and lasts until the next switch in the active hours, or without them until the next choice.
 
 ### Presence and the honest limits
 

@@ -685,15 +685,15 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 
 **Notification hours** — "Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too."
 
-- One group card with three rows, Weekdays, Saturday and Sunday, padding `10 14`, row gap 6: a grid of the row's name (13) · from select ("Off" first) · "to" 13 muted · to select, the selects in their own columns so an off row's from lines up; an off row has no "to" or to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm"). The rows are a group named by the section ("Notification hours"), each row a group named by its row, and the selects are named "Weekdays from", "Saturday to" and so on.
-- Slack line, under the rows, inset 14, 12 muted, its height kept when empty so nothing below moves: while the hours are still the defaults on this install, "Slack's schedule changes once you set your notification hours."; while the schedule was changed in Slack, "Your schedule was changed in Slack. Juno leaves it until you change your hours here." and **Use Juno's hours** (secondary, small). There is no switch for Slack's schedule.
-- Default: weekdays 9am to 7pm, Saturday and Sunday off. A to before from crosses midnight.
+- One group card with three rows, Weekdays, Saturday and Sunday, padding `10 14`, row gap 6: a grid of the row's name (13) · from select ("Off" first, after "Any time" while no hours are set) · "to" 13 muted · to select, the selects in their own columns so an off row's from lines up; an off or Any time row has no "to" or to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm"). The rows are a group named by the section ("Notification hours"), each row a group named by its row, and the selects are named "Weekdays from", "Saturday to" and so on.
+- Slack line, under the rows, inset 14, 12 muted, its height kept when empty so nothing below moves: while no notification hours are set, "These are your hours in Slack. Juno follows them until you change them here.", or when Slack has no schedule "Slack has no notification schedule, so nothing is paused. Set hours here to pause notifications."; while hours saved by an older version were never set on this install, "Slack's schedule changes once you set your notification hours."; while the schedule was changed in Slack, "Your schedule was changed in Slack. Juno leaves it until you change your hours here." and **Use Juno's hours** (secondary, small). There is no switch for Slack's schedule.
+- Not set at first: the rows show Slack's schedule, or Any time when Slack has none. Choosing a time or Off in a row sets the hours; rows that showed Any time start at weekdays 9am to 7pm, Saturday and Sunday off. A to before from crosses midnight.
 
 **Active in Slack** — "Outside these hours you show as away."
 
 - One group card: the same three rows as Notification hours, in a group named "Active in Slack", then the note row.
-- Note row (border-top 1px `--border-subtle`, padding `10 14 12`, 12 muted): "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."
-- Default: weekdays 9am to 7pm, Saturday and Sunday off, the same as Notification hours. A to before from crosses midnight.
+- Note row (border-top 1px `--border-subtle`, padding `10 14 12`, 12 muted): "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.", or while no active hours are set "Until you set hours, Juno shows you active whenever you use your Mac, as Slack does."
+- Not set at first: each row shows Any time. Choosing a time or Off in a row sets the hours, the rest starting at weekdays 9am to 7pm, Saturday and Sunday off. A to before from crosses midnight.
 
 **Always notify** — "These notify inside your hours, whatever they say. Turn them all on to be notified the way Slack does by default."
 
