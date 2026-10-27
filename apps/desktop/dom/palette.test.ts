@@ -23,10 +23,12 @@ async function openOnTheme(juno: Juno): Promise<void> {
   await palette.expectResults()
 }
 
-// One launch. The model's command goes first, so its post is the only one; the channel's menu, which scopes the
-// sidebar, goes last.
-domTest('⌘K opens, switches tabs, finds conversations, topics, messages and commands from this Mac, runs them, and keeps its results while typing', async ({ juno, fake, slack, step }) => {
-  const { palette, sidebar, tabs, topic, write, privacy, settings } = juno
+// ⌘K never waits on the network (performance 5.3). Sync's own discovery searches Slack too, never with typed text.
+const searchedSlack = (fake: DomContext['fake']) => fake.calls.filter((call) => call.method.startsWith('search.') && /replica|platfo|nothing like/.test(String(call.args['query'])))
+
+// The model's command goes first, so its post is the only one.
+domTest('⌘K opens, switches tabs, finds conversations, topics, messages and people from this Mac, and runs a model\'s command', async ({ juno, fake, slack, step }) => {
+  const { palette, tabs, topic, write, privacy } = juno
 
   await step('a model\'s command shows above the results, and Enter runs it', async () => {
 
@@ -151,6 +153,13 @@ domTest('⌘K opens, switches tabs, finds conversations, topics, messages and co
     await palette.expectClosed()
     await topic.expectMessage('Reminder: on-call handoff moves to Mondays starting next week.')
   })
+
+  expect(searchedSlack(fake)).toEqual([])
+})
+
+// The channel's menu, which scopes the sidebar, goes last.
+domTest('⌘K runs commands (the theme, an open topic\'s, Settings\' sections), shows each kind on All, and keeps its results while typing', async ({ juno, fake, slack, step }) => {
+  const { palette, sidebar, tabs, topic, settings } = juno
 
   await step('commands: ">theme" switches the theme, and an open topic\'s commands resolve it', async () => {
 
@@ -322,8 +331,7 @@ domTest('⌘K opens, switches tabs, finds conversations, topics, messages and co
       await sidebar.expectScope('platform')
     })
 
-    // ⌘K never waits on the network (performance 5.3). Sync's own discovery searches Slack too, never with typed text.
-    expect(fake.calls.filter((call) => call.method.startsWith('search.') && /replica|platfo|nothing like/.test(String(call.args['query'])))).toEqual([])
+    expect(searchedSlack(fake)).toEqual([])
 })
 
 async function openPalette({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
