@@ -29,10 +29,15 @@
 // again, as after a create whose answer was lost; that list takes the
 // place's draft whatever its stamp while Juno links none. A message sent
 // from the draft names it when it goes to the draft's place, and Slack
-// retires it; a refused post, or one sent elsewhere, leaves it, and Juno
-// deletes it. A draft with files keeps them: sending or clearing it empties
-// its text. Slack never reuses a draft id, so Juno ignores versions of the
-// ids it deleted, sent or saw deleted (`gone`).
+// retires it when the post lands; a refused post, or one sent elsewhere,
+// leaves it for Juno to delete, which looks at it first and leaves one
+// another device changed. A draft with files keeps them: sending or clearing
+// it empties its text. Every send remembers the draft whose text went, by
+// Slack's id or, while a create is not answered, its `client_msg_id`, with
+// Juno's texts that can be on it: a version of it with one of them never
+// brings the text back, whatever the clocks; one with another text is the
+// place's draft. Slack never reuses a draft id, so Juno ignores versions of
+// the ids it deleted, saw retired or saw deleted (`gone`).
 //
 // A version from Slack (an event, a list entry) is stale when it is no
 // newer than the newest stamp Juno has seen, or of a draft that is gone. A
@@ -71,30 +76,40 @@ module draftsProtocol {
 
   // `chosen` is when the writer chose a version (real time, for the
   // properties): the phone's write, or Juno's store of the text it saved.
-  // `juno`: the echo of Juno's own call (for the properties).
-  type Version = { id: int, text: int, stamp: int, deleted: bool, files: bool, chosen: int, juno: bool }
-  type Slot = { id: int, text: int, stamp: int, files: bool, chosen: int }
+  // `cmid` is the `client_msg_id` of the create that made the draft (0 for
+  // the phone's).
+  type Version = { id: int, text: int, stamp: int, deleted: bool, files: bool, chosen: int, cmid: int }
+  type Slot = { id: int, text: int, stamp: int, files: bool, chosen: int, cmid: int }
+  // A draft whose text went as a message: Slack's id (0 while Juno has not
+  // had it), its create's `cmid` (0 when Juno knew the id), and Juno's texts
+  // that can be on it.
+  type Sent = { id: int, cmid: int, texts: Set[int] }
   // `seenAt` is when Juno linked the draft `id`, on Juno's clock. `replaced`
-  // is a local text that lost to a version from Slack before Slack had it.
-  type Local = { text: int, editedAt: int, id: int, stamp: int, seenAt: int, files: bool, replaced: int, chosen: int }
+  // is the text that lost and ⌘Z brings back. `cmid` is the `client_msg_id`
+  // Juno creates the place's draft with; `sent` the drafts whose text went;
+  // `slackText` the text of the newest version Juno has seen of draft `id`.
+  type Local = { text: int, editedAt: int, id: int, stamp: int, seenAt: int, files: bool, replaced: int, chosen: int, cmid: int, sent: Set[Sent], slackText: int }
   // `sending` is the text of the call in flight (-1 for none, 0 for a delete
   // or a clear); `unsure` the texts of calls whose answers were lost, until a
   // list after the last loss (`unsureAt`); `findAt` when a create's answer
   // was lost or Slack said the place has a draft (0 for none); `sent` the
   // drafts Juno must delete: sent elsewhere, or a refused post's.
-  // `resave`: the row only saves again a version taken from Slack. `refusedGen`: the generation Slack refused for good.
+  // `resave`: the row only saves again a version taken from Slack. `refusedGen`: the generation Slack refused for good (-1 for none).
   type Row = { on: bool, gen: int, sending: int, unsure: Set[int], unsureAt: int, findAt: int, sent: Set[int], resave: bool, refusedGen: int }
   // `knew`: when it was claimed, the newest version Juno had seen of the draft it writes had files.
-  type Call = { on: bool, op: str, text: int, id: int, gen: int, edited: int, files: bool, chosen: int, knew: bool, accepted: bool, answer: str, answerId: int, answerStamp: int, answerFiles: bool }
+  // `changed`: a delete of a sent draft another device had changed when Juno looked (for the properties).
+  type Call = { on: bool, op: str, text: int, id: int, gen: int, edited: int, files: bool, chosen: int, knew: bool, changed: bool, cmid: int,
+    accepted: bool, answer: str, answerId: int, answerStamp: int, answerFiles: bool }
   type Read = { on: bool, op: str, text: int, id: int, gen: int, edited: int, files: bool, chosen: int }
   type Rules = {
     echoCheck: bool, resave: bool, tombstone: bool, hold: bool, seenGuard: bool,
     clearTime: bool, claimRead: bool, absenceRecheck: bool, liveFiles: bool, keepFiles: bool,
     deleteElsewhere: bool, keepListing: bool, keepReplaced: bool, quitStores: bool,
-    copyOnce: bool, freshAnswer: bool, refusalByGen: bool, listWhileOwed: bool
+    copyOnce: bool, freshAnswer: bool, refusalByGen: bool, listWhileOwed: bool,
+    versionTied: bool, sentTextRule: bool, createIds: bool
   }
   type State = {
-    clock: int, skew: int, nextText: int, nextId: int,
+    clock: int, skew: int, nextText: int, nextId: int, nextCmid: int,
     slack: Slot,
     local: Local, row: Row, read: Read, call: Call,
     gone: Set[int],
@@ -103,30 +118,33 @@ module draftsProtocol {
     connected: bool, catchup: bool, connectedAt: int, listsLeft: int,
     // A message posted from the draft, naming Slack's draft (0 for none),
     // whose newest version Juno had seen had files.
-    posting: bool, postDraft: int, postKnew: bool,
+    posting: bool, postDraft: int, postKnew: bool, postAt: int,
     // The composer.
     focused: bool, typed: bool, field: int, unsaved: bool, behind: bool,
     sealed: bool, label: str,
     // What the properties and the schedules read.
-    decidedAt: int -> int, sentTexts: Set[int], lost: Set[int],
+    // When the user changed a draft in Juno (`decidedAt`), and when a post that names it retired it (`retiredAt`).
+    decidedAt: int -> int, retiredAt: int -> int, sentTexts: Set[int], lost: Set[int],
     focusBroken: bool, filesLost: bool, typingLost: bool, firstNewer: int, editedSinceStart: bool, listFailures: int,
     // The newest version of each draft Juno has seen (its stamp, and whether it had files); texts Slack refuses
     // for good; a kept text a version from Slack replaced or dropped.
-    newest: int -> { stamp: int, files: bool }, refusedTexts: Set[int], copyLost: bool
+    newest: int -> { stamp: int, files: bool }, refusedTexts: Set[int], copyLost: bool, newerDeleted: bool
   }
 
   var s: State
   var remaining: int
 
-  pure val none: Slot = { id: 0, text: 0, stamp: 0, files: false, chosen: 0 }
-  pure val noCall: Call = { on: false, op: "", text: 0, id: 0, gen: 0, edited: 0, files: false, chosen: 0, knew: false, accepted: false, answer: "", answerId: 0, answerStamp: 0, answerFiles: false }
+  pure val none: Slot = { id: 0, text: 0, stamp: 0, files: false, chosen: 0, cmid: 0 }
+  pure val noCall: Call = { on: false, op: "", text: 0, id: 0, gen: 0, edited: 0, files: false, chosen: 0, knew: false, changed: false, cmid: 0,
+    accepted: false, answer: "", answerId: 0, answerStamp: 0, answerFiles: false }
   pure val noRead: Read = { on: false, op: "", text: 0, id: 0, gen: 0, edited: 0, files: false, chosen: 0 }
   pure val noAbsence = { on: false, id: 0, at: 0 }
   pure val rules: Rules = {
     echoCheck: true, resave: true, tombstone: true, hold: true, seenGuard: true,
     clearTime: true, claimRead: true, absenceRecheck: true, liveFiles: true, keepFiles: true,
     deleteElsewhere: true, keepListing: true, keepReplaced: true, quitStores: true,
-    copyOnce: true, freshAnswer: true, refusalByGen: true, listWhileOwed: true
+    copyOnce: true, freshAnswer: true, refusalByGen: true, listWhileOwed: true,
+    versionTied: true, sentTextRule: true, createIds: true
   }
   // Lists that may fail in a row before a sender without `keepListing` stops asking.
   pure val listTries = 2
@@ -139,21 +157,21 @@ module draftsProtocol {
     val phone = if (slackAt > 0) 2 else 0
     all {
       s' = {
-        clock: 3, skew: skew, nextText: 3, nextId: 2,
-        slack: if (slackAt > 0) { id: 1, text: phone, stamp: slackAt, files: false, chosen: slackAt } else none,
-        local: { text: juno, editedAt: junoAt, id: 0, stamp: 0, seenAt: 0, files: false, replaced: 0, chosen: junoAt },
-        row: { on: junoAt > 0, gen: if (junoAt > 0) 1 else 0, sending: -1, unsure: Set(), unsureAt: 0, findAt: 0, sent: Set(), resave: false, refusedGen: 0 },
+        clock: 3, skew: skew, nextText: 3, nextId: 2, nextCmid: 2,
+        slack: if (slackAt > 0) { id: 1, text: phone, stamp: slackAt, files: false, chosen: slackAt, cmid: 0 } else none,
+        local: { text: juno, editedAt: junoAt, id: 0, stamp: 0, seenAt: 0, files: false, replaced: 0, chosen: junoAt, cmid: 1, sent: Set(), slackText: 0 },
+        row: { on: junoAt > 0, gen: if (junoAt > 0) 1 else 0, sending: -1, unsure: Set(), unsureAt: 0, findAt: 0, sent: Set(), resave: false, refusedGen: -1 },
         read: noRead, call: noCall, gone: Set(),
         events: Set(), fetching: false, fetchAt: 0, fetched: none, absence: noAbsence,
         connected: true, catchup: true, connectedAt: 3, listsLeft: listTries,
-        posting: false, postDraft: 0, postKnew: false,
+        posting: false, postDraft: 0, postKnew: false, postAt: 0,
         focused: false, typed: false, field: juno, unsaved: false, behind: false,
         sealed: false, label: "init",
-        decidedAt: Map(), sentTexts: Set(), lost: Set(),
+        decidedAt: Map(), retiredAt: Map(), sentTexts: Set(), lost: Set(),
         focusBroken: false, filesLost: false, typingLost: false,
         firstNewer: if (junoAt == 0 and slackAt == 0) 0 else if (junoAt > slackAt) juno else phone,
         editedSinceStart: false, listFailures: 0,
-        newest: Map(), refusedTexts: Set(), copyLost: false
+        newest: Map(), refusedTexts: Set(), copyLost: false, newerDeleted: false
       },
       remaining' = drainLimit
     }
@@ -180,6 +198,44 @@ module draftsProtocol {
   // learned of it; `absent` a list's absence; `find` a list that looks for the
   // place's draft while Juno links none.
   pure def observe(st: State, v: Version, seenAt: int, absent: bool, find: bool, r: Rules): State = {
+    val stale = (not(absent) and not(find) and st.local.stamp >= v.stamp) or (r.tombstone and st.gone.contains(v.id))
+    val matches = sentFor(st, v)
+    if (stale or matches.size() == 0) observeVersion(st, v, seenAt, absent, find, r, false, false)
+    else observeSent(st, matches, v, seenAt, absent, find, r)
+  }
+
+  // The drafts whose text went that a version is of: by Slack's id, or by its create's `cmid`.
+  pure def sentFor(st: State, v: Version): Set[Sent] = st.local.sent.filter(x => (x.id != 0 and x.id == v.id) or (x.cmid != 0 and x.cmid == v.cmid))
+
+  // A version of a draft whose text went as a message, whatever the clocks say. With one of Juno's texts it
+  // never brings it back: the link to a draft with files stays (the cleared text goes over it, without
+  // `sentTextRule` the clock rule decides), any other is for Juno to delete. With another text another device
+  // changed it: it is the place's draft, applies over a draft the send emptied, and is kept for ⌘Z when newer
+  // local typing goes over it.
+  pure def observeSent(st: State, matches: Set[Sent], v: Version, seenAt: int, absent: bool, find: bool, r: Rules): State = {
+    val l = st.local
+    val ours = matches.exists(x => x.texts.contains(v.text))
+    val forgotten = { ...st, local: { ...l, sent: l.sent.exclude(matches) } }
+    if (v.deleted) observeVersion(forgotten, v, seenAt, absent, find, r, false, false)
+    else if (ours and l.id == v.id and r.sentTextRule)
+      saw({ ...st, clock: st.clock + 1, local: { ...l, stamp: if (v.stamp > l.stamp) v.stamp else l.stamp, files: v.files, slackText: v.text },
+        row: if (v.text != l.text and not(st.row.on)) { ...st.row, on: true, gen: st.row.gen + 1, resave: false } else st.row }, v.id, v.stamp, v.files)
+    else if (ours and l.id != v.id)
+      { ...st, clock: st.clock + 1,
+        local: { ...l, sent: l.sent.exclude(matches).union(matches.map(x => { ...x, id: v.id })) },
+        // A row only for the delete is no local edit.
+        row: if (st.row.on) { ...st.row, sent: st.row.sent.union(Set(v.id)) } else { ...st.row, on: true, gen: st.row.gen + 1, resave: true, sent: st.row.sent.union(Set(v.id)) } }
+    else if (ours) observeVersion(st, v, seenAt, absent, find, r, false, false)
+    else {
+      val o = observeVersion({ ...forgotten, row: { ...st.row, sent: st.row.sent.exclude(Set(v.id)) } }, v, seenAt, absent, find, r, l.text == 0, true)
+      val lost = o.local.text == l.text and l.text != 0 and o.local.replaced == 0
+      { ...o, local: { ...o.local, replaced: if (lost) v.text else o.local.replaced } }
+    }
+  }
+
+  // A version of the place's draft, by the rules above; `takes` lets it apply over a pending local edit, and
+  // `changed` says another device changed a draft Juno sent (for the properties).
+  pure def observeVersion(st: State, v: Version, seenAt: int, absent: bool, find: bool, r: Rules, takes: bool, changed: bool): State = {
     val l = st.local
     val stale = (not(absent) and not(find) and l.stamp >= v.stamp) or (r.tombstone and st.gone.contains(v.id))
     // Without `liveFiles`, a live draft of files alone counts as deleted.
@@ -189,19 +245,22 @@ module draftsProtocol {
     val same = v.text == l.text
     // A local edit Slack has not acknowledged; without `copyOnce` a resave of Slack's version counts as one.
     val pending = st.row.on and (not(r.copyOnce) or not(st.row.resave))
-    val kept = pending and l.editedAt > v.stamp
+    val kept = not(takes) and pending and l.editedAt > v.stamp
     val applies = not(stale) and not(other) and not(same) and not(own) and not(kept)
     val text = if (deleted) 0 else v.text
     val keep = applies and pending and l.text != 0 and r.keepReplaced
     // The kept text stays; without `copyOnce` the newest replaced text takes its place.
     val copy = if (r.copyOnce and l.replaced != 0) l.replaced else if (keep) l.text else l.replaced
     // Juno's text replaced by a version chosen before it (kept for ⌘Z excuses it only while Juno's clock
-    // runs behind), or, while the clocks agree, a version chosen before the user changed the draft in Juno.
+    // runs behind), or, while the clocks agree, a version chosen before the user changed the draft in Juno
+    // (unless another device changed a draft Juno sent), or, whatever the clocks, one chosen before a post
+    // that named the draft retired it.
     val older = applies and ((l.text != 0 and v.chosen < l.chosen and (st.skew == 0 or not(keep))) or
-      (st.skew == 0 and st.decidedAt.keys().contains(v.id) and v.chosen < st.decidedAt.get(v.id)))
+      (not(changed) and st.skew == 0 and st.decidedAt.keys().contains(v.id) and v.chosen < st.decidedAt.get(v.id)) or
+      (st.retiredAt.keys().contains(v.id) and v.chosen < st.retiredAt.get(v.id)))
     val after = { ...st, clock: st.clock + 1, lost: if (older) st.lost.union(Set(l.text)) else st.lost }
     val linked = { ...l, id: if (deleted) 0 else v.id, stamp: if (absent or v.stamp < l.stamp) l.stamp else v.stamp,
-      seenAt: if (v.id == l.id) l.seenAt else seenAt, files: if (deleted) false else v.files }
+      seenAt: if (v.id == l.id) l.seenAt else seenAt, files: if (deleted) false else v.files, slackText: if (deleted) 0 else v.text }
     val gone = if (deleted) st.gone.union(Set(v.id)) else st.gone
     if (stale) after
     else if (other) { ...after, gone: gone }
@@ -211,9 +270,6 @@ module draftsProtocol {
     else react({ ...after,
       local: { ...linked, text: text, editedAt: v.stamp, replaced: copy, chosen: v.chosen },
       gone: gone, copyLost: st.copyLost or (l.replaced != 0 and copy != l.replaced),
-      // A late echo of Juno's own call, after a list settled it, applies as a version from Slack: it can bring
-      // back a text Juno has since sent, until the deletion that made the list miss it arrives (known limit).
-      sentTexts: if (v.juno) st.sentTexts.exclude(Set(text)) else st.sentTexts,
       row: if (r.resave and (st.row.sending >= 0 or st.row.unsure.size() > 0)) { ...st.row, gen: st.row.gen + 1, resave: true }
         else if (st.row.sent.size() > 0) { ...st.row, gen: st.row.gen + 1, resave: true }
         else { ...st.row, on: false } }, text, r.hold)
@@ -265,16 +321,25 @@ module draftsProtocol {
   action sendWith(here: bool, r: Rules): bool = {
     val id = s.local.id
     val named = id != 0 and (not(s.local.files) or not(r.keepFiles))
+    // A create not yet answered may have made a draft: it is remembered by its `cmid`, and the next create
+    // gets a new one. Without `createIds` it is not remembered.
+    val unanswered = id == 0 and s.row.on and ((s.call.on and s.call.op == "create") or s.row.findAt > 0 or s.row.unsure.size() > 0)
+    val byCreate = unanswered and r.createIds
+    val texts = Set(s.field, s.local.text, if (id != 0) s.local.slackText else 0).union(if (s.row.sending > 0) Set(s.row.sending) else Set()).union(s.row.unsure).exclude(Set(0))
+    val entry = { id: id, cmid: if (id != 0) 0 else s.local.cmid, texts: texts }
     all {
       not(s.sealed), s.focused, s.field != 0, not(s.posting),
       s' = { ...s, clock: s.clock + 1, sentTexts: s.sentTexts.union(Set(s.field)),
-        decidedAt: if (id != 0) s.decidedAt.put(id, s.clock + 1) else s.decidedAt,
         field: 0, unsaved: false, behind: false,
-        local: { ...s.local, text: 0, editedAt: if (r.clearTime) s.clock + 1 - s.skew else 0, id: if (named) 0 else id, files: if (named) false else s.local.files, replaced: 0, chosen: s.clock + 1 },
-        gone: if (named and r.tombstone) s.gone.union(Set(id)) else s.gone,
+        local: { ...s.local, text: 0, editedAt: if (r.clearTime) s.clock + 1 - s.skew else 0, id: if (named) 0 else id, files: if (named) false else s.local.files, replaced: 0, chosen: s.clock + 1,
+          sent: if (id != 0 or byCreate) s.local.sent.union(Set(entry)) else s.local.sent, cmid: if (byCreate) s.nextCmid else s.local.cmid },
+        nextCmid: if (byCreate) s.nextCmid + 1 else s.nextCmid,
+        // Slack retires a draft the post names. One sent elsewhere waits for Juno's delete, which looks at it
+        // first; without `versionTied` it is gone at once, and its later versions are ignored.
+        gone: if (named and (here or not(r.versionTied)) and r.tombstone) s.gone.union(Set(id)) else s.gone,
         row: if (named and not(here) and r.deleteElsewhere) { ...s.row, on: true, gen: s.row.gen + 1, resave: false, sent: s.row.sent.union(Set(id)) }
           else if (s.row.on or (id != 0 and not(named))) { ...s.row, on: true, gen: s.row.gen + 1, resave: false } else s.row,
-        posting: true, postDraft: if (named and here) id else 0, postKnew: knowsFiles(s, id), editedSinceStart: true, label: "send" }
+        posting: true, postDraft: if (named and here) id else 0, postKnew: knowsFiles(s, id), postAt: s.clock + 1, editedSinceStart: true, label: "send" }
     }
   }
   action send = sendWith(true, rules)
@@ -285,8 +350,10 @@ module draftsProtocol {
       s.posting,
       s' = { ...s, clock: s.clock + 1, posting: false, postDraft: 0,
         slack: if (drops) none else s.slack,
+        // Slack retired the draft with the post: nothing from before the send may come back.
+        retiredAt: if (drops) s.retiredAt.put(s.postDraft, s.postAt) else s.retiredAt,
         filesLost: s.filesLost or (drops and s.slack.files and s.postKnew),
-        events: if (s.connected and drops) s.events.union(Set({ id: s.postDraft, text: 0, stamp: s.clock + 1, deleted: true, files: false, chosen: s.clock + 1, juno: false })) else s.events,
+        events: if (s.connected and drops) s.events.union(Set({ id: s.postDraft, text: 0, stamp: s.clock + 1, deleted: true, files: false, chosen: s.clock + 1, cmid: s.slack.cmid })) else s.events,
         label: "postLands" }
     }
   }
@@ -299,22 +366,21 @@ module draftsProtocol {
   }
 
   // Another device types in Slack's draft, attaches files to it, empties its
-  // text keeping its files, or deletes it (clearing or sending it). A text
-  // the phone keeps is chosen again: a sent one may come back with it.
+  // text keeping its files, or deletes it (clearing or sending it).
   pure def phoneWrite(st: State, text: int, files: bool, typed: bool): State = {
-    val v = { id: if (st.slack.id == 0) st.nextId else st.slack.id, text: text, stamp: st.clock + 1, files: files, chosen: st.clock + 1 }
+    val v = { id: if (st.slack.id == 0) st.nextId else st.slack.id, text: text, stamp: st.clock + 1, files: files, chosen: st.clock + 1, cmid: if (st.slack.id == 0) 0 else st.slack.cmid }
     { ...st, clock: st.clock + 1, nextText: if (typed) st.nextText + 1 else st.nextText, nextId: st.nextId + 1, slack: v,
-      sentTexts: st.sentTexts.exclude(Set(text)),
-      events: if (st.connected) st.events.union(Set({ id: v.id, text: text, stamp: v.stamp, deleted: false, files: files, chosen: v.chosen, juno: false })) else st.events,
+      events: if (st.connected) st.events.union(Set({ id: v.id, text: text, stamp: v.stamp, deleted: false, files: files, chosen: v.chosen, cmid: v.cmid })) else st.events,
       editedSinceStart: true }
   }
   action phoneType = all { not(s.sealed), s.events.size() < eventLimit, s' = { ...phoneWrite(s, s.nextText, s.slack.files, true), label: "phoneType" } }
-  action phoneAttach = all { not(s.sealed), not(s.slack.files), s.events.size() < eventLimit, s' = { ...phoneWrite(s, s.slack.text, true, false), label: "phoneAttach" } }
+  // Attaching files to a draft that has some writes it again with the same text.
+  action phoneAttach = all { not(s.sealed), s.events.size() < eventLimit, s' = { ...phoneWrite(s, s.slack.text, true, false), label: "phoneAttach" } }
   action phoneEmpty = all { not(s.sealed), s.slack.files, s.slack.text != 0, s.events.size() < eventLimit, s' = { ...phoneWrite(s, 0, true, false), label: "phoneEmpty" } }
   action phoneDelete = all {
     not(s.sealed), s.slack.id != 0, s.events.size() < eventLimit,
     s' = { ...s, clock: s.clock + 1, slack: none,
-      events: if (s.connected) s.events.union(Set({ id: s.slack.id, text: 0, stamp: s.clock + 1, deleted: true, files: false, chosen: s.clock + 1, juno: false })) else s.events,
+      events: if (s.connected) s.events.union(Set({ id: s.slack.id, text: 0, stamp: s.clock + 1, deleted: true, files: false, chosen: s.clock + 1, cmid: s.slack.cmid })) else s.events,
       editedSinceStart: true, label: "phoneDelete" }
   }
 
@@ -349,21 +415,41 @@ module draftsProtocol {
     val id = if (not(r.claimRead)) s.read.id else if (op == "deleteSent") sentId(s) else s.local.id
     val text = if (r.claimRead) s.local.text else s.read.text
     val nothing = (r.claimRead and not(s.row.on)) or op == "nothing" or (op == "create" and s.row.findAt > 0)
+    // Before deleting a sent draft Juno looks at it (`drafts.info`): one Slack has gone is done with, and one
+    // another device changed (another text, or files) is kept. Without `versionTied` it deletes it anyway.
+    val looks = op == "deleteSent" and r.versionTied
+    val entries = s.local.sent.filter(x => x.id == id)
+    val live = s.slack.id == id
+    val changedNow = live and (s.slack.files or not(entries.exists(x => x.texts.contains(s.slack.text))))
     all {
       s.read.on, not(s.call.on),
-      s' = if (nothing) { ...s, read: noRead,
+      s' = if (looks and not(live)) { ...s, read: noRead, gone: s.gone.union(Set(id)),
+          local: { ...s.local, sent: s.local.sent.exclude(entries) }, row: { ...s.row, sent: s.row.sent.exclude(Set(id)) }, label: "claim" }
+        else if (looks and changedNow) { ...keepSent({ ...s, read: noRead }, id, entries, r), label: "claim" }
+        else if (nothing) { ...s, read: noRead,
           row: if (r.claimRead and s.row.on and op == "nothing" and s.row.findAt == 0 and not(parked(s))) { ...s.row, on: false, sending: -1 } else s.row,
           label: "claim" }
         else { ...s, read: noRead,
           call: { ...noCall, on: true, op: op, text: if (op == "deleteSent" or op == "clear" or op == "delete") 0 else text, id: id,
             gen: if (r.claimRead) s.row.gen else s.read.gen,
             edited: if (r.claimRead) s.local.editedAt else s.read.edited, files: if (r.claimRead) s.local.files else s.read.files,
-            chosen: if (r.claimRead) s.local.chosen else s.read.chosen, knew: knowsFiles(s, id) },
+            chosen: if (r.claimRead) s.local.chosen else s.read.chosen, knew: knowsFiles(s, id), changed: op == "deleteSent" and changedNow, cmid: s.local.cmid },
           row: { ...s.row, sending: if (op == "deleteSent") -1 else if (op == "clear" or op == "delete") 0 else text },
           label: "claim" }
     }
   }
   action claim = claimWith(rules)
+
+  // A sent draft another device changed: its delete is off. With Juno's text and files it is linked again and
+  // its text cleared; with another text it is the place's draft, by the rule.
+  pure def keepSent(st: State, sid: int, entries: Set[Sent], r: Rules): State = {
+    val v = { id: sid, text: st.slack.text, stamp: st.slack.stamp, deleted: false, files: st.slack.files, chosen: st.slack.chosen, cmid: st.slack.cmid }
+    val kept = { ...st, gone: st.gone.exclude(Set(sid)), row: { ...st.row, sent: st.row.sent.exclude(Set(sid)) } }
+    if (entries.exists(x => x.texts.contains(v.text)))
+      saw({ ...kept, local: if (st.local.id != 0) st.local else { ...st.local, id: sid, files: v.files, seenAt: st.clock, slackText: v.text, stamp: if (v.stamp > st.local.stamp) v.stamp else st.local.stamp },
+        row: { ...kept.row, on: true, gen: kept.row.gen + 1, resave: false } }, sid, v.stamp, v.files)
+    else observe(kept, v, st.clock, false, false, r)
+  }
 
   // Slack runs the call; every write it makes is echoed. An update or delete
   // with no plausible edit time is refused (`draft_has_conflict`), and so is
@@ -375,19 +461,21 @@ module draftsProtocol {
     val occupied = not(refused) and c.op == "create" and s.slack.id != 0
     val checked = c.op == "create" or c.op == "deleteSent" or c.edited > 0
     val written = if (refused or not(checked) or occupied) s.slack
-      else if (c.op == "create") { id: s.nextId, text: c.text, stamp: s.clock + 1, files: false, chosen: c.chosen }
-      else if ((c.op == "update" or c.op == "clear") and found) { id: c.id, text: c.text, stamp: s.clock + 1, files: c.files, chosen: c.chosen }
+      else if (c.op == "create") { id: s.nextId, text: c.text, stamp: s.clock + 1, files: false, chosen: c.chosen, cmid: c.cmid }
+      else if ((c.op == "update" or c.op == "clear") and found) { id: c.id, text: c.text, stamp: s.clock + 1, files: c.files, chosen: c.chosen, cmid: s.slack.cmid }
       else if ((c.op == "delete" or c.op == "deleteSent") and found) none
       else s.slack
     val wrote = not(refused) and checked and ((c.op == "create" and not(occupied)) or found)
-    val echo = if (written.id == 0) { id: c.id, text: 0, stamp: s.clock + 1, deleted: true, files: false, chosen: c.chosen, juno: true }
-      else { id: written.id, text: written.text, stamp: written.stamp, deleted: false, files: written.files, chosen: written.chosen, juno: true }
+    val echo = if (written.id == 0) { id: c.id, text: 0, stamp: s.clock + 1, deleted: true, files: false, chosen: c.chosen, cmid: s.slack.cmid }
+      else { id: written.id, text: written.text, stamp: written.stamp, deleted: false, files: written.files, chosen: written.chosen, cmid: written.cmid }
     all {
       c.on, not(c.accepted), s.events.size() < eventLimit,
       s' = { ...s, clock: s.clock + 1, nextId: if (wrote and c.op == "create") s.nextId + 1 else s.nextId, slack: written,
         events: if (s.connected and wrote) s.events.union(Set(echo)) else s.events,
         // Juno's write removed files it had seen on the draft when it claimed the call.
         filesLost: s.filesLost or (wrote and s.slack.files and not(written.files) and c.knew),
+        // Juno deleted a sent draft another device had changed when Juno looked.
+        newerDeleted: s.newerDeleted or (wrote and c.op == "deleteSent" and c.changed),
         call: { ...c, accepted: true,
           answer: if (refused) "refused" else if (not(checked)) "conflict" else if (occupied) "exists" else if (c.op == "create" or ((c.op == "update" or c.op == "clear") and found)) "saved"
             else if (c.op == "update" or c.op == "clear") "notFound" else "deleted",
@@ -407,9 +495,11 @@ module draftsProtocol {
   // what Juno has seen of that draft. A refusal settles the generation it sent.
   action respondAt(r: Rules, dt: int): bool = {
     val c = s.call
-    val l = s.local
+    val l = if (c.op == "deleteSent") { ...s.local, sent: s.local.sent.filter(x => x.id != c.id) } else s.local
+    // Juno's create answered after its text went as a message: Juno deletes it instead of linking it.
+    val createSent = r.createIds and c.op == "create" and c.answer == "saved" and l.id != c.answerId and l.sent.exists(x => x.cmid != 0 and x.cmid == c.cmid)
     val t = s.clock + dt
-    val sent = if (c.op == "deleteSent") s.row.sent.exclude(Set(c.id)) else s.row.sent
+    val sent = if (c.op == "deleteSent") s.row.sent.exclude(Set(c.id)) else if (createSent) s.row.sent.union(Set(c.answerId)) else s.row.sent
     val goneSave = c.answer == "saved" and s.gone.contains(c.answerId)
     val covered = c.answer != "deleted" or l.id == c.id or l.id == 0
     val refused = c.answer == "refused"
@@ -426,14 +516,15 @@ module draftsProtocol {
     all {
       c.on, c.accepted,
       s' = saw({ ...s, clock: t, call: noCall,
-        local: if (refused or goneSave or keepLink or staleSame or c.answer == "exists" or c.answer == "conflict") l
-          else if (c.answer == "saved") { ...l, id: c.answerId, stamp: newer, seenAt: if (c.answerId == l.id) l.seenAt else t, files: c.answerFiles }
+        local: if (createSent) { ...l, sent: l.sent.map(x => if (x.cmid == c.cmid) { ...x, id: c.answerId } else x) }
+          else if (refused or goneSave or keepLink or staleSame or c.answer == "exists" or c.answer == "conflict") l
+          else if (c.answer == "saved") { ...l, id: c.answerId, stamp: newer, seenAt: if (c.answerId == l.id) l.seenAt else t, files: c.answerFiles, slackText: c.text }
           else { ...l, id: if (l.id == c.id) 0 else l.id, files: if (l.id == c.id) false else l.files, seenAt: t },
         gone: if (c.answer == "deleted" or c.answer == "notFound") s.gone.union(Set(c.id)) else s.gone,
         catchup: s.catchup or c.answer == "exists" or c.answer == "conflict",
         row: if (refused) refusedRow else { ...s.row, on: not(done), sending: -1, sent: sent,
           findAt: if (c.answer == "exists") t else if (c.answer == "saved" and not(goneSave)) 0 else s.row.findAt },
-        label: "respond" }, if (c.answer == "saved") c.answerId else 0, c.answerStamp, c.answerFiles)
+        label: "respond" }, if (c.answer == "saved" and not(createSent)) c.answerId else 0, c.answerStamp, c.answerFiles)
     }
   }
   action respondWith(r: Rules): bool = respondAt(r, 1)
@@ -460,6 +551,11 @@ module draftsProtocol {
     }
   }
   action deliverWith(r: Rules): bool = deliverAt(r, 1)
+  // Delivers a live version, not a deletion (for the schedules).
+  action deliverLive(r: Rules): bool = {
+    nondet v = s.events.filter(e => not(e.deleted)).oneOf()
+    all { s.connected, s' = { ...observe(saw(s, v.id, v.stamp, v.files), v, s.clock + 1, false, false, r), clock: s.clock + 1, events: s.events.exclude(Set(v)), label: "deliver" } }
+  }
   action deliver = deliverWith(rules)
   action deliverAny = { nondet dt = Set(0, 1).oneOf() deliverAt(rules, dt) }
 
@@ -482,7 +578,7 @@ module draftsProtocol {
   action finishListWith(r: Rules): bool = {
     val f = s.fetched
     val find = s.row.findAt > 0 and s.fetchAt > s.row.findAt and s.local.id == 0
-    val seen = if (f.id != 0) observe(saw(s, f.id, f.stamp, f.files), { id: f.id, text: f.text, stamp: f.stamp, deleted: false, files: f.files, chosen: f.chosen, juno: false }, s.fetchAt, false, find, r) else s
+    val seen = if (f.id != 0) observe(saw(s, f.id, f.stamp, f.files), { id: f.id, text: f.text, stamp: f.stamp, deleted: false, files: f.files, chosen: f.chosen, cmid: f.cmid }, s.fetchAt, false, find, r) else s
     // The draft Juno links once the entry applied, when the list lacks it.
     val missing = seen.local.id != 0 and seen.local.id != f.id and (not(r.seenGuard) or s.fetchAt > seen.local.seenAt)
     // A list requested after a lost create, or after Slack said the place has a draft, has shown it;
@@ -511,7 +607,7 @@ module draftsProtocol {
       a.on,
       s' = if ((r.absenceRecheck and not(still)) or target == 0) { ...s, absence: noAbsence, label: "absence" }
         // The deletion was chosen before the list was requested.
-        else { ...observe(s, { id: target, text: 0, stamp: s.local.stamp, deleted: true, files: false, chosen: a.at, juno: false }, a.at, true, false, r), absence: noAbsence, label: "absence" }
+        else { ...observe(s, { id: target, text: 0, stamp: s.local.stamp, deleted: true, files: false, chosen: a.at, cmid: 0 }, a.at, true, false, r), absence: noAbsence, label: "absence" }
     }
   }
   action applyAbsence = applyAbsenceWith(rules)
@@ -551,24 +647,28 @@ module draftsProtocol {
   // Typed text is never silently lost: Juno's text is replaced only by a
   // version chosen after it (while Juno's clock runs behind, it may be, and is
   // then kept for ⌘Z); and, while the clocks agree, a draft the user changed
-  // or sent in Juno never takes back a version chosen before that.
+  // in Juno, or sent with a post that names it, never takes back a version
+  // chosen before that. Another device's text Juno had not seen on a draft it
+  // sent otherwise (elsewhere, or with files) comes back as the place's
+  // draft: it is never lost.
   val typedNeverLost = s.lost == Set()
   // A focused composer that was typed in is never overwritten.
   val focusKept = not(s.focusBroken)
-  // While the clocks agree, a sent text never comes back, unless another
-  // device writes it again, or a late echo of a call whose answer was lost
-  // arrives after a list settled that call (it goes again with the deletion
-  // behind it). While Juno's clock runs behind, a send can lose to an edit
-  // made just before it elsewhere, as any local edit can.
-  val sentStaysGone = s.skew == 0 implies (not(s.sentTexts.contains(s.local.text)) and not(s.sentTexts.contains(s.field)))
+  // A sent text never comes back to Juno's draft or composer, whatever the
+  // clocks say: a version of a sent draft with one of Juno's texts never
+  // brings it back, however late it comes or however its stamp compares.
+  val sentStaysGone = not(s.sentTexts.contains(s.local.text)) and not(s.sentTexts.contains(s.field))
+  // Juno never deletes a sent draft another device changed (another text, or
+  // files), when the change was in Slack as Juno looked before deleting.
+  // Slack has no conditional delete: a change in the moment between the look
+  // and the delete can still go with it.
   // The first run merges Juno's old draft and Slack's by the same rule: the newer one stays.
   val firstRunMerged = (quiet and not(s.editedSinceStart)) implies s.local.text == s.firstNewer
   // Juno never removes files the newest version it has seen of a draft has:
   // sending or clearing it empties its text, and a save keeps them, however
   // late an older answer comes. Files another device attached that Juno had
   // not seen when it made the call can go with a send or a save, as Slack has
-  // no conditional write, and so can files attached to a draft Juno is done
-  // with (sent elsewhere) before it deletes it.
+  // no conditional write.
   val filesKept = not(s.filesLost)
   // Local text kept for ⌘Z stays until a local action lets it go: no version
   // from Slack replaces or drops it.
@@ -577,7 +677,8 @@ module draftsProtocol {
   val quitKeepsTyping = not(s.typingLost)
   val reachedAgreement = quiet and agreed
   val drainBound = remaining > 0 or reachedAgreement
-  val invariants = quietAgreement and typedNeverLost and focusKept and sentStaysGone and firstRunMerged and filesKept and copyKept and quitKeepsTyping and drainBound
+  val changedKept = not(s.newerDeleted)
+  val invariants = quietAgreement and typedNeverLost and focusKept and sentStaysGone and firstRunMerged and filesKept and copyKept and changedKept and quitKeepsTyping and drainBound
 
   // A list is asked for when one is owed (a catch-up, a lost answer, `attached_draft_exists`); a sweep's lists are inputs.
   action listOwed = all { s.catchup, startListAny }
@@ -961,6 +1062,72 @@ module draftsProtocol {
   )
   action sameMillisListStep = sameMillisList(rules)
   action sameMillisListBugStep = sameMillisList({ ...rules, listWhileOwed: false })
+
+  // Juno sends the draft into another place; before its delete, the phone
+  // changes the draft, and Juno has not heard it. Without tying the cleanup to
+  // the version sent, Juno deletes the phone's text.
+  action changedBeforeDelete(r: Rules): bool = tick(
+    if (s.sealed) progress else
+    if (s.label == "init") focus else
+    if (s.label == "focus") typeText(false) else
+    if (s.label == "type") pause else
+    if (s.label == "store") read else
+    if (s.label == "read" and not(s.posting)) claim else
+    if (s.label == "claim" and not(s.posting)) accept else
+    if (s.label == "accept" and not(s.posting)) respond else
+    if (s.label == "respond") sendWith(false, r) else
+    if (s.label == "send") phoneType else
+    if (s.label == "phoneType") read else
+    if (s.label == "read") claimWith(r) else
+    if (s.label == "claim" and s.call.on) accept else
+    seal
+  )
+  action changedBeforeDeleteStep = changedBeforeDelete(rules)
+  action changedBeforeDeleteBugStep = changedBeforeDelete({ ...rules, versionTied: false })
+
+  // Juno's clock runs behind. Juno links a draft with files; the phone adds a
+  // file, and that update, still with the text, reaches Juno after Juno sent
+  // the text. Without the sent text's rule, the clock rule takes it, and the
+  // sent text comes back.
+  action skewedFilesSend(r: Rules): bool = tick(
+    if (s.sealed) progress else
+    if (s.label == "init") phoneType else
+    if (s.label == "phoneType") phoneAttach else
+    if (s.label == "phoneAttach" and not(s.local.files)) deliver else
+    if (s.label == "deliver" and s.events.size() > 0 and not(s.focused)) deliver else
+    if (s.label == "deliver" and not(s.focused)) phoneAttach else
+    if (s.label == "phoneAttach") focus else
+    if (s.label == "focus") sendWith(true, r) else
+    if (s.label == "send") deliverWith(r) else
+    seal
+  )
+  action skewedFilesSendStep = skewedFilesSend(rules)
+  action skewedFilesSendBugStep = skewedFilesSend({ ...rules, sentTextRule: false })
+
+  // Juno's create lands, but its answer and echo are late; Juno sends the
+  // text, the phone deletes the draft, the answer is lost, and a list finds
+  // nothing, which settles the lost create. Without remembering the create by
+  // its `client_msg_id`, its late echo brings the sent text back.
+  action lateCreateEcho(r: Rules): bool = tick(
+    if (s.sealed) progress else
+    if (s.label == "init") focus else
+    if (s.label == "focus") typeText(false) else
+    if (s.label == "type") pause else
+    if (s.label == "store") read else
+    if (s.label == "read" and not(s.posting)) claim else
+    if (s.label == "claim" and s.call.on and not(s.call.accepted)) accept else
+    if (s.label == "accept") sendWith(true, r) else
+    if (s.label == "send") phoneDelete else
+    if (s.label == "phoneDelete") lose else
+    if (s.label == "lose") startList else
+    if (s.label == "startList") finishListWith(r) else
+    if (s.label == "finishList") read else
+    if (s.label == "read") claim else
+    if (s.label == "claim") deliverLive(r) else
+    seal
+  )
+  action lateCreateEchoStep = lateCreateEcho(rules)
+  action lateCreateEchoBugStep = lateCreateEcho({ ...rules, createIds: false })
 
   // The first run: Juno's old draft and a newer one in Slack for the same
   // place. Juno's create answers that the place has a draft; the list that
