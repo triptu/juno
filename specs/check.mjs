@@ -442,7 +442,7 @@ const regressions = [
   ['threadranges', 'restartGap', 'countSound', 'thread-restart-gap'],
 ]
 // Specs whose corrected runs must reach their drained agreement.
-const drained = new Set(['outbox', 'catchup', 'metadata', 'mutation-repair'])
+const drained = new Set(['outbox', 'catchup', 'metadata', 'mutation-repair', 'drafts'])
 
 const selectedSpec = huddleOnly ? 'huddle.qnt' : actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
 for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (huddleOnly && name === 'huddle-room.qnt') || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
@@ -450,7 +450,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors', 'threadranges'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors', 'threadranges', 'drafts'])) {
     // Thread coverage posts at most six replies: 4,000 traces of 60 transitions reach their interleavings within the job budget.
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : file === 'threadranges' ? { steps: 60, samples: 4000 } : {})
@@ -479,6 +479,16 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
     simulate('readstate', 'mirrorCatchUpBugStep', 'catchUpNeverBackwards', 'read-mirror-catchup-bug.itf.json', true)
     simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
+    // Draft sync: each race starts from no draft on either side; its bug mode breaks the property it names.
+    for (const [schedule, invariant] of [['echoRace', 'typedNeverLost'], ['inflightApply', 'quietAgreement'], ['sentReturns', 'typedNeverLost'], ['focusedRemote', 'focusKept'], ['staleList', 'quietAgreement']]) {
+      simulate('drafts', `${schedule}Step`, 'invariants', `drafts-${schedule}.itf.json`, false, false,
+        { init: 'initFresh', samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
+      simulate('drafts', `${schedule}BugStep`, invariant, `drafts-${schedule}-bug.itf.json`, true, false, { init: 'initFresh' })
+    }
+    for (const [schedule, init] of [['firstRun', 'initFirstRun'], ['offlineRestart', 'initFresh']]) {
+      simulate('drafts', `${schedule}Step`, 'invariants', `drafts-${schedule}.itf.json`, false, false,
+        { init, samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
+    }
     for (const schedule of ['retryAfterAccept', 'peekThenMark']) {
       simulate('readstate', `${schedule}Step`, 'invariants', `read-${schedule}.itf.json`)
     }

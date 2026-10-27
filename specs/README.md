@@ -2,7 +2,7 @@
 
 These specs describe the protocols and their limits. The model checks test the specs; `bun run specs:conformance` checks that the engine follows `outbox.qnt` ("Conformance" below).
 
-`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation, and edits, deletes and reaction toggles on Juno's own posts. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs. `catchup.qnt` models messages that other clients post, edit, delete and react to while the socket is down, and the recheck after the reconnect; `catchupProtocol` takes constants and `catchup` supplies three messages. `threadranges.qnt` models which replies of a thread the store has proven it holds ("Thread coverage" below).
+`follow.qnt` models the current follow command seam, two threads inside the quiet window, and one older thread. It includes Slack writes, socket delivery, HTTP pages, boot and hourly window passes, shorter reconnect reads, and activity lookups. Its `followProtocol` module takes constants; `follow` supplies the full simulator instance. `readstate.qnt` models read state as implemented in M4: Main and one followed thread that mirror, and one unfollowed thread that stays local. Its `readProtocol` module takes constants; `readstate` supplies the full simulator instance and `readstate-bounded.qnt` a small one. Like follow, it keeps Slack's event clock and Juno's observation clock apart. `outbox.qnt` models message sends, ambiguous failures, restart recovery and reconciliation, and edits, deletes and reaction toggles on Juno's own posts. Its `outboxProtocol` module takes constants; `outbox` supplies two draft IDs. `catchup.qnt` models messages that other clients post, edit, delete and react to while the socket is down, and the recheck after the reconnect; `catchupProtocol` takes constants and `catchup` supplies three messages. `threadranges.qnt` models which replies of a thread the store has proven it holds ("Thread coverage" below). `drafts.qnt` models one topic's draft synced with Slack's draft for the same place, which another device also edits ("Draft sync" below).
 
 ## Quiet-window rules and assumptions
 
@@ -310,6 +310,43 @@ Each race is a directed schedule with a fixed mode (`<name>Step`, must satisfy `
 `failedLookup` (`accepted-unsubscribe-failed-lookup`): `unsubscribe(1)`, `accept(1)`, then `reject(1)` for the lost response, then `failLookup(1)`. In bug mode the compare-and-swap fallback restores the previous follow although Slack says 0. The guard: the row keeps the command's state and the lookup is retried; under `seal` it succeeds and reads 0.
 
 The stale-page regression (`stale-follow-page`) is the older race: a page requested before the command. The command's first stamp stops it; its bug mode has no page guard at all.
+
+## Draft sync
+
+`drafts.qnt` models one topic's draft in Juno, its composer, and Slack's attached draft for the same channel or thread, which a phone also edits (SPEC 8, "Drafts"; research `slack-drafts.md`). Texts are integers and every edit makes a new one; 0 is no draft. One `clock` stamps typing on both devices and Slack's update stamps: the rule that compares a local edit with Slack's stamp assumes Juno's clock and Slack's agree, and the model makes them one clock.
+
+Rules and assumptions:
+
+- Slack keeps one attached draft per place. A create there answers `attached_draft_exists`; deleted and sent drafts refuse updates and deletes; a post that names a draft retires it with `draft_send`; every write is echoed on the socket, to the writer too.
+- A local change (`pause`, `send`) writes the stored draft and bumps the generation of the topic's one pending row. The sender (`request`) sends the stored text when it goes: update for the linked draft, create when Juno links none, delete for a cleared draft. `accept` is Slack running the call, `respond` its answer; the row ends only when no newer change replaced its intent, no find is open, and a delete's answer covers the draft Juno links.
+- A version from Slack (`deliver`, `finishList`) is stale when it is no newer than the newest stamp Juno has seen, or of a draft that is gone (deleted, sent or seen deleted; Slack never reuses an id). It is Juno's own when its text is the one Juno has, is sending, or sent in a call whose answer was lost (until a list after the loss); Juno's own text that has moved on goes over it. It loses to a local edit Slack has not acknowledged when the edit is newer; the edit then goes back to Slack. Otherwise it replaces the draft, and is saved again when a save was out or lost, since that save may land after it.
+- `lose` is a lost answer or a call that failed on the way; a lost call landed before Juno gave up on it, or never. A lost create, or `attached_draft_exists`, opens a find: no create, and no end of the row, until a list requested after it; that list takes the place's draft whatever its stamp while Juno links none.
+- A list (`startList`, `finishList`) is a snapshot taken when it was requested. A linked draft missing from it counts as deleted just after the version Juno knew, but only when the list was requested after Juno linked it. A catch-up needs a list requested after the socket came back, after Juno's current link, and with no call out.
+- The composer takes a changed stored draft unless it has typing not yet stored or it has focus and was typed in since it showed (`behind`); a field held back takes the stored draft on `blur` with nothing typed since. `restart` keeps the store and the row; a call that was out counts as lost.
+- `seal` stops typing, the phone, losses, disconnects and restarts; work, lists, delivery and a final `blur` drain. The full instance holds six socket events.
+
+| Quint name | Plain meaning |
+| --- | --- |
+| `typedNeverLost` | Juno's text is replaced only by a version typed after it, and a draft the user changed or sent in Juno never takes back a version from before that. |
+| `focusKept` | A focused composer that was typed in is never overwritten. |
+| `sentStaysGone` | A sent text never comes back to Juno's draft or composer. |
+| `firstRunMerged` | On the first run, Juno's old draft and Slack's draft for the place are merged by the same rule: the newer one stays. |
+| `quietAgreement` | Once all is quiet, Juno's draft, the composer and Slack's draft agree. |
+| `drainBound` | After input stops, agreement within 48 transitions. |
+
+Each race has a directed schedule from `initFresh` (no draft on either side) and a bug mode that switches off the one rule it shows: `echoRace` (Juno's echo arrives after newer typing; without the echo check the typing is replaced, `typedNeverLost`), `inflightApply` (the phone's edit applies while Juno's update is out and lands after it; without saving it again Slack keeps Juno's older text, `quietAgreement`), `sentReturns` (a list from before a send holds the phone's older version of the sent draft; without remembering gone drafts it comes back, `typedNeverLost`), `focusedRemote` (the phone edits while the field has focus and typing; without holding back the field changes under the caret, `focusKept`) and `staleList` (a list from before Juno's create says no draft; without the guard on when Juno linked it the draft is deleted in Juno only, `quietAgreement`). `firstRunStep` (from `initFirstRun`: Juno's old draft and a newer one in Slack) and `offlineRestartStep` must reach agreement. Writing the spec found eleven rules the first design lacked; each is in the list above, and a random run without it fails.
+
+| Draft action | Engine or fake Slack event |
+| --- | --- |
+| `typeText`, `pause`, `blur` | Typing in `TopicComposer`, its 400 ms store (`drafts.set`), leaving the field |
+| `send` | `messages.send` with `draftOf`: `sendDraft` in its transaction, `draft_id` on the post |
+| `request`, `accept`, `respond` | `sendDraftRow` (`engine/src/draftSend.ts`): `beginDraftSave`, the `drafts.*` call, `endDraftSave` |
+| `lose` | A transport error or lost answer: `deferDraftSave` with `ran` |
+| `postLands`, `postRefused` | The post's answer; a refused post's draft is deleted by `settleSent` |
+| `phoneType`, `phoneDelete` | `fake.putDraft`, `fake.removeDraft` |
+| `deliver` | A `draft_*` frame: `applyDraftEvent` (`engine/src/draftVersions.ts`), `observeDraft` |
+| `startList`, `finishList` | `listDrafts`: `drafts.list { is_active }` pages, absences, `settleDraftFinds` |
+| `disconnect`, `reconnect`, `restart` | The socket's drop and catch-up; an engine restart with `recoverDraftSaves` |
 
 ## Run the checks and bounds
 
