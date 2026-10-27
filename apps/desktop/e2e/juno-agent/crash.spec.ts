@@ -60,9 +60,6 @@ const test = base.extend<{ readonly model: ScriptedModel; readonly mcp: FakeLitt
   },
 })
 
-// Slow: each journey kills the engine or the agent and starts it, or the app, again: three to five launches.
-test.describe.configure({ timeout: 60_000 })
-
 /** Runs `f` on a launch and closes it however `f` ends. */
 async function using<A>(launch: Promise<RunningApp>, f: (juno: Juno, running: RunningApp) => Promise<A>): Promise<A> {
   const running = await launch
@@ -227,8 +224,8 @@ restartTest('after one engine kill, main gives the new engine the AI key and its
     await test.step('before the kill: the chat reads Slack, #eng is open with a draft, and the dot is cleared', () => beforeKill(run))
 
     process.kill(engine, 'SIGKILL')
-    await expect.poll(() => hooks(app, 'enginePid'), { timeout: 15_000 }).not.toBe(engine)
-    await expect.poll(() => hooks(app, 'engineState'), { timeout: 15_000 }).toBe('ready')
+    await expect.poll(() => hooks(app, 'enginePid'), { timeout: 15_000, intervals: [50] }).not.toBe(engine)
+    await expect.poll(() => hooks(app, 'engineState'), { timeout: 15_000, intervals: [50] }).toBe('ready')
 
     await test.step('nothing on screen was rebuilt: the tab, its draft and the rows are as they were', () => screenKept(run))
     await test.step('the new engine sets the dock dot again', async () => {

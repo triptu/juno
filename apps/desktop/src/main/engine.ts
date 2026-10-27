@@ -14,9 +14,8 @@ import { join } from 'node:path'
 import { Schema } from 'effect'
 import { Events, EngineToMain, type EngineConfig, type MainToEngine, type PortRequestResult } from '@juno/contract'
 import { startupMark } from './startupMarks'
+import { restartBackoff } from './restartBackoff'
 
-const BACKOFF_BASE_MS = 1_000
-const BACKOFF_CAP_MS = 30_000
 const CRASH_WINDOW_MS = 120_000
 const CRASH_LIMIT = 5
 /** How long a quit waits for the engine to finish and exit before it is killed. */
@@ -184,7 +183,7 @@ export class EngineSupervisor {
       return
     }
     this.state = 'restarting'
-    const delay = Math.min(BACKOFF_BASE_MS * 2 ** this.attempt, BACKOFF_CAP_MS)
+    const delay = restartBackoff(this.attempt)
     this.attempt++
     console.warn(`main: engine exited with code ${code}; restarting in ${delay} ms`)
     this.restartTimer = setTimeout(() => {

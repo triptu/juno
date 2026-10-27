@@ -36,7 +36,7 @@ export async function readySynced(juno: Juno): Promise<void> {
 }
 
 export async function agentReady(app: ElectronApplication | AppSurface): Promise<void> {
-  await expect.poll(() => hooks(app, 'agentState'), { timeout: 30_000 }).toBe('ready')
+  await expect.poll(() => hooks(app, 'agentState'), { timeout: 30_000, intervals: [50] }).toBe('ready')
 }
 
 /** Opens the Juno tab and returns its chat. */
@@ -127,7 +127,7 @@ export async function launchArmed(userData: string, options: LaunchOptions, poin
 /** Waits until the agent process `pid` has gone. */
 export async function expectKilled(app: ElectronApplication, pid: number | undefined): Promise<void> {
   if (pid === undefined) throw new Error('No agent process to watch')
-  await expect.poll(() => hooks(app, 'agentPid'), { timeout: 30_000 }).not.toBe(pid)
+  await expect.poll(() => hooks(app, 'agentPid'), { timeout: 30_000, intervals: [50] }).not.toBe(pid)
 }
 
 /** Arms the next agent only, keeping main's fake keychain alive across its restart. */
