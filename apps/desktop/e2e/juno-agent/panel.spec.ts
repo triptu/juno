@@ -1,9 +1,9 @@
-// The Juno chat and panel in the browser, as one journey from a synced start with the agent ready: an answer
-// leaves the owner's bubble where it painted; an answer on screen in the focused window is read; a question
-// written on Home goes to the chat with its picks and its field where Home's was; the panel's width beside a
-// topic and when it covers one, the emoji list's Esc (an emoji pick inserts with execCommand), its first frame and
-// its surfaces in dark mode; the open panel following a selection; and the panel at its bottom keeping a new
-// answer in view. Opening, closing, state per tab and Ask Juno are in the DOM lane
+// The Juno chat and panel in the browser, as three journeys from a synced start with the agent ready. The chat: an
+// answer leaves the owner's bubble where it painted; an answer on screen in the focused window is read; a question
+// written on Home goes to the chat with its picks and its field where Home's was. The panel beside a topic: its width
+// there and when it covers one, the emoji list's Esc (an emoji pick inserts with execCommand), its surfaces in dark
+// mode, and the open panel following a selection. A long panel: its first frame, and at its bottom a new answer kept
+// in view. Opening, closing, state per tab and Ask Juno are in the DOM lane
 // (`dom/juno-agent/panel.test.ts`), and the rest of the Juno tab too (`dom/juno-agent/chat.test.ts`).
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Locator } from '@playwright/test'
@@ -41,8 +41,6 @@ const test = chatTest.extend<{ readonly gate: { readonly wait: Promise<void>; re
 
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 180_000 })
-
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 const panelOf = (juno: Juno) => juno.win.locator('aside[data-juno-panel]')
@@ -53,7 +51,7 @@ async function ready(juno: Juno): Promise<void> {
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }
 
-test('the Juno chat and panel: answers move nothing and are read on screen, a Home question keeps its picks and field, the panel\'s widths, first frame and dark surfaces, a selection it follows, and a new answer at its bottom', async ({ juno, model, gate }) => {
+test('the Juno chat: an answer moves nothing and is read on screen, and a Home question keeps its picks and field', async ({ juno, model }) => {
   await ready(juno)
   // First, while the chat is empty: the probe follows the first owner bubble on screen.
   await test.step('a Juno response leaves the owner bubble where it first painted', async () => {
@@ -67,11 +65,19 @@ test('the Juno chat and panel: answers move nothing and are read on screen, a Ho
   })
   await test.step('an answer that arrives while the chat is on screen in the focused window is read, with no "new" divider', () => readOnScreen(juno))
   await test.step('a question written on Home goes to the Juno chat with its picks, the field where Home’s was, and Back returns to Home; the Juno tab takes @ and # picks too', () => homeQuestion(juno, model))
+})
+
+test('the Juno panel beside a topic: its widths, an emoji list\'s Esc, its dark surfaces, and a selection it follows', async ({ juno, model }) => {
+  await ready(juno)
   await test.step('440px beside the topic, and Esc closes an emoji list before the panel', () => widthAndEmoji(juno, model))
   await test.step('the panel covers the topic when the topic would keep less than 480px, keeping its draft and focus', () => resizePanel(juno))
-  await test.step('the panel opens at the newest message on its first frame', () => firstFrame(juno))
   await test.step('in dark mode no light surface shows in the panel', () => darkSurfaces(juno))
   await test.step('the open panel follows later selections: ⌘J asks about them, Backspace on the chip removes it, and a drag while the field has focus gives a new chip', () => followSelection(juno, model))
+})
+
+test('a long Juno panel opens at its newest message on its first frame, and at its bottom keeps a new answer in view', async ({ juno, gate }) => {
+  await ready(juno)
+  await test.step('the panel opens at the newest message on its first frame', () => firstFrame(juno))
   await test.step('the panel at the bottom keeps a new answer fully in view', () => answerAtBottom(juno, gate))
 })
 
@@ -300,7 +306,7 @@ async function highlight(juno: Juno, row: Locator, words: string): Promise<void>
   await expect.poll(() => juno.win.evaluate(() => document.getSelection()?.toString())).toBe(words)
 }
 
-/** The panel is open beside the Postgres thread, from the step before. */
+/** The panel is open beside the Postgres thread, from the dark surfaces step. */
 async function followSelection(juno: Juno, model: { readonly inputs: () => ReadonlyArray<string> }): Promise<void> {
   await juno.topic.expectTitle(POSTGRES)
   const panel = JunoChatPane.panel(juno.win)
@@ -351,7 +357,7 @@ function expectHeldAtEnd(seen: Frame[]): void {
   expect(seen.filter((frame) => !frame.inView || frame.distance > 1)).toEqual([])
 }
 
-/** The panel is open, with more than a screenful of bubbles from the steps before. */
+/** The panel is open, with more than a screenful of bubbles from the first frame step. */
 async function answerAtBottom(juno: Juno, gate: { readonly open: () => void }): Promise<void> {
   const { win } = juno
   const panel = JunoChatPane.panel(win)

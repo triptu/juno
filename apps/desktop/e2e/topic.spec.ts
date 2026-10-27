@@ -14,8 +14,6 @@ import type { Juno, Landing } from './driver/juno'
 import { expect, syncedTest, test, type Fixtures } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 
-test.describe.configure({ timeout: 90_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
@@ -86,11 +84,18 @@ const longTest = test.extend({
 })
 const THREAD = 'Review the rollout checklist 1'
 
-longTest('a long thread opens 80px below the band and loads older pages in place; scrolled up a reply waits unread; each of two tabs keeps its scroll; a notification for it focuses its tab, scrolls and flashes', async ({ juno, slack, fake }) => {
+longTest('a long thread opens 80px below the band and loads older pages in place; scrolled up a reply waits unread', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   await test.step('opens with the first new reply 80px below the header band, and older pages load without moving what is on screen', () => opensAtDivider(juno, slack))
   await test.step('scrolled up, a reply shows "1 new message" and stays unread until Jump to latest', () => scrolledUp(juno, slack))
+})
+
+longTest('a long thread: each of two tabs keeps its scroll; a notification for it focuses its tab, scrolls and flashes', async ({ juno, slack, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(THREAD).open()
+  await juno.topic.expectAtBottom()
   await test.step('one topic in two tabs: each tab keeps its own scroll position, and comes back there after messages arrive while it is hidden', () => twoTabs(juno, fake, THREAD))
   await test.step('a notification for a topic open in another tab focuses it, scrolls to the message and flashes it', () => notificationFocuses(juno, slack))
 })
