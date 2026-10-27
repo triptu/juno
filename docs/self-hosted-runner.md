@@ -103,6 +103,25 @@ Logs, test reports and coverage arrive in `.remote/<job>/`; split plans have a
 `plan.log` plus child `run.log` files. `bun run remote:usage` summarizes retained
 logs across worktrees, including failed and incomplete runs.
 
+### Host crash notifications
+
+On 2026-10-27 all 433 Electron SIGTRAP records from the preceding day named
+`electron --version`. Replaying that warm-up printed Chromium's fatal
+`setuid_sandbox_host.cc:166` check: its sandbox helper was not root-owned with
+mode 4755. `--no-sandbox` returned 0 without a display; no GPU or teardown change
+was needed. The eight Node SIGABRTs came from two gallery jobs with 256 MB heaps:
+their stacks resolve to `node::OOMErrorHandler` and V8's `FatalProcessOutOfMemory`.
+The [bounded gallery walk](reviews/2026-10-27-gallery-cpu.md#the-real-input-walk-over-every-state)
+already fixed that cause in `46bbe1d53`.
+
+The runner fix passed 47 host checks. A deliberate Node abort still printed its
+stack and returned 134, with no new systemd coredump record. A zero-limit control
+did create a record, without a stored core. With both fixes, desktop job
+`juno-1793079835087-68806-bf8e7ffb` passed all eight checks in `app.spec.ts` and
+`juno-agent/crash.spec.ts` (browser and Electron, including crash recovery).
+Between 05:43:54 and 05:44:41 UTC the host's record count stayed at 2,751;
+`coredumpctl list --since '2026-10-27 05:43:54 UTC'` found no new records.
+
 ## Cancellation and sleep
 
 On macOS the client runs `caffeinate -i -w <pid>` throughout remote preparation,
