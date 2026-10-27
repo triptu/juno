@@ -18,6 +18,16 @@ import { DomApp, domSnapshot, startDomApp, tempUserData, warmWorker } from './ap
 import { PageClock } from './clock'
 import { Juno } from './driver/juno'
 
+/**
+ * A counted test's page time stands still while its timers run: the page's clock ticks at each real minute (`nowAtom`),
+ * and a step that crossed one counted the rows whose "2m" label changed, or every message row at a ten-minute step.
+ */
+function fixedClock(): PageClock {
+  const clock = new PageClock()
+  clock.setFixedTime(Date.now())
+  return clock
+}
+
 const gcAboveBytes = Number(process.env.JUNO_DOM_GC_MB ?? 400) * 2 ** 20
 
 /** A model a test serves the agent from: the fake OpenRouter or a scripted one. */
@@ -36,7 +46,7 @@ export interface DomTestOptions<M extends Model | undefined = undefined> {
   readonly clock?: boolean | number | Date
   /** Starts the model the agent talks to; the agent runs with it unless `engine.agent` is false, and the engine's AI uses it. */
   readonly model?: () => Promise<M & Model>
-  /** The engine's frames reach the page one at a time, so counted renders do not depend on timing (`work.ts`). */
+  /** The engine's frames reach the page one at a time and the page's time stands still, so counted renders do not depend on timing (`work.ts`). */
   readonly counted?: boolean
   readonly timeout?: number
   /** Tags, as a Playwright test has them: a test with a tag JUNO_SKIP_TAGS names is skipped (`@heavy-huddle`, scripts/test-areas.mjs). */
@@ -80,7 +90,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
   performance.clearMeasures()
   const model = options.model === undefined ? undefined : await options.model()
   try {
-    const clock = options.clock === undefined || options.clock === false ? undefined : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())
+    const clock = options.clock === undefined || options.clock === false ? (options.counted === true ? fixedClock() : undefined) : new PageClock(options.clock === true ? undefined : new Date(options.clock).getTime())
     const engine: EngineOptions = { ...(model === undefined ? {} : { agent: true, fakeOpenRouterUrl: model.origin }), ...options.engine }
     if (options.fake !== undefined && options.synced !== false) throw new Error('A fake of its own needs `synced: false`: the snapshot is of the default seed.')
     warmWorker()

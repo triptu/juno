@@ -256,7 +256,7 @@ async function pickASpellingGuess(juno: Juno): Promise<void> {
 
   // An early right-click can leave macOS's asynchronous check without a
   // spelling marker. Make another edit outside the word between attempts
-  // so the checker runs again. Linux may still be loading its dictionary.
+  // so the checker runs again. On Linux the dictionary is in place before launch (`spellDictionary.ts`).
   await expect
     .poll(
       async () => {
