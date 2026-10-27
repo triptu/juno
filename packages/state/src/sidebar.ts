@@ -28,6 +28,7 @@ import { engineStatusAtom } from './engine'
 import { quietDaysAtom } from './quietWindow'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { holdOrder } from './holdOrder'
+import { keepPainted } from './paintedOrder'
 import { traceHold, traceList } from './sidebarTrace'
 import type { Registry } from './client'
 import { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
@@ -182,12 +183,10 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
     // Finishing sync is not a reason to reorder a painted list. The next live
     // activity or an explicit filter change resumes the ordinary recency order.
     if (shown.meta === next.meta) return quietDays < shown.quietDays ? { ...shown, quietDays } : shown
-    // A catch-up keeps a painted list in place.
+    // A catch-up keeps a painted list in place, except for activity since the engine started.
     if ((syncing && !building) || quietDays > shown.quietDays) {
-      const kept = shown.order.filter((id) => next.rows.has(id))
-      const known = new Set(kept)
-      const order = [...kept, ...next.order.filter((id) => !known.has(id))]
-      return { ...next, order: sameOrder(shown.order, order) ? shown.order : order, filter, quietDays }
+      const since = status._tag === 'Success' ? status.value.startedAt : Infinity
+      return { ...next, order: keepPainted(shown, next, since), filter, quietDays }
     }
   }
   return { ...next, filter, quietDays, ...mark }
