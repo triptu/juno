@@ -233,6 +233,23 @@ export const ConversationsOpenFields = {
   already_open: opt(S.Boolean),
 } as const
 
+// conversations.join and conversations.leave (research section 3, "Joining and leaving")
+
+export const ConversationsJoinArgs = S.Struct({ channel: S.String })
+export type ConversationsJoinArgs = typeof ConversationsJoinArgs.Type
+
+/** The joined channel. Kept optional: Juno takes membership from its own call and the `channel_joined` event, not from this object. */
+export const ConversationsJoinFields = {
+  channel: opt(Channel),
+  already_in_channel: opt(S.Boolean),
+} as const
+
+export const ConversationsLeaveArgs = S.Struct({ channel: S.String })
+export type ConversationsLeaveArgs = typeof ConversationsLeaveArgs.Type
+
+/** `not_in_channel: true` when the user was not in it; the call still succeeds. */
+export const ConversationsLeaveFields = { not_in_channel: opt(S.Boolean) } as const
+
 // api.getFlannelHttpUrl
 
 export const GetFlannelHttpUrlArgs = S.Struct({ include_external_workspaces: opt(FormBoolean) })
