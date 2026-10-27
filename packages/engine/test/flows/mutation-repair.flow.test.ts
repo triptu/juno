@@ -6,6 +6,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
+import { limitScale } from '@juno/testing/limits'
 import { millisToTs, Ts } from '@juno/domain'
 import { productionTiming } from '../../src/config'
 import { controlledClock, controlledSweeps } from '../controlledClock'
@@ -279,7 +280,7 @@ it('repairs offline changes in a thread outside the top ten on the large seed, w
   expect(engine.fake.calls.filter((c) => c.method !== 'client.getWebSocketURL' && c.method !== 'huddles/info').length).toBeLessThan(40)
   await nothingLeftAtNextStart(engine, { ...QUIET_FOLLOWS, recheckTopics: 10 })
 // Slow: its setup is a first sync of all 300 conversations, which the repair budget needs; CPU, not a wait (1 s on a Mac, 3 to 5 s in the laptop's full run).
-}, 10_000)
+}, 10_000 * limitScale())
 
 // The baseline is never promoted across a gap, a half-open socket or a failed frame.
 it('does not refresh a sweep baseline across a socket gap while counts is in flight', async () => {

@@ -15,10 +15,12 @@ import { HostPool, type TestHost } from '../e2e/browser/host'
 import { copySnapshot, matchingFake, sharedSnapshot, snapshotKey, snapshotState, type SnapshotMade, type WebSnapshot } from '../e2e/browser/snapshotCache'
 import { seedKey, seedOption, type SyncedSeed } from '../e2e/seeds'
 import type { EngineOptions } from '../web/host/testHost'
+import type { ConnectionState } from '@juno/state'
+import type { WebPageHandle } from '../web/page/connect'
 import type { WebTestSeam } from '../web/page/testSeam'
 import { PageClock } from './clock'
 import { Dom } from './input'
-import { holdReplies } from './socket'
+import { engineOffline, holdReplies } from './socket'
 import { closeWindow, DOM_BUILD, openWindow, warmRenderer } from './window'
 
 let pool: HostPool | undefined
@@ -107,6 +109,16 @@ export class DomApp {
   /** Holds the engine's replies to the RPC `tags` the page asks for from now on; the returned function delivers them. */
   holdReplies(...tags: ReadonlyArray<string>): () => void {
     return holdReplies(this.window, tags)
+  }
+
+  /** Drops the page's engine socket and refuses its redials until the returned function lets them through (`socket.ts`). */
+  engineOffline(): () => void {
+    return engineOffline(this.window)
+  }
+
+  /** The engine connection as the renderer sees it (`web/page/connect.ts`). */
+  get connection(): ConnectionState {
+    return (this.window as unknown as { __junoWeb: WebPageHandle }).__junoWeb.connection()
   }
 
   /** The page's test seam (`web/page/testSeam.ts`): menus, links and app-menu commands. */

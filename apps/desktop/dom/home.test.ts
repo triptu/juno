@@ -70,7 +70,7 @@ domTest('during the first sync Home shows, and shows rows before the sync ends',
   })
 }, AI)
 
-domTest('Home shows what waits from the sidebar, each row opens its topic, and a newer question comes first', async ({ juno, slack, clock, userData }) => {
+domTest('Home shows what waits from the sidebar, each row opens its topic, and a newer question comes first', async ({ juno, slack, clock, userData, app }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar, topic, tabs } = juno
@@ -99,14 +99,15 @@ domTest('Home shows what waits from the sidebar, each row opens its topic, and a
   await topic.expectTitle('Sam')
 
   // Pick up where you left off: a topic open for a minute, then new messages.
-  // The visit's minute starts as the tab shows the topic. Most of it runs on the page's clock, the last seconds in
-  // real time. In the browser lane the engine socket's pings run on that clock too: a long step leaves no time for
-  // their answers, so the socket drops and redials, and the visit, if written while it is down, is lost. The engine
-  // is live again before the minute ends.
+  // The visit's minute starts as the tab shows the topic. The engine connection is down as the minute ends, so the
+  // visit is made offline; it reaches the engine once the page dials again.
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
   await clock.runFor('00:55')
-  await juno.expectEngineLive()
+  const online = app.engineOffline()
+  await expect.poll(() => app.connection).toBe('reconnecting')
+  await clock.runFor('00:05')
+  online()
   await expect.poll(() => readUserDb(userData, slack.fake.teamId, (db) => db.prepare('SELECT topic_id FROM topic_visits ORDER BY seen_at DESC LIMIT 1').get()?.['topic_id']), { timeout: 15_000 }).toBe(threadId(slack, POSTGRES))
   await sidebar.row(OFFSITE).open()
   await topic.expectTitle(OFFSITE)

@@ -23,6 +23,7 @@ import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import { draftsDiscard, draftsKeep, followUpsMarkDone, followUpsNotDone, homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, tidyUpSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
+import { errorOf } from './result'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
 import { homeAppeared, homeGreeting, homeScene, type HomeScene } from './homeScene'
@@ -107,14 +108,31 @@ export function homeHeading(view: HomeView, items: ReadonlyArray<HomeItem>, appe
   }
 }
 
+/** How long a visit the engine did not get waits before it is sent again. */
+const VISIT_RETRY_MILLIS = 1_000
+
 /**
  * Follows the active tab and records a topic once it has been on screen
  * for `VISIT_MILLIS`, and again when it leaves, so the engine knows the
- * last topic the user had open. Returns the stop function.
+ * last topic the user had open. A visit made while the engine connection is
+ * down (a reconnect, a restart) is sent again each second until it lands;
+ * visits go one at a time, in order, so one held back never lands after a
+ * later one. Returns the stop function.
  */
 export function startVisitLog(registry: Registry): () => void {
   let current: { readonly id: string; timer: ReturnType<typeof setTimeout> | undefined; counted: boolean } | undefined
-  const visit = (id: string) => void runCommand(registry, homeVisit, { id })
+  let stopped = false
+  let sending: Promise<void> = Promise.resolve()
+  const send = async (id: string) => {
+    for (;;) {
+      const exit = await runCommand(registry, homeVisit, { id })
+      if (stopped || errorOf(exit)?._tag !== 'RpcClientError') return
+      await new Promise((resume) => setTimeout(resume, VISIT_RETRY_MILLIS))
+    }
+  }
+  const visit = (id: string) => {
+    sending = sending.then(() => send(id))
+  }
   const leave = () => {
     if (current === undefined) return
     if (current.timer !== undefined) clearTimeout(current.timer)
@@ -140,6 +158,7 @@ export function startVisitLog(registry: Registry): () => void {
   return () => {
     unsubscribe()
     leave()
+    stopped = true
   }
 }
 

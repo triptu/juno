@@ -25,7 +25,6 @@ import { ignoredChannelsAtom } from './ignored'
 import { topicAtom } from './messages'
 import { tabsAtom, tabTopic, type Tabs } from './tabs'
 import { engineStatusAtom } from './engine'
-import { quietDaysAtom } from './quietWindow'
 import { emptyWindow, samePerson, sameOrder, type ListWindow } from './list'
 import { holdOrder } from './holdOrder'
 import { keepPainted } from './paintedOrder'
@@ -67,7 +66,6 @@ export const nowAtom = Atom.make<number>((get) => {
 
 /** The window the sidebar shows, and the filter it belongs to. */
 export interface SidebarWindow extends ListWindow<TopicRow> {
-  readonly quietDays: number
   /** The filter of these rows. It lags `sidebarFilterAtom` until the new filter's first snapshot arrives. */
   readonly filter: TopicListFilter
   /** Rows held for open tabs, including those that become unread again. */
@@ -76,7 +74,10 @@ export interface SidebarWindow extends ListWindow<TopicRow> {
   readonly building?: boolean
   /** Shown in a held order (`sidebarListAtom`). */
   readonly held?: boolean
-  /** Kept out of recency order while a sync cycle ran (`keepPainted`): it takes the true order once the cycle ends. */
+  /**
+   * Kept out of recency order while a sync cycle ran (`keepPainted`): it takes the true order once the cycle ends.
+   * A widening of the quiet window does not set it: its rows stay last until the list next changes.
+   */
   readonly kept?: boolean
   /**
    * The true order a kept list took when its cycle ended. Every row it moves
@@ -172,15 +173,14 @@ export function retainOpenTopics(
  */
 const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
   const filter = get(sidebarFilterAtom)
-  const quietDays = get(quietDaysAtom)
   const result = get(topicListAtom(filter))
   const shown = Option.getOrUndefined(get.self<SidebarWindow>())
-  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter, quietDays }
+  if (!AsyncResult.isSuccess(result) || result.value.meta.seq === 0) return shown ?? { ...emptyWindow<TopicRow>(), filter }
   traceList(result.value.meta, result.value.order.length, filter)
   const status = get(engineStatusAtom)
   const syncing = status._tag !== 'Success' || status.value.syncing || status.value.phase._tag === 'booting' || status.value.phase._tag === 'catching-up'
   // An empty cache's list waits for the quick start (membership, DM names, the first followed threads); then rows fill in as they land.
-  if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter, quietDays }
+  if (result.value.meta.windowCovered === false) return shown !== undefined && shown.order.length > 0 ? shown : { ...emptyWindow<TopicRow>(), meta: result.value.meta, filter }
   const next = carryOver(shown, result.value)
   // The first sync builds the list, so its rows take their places as they land and nothing re-sorts when it ends.
   // That lasts until every cycle of it has finished, the follow pass after `live` included.
@@ -188,18 +188,24 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
   const building = firstSync || (shown?.building === true && syncing)
   const mark = building ? { building: true } : {}
   if (shown !== undefined && shown.filter === filter) {
-    const keeping = (syncing && !building) || quietDays > shown.quietDays
+    // The quiet window comes with the rows it was read with, so a widening is seen with the rows it brings,
+    // whichever of the list and the setting reaches the renderer first.
+    const widened = next.meta.quietDays !== undefined && shown.meta.quietDays !== undefined && next.meta.quietDays > shown.meta.quietDays
+    const keeping = (syncing && !building) || widened
     // Nothing new, unless a cycle kept the list out of order and has ended: then the rows settle to their true order.
-    if (shown.meta === next.meta && (keeping || shown.kept !== true)) return quietDays < shown.quietDays ? { ...shown, quietDays } : shown
-    // A cycle keeps a painted list in place, except for live activity (`keepPainted`).
+    if (shown.meta === next.meta && (keeping || shown.kept !== true)) return shown
+    // A cycle or a widening keeps a painted list in place, except for live activity (`keepPainted`). Rows a cycle
+    // kept settle when it ends; the rows a widening adds stay last until the list next changes, even when raising
+    // the window started a cycle.
     if (keeping) {
       const order = keepPainted(shown, next, status._tag === 'Success' ? status.value.startedAt : Infinity)
-      return { ...next, order, filter, quietDays, ...(sameOrder(order, next.order) ? {} : { kept: true }) }
+      const kept = shown.kept === true || (!widened && !sameOrder(order, next.order))
+      return { ...next, order, filter, ...(kept ? { kept: true } : {}) }
     }
     // The settle moves only rows held for changes from elsewhere: it slides, whatever the last write was.
-    if (shown.meta === next.meta) return { ...next, filter, quietDays, ...mark, settled: true }
+    if (shown.meta === next.meta) return { ...next, filter, ...mark, settled: true }
   }
-  return { ...next, filter, quietDays, ...mark }
+  return { ...next, filter, ...mark }
 })
 
 /** The source window plus previously visible topics still shown by a tab. */

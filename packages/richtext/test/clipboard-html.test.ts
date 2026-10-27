@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Window } from 'happy-dom'
 import { clipboardHtml } from '../src/index'
-import { growth } from './scaling'
+import { scanGrowth } from './scaling'
 
 /** `clipboardHtml` reads the browser's DOMParser, Node and Element; these come from a happy-dom window, put back after the file. */
 const dom = ['DOMParser', 'Node', 'Element'] as const
@@ -86,6 +86,6 @@ describe('rich clipboard HTML', () => {
     const pasted = clipboardHtml(html(200_000))
     expect(pasted.text.length).toBeGreaterThan(50_000)
     expect(pasted.links.length).toBeGreaterThan(1_000)
-    expect(growth((bytes) => clipboardHtml(html(bytes)), 50_000)).toBeLessThan(10)
+    expect(scanGrowth((bytes) => clipboardHtml(html(bytes)), 50_000)).toBeLessThan(6)
   })
 })
