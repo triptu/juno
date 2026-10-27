@@ -1288,6 +1288,10 @@ Juno's toolchain image is built on the runner through tstack's shared build
 lock. Dependencies install per run against the Bun cache and store in `/cache/bun` with
 `--frozen-lockfile --prefer-offline`; lockfile changes do not rebuild the image, but
 a new Bun pin does.
+The Electron warm-up uses `--no-sandbox`, as its test launches do, and fails the
+job if it fails. tstack's one-byte soft and hard core limits stop job crashes
+from reaching the host's crash reporter; exit status and stderr still report failures
+([details](self-hosted-runner.md#toolchain-caches-and-results)).
 Electron downloads, verified app builds and the spec cache (`/cache/specs`, which every job
 shares; an entry unused for 14 days is removed) persist under `/cache`, so no cache travels
 with a job. Carrying the Mac's spec cache cost a job about 15 s at 499 MB (packing, upload,

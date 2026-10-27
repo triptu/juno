@@ -89,7 +89,12 @@ toolchain image; every run installs the uploaded workspace, including with an
 override. Images must not depend on a baked `/work`, which tstack mounts as tmpfs.
 
 Each job runs `bun install --frozen-lockfile --prefer-offline`, checks the Bun
-version and starts tests under xvfb. tstack mounts `~/.cache/tstack-runner` at
+version and starts tests under xvfb. Electron's binary warm-up uses `--no-sandbox`,
+as its test launches do: the container cannot use its setuid sandbox helper.
+A failed warm-up fails the job and keeps stderr. tstack sets both core limits to
+one byte (`--ulimit core=1:1`), which makes Linux skip its piped core handler;
+zero still reaches systemd-coredump and the desktop crash reporter. Test crashes
+still fail through their exit status and logs. tstack mounts `~/.cache/tstack-runner` at
 `/cache`; Juno keeps the bun run store, metadata, Electron downloads, the app build
 cache and the spec cache (`/cache/specs`, entries unused for 14 days removed) there. Missing packages are downloaded. The former Juno cache is not
 removed or migrated while other clients might use it.
