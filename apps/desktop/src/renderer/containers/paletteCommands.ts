@@ -5,8 +5,9 @@
  * when the text matches them, or all of them after a leading ">". Each
  * reuses the action the rest of the app runs: the sidebar's pages, the Juno
  * menu's pages, Settings by section, the theme and accent of Settings ›
- * Appearance, the New tab, New message and New channel commands, the account menu's presence
- * and privacy, the topic menu, and the huddle's controls and header button.
+ * Appearance, the New tab, New message and New channel commands, the account
+ * menu's presence and privacy, the topic menu, the huddle's controls and header
+ * button, and a channel preview's Join channel.
  */
 import { useEffect, useState } from 'react'
 import { AccentSchema, type Accent, type SettingsSection, type Theme } from '@juno/contract'
@@ -34,6 +35,7 @@ import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem 
 import { muteShortcut } from '@juno/huddle-views'
 import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, shareFull, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
 import { openNewChannel } from './channelActions'
+import { joinFromPreview } from './channelMembership'
 import { closeJunoPanel, openPanel } from './juno/actions'
 import { openAllTopics, openGallery, openDevLog, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
@@ -210,6 +212,18 @@ function topicCommands(id: string | undefined): { readonly heading: string; read
   const selected = topic.kind === 'main' ? messageBeforePalette() : undefined
   const juno = registry.get(junoAvailableAtom)
   const panelOpen = registry.get(junoPanelOpenAtom)
+  // A channel you are not in (SPEC 7, "Not in the channel"): Join on its preview, and the links.
+  const header = registry.get(topicAtom(topic.id))
+  const notMember = header._tag === 'Success' ? header.value?.notMember : undefined
+  if (notMember !== undefined) {
+    const { id: channelId, label } = topic.channel
+    const links: ReadonlyArray<CommandRow | false> = [
+      notMember === 'preview' && row('join', 'public', `Join ${label}`, 'channel member', () => void joinFromPreview({ id: channelId, label })),
+      isLinkable(topic) && row('copy-link', 'link', 'Copy Slack link', 'url share', run('copy-link'), stays),
+      row('open-in-slack', 'open-in-slack', 'Open in Slack', 'app', run('open-in-slack'), stays),
+    ]
+    return { heading: labelOf(topic), rows: links.filter((candidate) => candidate !== false) }
+  }
   const rows: ReadonlyArray<CommandRow | false> = [
     topic.resolved ? row('reopen', 'reopen', 'Reopen', 'unresolve', run('reopen'), stays) : row('resolve', 'resolve', 'Resolve', 'done close', run('resolve'), stays),
     topic.pinned ? row('unpin', 'unpin', 'Unpin', 'pin', run('unpin'), stays) : row('pin', 'pin', 'Pin', 'keep top', run('pin'), stays),

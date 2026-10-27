@@ -25,6 +25,7 @@ import ReviewCards from './ReviewCards.fixtures'
 import SuggestionReviews from './SuggestionReviews.fixtures'
 import MediaViewer from './MediaViewer.fixtures'
 import DeleteConfirm from './DeleteConfirm.fixtures'
+import ReadOnlyNote from './ReadOnlyNote.fixtures'
 import Message from './Message.fixtures'
 import MessageMenu from './MessageMenu.fixtures'
 import MessageList from './MessageList.fixtures'
@@ -133,6 +134,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   MemoryPage,
   MemoryDocsPage,
   DeleteConfirm,
+  ReadOnlyNote,
   Message,
   MessageMenu,
   MessageList,

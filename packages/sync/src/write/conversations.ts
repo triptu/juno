@@ -24,11 +24,11 @@ export const toConversationRow = (c: Channel | Im): ConversationRow => {
     member_ids_json: members === undefined ? null : JSON.stringify(members),
     is_member: 0,
     is_archived: channel.is_archived === true ? 1 : 0,
+    is_general: channel.is_general === true ? 1 : 0,
     topic: channel.topic?.value ?? null,
     purpose: channel.purpose?.value ?? null,
     created: c.created === undefined ? null : String(c.created),
     updated: c.updated === undefined ? null : String(c.updated),
-    is_general: channel.is_general === true ? 1 : 0,
     is_ext_shared: channel.is_ext_shared === true ? 1 : 0,
     creator: channel.creator ?? null,
   }

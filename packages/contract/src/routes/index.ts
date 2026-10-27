@@ -14,6 +14,7 @@ import { EngineRoutes } from './engine'
 import { FilesRoutes } from './files'
 import { HomeRoutes } from './home'
 import { HuddleRoutes } from './huddle'
+import { MembershipRoutes } from './membership'
 import { MentionsRoutes } from './mentions'
 import { MessagesRoutes } from './messages'
 import { NewChatRoutes } from './newChat'
@@ -27,6 +28,6 @@ import { TopicsRoutes } from './topics'
 import { ViewsRoutes } from './views'
 import { WhoReactedRoutes } from './whoReacted'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes).merge(HuddleRoutes).merge(DevLogRoutes).merge(PicturesRoutes).merge(PresenceRoutes).merge(WhoReactedRoutes).merge(ChannelsRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes).merge(HuddleRoutes).merge(DevLogRoutes).merge(PicturesRoutes).merge(PresenceRoutes).merge(WhoReactedRoutes).merge(ChannelsRoutes).merge(MembershipRoutes)
 
 export type AllRoutes = typeof AllRoutes

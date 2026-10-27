@@ -150,6 +150,8 @@ const conversationRow = (pick: PickConversation): Row => {
     compact: true,
     ...(pick.person === undefined ? {} : { person: pick.person }),
     ...(mainId === undefined ? { sub: 'Starts a conversation' } : { opensTab: true, topicId: mainId }),
+    // Opens its Main as a preview (SPEC 7, "Not in the channel").
+    ...(pick.notJoined === true ? { sub: 'Not joined' } : {}),
     ...(channel === undefined ? {} : { menu: true, channel }),
     run: (options) => (mainId === undefined ? newMessage(pick) : openTopic(mainId, options)),
   }

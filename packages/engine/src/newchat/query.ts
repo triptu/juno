@@ -86,7 +86,8 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
     const users = yield* readUsers(sql, peopleOf(rows))
     return { recent: yield* withMainArt(sql, rows.map((row) => pickOf(row, users, selfId))), people: [], channels: [] } satisfies PickConversations
   }
-  const found = yield* rankFound(sql, yield* searchEntries(text), yield* usesOf(sql, selfId, now), now)
+  // A channel you are not in is ⌘K's alone (SPEC 10): a message goes where you are.
+  const found = yield* rankFound(sql, (yield* searchEntries(text)).filter(({ entry }) => entry.pick.notJoined !== true), yield* usesOf(sql, selfId, now), now)
   const ranked = yield* withMainArt(sql, [...found.filter((pick) => pick.kind === 'im').slice(0, PICK_LIMIT), ...found.filter((pick) => pick.kind !== 'im').slice(0, PICK_LIMIT)])
   return {
     recent: [],
@@ -164,7 +165,8 @@ const usesOf = (sql: SqlClient.SqlClient, selfId: string | undefined, now: numbe
  * by how much you use them, own sends and topic visits decaying by half
  * each week, then by activity. With text, the conversations the destination
  * list finds for it, by how well they match, then ranked the same way
- * (`rankSearchResults`). Local only.
+ * (`rankSearchResults`), and after them the public channels you are not in
+ * that match, ranked the same way. Local only.
  */
 export const queryPaletteConversations = Effect.fn('newChat.ranked')(function* (text: string) {
   const sql = yield* StoreReader
@@ -180,5 +182,7 @@ export const queryPaletteConversations = Effect.fn('newChat.ranked')(function* (
     return yield* withMainArt(sql, chosen.map((row) => pickOf(row, users, selfId)))
   }
   const ranked = yield* rankFound(sql, yield* searchEntries(text), uses, now)
-  return yield* withMainArt(sql, ranked.slice(0, PALETTE_CONVERSATIONS))
+  // Public channels you are not in come after yours, in their own rank order (SPEC 10).
+  const joinedFirst = [...ranked.filter((pick) => pick.notJoined !== true), ...ranked.filter((pick) => pick.notJoined === true)]
+  return yield* withMainArt(sql, joinedFirst.slice(0, PALETTE_CONVERSATIONS))
 })

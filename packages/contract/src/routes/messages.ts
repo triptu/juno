@@ -241,6 +241,12 @@ export const TopicDetail = Schema.Struct({
   art: Schema.optionalKey(Schema.String),
   /** A DM, or a thread in one, with a person whose account is deactivated: it can be read, not written to (SPEC 7, "People"). */
   deactivated: Schema.optionalKey(Schema.Literal(true)),
+  /**
+   * A channel's topic you are not in (SPEC 7, "Not in the channel"):
+   * `preview` for a public one, read-only with Join channel; `left` for a
+   * private one you left, which shows no messages. Absent while you are in it.
+   */
+  notMember: Schema.optionalKey(Schema.Literals(['preview', 'left'])),
 })
 export type TopicDetail = typeof TopicDetail.Type
 

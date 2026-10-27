@@ -24,6 +24,7 @@ export type TopicMenuAction =
   | ViewMenuAction
   | 'edit-channel'
   | 'ignore-channel'
+  | 'leave-channel'
   | 'juno-knows'
   | 'how-auto'
 
@@ -39,6 +40,7 @@ export type ChannelMenuAction =
   | ViewMenuAction
   | 'edit-channel'
   | 'ignore-channel'
+  | 'leave-channel'
   | 'ask-juno'
 export type PersonMenuAction = 'ask-juno' | 'juno-knows' | 'how-auto'
 
@@ -98,7 +100,17 @@ export interface TopicMenuState {
   readonly huddle?: HuddleMenuItem
   /** Edit channel… on a channel's Main: the user may rename it or change its members in Slack. */
   readonly editChannel?: boolean
+  /** Leave channel on a channel's Main (SPEC 5). Absent: no item. */
+  readonly leave?: LeaveMenuItem
 }
+
+/**
+ * Leave channel, on a channel you are in that Slack lets you leave (not #general): `now` for a public one, which
+ * leaves at once with Undo; `ask` for a private one, which asks first ("Leave channel…").
+ */
+export type LeaveMenuItem = 'now' | 'ask'
+
+const leaveItem = (leave: LeaveMenuItem) => item('leave-channel' as const, leave === 'ask' ? 'Leave channel…' : 'Leave channel')
 
 /** Edit channel… (SPEC 5, "Channel sheet"). */
 const editChannelItem = () => item('edit-channel' as const, 'Edit channel…')
@@ -191,6 +203,7 @@ export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<To
   if (isMain && state.views !== undefined) items.push(addToViewMenu<TopicMenuAction>(state.views))
   if (isMain && state.editChannel === true) items.push(editChannelItem())
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', `Ignore ${channelLabel(state.channel)}`))
+  if (isMain && state.leave !== undefined) items.push(leaveItem(state.leave))
   if (state.knowsAbout !== undefined) items.push(separator, item('juno-knows', knowsAbout(state.knowsAbout)))
   return items
 }
@@ -210,6 +223,8 @@ export interface ChannelMenuState {
   readonly huddle?: HuddleMenuItem
   /** The user may rename the channel or change its members in Slack: Edit channel… shows. */
   readonly editChannel?: boolean
+  /** Leave channel, as in the topic menu. Absent: no item. */
+  readonly leave?: LeaveMenuItem
 }
 
 /** The channel menu (inventory 15.2): a channel row in Browse, the header's context pill, a #channel chip. */
@@ -224,6 +239,7 @@ export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuIte
   if (state.views !== undefined) items.push(addToViewMenu<ChannelMenuAction>(state.views))
   if (state.editChannel === true) items.push(editChannelItem())
   if (!isDm(state.channel.kind)) items.push(item('ignore-channel', 'Ignore channel', 'Hide in Juno'))
+  if (state.leave !== undefined) items.push(leaveItem(state.leave))
   if (state.askJuno === true) items.push(separator, item('ask-juno', 'Ask Juno'))
   return items
 }

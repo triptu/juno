@@ -50,12 +50,12 @@ export interface ConversationRow {
   readonly member_ids_json: string | null
   readonly is_member: Flag
   readonly is_archived: Flag
+  /** The workspace's #general: no one can leave it, and only an admin or owner renames it. Absent is 0. */
+  readonly is_general: Flag
   readonly topic: string | null
   readonly purpose: string | null
   readonly created: string | null
   readonly updated: string | null
-  /** The workspace's general channel. Absent is 0. */
-  readonly is_general?: Flag
   /** Shared with another organisation (Slack Connect). Absent is 0. */
   readonly is_ext_shared?: Flag
   /** Who made the channel. */

@@ -6,7 +6,8 @@
  * opens the channel sheet where the user may change something. Mark channel as
  * read and unread wait for an engine command, so they show disabled. Add to
  * view (inventory 15.8) adds the channel to a sidebar view or removes it. The
- * person menu is `notifyActions.showPersonMenu`.
+ * person menu is `notifyActions.showPersonMenu`. Leave channel shows on a
+ * channel you are in that Slack lets you leave (`channelMembership.ts`).
  */
 import { channelMenuItems, isViewMenuAction, notifyChoiceOf, type ChannelMenuAction, type ContextMenuAt, type NotifyAction, type NotifyTargetView } from '@juno/contract'
 import { currentNotificationSettings, ignoreChannel, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry } from '@juno/state'
@@ -14,6 +15,7 @@ import { scopeToChannel, type MenuChannel } from './placeMenus'
 import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
 import { askJunoAbout } from './juno/actions'
 import { canEditChannel, editChannel } from './channelActions'
+import { leaveFromMenu, leaveMenuItem } from './channelMembership'
 import { openTopic } from './navigation'
 import { openNotificationsAt } from './notificationsAnchor'
 import { choiceFor, followsNew, nativeMenu, setFollowNew, setNotifyLevel } from './notifyActions'
@@ -26,7 +28,9 @@ const isNotify = (action: ChannelMenuAction): action is NotifyAction => action.s
 /** Shows the menu at the pointer, or at `at`. Resolves with the chosen action once it has run. */
 export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt): Promise<ChannelMenuAction | undefined> {
   const editable = canEditChannel(channel)
+  const leaving = leaveMenuItem(channel)
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
+  const leave = await leaving
   const target: NotifyTargetView = { kind: 'channel', id: channel.id }
   const huddle = huddleMenuItem(channel)
   const followNew = followsNew(settings, channel.id)
@@ -39,13 +43,14 @@ export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt):
     askJuno: registry.get(junoAvailableAtom),
     ...(huddle === undefined ? {} : { huddle }),
     ...((await editable) ? { editChannel: true } : {}),
+    ...(leave === undefined ? {} : { leave }),
   })
   const chosen = (await popupContextMenu(nativeMenu(items, (id) => !pending.has(id)), at)) as ChannelMenuAction | undefined
-  if (chosen !== undefined) await runChannelAction(chosen, channel, target, followNew)
+  if (chosen !== undefined) await runChannelAction(chosen, channel, target, followNew, at)
   return chosen
 }
 
-async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel, target: NotifyTargetView, followNew: boolean): Promise<void> {
+async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel, target: NotifyTargetView, followNew: boolean, at: ContextMenuAt | undefined): Promise<void> {
   if (isNotify(chosen)) return setNotifyLevel(target, notifyChoiceOf(chosen), channel.label)
   if (chosen === 'follow-new') return setFollowNew(channel, !followNew)
   if (chosen === 'how-auto') return openNotificationsAt('how-auto')
@@ -62,6 +67,8 @@ async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel,
       return void ignoreChannel(registry, channel)
     case 'edit-channel':
       return editChannel(channel)
+    case 'leave-channel':
+      return leaveFromMenu(channel, at)
     case 'ask-juno':
       return askJunoAbout({ _tag: 'channel', channelId: channel.id, name: channel.name, tint: channel.tint })
   }

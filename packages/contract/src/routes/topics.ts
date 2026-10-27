@@ -239,7 +239,7 @@ const followNewPayload = { channel: Schema.String, on: Schema.Boolean, since: Sc
 export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('topics.restore', restorePayload),
   Schema.TaggedStruct('channels.ignore', { channel: Schema.String }),
-  Schema.TaggedStruct('channels.unignore', { channel: Schema.String }),
+  Schema.TaggedStruct('channels.unignore', { channel: Schema.String }), Schema.TaggedStruct('channels.join', { channel: Schema.String }),
   Schema.TaggedStruct('channels.followNew', followNewPayload),
   Schema.TaggedStruct('topics.subscribe', { id: Schema.String }),
   Schema.TaggedStruct('topics.unsubscribe', { id: Schema.String }),

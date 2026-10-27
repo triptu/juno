@@ -76,7 +76,7 @@ const bareRow = (sql: SqlClient.SqlClient, id: string, target: WindowTarget) =>
     const rows = yield* sql<JoinedRow>`
       SELECT ${id} AS topic_id, c.id AS channel, ${target.kind} AS kind, NULL AS last_activity_ts, 0 AS message_count,
         '[]' AS participants_json, ${rootTs} AS root_ts, 0 AS unread_count, 1 AS unread_exact, 0 AS mentions_me, NULL AS preview_json, 0 AS rev,
-        c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
+        c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members, c.is_member AS c_member,
         o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at,
         s.subscribed AS subscribed, a.recipe AS art_recipe, a.status AS art_status, NULL AS channel_activity_ts
       FROM conversations c
@@ -112,6 +112,8 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
     const memberIds = tileMemberIds(columns, selfId)
     const { partnerId: _partnerId, memberIds: _memberIds, ...bare } = channelRefOf(info, partnerId, memberIds)
     const channel = memberIds.length === 0 ? bare : { ...bare, members: memberIds.map((member) => personFrom(member, users.get(member))) }
+    // A channel you are not in: a public one is a preview, a private one was left (SPEC 7, "Not in the channel").
+    const notMember = row.c_member === 0 && (row.c_kind === 'public' || row.c_kind === 'private') ? (row.c_kind === 'public' ? ('preview' as const) : ('left' as const)) : undefined
     const reads = yield* sql<{ last_read_ts: string | null; marked_unread: number }>`SELECT last_read_ts, marked_unread FROM topic_reads WHERE topic_id = ${id}`
     const lastReadTs = reads[0]?.last_read_ts ?? undefined
     const markedUnread = reads[0]?.marked_unread === 1
@@ -134,9 +136,10 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
       pinned: topic.overlay.pinnedAt !== undefined,
       resolved: isResolved(topic),
       messageCount: topic.activity.messageCount,
-      unreadCount: topic.activity.unreadCount,
+      // A preview counts as nothing unread (SPEC 7, "Not in the channel").
+      unreadCount: notMember === undefined ? topic.activity.unreadCount : 0,
       unreadExact: topic.activity.unreadExact !== false,
-      mentionsMe: topic.activity.mentionsMe,
+      mentionsMe: notMember === undefined && topic.activity.mentionsMe,
       ...(lastReadTs === undefined ? {} : { lastReadTs }),
       ...(markedUnread ? { markedUnread } : {}),
       ...(row.last_activity_ts === null ? {} : { lastActivityTs: row.last_activity_ts }),
@@ -144,6 +147,7 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
       ...(threadCount === undefined ? {} : { threadCount }),
       ...(art === undefined || art.recipe === '' ? {} : { art: art.recipe }),
       ...(partnerId !== undefined && users.get(partnerId)?.deleted === 1 ? { deactivated: true as const } : {}),
+      ...(notMember === undefined ? {} : { notMember }),
     }
   })
 

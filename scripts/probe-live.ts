@@ -64,6 +64,10 @@
  * the largest counts), it calls `reactions.get` without and with `full` and
  * compares `users.length` with `count` for each reaction. Counts only.
  *
+ * `--only joinleave` reads one channel-browser page and one preview history
+ * message, then joins and leaves a private test channel it creates
+ * (`juno-test-join-leave`). Codes, key names and counts only (`joinLeaveOnly`).
+ *
  * Output is counts, key censuses and milliseconds. No id, text, name, URL or
  * value is printed. `--out DIR` writes the redacted response shapes there
  * (default: a new temporary directory); copy the ones a fixture needs into
@@ -79,7 +83,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EdgeUsersInfoResponse, Methods, type MethodName } from '@juno/slack-schema'
 import { apiBaseFromWorkspace, slackRoute } from '@juno/slack'
-import { decodeIssues, readCachedSession, redact } from './live-common.ts'
+import { decodeIssues, readCachedSession, redact, type CachedSession } from './live-common.ts'
 
 const READ_ONLY_METHODS = [
   'auth.test',
@@ -151,6 +155,10 @@ async function main(): Promise<number> {
   }
   if (flag('--only') === 'search2') {
     await probeSearch(cached, flag('--out'), flag('--section'))
+    return 0
+  }
+  if (flag('--only') === 'joinleave') {
+    console.log(JSON.stringify(await joinLeaveOnly(cached), null, 2))
     return 0
   }
   const { session, cookie } = cached
@@ -1289,6 +1297,104 @@ function countBy<T>(items: ReadonlyArray<T>, key: (item: T) => string): Record<s
   const out: Record<string, number> = {}
   for (const item of items) out[key(item)] = (out[key(item)] ?? 0) + 1
   return out
+}
+
+const JOIN_LEAVE_TEST_CHANNEL = 'juno-test-join-leave'
+
+/** One `joinLeaveOnly` call: only its five methods, 3 s apart, stopping for good on a rate limit; records codes and key names in `report`. */
+function joinLeaveCaller({ session, cookie }: CachedSession, report: Record<string, unknown>) {
+  const base = apiBaseFromWorkspace(session.workspaceUrl)
+  const route = slackRoute(session)
+  const allowed = ['search.modules.channels', 'conversations.history', 'conversations.create', 'conversations.join', 'conversations.leave']
+  let last = 0
+  let stopped = false
+  return async (method: string, args: Record<string, string | number>, label: string): Promise<Json | undefined> => {
+    if (!allowed.includes(method)) throw new Error(`refusing ${method}`)
+    if (stopped) return undefined
+    const wait = last + 3_000 - Date.now()
+    if (wait > 0) await sleep(wait)
+    last = Date.now()
+    const url = new URL(`${base}/${method}`)
+    url.searchParams.set('_x_id', `noversion-${(Date.now() / 1000).toFixed(3)}`)
+    url.searchParams.set('slack_route', route)
+    url.searchParams.set('_x_app_name', 'client')
+    const body = new FormData()
+    body.append('token', session.token)
+    body.append('_x_reason', 'probe')
+    body.append('_x_mode', 'online')
+    for (const [name, value] of Object.entries(args)) body.append(name, String(value))
+    const response = await fetch(url, { method: 'POST', body, headers: { cookie } })
+    let json: Json | undefined
+    try {
+      json = (await response.json()) as Json
+    } catch {
+      json = undefined
+    }
+    const limited = response.status === 429 || /rate_?limit/.test(String(json?.['error']))
+    if (limited) stopped = true
+    const channel = json?.['channel']
+    report[label] = {
+      status: response.status,
+      ok: json?.['ok'] === true,
+      ...(json?.['error'] === undefined ? {} : { error: String(json['error']) }),
+      ...(json?.['warning'] === undefined ? {} : { warning: String(json['warning']) }),
+      ...(json?.['response_metadata'] === undefined ? {} : { responseMetadataKeys: Object.keys(json['response_metadata'] as Json).toSorted() }),
+      keys: json === undefined ? [] : Object.keys(json).toSorted(),
+      ...(channel !== null && typeof channel === 'object' ? { channelKeys: Object.keys(channel).toSorted(), channelIsMember: (channel as Json)['is_member'] } : {}),
+      ...(limited ? { rateLimited: true } : {}),
+    }
+    return json
+  }
+}
+
+/**
+ * `--only joinleave`: how Slack answers the channel browser, a preview read, join and leave.
+ * Reads: one `search.modules.channels` page as the browser asks it, and one `conversations.history`
+ * message of a public channel the user is not in. Writes, only in a private channel it creates for
+ * this (`juno-test-join-leave`, or the existing one of that name): `conversations.join` while a
+ * member, `conversations.leave`, then `conversations.join` again. It never archives. Calls start
+ * 3 s apart, there is no retry, and a rate limit stops it. Prints ok, error and warning codes, key
+ * names and counts; no id, name or text.
+ */
+async function joinLeaveOnly(cached: CachedSession): Promise<unknown> {
+  const report: Record<string, unknown> = {}
+  const call = joinLeaveCaller(cached, report)
+
+  const browse = await call(
+    'search.modules.channels',
+    { module: 'channels', query: '', page: 1, count: 20, browse: 'standard', highlight: 0, extracts: 0, extra_message_data: 0, no_user_profile: 1, channel_type: 'exclude_archived', exclude_my_channels: 1, sort: 'name', sort_dir: 'asc' },
+    'browse',
+  )
+  const items = (Array.isArray(browse?.['items']) ? browse['items'] : []) as Array<Json>
+  report['browseItems'] = {
+    count: items.length,
+    notMember: items.filter((i) => i['is_member'] === false).length,
+    private: items.filter((i) => i['is_private'] === true).length,
+    archived: items.filter((i) => i['is_archived'] === true).length,
+    keys: keyCensus(items),
+    paginationKeys: typeof browse?.['pagination'] === 'object' && browse['pagination'] !== null ? Object.keys(browse['pagination'] as Json).toSorted() : [],
+  }
+  const previewable = items.find((i) => i['is_member'] === false && i['is_private'] !== true && i['is_archived'] !== true && typeof i['id'] === 'string')
+  if (previewable !== undefined) {
+    const history = await call('conversations.history', { channel: String(previewable['id']), limit: 1 }, 'previewHistory')
+    report['previewMessages'] = Array.isArray(history?.['messages']) ? history['messages'].length : 0
+  }
+
+  const created = await call('conversations.create', { name: JOIN_LEAVE_TEST_CHANNEL, is_private: 'true', validate_name: 'true' }, 'create')
+  const createdId = (created?.['channel'] as Json | undefined)?.['id']
+  let channelId = typeof createdId === 'string' ? createdId : undefined
+  if (channelId === undefined && created?.['error'] === 'name_taken') {
+    const mine = await call('search.modules.channels', { module: 'channels', query: JOIN_LEAVE_TEST_CHANNEL, page: 1, count: 20, search_only_my_channels: 1, channel_type: 'private', no_user_profile: 1 }, 'findExisting')
+    const match = ((Array.isArray(mine?.['items']) ? mine['items'] : []) as Array<Json>).find(
+      (i) => typeof i['id'] === 'string' && String(i['name']).replace(/[\uE000\uE001]/g, '') === JOIN_LEAVE_TEST_CHANNEL,
+    )
+    channelId = match === undefined ? undefined : String(match['id'])
+  }
+  if (channelId === undefined) return report
+  await call('conversations.join', { channel: channelId }, 'joinWhileMember')
+  await call('conversations.leave', { channel: channelId }, 'leave')
+  await call('conversations.join', { channel: channelId }, 'joinAfterLeave')
+  return report
 }
 
 function pick(object: Json, keys: ReadonlyArray<string>): Record<string, unknown> {

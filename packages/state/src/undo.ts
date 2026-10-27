@@ -17,6 +17,7 @@ import {
   channelsEdit,
   channelsFollowNew,
   channelsIgnore,
+  channelsJoin,
   channelsUnignore,
   draftsRestore,
   followUpsRestore,
@@ -159,6 +160,8 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, channelsUnignore, payloadOf(undo))
     case 'channels.followNew':
       return runCommand(registry, channelsFollowNew, payloadOf(undo))
+    case 'channels.join':
+      return runCommand(registry, channelsJoin, payloadOf(undo))
     case 'topics.subscribe':
       return runCommand(registry, topicsSubscribe, payloadOf(undo))
     case 'topics.unsubscribe':

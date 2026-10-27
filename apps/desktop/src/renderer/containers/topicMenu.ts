@@ -7,6 +7,7 @@ import { viewChoices } from './viewActions'
 import { huddleMenuItem } from './huddle/menuItem'
 import { canEditChannel } from './channelActions'
 import { labelOf, isLinkable, notifyTarget, runTopicAction } from './topicActions'
+import { leaveFromMenu, leaveMenuItem } from './channelMembership'
 import type { ActionTopic } from './topicSource'
 
 const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.channel.partner : undefined
@@ -23,7 +24,9 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
   const drawable = canRedraw(registry)
   // Edit channel… on a channel's Main, asked of the store beside the settings.
   const editable = topic.kind === 'main' ? canEditChannel(topic.channel) : Promise.resolve(false)
+  const leaving = topic.kind === 'main' ? leaveMenuItem(topic.channel) : undefined
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
+  const leave = await leaving
   const notify = notifyTarget(topic)
   const huddle = huddleMenuItem(topic.channel)
   const state = {
@@ -38,10 +41,12 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     ...(topic.kind === 'main' ? { followNew: followsNew(settings, topic.channel.id), views: viewChoices(topic.channel.id) } : {}),
     ...(huddle === undefined ? {} : { huddle }),
     ...((await editable) ? { editChannel: true } : {}),
+    ...(leave === undefined ? {} : { leave }),
     ...(dmPartner(topic) !== undefined && registry.get(junoAvailableAtom) ? { knowsAbout: dmPartner(topic)!.name } : {}),
   }
   const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => isLinkable(topic) || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
-  if (chosen !== undefined) runTopicAction(topic, chosen, from)
+  if (chosen === 'leave-channel') leaveFromMenu(topic.channel, at)
+  else if (chosen !== undefined) runTopicAction(topic, chosen, from)
 }
 
 

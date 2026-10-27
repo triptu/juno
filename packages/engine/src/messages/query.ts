@@ -176,6 +176,10 @@ const parseJson = <A>(json: string | null): A | undefined => {
 export const listMessages = (target: WindowTarget, range: MessageRange, cache: MessageCache): Effect.Effect<ListRun<MessageView>, SqlError, StoreReader> =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
+    const team = yield* sql<{ self_user_id: string | null; left: 0 | 1 }>`SELECT self_user_id,
+      EXISTS (SELECT 1 FROM conversations WHERE id = ${target.channel} AND kind = 'private' AND is_member = 0) AS "left" FROM team LIMIT 1`
+    // A private channel you left shows none of its messages, as Slack's own client drops them (SPEC 7, "Not in the channel").
+    if (team[0]?.left === 1) return { rows: [], atNewest: true }
     const statements = windowStatements(target, range)
     // The older statement reads one extra row, the message before the window (see `windowStatements`).
     const older = yield* sql.unsafe<WindowMessage>(statements[0]!.sql, statements[0]!.params)
@@ -201,7 +205,6 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const root = (yield* sql.unsafe<WindowMessage>(statement.sql, statement.params))[0]
       if (root !== undefined) stored = [root, ...stored]
     }
-    const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
     const selfId = team[0]?.self_user_id ?? undefined
     // A thread shows only the stretch around the anchor that its ranges prove continuous (`clipThread`).
     let coverage: ThreadCoverage | undefined

@@ -16,9 +16,10 @@
  *   (Notify me Never, here or in Slack) is never overridden. The calls go
  *   one at a time on the background lane, so a busy channel does not burst
  *   Slack's rate limits.
- * - While the channel is ignored the setting does nothing: its new threads
- *   are recorded as done without a follow, so stopping the ignore does not
- *   follow them afterwards.
+ * - While the channel is ignored, or one the user left (its preview stores
+ *   messages, SPEC 7), the setting does nothing: its new threads are
+ *   recorded as done without a follow, so stopping the ignore or joining
+ *   again does not follow them afterwards.
  * - Existing threads are not followed when it is turned on, and turning it
  *   off unfollows nothing.
  *
@@ -84,10 +85,11 @@ interface Candidate {
  * only its new roots in the `messages_thread_roots` index.
  */
 export const candidatesStatement = (limit: number) => ({
-  sql: `SELECT m.channel, m.ts, ig.channel IS NOT NULL AS ignored
+  sql: `SELECT m.channel, m.ts, ig.channel IS NOT NULL OR c.is_member = 0 AS ignored
     FROM follow_new_threads f CROSS JOIN messages m
     LEFT JOIN auto_followed a ON a.channel = m.channel AND a.thread_ts = m.ts
     LEFT JOIN ignored_channels ig ON ig.channel = m.channel
+    LEFT JOIN conversations c ON c.id = m.channel
     WHERE m.channel = f.channel AND m.ts >= f.since_ts AND m.reply_count > 0 AND a.channel IS NULL
     ORDER BY m.ts LIMIT ?`,
   params: [limit] as ReadonlyArray<number>,
