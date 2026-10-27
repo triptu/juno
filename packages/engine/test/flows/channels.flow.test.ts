@@ -35,6 +35,8 @@ it('a create names whom Slack could not add; a refused rename goes back while th
     expect(members(engine, channel)).toEqual([MAYA, SELF_ID].toSorted())
     // Stored before the socket says so, so its Main opens at once.
     expect(stored(engine, channel)).toEqual({ name: 'ops-room', kind: 'private', is_member: 1 })
+    // The create's own `channel_joined` carries the name too; the next step reads the name after it has landed.
+    await engine.socketIdle()
   })
 
   await step('a rename Slack refuses shows at once, then the old name is back; the removal still lands', async () => {
