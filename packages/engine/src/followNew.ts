@@ -79,16 +79,16 @@ interface Candidate {
 
 /**
  * Roots with replies, newer than the setting, that Follow new threads has
- * not had its go at, oldest first. `reply_count > 0` lets it read the
- * `messages_thread_roots` index.
+ * not had its go at, oldest first. The CROSS JOIN keeps the few conversations
+ * with the setting as the outer loop, and `reply_count > 0` lets each read
+ * only its new roots in the `messages_thread_roots` index.
  */
 export const candidatesStatement = (limit: number) => ({
   sql: `SELECT m.channel, m.ts, ig.channel IS NOT NULL AS ignored
-    FROM follow_new_threads f
-    JOIN messages m ON m.channel = f.channel AND m.ts >= f.since_ts AND m.reply_count > 0
+    FROM follow_new_threads f CROSS JOIN messages m
     LEFT JOIN auto_followed a ON a.channel = m.channel AND a.thread_ts = m.ts
     LEFT JOIN ignored_channels ig ON ig.channel = m.channel
-    WHERE a.channel IS NULL
+    WHERE m.channel = f.channel AND m.ts >= f.since_ts AND m.reply_count > 0 AND a.channel IS NULL
     ORDER BY m.ts LIMIT ?`,
   params: [limit] as ReadonlyArray<number>,
 })
