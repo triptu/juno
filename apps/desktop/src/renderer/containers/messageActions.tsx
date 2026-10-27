@@ -69,6 +69,8 @@ export interface MessageActionsOutput {
   /** Retry (`on` as asked) or Dismiss (the opposite) on a reaction Slack refused. */
   /** A right-click on a row, or on its sender's name or avatar, or a press on its menu button (`at.trigger`). */
   readonly onMessageMenu: (ts: string, at: MenuAt, onSender: boolean) => void
+  /** ⌘-click on a message in Main: its thread in a tab behind this one. Created once per topic. */
+  readonly openThreadBehind: (ts: string) => void
   /** ↑ on the composer's first line. */
   readonly selectNewest: () => void
   /** Esc in the composer with nothing of its own to close: the message under the pointer, else the newest. */
@@ -194,6 +196,7 @@ export function useMessageActions({ detail, list, scrollRef, composer, readOnly 
       void editField.load()
       handlers.selectHovered()
     },
+    openThreadBehind: commands.openThreadBehind,
     activeMessage: menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,

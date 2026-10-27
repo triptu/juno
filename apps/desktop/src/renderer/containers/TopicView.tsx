@@ -186,9 +186,13 @@ function useReaderUse(reader: TopicProps['reader']) {
   }
 }
 
-/** What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus. */
-function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
+/**
+ * What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus; in a
+ * topic tab's Main (`main`, not the Search tab's reader), ⌘-click on a message opens its thread behind.
+ */
+function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, main: boolean) {
   return {
+    ...(main ? { onOpenThreadBehind: messageActions.openThreadBehind } : {}),
     onRetry: retry,
     onDiscard: discard,
     onMessageMenu: messageActions.onMessageMenu,
@@ -283,7 +287,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
       onOpenMedia={openMedia}
       onImageMenu={(ts, fileId, event) => showMessageImageMenu(list, ts, fileId, event, openMedia)}
       {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
-      {...(readOnly ? {} : rowActions(list, messageActions))}
+      {...(readOnly ? {} : rowActions(list, messageActions, detail.kind === 'main' && reader === undefined))}
     />
   )
   if (readOnly) return messages

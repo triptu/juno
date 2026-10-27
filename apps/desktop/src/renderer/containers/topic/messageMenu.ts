@@ -47,7 +47,7 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
   // Only a reply Slack has, as Slack's own client offers it.
   const broadcastable = own && topic.kind === 'thread' && linkable && message.kind === 'message' && !message.root && !message.broadcast
   return [
-    ...(opensThread(topic.kind, message) ? [item('reply', message.thread === undefined ? 'Start thread' : 'Open thread', 'thread', false, 'T')] : []),
+    ...(opensThread(topic.kind, message) ? [item('reply', message.thread === undefined && message.broadcastFrom === undefined ? 'Start thread' : 'Open thread', 'thread', false, 'T')] : []),
     item('quote', 'Quote', 'quote', false, 'Q'),
     ...(juno ? [item('ask-juno', 'Ask Juno', 'juno')] : []),
     SEPARATOR,
