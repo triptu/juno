@@ -1,4 +1,4 @@
-import { GONE_KEPT, keptSent, observeSlackDraft, parseTopicId, type DraftOutcome, type DraftState, type SentText, type SlackDraft } from '@juno/domain'
+import { keptSent, observeSlackDraft, parseTopicId, type DraftOutcome, type DraftState, type SentText, type SlackDraft } from '@juno/domain'
 import { Invalidation, StoreWriter, type SqlClient, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { invalidate, type Writer } from './shared'
@@ -188,11 +188,11 @@ export const linkedDrafts: Effect.Effect<ReadonlyArray<{ readonly topicId: strin
     return rows.map((row) => ({ topicId: row.topic_id, slackId: row.slack_id, seenAt: Number(row.seen_at ?? 0) }))
   })
 
-/** The topic that links Slack's draft `slackId`, remembers it gone, or sent a text from it (by id, or by its create's `clientMsgId`). */
+/** The topic that links Slack's draft `slackId`, remembers it gone, made it with a create (`clientMsgId`), or sent a text from it (by id, or by its create's `clientMsgId`). */
 export const topicOfSlackDraft = (slackId: string, clientMsgId?: string): Effect.Effect<string | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    return (yield* sql<{ topic_id: string }>`SELECT topic_id FROM draft_sync WHERE slack_id = ${slackId}
+    return (yield* sql<{ topic_id: string }>`SELECT topic_id FROM draft_sync WHERE slack_id = ${slackId} OR client_msg_id = ${clientMsgId ?? ''}
       OR EXISTS (SELECT 1 FROM json_each(COALESCE(gone_ids, '[]')) WHERE value = ${slackId})
       OR EXISTS (SELECT 1 FROM json_each(COALESCE(sent_json, '[]')) WHERE json_extract(value, '$.id') = ${slackId} OR json_extract(value, '$.clientMsgId') = ${clientMsgId ?? ''}) LIMIT 1`)[0]?.topic_id
   })
@@ -276,10 +276,11 @@ export const writeLocalDraft = (id: string, text: string, timing: { readonly now
  * asks Slack to delete nothing. The text is remembered as sent from the place, with Juno's own texts that can
  * be on Slack's draft (calls still out or lost), so a version with one of them never brings it back, whatever
  * the clocks say. When the post goes where the draft is and the draft has no files (`here`), it names the
- * draft (`draft_id`, returned) and Slack retires it: Juno stops linking it and counts it gone, until Slack
- * refuses the post (`keepFailedDraft`). A post that went elsewhere leaves Slack's draft where it is, and Juno
- * stops linking it; a draft with files stays linked and untouched. A create Juno had no answer to is
- * remembered by its `client_msg_id`, and the next create gets a new one.
+ * draft (`draft_id`, returned) and Slack retires it when the post lands. The draft stays linked until Slack
+ * says it is gone, so its versions keep coming in, and if Slack refuses the post it is the place's draft as
+ * it was; Juno writes nothing to it while the post waits (`claimDraftSave`). A post that went elsewhere
+ * leaves Slack's draft where it is, and Juno stops linking it; a draft with files stays linked and untouched.
+ * A create Juno had no answer to is remembered by its `client_msg_id`, and the next create gets a new one.
  */
 export const sendDraft = (id: string, text: string, now: number, here: boolean): Effect.Effect<string | undefined, SqlError, Services> =>
   Effect.gen(function* () {
@@ -294,15 +295,13 @@ export const sendDraft = (id: string, text: string, now: number, here: boolean):
     // A text with no draft Juno knows of to hold it is settled at once.
     const sentText: SentText = before.slackId !== undefined ? { id: before.slackId, texts } : unanswered !== undefined ? { clientMsgId: unanswered, texts } : { texts, settled: true }
     const named = here && before.slackId !== undefined && !before.hasFiles
-    const unlinks = before.slackId !== undefined && !before.hasFiles
+    const leaves = !here && before.slackId !== undefined && !before.hasFiles
     const { slackId, seenAt, clientMsgId: create, ...rest } = yield* draftSyncRow(topicId)
     yield* writeSync({
       ...rest,
-      ...(unlinks || slackId === undefined ? {} : { slackId }),
-      ...(unlinks || seenAt === undefined ? {} : { seenAt }),
+      ...(leaves || slackId === undefined ? {} : { slackId }),
+      ...(leaves || seenAt === undefined ? {} : { seenAt }),
       ...(unanswered !== undefined || create === undefined ? {} : { clientMsgId: create }),
-      // Slack retires a draft the post names: what a list took before the send cannot bring it back.
-      gone: named && slackId !== undefined ? [...rest.gone.filter((each) => each !== slackId), slackId].slice(-GONE_KEPT) : rest.gone,
       sent: keptSent([...rest.sent, sentText]),
       replaced: undefined,
     })
@@ -312,19 +311,6 @@ export const sendDraft = (id: string, text: string, now: number, here: boolean):
       else yield* dropRow(topicId)
     }
     return named ? before.slackId : undefined
-  })
-
-/**
- * Slack refused the post that named draft `slackId`: the draft was not retired. It is the place's draft still,
- * linked again (unless Juno links another), and nothing of it counts as gone; deleting the failed message
- * changes nothing.
- */
-export const keepFailedDraft = (slackId: string, now: number): Effect.Effect<void, SqlError, Services> =>
-  Effect.gen(function* () {
-    const topicId = yield* topicOfSlackDraft(slackId)
-    if (topicId === undefined) return
-    const state = yield* draftSyncRow(topicId)
-    yield* writeSync({ ...state, gone: state.gone.filter((each) => each !== slackId), ...(state.slackId === undefined ? { slackId, seenAt: now } : {}) })
   })
 
 /**
@@ -350,8 +336,8 @@ export const observeDraft = (
     if (outcome === 'applied') {
       yield* writeText(topicId, state.text, state.editedAt)
       if (row !== undefined) {
-        // A save out, or one whose answer was lost, may land after this version: it goes again, an empty one as
-        // a delete of what that save wrote.
+        // A save out, or one whose answer was lost, may land after this version: a text goes again. An empty
+        // version does not: Juno deletes only for the user's clear, so a late save stays in Slack.
         if (row.sending !== undefined || row.unsure.length > 0) yield* writeRow({ ...row, gen: row.gen + 1, resave: true, quiet: false }, 0)
         else yield* dropRow(topicId)
       }

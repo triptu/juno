@@ -39,9 +39,10 @@
  * not one. A deletion of a draft Juno does not link only marks it gone. A
  * draft missing from a complete list requested after Juno linked it counts
  * as deleted just after the version Juno knew (`absent`), so local edits
- * Slack has not seen survive it and go as a new draft. A local clear has a
- * time of its own (the store's `cleared_at`), which its deletion carries and
- * is compared by. A list that looks for the place's draft after a lost create or
+ * Slack has not seen survive it and go as a new draft; so does typing done
+ * after a send, when Slack retires or deletes the draft the text went from.
+ * A local clear has a time of its own (the store's `cleared_at`), which its
+ * deletion carries and is compared by. A list that looks for the place's draft after a lost create or
  * `attached_draft_exists`, while Juno links none (`find`), takes its entry
  * whatever its stamp.
  */
@@ -148,7 +149,12 @@ export function observeSlackDraft(state: DraftState, slack: SlackDraft, how: Obs
     return { state: link, outcome: 'linked', save: state.pending && !how.same(state.text, slack.text) }
   }
   // The draft a text went from is gone, or holds another text now.
-  return observeVersion({ ...state, sent: keptSent(state.sent.map((each) => (from(each) ? { ...each, settled: true } : each))) }, slack, how)
+  const settled = { ...state, sent: keptSent(state.sent.map((each) => (from(each) ? { ...each, settled: true } : each))) }
+  // Typing done after a send outlives the draft it went from: it goes on as a new draft.
+  if (slack.deleted && state.slackId === slack.id && state.pending && state.sent.some(from)) {
+    return { state: { ...withoutLink(settled), gone: withGone(state.gone, slack.id), slackStamp: Math.max(state.slackStamp ?? 0, how.absent === true ? 0 : slack.stamp) }, outcome: 'kept', save: true }
+  }
+  return observeVersion(settled, slack, how)
 }
 
 /** A version of the place's draft, by the rules above. */

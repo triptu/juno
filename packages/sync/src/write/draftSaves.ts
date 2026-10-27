@@ -21,23 +21,28 @@ export interface DraftClaim {
 
 /**
  * Reads the topic's row and claims it for one call, in one transaction (run it in one): what the stored
- * draft needs now, marked as sending so its echo is known. A cleared draft is deleted only for a user's clear:
- * Juno's own (a local edit, not a send), or another device's emptied draft put back over Juno's own late
- * save (a resave).
- * Nothing is claimed when the row is gone or not due, or when a
+ * draft needs now, marked as sending so its echo is known. A cleared draft is deleted only for the user's
+ * clear (a local edit, not a send). Nothing is written to a draft a post names while the post waits: the row
+ * looks again `retryMillis` later, and typing done meanwhile goes on as a new draft once Slack retires that
+ * draft. Nothing is claimed when the row is gone or not due, or when a
  * create must wait for a list to find the place's draft (the list makes the row due again). Nothing is sent
  * for a draft with files, or for a text Slack refused for good: the row waits for a newer change, so the
  * local text stays a local edit. Otherwise, with nothing owed, the row ends. A caller that gets no claim
  * sends nothing. `fresh` makes the `client_msg_id` of a first create; `now` is Juno's clock.
  */
-export const claimDraftSave = (topicId: string, now: number, fresh: () => string): Effect.Effect<DraftClaim | undefined, SqlError, Services> =>
+export const claimDraftSave = (topicId: string, now: number, retryMillis: number, fresh: () => string): Effect.Effect<DraftClaim | undefined, SqlError, Services> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const state = yield* draftSyncRow(topicId)
     const row = state.row
     if (row === undefined || row.nextAt > now) return undefined
+    const retiring = state.slackId !== undefined && (yield* sql`SELECT 1 FROM pending_messages WHERE draft_id = ${state.slackId} AND state != 'failed' LIMIT 1`).length > 0
+    if (retiring) {
+      yield* sql`UPDATE outbox SET next_at = ${String(now + retryMillis)} WHERE kind = 'draft' AND target_key = ${topicId}`
+      return undefined
+    }
     const waits = row.refused === row.gen || (state.slackId !== undefined && state.hasFiles)
-    const op = waits ? undefined : state.text !== '' ? (state.slackId !== undefined ? 'update' : 'create') : state.slackId !== undefined && (state.pending || row.resave) ? 'delete' : undefined
+    const op = waits ? undefined : state.text !== '' ? (state.slackId !== undefined ? 'update' : 'create') : state.slackId !== undefined && state.pending ? 'delete' : undefined
     if (op === undefined || (op === 'create' && row.findAt > 0)) {
       if (row.findAt > 0 || waits) yield* sql`UPDATE outbox SET next_at = ${String(Number.MAX_SAFE_INTEGER)} WHERE kind = 'draft' AND target_key = ${topicId}`
       else yield* dropRow(topicId)
@@ -90,8 +95,9 @@ export const endDraftSave = (topicId: string, gen: number, answer: DraftAnswer, 
         // The draft a text went from now holds Juno's newer text.
         const sent = keptSent(before.sent.map((each) => (each.id === answer.id && !each.texts.includes(answer.text) ? { ...each, settled: true } : each)))
         if (goneSave) settled = false
-        else if (sentCreate) state = { ...before, sent: before.sent.map((each) => (each.clientMsgId === answer.clientMsgId ? { ...each, id: answer.id } : each)) }
-        else if (!older) {
+        // A create whose text went as a message: remembered by id, and settled at once when its draft is already gone.
+        if (sentCreate) state = { ...before, sent: keptSent(before.sent.map((each) => (each.clientMsgId === answer.clientMsgId ? { ...each, id: answer.id, settled: goneSave } : each))) }
+        else if (!goneSave && !older) {
           state = {
             ...before,
             slackId: answer.id,
@@ -110,7 +116,12 @@ export const endDraftSave = (topicId: string, gen: number, answer: DraftAnswer, 
       case 'gone':
       case 'deleted': {
         const { slackId: _, seenAt: _seen, ...unlinked } = before
-        state = { ...(before.slackId === answer.id ? unlinked : before), gone: [...before.gone.filter((id) => id !== answer.id), answer.id].slice(-GONE_KEPT) }
+        state = {
+          ...(before.slackId === answer.id ? unlinked : before),
+          gone: [...before.gone.filter((id) => id !== answer.id), answer.id].slice(-GONE_KEPT),
+          // The draft a text went from is gone.
+          sent: keptSent(before.sent.map((each) => (each.id === answer.id ? { ...each, settled: true } : each))),
+        }
         // A delete covers the draft it named; one linked meanwhile still needs its own.
         if (answer.kind === 'gone' || (before.slackId !== undefined && before.slackId !== answer.id)) settled = false
         break

@@ -50,7 +50,7 @@ export const sendDraftRow = (deps: SenderDeps, open: OpenWorkspace, topicId: str
       const hold = control.onDraftWrite?.('claim', topicId, 'before')
       if (hold !== undefined) yield* Effect.promise(() => hold)
       // Read and claimed together: a version from Slack that replaced the intent meanwhile leaves nothing to send.
-      const claim = yield* local(transaction(claimDraftSave(topicId, yield* Clock.currentTimeMillis, () => crypto.randomUUID())))
+      const claim = yield* local(transaction(claimDraftSave(topicId, yield* Clock.currentTimeMillis, deps.timing.retryBaseMillis, () => crypto.randomUUID())))
       control.onDraftWrite?.('claim', topicId, 'after')
       if (claim === undefined) return
       const places: ReadonlyArray<DraftDestination> = [{ channel_id: destination.channel, ...(destination.threadTs === undefined ? {} : { thread_ts: destination.threadTs, broadcast: false }) }]
