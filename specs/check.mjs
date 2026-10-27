@@ -484,7 +484,8 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
       ['echoRace', 'typedNeverLost'], ['inflightApply', 'quietAgreement'], ['sentReturns', 'typedNeverLost'], ['focusedRemote', 'focusKept'],
       ['staleList', 'quietAgreement'], ['clearStamp', 'drainBound'], ['staleClaim', 'quietAgreement'], ['staleAbsence', 'quietAgreement'],
       ['filesOnly', 'drainBound'], ['filesSend', 'filesKept'], ['sentElsewhere', 'quietAgreement'], ['listsFail', 'drainBound'],
-      ['behindClock', 'typedNeverLost', 'initBehind'], ['quitTyping', 'quitKeepsTyping'],
+      ['behindClock', 'typedNeverLost', 'initBehind'], ['quitTyping', 'quitKeepsTyping'], ['copyTwice', 'copyKept'], ['staleAnswer', 'filesKept'],
+      ['refusedEdit', 'quietAgreement'], ['sameMillisList', 'drainBound'],
     ]) {
       simulate('drafts', `${schedule}Step`, 'invariants', `drafts-${schedule}.itf.json`, false, false,
         { init, samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
