@@ -6,8 +6,9 @@
  * needs on top of it: keys that are table names with optional row ids,
  * batching that fires only after a transaction commits, a wildcard key so a
  * cache reset re-runs every live query, and `liveQuery`, a stream that re-runs
- * a read when its keys are invalidated with a leading-edge debounce and emits
- * each run's result as a value, so one failed run never ends a subscription.
+ * a read when its keys are invalidated or a trigger asks, one run at a time,
+ * with a leading-edge debounce, and emits each run's result as a value, so one
+ * failed run never ends a subscription.
  */
 import { Cause, Context, Duration, Effect, Exit, Layer, Option, Queue, Result, Stream } from 'effect'
 import * as Reactivity from 'effect/reactivity/Reactivity'
@@ -33,6 +34,12 @@ export interface LiveQueryOptions {
    * Default 30 ms.
    */
   readonly debounce?: Duration.Input | undefined
+  /**
+   * More reasons to run again, beside the keys (a minute's tick, a presence
+   * change). Each element asks for a run through the same loop, so runs never
+   * overlap and each result sent is from a later read than the one before.
+   */
+  readonly triggers?: Stream.Stream<unknown> | undefined
 }
 
 export const DEFAULT_LIVE_QUERY_DEBOUNCE: Duration.Input = '30 millis'
@@ -111,7 +118,7 @@ export class Invalidation extends Context.Service<
     subscribeUnsafe(keys: InvalidationKeys, handler: () => void): () => void
     /**
      * A stream that emits the result of `query` now and again whenever `keys`
-     * are invalidated. A failed run is emitted as `Result.fail(e)` and the
+     * are invalidated or `options.triggers` emits. A failed run is emitted as `Result.fail(e)` and the
      * subscription stays alive; only a defect fails the stream.
      */
     liveQuery<A, E, R>(
@@ -219,6 +226,9 @@ export class Invalidation extends Context.Service<
 
             Queue.offerUnsafe(signal, undefined)
             yield* Effect.forkScoped(loop)
+            if (options?.triggers !== undefined) {
+              yield* Effect.forkScoped(Stream.runForEach(options.triggers, () => Effect.sync(() => Queue.offerUnsafe(signal, undefined))))
+            }
           }),
         )
       }

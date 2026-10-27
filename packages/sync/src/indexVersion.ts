@@ -21,5 +21,7 @@
  * Slack refused is no activity until it is retried. 10: the draft sync
  * change touched the files the index reads (posts, write, markup); the
  * rows should not differ, and the bump only makes the next start check.
+ * 11: live query triggers changed the store's invalidation module, which
+ * the index imports; the rows do not differ, as for 10.
  */
-export const INDEX_VERSION = 10
+export const INDEX_VERSION = 11
