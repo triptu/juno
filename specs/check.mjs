@@ -481,11 +481,12 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
     simulate('readstate', 'coalesceStep', 'coalescingSafety', 'read-coalesce.itf.json')
     // Draft sync: each race starts from no draft on either side (Juno's clock behind for `behindClock` and `lateEcho`); its bug mode breaks the property it names.
     for (const [schedule, invariant, init = 'initFresh'] of [
-      ['echoRace', 'typedNeverLost'], ['inflightApply', 'quietAgreement'], ['sentReturns', 'typedNeverLost'], ['focusedRemote', 'focusKept'],
+      ['echoRace', 'typedNeverLost'], ['inflightApply', 'quietAgreement'], ['deletedReturns', 'typedNeverLost'], ['focusedRemote', 'focusKept'],
       ['staleList', 'quietAgreement'], ['clearStamp', 'drainBound'], ['staleClaim', 'quietAgreement'], ['staleAbsence', 'quietAgreement'],
       ['filesOnly', 'drainBound'], ['listsFail', 'drainBound'], ['behindClock', 'typedNeverLost', 'initBehind'], ['quitTyping', 'quitKeepsTyping'],
       ['copyTwice', 'copyKept'], ['staleAnswer', 'deletesOnlyOnClear'], ['refusedEdit', 'quietAgreement'], ['sameMillisList', 'drainBound'],
       ['lateEcho', 'sentStaysGone', 'initBehind'], ['manySends', 'sentStaysGone'], ['sentElsewhere', 'deletesOnlyOnClear'], ['filesHandsOff', 'deletesOnlyOnClear'],
+      ['lateSave', 'deletesOnlyOnClear'], ['refusedSend', 'quietAgreement'], ['retireSettles', 'retiredSettles'],
     ]) {
       simulate('drafts', `${schedule}Step`, 'invariants', `drafts-${schedule}.itf.json`, false, false,
         { init, samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
