@@ -99,6 +99,12 @@ export interface MessageListProps {
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   /** A broadcast reply's "in <topic title>" in Main: the thread `id`, opened at the reply `ts`. */
   readonly onOpenReply?: (id: string, ts: string, event: ActivateEvent) => void
+  /**
+   * A ⌘-click on a Main message itself (its words, time or background), not on a link or other control in it, for a
+   * press that did not move: the container opens the message's thread in a tab behind this one (SPEC 7). The press
+   * neither focuses the row nor starts a selection.
+   */
+  readonly onOpenThreadBehind?: (ts: string) => void
   /** The pointer came onto a Main message that has a thread: warm the thread, which a peek or an open may read next. */
   readonly onPrefetchThread?: (id: string) => void
   readonly onChannel?: (id: string) => void
@@ -145,6 +151,19 @@ export interface MessageListProps {
 const ROW = '[data-message-row]'
 /** A Main message that has a thread; `data-thread` is the thread's topic id. */
 const THREAD_ROW = '[data-thread]'
+
+/** What in a row handles its own click and ⌘-click: links, people, chips, files, pictures, reactions, buttons. */
+const CONTROL = 'a, button, input, textarea, select, audio, video, [role="button"], [role="link"], [data-opens-person], [data-thumbnail], [data-reaction], [data-file-card], [data-message-more]'
+
+/** The row a ⌘-press opens: one pressed on itself, not on a control in it, and not being edited. */
+function plainRow(event: MouseEvent<HTMLElement>): string | undefined {
+  const target = event.target
+  if (!event.metaKey || event.button !== 0 || !(target instanceof Element)) return undefined
+  const row = target.closest<HTMLElement>(ROW)
+  if (row === null || !event.currentTarget.contains(row) || row.dataset['editing'] !== undefined) return undefined
+  const control = target.closest(CONTROL)
+  return control !== null && row.contains(control) ? undefined : row.dataset['messageRow']
+}
 
 /** How far a press on the list moves before it is a drag selection, px. */
 const DRAG_SELECTION = 4
@@ -291,6 +310,7 @@ export function MessageList({
   onPastEnd,
   onOpenThread,
   onOpenReply,
+  onOpenThreadBehind,
   onPrefetchThread,
   onChannel,
   onPerson,
@@ -343,6 +363,16 @@ export function MessageList({
         aria-busy={status === 'loading' || status === 'pending'}
         onKeyDown={(event) => onKeyDown(event, onRowKey, onPastEnd)}
         onPointerDown={watchSelectionDrag}
+        // ⌘-click on a message: no focus or selection on the press, the thread on the click (`plainRow`).
+        onMouseDown={onOpenThreadBehind === undefined ? undefined : (event) => plainRow(event) !== undefined && event.preventDefault()}
+        onClick={
+          onOpenThreadBehind === undefined
+            ? undefined
+            : (event) => {
+                const ts = event.detail === 1 && !press.dragged ? plainRow(event) : undefined
+                if (ts !== undefined) onOpenThreadBehind(ts)
+              }
+        }
         onPointerOver={
           onPrefetchThread === undefined
             ? undefined

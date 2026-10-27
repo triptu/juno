@@ -10,7 +10,7 @@ import type { MenuAt, MenuPoint, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
 import { withMenus } from '../messageMenu'
 import { isOwnEditable, opensThread, refOf } from '../messageRows'
-import { openTopic, openTopicInBackground } from '../navigation'
+import { openTopic, openTopicAt, openTopicAtInBackground, openTopicInBackground } from '../navigation'
 import type { MenuInput } from './messageMenu'
 
 const ROW = '[data-message-row]'
@@ -109,17 +109,30 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       })
     }
     // ⌘-click or ⌘Enter opens the thread in a background tab: this tab, its scroll and its focus stay (SPEC 7).
-    const reply = (message: MessageView, options?: { readonly newTab: boolean }) => (options?.newTab === true ? openTopicInBackground : openTopic)(`t:${channel}:${message.ts}`)
+    // A reply also sent to the channel opens its thread at the reply, as its "in <topic title>" does.
+    const reply = (message: MessageView, options?: { readonly newTab: boolean }) => {
+      const from = message.broadcastFrom
+      if (from === undefined) return (options?.newTab === true ? openTopicInBackground : openTopic)(`t:${channel}:${message.ts}`)
+      if (options?.newTab === true) openTopicAtInBackground(from.id, message.ts)
+      else openTopicAt(from.id, message.ts, { flash: true })
+    }
+    // A ⌘-click on a message in Main opens its thread as ⌘ on the menu's row does.
+    const openThreadBehind = (ts: string) => {
+      const message = latest.current.list.rows.get(ts)
+      if (message !== undefined && opensThread(latest.current.detail.kind, message)) reply(message, { newTab: true })
+    }
     const handlers: MessageActions & {
       readonly react: typeof react
       readonly startEdit: typeof startEdit
       readonly askDelete: typeof askDelete
       readonly reply: typeof reply
+      readonly openThreadBehind: typeof openThreadBehind
     } = {
       react,
       startEdit,
       askDelete,
       reply,
+      openThreadBehind,
       onSeeReactions: (message, name, chip) => setReactions({ ts: message.ts, name, anchor: chip }),
       onConfirmDelete: confirmDelete,
       onButton: (message, attachment, button) => pressMessageButton(registry, refOf(channel, message), attachment, button).then((exit) => exit._tag === 'Success'),
