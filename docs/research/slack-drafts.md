@@ -259,6 +259,7 @@ Inferred, for Juno's design
 - Whether `is_active=true` includes scheduled drafts (the account had none), and the exact server meaning of `invalid_unattached_thread_draft` (a composer thread draft without a schedule was accepted).
 - `files.share` with `draft_id`, `draft_id` for a draft the server never saw, `date_stashed` round-trips, and `drafts.bulkDelete` answers. None were tried live.
 - Whether the server deletes a draft's files on `drafts.delete` without `skip_file_deletion` (inferred from the argument name).
+- Whether `drafts.update` without `file_ids` keeps the draft's files. The client always sends `file_ids` (`cbs` `updateDraftApi`), so Juno sends `[]`, and a file another device attaches while Juno's update is out can be dropped.
 - Rate limit tiers for `drafts.*`.
 - Enterprise Grid: whether `drafts.*` needs the org token or the team token, and whether drafts are org-wide (the once-per-org fetch suggests so). Not checked on a Grid account.
 - How the mobile apps debounce and apply remote changes. Only the web and desktop client was read.
