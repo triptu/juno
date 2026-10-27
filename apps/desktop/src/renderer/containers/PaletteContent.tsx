@@ -239,7 +239,7 @@ export function OpenPalette() {
   const conversationsValue = conversations._tag === 'Success' ? conversations.value : undefined
   const messagesValue = messages._tag === 'Success' ? messages.value : undefined
   const conversationRows = (conversationsValue ?? []).map(conversationRow)
-  // The last Conversations row when the text names no channel there (SPEC 10).
+  // The last Conversations row when the text names no channel there (SPEC 10); on All only when nothing matches, so it never takes a match's place as the first row.
   const newChannel = newChannelName(shownText, conversationsValue)
   const withNewChannel = (rows: ReadonlyArray<Row>): ReadonlyArray<Row> => (newChannel === undefined ? rows : [...rows, { id: 'new-channel', icon: 'public', label: `New channel “#${newChannel}”…`, compact: true, run: () => openNewChannel(shownText) }])
   const matches = matchRows(messagesValue ?? [])
@@ -257,7 +257,7 @@ export function OpenPalette() {
       // The open topic's commands first, then the global ones as the Commands tab orders them.
       const commandRows = [...(topic === undefined ? [] : matchCommands(topic.rows, shownText)), ...globalSections(globalRows, shownText).flatMap((section) => section.items)]
       sections = [
-        { heading: 'Conversations', hint: '⌘2', items: withNewChannel(conversationRows.slice(0, ALL_CONVERSATIONS)) },
+        { heading: 'Conversations', hint: '⌘2', items: conversationRows.length + matches.length + commandRows.length === 0 ? withNewChannel([]) : conversationRows.slice(0, ALL_CONVERSATIONS) },
         { heading: 'Topics and messages', hint: '⌘3', items: matches.slice(0, ALL_MATCHES) },
         { key: 'commands', heading: 'Pages, settings and commands', hint: '⌘4', items: commandRows.slice(0, ALL_COMMANDS) },
         { heading: 'Juno', items: juno },
