@@ -17,6 +17,12 @@ export interface WorkControlOptions {
    * reads again and must not send or delete from the stale read.
    */
   readonly onDraftWrite?: (step: 'claim' | 'absence', topicId: string, phase: 'before' | 'after') => Promise<void> | undefined
+  /**
+   * A live list that also runs once a minute (`topics.list`, `allTopics.list`, `allTopics.summary`): `tick` when the
+   * minute asks for a run, `read` when a run has read the store. A test returns a promise at `read` to hold the run
+   * there while a write and a tick land; what it sends must never be older than what was sent before it.
+   */
+  readonly onLiveRun?: (route: string, event: 'tick' | 'read') => Promise<void> | undefined
 }
 
 export class WorkControl extends Context.Reference<WorkControlOptions>('juno/engine/WorkControl', {

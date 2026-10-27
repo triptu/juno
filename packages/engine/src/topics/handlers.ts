@@ -24,13 +24,14 @@
  * job makes the follows. The topic actions (`actions.ts`) are
  * local; a resolve that queued a read mark wakes `MarkWorker`.
  */
-import { Clock, Effect, Schema, type Scope, Semaphore, Stream } from 'effect'
+import { Clock, Effect, Schema, type Scope, Stream } from 'effect'
 import { ALL_TOPICS_WINDOW, AllTopicsRoutes, SIDEBAR_WINDOW, TopicListRow, TopicsRoutes, type CommandResult } from '@juno/contract'
 import { Invalidation, liveQuery, type InvalidationKeys, type SqlError } from '@juno/store'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
+import { WorkControl, type WorkControlOptions } from '../workControl'
 import { Workspace, type StoreServices } from '../workspace'
 import { keepSuggested, keepTopicOpen, renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from '../topicActions'
 import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
@@ -51,16 +52,27 @@ const IGNORABLE_KEYS: InvalidationKeys = ['ignored_channels', 'conversations']
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
 
+/** The query, telling a test's `onLiveRun` when it has read and waiting while the test holds it there. */
+const observed = <A, E, R>(route: string, query: Effect.Effect<A, E, R>, control: WorkControlOptions): Effect.Effect<A, E, R> =>
+  control.onLiveRun === undefined
+    ? query
+    : Effect.tap(query, () => {
+        const hold = control.onLiveRun?.(route, 'read')
+        return hold === undefined ? Effect.void : Effect.promise(() => hold)
+      })
+
 /**
  * Query runs from the current store; nothing while no workspace is open.
  * `setup` runs once per open workspace, in a scope that lasts as long as
  * the workspace does, and returns the query. With `tick`, the query also
  * runs once a minute so a topic turns quiet on time; only this
- * subscription re-runs. Runs of one subscription never overlap, so a
- * later run's value is never sent before an earlier one's.
+ * subscription re-runs. The minute is one more trigger of the live query,
+ * so its runs and the change runs share one loop: runs never overlap, and
+ * a run that read older rows never sends after one that read newer rows.
  */
 function liveRuns<A>(
   workspace: Workspace['Service'],
+  route: string,
   keys: InvalidationKeys,
   setup: Effect.Effect<Effect.Effect<A, SqlError, StoreServices>, never, StoreServices | Scope.Scope>,
   tick: boolean,
@@ -69,13 +81,11 @@ function liveRuns<A>(
     Stream.switchMap((open) => {
       if (open === undefined) return Stream.empty
       const opened = Effect.gen(function* () {
-        const query = yield* setup
-        const lane = Semaphore.makeUnsafe(1)
-        const run = lane.withPermit(timed(query))
-        const live = liveQuery(keys, run)
+        const control = yield* WorkControl
+        const query = observed(route, yield* setup, control)
         // `Stream.tick` emits at once; the live query already runs at subscribe time.
-        const ticks = Stream.tick(QUIET_TICK).pipe(Stream.drop(1), Stream.mapEffect(() => Effect.result(run)))
-        return tick ? Stream.merge(live, ticks) : live
+        const minutes = Stream.tick(QUIET_TICK).pipe(Stream.drop(1), Stream.tap(() => Effect.sync(() => control.onLiveRun?.(route, 'tick'))))
+        return liveQuery(keys, timed(query), { triggers: tick ? minutes : undefined })
       })
       return Stream.scoped(Stream.unwrap(opened).pipe(Stream.provide(open.context)))
     }),
@@ -114,8 +124,8 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
         Effect.map(({ result }) => result),
       )
 
-    const runs = <A>(keys: InvalidationKeys, setup: Effect.Effect<Effect.Effect<A, SqlError, StoreServices>, never, StoreServices | Scope.Scope>, tick: boolean) =>
-      liveRuns(workspace, keys, setup, tick)
+    const runs = <A>(route: string, keys: InvalidationKeys, setup: Effect.Effect<Effect.Effect<A, SqlError, StoreServices>, never, StoreServices | Scope.Scope>, tick: boolean) =>
+      liveRuns(workspace, route, keys, setup, tick)
 
     return {
       'topics.list': (payload) => {
@@ -129,10 +139,10 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
             return yield* listTopics(filter, { now, limit }, cache)
           })
         })
-        return serveLiveList(runs(SIDEBAR_KEYS, setup, true), { encodeRow, measure }).pipe(retryFirstRun('topics.list'), Stream.orDie)
+        return serveLiveList(runs('topics.list', SIDEBAR_KEYS, setup, true), { encodeRow, measure }).pipe(retryFirstRun('topics.list'), Stream.orDie)
       },
       'topics.counts': (payload) =>
-        serveLiveValue(runs(COUNT_KEYS, Effect.succeed(countTopics(payload.scope)), false), { measure }).pipe(retryFirstRun('topics.counts'), Stream.orDie),
+        serveLiveValue(runs('topics.counts', COUNT_KEYS, Effect.succeed(countTopics(payload.scope)), false), { measure }).pipe(retryFirstRun('topics.counts'), Stream.orDie),
       'topics.subscribe': (payload) => setSubscribed(payload.id, true).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
       'topics.unsubscribe': (payload) => setSubscribed(payload.id, false).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox)),
       'topics.resolve': ({ id }) => act(resolveTopic(id)),
@@ -147,9 +157,9 @@ export const TopicsHandlers = TopicsRoutes.toLayer(
       'channels.unignore': ({ channel }) => setChannelIgnored(channel, false).pipe(Effect.provideService(Workspace, workspace)),
       'channels.followNew': ({ channel, on, since }) => setFollowNew(channel, on, since).pipe(Effect.provideService(Workspace, workspace)),
       'channels.ignored': () =>
-        serveLiveValue(runs(IGNORED_KEYS, Effect.succeed(listIgnoredChannels), false), { measure }).pipe(retryFirstRun('channels.ignored'), Stream.orDie),
+        serveLiveValue(runs('channels.ignored', IGNORED_KEYS, Effect.succeed(listIgnoredChannels), false), { measure }).pipe(retryFirstRun('channels.ignored'), Stream.orDie),
       'channels.ignorable': () =>
-        serveLiveValue(runs(IGNORABLE_KEYS, Effect.succeed(listIgnorableChannels), false), { measure }).pipe(retryFirstRun('channels.ignorable'), Stream.orDie),
+        serveLiveValue(runs('channels.ignorable', IGNORABLE_KEYS, Effect.succeed(listIgnorableChannels), false), { measure }).pipe(retryFirstRun('channels.ignorable'), Stream.orDie),
     }
   }),
 )
@@ -174,11 +184,11 @@ export const AllTopicsHandlers = AllTopicsRoutes.toLayer(
         const setup = Effect.map(rowCacheForSubscription, (cache) =>
           Effect.flatMap(Clock.currentTimeMillis, (now) => listAllTopics(filter, { now, offset, limit }, cache)),
         )
-        return serveLiveList(liveRuns(workspace, allTopicsKeys(filter.query), setup, true), { encodeRow, measure }).pipe(retryFirstRun('allTopics.list'), Stream.orDie)
+        return serveLiveList(liveRuns(workspace, 'allTopics.list', allTopicsKeys(filter.query), setup, true), { encodeRow, measure }).pipe(retryFirstRun('allTopics.list'), Stream.orDie)
       },
       'allTopics.summary': (narrowing) => {
         const setup = Effect.succeed(Effect.flatMap(Clock.currentTimeMillis, (now) => summarizeAllTopics(narrowing, now)))
-        return serveLiveValue(liveRuns(workspace, allTopicsKeys(narrowing.query), setup, true), { measure }).pipe(retryFirstRun('allTopics.summary'), Stream.orDie)
+        return serveLiveValue(liveRuns(workspace, 'allTopics.summary', allTopicsKeys(narrowing.query), setup, true), { measure }).pipe(retryFirstRun('allTopics.summary'), Stream.orDie)
       },
     }
   }),
