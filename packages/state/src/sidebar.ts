@@ -76,6 +76,8 @@ export interface SidebarWindow extends ListWindow<TopicRow> {
   readonly building?: boolean
   /** Shown in a held order (`sidebarListAtom`). */
   readonly held?: boolean
+  /** Kept out of recency order while a sync cycle ran (`keepPainted`): it takes the true order once the cycle ends. */
+  readonly kept?: boolean
 }
 
 /**
@@ -180,13 +182,13 @@ const sidebarSourceAtom = Atom.make((get): SidebarWindow => {
   const building = firstSync || (shown?.building === true && syncing)
   const mark = building ? { building: true } : {}
   if (shown !== undefined && shown.filter === filter) {
-    // Finishing sync is not a reason to reorder a painted list. The next live
-    // activity or an explicit filter change resumes the ordinary recency order.
-    if (shown.meta === next.meta) return quietDays < shown.quietDays ? { ...shown, quietDays } : shown
-    // A catch-up keeps a painted list in place, except for activity since the engine started.
-    if ((syncing && !building) || quietDays > shown.quietDays) {
-      const since = status._tag === 'Success' ? status.value.startedAt : Infinity
-      return { ...next, order: keepPainted(shown, next, since), filter, quietDays }
+    const keeping = (syncing && !building) || quietDays > shown.quietDays
+    // Nothing new, unless a cycle kept the list out of order and has ended: then the rows settle to their true order.
+    if (shown.meta === next.meta && (keeping || shown.kept !== true)) return quietDays < shown.quietDays ? { ...shown, quietDays } : shown
+    // A cycle keeps a painted list in place, except for live activity (`keepPainted`).
+    if (keeping) {
+      const order = keepPainted(shown, next, status._tag === 'Success' ? status.value.startedAt : Infinity)
+      return { ...next, order, filter, quietDays, ...(sameOrder(order, next.order) ? {} : { kept: true }) }
     }
   }
   return { ...next, filter, quietDays, ...mark }
