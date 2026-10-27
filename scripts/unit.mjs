@@ -17,11 +17,16 @@ import { availableParallelism } from 'node:os'
 import { join, resolve } from 'node:path'
 import { unitTestMatcher } from './affected-tests.mjs'
 import { forwardSignals } from './remote/children.mjs'
-import { stressScale, UNIT_LIMIT_MS } from '../packages/testing/src/limits.ts'
 
-// The default test timeout is the unit lane's limit on one test's time (packages/testing/src/limits.ts). The
-// preload's setDefaultTimeout reaches only the first file a Bun process runs, so it is passed on the command line too.
-const TIMEOUT_MS = UNIT_LIMIT_MS * stressScale()
+/**
+ * The default test timeout: the unit lane's limit on one test's time (packages/testing/src/limits.ts), scaled in a
+ * stress run. The preload's setDefaultTimeout reaches only the first file a Bun process runs, so it is passed on the
+ * command line too. Loaded only to run, since the tool tests copy `scripts/` without the packages.
+ */
+async function unitTimeout() {
+  const { stressScale, UNIT_LIMIT_MS } = await import('../packages/testing/src/limits.ts')
+  return UNIT_LIMIT_MS * stressScale()
+}
 
 const runsBunTest = (root, dir) => /^bun test\b/.test(JSON.parse(readFileSync(resolve(root, dir, 'package.json'), 'utf8')).scripts?.test ?? '')
 
@@ -33,11 +38,11 @@ function testRoot(root, dir) {
 }
 
 /** The `bun test` arguments for a run (every package, or the files after `--files`) and its order seed. */
-export function unitCommand(given, root, { workers = defaultWorkers() } = {}) {
+export function unitCommand(given, root, { workers = defaultWorkers(), timeout } = {}) {
   const { seed, rest } = takeSeed(given)
   const isolate = isolateFlag(rest)
   const args = rest.filter((arg) => arg !== '--isolate' && arg !== '--no-isolate' && arg !== '--randomize')
-  const run = (paths, extra, count) => ({ seed, args: ['test', `--parallel=${count}`, isolate, `--seed=${seed}`, `--timeout=${TIMEOUT_MS}`, ...extra, ...paths] })
+  const run = (paths, extra, count) => ({ seed, args: ['test', `--parallel=${count}`, isolate, `--seed=${seed}`, ...(timeout === undefined ? [] : [`--timeout=${timeout}`]), ...extra, ...paths] })
   const at = args.indexOf('--files')
   if (at === -1) {
     const { workspaces } = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
@@ -96,7 +101,7 @@ function defaultWorkers() {
 }
 
 if (import.meta.main) {
-  const { seed, args } = unitCommand(process.argv.slice(2), process.cwd())
+  const { seed, args } = unitCommand(process.argv.slice(2), process.cwd(), { timeout: await unitTimeout() })
   console.log(`unit: test order seed ${seed}; \`bun run test --seed ${seed}\` repeats it`)
   const child = spawn('bun', args, { stdio: 'inherit', env: bunTestEnv() })
   forwardSignals(new Set([child]))
