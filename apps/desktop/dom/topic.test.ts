@@ -1,5 +1,5 @@
 // Reading a topic (SPEC 6 and 7): prefetch on hover, where it opens, the context pill and a
-// #channel chip, the "N new" divider and the read mark, the topic menu's Notify me, Follow and
+// #channel chip, Follow new threads in the channel menu, the "N new" divider and the read mark, the topic menu's Notify me, Follow and
 // ⌘Z, Main's thread links, the title's topic switcher, and a composer that mounts late or comes back
 // taking the keys typed at once.
 import type { FakeSlack } from '@juno/fake-slack'
@@ -41,6 +41,22 @@ domTest('a topic warms on hover, opens at its "N new" divider, follows and unfol
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.contextPill.click()
     await juno.sidebar.expectScope('eng')
+  })
+
+  await step('Follow new threads in the channel menu turns on with a toast, and ⌘Z turns it off', async () => {
+    await juno.sidebar.row(POSTGRES).open()
+    const followNew = async () => {
+      await juno.chooseNextMenuItem(null)
+      await juno.topic.contextPill.click({ button: 'right' })
+      return (await juno.lastMenu()).labels.find((label) => label.startsWith('Follow new threads'))
+    }
+    await juno.chooseNextMenuItem('follow-new')
+    await juno.topic.contextPill.click({ button: 'right' })
+    await juno.expectToast('Following new threads in #eng')
+    // The toast shows once the menus' settings show the change.
+    expect(await followNew()).toBe('Follow new threads ✓')
+    await juno.undo()
+    await expect.poll(followNew).toBe('Follow new threads')
   })
 
   await step('a #channel chip scopes the sidebar to that channel', async () => {

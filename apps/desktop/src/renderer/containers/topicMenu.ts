@@ -2,7 +2,7 @@ import { junoSettingsNow } from '@juno/state/agent'
 import { openSettings } from './navigation'
 import { topicMenuItems, type ContextMenuAt, type TopicMenuAction } from '@juno/contract'
 import { redrawTopic, showToast, type RedrawProblem, canRedraw, currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, type RenameTarget } from '@juno/state'
-import { choiceFor, nativeMenu } from './notifyActions'
+import { choiceFor, followsNew, nativeMenu } from './notifyActions'
 import { viewChoices } from './viewActions'
 import { huddleMenuItem } from './huddle/menuItem'
 import { labelOf, isLinkable, notifyTarget, runTopicAction } from './topicActions'
@@ -15,7 +15,7 @@ const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.ch
  * at the pointer or at `at`. `from` says which title Rename edits. Notify me
  * on a thread is how it is followed: Always and Auto
  * follow it in Slack, Never unfollows it (SPEC 5). On Main it is the
- * channel's or DM's choice.
+ * channel's or DM's choice, and Follow new threads is the conversation's.
  */
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
   // Redraw art shows only when a drawing can be made: asked beside the settings, within a fraction of a second.
@@ -31,8 +31,8 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     resolved: topic.resolved,
     notify: choiceFor(settings, notify.target, topic.subscribed),
     canDraw: settings?.aiAssist === true && (await drawable),
-    // Add to view (inventory 15.8) is on Main: the row's channel or DM.
-    ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
+    // Follow new threads and Add to view (inventory 15.8) are on Main: the row's channel or DM.
+    ...(topic.kind === 'main' ? { followNew: followsNew(settings, topic.channel.id), views: viewChoices(topic.channel.id) } : {}),
     ...(huddle === undefined ? {} : { huddle }),
     ...(dmPartner(topic) !== undefined && registry.get(junoAvailableAtom) ? { knowsAbout: dmPartner(topic)!.name } : {}),
   }

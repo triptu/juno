@@ -1,6 +1,7 @@
 /**
  * The channel menu (inventory 15.2) on the header's context pill and a
- * #channel chip. Its Notify me sets the channel's level; Ask Juno opens the
+ * #channel chip. Its Notify me sets the channel's level, and Follow new
+ * threads beside it turns that setting on or off; Ask Juno opens the
  * Juno panel, or the Juno tab, with an About chip (SPEC 7). Mark channel as
  * read and unread wait for an engine command, so they show disabled. Add to
  * view (inventory 15.8) adds the channel to a sidebar view or removes it. The
@@ -13,7 +14,7 @@ import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
 import { askJunoAbout } from './juno/actions'
 import { openTopic } from './navigation'
 import { openNotificationsAt } from './notificationsAnchor'
-import { choiceFor, nativeMenu, setNotifyLevel } from './notifyActions'
+import { choiceFor, followsNew, nativeMenu, setFollowNew, setNotifyLevel } from './notifyActions'
 import { runViewMenuAction, viewChoices } from './viewActions'
 
 const pending: ReadonlySet<string> = new Set<ChannelMenuAction>(['mark-channel-read', 'mark-channel-unread'])
@@ -25,21 +26,24 @@ export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt):
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'channel', id: channel.id }
   const huddle = huddleMenuItem(channel)
+  const followNew = followsNew(settings, channel.id)
   const items = channelMenuItems({
     channel: { id: channel.id as never, kind: channel.kind, name: channel.name },
     hasMain: channel.mainId !== undefined,
     notify: choiceFor(settings, target),
+    followNew,
     views: viewChoices(channel.id),
     askJuno: registry.get(junoAvailableAtom),
     ...(huddle === undefined ? {} : { huddle }),
   })
   const chosen = (await popupContextMenu(nativeMenu(items, (id) => !pending.has(id)), at)) as ChannelMenuAction | undefined
-  if (chosen !== undefined) await runChannelAction(chosen, channel, target)
+  if (chosen !== undefined) await runChannelAction(chosen, channel, target, followNew)
   return chosen
 }
 
-async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel, target: NotifyTargetView): Promise<void> {
+async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel, target: NotifyTargetView, followNew: boolean): Promise<void> {
   if (isNotify(chosen)) return setNotifyLevel(target, notifyChoiceOf(chosen), channel.label)
+  if (chosen === 'follow-new') return setFollowNew(channel, !followNew)
   if (chosen === 'how-auto') return openNotificationsAt('how-auto')
   if (isViewMenuAction(chosen)) return runViewMenuAction(chosen, channel)
   switch (chosen) {

@@ -24,6 +24,7 @@ import {
 } from '@juno/contract'
 import {
   copyText,
+  currentNotificationSettings,
   editUndo,
   flushSidebar,
   ignoreChannel,
@@ -41,7 +42,7 @@ import {
 import { openTopic, openTopicFromList } from './navigation'
 import { runViewMenuAction } from './viewActions'
 import { openNotificationsAt } from './notificationsAnchor'
-import { setNotifyLevel } from './notifyActions'
+import { followsNew, setFollowNew, setNotifyLevel } from './notifyActions'
 import { showWhatJunoKnows } from './juno/actions'
 import { joinHuddleFromMenu } from './huddle/menuItem'
 import { headerOf, rowOf, topicOf, type ActionTopic } from './topicSource'
@@ -147,6 +148,8 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
       return setNotifyLevel(notify.target, notifyChoiceOf(chosen), notify.label)
     case 'how-auto':
       return openNotificationsAt('how-auto')
+    case 'follow-new':
+      return setFollowNew(topic.channel, !followsNew(currentNotificationSettings(registry), topic.channel.id))
     case 'ignore-channel':
       flushSidebar(registry)
       return void ignoreChannel(registry, topic.channel)
