@@ -8,6 +8,8 @@
  * Notify me on a thread is also its follow (SPEC 5): Always and Auto
  * follow it in Slack through `topics.subscribe`, Never unfollows it. Always
  * and Never are also stored as the thread's level, which the decision reads.
+ * The settings also carry the conversations with Follow new threads on
+ * (`../followNew.ts`), which the menus show beside Notify me.
  *
  * Slack's own schedule (the `dnd_*` user prefs) follows the notification
  * hours through `SlackSchedule` (`../slackSchedule.ts`), which watches the
@@ -50,16 +52,17 @@ import { Outbox } from '../outbox'
 import { SlackSchedule, slackScheduleView } from '../slackSchedule'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
 import { setSubscribed } from '../follow'
+import { followNewChannels } from '../followNew'
 import { Workspace, type StoreServices } from '../workspace'
 import { tagsFor, todayCounts, todayDecisions } from './pageQueries'
 
-const SETTINGS_KEYS: InvalidationKeys = ['prefs']
+const SETTINGS_KEYS: InvalidationKeys = ['prefs', 'follow_new_threads']
 const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team', 'topic_overlay']
 const DECISION_KEYS: InvalidationKeys = ['notification_log']
 /** People and channels an instruction names that the rule check is shown, at most. */
 const NAMED_LIMIT = 5
 
-const viewOf = (settings: NotificationSettings, aiAssist: boolean): NotificationSettingsView => ({
+const viewOf = (settings: NotificationSettings, aiAssist: boolean, followNewThreads: ReadonlyArray<string>): NotificationSettingsView => ({
   notificationHours: settings.notificationHours,
   presenceHours: settings.presenceHours,
   channels: settings.channels,
@@ -69,6 +72,7 @@ const viewOf = (settings: NotificationSettings, aiAssist: boolean): Notification
   instructions: settings.instructions ?? [],
   aiAssist,
   huddleRing: settings.huddleRing !== false,
+  followNewThreads,
 })
 
 /** The people and channels an instruction names: a person's full or first name or handle, a channel's name, as whole words. */
@@ -169,7 +173,10 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
       })
 
-    const settingsView = Effect.map(readSettings, ({ settings, aiAssist }) => viewOf(settings, aiAssist))
+    const settingsView = Effect.gen(function* () {
+      const { settings, aiAssist } = yield* readSettings
+      return viewOf(settings, aiAssist, yield* followNewChannels)
+    })
 
     const status = Effect.gen(function* () {
       const now = localTime(yield* Clock.currentTimeMillis)

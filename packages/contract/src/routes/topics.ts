@@ -233,10 +233,14 @@ export const DraftRestore = Schema.Struct({
   keptAt: Schema.NullOr(Schema.String),
 })
 
+/** Follow new threads on or off; `since` is the time it was turned on, given only by the undo of turning it off. */
+const followNewPayload = { channel: Schema.String, on: Schema.Boolean, since: Schema.optionalKey(Schema.String) }
+
 export const UndoCommand = Schema.Union([
   Schema.TaggedStruct('topics.restore', restorePayload),
   Schema.TaggedStruct('channels.ignore', { channel: Schema.String }),
   Schema.TaggedStruct('channels.unignore', { channel: Schema.String }),
+  Schema.TaggedStruct('channels.followNew', followNewPayload),
   Schema.TaggedStruct('topics.subscribe', { id: Schema.String }),
   Schema.TaggedStruct('topics.unsubscribe', { id: Schema.String }),
   Schema.TaggedStruct('reads.markRead', { id: Schema.String, upTo: Schema.optionalKey(Schema.String) }),
@@ -343,6 +347,15 @@ export const channelsIgnore = action('channels.ignore', { channel: Schema.String
 
 export const channelsUnignore = action('channels.unignore', { channel: Schema.String })
 
+/**
+ * Follow new threads in a channel, DM or group DM (SPEC 5), a setting of
+ * Juno's own. While it is on, Juno follows in Slack each thread whose root
+ * is newer than the time it was turned on, once, when the root gets its
+ * first reply. Turning it off follows nothing more and unfollows nothing.
+ * A conversation the store does not know is `NotFound`.
+ */
+export const channelsFollowNew = action('channels.followNew', followNewPayload)
+
 /** A channel Settings › Ignored can add: one you are in, not archived and not ignored. */
 export const IgnorableChannel = Schema.Struct({
   id: Schema.String,
@@ -381,6 +394,7 @@ export const TopicsRoutes = RpcGroup.make(
   topicsRestore,
   channelsIgnore,
   channelsUnignore,
+  channelsFollowNew,
   channelsIgnored,
   channelsIgnorable,
 )

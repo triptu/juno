@@ -14,6 +14,7 @@ import { JunoHostLive, PhaseSource } from './agent-host/host'
 import { AiFallback } from './aiFallback'
 import { AiWarmup } from './aiWarmup'
 import { TitleJob } from './titleJob'
+import { FollowNewJob } from './followNew'
 import { AiProviderLive } from './ai'
 import { AiAudit } from './aiAudit'
 import { AiHandlers } from './aiActivity'
@@ -103,7 +104,7 @@ const EnginePhases = Layer.effectDiscard(
 )
 
 /** Everything the route handlers need. Requires the host seams (`HostLink`, `HttpTransport`) and `EngineConfig`. */
-export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, AutomatedJob, AiWarmup).pipe(
+export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, AutomatedJob, AiWarmup, FollowNewJob).pipe(
   Layer.provideMerge(MarkWorker.layer),
   Layer.provideMerge(SlackSchedule.layer),
   Layer.provideMerge(PostWorker.layer),

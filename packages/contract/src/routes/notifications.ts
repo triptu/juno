@@ -2,7 +2,8 @@
  * Notification routes (spec section 14, inventory 2.1, 13 and 15).
  *
  * - `notifications.settings` is the owner's settings as stored, with the AI
- *   assist switch. The menus read the current Notify me level from it.
+ *   assist switch and the conversations with Follow new threads on. The
+ *   menus read the current Notify me level and Follow new threads from it.
  * - `notifications.page` is what the Notifications page shows beyond the
  *   settings: the Always and Never lists with their names, today's counts
  *   and the state of Slack's schedule.
@@ -91,6 +92,8 @@ export const NotificationSettingsView = Schema.Struct({
   aiAssist: Schema.Boolean,
   /** Ring for huddles. Off: an incoming huddle shows its card and notification without the sound. */
   huddleRing: Schema.Boolean,
+  /** The channels, DMs and group DMs with Follow new threads on, which their menus show beside Notify me (SPEC 5). */
+  followNewThreads: Schema.Array(Schema.String),
 })
 export type NotificationSettingsView = typeof NotificationSettingsView.Type
 

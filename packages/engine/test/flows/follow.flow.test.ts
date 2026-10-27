@@ -1,13 +1,14 @@
 // Following threads (SPEC 5, "Subscribe works on any thread"; specs/follow.qnt), end to end: the user's
-// Subscribe and Unsubscribe are mirrored to Slack with undo, a reply or a mention follows as in Slack, and a
-// refused or racing command never leaves a follow Slack does not have. `follow-races.flow.test.ts` has the
-// follows Juno did not make. Every test starts warm on the synced default workspace.
+// Subscribe and Unsubscribe are mirrored to Slack with undo, a reply or a mention follows as in Slack, a
+// refused or racing command never leaves a follow Slack does not have, and Follow new threads follows each
+// new thread of a channel once (specs/follownew.qnt). `follow-races.flow.test.ts` has the follows Juno did
+// not make. Every test starts warm on the synced default workspace.
 import { afterEach, expect, it } from 'bun:test'
-import type { TopicCounts, UndoCommand } from '@juno/contract'
+import { channelsFollowNew, notificationsSetLevel, type TopicCounts, type UndoCommand } from '@juno/contract'
 import { SELF_ID } from '@juno/fake-slack'
-import { topicCountsAtom } from '@juno/state'
+import { runCommand, topicCountsAtom } from '@juno/state'
 import { waitFor, type RunningEngine } from '../harness'
-import { apiCalls, errorOf, quiet, restart, storedFollow, subscribe, threadId as threadIdIn, tsOf, unsubscribe, valueOf } from '../scenario'
+import { apiCalls, errorOf, quiet, restart, slackWrites, storedFollow, subscribe, threadId as threadIdIn, tsOf, unsubscribe, valueOf } from '../scenario'
 import { step } from '../step'
 import { syncedEngine } from '../synced'
 
@@ -224,4 +225,59 @@ it('a reply from Slack while a Subscribe is in flight does not hide the intent, 
   // The noted observation made the command ask for the root: Slack's newer unfollow wins.
   await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the thread gone after the refresh')
   expect(storedFollow(engine, 'C0PLATFORM', tsOf(id))).toBe(0)
+})
+
+it('Follow new threads follows each thread that starts in the channel once, live and after a restart, and never over a Never', async () => {
+  const engine = await synced()
+  const older = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Anyone seen the staging cert warning?' })
+  await engine.socketIdle()
+  const adds = (next: RunningEngine) => apiCalls(next, 'subscriptions.thread.add').map((call) => call.args['thread_ts'])
+  /** A root by someone else and its first reply: a new thread. */
+  const startThread = (text: string) => {
+    const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text })
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Looking.', threadTs: root.ts })
+    return root.ts
+  }
+  const followedRow = (next: RunningEngine, ts: string, label: string) =>
+    next.rowsUntil((rows) => rows.some((r) => r.id === `t:C0ENG:${ts}` && r.subscribed), label)
+
+  await step('turning it on changes nothing in Slack, and its undo turns it off', async () => {
+    const calls = engine.fake.calls.length
+    expect(valueOf(await runCommand(engine.registry, channelsFollowNew, { channel: 'C0ENG', on: true }))).toEqual({ undo: { _tag: 'channels.followNew', channel: 'C0ENG', on: false } })
+    expect(valueOf(await runCommand(engine.registry, channelsFollowNew, { channel: 'C0ENG', on: true }))).toEqual({})
+    expect(slackWrites(engine, calls)).toEqual([])
+  })
+
+  let first = ''
+  await step('a root posted after it gets its first reply: Juno follows the thread in Slack and it joins the sidebar', async () => {
+    // A thread whose root came before the setting is left alone. Roots are taken oldest first, so by the time the
+    // new thread is followed, the older one would have been.
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Not me.', threadTs: older.ts })
+    first = startThread('Release notes draft for 4.2 is up.')
+    await followedRow(engine, first, 'the new thread followed')
+    expect(adds(engine)).toEqual([first])
+    expect(engine.fake.workspace.subscription('C0ENG', first as never)?.subscribed).toBe(true)
+    expect(storedFollow(engine, 'C0ENG', older.ts)).toBeUndefined()
+  })
+
+  await step('after Never on it, more replies do not follow it again', async () => {
+    valueOf(await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'thread', id: `t:C0ENG:${first}` }, choice: 'never' }))
+    await engine.rowsUntil((rows) => !rows.some((r) => r.id === `t:C0ENG:${first}`), 'the thread gone after Never')
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Updated the changelog.', threadTs: first })
+    const next = startThread('Who is on call this weekend?')
+    await followedRow(engine, next, 'the next new thread followed')
+    expect(adds(engine)).toEqual([first, next])
+    expect(storedFollow(engine, 'C0ENG', first)).toBe(0)
+  })
+
+  await step('a thread that started while Juno was closed is followed after the catch-up', async () => {
+    let closed = ''
+    const next = await restart(engines, engine, (fake) => {
+      const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Postmortem doc for the outage.' })
+      fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Adding the timeline.', threadTs: root.ts })
+      closed = root.ts
+    })
+    await followedRow(next, closed, 'the thread from while closed followed')
+    expect(adds(next)).toEqual([closed])
+  })
 })

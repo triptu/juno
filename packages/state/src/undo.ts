@@ -14,6 +14,7 @@ import * as Atom from 'effect/reactivity/Atom'
 import type { Rpc } from 'effect/rpc'
 import {
   artRestore,
+  channelsFollowNew,
   channelsIgnore,
   channelsUnignore,
   draftsRestore,
@@ -149,6 +150,8 @@ function replay(registry: Registry, undo: UndoCommand): Promise<unknown> {
       return runCommand(registry, channelsIgnore, payloadOf(undo))
     case 'channels.unignore':
       return runCommand(registry, channelsUnignore, payloadOf(undo))
+    case 'channels.followNew':
+      return runCommand(registry, channelsFollowNew, payloadOf(undo))
     case 'topics.subscribe':
       return runCommand(registry, topicsSubscribe, payloadOf(undo))
     case 'topics.unsubscribe':
