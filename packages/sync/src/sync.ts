@@ -107,16 +107,18 @@ export interface RunSyncOptions {
 /**
  * Fetches for opened topics (`open.ts`), run in the sync's context so they
  * share its queues: stub roots get fetched and unknown senders named, both
- * in the background. On the interactive lane; when Slack rate-limits the
- * call, the same fetch is queued on the background lane and the error is
- * returned, so the caller shows what the store has.
+ * in the background. An open's first page and a jump run on the interactive
+ * lane; older and newer pages and an open's later pages on `paging`, which
+ * yields to them. When Slack rate-limits the call, the same fetch is queued
+ * on the background lane and the error is returned, so the caller shows
+ * what the store has.
  */
 export interface TopicFetcher {
   readonly open: (topicId: string) => Effect.Effect<FetchReport, OpenError>
   readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
   /** The replies after `after` in a thread, when the store cannot prove them (`fetchNewer`). */
   readonly newer: (topicId: string, after: string) => Effect.Effect<FetchReport, OpenError>
-  /** Stores the message `ts` in full for a jump to it (`fetchAt`). */
+  /** Stores the message `ts` in full for a jump to it (`fetchAt`). Concurrent jumps to one message share the read. */
   readonly at: (topicId: string, ts: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores a DM-open answer through the running metadata fence. */
   readonly opened: (channel: Parameters<typeof applyOpened>[1]) => Effect.Effect<void, SqlError>

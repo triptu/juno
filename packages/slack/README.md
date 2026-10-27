@@ -14,7 +14,7 @@ Then use the services:
 
 - `SlackApi`: Web API calls, decoded with `@juno/slack-schema`. A call's `beforeSend` runs holding its lane's permit just before each exchange and can stop the call with its own error. Includes `presence.set({ presence: 'auto' | 'away' })`.
 - `SlackEdge`: the edge API (`users/info` and similar).
-- `RequestQueue`: request lanes, per-method rate limits and `Retry-After`.
+- `RequestQueue`: request lanes, per-method rate limits and `Retry-After`. `paging` calls share the interactive lane's permits and tokens but yield to interactive ones (`permits.ts`).
 - `SlackSocket`: the event socket with reconnect, as a stream of `SocketEvent`. Each frame carries `receivedAt`, stamped before it enters the consumer queue; sync uses it to distinguish a newer pong from an older queued one. `tickle(reason)` tells Slack the user is here, at most once per `socket.tickleSpacingMillis` (19 s) across reconnects.
 - `SlackConfig` / `slackConfigLayer`: timers and limits, with defaults.
 - `SlackTrace`: hears each Web API and edge call start and end (params without the token, timing, attempts, outcome, response size and body) for the engine's developer log. A `Context.Reference` that is off by default, so a client built without it does no extra work.

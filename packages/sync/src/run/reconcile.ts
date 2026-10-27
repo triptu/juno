@@ -14,7 +14,8 @@ const refreshOpenTopics = (runtime: SyncRuntime) => Effect.gen(function* () {
   const nameSenders = (report: FetchReport) => Effect.sync(() => wantUsers(ctx, report.unknownUsers))
   const open = options.openTopics === undefined ? [] : yield* options.openTopics
   for (const topicId of open) {
-    yield* fetchTopic(ctx, topicId, 'interactive').pipe(
+    // Not asked for by the user: it yields to their opens and jumps.
+    yield* fetchTopic(ctx, topicId, 'paging').pipe(
       Effect.tap(nameSenders),
       Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: open topic not refreshed', { cause: error })),
     )

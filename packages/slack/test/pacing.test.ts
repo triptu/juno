@@ -136,3 +136,42 @@ itEffect('a background call already waiting for its slot rechecks a pause that a
   yield* TestClock.adjust(3_000)
   expect(yield* Fiber.join(next)).toBe(5_000)
 }).pipe(Effect.provide(RequestQueue.layer)))
+
+itEffect('paging leaves the user a permit, and a user call waiting for one goes before waiting pages', () => Effect.gen(function* () {
+  const queue = yield* RequestQueue
+  const order: Array<string> = []
+  const call = (lane: 'interactive' | 'paging', name: string, millis: number) =>
+    Effect.forkChild(queue.run(lane, 'conversations.replies', Effect.sync(() => { order.push(name) }).pipe(Effect.andThen(Effect.sleep(millis)))))
+  yield* call('paging', 'page 1', 1_000)
+  yield* call('paging', 'page 2', 1_000)
+  const third = yield* call('paging', 'page 3', 0)
+  yield* TestClock.adjust(0)
+  // The third page would take the last permit, which stays the user's.
+  expect(order).toEqual(['page 1', 'page 2'])
+  yield* call('interactive', 'jump', 1_000)
+  yield* TestClock.adjust(0)
+  expect(order).toEqual(['page 1', 'page 2', 'jump'])
+  // Every permit taken: a user call waits, and the page waiting longer does not go first. A page that gives up waiting takes nothing.
+  const open = yield* call('interactive', 'open', 0)
+  const gone = yield* call('paging', 'gone', 0)
+  yield* TestClock.adjust(0)
+  yield* Fiber.interrupt(gone)
+  yield* TestClock.adjust(1_000)
+  yield* Fiber.join(open)
+  yield* Fiber.join(third)
+  expect(order).toEqual(['page 1', 'page 2', 'jump', 'open', 'page 3'])
+  const together = yield* Effect.forkChild(Effect.forEach([1, 2, 3], () => queue.run('interactive', 'conversations.replies', Clock.currentTimeMillis), { concurrency: 'unbounded' }))
+  yield* TestClock.adjust(0)
+  expect(yield* Fiber.join(together)).toEqual([1_000, 1_000, 1_000])
+}).pipe(Effect.provide(RequestQueue.layer)))
+
+itEffect('a page leaves the last two interactive tokens to the user', () => Effect.gen(function* () {
+  const queue = yield* RequestQueue
+  yield* Effect.forEach(Array.from({ length: 18 }), () => queue.run('interactive', 'conversations.replies', Effect.void))
+  const page = yield* Effect.forkChild(queue.run('paging', 'conversations.replies', Clock.currentTimeMillis))
+  yield* TestClock.adjust(0)
+  expect(yield* queue.run('interactive', 'conversations.replies', Clock.currentTimeMillis)).toBe(0)
+  // One token left: the page waits for two more, at one per 500 ms.
+  yield* TestClock.adjust(1_000)
+  expect(yield* Fiber.join(page)).toBe(1_000)
+}).pipe(Effect.provide(RequestQueue.layer)))
