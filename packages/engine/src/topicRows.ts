@@ -30,6 +30,8 @@ export interface JoinedRow extends TopicIndexRow {
   readonly c_name: string | null
   readonly c_user_id: string | null
   readonly c_members: string | null
+  /** The user is in the conversation (`conversations.is_member`). Read by the topic header only. */
+  readonly c_member?: 0 | 1
   readonly manual_title: string | null
   readonly ai_title: string | null
   readonly resolved_at: string | null
@@ -46,7 +48,7 @@ export interface JoinedRow extends TopicIndexRow {
 
 /** The columns of a `JoinedRow`, without `channel_activity_ts`. */
 export const TOPIC_COLUMNS = `
-  SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members,
+  SELECT i.*, c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members, c.is_member AS c_member,
     o.manual_title, o.ai_title, o.resolved_at, o.resolved_activity_ts, o.reopened_at, o.pinned_at,
     s.subscribed AS subscribed, a.recipe AS art_recipe, a.status AS art_status`
 

@@ -38,13 +38,15 @@ const build = Effect.gen(function* () {
   const selfId = (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`)[0]?.self_user_id ?? undefined
   const users = new Map<string, IndexUser>()
   for (const user of yield* sql<IndexUser>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, deleted, is_bot FROM users`) users.set(user.id, user)
-  const rows = yield* sql<Omit<ConversationRow, 'has_topics'>>`SELECT c.id, c.kind, c.name, c.user_id, c.member_ids_json FROM conversations c
+  // Public channels you are not in are for ⌘K only (`notJoined`), as Slack lists no private ones you are not in.
+  const rows = yield* sql<Omit<ConversationRow, 'has_topics'> & { readonly is_member: 0 | 1 }>`SELECT c.id, c.kind, c.name, c.user_id, c.member_ids_json, c.is_member FROM conversations c
     LEFT JOIN ignored_channels g ON g.channel = c.id
-    WHERE g.channel IS NULL AND (c.kind = 'im' OR c.is_member = 1)`
+    WHERE g.channel IS NULL AND (c.kind = 'im' OR c.is_member = 1 OR (c.kind = 'public' AND c.is_archived = 0))`
   const entries: Array<IndexEntry> = []
   const withDm = new Set<string>()
   for (const row of rows) {
-    const pick = pickOf({ ...row, has_topics: 1 }, users, selfId)
+    const member = pickOf({ ...row, has_topics: 1 }, users, selfId)
+    const pick = row.kind === 'public' && row.is_member === 0 ? { ...member, notJoined: true as const } : member
     if (row.kind === 'im') {
       // A DM with someone gone or a bot is not offered, as their name is not.
       const user = row.user_id === null ? undefined : users.get(row.user_id)

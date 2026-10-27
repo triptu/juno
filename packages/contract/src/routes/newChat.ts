@@ -54,6 +54,8 @@ export const PickConversation = Schema.Struct({
   members: Schema.optionalKey(Schema.Array(Person)),
   /** Juno holds no message in it: "No messages yet" for a person. */
   empty: Schema.Boolean,
+  /** A public channel you are not in: only ⌘K lists it, after yours, marked "Not joined" (SPEC 10). */
+  notJoined: Schema.optionalKey(Schema.Literal(true)),
   /** With text, the parts of `name` the text matched, as [start, end) offsets, for the row to highlight. */
   highlight: Schema.optionalKey(Schema.Array(Schema.Tuple([Schema.Int, Schema.Int]))),
 })
