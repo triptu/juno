@@ -41,9 +41,11 @@ export const applyDraftEvent = (frame: DraftFrame, seenAt: number): Effect.Effec
       if (place !== undefined) yield* transaction(applyVersion(place, frame.draft, { seenAt, listed: false }))
       return
     }
-    const topicId = yield* topicOfSlackDraft(frame.draft_id)
+    const clientMsgId = 'client_msg_id' in frame ? frame.client_msg_id : undefined
+    const topicId = yield* topicOfSlackDraft(frame.draft_id, clientMsgId)
     if (topicId === undefined) return
-    yield* transaction(observeDraft(topicId, { id: frame.draft_id, text: '', stamp: frame.event_ts === undefined ? seenAt : stampOf(frame.event_ts), deleted: true }, { seenAt, same }))
+    const removed = { id: frame.draft_id, text: '', stamp: frame.event_ts === undefined ? seenAt : stampOf(frame.event_ts), deleted: true, ...(clientMsgId === undefined ? {} : { clientMsgId }) }
+    yield* transaction(observeDraft(topicId, removed, { seenAt, same }))
   })
 
 /**
@@ -103,14 +105,18 @@ const placeOf = (draft: Draft): Effect.Effect<string | undefined, SqlError, Stor
     return yield* draftTopicId(sql, id)
   })
 
-/** A version of a place's draft, as the composer's text. A live draft of files alone has no text, and is not a deletion. */
-const applyVersion = (topicId: string, draft: Draft, how: { readonly seenAt: number; readonly listed: boolean }) =>
+/** Slack's draft as a version of a place's draft, its text as the composer's. A live draft of files alone has no text, and is not a deletion. */
+export const versionOf = (draft: Draft): Effect.Effect<SlackDraft & { readonly fileIds: ReadonlyArray<string> }, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const deleted = draft.is_deleted === true || draft.is_sent === true
     const blocks = draft.blocks ?? []
     const markup = deleted ? '' : draftMarkup(blocks, yield* draftLookups(blocks))
-    const version: SlackDraft & { readonly fileIds: ReadonlyArray<string> } = { id: draft.id, text: markup.trim() === '' ? '' : markup, stamp: stampOf(draft.last_updated_ts), deleted, fileIds: draft.file_ids ?? [] }
-    return yield* observeDraft(topicId, version, { ...how, same })
+    return { id: draft.id, text: markup.trim() === '' ? '' : markup, stamp: stampOf(draft.last_updated_ts), deleted, fileIds: draft.file_ids ?? [], clientMsgId: draft.client_msg_id }
+  })
+
+const applyVersion = (topicId: string, draft: Draft, how: { readonly seenAt: number; readonly listed: boolean }) =>
+  Effect.gen(function* () {
+    return yield* observeDraft(topicId, yield* versionOf(draft), { ...how, same })
   })
 
 /** Names for the people, channels and user groups a draft mentions, so the composer shows them as picks. */

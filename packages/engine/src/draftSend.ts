@@ -14,18 +14,20 @@
  *   run the call, so a list follows. A rate limit or no session: the row
  *   waits. Any other refusal settles the generation it sent: that text stays
  *   in Juno only, and a newer edit still goes.
- * - A draft that went with a post is retired by Slack when the post lands,
- *   and deleted when Slack refused the post.
+ * - A draft that went with a post is retired by Slack when the post lands.
+ *   One Slack refused the post for, or one the post went elsewhere from, Juno
+ *   deletes, after `drafts.info` shows it still holds only Juno's text: Slack
+ *   has no conditional delete, and a draft another device changed stays.
  */
 import { Clock, Effect } from 'effect'
 import { composeOutgoing } from '@juno/richtext'
 import type { SlackApiError } from '@juno/slack'
 import { StoreWriter, transaction, type SqlError } from '@juno/store'
-import { claimDraftSave, deferDraftSave, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, endSentDraft, refuseDraftSave, type DraftAnswer, type DraftClaim, type PendingDraft } from '@juno/sync'
+import { checkSentDraft, claimDraftSave, deferDraftSave, draftDestination, draftSyncRow, dropDraftSave, endDraftSave, endSentDraft, refuseDraftSave, type DraftAnswer, type DraftClaim, type PendingDraft } from '@juno/sync'
 import { WorkControl } from './workControl'
 import type { EngineTimingConfig } from './config'
 import type { MirrorError, Outbox } from './outbox'
-import { inStore, stampOf, type Blocks, type Draft, type DraftDestination } from './draftVersions'
+import { inStore, same, stampOf, versionOf, type Blocks, type Draft, type DraftDestination } from './draftVersions'
 import type { OpenWorkspace, StoreServices } from './workspace'
 
 export interface SenderDeps {
@@ -67,12 +69,12 @@ const call = (api: Parameters<Parameters<Outbox['Service']['send']>[0]>[0], clai
   const reason = { reason: 'MessageInput:updateDraft' }
   switch (claim.op) {
     case 'create':
-      return Effect.map(api.call('drafts.create', { blocks: blocksOf(claim.text), client_msg_id: claim.clientMsgId!, destinations: places, file_ids: [], is_from_composer: false }, reason), (answer) => saved(answer.draft))
+      return Effect.map(api.call('drafts.create', { blocks: blocksOf(claim.text), client_msg_id: claim.clientMsgId!, destinations: places, file_ids: [], is_from_composer: false }, reason), (answer) => saved(answer.draft, claim.text))
     case 'update':
     case 'clear':
       return Effect.map(
         api.call('drafts.update', { draft_id: claim.slackId!, client_last_updated_ts: edited, blocks: blocksOf(claim.text), destinations: places, file_ids: [...claim.fileIds], is_from_composer: false }, reason),
-        (answer) => saved(answer.draft),
+        (answer) => saved(answer.draft, claim.text),
       )
     case 'delete':
       return Effect.as(api.call('drafts.delete', { draft_id: claim.slackId!, client_last_updated_ts: edited, skip_file_deletion: true }, reason), { kind: 'deleted', id: claim.slackId! } as const)
@@ -96,13 +98,15 @@ const settleFailure = (deps: SenderDeps, open: OpenWorkspace, topicId: string, r
   })
 
 /**
- * Drafts that went as messages: one its post names was retired by Slack once the post landed, and is
- * deleted when Slack refused the post; one its post does not name (sent to another place) is deleted.
- * Returns false when the row was put off.
+ * Drafts that went as messages: one its post names was retired by Slack once the post landed. Juno deletes
+ * one Slack refused the post for, one the post went elsewhere from, and one its create made after the text
+ * went, but only once `drafts.info` shows it still holds only Juno's text and no files; one another device
+ * changed stays. Returns false when the row was put off.
  */
 const settleSent = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row: PendingDraft, now: number) =>
   Effect.gen(function* () {
     const local = inStore(open)
+    const reason = { reason: 'InputContainer:sendMessage' }
     for (const sent of row.sent) {
       if (sent.named) {
         const post = yield* local(postState(sent.after))
@@ -112,7 +116,19 @@ const settleSent = (deps: SenderDeps, open: OpenWorkspace, topicId: string, row:
         }
         if (post !== 'failed') continue
       }
-      const result = yield* Effect.result(deps.outbox.send((api) => api.call('drafts.delete', { draft_id: sent.id, client_last_updated_ts: String(now), skip_file_deletion: true }, { reason: 'InputContainer:sendMessage' })))
+      const info = yield* Effect.result(deps.outbox.send((api) => api.call('drafts.info', { draft_id: sent.id }, reason)))
+      if (info._tag === 'Failure' && !isGone(info.failure)) {
+        yield* defer(deps, open, topicId, row, info.failure, false)
+        return false
+      }
+      const draft = info._tag === 'Success' ? info.success.draft : undefined
+      if (draft === undefined || draft.is_deleted === true || draft.is_sent === true) {
+        yield* local(transaction(endSentDraft(topicId, sent.id)))
+        continue
+      }
+      const version = yield* local(versionOf(draft))
+      if (!(yield* local(transaction(checkSentDraft(topicId, version, { seenAt: yield* Clock.currentTimeMillis, same }))))) continue
+      const result = yield* Effect.result(deps.outbox.send((api) => api.call('drafts.delete', { draft_id: sent.id, client_last_updated_ts: String(now), skip_file_deletion: true }, reason)))
       if (result._tag === 'Failure' && !isGone(result.failure)) {
         yield* defer(deps, open, topicId, row, result.failure, false)
         return false
@@ -163,4 +179,5 @@ const blocksOf = (text: string): Blocks => {
   return blocks.length === 0 ? [{ type: 'rich_text', elements: [] }] : blocks
 }
 
-const saved = (draft: Draft): DraftAnswer => ({ kind: 'saved', id: draft.id, stamp: stampOf(draft.last_updated_ts), fileIds: draft.file_ids ?? [], clientMsgId: draft.client_msg_id })
+/** Slack's answer to a save of `text`, which its draft now holds. */
+const saved = (draft: Draft, text: string): DraftAnswer => ({ kind: 'saved', id: draft.id, stamp: stampOf(draft.last_updated_ts), fileIds: draft.file_ids ?? [], clientMsgId: draft.client_msg_id, text })

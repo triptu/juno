@@ -8,6 +8,15 @@
  * - Stale: no newer than the newest stamp Juno has seen for the place
  *   (`slackStamp`), or of a draft Juno deleted, sent or saw deleted
  *   (`gone`; Slack never reuses an id). Nothing changes.
+ * - Of a draft whose text went as a message (`sent`, by Slack's id, or by
+ *   the create's `client_msg_id` while Juno has not had the id), whatever
+ *   the clocks say: with one of Juno's texts it is the sent text and never
+ *   comes back; the link to a draft with files stays (its files kept, the
+ *   cleared text goes over it), and any other such draft is for Juno to
+ *   delete (`cleanup: 'delete'`). With another text, another device changed
+ *   it after the send: it is the place's draft and is not deleted
+ *   (`cleanup: 'keep'`); it applies over a draft the send emptied, and when
+ *   newer local typing wins over it, it is kept for ⌘Z.
  * - Juno's own: the text Juno has, is sending, or sent in a call whose
  *   answer was lost (`unsure`, until a list after the loss). Only the link
  *   changes; when Juno's text has moved on, it goes over it.
@@ -52,6 +61,8 @@ export interface DraftState {
   readonly slackStamp?: number
   /** When Juno linked `slackId`, on its clock. */
   readonly seenAt?: number
+  /** The text of the newest version Juno has seen of the draft it links: a send counts it among Juno's texts. */
+  readonly slackText?: string
   /** A local edit Slack has not acknowledged. A save that only puts a version from Slack back is not one. */
   readonly pending: boolean
   /** The text of the call out, `''` for a delete. */
@@ -60,8 +71,21 @@ export interface DraftState {
   readonly unsure: ReadonlyArray<string>
   /** Slack drafts Juno deleted, sent or saw deleted. */
   readonly gone: ReadonlyArray<string>
-  /** Juno's local edit, not yet in Slack, that a version from another device replaced; ⌘Z brings it back. */
+  /** Drafts whose text went as a message, until Slack confirms them gone. */
+  readonly sent: ReadonlyArray<SentVersion>
+  /** Text that lost to the other side and ⌘Z brings back: Juno's local edit a version from another device replaced before Slack had it, or another device's text on a sent draft that newer local typing went over. */
   readonly replaced?: string
+}
+
+/** A draft whose text went as a message, and Juno's texts that can be on it: the one sent, and those of calls still out or lost. */
+export interface SentVersion {
+  /** Slack's id, once Juno has it. */
+  readonly id?: string
+  /** The `client_msg_id` of Juno's create, for a draft whose create was not answered when the text went. */
+  readonly clientMsgId?: string
+  readonly texts: ReadonlyArray<string>
+  /** When it went, on Juno's clock: it is forgotten 30 days on. */
+  readonly at: number
 }
 
 /** A version of the place's draft from Slack. */
@@ -73,6 +97,8 @@ export interface SlackDraft {
   readonly stamp: number
   /** Deleted or sent: the draft is no longer live. */
   readonly deleted: boolean
+  /** The `client_msg_id` its create had. */
+  readonly clientMsgId?: string
 }
 
 /**
@@ -88,6 +114,8 @@ export interface ObservedDraft {
   readonly outcome: DraftOutcome
   /** Juno's text must go to Slack: a pending row is needed, and is due now. */
   readonly save: boolean
+  /** For a draft whose text went as a message: delete it (it holds only Juno's text), or keep it (another device changed it). */
+  readonly cleanup?: 'delete' | 'keep'
 }
 
 export interface ObserveHow {
@@ -110,16 +138,39 @@ const withGone = (gone: ReadonlyArray<string>, id: string): ReadonlyArray<string
 export function observeSlackDraft(state: DraftState, slack: SlackDraft, how: ObserveHow): ObservedDraft {
   const stale = (how.absent !== true && how.find !== true && state.slackStamp !== undefined && state.slackStamp >= slack.stamp) || state.gone.includes(slack.id)
   if (stale) return { state, outcome: 'stale', save: false }
+  const sentAs = state.sent.find((each) => each.id === slack.id || (slack.clientMsgId !== undefined && each.clientMsgId === slack.clientMsgId))
+  if (sentAs !== undefined) return observeSentDraft(state, sentAs, slack, how)
+  return observeVersion(state, slack, how)
+}
+
+/** A version of a draft whose text went as a message, by the rules above. */
+function observeSentDraft(state: DraftState, sentAs: SentVersion, slack: SlackDraft, how: ObserveHow): ObservedDraft {
+  const others = state.sent.filter((each) => each !== sentAs)
+  // Slack has it gone: nothing to delete, and it is forgotten.
+  if (slack.deleted) return observeVersion({ ...state, sent: others }, slack, how)
+  if (sentAs.texts.some((text) => how.same(text, slack.text))) {
+    const known = { ...state, sent: state.sent.map((each) => (each === sentAs ? { ...each, id: slack.id } : each)) }
+    if (state.slackId !== slack.id) return { state: known, outcome: 'linked', save: false, cleanup: 'delete' }
+    return { state: { ...known, slackStamp: Math.max(state.slackStamp ?? 0, slack.stamp), slackText: slack.text }, outcome: 'linked', save: !how.same(state.text, slack.text) }
+  }
+  // Changed after the send: the place's draft. A send's empty draft takes it whatever the clocks say.
+  const observed = observeVersion({ ...state, sent: others }, slack, how, state.text === '')
+  const lost = observed.outcome === 'kept' && observed.state.replaced === undefined ? { replaced: slack.text } : {}
+  return { ...observed, state: { ...observed.state, ...lost }, cleanup: 'keep' }
+}
+
+/** A version of the place's draft, by the rules above; `takes` lets it apply over a pending local edit. */
+function observeVersion(state: DraftState, slack: SlackDraft, how: ObserveHow, takes = false): ObservedDraft {
   const deleted = slack.deleted
   // An old draft of the place, not the one Juno links: it can never come back, and nothing else changes.
   if (deleted && state.slackId !== slack.id) return { state: { ...state, gone: withGone(state.gone, slack.id) }, outcome: 'linked', save: false }
   const own = (state.sending !== undefined && how.same(slack.text, state.sending)) || state.unsure.some((text) => how.same(slack.text, text))
   const same = how.same(slack.text, state.text)
-  const kept = state.pending && state.editedAt > slack.stamp
+  const kept = !takes && state.pending && state.editedAt > slack.stamp
   const relinked = deleted ? undefined : slack.id
   const link: DraftState = {
     ...withoutLink(state),
-    ...(relinked === undefined ? {} : { slackId: relinked, seenAt: relinked === state.slackId && state.seenAt !== undefined ? state.seenAt : how.seenAt }),
+    ...(relinked === undefined ? {} : { slackId: relinked, seenAt: relinked === state.slackId && state.seenAt !== undefined ? state.seenAt : how.seenAt, slackText: slack.text }),
     slackStamp: how.absent === true ? (state.slackStamp ?? slack.stamp) : Math.max(state.slackStamp ?? 0, slack.stamp),
     gone: deleted ? withGone(state.gone, slack.id) : state.gone,
   }
@@ -133,6 +184,6 @@ export function observeSlackDraft(state: DraftState, slack: SlackDraft, how: Obs
 }
 
 function withoutLink(state: DraftState): DraftState {
-  const { slackId: _id, seenAt: _seen, ...rest } = state
+  const { slackId: _id, seenAt: _seen, slackText: _text, ...rest } = state
   return rest
 }
