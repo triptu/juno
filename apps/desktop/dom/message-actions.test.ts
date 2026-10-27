@@ -307,6 +307,40 @@ async function threads({ juno, fake, step }: Context): Promise<void> {
     await topic.expectTitle(/A topic for later/)
     await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
   })
+  await step('⌘-click on a message in Main opens its thread in a tab right after this one; its link and its sender keep their own', async () => {
+    await openMain(juno)
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Retro notes are in <https://example.com/retro|the retro doc>' })
+    const plain = topic.message('Retro notes are in')
+    await expect(plain).toBeVisible()
+    const strip = () => tabs.root.getByRole('tab').all().map((tab) => ({ title: tab.getAttribute('data-tooltip') ?? '', active: tab.getAttribute('aria-selected') === 'true' }))
+    const active = () => strip().find((tab) => tab.active)?.title
+    const nextToActive = () => strip()[strip().findIndex((tab) => tab.active) + 1]?.title ?? ''
+    const mainTab = active()
+    const before = strip().length
+
+    // The link opens in the browser and the name opens Maya's DM behind; neither opens a thread. The DM's tab comes
+    // through the same queue as a thread's would, after it, so once it shows a wrong thread tab would show too.
+    await plain.getByRole('link', { name: 'the retro doc' }).click({ modifiers: ['Meta'] })
+    await expect.poll(() => juno.browserLinks()).toContain('https://example.com/retro')
+    await plain.getByRole('button', { name: 'Maya Chen', exact: true }).click({ modifiers: ['Meta'] })
+    await tabs.expectCount(before + 1)
+    expect(strip().some((tab) => /Retro notes/.test(tab.title))).toBe(false)
+
+    // On a message with a thread: that thread, in a new tab right after this one, which stays active at Main.
+    await topic.message(POSTGRES).locator('[data-msg-text]').first().click({ modifiers: ['Meta'] })
+    await tabs.expectCount(before + 2)
+    await expect.poll(nextToActive).toMatch(/Postgres|Draft plan/)
+    expect(active()).toBe(mainTab)
+    await topic.expectTitle('Main')
+
+    // On a message with no replies: a new thread for it, as Start thread opens one.
+    await plain.locator('[data-msg-text]').first().click({ modifiers: ['Meta'] })
+    await tabs.expectCount(before + 3)
+    await expect.poll(nextToActive).toMatch(/Retro notes/)
+    expect(active()).toBe(mainTab)
+    await tabs.select('Retro notes')
+    await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+  })
 }
 
 async function refusedReaction({ juno, fake }: Context): Promise<void> {
