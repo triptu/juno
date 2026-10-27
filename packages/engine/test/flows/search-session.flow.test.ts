@@ -146,7 +146,7 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
     expect(printSearchQuery(newer.read()!.query)).toBe('nothingforthisquery')
     expect(ids(newer.read()!)).toEqual([])
   })
-}, 90_000)
+})
 
 it('local and Slack identity/date filters agree; apps and Automated are hidden with explicit scope overriding Automated', async () => {
   const engine = await syncedEngine(engines)
@@ -237,7 +237,7 @@ it('local and Slack identity/date filters agree; apps and Automated are hidden w
     const wrongAuthor = await session(engine, parseSearchQuery('"Named title needle" from:U0LEO in:C0ENG'), 'title-other').until((s) => s.state === 'done')
     expect(wrongAuthor.groups).toEqual([])
   })
-}, 90_000)
+})
 
 it('retains local rows on Slack failure; pins wait for Slack; offline and palette searches make no remote search', async () => {
   const engine = await syncedEngine(engines)
@@ -268,7 +268,7 @@ it('retains local rows on Slack failure; pins wait for Slack; offline and palett
   expect(offline.needsSlack).toBe(true)
   expect(ids(offline)).toEqual([])
   expect(fake.callCount('search.modules.messages')).toBe(0)
-}, 90_000)
+})
 
 it("the Date presets' calendar is the Slack profile's time zone, and follows a change to it", async () => {
   const engine = await syncedEngine(engines)

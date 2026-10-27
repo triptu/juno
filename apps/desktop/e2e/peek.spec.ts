@@ -12,8 +12,6 @@ import { expectStableAnchor } from './shiftProbe'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 90_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ENG_MAIN = '#eng'

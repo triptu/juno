@@ -60,8 +60,6 @@ const test = base.extend<{ readonly model: ScriptedModel; readonly mcp: FakeLitt
   },
 })
 
-test.describe.configure({ timeout: 180_000 })
-
 /** Runs `f` on a launch and closes it however `f` ends. */
 async function using<A>(launch: Promise<RunningApp>, f: (juno: Juno, running: RunningApp) => Promise<A>): Promise<A> {
   const running = await launch

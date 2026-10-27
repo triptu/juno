@@ -107,7 +107,6 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 }
 
 // Signed in. The drag regions are counted first, before any surface has opened.
-test.describe.configure({ timeout: 120_000 })
 syncedTest('the window: its image policy, drag regions, surfaces over the title bars, the build line with updates off, the test notification and permission line, swipes, minimize, the bottom at 2x, full screen and zoom', { tag: '@electron' }, async ({ juno, fake, app, win }) => {
   await test.step('images load only from the app and Slack; unfurls go through main (src/main/publicImage.ts)', async () => {
     const policy = await juno.win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')

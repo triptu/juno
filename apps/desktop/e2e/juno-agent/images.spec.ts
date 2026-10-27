@@ -24,8 +24,6 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
 
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 const chatRequests = (model: ScriptedModel) => model.requests.filter((request) => !request.compaction)
 
 test('an image attached on Home goes to Juno as an image part and a PDF stays on Home; the Juno tab takes a dropped image on its own, and with a model that reads text only the image stays and the line says why', async ({ juno, model }) => {

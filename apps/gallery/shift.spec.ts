@@ -45,7 +45,8 @@ for (let part = 0; part < walkTests; part++) {
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
     const limit = Math.ceil(routes.length / walkTests)
-    // Three seconds per state leaves room above the measured two-second average; each individual state still has a 30 s limit.
+    // Slow: one part of the walk over every state. Three seconds a state leaves room above the measured two-second
+    // average, and each state still has its own 30 s limit.
     test.setTimeout(Math.max((only ? 15 : 20) * 60_000, limit * 3_000))
     const queue = claimQueue('shift')
     const { retry } = test.info()

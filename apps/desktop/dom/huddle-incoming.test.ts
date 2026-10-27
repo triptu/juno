@@ -75,4 +75,4 @@ domTest('a huddle the user started elsewhere shows no card, an ignored channel r
     expect(await ringing(win)).toBe(false)
     expect(await juno.dockBounces()).toBe(1)
   })
-}, { timeout: 90_000 })
+})

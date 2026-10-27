@@ -68,8 +68,7 @@ async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
  * declared without a group).
  */
 test('screenshots every state in light and dark', async ({ page }) => {
-  // One test walks every state twice, a navigation each: a few minutes for
-  // the whole gallery, past the default timeout.
+  // Slow: one test walks every state twice, a navigation each: a few minutes for the whole gallery.
   test.setTimeout(10 * 60_000)
   const routes = (await readRoutes(page)).filter((route) => !only || only.includes(route.component))
   await page.evaluate(() => document.fonts.ready)

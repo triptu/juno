@@ -107,4 +107,4 @@ domTest('Main, a thread, a thread again, a tab gone back to, ⌘K, Search, a lon
     await juno.topic.expectMessage('Look at the middle step')
     await paintsHeld(fake, () => anchor.click(), () => expect(juno.topic.message('rollout step 300')).toBeVisible())
   })
-}, { timeout: 90_000 })
+})

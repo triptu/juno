@@ -61,7 +61,7 @@ domTest('Notify me levels, which messages notify and how a click opens them, and
     await juno.expectToast('Instruction removed')
     await expect(page.instruction(words)).toHaveCount(0)
   })
-}, { timeout: 90_000 })
+})
 
 async function levels({ juno }: Context): Promise<void> {
   // A bot channel: the Automated view holds it.

@@ -13,8 +13,6 @@ import { Juno } from './driver/juno'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 // No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
 const RINA = 'Rina finished the onsite'
 const SWITCH = 'Hide message text while sharing the screen'

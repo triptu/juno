@@ -36,8 +36,6 @@ const test = chatTest.extend({
   },
 })
 
-test.describe.configure({ timeout: 90_000 })
-
 /** The message's top and bottom inside the topic's scroller, in px from its top. */
 const placeIn = (juno: Juno, text: string) =>
   juno.topic.scroller.evaluate((scroller, wanted) => {

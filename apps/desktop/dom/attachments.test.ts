@@ -21,7 +21,7 @@ domTest('drops, pastes and picks files in Main, replies and Home, retries a fail
   await step('Home keeps its files through a change of destination and sends them to the last one', () => homeKeepsFiles(context))
   await step('several images open in the viewer at the one clicked, and the keys and the filmstrip move through them', () => viewer(context))
   await step('a Markdown file card opens the whole file in the viewer, and a voice clip plays Slack\'s transcoded copy', () => fileCards(context))
-}, { timeout: 120_000 })
+})
 
 type Context = Pick<DomContext, 'juno' | 'fake'>
 

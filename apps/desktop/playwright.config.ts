@@ -1,6 +1,7 @@
 import { cpus } from 'node:os'
 import { join, resolve } from 'node:path'
 import { defineConfig } from '@playwright/test'
+import { BROWSER_LIMIT_MS, ELECTRON_LIMIT_MS } from '@juno/testing/limits'
 import type { Lane } from './e2e/fixtures'
 import { BROWSER_SPECS } from './e2e/lanes'
 
@@ -17,6 +18,7 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // Electron (`launch.ts`) are pinned to en-US.
 process.env.TZ = 'UTC'
 // A stress run (JUNO_STRESS, scripts/remote/workers.sh) slows everything down and scales the default timeouts to match.
+// Each lane's test timeout is its limit on one test's time (`@juno/testing/limits`, docs/development.md, "Rules for tests").
 const scale = Number(process.env.JUNO_STRESS_SCALE ?? 1)
 
 // One Electron app at a time on the shared Mac. Each test has its own fake
@@ -68,7 +70,7 @@ export default defineConfig<object, { lane: Lane }>({
       retries: 0,
       // Each scenario films and analyses every frame; half the browser workers keep the frames coming on time.
       workers: Math.max(1, Math.ceil(browserWorkers / 2)),
-      timeout: 120_000 * scale,
+      timeout: BROWSER_LIMIT_MS * scale,
       expect: { timeout: 15_000 * scale },
       ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
       use: {
@@ -88,6 +90,7 @@ export default defineConfig<object, { lane: Lane }>({
       // A test that passes only on a second try is a bug to fix.
       retries: 0,
       workers: browserWorkers,
+      timeout: BROWSER_LIMIT_MS * scale,
       grepInvert: new RegExp(tagPattern(['@electron', ...excludedTags])),
       use: {
         lane: 'web' satisfies Lane,
@@ -106,6 +109,7 @@ export default defineConfig<object, { lane: Lane }>({
       // Each test is its own group, so one file's tests spread over the workers; the slowest start first (e2e/order.ts).
       fullyParallel: true,
       workers: electronWorkers,
+      timeout: ELECTRON_LIMIT_MS * scale,
       grep: electronGrep,
       ...(excludedTags.length ? { grepInvert: new RegExp(tagPattern(excludedTags)) } : {}),
     },

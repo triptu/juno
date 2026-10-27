@@ -100,7 +100,7 @@ domTest('a topic warms on hover, opens at its "N new" divider, follows and unfol
   await step('after Follow, Notify me in ⋯ shows Auto and changes it', () => notifyMeAfterFollow(context))
   await step('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', () => linksAndSwitcher(juno))
   await step('the switcher searches the channel’s topics, and ⌘ opens one in a new tab', () => searchSwitcher(juno))
-}, { timeout: 120_000 })
+})
 
 /** The driver, and whether Slack was called with `method` (in `channel`). */
 interface Following {

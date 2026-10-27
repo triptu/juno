@@ -37,7 +37,7 @@ domTest('writes from Home to people, channels and threads, keeps text and read s
   await step('a new thread whose root fails stays with Not sent and Retry, and a queued reply follows it', () => failedRoot(context))
   await step('a thread chosen in the topic chip takes the send as a reply there, once in its tab behind Home', () => sendToThread(context))
   await step('a send opens its topic behind Home, right after it, once; and goes when another tab is chosen before its checks answer', () => sendTabs(context))
-}, { timeout: 120_000 })
+})
 
 async function sendToPerson({ juno, fake }: Context): Promise<void> {
   fake.resetCalls()

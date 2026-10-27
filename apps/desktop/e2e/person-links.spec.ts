@@ -14,8 +14,6 @@ import type { Juno } from './driver/juno'
 // Starts signed in and synced (README, "Synced start"); the replies and Deploy Bot's DM arrive live.
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 const SELF = 'U0TUSHAR'
 const POSTGRES = 'Draft plan is in the doc'
 const FIRST = 'Maya first: the dry run slot is booked.'

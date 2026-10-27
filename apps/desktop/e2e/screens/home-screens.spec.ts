@@ -20,6 +20,7 @@ const DAY = 24 * 60 * 60 * 1000
 const SIZES = { '1200x800': [1200, 800], large: [1600, 1000] } as const
 
 test.skip(process.env['JUNO_SCREENS'] !== '1' || out === '', 'set JUNO_SCREENS=1 and JUNO_SCREENS_OUT to write the screenshots')
+// Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
 test.describe.configure({ timeout: 240_000 })
 
 /** Everything read: Home is caught up. */

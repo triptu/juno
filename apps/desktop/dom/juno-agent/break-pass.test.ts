@@ -51,4 +51,4 @@ domTest('Resolve waits for approval, double clicking resolves once, Undo survive
   await expect(offChat.composer).toBeDisabled()
   await expect(offChat.root.getByRole('button', { name: 'Resolve', exact: true })).toHaveCount(0)
   await off.sidebar.row('#eng').expectVisible()
-}, { model, timeout: 120_000 })
+}, { model })

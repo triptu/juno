@@ -67,4 +67,4 @@ domTest('Juno proposes a reply, nothing reaches Slack without the click, and a r
     await expect(card).toHaveAttribute('data-card-status', 'done')
     expect(fake.messages(eng).filter((m) => m.text === RETRIED)).toHaveLength(1)
   })
-}, { model, timeout: 120_000 })
+}, { model })

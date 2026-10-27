@@ -142,7 +142,7 @@ domTest('in Main, sends settle, a refused send has Retry and Delete draft, fast 
   })
   await step('Forward… shares a message into a channel with a note, and a refused forward can be retried', () => forwardMessage(juno, fake))
   await step('Also send to #eng sends your own reply to the channel, Main shows it at once, and its title opens the thread', () => broadcast(juno, fake))
-}, { timeout: 120_000 })
+})
 
 // The sends share a launch; each step opens the tabs it needs. The offline send goes last.
 domTest('sends across tabs: the last tab closed while it sends, a draft two tabs share, a send from Home that leaves the tabs where they were, and a send while offline', async ({ juno, fake, step }) => {
@@ -221,7 +221,7 @@ domTest('sends across tabs: the last tab closed while it sends, a draft two tabs
     expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent offline')).toHaveLength(1)
     await expect(juno.topic.message('Sent offline')).toHaveCount(1)
   })
-}, { timeout: 120_000 })
+})
 
 /** Forward… on `text` in the open topic, then `destination` from the list and `note`, and Enter. */
 async function forward(juno: Juno, text: string, destination: string, note: string): Promise<void> {

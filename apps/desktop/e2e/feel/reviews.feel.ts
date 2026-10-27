@@ -14,6 +14,7 @@ import { feedbackInOneFrame, firstFrameRight, landsAndStays, noFlicker, noLayout
 import { Feel, test } from './feel'
 import { tag } from './pane'
 
+// Slow: a feel scenario that films three review sheets; on demand only (JUNO_ON_DEMAND=1).
 test.describe.configure({ timeout: 240_000 })
 
 const POSTGRES = 'Draft plan is in the doc'

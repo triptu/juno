@@ -5,8 +5,6 @@ import type { Juno } from './driver/juno'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 180_000 })
-
 const SEARCH = 'search.modules.messages'
 
 /** The rows' ids in order, to see that nothing above moved. */

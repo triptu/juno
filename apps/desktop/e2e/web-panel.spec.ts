@@ -10,8 +10,6 @@ import type { Juno } from './driver/juno'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 const DOC = 'https://docs.google.com/document/d/1fakeDocId/edit'
 

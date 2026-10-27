@@ -155,6 +155,7 @@ test.describe('mac process budgets', { tag: '@mac' }, () => {
   // The large seed with Juno on a fake model: each state is reached in turn
   // in one launch, as a person moves through the app.
   test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', async () => {
+    // Slow: measures idle CPU over performance.md's 20 s windows; on demand only (JUNO_ON_DEMAND=1).
     test.setTimeout(20 * IDLE_WINDOW_MS + 600_000)
     const fake = await startFakeSlack({ seed: largeSeed() })
     const model = await startFakeOpenRouter({ answer })

@@ -15,8 +15,6 @@ import type { Juno, MessageMenuDriver } from './driver/juno'
 
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 /** Waits until every animation in the menu has finished: the morph. */
 const settled = (menu: Locator) => menu.evaluate((node) => Promise.all(node.getAnimations({ subtree: true }).filter((animation) => !(animation instanceof CSSAnimation) && !(animation instanceof CSSTransition)).map((animation) => animation.finished)).then(() => undefined))
 

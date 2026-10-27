@@ -15,8 +15,6 @@ import { schemeSrc } from './driver/juno'
 // Starts signed in and synced (README, "Synced start"); the messages arrive live.
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 120_000 })
-
 const COLUMNS = ['Region', 'Requests', 'Errors', 'Error rate', 'p50 latency', 'p95 latency', 'p99 latency', 'CPU use', 'Memory use', 'Instances', 'Deployed build', 'On call', 'Notes']
 
 /** Some photo under `scope` has loaded its bytes. */

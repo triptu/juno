@@ -214,7 +214,7 @@ domTest('the panel opens and closes, keeps state per tab, says what each message
     await juno.topic.expectMessage('Edited beside the panel')
     await expect(juno.topic.message('Edited beside the panel').getByRole('button', { name: '1 👍, including you' })).toBeVisible()
   })
-}, { model, timeout: 120_000 })
+}, { model })
 /** Selects `words` in a message, as a drag that ends there: the selection, then the pointer's release. */
 async function select(juno: Juno, row: Query, words: string): Promise<void> {
   const { document } = juno.dom

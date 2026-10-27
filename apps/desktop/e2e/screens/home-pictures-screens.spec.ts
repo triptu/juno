@@ -67,6 +67,7 @@ async function shoot(win: Page, name: string): Promise<void> {
 const scaled = (kind: 'size' | 'distance', prefer: string) => PICTURES.find((entry) => entry.id === prefer && entry.scale?.kind === kind) ?? PICTURES.find((entry) => entry.scale?.kind === kind && entry.kind !== 'space') ?? PICTURES.find((entry) => entry.scale?.kind === kind)
 
 quiet('Home with a picture, the picture page with its scale, and the gallery in both orders, light and dark', async ({ juno, win, userData }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(240_000)
   await mkdir(progress, { recursive: true })
   await juno.signIn()

@@ -10,6 +10,10 @@
 // - time-of-day: reading the hour, minute or weekday of the real clock. Set the time (a test clock) or the hours
 //   around it. A helper that does that says so: `// Time of day: <why>`.
 // - wall-time: an assertion on elapsed wall time. Budgets belong to perf; count work instead. `// Wall time: <why>`.
+// - timeout: a test's own timeout, above its lane's limit (`test.setTimeout`, `test.slow`, a describe's `timeout`,
+//   bun's `setDefaultTimeout` or a timeout after a test's body, `domTest`'s `timeout`). A test over the limit waits on
+//   something it does not control: fix that. A crash and relaunch journey or a feel scenario that must take longer
+//   says why: `// Slow: <why>`.
 //
 // The marker goes on the line or one of the three above it. Files that had hits when this check came in keep their
 // count in scripts/test-patterns-baseline.json, and the check fails when a file's count for a rule grows.
@@ -46,6 +50,14 @@ const rules = [
     pattern: /expect\([^;]*(?:performance\.now\(\)|Date\.now\(\))/,
     advice: 'count work instead; time budgets belong to perf',
   },
+  {
+    name: 'timeout',
+    marker: 'Slow:',
+    pattern: /\b(?:test|testInfo|info\(\))\.setTimeout\(|\btest\.slow\(|describe\.configure\(\{[^}]*\btimeout\b|\bsetDefaultTimeout\(|^\s*\}\s*,\s*\{[^}]*\btimeout\s*:[^}]*\}\s*\)\s*;?\s*$/,
+    // In bun test files, a number after a test's body is its timeout too.
+    bunPattern: /^\s*\}\s*,\s*[\d_]+\s*\)\s*;?\s*$/,
+    advice: 'find what the test waits on and fix that, so it fits its lane\'s limit',
+  },
 ]
 
 /** Test files and the helpers only tests use. Perf files measure time on purpose. */
@@ -65,13 +77,16 @@ function testFiles() {
 }
 
 /** Each rule's hits in one file's text: line numbers without the rule's marker nearby. */
-function hitsIn(text) {
+function hitsIn(text, file) {
+  const bunTest = /\.test\.[cm]?[jt]sx?$/.test(file)
   const lines = text.split('\n')
   const hits = []
   lines.forEach((line, index) => {
     const code = line.replace(/\/\/.*$/, '')
     for (const rule of rules) {
-      if (!rule.pattern.test(code)) continue
+      if (!rule.pattern.test(code) && !(bunTest && rule.bunPattern?.test(code))) continue
+      // Setting a lane's limit itself (`@juno/testing/limits`) is not a test raising its own.
+      if (rule.name === 'timeout' && /\b[A-Z]+_LIMIT_MS\b/.test(code)) continue
       const near = lines.slice(Math.max(0, index - 3), index + 1).join('\n')
       if (!near.includes(rule.marker)) hits.push({ rule: rule.name, line: index + 1, text: line.trim() })
     }
@@ -83,7 +98,7 @@ if (import.meta.main) {
   const counts = {}
   const found = new Map()
   for (const file of testFiles()) {
-    const hits = hitsIn(readFileSync(path.join(root, file), 'utf8'))
+    const hits = hitsIn(readFileSync(path.join(root, file), 'utf8'), file)
     if (hits.length === 0) continue
     found.set(file, hits)
     counts[file] = {}

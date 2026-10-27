@@ -13,6 +13,7 @@ import { happened, landsAndStays, noFlicker, noLayoutShift, opensWhole, staysDra
 import { Feel, test } from './feel'
 import { tag } from './pane'
 
+// Slow: a feel scenario that films each lazy part's first open; on demand only (JUNO_ON_DEMAND=1).
 test.describe.configure({ timeout: 240_000 })
 
 // Starts signed in and synced (README, "Synced start"), but for the sync card, which needs the first sync.
@@ -35,6 +36,7 @@ async function routeAnswered(userData: string, teamId: string, since: number): P
       } finally {
         db.close()
       }
+    // Slow: a feel scenario that films each lazy part's first open; on demand only (JUNO_ON_DEMAND=1).
     }, { timeout: 15_000 })
     .toBeGreaterThanOrEqual(since)
 }

@@ -14,8 +14,6 @@ test.use({ synced: true })
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
 test.use({ sidebarTrace: true })
 
-test.describe.configure({ timeout: 90_000 })
-
 const ROW = '[role="group"][aria-label="Topics"] [data-topic-row]'
 
 function recentIds(juno: Juno): Promise<string[]> {

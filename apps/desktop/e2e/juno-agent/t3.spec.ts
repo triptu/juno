@@ -55,8 +55,6 @@ const POLL = 25_000
 
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 150_000 })
-
 /** Points T3 Code at `url` in its Configure sheet and connects it. */
 async function connectT3(juno: Juno, url: string): Promise<void> {
   const page = await openPage(juno, 'Connections')

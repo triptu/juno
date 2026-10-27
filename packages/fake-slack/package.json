@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "bun test --randomize --timeout=30000",
+    "test": "bun test --randomize --timeout=5000",
     "start": "bun src/bin.ts"
   },
   "dependencies": {

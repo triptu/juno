@@ -324,7 +324,7 @@ domTest('⌘K opens, switches tabs, finds conversations, topics, messages and co
 
     // ⌘K never waits on the network (performance 5.3). Sync's own discovery searches Slack too, never with typed text.
     expect(fake.calls.filter((call) => call.method.startsWith('search.') && /replica|platfo|nothing like/.test(String(call.args['query'])))).toEqual([])
-}, { timeout: 120_000 })
+})
 
 async function openPalette({ juno }: Pick<DomContext, 'juno'>): Promise<void> {
   const { palette, tabs } = juno

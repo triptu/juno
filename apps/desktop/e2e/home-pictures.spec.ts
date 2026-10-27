@@ -14,8 +14,6 @@ import type { Page } from '@playwright/test'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 
-test.describe.configure({ timeout: 150_000 })
-
 const DAY = 24 * 60 * 60 * 1000
 const SWITCH = 'Show a picture when you are caught up'
 

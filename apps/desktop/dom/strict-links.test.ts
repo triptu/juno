@@ -68,7 +68,7 @@ domTest('links: URLs and domains post as Slack posts them, ⌘-click opens one, 
   await step('URLs and domains sent from the composer show as links before and after the echo', () => sendPlainLinks({ juno, fake }))
   await step('a rich link pasted from another app is sent and edited with its label and the URL', () => pasteRichLink({ juno, fake }))
   await step('⌘K on selected words edits their link', () => editLinkedWords({ juno, fake }))
-}, { timeout: 120_000 })
+})
 
 async function sendPlainLinks({ juno, fake }: Context): Promise<void> {
   const { topic } = juno

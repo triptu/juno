@@ -106,7 +106,7 @@ domTest('a pin from the owner\'s words is edited, then goes with its source, who
   await expect(askedLine).toHaveAttribute('data-memory-line', 'line')
   await expect(page.locator('[data-memory-line="masked"]')).toHaveCount(0)
   await expect(page).not.toContainText(ASKED)
-}, { model, timeout: 180_000 })
+}, { model })
 
 domTest('Remember shows "Remembered · Undo", and words selected in a message are remembered from its menu and removed with their pin', async ({ juno }) => {
   await ready(juno)
@@ -165,4 +165,4 @@ domTest('Remember shows "Remembered · Undo", and words selected in a message ar
   await expect(note).toHaveCount(0)
   page = await openPage(juno, 'What Juno remembers')
   await expect(page.getByText('Nothing pinned yet')).toBeVisible()
-}, { model, timeout: 180_000 })
+}, { model })

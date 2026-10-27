@@ -113,4 +113,4 @@ it('the quiet window: a 3-day sync reads no older history, raising backfills pag
     await quiet(engine)
     expect(historyPages(engine, since)).toEqual([])
   })
-}, 60_000)
+})

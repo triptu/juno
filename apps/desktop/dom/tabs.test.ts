@@ -195,7 +195,7 @@ domTest('tabs open, focus, close, go back and forward and reopen from the sideba
     await tabs.expectActive('Home')
     await freshHome(juno)
   })
-}, { timeout: 120_000 })
+})
 
 async function openFocusAndClose(juno: Juno): Promise<void> {
   const { sidebar, tabs } = juno

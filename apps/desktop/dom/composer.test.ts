@@ -58,7 +58,7 @@ domTest('markup, formatting, mentions, channel links and colon emoji go to Slack
   await step('a draft keeps its mentions across topic switches', () => keepMentionDraft(context))
   await step('Home suggests people and channels inside a question for Juno and once a person or channel is chosen', () => homeSuggestions(context))
   await step('colon suggestions insert Unicode and send it; Esc keeps the colon text and a closing colon converts it', () => colonEmoji(context))
-}, { timeout: 120_000 })
+})
 
 async function sendMarkup({ juno, fake }: Context): Promise<void> {
   const { topic } = juno

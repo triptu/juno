@@ -24,6 +24,7 @@ const asks = [
 ]
 
 test('the Juno panel beside a thread and a Main, light and dark', async ({ juno, win }) => {
+  // Slow: screenshots of every screen, on demand only (JUNO_SCREENS=1).
   test.setTimeout(240_000)
   await juno.signIn()
   await juno.waitForSync()

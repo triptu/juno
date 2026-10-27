@@ -4,6 +4,7 @@ import { fetchSpellDictionary } from '../spellDictionary'
 
 // The electron project's build (`out/`), before any of its tests.
 test('build the app', () => {
+  // Slow: builds the app once per run, before any test.
   test.setTimeout(600_000)
   build()
 })

@@ -2,16 +2,13 @@
 // step (docs/research/codemode.md), large schemas as PostHog's MCP server has them
 // (docs/research/posthog-mcp.md) whole or as one line, PostHog's `exec` command tool, and large
 // results kept out of the next request.
-import { afterEach, expect, setDefaultTimeout, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import { json, reply, startFakeMcpServer, startFakeNotion } from '@juno/agent-testing'
 import { LITTLEBIRD, NOTION, T3 } from '../src/mcp'
 import { activityPage } from '../src/serve/pages'
 import { SCHEMA_LIMIT } from '../src/mcp/discovery'
 import { dollars } from '../src/spend'
 import { callTool, callsOf, closeAfter, closeConnections, connections, credentials, findTools } from './connections-harness'
-
-// Each test opens the engine; a run takes under a second, but a loaded machine can stretch it past bun's 5 s.
-setDefaultTimeout(30_000)
 
 afterEach(closeConnections)
 

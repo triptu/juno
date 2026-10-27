@@ -17,11 +17,11 @@ import { availableParallelism } from 'node:os'
 import { join, resolve } from 'node:path'
 import { unitTestMatcher } from './affected-tests.mjs'
 import { forwardSignals } from './remote/children.mjs'
+import { stressScale, UNIT_LIMIT_MS } from '../packages/testing/src/limits.ts'
 
-// The default test timeout. The preload's setDefaultTimeout reaches only the
-// first file a Bun process runs, so it is passed on the command line too.
-// A stress run (JUNO_STRESS, scripts/remote/workers.sh) scales it with the load it adds.
-const TIMEOUT_MS = 30_000 * Number(process.env.JUNO_STRESS_SCALE ?? 1)
+// The default test timeout is the unit lane's limit on one test's time (packages/testing/src/limits.ts). The
+// preload's setDefaultTimeout reaches only the first file a Bun process runs, so it is passed on the command line too.
+const TIMEOUT_MS = UNIT_LIMIT_MS * stressScale()
 
 const runsBunTest = (root, dir) => /^bun test\b/.test(JSON.parse(readFileSync(resolve(root, dir, 'package.json'), 'utf8')).scripts?.test ?? '')
 

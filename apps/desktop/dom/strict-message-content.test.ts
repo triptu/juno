@@ -48,4 +48,4 @@ domTest('an edit of a message with a table keeps the table, and a user group sho
     await expect(design).toHaveAttribute('title', 'Design crew')
     await expect(topic.root).not.toContainText('S0DESIGN')
   })
-}, { timeout: 90_000 })
+})

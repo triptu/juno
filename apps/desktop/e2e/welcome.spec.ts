@@ -12,8 +12,6 @@ import type { Locator } from '@playwright/test'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 
-test.describe.configure({ timeout: 150_000 })
-
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 /** Home, where the card is: the layout checks measure it alone. */

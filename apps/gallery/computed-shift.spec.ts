@@ -19,6 +19,7 @@ for (let part = 0; part < parts; part++) {
   test(`no forced interaction shifts the layout, in any state of any component (part ${part + 1} of ${parts})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, page }) => {
     const routes = (await readRoutes(page)).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
+    // Slow: one part of the walk over every state: five minutes, or a second a state over the parts that run at once.
     test.setTimeout(Math.max(5 * 60_000, Math.ceil(routes.length * 1_000 / Math.min(parts, test.info().config.workers))))
     const queue = claimQueue('computed')
     const cache = stateCache('computed', browser)

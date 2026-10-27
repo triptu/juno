@@ -18,12 +18,12 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { forwardSignals } from './remote/children.mjs'
 import { bunTestEnv, takeSeed } from './unit.mjs'
+import { DOM_LIMIT_MS, stressScale } from '../packages/testing/src/limits.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const app = join(root, 'apps/desktop')
-// A test boots a host and a renderer; a cold worker under load needs more than unit tests' 30 s.
-// A stress run (JUNO_STRESS, scripts/remote/workers.sh) scales it with the load it adds.
-const TIMEOUT_MS = 60_000 * Number(process.env.JUNO_STRESS_SCALE ?? 1)
+// The DOM lane's limit on one test's time (packages/testing/src/limits.ts); a worker warms up before its first test.
+const TIMEOUT_MS = DOM_LIMIT_MS * stressScale()
 
 /** Whether a repo path is a DOM lane test file. */
 export const isDomTest = (file) => /^apps\/desktop\/dom\/(?!dist\/)[^.][^]*\.test\.ts$/.test(file) && !file.split('/').includes('..')
