@@ -153,6 +153,61 @@ function inlineTokenReads(): Plugin {
   }
 }
 
+/** The non-computed key of a member or property: a name, not a read of the variable. */
+const keyStarts = (node: ESTree.Node, into: Set<number>) => {
+  if (node.type === 'MemberExpression' && !node.computed) into.add(node.property.start)
+  else if ((node.type === 'Property' && !node.shorthand) || node.type === 'MethodDefinition' || node.type === 'PropertyDefinition') {
+    if (!node.computed) into.add(node.key.start)
+  }
+}
+
+/**
+ * Node's `global` as the page's `globalThis`. Chime's CommonJS modules read
+ * `global`: its CSP monitor runs `'document' in global` as a call starts.
+ * Rollup's CommonJS plugin rewrote it to a shim; Rolldown leaves it as it is,
+ * and the page has no `global`. From the move to Vite 8 (0.1.23) every
+ * huddle join threw `ReferenceError` and the call failed (10-27). The build
+ * fails if a chunk still reads a `global` it does not declare.
+ */
+function nodeGlobal(): Plugin {
+  return {
+    name: 'juno:node-global',
+    config: () => ({ define: { global: 'globalThis' } }),
+    generateBundle(_options, bundle) {
+      for (const file of Object.values(bundle)) {
+        if (file.type !== 'chunk' || !/\bglobal\b/.test(file.code)) continue
+        const { program } = parseSync(file.fileName, file.code)
+        const declared = new Set<string>()
+        const keys = new Set<number>()
+        const reads: Array<number> = []
+        const functionLike = (node: { readonly id?: ESTree.Node | null; readonly params: ReadonlyArray<ESTree.Node> }) => {
+          boundNames(node.id, declared)
+          for (const param of node.params) boundNames(param, declared)
+        }
+        new Visitor({
+          VariableDeclarator: (node) => boundNames(node.id, declared),
+          FunctionDeclaration: functionLike,
+          FunctionExpression: functionLike,
+          ArrowFunctionExpression: functionLike,
+          ClassDeclaration: (node) => boundNames(node.id, declared),
+          ClassExpression: (node) => boundNames(node.id, declared),
+          CatchClause: (node) => boundNames(node.param, declared),
+          MemberExpression: (node) => keyStarts(node, keys),
+          Property: (node) => keyStarts(node, keys),
+          MethodDefinition: (node) => keyStarts(node, keys),
+          PropertyDefinition: (node) => keyStarts(node, keys),
+          Identifier: (node) => {
+            if (node.name === 'global') reads.push(node.start)
+          },
+        }).visit(program)
+        if (declared.has('global')) continue
+        const at = reads.find((start) => !keys.has(start))
+        if (at !== undefined) this.error(`juno:node-global: ${file.fileName} reads Node's \`global\` at ${at}, which the page does not have`)
+      }
+    },
+  }
+}
+
 /**
  * React with the React Compiler (performance.md 5.4). `@vitejs/plugin-react` runs Oxc's Rust port
  * of the compiler (`oxc-transform-react`), which turns JSX into calls in the same pass, with no
@@ -175,6 +230,7 @@ export function reactWithCompiler(reportDiagnostics: boolean): PluginOption {
  */
 export function rendererPlugins(options: { readonly repoRoot: string; readonly minify: boolean; readonly reportSkipped?: boolean; readonly cssLayers?: boolean }): PluginOption[] {
   return [
+    nodeGlobal(),
     phosphorWeights(options.repoRoot),
     inlineTokenReads(),
     stylex.vite({

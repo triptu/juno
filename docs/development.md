@@ -1023,7 +1023,11 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   imports a lazy-only module puts it on the first screen even when nothing there calls it.
   `juno:inline-token-reads` turns a token read such as `colors['--background-subtle']` into its
   `var()` value, since Rolldown keeps a whole token group that a chunk imports
-  (`docs/performance.md`, "Vite 8 first screen").
+  (`docs/performance.md`, "Vite 8 first screen"). Rollup's CommonJS plugin rewrote a
+  dependency's reads of Node's `global`; Rolldown leaves them, and the page has no `global`.
+  Chime reads it as a call starts, so from 0.1.23 every huddle join failed (10-27).
+  `juno:node-global` defines `global` as `globalThis` in every renderer build and fails the
+  build if a chunk still reads a `global` it does not declare.
 
 Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md` ("Pitfalls") and
 `.claude/skills/stylex/SKILL.md`.

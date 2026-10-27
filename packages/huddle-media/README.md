@@ -71,7 +71,7 @@ The snapshot (`src/types.ts` has the comments):
 - **Voice Focus.** On by default. `join` checks support first; when supported, the device controller runs Web Audio and the model loads after the call starts, then the microphone is restarted through it. When it is unsupported or fails to load (for example a CSP that blocks `*.sdkassets.chime.aws`), the call goes on without it and `noiseSuppression` reads `unsupported`.
 - Slack also rewrites TURN UDP port 3478 to 22466 (research section 1). Juno does not; the spike connected without it.
 
-The integration has to allow, in the renderer's CSP: `connect-src` for Chime's `wss:` and `https:` hosts, and for Voice Focus `script-src`/`worker-src` `https://*.sdkassets.chime.aws` with `'wasm-unsafe-eval'`. Main has to grant the microphone and screen capture to Juno's page (`main/media.ts`), and lists what may be shared (`main/screenShare.ts`). While access is `denied`, Mute opens System Settings at Privacy & Security, Microphone through main (`huddle.microphoneSettings`).
+The renderer build maps Node's `global` to `globalThis` (`juno:node-global` in `apps/desktop/renderer.vite.ts`): Chime's CommonJS modules read it as a call starts, and Rolldown leaves it as it is. The integration has to allow, in the renderer's CSP: `connect-src` for Chime's `wss:` and `https:` hosts, and for Voice Focus `script-src`/`worker-src` `https://*.sdkassets.chime.aws` with `'wasm-unsafe-eval'`. Main has to grant the microphone and screen capture to Juno's page (`main/media.ts`), and lists what may be shared (`main/screenShare.ts`). While access is `denied`, Mute opens System Settings at Privacy & Security, Microphone through main (`huddle.microphoneSettings`).
 
 ## The fake
 
