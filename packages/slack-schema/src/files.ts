@@ -57,6 +57,8 @@ export const FilesShareArgs = S.Struct({
   resharing_aware: opt(FormBoolean),
   skip_dlp_user_warning: opt(FormBoolean),
   from_share_modal: opt(FormBoolean),
+  /** The draft the message was, as for `chat.postMessage` (research `slack-drafts.md` section 8, from code only). */
+  draft_id: opt(S.String),
 })
 export type FilesShareArgs = typeof FilesShareArgs.Type
 

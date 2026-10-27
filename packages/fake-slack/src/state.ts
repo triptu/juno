@@ -25,6 +25,7 @@ import type { Clock } from './clock.ts'
 import { threadCounts, threadIndex } from './threadViews.ts'
 import { escapeText, textToBlocks, toMrkdwn, unescapeText } from './richtext.ts'
 import { withListedReactors } from './reactors.ts'
+import { DraftStore } from './drafts.ts'
 
 export type ConversationKind = 'public' | 'private' | 'im' | 'mpim'
 
@@ -135,6 +136,8 @@ export class Workspace {
   readonly clock: Clock
   readonly selfId: string
   readonly team: Team
+  /** Self's message drafts (`drafts.ts`). */
+  readonly drafts: DraftStore = new DraftStore(this)
   #lastTs: Ts = NEVER_READ
   readonly #backdated = new Set<string>()
   #sequence = 0

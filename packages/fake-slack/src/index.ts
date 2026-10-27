@@ -5,7 +5,7 @@
  * controls are reachable over HTTP as `POST /control/<name>` with a JSON body,
  * for tests that drive a built app.
  */
-import type { Message, RtmFrame } from '@juno/slack-schema'
+import type { Draft, Message, RtmFrame } from '@juno/slack-schema'
 import { features } from './features/index.ts'
 import { mergeFeatures, type FakeControls } from './features/registry.ts'
 import type { Handlers } from './methods.ts'
@@ -195,6 +195,26 @@ export class FakeSlack {
   /** Self unfollows a thread from another client. Emits `thread_unsubscribed`. */
   unfollowThread(input: { channel: string; threadTs: string }): Subscription {
     return this.workspace.unsubscribe(input.channel, asTs(input.threadTs))
+  }
+
+  /**
+   * Self types in a channel's or thread's draft on another device: its
+   * attached draft is updated, or made. `at` (epoch milliseconds) backdates
+   * the write, as for a phone whose save reached Slack late. Emits
+   * `draft_create` or `draft_update`.
+   */
+  putDraft(input: { channel: string; threadTs?: string; text: string; at?: number }): Draft {
+    return this.workspace.drafts.putFromElsewhere(input)
+  }
+
+  /** Self clears a channel's or thread's draft on another device, or sends it (`sent`). Emits `draft_delete` or `draft_send`. */
+  removeDraft(input: { channel: string; threadTs?: string; sent?: boolean }): void {
+    this.workspace.drafts.removeFromElsewhere(input)
+  }
+
+  /** The text of the live draft of a channel or thread, as Slack's other devices show it; `undefined` for none. */
+  draftText(channel: string, threadTs?: string): string | undefined {
+    return this.workspace.drafts.textAt(channel, threadTs)
   }
 
   /** The user groups self belongs to (`client.userBoot.subteams.self`). */

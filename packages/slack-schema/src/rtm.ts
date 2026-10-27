@@ -14,6 +14,7 @@ import { Channel, Im } from './conversations.ts'
 import { Message, MessageFields, StructuralSubtypes } from './message.ts'
 import { ThreadSubscription } from './threads.ts'
 import { Subteam, User } from './users.ts'
+import { DraftChangedEvent, DraftRemovedEvent } from './drafts.ts'
 
 const opt = S.optionalKey
 
@@ -367,6 +368,7 @@ export const KnownFrames = [
   PrefChangeEvent,
   FileEvent,
   DesktopNotificationEvent,
+  DraftChangedEvent, DraftRemovedEvent,
 ] as const
 
 /** Every `type` one of the known frames accepts. */

@@ -35,6 +35,15 @@ import {
 } from './chat.ts'
 import { ErrorResponse, okResponse } from './common.ts'
 import {
+  DraftsCreateArgs,
+  DraftsDeleteArgs,
+  DraftsDeleteFields,
+  DraftsListArgs,
+  DraftsListFields,
+  DraftsUpdateArgs,
+  DraftWriteFields,
+} from './drafts.ts'
+import {
   ConversationsCreateArgs,
   ConversationsCreateFields,
   ConversationsHistoryArgs,
@@ -123,6 +132,10 @@ export const Methods = {
   'rooms.join': method(RoomsJoinArgs, RoomsJoinFields),
   'rooms.leave': method(RoomsLeaveArgs, RoomsLeaveFields),
   'users.profile.set': method(UsersProfileSetArgs, UsersProfileSetFields),
+  'drafts.list': method(DraftsListArgs, DraftsListFields),
+  'drafts.create': method(DraftsCreateArgs, DraftWriteFields),
+  'drafts.update': method(DraftsUpdateArgs, DraftWriteFields),
+  'drafts.delete': method(DraftsDeleteArgs, DraftsDeleteFields),
 } as const
 
 export type Methods = typeof Methods
