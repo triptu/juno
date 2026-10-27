@@ -17,6 +17,7 @@
  * only when a proven range of its replies reaches back to the read pointer
  * (`thread_ranges`), not when the stored replies reach `reply_count`. 8:
  * Juno's own posts Slack has not stored yet count as the user's messages
- * when queued, so a send moves its topic before Slack answers.
+ * when queued, so a send moves its topic before Slack answers. 9: a post
+ * Slack refused is no activity until it is retried.
  */
-export const INDEX_VERSION = 8
+export const INDEX_VERSION = 9

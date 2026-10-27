@@ -1,10 +1,12 @@
 // The sidebar's order against the fake Slack (SPEC 5, "Holding the order"): an own send moves its topic
 // to the top before Slack answers, from Main and from a thread under the pointer, and a live reply or DM
 // moves its row while a sync cycle runs. The first window that shows the new words has the row on top:
-// the move never lags the content.
+// the move never lags the content. An own send undone during a cycle (refused, deleted) moves its row
+// back, and rows a cycle kept in place take their true order once it ends.
 import { afterEach, expect, it } from 'bun:test'
 import {
   defaultTopicListFilter,
+  deleteMessage,
   engineStatusAtom,
   sendMessage,
   setSidebarEngaged,
@@ -14,7 +16,7 @@ import {
   type SidebarWindow,
 } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
-import { valueOf } from '../scenario'
+import { readDb, valueOf } from '../scenario'
 import { step } from '../step'
 import { syncedEngine } from '../synced'
 
@@ -24,6 +26,21 @@ afterEach(async () => {
   for (const unmount of unmounts.splice(0)) unmount()
   for (const engine of engines.splice(0).toReversed()) await engine.stop()
 })
+
+/** The engine's start and whether the page sees a sync cycle running. */
+const engineStatus = (engine: RunningEngine) => {
+  const status = engine.registry.get(engineStatusAtom)
+  return status._tag === 'Success' ? status.value : undefined
+}
+
+/** A reconnect whose catch-up waits on its counts, so a cycle runs while the socket is live, until `client.counts` is released. */
+async function heldCatchUp(engine: RunningEngine): Promise<void> {
+  const { fake } = engine
+  fake.holdNext({ method: 'client.counts' })
+  fake.dropSocket()
+  await waitFor(() => (fake.heldCount({ method: 'client.counts' }) === 1 && fake.socketCount() === 1) || undefined, WAIT_MS, 'the catch-up waiting on its counts')
+  await waitFor(() => engineStatus(engine)?.syncing || undefined, WAIT_MS, 'the sidebar seeing the sync cycle')
+}
 
 /** Mounts the shown window the way the list container does, and records every value it takes. */
 function watchList(engine: RunningEngine) {
@@ -81,14 +98,7 @@ it('an own send moves its topic to the top before Slack answers, and live messag
   })
 
   await step('while a catch-up runs, a reply from someone else and a DM move their rows at once', async () => {
-    // The catch-up after a reconnect waits on its counts, so the cycle runs while the socket is live.
-    fake.holdNext({ method: 'client.counts' })
-    fake.dropSocket()
-    await waitFor(() => (fake.heldCount({ method: 'client.counts' }) === 1 && fake.socketCount() === 1) || undefined, WAIT_MS, 'the catch-up waiting on its counts')
-    await waitFor(() => {
-      const status = registry.get(engineStatusAtom)
-      return (status._tag === 'Success' && status.value.syncing) || undefined
-    }, WAIT_MS, 'the sidebar seeing the sync cycle')
+    await heldCatchUp(engine)
 
     const thread = lowest('t:')
     const [, channel, threadTs] = thread.split(':') as [string, string, string]
@@ -103,5 +113,67 @@ it('an own send moves its topic to the top before Slack answers, and live messag
     expect(engine.syncing()).toBe(true)
     fake.release({ method: 'client.counts' })
     await engine.syncIdle()
+  })
+})
+
+it('during a catch-up an own send that is refused or deleted moves its row back, and kept rows take their true order when it ends', async () => {
+  const engine = await syncedEngine(engines)
+  const { registry, fake } = engine
+  registry.set(sidebarFilterAtom, defaultTopicListFilter)
+  const { shown } = watchList(engine)
+  await shown()
+  const recent = () => registry.get(sidebarSectionsAtom).recent
+  const row = (id: string) => registry.get(sidebarListAtom).rows.get(id)
+  const lowest = (prefix: string) => recent().findLast((id) => id.startsWith(prefix) && id !== recent()[0])!
+  const pending = (text: string) => readDb(engine, 'user.db', (db) =>
+    db.prepare('SELECT client_msg_id AS id, state FROM pending_messages WHERE text = ?').get(text) as { id: string; state: string } | undefined)
+  await heldCatchUp(engine)
+
+  await step('a send Slack refuses leaves its row where it was, with its last message', async () => {
+    const id = lowest('m:C')
+    const before = recent()
+    const preview = row(id)!.preview.text
+    fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 1 })
+    valueOf(await sendMessage(registry, { kind: 'channel', channelId: id.slice(2) }, 'This one is refused'))
+    await waitFor(() => pending('This one is refused')?.state === 'failed' || undefined, WAIT_MS, 'the refused post')
+    await waitFor(() => row(id)?.preview.text === preview || undefined, WAIT_MS, 'the last message back in the row')
+    expect(recent()).toEqual(before)
+  })
+
+  await step('a reply deleted before Slack has it moves its thread back', async () => {
+    const thread = lowest('t:')
+    const [, channel, threadTs] = thread.split(':') as [string, string, string]
+    const main = `m:${channel}`
+    const before = recent().filter((id) => id !== main)
+    // The channel's first post waits on Slack, so the reply stays queued behind it and can be deleted.
+    fake.holdNext({ method: 'chat.postMessage', before: true })
+    valueOf(await sendMessage(registry, { kind: 'channel', channelId: channel }, 'Holding the channel'))
+    valueOf(await sendMessage(registry, { kind: 'channel', channelId: channel, threadTs }, 'Taking this back'))
+    // Both posts can be queued in one millisecond, so the thread and its channel's Main may tie at the top.
+    await waitFor(() => recent().filter((id) => id !== main)[0] === thread || undefined, WAIT_MS, 'the reply moving its thread up')
+    const reply = pending('Taking this back')!
+    expect(reply.state).toBe('queued')
+    valueOf(await deleteMessage(registry, { channelId: channel, ts: `pending:${reply.id}`, clientMsgId: reply.id }))
+    await waitFor(() => row(thread)?.preview.text !== 'Taking this back' || undefined, WAIT_MS, 'the reply gone from the row')
+    expect(recent().filter((id) => id !== main)).toEqual(before)
+    fake.release({ method: 'chat.postMessage' })
+    // The held post stored: its row has its Slack time, so nothing moves under the next step.
+    await waitFor(() => {
+      const posted = fake.messages(channel).find((m) => m.text === 'Holding the channel')
+      return (posted !== undefined && pending('Holding the channel') === undefined && row(main)?.lastActivityTs === posted.ts) || undefined
+    }, WAIT_MS, 'the held post stored')
+  })
+
+  await step('activity from before the launch keeps its row in place during the catch-up, and the rows take their true order when it ends', async () => {
+    const id = lowest('m:C')
+    const before = recent()
+    // Dated a minute before the engine started: newer than the rows above it, but not live.
+    fake.workspace.post({ channel: id.slice(2), user: 'U0LEO', text: 'Written before the launch', at: engineStatus(engine)!.startedAt - 60_000 })
+    await waitFor(() => row(id)?.preview.text === 'Written before the launch' || undefined, WAIT_MS, 'the message in the row')
+    expect(recent()).toEqual(before)
+    fake.release({ method: 'client.counts' })
+    await waitFor(() => (engineStatus(engine)?.syncing === false) || undefined, WAIT_MS, 'the sidebar seeing the catch-up end')
+    const activity = recent().map((other) => row(other)!.lastActivityAt)
+    expect(activity).toEqual(activity.toSorted((a, b) => b - a))
   })
 })
