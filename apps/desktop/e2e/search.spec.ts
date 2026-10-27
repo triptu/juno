@@ -69,10 +69,10 @@ test('search: from: chip, local cards first, Slack merges below, Space shows the
   if (SHOTS) await test.step('shots: one column and dark', () => moreShots(context))
   // What the Search tab shows and finds is in the DOM lane (`dom/search.test.ts`); the blur is CSS.
   await test.step('with message text hidden, the field, its chips, the cards and the note blur', () => blurred(context))
-  // Last: its 650 replies in #eng are dated up to a second before the fake's now, where a later step's own could fall.
-  await juno.tabs.menu('close-tab')
-  await test.step('reader navigation applies the whole query beyond the message window', () => navigateMatches({ juno, fake }))
 })
+
+test('search: reader navigation applies the whole query beyond the message window, also after Slack was slow with the thread', ({ juno, fake }) =>
+  navigateMatches({ juno, fake }))
 
 async function moreShots({ juno }: Context): Promise<void> {
   const page = searchPage(juno.win)
