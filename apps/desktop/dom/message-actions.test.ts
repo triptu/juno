@@ -322,7 +322,7 @@ async function threads({ juno, fake, step }: Context): Promise<void> {
     // through the same queue as a thread's would, after it, so once it shows a wrong thread tab would show too.
     await plain.getByRole('link', { name: 'the retro doc' }).click({ modifiers: ['Meta'] })
     await expect.poll(() => juno.browserLinks()).toContain('https://example.com/retro')
-    await plain.getByRole('button', { name: 'Maya Chen', exact: true }).click({ modifiers: ['Meta'] })
+    await plain.getByRole('button', { name: 'Maya', exact: true }).click({ modifiers: ['Meta'] })
     await tabs.expectCount(before + 1)
     expect(strip().some((tab) => /Retro notes/.test(tab.title))).toBe(false)
 
