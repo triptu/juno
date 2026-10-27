@@ -8,6 +8,9 @@ const backgroundPacingOf = (lanes: SlackConfigShape['lanes']) => {
   return { totalMillis: override, methodMillis: override, methods: {} }
 }
 
+/** Interactive tokens a paging start leaves for the user's own calls. */
+const PAGING_RESERVE = 2
+
 /** Shared lane budgets and method backoff. Times are milliseconds from the queue's clock. */
 export const makePacing = (lanes: SlackConfigShape['lanes'], startedAt: number) => {
   const background = backgroundPacingOf(lanes)
@@ -42,19 +45,21 @@ export const makePacing = (lanes: SlackConfigShape['lanes'], startedAt: number) 
     admit(lane: Lane, method: string, now: number, pauseEnd: number): number {
       const bucket = lane === 'background' ? bucketOf(method) : undefined
       if (bucket !== undefined) recover(bucket, now)
-      if (lane === 'interactive' && refillInterval > 0) {
+      const tokens = (lane === 'interactive' || lane === 'paging') && refillInterval > 0
+      if (tokens) {
         interactiveTokens = Math.min(20, interactiveTokens + Math.max(0, now - interactiveUpdated) / refillInterval)
         interactiveUpdated = now
       }
+      const needed = lane === 'paging' ? 1 + PAGING_RESERVE : 1
       const laneEnd = lane === 'background' ? backgroundNext
-        : lane === 'interactive' && refillInterval > 0 ? now + Math.max(0, 1 - interactiveTokens) * refillInterval : 0
+        : tokens ? now + Math.max(0, needed - interactiveTokens) * refillInterval : 0
       const until = Math.max(pauseEnd, bucket?.next ?? 0, laneEnd)
       if (until > now) return until - now
       if (bucket !== undefined) {
         bucket.next = now + bucket.interval
         backgroundNext = now + background.totalMillis
       }
-      if (lane === 'interactive' && refillInterval > 0) interactiveTokens -= 1
+      if (tokens) interactiveTokens -= 1
       return 0
     },
   }

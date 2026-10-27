@@ -6,6 +6,12 @@
  *   refill 2/second. Token waits queue; if the method is paused for longer than `interactiveMaxWaitMillis`
  *   the call fails at once with `SlackRateLimited`, so the route can answer
  *   from the cache and the engine can show `rate-limited`.
+ * - `paging`: pages read ahead of the user (a view's older and newer
+ *   pages, an open's pages after its first). The interactive lane's
+ *   permits, tokens and pause rules, but it yields: an interactive call
+ *   waiting for a permit goes first, and paging never takes the last free
+ *   permit (`permits.ts`) or the last two tokens (`pacing.ts`), so the
+ *   user's own call starts at once. It adds no concurrency or rate.
  * - `background`: backfill and sweeps. Concurrency 2. Each method has its own
  *   spacing, so independent methods run side by side: history and replies
  *   40 a minute, search 10, edge `users/info` and any other method 20, and
@@ -27,8 +33,9 @@ import { Clock, Context, Effect, Layer, Ref, Semaphore, Stream, SubscriptionRef 
 import { SlackConfig } from './config.ts'
 import { SlackRateLimited } from './errors.ts'
 import { makePacing } from './pacing.ts'
+import { makeSharedPermits } from './permits.ts'
 
-export type Lane = 'interactive' | 'background' | 'send'
+export type Lane = 'interactive' | 'paging' | 'background' | 'send'
 
 export interface RequestQueueShape {
   /** Runs `effect` on `lane` once `method` is not paused and a permit is free. */
@@ -46,10 +53,14 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
     RequestQueue,
     Effect.gen(function* () {
       const config = yield* SlackConfig
+      const shared = makeSharedPermits(config.lanes.interactiveConcurrency)
+      const background = yield* Semaphore.make(config.lanes.backgroundConcurrency)
+      const send = yield* Semaphore.make(config.lanes.sendConcurrency)
       const permits = {
-        interactive: yield* Semaphore.make(config.lanes.interactiveConcurrency),
-        background: yield* Semaphore.make(config.lanes.backgroundConcurrency),
-        send: yield* Semaphore.make(config.lanes.sendConcurrency),
+        interactive: shared.withPermit(false),
+        paging: shared.withPermit(true),
+        background: background.withPermit,
+        send: send.withPermit,
       }
       const paused = yield* Ref.make(new Map<string, number>())
       const pacing = makePacing(config.lanes, yield* Clock.currentTimeMillis)
@@ -86,15 +97,16 @@ export class RequestQueue extends Context.Service<RequestQueue, RequestQueueShap
 
       const run = <A, E, R>(lane: Lane, method: string, effect: Effect.Effect<A, E, R>) =>
         Effect.gen(function* () {
+          const interactive = lane === 'interactive' || lane === 'paging'
           while (true) {
-            if (lane === 'interactive') {
+            if (interactive) {
               const remaining = ((yield* pausedUntil(method)) ?? 0) - (yield* Clock.currentTimeMillis)
               if (remaining > config.interactiveMaxWaitMillis) return yield* new SlackRateLimited({ method, retryAfterMillis: remaining })
             }
-            const result = yield* permits[lane].withPermit(Effect.gen(function* () {
+            const result = yield* permits[lane](Effect.gen(function* () {
               const now = yield* Clock.currentTimeMillis
               const pauseEnd = (yield* Ref.get(paused)).get(method) ?? 0
-              if (lane === 'interactive' && pauseEnd - now > config.interactiveMaxWaitMillis) {
+              if (interactive && pauseEnd - now > config.interactiveMaxWaitMillis) {
                 return yield* new SlackRateLimited({ method, retryAfterMillis: pauseEnd - now })
               }
               // No future reservation or lane permit is held while sleeping.
