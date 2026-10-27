@@ -44,9 +44,13 @@
  * A message Slack refuses to change (too old to edit, say) goes back to
  * what Slack has.
  *
- * Drafts, kept per topic in `user.db` so they outlive the app:
+ * Drafts, kept per topic in `user.db` so they outlive the app, and synced
+ * with Slack's drafts for the topic's conversation or thread (SPEC 8):
  * - `drafts.get`: the topic's draft, `''` when it has none (a live value).
- * - `drafts.set`: replaces it; `''` deletes it.
+ *   A draft changed on another device shows here.
+ * - `drafts.set`: replaces it; `''` deletes it. The change goes to Slack
+ *   after a pause in typing, or at once with `now` (the field lost focus,
+ *   the tab hid, the window is closing).
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
@@ -216,7 +220,7 @@ export const messagesGrammar = Rpc.make('messages.grammar', {
 /** The draft of one topic, `''` when it has none. */
 export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Schema.String }, value: Schema.String })
 
-/** Replaces a topic's draft; an empty or blank text deletes it. */
-export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
+/** Replaces a topic's draft; an empty or blank text deletes it. With `now`, Slack gets it without waiting for a pause in typing. */
+export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String, now: Schema.optionalKey(Schema.Boolean) }, success: Schema.Void, error: NotSignedIn })
 
 export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesAttachmentAction, messagesSend, messagesForward, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesBroadcast, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)

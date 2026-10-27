@@ -122,7 +122,7 @@ const draftFamily = liveQuery(draftsGet)
 /** A topic's draft, `''` when it has none. */
 export const draftAtom = (topicId: string) => draftFamily({ topicId })
 
-/** Replaces a topic's draft; an empty text deletes it. */
-export const saveDraft = (registry: Registry, topicId: string, text: string) => runCommand(registry, draftsSet, { topicId, text })
+/** Replaces a topic's draft; an empty text deletes it. With `now`, it goes to Slack without waiting for a pause in typing. */
+export const saveDraft = (registry: Registry, topicId: string, text: string, now = false) => runCommand(registry, draftsSet, { topicId, text, ...(now ? { now } : {}) })
 
 export const resolveMessageAction = (registry: Registry, id: number, retry: boolean) => runCommand(registry, messagesResolveAction, { id, retry })

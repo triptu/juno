@@ -44,6 +44,8 @@ export const queueText = (post: {
   readonly files?: ReadonlyArray<PendingFile>
   /** A forward's source (`send/forward.ts`); the text is its note. */
   readonly share?: PendingShare
+  /** Slack's draft the text was (`sendDraft`). */
+  readonly draftId?: string | undefined
   readonly createdAt: number
 }) => {
   const empty = post.text.trim() === ''
