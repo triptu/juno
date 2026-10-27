@@ -3,12 +3,14 @@ import type { FullResult, Reporter, TestCase, TestResult, TestStep } from '@play
 /**
  * Under JUNO_E2E_TIMINGS=1, prints one `e2e-timing:` JSON line per test run: where its
  * time went (fixture setup and teardown, fixed waits, polls, other expects and API
- * calls), the `e2e timing:` phases the fixtures and driver print, and its worker and
- * start time. `bun scripts/e2e-timings.mjs <run.log>` sums them.
+ * calls), the `e2e timing:` phases the fixtures and driver print, each top-level
+ * `test.step` (title and milliseconds, in order), and its worker and start time.
+ * `bun scripts/e2e-timings.mjs <run.log>` sums them.
  */
 export default class TimingReporter implements Reporter {
   readonly #phases = new Map<TestResult, Record<string, number>>()
   readonly #buckets = new Map<TestResult, Record<string, number>>()
+  readonly #journey = new Map<TestResult, Array<{ readonly title: string; readonly ms: number }>>()
   #begun = 0
 
   onBegin(): void {
@@ -23,6 +25,7 @@ export default class TimingReporter implements Reporter {
   }
 
   onStepEnd(_test: TestCase, result: TestResult, step: TestStep): void {
+    if (step.category === 'test.step' && step.parent === undefined) this.#journey.set(result, [...this.#journey.get(result) ?? [], { title: step.title, ms: step.duration }])
     const bucket = bucketOf(step)
     if (bucket === undefined) return
     // Count the outermost call only: an expect's own API calls are part of the expect, a fixture's part of its hook.
@@ -43,6 +46,7 @@ export default class TimingReporter implements Reporter {
       ms: result.duration,
       steps: this.#buckets.get(result) ?? {},
       phases: this.#phases.get(result) ?? {},
+      testSteps: this.#journey.get(result) ?? [],
     }
     console.log(`e2e-timing: ${JSON.stringify(line)}`)
   }
