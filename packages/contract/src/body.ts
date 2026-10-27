@@ -80,7 +80,8 @@ const ContentBlock = Schema.Union([
   }),
   Schema.Struct({ kind: Schema.Literal('heading'), children: Schema.Array(BodyInline) }),
   Schema.Struct({ kind: Schema.Literal('divider') }),
-  Schema.Struct({ kind: Schema.Literal('context'), children: Schema.Array(BodyInline) }),
+  // `icons`: the context block's image elements, drawn small before its text; `alt` is for a screen reader.
+  Schema.Struct({ kind: Schema.Literal('context'), children: Schema.Array(BodyInline), icons: Schema.optionalKey(Schema.Array(Schema.Struct({ url: Schema.String, alt: Schema.String }))) }),
   Schema.Struct({ kind: Schema.Literal('fields'), items: Schema.Array(Schema.Array(BodyInline)) }),
   Schema.Struct({ kind: Schema.Literal('image'), url: Schema.String, alt: Schema.String, width: Schema.optionalKey(Schema.Number), height: Schema.optionalKey(Schema.Number) }),
   /**
