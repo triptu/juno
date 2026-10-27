@@ -25,9 +25,10 @@ let pool: HostPool | undefined
 const hostPool = () => (pool ??= new HostPool(DOM_BUILD))
 
 /** Loads the worker's first host and compiles the renderer, while it waits for the synced snapshot. */
-export function warmWorker(): void {
-  hostPool().warm()
+export async function warmWorker(): Promise<void> {
+  const host = hostPool().warm()
   warmRenderer()
+  await host
 }
 
 /** Ends the worker's hosts, so each writes its CPU profile (`profile.ts`). */

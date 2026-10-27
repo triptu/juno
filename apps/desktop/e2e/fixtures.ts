@@ -86,6 +86,11 @@ export interface WorkerFixtures {
   /** Loaded browser hosts; every lease starts a fresh engine on its test's data folder. */
   readonly hostPool: HostPool
   readonly webPages: () => Promise<WebPages>
+  /**
+   * Builds the default synced start (the browser's snapshot, shared by the run, or this worker's synced workspace in
+   * Electron) before the worker's first test, so no test's time includes the sign-in and first sync it is copied from.
+   */
+  readonly warmStart: void
 }
 
 type SyncOptions = Pick<LaunchOptions, 'timing' | 'fakeAiDelayMillis'>
@@ -174,6 +179,20 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       await pages?.close()
     },
     { scope: 'worker' },
+  ],
+  warmStart: [
+    // `display` first: an Electron build opens on this worker's X display.
+    async ({ display: _display, webBrowser, hostPool, syncedWorkspaces }, use, workerInfo) => {
+      const project = workerInfo.project.name
+      if (project === 'browser') await webSnapshot(await webBrowser(), hostPool, { timing: 'fast' })
+      if (project === 'electron') {
+        const options: SyncOptions = { timing: launchTiming({}) }
+        await syncedWorkspaces.get(await syncedKey(options), (dir) => buildSynced(dir, options))
+      }
+      await use()
+    },
+    // Slow: the first worker builds the browser's snapshot while the others wait for it; an Electron worker signs in and syncs once.
+    { scope: 'worker', auto: true, timeout: 120_000 },
   ],
   freshContext: [false, { option: true }],
   webPage: async ({ lane, webPages, viewport, permissions, freshContext }, use) => {

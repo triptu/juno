@@ -33,6 +33,25 @@ test('real Playwright reports retries, failures, unfinished tests and teardown e
   assert.deepEqual(report.cases[0].attempts.map((run) => run.status), ['failed', 'passed'])
 })
 
+test('a worker warm-up is left out of the time of the test the worker starts with', async (t) => {
+  const { spawnSync } = await import('node:child_process')
+  const { writeFileSync } = await import('node:fs')
+  const { join, resolve } = await import('node:path')
+  const { root: dir, env } = toolFixture(t)
+  const root = resolve(import.meta.dirname, '..')
+  const playwright = join(root, 'apps/desktop/node_modules/@playwright/test')
+  writeFileSync(join(dir, 'warm.spec.mjs'), `import { test as base } from '${playwright}/index.mjs'
+const test = base.extend({ warmStart: [async ({}, use) => { await new Promise((done) => setTimeout(done, 1500)); await use() }, { scope: 'worker', auto: true, timeout: 10000 }] })
+test('first', () => {}); test('second', () => {})`)
+  writeFileSync(join(dir, 'playwright.config.mjs'), `export default { testDir: '.', workers: 1, reporter: [['${join(root, 'scripts/test-results-reporter.mjs')}']] }`)
+  const result = spawnSync('node', [join(playwright, 'cli.js'), 'test', '--config', join(dir, 'playwright.config.mjs')], { encoding: 'utf8', env: { ...env, CI: '1' } })
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  const [first, second] = testResults(result.stdout).cases
+  assert.ok(first.warmupMs >= 1500, JSON.stringify(first))
+  assert.ok(first.durationMs < 1000 && first.attempts[0].durationMs === first.durationMs, JSON.stringify(first))
+  assert.equal(second.warmupMs, undefined)
+})
+
 test('failure causes distinguish cancellation and infrastructure from provisional test failures and confirmed product defects', async () => {
   const { failureCause } = await import('./test-results-reporter.mjs')
   assert.equal(failureCause({ code: 130 }).category, 'cancellation')
