@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { parseSync, Visitor, type ESTree, type PluginOption, type Plugin } from 'vite'
+import { build, parseSync, Visitor, type ESTree, type PluginOption, type Plugin } from 'vite'
 import stylex from '@stylexjs/unplugin'
 import react from '@vitejs/plugin-react'
 
@@ -206,6 +206,29 @@ function nodeGlobal(): Plugin {
       }
     },
   }
+}
+
+/**
+ * Builds one script, `entry`, into `outDir` as `<name>.js` the way the app
+ * builds its renderer: these plugins and output, minified. For a page
+ * outside the app that must run the code a release ships
+ * (`scripts/huddle-live-browser.ts`).
+ */
+export async function buildLikeRenderer(options: { readonly repoRoot: string; readonly name: string; readonly entry: string; readonly outDir: string }): Promise<void> {
+  await build({
+    configFile: false,
+    root: options.repoRoot,
+    logLevel: 'warn',
+    plugins: rendererPlugins({ repoRoot: options.repoRoot, minify: true, reportSkipped: false }),
+    build: {
+      outDir: options.outDir,
+      emptyOutDir: false,
+      minify: 'oxc',
+      modulePreload: false,
+      chunkSizeWarningLimit: 4_000,
+      rolldownOptions: { input: { [options.name]: options.entry }, output: { ...rendererOutput, entryFileNames: '[name].js' } },
+    },
+  })
 }
 
 /**
