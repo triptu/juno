@@ -79,8 +79,9 @@ export function toggleResolved(id: string): void {
  * the topic held unread while it stays open, as the topic's Mark as unread (SPEC 7).
  */
 export function markUnreadFrom(id: string, ts: string): void {
+  const topic = topicOf(id)
   releaseSidebarTopic(registry, id)
-  void runAction(registry, readsMarkUnread, { id, from: ts }, { text: 'Marked unread' })
+  void runAction(registry, readsMarkUnread, { id, from: ts }, topic === undefined ? { text: 'Marked as unread' } : said('Marked as unread', topic))
 }
 
 /** Rename saved: the engine clears the manual title for an empty one or the AI title. */

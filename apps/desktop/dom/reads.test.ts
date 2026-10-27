@@ -110,7 +110,7 @@ domTest('Mark unread on a message makes it and the rest unread, holds while you 
 
   await step('Mark unread on the seventh: the divider is before it, four unread with the mention, and Slack reads to the sixth', async () => {
     await topic.chooseInMessageMenu(SEVENTH, 'mark-unread')
-    await juno.expectToast('Marked unread')
+    await juno.expectToast(`Marked as unread · ${POSTGRES}`)
     await postgres.expectUnread(4)
     await postgres.expectMention()
     await expect(firstNew).toContainText(SEVENTH)
