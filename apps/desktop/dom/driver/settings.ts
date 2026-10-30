@@ -77,7 +77,7 @@ export class NotificationsPage {
   }
 
   get awayOutsideHours(): Query {
-    return this.root.getByRole('switch', { name: 'Set me away outside active hours', exact: true })
+    return this.root.getByRole('switch', { name: 'Set me away outside active hours' })
   }
 
   /** Turns Set me away outside active hours on. It starts off, with the Active in Slack rows hidden. */
