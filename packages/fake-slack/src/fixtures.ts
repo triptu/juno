@@ -3,7 +3,7 @@
  * docs/design/handoff/prototype/Threads v3.dc.html. Everything is invented.
  * Times are minutes before the clock's "now" when the seed runs.
  */
-import type { Team, Ts, User } from '@juno/slack-schema'
+import type { Team, Ts, User, UserPrefs } from '@juno/slack-schema'
 import { WORKSPACE_EMOJI } from './emoji.ts'
 import { fileObject } from './files.ts'
 import { samplePdf, samplePng } from './samples.ts'
@@ -494,8 +494,43 @@ export function userObject(seed: SeedUser, avatarBase: string): User {
   }
 }
 
-/** Fills a workspace with the seed. `avatarBase` is the URL under which the fake serves avatars. */
+/** The default seed's Slack preferences. */
+const PREFS: UserPrefs = {
+  muted_channels: 'C0DEPLOYS',
+  highlight_words: 'postgres,offsite',
+  mute_sounds: false,
+  show_typing: true,
+  enable_unread_view: true,
+  enable_threads_view: true,
+  tz: 'Europe/Paris',
+  time24: true,
+  locale: 'en-US',
+  all_channels_loud: false,
+  channel_notification_settings: '{}',
+  desktop_notification_actions: 'default',
+  emoji_mode: 'default',
+  // Slack's notification schedule, the same as Juno's default notification hours (Monday to Friday, 9 to 7). Hours come in both forms live.
+  dnd_enabled: true,
+  dnd_days: 'weekdays',
+  dnd_start_hour: '19:00',
+  dnd_end_hour: '9:00',
+}
+
+/** What a seed holds: its people, user groups, preferences and conversations. */
+export interface SeedData {
+  readonly people: ReadonlyArray<SeedUser>
+  readonly usergroups: ReadonlyArray<{ readonly id: string; readonly handle: string; readonly name: string; readonly deleted?: boolean }>
+  readonly prefs: UserPrefs
+  readonly conversations: ReadonlyArray<SeedConversation>
+}
+
+/** Fills a workspace with the default seed. `avatarBase` is the URL under which the fake serves avatars. */
 export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
+  seedFrom(workspace, avatarBase, { people: PEOPLE, usergroups: USERGROUPS, prefs: PREFS, conversations: CONVERSATIONS })
+}
+
+/** Fills a workspace with a seed's data. */
+export function seedFrom(workspace: Workspace, avatarBase: string, data: SeedData): void {
   const now = workspace.clock.now()
   const minute = 60_000
   const at = (ago: number) => now - ago * minute
@@ -505,31 +540,12 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
   workspace.emoji.set('hello_juno', { name: 'hello_juno', value: 'alias:juno_wave' })
   const baseUrl = avatarBase.replace(/\/avatars$/, '')
 
-  for (const person of PEOPLE) workspace.addUser(userObject(person, avatarBase))
-  for (const group of USERGROUPS) workspace.putUsergroup(group, false)
+  for (const person of data.people) workspace.addUser(userObject(person, avatarBase))
+  for (const group of data.usergroups) workspace.putUsergroup(group, false)
 
-  workspace.prefs = {
-    muted_channels: 'C0DEPLOYS',
-    highlight_words: 'postgres,offsite',
-    mute_sounds: false,
-    show_typing: true,
-    enable_unread_view: true,
-    enable_threads_view: true,
-    tz: 'Europe/Paris',
-    time24: true,
-    locale: 'en-US',
-    all_channels_loud: false,
-    channel_notification_settings: '{}',
-    desktop_notification_actions: 'default',
-    emoji_mode: 'default',
-    // Slack's notification schedule, the same as Juno's default notification hours (Monday to Friday, 9 to 7). Hours come in both forms live.
-    dnd_enabled: true,
-    dnd_days: 'weekdays',
-    dnd_start_hour: '19:00',
-    dnd_end_hour: '9:00',
-  }
+  workspace.prefs = data.prefs
 
-  for (const seed of CONVERSATIONS) {
+  for (const seed of data.conversations) {
     workspace.addConversation({
       id: seed.id,
       name: seed.name,
@@ -543,10 +559,36 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
     })
   }
 
-  // Messages, oldest first across the whole workspace so ts order matches time order.
+  const roots = postMessages(workspace, baseUrl, data.conversations, at)
+
+  // Thread subscriptions and read state. Self follows every thread by default, in the channels self is in.
+  for (const root of roots) {
+    if (!workspace.isMember(root.channel)) continue
+    const replies = workspace.replies(root.channel, root.ts)
+    const settings = root.seed.thread ?? {}
+    const unread = settings.unread ?? 0
+    const lastRead = unread === 0 ? (replies.at(-1)?.ts ?? root.ts) : (replies.at(-1 - unread)?.ts ?? root.ts)
+    workspace.subscriptions.set(`${root.channel}:${root.ts}`, {
+      channel: root.channel,
+      threadTs: root.ts,
+      lastRead,
+      subscribed: settings.subscribed ?? true,
+      dateCreate: at(root.seed.ago),
+    })
+  }
+  for (const conversation of data.conversations) {
+    const main = workspace.main(conversation.id)
+    const unread = conversation.unread ?? 0
+    const lastRead = unread === 0 ? (main.at(-1)?.ts ?? NEVER_READ) : (main.at(-1 - unread)?.ts ?? NEVER_READ)
+    workspace.reads.set(conversation.id, lastRead)
+  }
+}
+
+/** Posts a seed's messages, oldest first across the whole workspace so ts order matches time order, and returns the thread roots. */
+function postMessages(workspace: Workspace, baseUrl: string, conversations: ReadonlyArray<SeedConversation>, at: (ago: number) => number): Array<{ channel: string; seed: SeedMessage; ts: Ts }> {
   const roots: Array<{ channel: string; seed: SeedMessage; ts: Ts }> = []
   const flat: Array<{ channel: string; seed: SeedMessage; parent?: SeedMessage }> = []
-  for (const conversation of CONVERSATIONS) {
+  for (const conversation of conversations) {
     for (const message of conversation.messages) {
       flat.push({ channel: conversation.id, seed: message })
       for (const reply of message.replies ?? []) flat.push({ channel: conversation.id, seed: reply, parent: message })
@@ -577,28 +619,7 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
     }
     if (entry.parent === undefined && entry.seed.replies !== undefined) roots.push({ channel: entry.channel, seed: entry.seed, ts: posted.ts })
   }
-
-  // Thread subscriptions and read state. Self follows every thread by default, in the channels self is in.
-  for (const root of roots) {
-    if (!workspace.isMember(root.channel)) continue
-    const replies = workspace.replies(root.channel, root.ts)
-    const settings = root.seed.thread ?? {}
-    const unread = settings.unread ?? 0
-    const lastRead = unread === 0 ? (replies.at(-1)?.ts ?? root.ts) : (replies.at(-1 - unread)?.ts ?? root.ts)
-    workspace.subscriptions.set(`${root.channel}:${root.ts}`, {
-      channel: root.channel,
-      threadTs: root.ts,
-      lastRead,
-      subscribed: settings.subscribed ?? true,
-      dateCreate: at(root.seed.ago),
-    })
-  }
-  for (const conversation of CONVERSATIONS) {
-    const main = workspace.main(conversation.id)
-    const unread = conversation.unread ?? 0
-    const lastRead = unread === 0 ? (main.at(-1)?.ts ?? NEVER_READ) : (main.at(-1 - unread)?.ts ?? NEVER_READ)
-    workspace.reads.set(conversation.id, lastRead)
-  }
+  return roots
 }
 
 function silentReact(workspace: Workspace, channel: string, ts: string, name: string, user: string): void {

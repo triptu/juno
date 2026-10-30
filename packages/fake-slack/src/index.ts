@@ -40,6 +40,8 @@ export interface FakeSlackOptions {
   readonly latencyMillis?: number
   /** Enterprise Grid: the team carries this `enterprise_id`, in `auth.test`, `client.userBoot` and the client page. */
   readonly enterpriseId?: string
+  /** The workspace's name in place of "Juno Fake", as a seed of another company wants (`DEMO_TEAM_NAME`). */
+  readonly teamName?: string
 }
 
 export interface Credentials {
@@ -81,7 +83,8 @@ export class FakeSlack {
     const registry = mergeFeatures(features)
     const handlers = registry.methods satisfies Handlers
     const clock = new Clock(options.now ?? options.seedTime)
-    const team = options.enterpriseId === undefined ? TEAM : { ...TEAM, enterprise_id: options.enterpriseId, enterprise_name: 'Juno Fake Org' }
+    const named = options.teamName === undefined ? TEAM : { ...TEAM, name: options.teamName }
+    const team = options.enterpriseId === undefined ? named : { ...named, enterprise_id: options.enterpriseId, enterprise_name: 'Juno Fake Org' }
     const workspace = new Workspace(clock, SELF_ID, team)
     let fake: FakeSlack | undefined
     const server = new FakeServer(workspace, (name, input) => {
@@ -617,6 +620,7 @@ export function startFakeSlack(options?: FakeSlackOptions): Promise<FakeSlack> {
 }
 export { writeSlackAppFixture } from './slackApp.ts'
 export { largeSeed } from './seeds/large.ts'
+export { DEMO_TEAM_NAME, demoSeed } from './seeds/demo.ts'
 
 export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from './seeds/topic300.ts'
 export { CODE_BLOCK_COUNT, codeBlocksSeed } from './seeds/codeBlocks.ts'

@@ -4,9 +4,10 @@
  * process holds all of it:
  *
  * - a fake Slack seeded with the default seed the e2e and feel tests use,
- *   on a free port, with its control API;
+ *   or the demo company with `demo`, on a free port, with its control API;
  * - the engine on a fresh data folder, signed in to the fake, with the
- *   fake AI, serving its routes over WebSockets (`socketTransport`);
+ *   fake AI (and its background jobs with `demo`, so topics get titles and
+ *   art), serving its routes over WebSockets (`socketTransport`);
  * - Vite in dev mode (HMR) serving the renderer with the web page entry
  *   (`../page/main.ts`), the engine socket and `/__juno/` files on the same
  *   port.
@@ -21,7 +22,7 @@ import { Logger, LogLevel } from 'effect'
 import { createServer, type Plugin, type ViteDevServer } from 'vite'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { memoryHost, socketTransport, startEngine, type EngineHandle } from '@juno/engine'
-import { startFakeSlack } from '@juno/fake-slack'
+import { DEMO_TEAM_NAME, demoSeed, startFakeSlack } from '@juno/fake-slack'
 import { rendererPlugins } from '../../renderer.vite'
 import { ENGINE_SOCKET_PATH } from '../paths'
 import { fakeMain, memorySessionStore, storedSession } from './fakeMain'
@@ -38,6 +39,8 @@ export interface WebShellOptions {
   readonly port: number
   /** The interface to listen on: 127.0.0.1, or 0.0.0.0 for the LAN (`--host`). */
   readonly host?: string
+  /** Seed the fake Slack with the demo company (`--demo`), for screenshots, in place of the test seed. */
+  readonly demo?: boolean
   /** Vite's log level; the command line keeps it to warnings. */
   readonly logLevel?: 'info' | 'warn' | 'error' | 'silent'
 }
@@ -157,14 +160,14 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
     }
   }
   try {
-    const fake = await startFakeSlack({ seedTime: Date.now() })
+    const fake = await startFakeSlack({ seedTime: Date.now(), ...(options.demo === true ? { seed: demoSeed, teamName: DEMO_TEAM_NAME } : {}) })
     cleanups.push(() => fake.close())
     const engineHost = memoryHost()
     const main = fakeMain(engineHost, { fakeUrl: fake.url, store: memorySessionStore(storedSession(fake.signIn())), signIn: () => Promise.resolve(fake.signIn()) })
     const transport = socketTransport({ host, port: options.port })
     const engine: EngineHandle = await startEngine(
       transport,
-      { userData, e2e: true, dev: true, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: false },
+      { userData, e2e: true, dev: true, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.demo === true },
       { host: engineHost, httpTransport: main.httpTransport, logger: engineLogger },
     )
     cleanups.push(() => engine.stop())
