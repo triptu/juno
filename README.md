@@ -25,13 +25,13 @@ Slack is organised by channel, and threads sit inside them. Juno shows one list 
   <img src="docs/readme/topic-design-mocks-dark.png" width="49%" alt="The same thread and topic list in the dark theme.">
 </p>
 
-A topic is a Slack thread, or the unthreaded messages of a channel or DM (its Main). The sidebar lists the threads you follow, the threads that mention you and every Main, newest activity first. Each row shows the title, the latest message, its channel or person, and what is unread. A topic with no activity for a few days leaves the list unless it is pinned or unread.
+A topic is a Slack thread, or the unthreaded messages of a channel or DM (its Main). The sidebar lists the threads you follow, the threads that mention you and Main streams, newest activity first. Each row shows the title, the latest message, its channel or person, and what is unread. A topic with no activity for a few days leaves the list unless it is pinned or unread.
 
 With an AI key, Juno names recent threads from their messages and draws a small picture for each row. A title you write yourself stays. Juno asks the model to keep pay, health and other sensitive details out of titles.
 
 <img src="docs/readme/resolve-undo-toast-light.png" width="100%" alt="A topic just resolved: its row has left the list and a toast at the bottom left reads Resolved with an Undo button.">
 
-Resolve clears a topic from the list and marks it read. A toast offers Undo, and so does ⌘Z. If someone replies later, the topic comes back marked Reopened. Nothing is deleted.
+Resolve marks a topic read and removes it from the list unless it is pinned. A toast offers Undo, and so does ⌘Z. If someone replies later, the topic comes back marked Reopened. Nothing is deleted.
 
 <img src="docs/readme/topic-peek-light.png" width="100%" alt="Holding Option over a sidebar row: the topic shows in a popover beside the list.">
 
@@ -80,7 +80,7 @@ Chat with Juno in its own tab or beside the topic you are reading (⌘J). Ask it
 
 - Tabs like a browser: ⌘T, ⌘W, ⌘⇧T to reopen, pin and drag, and back and forward per tab.
 - Views: your own sets of channels and DMs, and an Automated view Juno fills with bot and alert channels, kept out of All.
-- All topics: every topic, open, resolved, quiet or unfollowed, in a table with filters.
+- All topics lists open, resolved, quiet and unfollowed topics in a table with filters.
 - Huddles: join and start Slack huddles, with audio and screen sharing. An incoming huddle rings according to your notification settings.
 - Hide message text (⌃⌘H) blurs message previews and titles copied from messages. A setting turns it on when another app starts sharing your screen.
 - Web links open in a panel beside the topic.
