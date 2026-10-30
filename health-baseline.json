@@ -9,9 +9,9 @@
     "unlistedDependencies": 0,
     "clonePairs": 4,
     "oversizedFiles": 44,
-    "oversizedFunctions": 107
+    "oversizedFunctions": 106
   },
-  "clonedLines": 76,
+  "clonedLines": 75,
   "oversizedFiles": [
     "apps/desktop/e2e/driver/juno.ts",
     "apps/desktop/e2e/feel/recorder.ts",
@@ -132,7 +132,6 @@
     "packages/engine/test/perf/topics-large.perf.ts:describe('topics.list on the large seed')#1",
     "packages/engine/test/perf/topics-large.perf.ts:describe('topics.list on the large seed')/it('boots, then runs the sidebar window within budget')#1",
     "packages/engine/test/session.test.ts:describe('session')#1",
-    "packages/fake-slack/src/fixtures.ts:seedWorkspace#1",
     "packages/fake-slack/src/seeds/large.ts:largeSeed#1",
     "packages/fake-slack/src/seeds/large.ts:largeSeed#2",
     "packages/notifications/src/engine.ts:makeNotifications/Effect.fn()#1",
