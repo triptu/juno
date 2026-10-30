@@ -689,9 +689,9 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 - Slack line, under the rows, inset 14, 12 muted, its height kept when empty so nothing below moves: while no notification hours are set, "These are your hours in Slack. Juno follows them until you change them here.", or when Slack has no schedule "Slack has no notification schedule, so nothing is paused. Set hours here to pause notifications."; while hours saved by an older version were never set on this install, "Slack's schedule changes once you set your notification hours."; while the schedule was changed in Slack, "Your schedule was changed in Slack. Juno leaves it until you change your hours here." and **Use Juno's hours** (secondary, small). There is no switch for Slack's schedule.
 - Not set at first: the rows show Slack's schedule, or Any time when Slack has none. Choosing a time or Off in a row sets the hours; rows that showed Any time start at weekdays 9am to 7pm, Saturday and Sunday off. A to before from crosses midnight.
 
-**Active in Slack** — "Outside these hours you show as away."
+**Active in Slack** — no sub.
 
-- One group card: the same three rows as Notification hours, in a group named "Active in Slack", then the note row.
+- One group card: first a list row with the switch "Set me away outside active hours" (`Checkbox` `role="switch"` `size="lg"`), description "Choose the hours you're active. Outside them, Juno sets you away in Slack.", off by default. Only while it is on, a divider, then the same three rows as Notification hours, in a group named "Active in Slack", then the note row. Off, the card is the switch row alone.
 - Note row (border-top 1px `--border-subtle`, padding `10 14 12`, 12 muted): "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.", or while no active hours are set "Until you set hours, Juno shows you active whenever you use your Mac, as Slack does."
 - Not set at first: each row shows Any time. Choosing a time or Off in a row sets the hours, the rest starting at weekdays 9am to 7pm, Saturday and Sunday off. A to before from crosses midnight.
 
