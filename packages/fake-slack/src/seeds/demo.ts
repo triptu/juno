@@ -294,12 +294,12 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     messages: [
       {
         from: 'U0RUTH',
-        text: 'Selin finished the Android onsite. Panel notes are in the scorecard.',
+        text: 'Selin finished the Android onsite. Panel notes are in the scorecard. Her other offer expires this week.',
         ago: HOUR + 10,
         thread: { unread: 2 },
         replies: [
           { from: 'U0KENJI', text: 'Strong. Her take-home handled offline sync better than our app does.', ago: 40 },
-          { from: 'U0RUTH', text: '<@U0TUSHAR> she has another offer that expires this week. Could you do a 20 minute call with her tomorrow?', ago: 15 },
+          { from: 'U0RUTH', text: '<@U0TUSHAR> could you call Selin tomorrow?', ago: 15 },
         ],
       },
     ],
@@ -336,7 +336,7 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         ago: HOUR + 45,
         thread: { unread: 1 },
         replies: [
-          { from: SELF, text: "Yes. I'll show the week view and the reminder numbers.", ago: HOUR + 30 },
+          { from: SELF, text: "Yes. I'll show the new week view.", ago: HOUR + 30 },
           { from: 'U0NAOMI', text: 'Great. Send me a title when you have one.', ago: 20 },
         ],
       },
