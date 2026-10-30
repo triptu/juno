@@ -559,10 +559,36 @@ export function seedFrom(workspace: Workspace, avatarBase: string, data: SeedDat
     })
   }
 
-  // Messages, oldest first across the whole workspace so ts order matches time order.
+  const roots = postMessages(workspace, baseUrl, data.conversations, at)
+
+  // Thread subscriptions and read state. Self follows every thread by default, in the channels self is in.
+  for (const root of roots) {
+    if (!workspace.isMember(root.channel)) continue
+    const replies = workspace.replies(root.channel, root.ts)
+    const settings = root.seed.thread ?? {}
+    const unread = settings.unread ?? 0
+    const lastRead = unread === 0 ? (replies.at(-1)?.ts ?? root.ts) : (replies.at(-1 - unread)?.ts ?? root.ts)
+    workspace.subscriptions.set(`${root.channel}:${root.ts}`, {
+      channel: root.channel,
+      threadTs: root.ts,
+      lastRead,
+      subscribed: settings.subscribed ?? true,
+      dateCreate: at(root.seed.ago),
+    })
+  }
+  for (const conversation of data.conversations) {
+    const main = workspace.main(conversation.id)
+    const unread = conversation.unread ?? 0
+    const lastRead = unread === 0 ? (main.at(-1)?.ts ?? NEVER_READ) : (main.at(-1 - unread)?.ts ?? NEVER_READ)
+    workspace.reads.set(conversation.id, lastRead)
+  }
+}
+
+/** Posts a seed's messages, oldest first across the whole workspace so ts order matches time order, and returns the thread roots. */
+function postMessages(workspace: Workspace, baseUrl: string, conversations: ReadonlyArray<SeedConversation>, at: (ago: number) => number): Array<{ channel: string; seed: SeedMessage; ts: Ts }> {
   const roots: Array<{ channel: string; seed: SeedMessage; ts: Ts }> = []
   const flat: Array<{ channel: string; seed: SeedMessage; parent?: SeedMessage }> = []
-  for (const conversation of data.conversations) {
+  for (const conversation of conversations) {
     for (const message of conversation.messages) {
       flat.push({ channel: conversation.id, seed: message })
       for (const reply of message.replies ?? []) flat.push({ channel: conversation.id, seed: reply, parent: message })
@@ -593,28 +619,7 @@ export function seedFrom(workspace: Workspace, avatarBase: string, data: SeedDat
     }
     if (entry.parent === undefined && entry.seed.replies !== undefined) roots.push({ channel: entry.channel, seed: entry.seed, ts: posted.ts })
   }
-
-  // Thread subscriptions and read state. Self follows every thread by default, in the channels self is in.
-  for (const root of roots) {
-    if (!workspace.isMember(root.channel)) continue
-    const replies = workspace.replies(root.channel, root.ts)
-    const settings = root.seed.thread ?? {}
-    const unread = settings.unread ?? 0
-    const lastRead = unread === 0 ? (replies.at(-1)?.ts ?? root.ts) : (replies.at(-1 - unread)?.ts ?? root.ts)
-    workspace.subscriptions.set(`${root.channel}:${root.ts}`, {
-      channel: root.channel,
-      threadTs: root.ts,
-      lastRead,
-      subscribed: settings.subscribed ?? true,
-      dateCreate: at(root.seed.ago),
-    })
-  }
-  for (const conversation of data.conversations) {
-    const main = workspace.main(conversation.id)
-    const unread = conversation.unread ?? 0
-    const lastRead = unread === 0 ? (main.at(-1)?.ts ?? NEVER_READ) : (main.at(-1 - unread)?.ts ?? NEVER_READ)
-    workspace.reads.set(conversation.id, lastRead)
-  }
+  return roots
 }
 
 function silentReact(workspace: Workspace, channel: string, ts: string, name: string, user: string): void {
