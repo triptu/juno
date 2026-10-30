@@ -1,10 +1,11 @@
 // Runs on Node: Bun's node:sqlite on macOS cannot open the store (docs/development.md, "Runtimes").
 /**
- * `bun run web [--host]`: starts the web shell (`shell.ts`) on this worktree's
- * port (`port.ts`, or JUNO_WEB_PORT) and prints one line with the app's and
- * the fake Slack's control addresses. `--host` listens on every interface,
- * for a phone or another machine on the LAN; the fake Slack stays on this
- * Mac.
+ * `bun run web [--host] [--demo]`: starts the web shell (`shell.ts`) on this
+ * worktree's port (`port.ts`, or JUNO_WEB_PORT) and prints one line with the
+ * app's and the fake Slack's control addresses. `--host` listens on every
+ * interface, for a phone or another machine on the LAN; the fake Slack stays
+ * on this Mac. `--demo` seeds the invented company for screenshots
+ * (`demoSeed` in `@juno/fake-slack`) in place of the test seed.
  *
  * Stops on Ctrl-C, SIGTERM or SIGHUP, and when the process that started it
  * goes away, so an agent's shell that dies leaves nothing running.
@@ -18,6 +19,7 @@ import { startWebShell } from './shell'
 import { webShellPort } from './port'
 
 const lan = process.argv.includes('--host')
+const demo = process.argv.includes('--demo')
 const port = webShellPort()
 
 let stopping = false
@@ -52,7 +54,7 @@ setInterval(() => {
   if (process.ppid !== starters[0] || !starters.every(alive)) stop(0)
 }, 1000).unref()
 
-const starting = startWebShell({ port, host: lan ? '0.0.0.0' : '127.0.0.1' })
+const starting = startWebShell({ port, host: lan ? '0.0.0.0' : '127.0.0.1', demo })
 let shell: Awaited<ReturnType<typeof startWebShell>>
 try {
   shell = await starting
