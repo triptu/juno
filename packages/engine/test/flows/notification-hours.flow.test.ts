@@ -3,7 +3,7 @@
 // schedule from the hours once set (what reaches Slack and when), hours saved by an older version, and presence
 // set by the hours rows. The rest of the decisions the hours make are notifications.flow.test.ts.
 import { afterEach, expect, it } from 'bun:test'
-import { notificationsDecisions, notificationsSetGroupHours, notificationsSetLevel, notificationsSettings, notificationsStatus, notificationsUseJunoHours, prefsSet, type NotificationDecisions, type NotificationSettingsView, type NotificationStatus, type SlackScheduleView, type TodayRow } from '@juno/contract'
+import { notificationsDecisions, notificationsSetAwayOutsideHours, notificationsSetGroupHours, notificationsSetLevel, notificationsSettings, notificationsStatus, notificationsUseJunoHours, prefsSet, type NotificationDecisions, type NotificationSettingsView, type NotificationStatus, type SlackScheduleView, type TodayRow } from '@juno/contract'
 import { liveQuery, notificationsPageAtom, runCommand } from '@juno/state'
 import { Schema } from 'effect'
 import { productionTiming } from '../../src/config'
@@ -87,7 +87,7 @@ it('a new sign-in on a Saturday evening, with no schedule in Slack, is as Slack 
 
   await step('neither set of hours is set, and Slack has no schedule to follow', async () => {
     const settings = await liveUntil<NotificationSettingsView, NotificationSettingsView>(engine, liveQuery(notificationsSettings)(undefined), (value) => value, 'the settings')
-    expect(settings).toMatchObject({ notificationHours: null, presenceHours: null })
+    expect(settings).toMatchObject({ notificationHours: null, presenceHours: null, awayOutsideHours: false })
     expect(await page(engine, () => true, 'the page')).toEqual({ changedInSlack: false, waitingForHours: false, slackHours: null })
   })
 
@@ -252,9 +252,10 @@ it('hours saved by an older version load; Saturday reaches Slack as a custom day
     })
   })
 
-  await step('the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async () => {
+  await step('with Set me away outside active hours on, the Active in Slack rows set presence by the day: today\'s row active, then away until the weekend day\'s hours', async () => {
     const status = (predicate: (value: NotificationStatus) => boolean, label: string) =>
       liveUntil<NotificationStatus, NotificationStatus>(engine, liveQuery(notificationsStatus)(undefined), (value) => (predicate(value) ? value : undefined), label)
+    valueOf(await runCommand(engine.registry, notificationsSetAwayOutsideHours, { enabled: true }))
     await setRow(engine, 'presence', rowOf(today), { from: 660, to: 780 })
     expect((await status((value) => value.presence === 'active', 'active by today\'s row')).presenceLabel).toMatch(/^Active/)
     // Every row off but the weekend day that is not today, 11am to 2pm.

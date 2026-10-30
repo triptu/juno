@@ -23,6 +23,8 @@
  *   when one is added, whether it is really a rule about one person or
  *   channel.
  * - `notifications.setHuddleRing` is Ring for huddles (SPEC 20).
+ * - `notifications.setAwayOutsideHours` is Set me away outside active hours.
+ *   Off, the default, Juno never sets the owner away by the active hours.
  * - `notifications.setPresence` is Set yourself away or active. It shows at
  *   once and holds until the next switch in the active hours (without them,
  *   Slack holds it until the next choice); `sent` is
@@ -30,7 +32,8 @@
  * - `notifications.useJunoHours` writes the notification hours to Slack's
  *   schedule again after it was changed in Slack.
  * - Hours start not set: the notification hours are then Slack's schedule,
- *   and presence is not switched by hours. Setting a row of hours not set
+ *   and presence is not switched by hours. Active hours switch presence only
+ *   while `awayOutsideHours` is on. Setting a row of hours not set
  *   starts from the hours shown, or Monday to Friday 9 to 7.
  */
 import { Schema } from 'effect'
@@ -88,8 +91,10 @@ export type Instruction = typeof Instruction.Type
 export const NotificationSettingsView = Schema.Struct({
   /** Null until the owner sets them: Slack's own schedule is in effect (`SlackScheduleView.slackHours`). */
   notificationHours: Schema.NullOr(Hours),
-  /** Null until the owner sets them: presence is not switched by hours. */
+  /** Null until the owner sets them. Kept while `awayOutsideHours` is off. */
   presenceHours: Schema.NullOr(Hours),
+  /** Set me away outside active hours. Off by default: presence is not switched by hours. */
+  awayOutsideHours: Schema.Boolean,
   channels: Schema.Record(Schema.String, NotifyLevel),
   people: Schema.Record(Schema.String, NotifyLevel),
   threads: Schema.Record(Schema.String, NotifyLevel),
@@ -264,6 +269,13 @@ export const notificationsSetHuddleRing = Rpc.make('notifications.setHuddleRing'
   error: NotSignedIn,
 })
 
+/** Set me away outside active hours on or off. */
+export const notificationsSetAwayOutsideHours = Rpc.make('notifications.setAwayOutsideHours', {
+  payload: { enabled: Schema.Boolean },
+  success: Schema.Void,
+  error: NotSignedIn,
+})
+
 /** Sets a Notify me choice. On a thread, Always and Auto follow it and Never unfollows it. */
 export const notificationsSetLevel = Rpc.make('notifications.setLevel', {
   payload: { target: NotifyTargetSchema, choice: NotifyChoiceSchema },
@@ -295,6 +307,7 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsRemoveInstruction,
   notificationsCheckInstruction,
   notificationsSetHuddleRing,
+  notificationsSetAwayOutsideHours,
   notificationsSetLevel,
   notificationsSetPresence,
   notificationsUseJunoHours,

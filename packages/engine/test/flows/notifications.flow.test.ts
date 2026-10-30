@@ -1,8 +1,8 @@
 // Notifications (SPEC 14): the decision service on a real store with Effect's TestClock (the reading's 2 s
 // timeout, hours starts, settings changed mid-reading, presence), the engine's socket path into a recording
 // Notifier, and which topics the dock badge counts. Slack's schedule and presence by the hours rows are
-// notification-hours.flow.test.ts. Main's Notifier (privacy mode, focused-topic suppression, showing the
-// badge) is apps/desktop/test/notifier.test.ts: engine tests do not import apps/desktop.
+// notification-hours.flow.test.ts; the switch that lets the hours set presence is away-outside-hours.flow.test.ts.
+// Main's Notifier (privacy mode, focused-topic suppression, showing the badge) is apps/desktop/test/notifier.test.ts: engine tests do not import apps/desktop.
 import { itEffect } from '@juno/testing/effect'
 import { afterEach, expect, it } from 'bun:test'
 import { AiProvider, makeFakeAiProvider } from '@juno/ai'
@@ -134,7 +134,7 @@ itEffect('with AI assist off, held messages stay held, and presence follows the 
   const fake = yield* fakeSlack
   yield* Effect.gen(function* () {
     yield* TestClock.setTime(monday(8))
-    yield* setSettings()
+    yield* setSettings({ ...settings, awayOutsideHours: true })
     yield* transaction(prefs.set('aiAssist', false))
     const api = yield* SlackApi
     const setPresence = (presence: 'active' | 'away') => api.call('presence.set', { presence }).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))

@@ -165,6 +165,7 @@ export {
   saveInstruction,
   setAlwaysNotify,
   setGroupHours,
+  setAwayOutsideHours,
   setHuddleRing,
   setPresence,
   applyJunoHours,

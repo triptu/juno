@@ -87,8 +87,13 @@ export interface NotificationSettings {
    * owner sets them, and then Slack's own schedule is in effect (`readSettings` in `@juno/notifications`).
    */
   readonly notificationHours?: Hours
-  /** When Slack shows the owner as active, outside them away. Undefined until the owner sets them: Slack's automatic mode. */
+  /**
+   * When Slack shows the owner as active, outside them away, while `awayOutsideHours` is on. Undefined until the
+   * owner sets them: Slack's automatic mode.
+   */
   readonly presenceHours?: Hours
+  /** Set me away outside active hours. Missing means off: Juno never sets the owner away, and the hours are kept. */
+  readonly awayOutsideHours?: boolean
   /** By channel or DM id. */
   readonly channels: Readonly<Record<string, NotifyLevel>>
   /** By user id. */
@@ -292,6 +297,11 @@ export function pausedLabel(at: LocalTime, notificationHours: Hours | undefined)
 }
 
 export type Presence = 'active' | 'away'
+
+/** The active hours as they set presence: none while Set me away outside active hours is off. */
+export function awayHours(settings: Pick<NotificationSettings, 'presenceHours' | 'awayOutsideHours'>): Hours | undefined {
+  return settings.awayOutsideHours === true ? settings.presenceHours : undefined
+}
 
 /** What the presence schedule says for `at`. The engine applies it at each switch, on launch and on wake. */
 export function scheduledPresence(at: LocalTime, presenceHours: Hours): Presence {

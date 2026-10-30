@@ -1,5 +1,5 @@
 import { AiProvider, notificationReading, type NotificationReadingInput } from '@juno/ai'
-import { channelLabel, decideNotification, localTime, nextSwitchTime, sameHours, scheduledPresence, type Instruction, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
+import { awayHours, channelLabel, decideNotification, localTime, nextSwitchTime, sameHours, scheduledPresence, type Instruction, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Semaphore, SubscriptionRef } from 'effect'
 import { exchangesWith, readConversation, type Conversation } from './conversation'
@@ -49,6 +49,8 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   const presenceLock = yield* Semaphore.make(1)
   /** What Juno last told Slack; undefined until it has, so each session applies presence once. */
   let applied: Presence | undefined
+  /** Whether Juno's last set was away by the active hours, to set active once if they stop setting presence. */
+  let awayByHours = false
   const current = yield* SubscriptionRef.make<Presence | undefined>(undefined)
 
   /** Stores the decision and, for a banner, claims and shows it. */
@@ -111,28 +113,30 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   const writeHold = (hold: PresenceHold | undefined) => presenceHold.write(hold).pipe(Effect.provide(storeContext))
 
   /**
-   * Holds `value` until the next switch in the active hours. Without active hours nothing is held: Slack keeps a
-   * choice itself until the next one, and Juno never changes it.
+   * Holds `value` until the next switch in the active hours. While they set no presence nothing is held: Slack
+   * keeps a choice itself until the next one, and Juno never changes it.
    */
   const hold = (value: Presence) => Effect.gen(function* () {
-    const { settings: { presenceHours } } = yield* configuration
+    awayByHours = false
+    const hours = awayHours((yield* configuration).settings)
     const now = yield* Clock.currentTimeMillis
-    yield* writeHold(presenceHours === undefined ? undefined : { presence: value, until: nextSwitchTime(now, presenceHours) ?? null, hours: presenceHours })
+    yield* writeHold(hours === undefined ? undefined : { presence: value, until: nextSwitchTime(now, hours) ?? null, hours })
   })
 
   /** The choice by hand while it holds; one that ended, or whose active hours changed since, is removed. */
   const heldPresence = (settings: NotificationSettings, now: number) => Effect.gen(function* () {
     const saved = yield* readHold
     if (saved === undefined) return undefined
-    if (settings.presenceHours !== undefined && sameHours(saved.hours, settings.presenceHours) && (saved.until === null || now < saved.until)) return saved.presence
+    const hours = awayHours(settings)
+    if (hours !== undefined && sameHours(saved.hours, hours) && (saved.until === null || now < saved.until)) return saved.presence
     yield* writeHold(undefined)
     return undefined
   })
 
   /**
-   * Settings saved before 2026-10-27 kept active hours never set as Monday to Friday 9 to 7, and Juno set the owner
-   * away by them. Those hours now read as not set, so once, unless a choice by hand still holds, Slack's automatic
-   * mode comes back. False when Slack refused it, to try again at the next tick.
+   * Settings saved before 2026-10-31 had no Set me away outside active hours, and Juno set the owner away by any
+   * active hours. The switch starts off, so once, unless a choice by hand still holds, Slack's automatic mode comes
+   * back. False when Slack refused it, to try again at the next tick.
    */
   const handBack = Effect.gen(function* () {
     const saved = yield* readHold
@@ -147,23 +151,28 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
 
   /**
    * Applies the choice by hand while it holds, else the active hours; `force` sends it even when unchanged.
-   * Without active hours and a choice, it sends nothing: presence is Slack's, as in Slack's own app.
+   * While the hours set no presence and there is no choice, it sends nothing: presence is Slack's, as in Slack's
+   * own app. If Juno had set the owner away by the hours, it first sets active once.
    */
   const tick = (force: boolean) => Effect.gen(function* () {
     if (!handedBack) {
       const old = yield* oldSettings.pipe(Effect.provide(storeContext))
-      if (old?.presenceUnset === true && !(yield* handBack)) return
+      if (old?.setAwayByHours === true && !(yield* handBack)) return
       if (old !== undefined) yield* saveOldSettings.pipe(Effect.provide(storeContext))
       handedBack = true
     }
     const { settings } = yield* configuration
     const now = yield* Clock.currentTimeMillis
-    const next = (yield* heldPresence(settings, now)) ?? (settings.presenceHours === undefined ? undefined : scheduledPresence(localTime(now), settings.presenceHours))
-    if (next === undefined || (!force && next === applied)) return
-    if (yield* setPresence(next)) {
+    const held = yield* heldPresence(settings, now)
+    const hours = awayHours(settings)
+    const next = held ?? (hours !== undefined ? scheduledPresence(localTime(now), hours) : awayByHours ? 'active' : undefined)
+    if (next === undefined) return
+    if (force || next !== applied) {
+      if (!(yield* setPresence(next))) return
       applied = next
       yield* SubscriptionRef.set(current, next)
     }
+    awayByHours = held === undefined && hours !== undefined && next === 'away'
   })
 
   return {
@@ -195,11 +204,13 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
       const before = yield* SubscriptionRef.getAndSet(current, value)
       return yield* Effect.gen(function* () {
         const held = yield* readHold
+        const wasAwayByHours = awayByHours
         yield* hold(value)
         if (yield* setPresence(value)) {
           applied = value
           return true
         }
+        awayByHours = wasAwayByHours
         yield* writeHold(held)
         yield* SubscriptionRef.set(current, before)
         return false
