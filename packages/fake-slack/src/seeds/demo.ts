@@ -21,7 +21,7 @@ const SELF = 'U0TUSHAR'
 const PEOPLE: ReadonlyArray<SeedUser> = [
   { id: SELF, name: 'alex', realName: 'Alex Rivera', title: 'Head of engineering', color: '3b6ea8', tz: 'Europe/London' },
   { id: 'U0NAOMI', name: 'naomi', realName: 'Naomi Brandt', title: 'Product lead', color: 'b0496b', tz: 'Europe/Berlin' },
-  { id: 'U0THEO', name: 'theo', realName: 'Theo Lindqvist', title: 'Staff engineer', color: '2f6f5e', tz: 'Europe/Stockholm' },
+  { id: 'U0JONAS', name: 'jonas', realName: 'Jonas Berg', title: 'Staff engineer', color: '2f6f5e', tz: 'Europe/Stockholm' },
   { id: 'U0AMARA', name: 'amara', realName: 'Amara Nwosu', title: 'Product designer', color: 'c26a2e', tz: 'Europe/London' },
   { id: 'U0KENJI', name: 'kenji', realName: 'Kenji Mori', title: 'iOS engineer', color: '5b4aa0', tz: 'Europe/Amsterdam' },
   { id: 'U0LUCIA', name: 'lucia', realName: 'Lucía Ferreira', title: 'Backend engineer', color: '8a5a44', tz: 'Europe/Lisbon' },
@@ -54,19 +54,19 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
       { from: 'U0LUCIA', text: 'thanks for the warning', ago: 5 * HOUR - 4 },
       { from: 'U0KENJI', text: 'Does that affect TestFlight builds?', ago: 4 * HOUR + 40 },
       { from: 'U0OSKAR', text: 'No, only the staging API.', ago: 4 * HOUR + 36 },
-      { from: 'U0THEO', text: 'Small thing: please rebase on main before Thursday. The lint config changed.', ago: 42 },
-      { from: 'U0LUCIA', text: 'Done for mine.', ago: 39, reactions: [['+1', 'U0THEO']] },
+      { from: 'U0JONAS', text: 'Small thing: please rebase on main before Thursday. The lint config changed.', ago: 42 },
+      { from: 'U0LUCIA', text: 'Done for mine.', ago: 39, reactions: [['+1', 'U0JONAS']] },
       {
-        from: 'U0THEO',
+        from: 'U0JONAS',
         text: "Release 2.4 goes out Thursday. Here's what's in it and what's still open.",
         ago: 2 * DAY + 2 * HOUR,
         thread: { unread: 2 },
         replies: [
           { from: 'U0KENJI', text: 'The iOS build is in review with Apple. Usually takes a day.', ago: 2 * DAY + HOUR },
-          { from: 'U0LUCIA', text: 'The recurring bookings API is merged behind the flag.', ago: DAY + 5 * HOUR, reactions: [['tada', 'U0THEO', 'U0NAOMI']] },
+          { from: 'U0LUCIA', text: 'The recurring bookings API is merged behind the flag.', ago: DAY + 5 * HOUR, reactions: [['tada', 'U0JONAS', 'U0NAOMI']] },
           { from: 'U0NAOMI', text: 'Release notes draft is in the doc. The calendar week view is the headline.', ago: DAY + 2 * HOUR },
-          { from: 'U0THEO', text: 'Two blockers left: the time zone bug in reminders and the push retry. Both have owners.', ago: 3 * HOUR },
-          { from: 'U0THEO', text: '<@U0TUSHAR> can you sign off on the release notes by Wednesday?', ago: 25 },
+          { from: 'U0JONAS', text: 'Two blockers left: the time zone bug in reminders and the push retry. Both have owners.', ago: 3 * HOUR },
+          { from: 'U0JONAS', text: '<@U0TUSHAR> can you sign off on the release notes by Wednesday?', ago: 25 },
         ],
       },
       {
@@ -75,8 +75,8 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         ago: DAY + 6 * HOUR,
         replies: [
           { from: 'U0OSKAR', text: 'Agree. The new queue gives us dead letters for free.', ago: DAY + 5 * HOUR },
-          { from: 'U0THEO', text: 'After 2.4, though. Not worth the risk this week.', ago: DAY + 4 * HOUR },
-          { from: 'U0LUCIA', text: "Fair. I'll have the plan ready for Monday.", ago: DAY + 4 * HOUR - 10, reactions: [['+1', 'U0THEO', 'U0OSKAR', SELF]] },
+          { from: 'U0JONAS', text: 'After 2.4, though. Not worth the risk this week.', ago: DAY + 4 * HOUR },
+          { from: 'U0LUCIA', text: "Fair. I'll have the plan ready for Monday.", ago: DAY + 4 * HOUR - 10, reactions: [['+1', 'U0JONAS', 'U0OSKAR', SELF]] },
         ],
       },
       {
@@ -84,9 +84,9 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         text: 'Sign-in test is flaky again. It fails on CI about one run in ten.',
         ago: 7 * HOUR,
         replies: [
-          { from: 'U0THEO', text: "It waits on the keyboard animation. I've seen this one before.", ago: 6 * HOUR + 30 },
+          { from: 'U0JONAS', text: "It waits on the keyboard animation. I've seen this one before.", ago: 6 * HOUR + 30 },
           { from: 'U0KENJI', text: 'Adding an explicit wait for the field. PR in a bit.', ago: 6 * HOUR },
-          { from: 'U0KENJI', text: 'Fixed in #1482. Ten green runs in a row.', ago: 3 * HOUR + 20, reactions: [['tada', 'U0THEO', 'U0LUCIA']] },
+          { from: 'U0KENJI', text: 'Fixed in #1482. Ten green runs in a row.', ago: 3 * HOUR + 20, reactions: [['tada', 'U0JONAS', 'U0LUCIA']] },
         ],
       },
       {
@@ -166,7 +166,7 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         from: 'U0AMARA',
         text: 'New dashboard empty states are ready. They are in Figma.',
         ago: 4 * DAY,
-        replies: [{ from: 'U0THEO', text: 'These are lovely. Ship them.', ago: 4 * DAY - HOUR, reactions: [['heart', 'U0AMARA']] }],
+        replies: [{ from: 'U0JONAS', text: 'These are lovely. Ship them.', ago: 4 * DAY - HOUR, reactions: [['heart', 'U0AMARA']] }],
       },
     ],
   },
@@ -221,7 +221,7 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     purpose: 'Quotes, requests and complaints from customers. One message each.',
     unread: 2,
     messages: [
-      { from: 'U0FARAH', text: 'A clinic in Lyon: "The new reminders cut our no-shows in half."', ago: 2 * DAY + 4 * HOUR, reactions: [['heart', 'U0NAOMI', 'U0LUCIA', SELF], ['tada', 'U0THEO']] },
+      { from: 'U0FARAH', text: 'A clinic in Lyon: "The new reminders cut our no-shows in half."', ago: 2 * DAY + 4 * HOUR, reactions: [['heart', 'U0NAOMI', 'U0LUCIA', SELF], ['tada', 'U0JONAS']] },
       { from: 'U0FARAH', text: 'Two requests this week to export bookings as a spreadsheet.', ago: DAY + 3 * HOUR },
       {
         from: 'U0FARAH',
@@ -270,7 +270,7 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     id: 'C0LEADERSHIP',
     name: 'leadership',
     kind: 'private',
-    members: [SELF, 'U0NAOMI', 'U0THEO'],
+    members: [SELF, 'U0NAOMI', 'U0JONAS'],
     topic: 'Plans, people and budget',
     messages: [
       {
@@ -279,7 +279,7 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
         ago: 3 * DAY,
         thread: { unread: 1 },
         replies: [
-          { from: 'U0THEO', text: 'Engineering would ask for three: two backend, one mobile.', ago: 3 * DAY - 2 * HOUR },
+          { from: 'U0JONAS', text: 'Engineering would ask for three: two backend, one mobile.', ago: 3 * DAY - 2 * HOUR },
           { from: 'U0NAOMI', text: '<@U0TUSHAR> can you write the case for the mobile hire? A paragraph is enough.', ago: 4 * HOUR },
         ],
       },
@@ -289,7 +289,7 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     id: 'C0HIRING',
     name: 'hiring',
     kind: 'private',
-    members: [SELF, 'U0RUTH', 'U0THEO', 'U0KENJI'],
+    members: [SELF, 'U0RUTH', 'U0JONAS', 'U0KENJI'],
     topic: 'Open roles and candidates',
     messages: [
       {
@@ -343,16 +343,16 @@ const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
     ],
   },
   {
-    id: 'D0THEO',
+    id: 'D0JONAS',
     name: '',
     kind: 'im',
-    members: [SELF, 'U0THEO'],
+    members: [SELF, 'U0JONAS'],
     unread: 2,
     messages: [
-      { from: 'U0THEO', text: 'Thanks for covering the review yesterday.', ago: DAY + 5 * HOUR },
+      { from: 'U0JONAS', text: 'Thanks for covering the review yesterday.', ago: DAY + 5 * HOUR },
       { from: SELF, text: 'Any time.', ago: DAY + 5 * HOUR - 3 },
-      { from: 'U0THEO', text: 'Do you have a minute to look at the queue plan?', ago: 28 },
-      { from: 'U0THEO', text: 'No rush. Before Monday is fine.', ago: 27 },
+      { from: 'U0JONAS', text: 'Do you have a minute to look at the queue plan?', ago: 28 },
+      { from: 'U0JONAS', text: 'No rush. Before Monday is fine.', ago: 27 },
     ],
   },
   {
