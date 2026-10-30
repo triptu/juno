@@ -681,6 +681,19 @@ export class NotificationsPage {
     this.root = win.locator('main')
   }
 
+  get awayOutsideHours(): Locator {
+    return this.root.getByRole('switch', { name: 'Set me away outside active hours', exact: true })
+  }
+
+  /** Turns Set me away outside active hours on. It starts off, with the Active in Slack rows hidden. */
+  async turnOnAwayOutsideHours(): Promise<void> {
+    await expect(this.awayOutsideHours).not.toBeChecked()
+    await expect(this.hours('Active in Slack')).toHaveCount(0)
+    await this.awayOutsideHours.click()
+    await expect(this.awayOutsideHours).toBeChecked()
+    await expect(this.hours('Active in Slack')).toBeVisible()
+  }
+
   /** The Notification hours or Active in Slack rows. */
   hours(which: HoursSection): Locator {
     return this.root.locator(labelled('[role="group"]', which === 'Notifications' ? 'Notification hours' : which))
@@ -1092,8 +1105,8 @@ export class Juno implements JunoVerbs {
   }
 
   /**
-   * Notification and Active in Slack hours around now on every day, saved, and Settings closed: Slack shows the
-   * owner active and the account button its dot rather than the paused badge, whatever the time and day. The engine
+   * Notification and Active in Slack hours around now on every day, with Set me away outside active hours on, saved,
+   * and Settings closed: Slack shows the owner active and the account button its dot rather than the paused badge, whatever the time and day. The engine
    * tickles with main's last activity reading as the hours take the owner in (`packages/engine/src/activity.ts`).
    */
   async allHoursNow(): Promise<void> {
@@ -1108,6 +1121,7 @@ export class Juno implements JunoVerbs {
     const half = Math.floor(minutes / 30) * 30
     const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
     const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
+    if (sections.includes('Active in Slack')) await this.notifications.turnOnAwayOutsideHours()
     for (const section of sections) for (const row of hoursRows) await this.notifications.setRow(section, row, { from, to })
     await this.tabs.close('Settings')
     await this.openNotifications()
