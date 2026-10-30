@@ -15,6 +15,7 @@ import {
   saveInstruction,
   sendTestNotification,
   setAlwaysNotify,
+  setAwayOutsideHours,
   setGroupHours,
   setHuddleRing,
   showToast,
@@ -263,6 +264,8 @@ export function NotificationsPage() {
     <NotificationsPageView
       notificationHours={current.notificationHours}
       presenceHours={current.presenceHours}
+      awayOutsideHours={current.awayOutsideHours}
+      onAwayOutsideHoursChange={(enabled) => setAwayOutsideHours(registry, enabled)}
       onHoursChange={(which, group, hours) => setGroupHours(registry, which, group, hours)}
       slackSchedule={lists.slackSchedule}
       onUseJunoHours={() => applyJunoHours(registry)}

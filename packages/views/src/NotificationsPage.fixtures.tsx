@@ -68,6 +68,8 @@ const saturdayHours = { days: [...weekdays, 6 as const], from: 540, to: 1140, da
 export const notificationsBase: NotificationsPageProps = {
   notificationHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
   presenceHours: { days: weekdays, from: 9 * 60, to: 20 * 60 },
+  awayOutsideHours: true,
+  onAwayOutsideHoursChange: noop,
   onHoursChange: noop,
   slackSchedule: { changedInSlack: false, waitingForHours: false, slackHours: null },
   onUseJunoHours: noop,
@@ -146,6 +148,8 @@ export default defineFixtures(
       'weekends-off': fixture({ ...notificationsBase, notificationHours: { days: weekdays, from: 540, to: 1140 }, presenceHours: { days: weekdays, from: 540, to: 1140 } }),
       // Weekdays 9 to 7, Saturday 11 to 2, Sunday off.
       'saturday-hours': fixture({ ...notificationsBase, notificationHours: saturdayHours, presenceHours: saturdayHours }),
+      // Active hours kept but not used: Juno never sets you away, and the rows are hidden.
+      'away-off': fixture({ ...notificationsBase, awayOutsideHours: false }),
       'how-auto': fixture({ ...notificationsBase, anchor: 'how-auto', anchorKey: 1 }, tall),
     },
     'Always notify': {

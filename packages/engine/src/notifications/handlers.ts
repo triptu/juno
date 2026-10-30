@@ -31,6 +31,7 @@ import {
 } from '@juno/contract'
 import {
   alwaysNotifyOf,
+  awayHours,
   localTime,
   notifyChoice,
   parseTopicId,
@@ -68,6 +69,7 @@ const NAMED_LIMIT = 5
 const viewOf = (settings: NotificationSettings, aiAssist: boolean, followNewThreads: ReadonlyArray<string>): NotificationSettingsView => ({
   notificationHours: settings.notificationHours ?? null,
   presenceHours: settings.presenceHours ?? null,
+  awayOutsideHours: settings.awayOutsideHours === true,
   channels: settings.channels,
   people: settings.people,
   threads: settings.threads ?? {},
@@ -184,8 +186,9 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       const { settings } = yield* readSettings
       const presence = (yield* control.currentPresence) ?? null
       const seen = yield* selfPresence.current
-      const shown = presence ?? (settings.presenceHours === undefined ? 'active' : scheduledPresence(now, settings.presenceHours))
-      const label = presenceLabel(now, shown, settings.presenceHours)
+      const hours = awayHours(settings)
+      const shown = presence ?? (hours === undefined ? 'active' : scheduledPresence(now, hours))
+      const label = presenceLabel(now, shown, hours)
       const note = presence === null ? undefined : seenNote(presence, seen)
       const paused = pausedLabel(now, settings.notificationHours)
       return { presence, seen: seen ?? null, presenceLabel: note === undefined ? label : `${label}. ${note}`, ...(paused === undefined ? {} : { paused }) } satisfies NotificationStatus
@@ -284,6 +287,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           }).pipe(Effect.orDie),
         ),
       'notifications.setHuddleRing': ({ enabled }) => updateSettings((settings) => ({ ...settings, huddleRing: enabled })).pipe(Effect.asVoid),
+      'notifications.setAwayOutsideHours': ({ enabled }) => updateSettings((settings) => ({ ...settings, awayOutsideHours: enabled })).pipe(Effect.asVoid),
       'notifications.setLevel': ({ target, choice }) => setLevel(target, choice),
       'notifications.setPresence': ({ presence }) =>
         Effect.gen(function* () {

@@ -16,11 +16,13 @@ const levels = Schema.Record(Schema.String, level)
 /**
  * The `notifications` pref. Hours are stored only once the owner sets them. Settings saved before 2026-10-27
  * have no `hoursAsSet` and kept hours never set as Monday to Friday 9 to 7: those read as not set (`settingsOf`).
+ * Settings saved before 2026-10-31 have no `awayOutsideHours`, which reads as off.
  */
 export const NotificationSettingsSchema = Schema.Struct({
   notificationHours: Schema.optionalKey(hours),
   presenceHours: Schema.optionalKey(hours),
   hoursAsSet: Schema.optionalKey(Schema.Literal(true)),
+  awayOutsideHours: Schema.optionalKey(Schema.Boolean),
   channels: levels,
   people: levels,
   threads: Schema.optionalKey(levels),
@@ -62,6 +64,9 @@ const current = (raw: unknown): unknown => {
 
 const decodeSettings = Schema.decodeUnknownOption(NotificationSettingsSchema)
 
+/** Saved before 2026-10-31: Juno set the owner away by any active hours, with no switch to turn it off. */
+const savedBeforeSwitch = (raw: unknown) => typeof raw === 'object' && raw !== null && !('awayOutsideHours' in raw)
+
 /** Saved before 2026-10-27: hours never set were kept as Monday to Friday 9 to 7. */
 const savedWithStartingHours = (raw: unknown) => typeof raw === 'object' && raw !== null && !('hoursAsSet' in raw)
 
@@ -83,22 +88,22 @@ export const settingsOf = (raw: unknown): NotificationSettings => {
 }
 
 const store = (settings: NotificationSettings) =>
-  prefs.set('notifications', Schema.decodeUnknownSync(NotificationSettingsSchema)({ ...settings, hoursAsSet: true }))
+  prefs.set('notifications', Schema.decodeUnknownSync(NotificationSettingsSchema)({ ...settings, hoursAsSet: true, awayOutsideHours: settings.awayOutsideHours === true }))
 
-/** Saves the settings: hours not set are left out, and `hoursAsSet` says so. */
+/** Saves the settings: hours not set are left out, and `hoursAsSet` says so. `awayOutsideHours` is always stored. */
 export const saveSettings = (settings: NotificationSettings) => transaction(store(settings))
 
 /**
- * Undefined unless the settings were saved before 2026-10-27; then whether their active hours were the starting
- * ones, which now read as not set.
+ * Undefined unless the settings were saved before 2026-10-31; then whether Juno may have set the owner away by
+ * active hours, which no longer set presence until the owner turns Set me away outside active hours on.
  */
 export const oldSettings = Effect.map(prefs.get('notifications'), (raw) =>
-  savedWithStartingHours(raw) ? { presenceUnset: settingsOf(raw).presenceHours === undefined } : undefined)
+  savedBeforeSwitch(raw) ? { setAwayByHours: savedWithStartingHours(raw) || 'presenceHours' in (raw as object) } : undefined)
 
-/** Saves settings saved before 2026-10-27 as they read now, so they are read the new way from then on. */
+/** Saves settings saved before 2026-10-31 as they read now, so they are read the new way from then on. */
 export const saveOldSettings = transaction(Effect.gen(function* () {
   const raw = yield* prefs.get('notifications')
-  if (savedWithStartingHours(raw)) yield* store(settingsOf(raw))
+  if (savedBeforeSwitch(raw)) yield* store(settingsOf(raw))
 }))
 
 /** Slack's prefs as the sync last stored them, or undefined before the first boot. */

@@ -222,15 +222,15 @@ export class Juno implements JunoVerbs {
   }
 
   /**
-   * Notification and Active in Slack hours around now on every day, saved, and Settings closed: Slack shows the
-   * owner active and the account button its dot rather than the paused badge, whatever the time and day.
+   * Notification and Active in Slack hours around now on every day, with Set me away outside active hours on, saved,
+   * and Settings closed: Slack shows the owner active and the account button its dot rather than the paused badge, whatever the time and day.
    */
   async allHoursNow(): Promise<void> {
     await this.#hoursNow(['Notifications', 'Active in Slack'], {})
     await this.tabs.close('Settings')
   }
 
-  /** Active in Slack hours around now and notification hours away from now, on every day, saved, and Settings closed: the hours keep the owner active while notifications are paused. */
+  /** Active in Slack hours around now, with Set me away outside active hours on, and notification hours away from now, on every day, saved, and Settings closed: the hours keep the owner active while notifications are paused. */
   async activeWhilePaused(): Promise<void> {
     await this.#hoursNow(['Active in Slack'], {})
     await this.#hoursNow(['Notifications'], { outside: true })
@@ -243,6 +243,7 @@ export class Juno implements JunoVerbs {
     const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
     const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
     const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
+    if (sections.includes('Active in Slack')) await this.notifications.turnOnAwayOutsideHours()
     for (const section of sections) for (const row of hoursRows) await this.notifications.setRow(section, row, { from, to })
     await this.tabs.close('Settings')
     await this.openNotifications()

@@ -13,6 +13,7 @@ import {
   notificationsRemoveInstruction,
   notificationsSaveInstruction,
   notificationsSetAlwaysNotify,
+  notificationsSetAwayOutsideHours,
   notificationsSetHuddleRing,
   notificationsSetGroupHours,
   notificationsSetPresence,
@@ -147,6 +148,11 @@ export async function checkInstruction(registry: Registry, text: string, directi
 /** Ring for huddles (SPEC 20, "Incoming huddles"). */
 export function setHuddleRing(registry: Registry, enabled: boolean): void {
   void runCommand(registry, notificationsSetHuddleRing, { enabled })
+}
+
+/** Set me away outside active hours (SPEC 14, "Active hours"). */
+export function setAwayOutsideHours(registry: Registry, enabled: boolean): void {
+  void runCommand(registry, notificationsSetAwayOutsideHours, { enabled })
 }
 
 /** Set yourself away or active: shows at once and holds until the next switch in the active hours. */

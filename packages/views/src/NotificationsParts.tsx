@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { Ref } from 'react'
 import { groupHours, type Hours, type HoursGroup, type NotificationPermission } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, ListRow, Section, Select, Surface, Text } from '@juno/ui'
+import { Button, Checkbox, ListRow, Section, Select, Surface, Text } from '@juno/ui'
 import { hourLabel } from './time'
 
 /**
@@ -26,8 +26,11 @@ export interface SlackScheduleState {
 export interface HoursProps {
   /** Null until set: Slack's schedule applies. */
   readonly notificationHours: Hours | null
-  /** Null until set: presence is not switched by hours. */
+  /** Null until set. Kept while `awayOutsideHours` is off. */
   readonly presenceHours: Hours | null
+  /** Set me away outside active hours. Off: presence is not switched by hours, and the rows are hidden. */
+  readonly awayOutsideHours: boolean
+  readonly onAwayOutsideHoursChange: (enabled: boolean) => void
   /** One row's hours: a from or to turns the row on, `off` turns it off. */
   readonly onHoursChange: (which: HoursKind, group: HoursGroup, hours: Partial<Span> | 'off') => void
   /** Slack's own schedule; undefined until the engine answers. */
@@ -56,8 +59,8 @@ const rows: ReadonlyArray<{ readonly group: HoursGroup; readonly name: string }>
   { group: 'sunday', name: 'Sunday' },
 ]
 
-/** Notification hours, then Active in Slack, each its own section with the same three rows. */
-export function HoursSections({ notificationHours, presenceHours, onHoursChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
+/** Notification hours, then Active in Slack, each its own section. Active in Slack shows its rows only while its switch is on. */
+export function HoursSections({ notificationHours, presenceHours, awayOutsideHours, onAwayOutsideHoursChange, onHoursChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
   return (
     <>
       <Section headingRef={hoursRef} heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
@@ -66,16 +69,30 @@ export function HoursSections({ notificationHours, presenceHours, onHoursChange,
           <SlackLine following={notificationHours === null} schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
         </Surface>
       </Section>
-      <Section heading="Active in Slack" sub="Outside these hours you show as away.">
+      <Section heading="Active in Slack">
         <Surface kind="group">
-          <HoursRows which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} />
-          <div {...stylex.props(styles.note)}>
-            <Text variant="meta" tone="muted" as="p">
-              {presenceHours === null
-                ? 'Until you set hours, Juno shows you active whenever you use your Mac, as Slack does.'
-                : "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."}
-            </Text>
-          </div>
+          <ListRow divider={awayOutsideHours}>
+            <Checkbox
+              role="switch"
+              size="lg"
+              label="Set me away outside active hours"
+              description="Choose the hours you're active. Outside them, Juno sets you away in Slack."
+              checked={awayOutsideHours}
+              onChange={(event) => onAwayOutsideHoursChange(event.currentTarget.checked)}
+            />
+          </ListRow>
+          {awayOutsideHours ? (
+            <>
+              <HoursRows which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} />
+              <div {...stylex.props(styles.note)}>
+                <Text variant="meta" tone="muted" as="p">
+                  {presenceHours === null
+                    ? 'Until you set hours, Juno shows you active whenever you use your Mac, as Slack does.'
+                    : "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."}
+                </Text>
+              </div>
+            </>
+          ) : null}
         </Surface>
       </Section>
     </>

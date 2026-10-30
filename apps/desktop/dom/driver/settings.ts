@@ -76,6 +76,19 @@ export class NotificationsPage {
     this.root = dom.getByRole('main')
   }
 
+  get awayOutsideHours(): Query {
+    return this.root.getByRole('switch', { name: 'Set me away outside active hours' })
+  }
+
+  /** Turns Set me away outside active hours on. It starts off, with the Active in Slack rows hidden. */
+  async turnOnAwayOutsideHours(): Promise<void> {
+    await expect(this.awayOutsideHours).not.toBeChecked()
+    await expect(this.hours('Active in Slack')).toHaveCount(0)
+    await this.awayOutsideHours.click()
+    await expect(this.awayOutsideHours).toBeChecked()
+    await expect(this.hours('Active in Slack')).toBeVisible()
+  }
+
   /** The Notification hours or Active in Slack rows. */
   hours(which: HoursSection): Query {
     return this.root.getByRole('group', { name: which === 'Notifications' ? 'Notification hours' : which, exact: true })

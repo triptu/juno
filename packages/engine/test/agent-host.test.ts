@@ -329,7 +329,7 @@ describe('the AgentHost port', () => {
     // The hours are local, so the engine reads noon whenever the test runs.
     const { engine, agent } = await hostWithAgent('disabled', { clock: clockAt(localNoon()) })
     const never = { days: [], from: 9 * 60, to: 19 * 60 }
-    const settings = { notificationHours: never, presenceHours: never, matters: '', channels: {}, people: {} }
+    const settings = { notificationHours: never, presenceHours: never, awayOutsideHours: true, matters: '', channels: {}, people: {} }
     await runCommand(engine.registry, prefsSet, { key: 'notifications', value: settings })
     expect(await presence(agent.client, (p) => p.quietHours && !p.ownerActive)).toMatchObject({ quietHours: true, ownerActive: false })
 
