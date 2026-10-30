@@ -16,7 +16,7 @@ Slack is organised by channel, and threads sit inside them. Its notification set
 
 ## What you get
 
-### Topics, not channels
+### One list of topics
 
 <p>
   <img src="docs/readme/topic-design-mocks-light.png" width="49%" alt="A thread from #design open beside the topic list, light theme.">
@@ -35,7 +35,7 @@ Each message either notifies you or stays in Juno. Your notification hours and y
 
 <img src="docs/readme/notification-decisions-light.png" width="100%" alt="Today's notifications: each message with Notified or In Juno and the reason, such as Mentions always notify, Naomi asks you something, or An update with nothing asked of you.">
 
-Every decision is kept with its reason. Settings › Notifications shows today's count and the list, and each row has a button to say it should have gone the other way, which proposes an instruction. Your notification hours are written to Slack's own schedule, so your phone goes quiet at the same time.
+Every decision is kept with its reason. Settings › Notifications shows today's count and the list, and each row has a button to say it should have gone the other way. Juno then proposes an instruction. Your notification hours are written to Slack's own schedule, so your phone goes quiet at the same time.
 
 ### Home
 
@@ -80,7 +80,7 @@ Hide message text (⌃⌘H) blurs message previews and plain titles in the sideb
 
 ### Ask Juno
 
-Juno is one chat with one assistant, in its own tab or beside the topic you are reading (⌘J). Ask it to catch you up on a topic, and each claim links to the message it came from. Ask it to draft a reply, resolve topics, catch you up on a channel every weekday at 9, or tell you if someone has not replied by Thursday. Anything that leaves Juno, a message or a resolve, is a card with one button, and nothing is sent until you press it. The Activity page lists every run, what it read and what you decided.
+Juno is also an assistant: one chat, in its own tab or beside the topic you are reading (⌘J). Ask it to catch you up on a topic, and each claim links to the message it came from. Ask it to draft a reply, resolve topics, catch you up on a channel every weekday at 9, or tell you if someone has not replied by Thursday. Anything that leaves Juno, a message or a resolve, comes as a card with one button. Nothing is sent until you press it. The Activity page lists every run, what it read and what you decided.
 
 ### Huddles
 
