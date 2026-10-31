@@ -4,11 +4,7 @@
 
 A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.
 
-<!-- Trailer poster goes here, linking to the video. Until then, the screenshot below. -->
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/topic-release-dark.png">
-  <img src="docs/readme/topic-release-light.png" width="100%" alt="The Juno window. On the left, one list of topics with titles, the latest message, unread counts and @ marks. On the right, an open thread from #eng at its 2 new divider.">
-</picture>
+<a href="https://juno.tushar.ai/#film"><img src="docs/readme/film-poster.jpg" width="100%" alt="A frame from the Juno film: Home with the greeting Morning, Arin, and three rows: Mira wants the launch page approved before 2, you said you'd send Ivo the export notes, and 3 topics look settled. Click to watch the film."></a>
 
 [Download Juno for Apple Silicon Macs](https://github.com/triptu/juno-releases/releases/latest). Setup is in [Getting started](#getting-started).
 
