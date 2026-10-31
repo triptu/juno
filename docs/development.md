@@ -969,7 +969,7 @@ python3 -m http.server -d apps/desktop/web/demo/dist 8000   # any static server,
   git add site/try && git commit -m "Site: publish the demo"
   ```
 
-  `--out` replaces only a folder that is empty or holds an earlier demo, and leaves out build-cached's marker. Without `--from` it builds here first, which is heavy for this Mac. The snapshot names the commit it was exported at; `demo:build` warns when that is not HEAD. `site/vercel.json` redirects `/try` to `/try/`, so the page's relative paths resolve, caches `try/assets/` (named by content) for a year and `try/demo/` (the snapshot and its files) for five minutes.
+  `--out` replaces only a folder that is empty or holds an earlier demo, and leaves out build-cached's marker. Without `--from` it builds here first, which is heavy for this Mac. The snapshot names the commit it was exported at, and `demo:build` warns when that is not HEAD, but a laptop build has no Git history and names `unknown`: publish a build of a clean checkout of the commit you mean to ship. `site/vercel.json` redirects `/try` to `/try/`, so the page's relative paths resolve, caches `try/assets/` (named by content) for a year and `try/demo/` (the snapshot and its files) for five minutes.
 
 ## The feel suite
 
