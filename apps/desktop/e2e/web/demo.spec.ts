@@ -59,7 +59,8 @@ test('the demo shows every topic whole from its snapshot, over static files only
     const main = page.getByRole('main')
     const rows = sidebar.getByRole('listitem')
     const selectedTab = page.getByRole('tablist', { name: 'Tabs' }).getByRole('tab', { selected: true })
-    const shownMessages = main.locator('[data-message-row]')
+    // Another tab's topic stays mounted, hidden.
+    const shownMessages = main.locator('[data-message-row]').filter({ visible: true })
     // The selected tab's full title, its tooltip; its text also holds an avatar's initial. A Main's is its channel's name.
     const expectOpen = (title: string) => expect(selectedTab).toHaveAttribute('data-tooltip', title.replace(/^#/, ''))
     await expect(rows).toHaveCount(all.order.length)
@@ -73,18 +74,20 @@ test('the demo shows every topic whole from its snapshot, over static files only
     })
 
     await test.step('the quick filters, Automated and Unread only list from the snapshot', async () => {
+      const filters = sidebar.getByRole('group', { name: 'Quick filters' })
       // A group's name says ", unread" while it has unread topics and is not selected.
+      const quick = (name: string) => filters.getByRole('button', { name: new RegExp(`^${name}(,|$)`) })
       for (const [filter, kind] of [['Channels', 'channels'], ['DMs', 'dms'], ['All', 'all']] as const) {
-        await sidebar.getByRole('button', { name: new RegExp(`^${filter}`) }).click()
+        await quick(filter).click()
         await expect(rows).toHaveCount(listOf(`{"kind":"${kind}","unreadOnly":false}`).order.length)
       }
-      await sidebar.getByRole('button', { name: 'Automated' }).click()
-      await expect(sidebar.getByRole('button', { name: 'Automated' })).toHaveAttribute('aria-pressed', 'true')
-      await sidebar.getByRole('button', { name: /^All/ }).click()
-      await sidebar.getByRole('button', { name: 'Unread only' }).click()
-      await expect(sidebar.getByRole('button', { name: 'Unread only' })).toHaveAttribute('aria-pressed', 'true')
+      await quick('Automated').click()
+      await expect(quick('Automated')).toHaveAttribute('aria-pressed', 'true')
+      await quick('All').click()
+      await filters.getByRole('button', { name: 'Unread only' }).click()
+      await expect(filters.getByRole('button', { name: 'Unread only' })).toHaveAttribute('aria-pressed', 'true')
       await expect(rows).toHaveCount(listOf('{"kind":"all","unreadOnly":true}').order.length)
-      await sidebar.getByRole('button', { name: 'Unread only' }).click()
+      await filters.getByRole('button', { name: 'Unread only' }).click()
       await expect(rows).toHaveCount(all.order.length)
     })
 
@@ -121,9 +124,9 @@ test('the demo shows every topic whole from its snapshot, over static files only
     })
 
     await test.step('holding Option over a row peeks at the topic', async () => {
-      await page.keyboard.down('Alt')
       await sidebar.getByRole('listitem', { name: 'Widget crashes on small phones' }).hover()
-      await expect(page.getByRole('dialog').locator('[data-message-row]')).toHaveCount(messagesOf('Widget crashes on small phones'))
+      await page.keyboard.down('Alt')
+      await expect(page.locator('[role="dialog"][aria-roledescription="peek"] [data-message-row]')).toHaveCount(messagesOf('Widget crashes on small phones'))
       await page.keyboard.up('Alt')
     })
 
