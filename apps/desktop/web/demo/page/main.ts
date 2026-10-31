@@ -7,7 +7,7 @@
  */
 import './install'
 import { registry } from '@juno/state'
-import { configureDemoConnection, type DemoMiss, type DemoSnapshot } from '@juno/state/demo'
+import { configureDemoConnection, DEMO_SNAPSHOT_VERSION, type DemoMiss, type DemoSnapshot } from '@juno/state/demo'
 import { mark } from '@juno/state/perf'
 import { startRenderer } from '../../../src/renderer/start'
 import type { DemoPageHandle } from './handle'
@@ -17,9 +17,11 @@ const misses: Array<DemoMiss> = []
 const handle: DemoPageHandle = { misses: () => misses }
 Object.assign(window, { __junoDemo: handle })
 // Relative to the page, so the demo works under any path (`/try/`).
-const snapshot = fetch('demo/snapshot.json').then((response) => {
+const snapshot = fetch('demo/snapshot.json').then(async (response) => {
   if (!response.ok) throw new Error(`demo: snapshot answered ${response.status}`)
-  return response.json() as Promise<DemoSnapshot>
+  const loaded = (await response.json()) as DemoSnapshot
+  if (loaded.version !== DEMO_SNAPSHOT_VERSION) throw new Error(`demo: snapshot version ${loaded.version}, the page reads ${DEMO_SNAPSHOT_VERSION}`)
+  return loaded
 })
 configureDemoConnection(registry, snapshot, (miss) => {
   misses.push(miss)
