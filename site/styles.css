@@ -154,10 +154,6 @@ h1 { font-size: clamp(58px, 6.6vw, 96px); line-height: .98; letter-spacing: -.02
 .button-quiet:hover { filter: none; box-shadow: inset 0 0 0 1px var(--ink); }
 .try-button { display: none; }
 html.try-on .try-button { display: inline-flex; }
-.film-link { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; text-decoration: none; }
-.film-link svg { color: var(--muted); }
-.film-link .dim { margin-left: -2px; font-size: 13px; }
-.film-link:hover { text-decoration: underline; }
 .note { font-size: 12.5px; line-height: 1.5; color: var(--faint); margin-top: 18px; max-width: 34em; }
 
 .hero-art { justify-self: end; width: 100%; max-width: 560px; }
@@ -170,7 +166,7 @@ html.try-on .try-button { display: inline-flex; }
 .credit { color: var(--muted); font-size: 12px; margin-top: 4px; font-variant-numeric: oldstyle-nums; }
 
 /* Sections */
-.copy h2, .speed-head h2, .start h2, .film-head h2, .features h2 { font-size: 54px; line-height: 1.04; letter-spacing: -.015em; }
+.copy h2, .speed-head h2, .start h2, .features h2 { font-size: 54px; line-height: 1.04; letter-spacing: -.015em; }
 .copy p { color: var(--muted); max-width: 28em; margin-top: 24px; font-size: 17.5px; }
 figcaption { font-size: 13px; line-height: 1.5; color: var(--muted); text-align: center; margin-top: 18px; max-width: 36em; margin-inline: auto; }
 .sheet { position: relative; background: var(--sheet); border: 1px solid var(--sheet-line); border-radius: 12px; overflow: hidden; box-shadow: var(--sheet-shadow); }
@@ -189,8 +185,7 @@ figcaption { font-size: 13px; line-height: 1.5; color: var(--muted); text-align:
 .toast img { width: 100%; }
 
 /* The film: full width on the page's own line, its own poster from the middle of the film. */
-.film { padding: 0 0 104px; }
-.film-head { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; margin-bottom: 28px; }
+.film { padding: 16px 0 56px; }
 .player { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--sheet); border: 1px solid var(--sheet-line); box-shadow: var(--sheet-shadow); }
 .player video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .poster { position: absolute; inset: 0; }
@@ -279,7 +274,7 @@ html.js .settle.in { opacity: 1; transform: none; transition: opacity .55s cubic
   .wrap { width: min(1120px, 100% - 72px); }
   .hero { gap: 48px; }
   h1 { font-size: clamp(54px, 7.2vw, 84px); }
-  .copy h2, .speed-head h2, .start h2, .film-head h2, .features h2 { font-size: 46px; }
+  .copy h2, .speed-head h2, .start h2, .features h2 { font-size: 46px; }
   .notify h2 { font-size: 54px; }
   .reasons dd { font-size: 38px; }
   .topics, .home, .agent, .speed-head { gap: 48px; }
@@ -328,7 +323,7 @@ html.js .settle.in { opacity: 1; transform: none; transition: opacity .55s cubic
   .mat { padding: 20px 20px 26px; }
   .hero-art figcaption { margin-top: 16px; font-size: 12.5px; }
 
-  .copy h2, .speed-head h2, .start h2, .film-head h2, .features h2 { font-size: 40px; letter-spacing: -.012em; }
+  .copy h2, .speed-head h2, .start h2, .features h2 { font-size: 40px; letter-spacing: -.012em; }
   .copy p { margin-top: 18px; font-size: 16.5px; }
   .topics, .home, .agent { gap: 36px; padding: 72px 0; }
   .agent { padding-top: 0; }
@@ -337,8 +332,7 @@ html.js .settle.in { opacity: 1; transform: none; transition: opacity .55s cubic
   .list-figure { max-width: none; }
   figcaption { font-size: 12.5px; margin-top: 14px; }
 
-  .film { padding: 0 0 80px; }
-  .film-head { flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 18px; }
+  .film { padding: 8px 0 40px; }
   .player { border-radius: 10px; }
   .play { left: auto; right: 12px; bottom: 12px; transform: none; width: 44px; height: 44px; padding: 0 0 0 2px; justify-content: center; border-radius: 50%; }
   .play span { display: none; }

@@ -46,9 +46,6 @@ trailer.addEventListener('ended', () => {
   trailer.controls = false
   player.classList.remove('playing')
 })
-document.querySelector('.film-link').addEventListener('click', () => {
-  setTimeout(() => play.focus({ preventScroll: true }), 400)
-})
 
 // The speed clip: a muted loop in the page's appearance. Under reduced motion it waits as a poster with a Play button.
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
