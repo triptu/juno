@@ -37,8 +37,10 @@ const harnessEntries = ['scripts/plan.mjs', 'scripts/remote.mjs', 'scripts/heavy
   'scripts/verify-plan.mjs', 'scripts/verify-files.mjs']
 const rootInputs = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
 // Playwright's config, its reporters and global setup, and the build steps every desktop lane runs first.
-const playwrightEntries = ['apps/desktop/playwright.config.ts', 'apps/desktop/e2e/order.ts', 'apps/desktop/e2e/timings.ts', 'apps/desktop/e2e/feel/sheet.ts', 'apps/desktop/e2e/setup/web.setup.ts', 'apps/desktop/e2e/setup/electron.setup.ts']
+const playwrightEntries = ['apps/desktop/playwright.config.ts', 'apps/desktop/e2e/order.ts', 'apps/desktop/e2e/timings.ts', 'apps/desktop/e2e/feel/sheet.ts', 'apps/desktop/e2e/setup/web.setup.ts', 'apps/desktop/e2e/setup/electron.setup.ts', 'apps/desktop/e2e/setup/demo.setup.ts']
 const laneBuilds = { 'test:dom': 'dom/dist', 'test:browser': 'dist', 'test:electron': 'out' }
+// The read-only demo's spec runs in the browser lane against its own build, the demo project (docs/development.md, "Demo").
+const demoSpec = 'apps/desktop/e2e/web/demo.spec.ts'
 
 /** The whole-module graph a bundle sees, plus the files and folders a module names by path from its own folder. */
 class TestGraph extends BuildGraph {
@@ -117,15 +119,19 @@ export async function fileInventory(root, tracked) {
   if (specs.length > 0) {
     const { app, support } = desktopInputs(files, closure)
     const shared = union(harness, widen(app), widen(support), ...playwrightEntries.filter((file) => files.has(file)).map((file) => widen(closure(file))))
-    // The browser lane runs the browser and feel projects: the spec files lanes.ts names, and the feel scenarios.
+    // The browser lane runs the browser, feel and demo projects: the spec files lanes.ts names, the feel scenarios and the demo's spec.
     const lanesFile = join(root, 'apps/desktop/e2e/lanes.ts')
     const browserSpecs = existsSync(lanesFile) ? (await import(lanesFile)).BROWSER_SPECS.map((spec) => `apps/desktop/e2e/${spec}`) : []
     const feel = [...files].filter((file) => /^apps\/desktop\/e2e\/feel\/[^/]+\.feel\.ts$/.test(file))
-    // The Electron project runs every spec but the web shell's, the setup steps, perf and the screens.
-    const electron = specs.filter((file) => !/^apps\/desktop\/e2e\/(web\/web-shell\.spec\.ts|setup\/|perf\.spec\.ts|[^/]*\.perf\.spec\.ts|screens\.spec\.ts|screens\/)/.test(file))
+    // The Electron project runs every spec but the web shell's, the demo's, the setup steps, perf and the screens.
+    const electron = specs.filter((file) => !/^apps\/desktop\/e2e\/(web\/web-shell\.spec\.ts|web\/demo\.spec\.ts|setup\/|perf\.spec\.ts|[^/]*\.perf\.spec\.ts|screens\.spec\.ts|screens\/)/.test(file))
     for (const [lane, list] of [['test:browser', [...browserSpecs.filter((file) => files.has(file)), ...feel].toSorted()], ['test:electron', electron]]) {
       const build = built(laneBuilds[lane])
       lanes[lane] = list.map((file) => ({ file, inputs: union(shared, build.files, widen(closure(file))), extra: build.extra }))
+    }
+    if (files.has(demoSpec)) {
+      const build = built('web/demo/dist')
+      lanes['test:browser'] = [...lanes['test:browser'], { file: demoSpec, inputs: union(shared, build.files, widen(closure(demoSpec))), extra: build.extra }].toSorted((a, b) => (a.file < b.file ? -1 : 1))
     }
   }
   return lanes

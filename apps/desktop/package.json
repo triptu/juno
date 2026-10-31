@@ -19,7 +19,7 @@
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json && tsc -p tsconfig.dom.json",
     "test": "bun test --randomize --timeout=5000",
     "test:e2e": "NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" bun ../../scripts/without-run-as-node.mjs playwright test",
-    "test:browser": "NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" bun ../../scripts/without-run-as-node.mjs playwright test --project=browser --project=feel",
+    "test:browser": "NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" bun ../../scripts/without-run-as-node.mjs playwright test --project=browser --project=feel --project=demo",
     "test:electron": "NODE_OPTIONS=\"--max-old-space-size=256 $NODE_OPTIONS\" bun ../../scripts/without-run-as-node.mjs playwright test --project=electron",
     "perf": "JUNO_PERF=1 bun ../../scripts/without-run-as-node.mjs playwright test -c playwright.perf.config.ts",
     "test:feel": "bun ../../scripts/build-cached.mjs out bun run build && bun ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
