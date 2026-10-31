@@ -117,12 +117,16 @@ const full = (overrides: Partial<SidebarProps> = {}, listProps: Partial<TopicLis
   </Sidebar>
 )
 
-/** Thirty rows still waiting for their art. The one that gets it is in the last ten, far below the view. */
-const waiting = Array.from({ length: 3 }, (_, round) => recentIds.map((id) => ({ ...rowsById.get(id)!, id: `${id}:${round}`, art: undefined }))).flat()
-const lastWaiting = `${rows.postgres.id}:2`
+/**
+ * Ninety rows still waiting for their art. The one that gets it is in the
+ * middle, far below the view and more than 32 rows from either end, where
+ * rows are never skipped (performance.md 3.2).
+ */
+const waiting = Array.from({ length: 9 }, (_, round) => recentIds.map((id) => ({ ...rowsById.get(id)!, id: `${id}:${round}`, art: undefined }))).flat()
+const lastWaiting = `${rows.postgres.id}:4`
 
 /**
- * The last row's art arrives while it is off screen, through
+ * A middle row's art arrives while it is off screen, through
  * `window.__fixtureControls.art`. The test scrolls it into view after the
  * fade's time and checks that its first frame shows the art at full opacity.
  */
