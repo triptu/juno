@@ -241,13 +241,8 @@ h2 {
   box-shadow: var(--shot-shadow);
 }
 
-.media video {
-  aspect-ratio: 32 / 15;
-}
-
-.media img {
-  aspect-ratio: 16 / 10;
-}
+/* Each video and image carries its width and height, so the box keeps the
+   right shape before the bytes arrive. */
 
 /* Also and getting started */
 
