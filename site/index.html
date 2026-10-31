@@ -1,126 +1,271 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="try-on">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Juno for Mac</title>
-  <meta name="description" content="A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.">
-  <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" media="(prefers-color-scheme: light)" content="hsl(48, 50%, 98%)">
-  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1B1916">
-  <meta property="og:title" content="Juno for Mac">
-  <meta property="og:description" content="A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.">
-  <meta property="og:image" content="https://juno.tushar.ai/trailer-poster.jpg">
-  <meta property="og:url" content="https://juno.tushar.ai/">
-  <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="preload" href="/fonts/figtree-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/fonts/instrument-serif-latin-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f6f1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#292623">
+<meta name="description" content="Juno puts every Slack thread and channel in one list. It checks each notification and only pings you when it matters. When you're caught up, it shows you art.">
+<title>Juno for Mac</title>
+<meta property="og:title" content="Juno for Mac">
+<meta property="og:description" content="Juno puts every Slack thread and channel in one list. It checks each notification and only pings you when it matters. When you're caught up, it shows you art.">
+<meta property="og:image" content="https://juno.tushar.ai/trailer-poster.jpg">
+<meta property="og:url" content="https://juno.tushar.ai/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/figtree-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/instrument-serif-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/styles.css">
+<script>
+  // The appearance you chose last time, before the first paint. Nothing stored means the system's.
+  try { var t = localStorage.getItem('juno-theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t } catch (e) {}
+</script>
 </head>
 <body>
-  <main class="wrap">
-    <header class="hero">
-      <img class="hero-icon" src="/icon.svg" width="72" height="72" alt="">
-      <h1>A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.</h1>
-      <p class="hero-actions">
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="opening">
+  <div class="field field-hero" data-field="hero" aria-hidden="true"><canvas></canvas></div>
+  <header class="nav wrap">
+    <a class="brand" href="#"><img src="/icon.svg" width="30" height="30" alt="">Juno</a>
+    <nav>
+      <a href="#topics">The app</a>
+      <a href="#features">More</a>
+      <a href="#start">Get Juno</a>
+      <button class="theme" type="button" aria-label="Switch to dark appearance">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.75a7.25 7.25 0 0 1 0 14.5Z" fill="currentColor"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <main id="main">
+
+  <section class="hero wrap" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="label">A Slack client for Mac</p>
+      <h1 id="hero-title">Slack organised into&nbsp;topics.</h1>
+      <p class="lede">Juno puts every Slack thread and channel in one list. It checks each notification and only pings you when it matters. When you're caught up, it shows you&nbsp;art.</p>
+      <div class="actions">
         <a class="button" href="https://github.com/triptu/juno-releases/releases/latest">Download for Mac</a>
-        <span class="hero-note">For Apple Silicon Macs.</span>
-      </p>
-    </header>
-
-    <figure class="trailer">
-      <video controls playsinline preload="none" poster="/trailer-poster.jpg" width="1920" height="1080">
-        <source src="/trailer.mp4" type="video/mp4">
-      </video>
+        <!-- The browser demo. Add class "try-on" to <html> to show it. -->
+        <a class="button button-quiet try-button" href="/try/">Try it in your browser</a>
+        <a class="film-link" href="#film"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5v9l8-4.5Z" fill="currentColor"/></svg>Watch the film<span class="dim">1 min</span></a>
+      </div>
+      <p class="note">For Apple Silicon Macs. Signs in using your Slack desktop app. AI features are optional and use your own OpenRouter&nbsp;key.</p>
+    </div>
+    <figure class="hero-art">
+      <div class="mat"><div class="print"><img src="/img/almond-blossom.webp" width="1400" height="1106" fetchpriority="high" alt="Almond Blossom by Vincent van Gogh: branches of white blossom against a blue sky."></div></div>
+      <figcaption><span>Home when everything is caught up.</span><span class="credit">Almond Blossom · Vincent van Gogh, 1890</span></figcaption>
     </figure>
+  </section>
+</div>
 
-    <section class="point">
-      <h2>One list of topics</h2>
-      <p>A topic is a Slack thread, or the unthreaded messages of a channel or DM. Juno lists them newest first, and Resolve removes one from the list until someone replies.</p>
-      <figure class="media">
-        <video class="loop" autoplay muted loop playsinline preload="metadata" poster="/loops/topics-poster.jpg" width="1600" height="750" aria-label="The topic list: pinned and recent threads with titles, the latest message and unread counts, with one thread open beside it. The pointer moves down the rows.">
-          <source src="/loops/topics.mp4" type="video/mp4">
-        </video>
-      </figure>
-    </section>
+<section class="topics wrap" id="topics" aria-labelledby="topics-title">
+  <div class="copy">
+    <h2 id="topics-title">Topics</h2>
+    <p>Every thread and channel in one list, newest activity on top. Juno gives each thread a clear title and a small drawing. Topics nobody has touched in days drop off on their&nbsp;own.</p>
+    <ul class="marks" aria-hidden="true">
+      <li title="Launch approval"><svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="var(--art-coral-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 C27 11 29 19 26 28 H14 C11 19 13 11 20 6 Z" fill="var(--art-coral-soft)"/><circle cx="20" cy="17" r="3" fill="var(--art-coral-accent)" stroke="none"/><path d="M14 24 L9 31 H15"/><path d="M26 24 L31 31 H25"/></g></svg></li>
+      <li title="Invoice email wording"><svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="var(--art-amber-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="11" width="26" height="19" rx="4" fill="var(--art-amber-soft)"/><polyline points="8 13 20 22 32 13"/><circle cx="30" cy="11" r="2.2" fill="var(--art-amber-accent)" stroke="none"/></g></svg></li>
+      <li title="Export progress"><svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="var(--art-teal-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11 V29 A11 4.5 0 0 0 31 29 V11"/><ellipse cx="20" cy="11" rx="11" ry="4.5" fill="var(--art-teal-soft)"/><path d="M9 20 A11 4.5 0 0 0 31 20"/><circle cx="26" cy="29" r="2" fill="var(--art-teal-accent)" stroke="none"/></g></svg></li>
+      <li title="Weekly notes"><svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="var(--art-periwinkle-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="10" width="26" height="23" rx="5" fill="var(--art-periwinkle-soft)"/><line x1="7" y1="17" x2="33" y2="17"/><line x1="13" y1="7" x2="13" y2="12"/><line x1="27" y1="7" x2="27" y2="12"/><circle cx="20" cy="25" r="2.2" fill="var(--art-periwinkle-accent)" stroke="none"/></g></svg></li>
+    </ul>
+  </div>
+  <figure class="list-figure">
+    <div class="list-crop">
+      <img class="light-only" src="/img/list-light.webp" width="768" height="840" loading="lazy" alt="Four rows of the topic list: Launch approval pinned, then Invoice email wording with three new messages, Mira Sen and the product channel. Each row has a small drawing, a title and its latest message.">
+      <img class="dark-only" src="/img/list-dark.webp" width="768" height="840" loading="lazy" alt="">
+      <div class="toast settle">
+        <img class="light-only" src="/img/toast-light.webp" width="624" height="136" loading="lazy" alt="A toast: Resolved, Export progress, with an Undo button.">
+        <img class="dark-only" src="/img/toast-dark.webp" width="624" height="136" loading="lazy" alt="">
+      </div>
+    </div>
+    <figcaption>Resolve a topic when it's done. If someone replies, it comes back.</figcaption>
+  </figure>
+</section>
 
-    <section class="point">
-      <h2>Nothing waits for Slack</h2>
-      <p>Juno reads every screen from a copy of your Slack on this Mac, so opening a topic, switching a tab or ⌘K never waits for the network. Rows and tabs open on mouse down, and hovering a row loads its topic before the click. A message you send shows at once and goes to Slack in the background, in order. Every interaction has a time budget, and a change that breaks one fails the build.</p>
-      <figure class="media">
-        <video class="loop" autoplay muted loop playsinline preload="metadata" poster="/loops/speed-poster.jpg" width="1600" height="1000" aria-label="Three tabs open on three topics. The pointer clicks each tab in turn and its topic shows at once. Recorded at real speed.">
-          <source src="/loops/speed.mp4" type="video/mp4">
-        </video>
-      </figure>
-    </section>
+<section class="film wrap" id="film" aria-labelledby="film-title">
+  <div class="film-head">
+    <h2 id="film-title">The film</h2>
+    <p>One minute, with sample conversations.</p>
+  </div>
+  <div class="player">
+    <video id="trailer" playsinline preload="none" width="1920" height="1080" aria-label="The Juno film"><source src="/trailer.mp4" type="video/mp4"></video>
+    <div class="poster">
+      <img src="/trailer-poster.jpg" width="1920" height="1080" loading="lazy" alt="">
+      <button class="play" type="button" aria-label="Play the film, 1 minute 2 seconds"><svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5v9l8-4.5Z" fill="currentColor"/></svg><span class="play-text">Play the film</span><span class="dim">1:02</span></button>
+    </div>
+  </div>
+</section>
 
-    <section class="point">
-      <h2>Pleasant to look at</h2>
-      <p>Juno follows macOS: native menus, the arrow cursor on every button and row, and a pressed button that stays still. Unread counts are quiet tags in your accent colour, not black badges, and with an AI key Juno draws a small picture for each row. When you are caught up, Home shows a painting or print from a museum's collection, or a picture from space, with one line about it. Light and dark themes, and a choice of accent colours.</p>
-      <figure class="media">
-        <img src="/img/home-picture.jpg" width="1600" height="750" loading="lazy" alt="Home when you are caught up: Almond Blossom by Vincent van Gogh, 1890, with its label and his line about it, large branches of white almond blossom against a blue sky.">
-      </figure>
-    </section>
+<section class="notify" aria-labelledby="notify-title">
+  <div class="field field-notify" data-field="notify" aria-hidden="true"><canvas></canvas></div>
+  <div class="wrap">
+    <h2 id="notify-title">Notifications</h2>
+    <p class="notify-line">Juno looks at every notification and decides if it's worth pinging you. Simple rules handle the obvious ones. AI reads the rest, using instructions you write. You can always see&nbsp;why.</p>
+    <dl class="reasons">
+      <div><dt>Notified</dt><dd>Ivo asks you something.</dd></div>
+      <div><dt>Stayed in Juno</dt><dd>Talk you're not part of.</dd></div>
+    </dl>
+    <figure class="decisions-figure">
+      <div class="sheet decisions-sheet">
+        <picture>
+          <source media="(max-width: 720px)" srcset="/img/decisions-phone-light.webp" width="800" height="320">
+          <img class="light-only" src="/img/decisions-light.webp" width="1440" height="320" loading="lazy" alt="Two of today's decisions. Ivo Reed in #engineering, Cutover window: Can you sign off on the cutover window? Notified, Juno's reading: Ivo asks you something. Emil Park in #support: Lena and I will take the figures offline. In Juno, Juno's reading: Talk you're not part of.">
+        </picture>
+        <picture>
+          <source media="(max-width: 720px)" srcset="/img/decisions-phone-dark.webp" width="800" height="320">
+          <img class="dark-only" src="/img/decisions-dark.webp" width="1440" height="320" loading="lazy" alt="">
+        </picture>
+      </div>
+      <figcaption>Today's decisions, from Settings. Juno also copies your quiet hours to Slack, so your phone stays quiet too.</figcaption>
+    </figure>
+  </div>
+</section>
 
-    <section class="point">
-      <h2>Notifications decided for you</h2>
-      <p>Each message either notifies you or stays in Juno. Juno reads it with your instructions in your own words, and keeps every decision with its reason.</p>
-      <figure class="media">
-        <video class="loop" autoplay muted loop playsinline preload="metadata" poster="/loops/notifications-poster.jpg" width="1600" height="750" aria-label="Messages arrive one by one. Most stop at a line with a reason, such as an update with nothing asked of you. One that asks you to sign off passes through.">
-          <source src="/loops/notifications.mp4" type="video/mp4">
-        </video>
-      </figure>
-    </section>
+<section class="home wrap" aria-labelledby="home-title">
+  <figure class="home-figure">
+    <picture>
+      <source media="(max-width: 720px)" srcset="/img/home-phone-light.webp" width="760" height="670">
+      <img class="light-only" src="/img/home-light.webp" width="1040" height="688" loading="lazy" alt="Home on a Monday morning: the Juno mark beside a cup of coffee, the greeting Morning, Arin, and three rows: something you said you would send Ivo, three topics that look settled, and a topic to pick up where you left off.">
+    </picture>
+    <picture>
+      <source media="(max-width: 720px)" srcset="/img/home-phone-dark.webp" width="760" height="670">
+      <img class="dark-only" src="/img/home-dark.webp" width="1040" height="688" loading="lazy" alt="">
+    </picture>
+  </figure>
+  <div class="copy">
+    <h2 id="home-title">Home</h2>
+    <p>Home shows the questions you haven't answered, the things you promised to do, and topics that look finished. When there's nothing left, it shows a work of&nbsp;art.</p>
+  </div>
+</section>
 
-    <section class="point">
-      <h2>Home</h2>
-      <p>Home lists questions you have not answered and things you said you would do, with links to their topics. It also suggests topics to resolve.</p>
-      <figure class="media">
-        <video class="loop" autoplay muted loop playsinline preload="metadata" poster="/loops/home-poster.jpg" width="1600" height="750" aria-label="Home: a greeting, something you said you would do, and topics that look settled. The pointer clears them one by one, and then, caught up, Home shows a painting of almond blossom.">
-          <source src="/loops/home.mp4" type="video/mp4">
-        </video>
-      </figure>
-    </section>
+<section class="agent wrap" aria-labelledby="agent-title">
+  <div class="copy">
+    <h2 id="agent-title">Juno AI</h2>
+    <p>Press ⌘J to ask Juno about anything in Slack. Every answer links to the messages it used. It can pull facts from Notion or other tools you connect, and write a draft for you to edit. Nothing is sent until you press&nbsp;Send.</p>
+  </div>
+  <figure class="agent-figure">
+    <div class="sheet agent-sheet">
+      <img class="light-only" src="/img/agent-light.webp" width="896" height="680" loading="lazy" alt="The Juno panel beside Launch approval. Catch me up. The answer: the preview is updated, Mira needs your approval on the page before 2, with the words linked to the messages. Then: Draft the export notes for Ivo. Take the numbers from Noor's doc in Notion. A status bubble reads Searching Notion.">
+      <img class="dark-only" src="/img/agent-dark.webp" width="896" height="680" loading="lazy" alt="">
+    </div>
+    <div class="sheet agent-sheet agent-card">
+      <img class="light-only" src="/img/agent-card-light.webp" width="896" height="540" loading="lazy" alt="A Send message card to Ivo Reed, direct message, with the draft in an editable field: Export notes: two of six testers missed the export button. The label now shows a file count. Dismiss and Send buttons.">
+      <img class="dark-only" src="/img/agent-card-dark.webp" width="896" height="540" loading="lazy" alt="">
+    </div>
+    <figcaption>Juno pulls the numbers from Notion and drafts the message. You edit it and send&nbsp;it.</figcaption>
+  </figure>
+</section>
 
-    <section class="point">
-      <h2>Ask Juno</h2>
-      <p>Ask Juno to catch you up on a topic, and the answer links to the messages it read. Ask it to draft a reply, and it waits for your click before sending.</p>
-      <figure class="media">
-        <video class="loop" autoplay muted loop playsinline preload="metadata" poster="/loops/agent-poster.jpg" width="1600" height="750" aria-label="The Juno panel beside a thread: Catch me up, a two-line answer, Say it's approved, and a Send message card with a Send button.">
-          <source src="/loops/agent.mp4" type="video/mp4">
-        </video>
-      </figure>
-    </section>
+<section class="speed" aria-labelledby="speed-title">
+  <div class="wrap">
+    <div class="speed-head">
+      <h2 id="speed-title">Impressively fast</h2>
+      <div>
+        <p>Fast enough to make Slack feel slow. Below is a real-time recording, with no speed-up and no&nbsp;cuts.</p>
+      </div>
+    </div>
+    <div class="clip">
+      <video class="speed-video" muted loop playsinline preload="metadata" width="2560" height="1440" poster="/video/speed-light-poster.jpg" data-light="/video/speed-light.mp4" data-dark="/video/speed-dark.mp4" data-light-webm="/video/speed-light.webm" data-dark-webm="/video/speed-dark.webm" data-poster-light="/video/speed-light-poster.jpg" data-poster-dark="/video/speed-dark-poster.jpg" aria-label="Juno opening topics and tabs one after another, with a stopwatch showing real time"></video>
+      <button class="play clip-play" type="button" aria-label="Play the clip" hidden><svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5v9l8-4.5Z" fill="currentColor"/></svg><span class="play-text">Play</span></button>
+    </div>
+  </div>
+</section>
 
-    <p class="also">Also ⌘K for conversations and messages already on this Mac, a Search tab that searches Slack with filters, tabs like a browser, your own views of channels and DMs, Slack huddles, a blur for message text while you share your screen, and web links in a side panel.</p>
+<section class="features wrap" id="features" aria-labelledby="features-title">
+  <h2 id="features-title">More features</h2>
+  <ul class="feature-list">
+    <li><button type="button" class="feature" data-spot="29.5 0.8 70 5.6" aria-pressed="false">Tabs<span class="sr"> Tabs, like a browser. ⌘T opens one, ⌘W closes it, ⌘⇧T brings it back. Pin the ones you keep. Old tabs close themselves.</span></button></li>
+    <li><button type="button" class="feature" data-spot="65.6 5.8 34 93" aria-pressed="false">Built-in browser<span class="sr"> Links open inside Juno, so you don't have to switch apps. You stay signed in.</span></button></li>
+    <li><button type="button" class="feature" data-spot="0.5 5.4 28 9.4" aria-pressed="false">Huddles<span class="sr"> Join or start huddles from the sidebar, with audio and screen sharing.</span></button></li>
+    <li><button type="button" class="feature" data-spot="0.5 21.6 13.2 4.8" aria-pressed="false">Views<span class="sr"> Group channels and DMs your way, and hide them from the main list if you want.</span></button></li>
+    <li><button type="button" class="feature" data-spot="0.5 45.6 28 19.8" aria-pressed="false">Auto titles<span class="sr"> AI gives every thread a clear title and a small drawing. Rename it and Juno keeps your name.</span></button></li>
+    <li><button type="button" class="feature" data-spot="34.6 56 14 3.4" aria-pressed="false">Typo checks<span class="sr"> After you send, Juno flags typos and slips. One click to fix them.</span></button></li>
+    <li><button type="button" class="feature" data-spot="30.4 13.2 33.6 84.6" aria-pressed="false">Keyboard<span class="sr"> Press ↑ to pick a message, then T to reply in a thread, Q to quote, E to edit or R to react.</span></button></li>
+    <li><button type="button" class="feature" data-inset="quote" aria-pressed="false">Quote<span class="sr"> Press Q to quote a message, or select a few words to quote just those.</span></button></li>
+    <li><button type="button" class="feature" data-inset="reactions" aria-pressed="false">Quick reactions<span class="sr"> Right-click a message to react. Your usual emoji come first.</span></button></li>
+    <li><button type="button" class="feature" data-inset="search" aria-pressed="false">Search<span class="sr"> Results appear as you type, starting with what's already on your Mac. Filters turn into chips.</span></button></li>
+    <li><button type="button" class="feature" data-inset="loops" aria-pressed="false">Follow-ups<span class="sr"> Juno tells you when nobody replies, and keeps track of what you promised to do.</span></button></li>
+    <li><button type="button" class="feature" data-inset="tidyup" aria-pressed="false">Tidy up<span class="sr"> Quiet topics clear themselves. Juno suggests which ones look done.</span></button></li>
+    <li><button type="button" class="feature" data-inset="picture" aria-pressed="false">Art<span class="sr"> When you're caught up, Home shows a work of art. Browse them all in the gallery.</span></button></li>
+    <li><button type="button" class="feature" data-inset="connections" aria-pressed="false">Connections<span class="sr"> Connect Notion, Littlebird, T3 Code or any MCP server, and Juno can use them.</span></button></li>
+    <li><button type="button" class="feature" data-inset="memory" aria-pressed="false">Memory<span class="sr"> Juno remembers who people are and how you talk to them. You can edit or delete any note.</span></button></li>
+  </ul>
+  <figure class="window-figure">
+    <figcaption class="feature-caption">Hover or tap a feature to see it in the app.</figcaption>
+    <div class="window sheet">
+      <img class="light-only" src="/img/window-light.webp" width="2640" height="1600" loading="lazy" alt="The Juno window. Five tabs along the top. In the sidebar, a huddle running in #design, the filter pills with a Design view, and the topic list. The Launch approval thread, with a reaction on one message and a suggested fix under the last one. A web page open in a panel beside the thread.">
+      <img class="dark-only" src="/img/window-dark.webp" width="2640" height="1600" loading="lazy" alt="">
+      <div class="spot" aria-hidden="true"></div>
+      <div class="inset" aria-hidden="true"><img class="light-only" alt=""><img class="dark-only" alt=""></div>
+    </div>
+  </figure>
+</section>
 
-    <section class="start" id="getting-started">
-      <h2>Getting started</h2>
-      <ol>
-        <li>Download the <code>-arm64.dmg</code> from the <a href="https://github.com/triptu/juno-releases/releases/latest">latest release</a> and drag Juno to Applications.</li>
-        <li>If macOS blocks the first open, choose Open Anyway in System Settings › Privacy &amp; Security, or run:
-          <pre><code>xattr -d com.apple.quarantine /Applications/Juno.app</code></pre></li>
-        <li>Sign in to Slack's desktop app first. In Juno, choose "Use the Slack app's session" and allow the macOS password prompt.</li>
-        <li>For the AI features, add an OpenRouter key in Settings › Juno. These features send the relevant Slack text to OpenRouter, or to the endpoint you chose for the assistant. Without a key, direct messages and mentions notify.</li>
-      </ol>
-      <p class="start-actions"><a class="button" href="https://github.com/triptu/juno-releases/releases/latest">Download for Mac</a></p>
-    </section>
+<section class="start wrap" id="start" aria-labelledby="start-title">
+  <div class="start-head">
+    <h2 id="start-title">Get Juno</h2>
+    <div class="start-cta">
+      <a class="button" href="https://github.com/triptu/juno-releases/releases/latest">Download for Mac</a>
+      <p class="note">For Apple Silicon Macs</p>
+    </div>
+  </div>
+  <ol class="steps">
+    <li>
+      <h3>Install it</h3>
+      <p>Download the file ending in <code>-arm64.dmg</code> and drag Juno to Applications. Juno is unsigned. If macOS blocks the first open, choose Open Anyway in System Settings › Privacy &amp; Security, or run:</p>
+      <pre><code>xattr -d com.apple.quarantine /Applications/Juno.app</code></pre>
+    </li>
+    <li>
+      <h3>Connect Slack</h3>
+      <p>Sign in to Slack's desktop app first. In Juno, choose "Use the Slack app's session" and allow the macOS password prompt.</p>
+    </li>
+    <li>
+      <h3>Add an AI key</h3>
+      <p>Optional. Add an OpenRouter key in Settings › Juno to turn on titles, drawings, notification reading and Home. Those features send the Slack text they need to OpenRouter, or to the provider you choose.</p>
+    </li>
+  </ol>
+</section>
 
-    <footer class="foot">
-      <p>Juno is made by <a href="https://tushar.ai">Tushar</a>.</p>
-    </footer>
-  </main>
-  <script>
-    // With reduced motion on, the loops stay on their posters.
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      for (const video of document.querySelectorAll('video.loop')) {
-        video.removeAttribute('autoplay');
-        video.pause();
-        video.load();
-      }
-    }
-  </script>
+</main>
+
+<footer class="footer">
+  <div class="field field-footer" data-field="footer" aria-hidden="true"><canvas></canvas></div>
+  <div class="wrap">
+    <!-- Home's seated j at its table (sunk back with the laptop closed; under a moon with it open in the dark), with six of the topic drawings set down beside it. scene.js moves them with the pointer. -->
+    <div class="scene" aria-hidden="true">
+      <span class="piece outer" data-depth="1.25"><svg viewBox="0 0 40 40"><g fill="none" stroke="var(--art-coral-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 C27 11 29 19 26 28 H14 C11 19 13 11 20 6 Z" fill="var(--art-coral-soft)"/><circle cx="20" cy="17" r="3" fill="var(--art-coral-accent)" stroke="none"/><path d="M14 24 L9 31 H15"/><path d="M26 24 L31 31 H25"/></g></svg></span>
+      <span class="piece" data-depth=".8"><svg viewBox="0 0 40 40"><g fill="none" stroke="var(--art-amber-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="11" width="26" height="19" rx="4" fill="var(--art-amber-soft)"/><polyline points="8 13 20 22 32 13"/><circle cx="30" cy="11" r="2.2" fill="var(--art-amber-accent)" stroke="none"/></g></svg></span>
+      <span class="piece" data-depth="1.05"><svg viewBox="0 0 40 40"><g fill="none" stroke="var(--art-sage-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10 H26 L30 14 V30 H10 Z" fill="var(--art-sage-soft)"/><polyline points="15 22 18 25 25 18"/><circle cx="26" cy="10" r="2" fill="var(--art-sage-accent)" stroke="none"/></g></svg></span>
+      <div class="j">
+        <svg class="light-only" viewBox="0 0 104 72"><rect x="50" y="43" width="48" height="22" rx="11" fill="var(--warm)"/><g transform="translate(4 8)"><circle cx="20" cy="48.6" r="5" fill="currentColor"/><circle cx="8" cy="48.6" r="4.5" fill="currentColor"/></g></svg>
+        <svg class="light-only j-body sink" viewBox="0 0 104 72"><path transform="translate(26 8)" d="M57 31 C57 40 54 45 46 47.6 C42 48.6 36 48.6 25 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></svg>
+        <svg class="light-only j-head sink" viewBox="0 0 104 72"><circle cx="76" cy="24" r="7" fill="currentColor"/></svg>
+        <svg class="dark-only" viewBox="0 0 104 72"><path d="M24 10 A12 12 0 1 0 36 27 A9.5 9.5 0 0 1 24 10 Z" fill="var(--warm)"/><path d="M24 10 A12 12 0 1 0 36 27 A9.5 9.5 0 0 1 24 10 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g transform="translate(26 8)"><circle cx="20" cy="48.6" r="5" fill="currentColor"/><circle cx="10.5" cy="36.5" r="4.5" fill="currentColor"/></g></svg>
+        <svg class="dark-only j-body up" viewBox="0 0 104 72"><path transform="translate(26 8)" d="M47.5 25 C47.5 35.5 46 42.5 40.5 46.5 C37.5 48.6 34.5 48.6 31 48.6" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round"/></svg>
+        <svg class="dark-only j-head up" viewBox="0 0 104 72"><circle cx="66" cy="18" r="7" fill="currentColor"/></svg>
+      </div>
+      <span class="piece" data-depth=".9"><svg viewBox="0 0 40 40"><g fill="none" stroke="var(--art-teal-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11 V29 A11 4.5 0 0 0 31 29 V11"/><ellipse cx="20" cy="11" rx="11" ry="4.5" fill="var(--art-teal-soft)"/><path d="M9 20 A11 4.5 0 0 0 31 20"/><circle cx="26" cy="29" r="2" fill="var(--art-teal-accent)" stroke="none"/></g></svg></span>
+      <span class="piece" data-depth="1.3"><svg viewBox="0 0 40 40"><g fill="none" stroke="var(--art-sky-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 29 H29 A6 6 0 0 0 28 17 A9 9 0 0 0 11 20 A4.5 4.5 0 0 0 11 29 Z" fill="var(--art-sky-soft)"/><polyline points="16 23 20 19 24 23"/><line x1="20" y1="19" x2="20" y2="31"/></g></svg></span>
+      <span class="piece outer" data-depth=".7"><svg viewBox="0 0 40 40"><g fill="none" stroke="var(--art-plum-ink)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="12" width="24" height="18" rx="4" fill="var(--art-plum-soft)"/><circle cx="16" cy="20" r="3" fill="var(--art-plum-accent)" stroke="none"/><line x1="22" y1="18" x2="27" y2="18"/><line x1="22" y1="23" x2="26" y2="23"/></g></svg></span>
+    </div>
+    <p class="sign-off">Caught up</p>
+    <div class="footer-row">
+      <div>
+        <p class="plain">Juno has no server of its own. Your Mac talks to Slack directly, and AI only runs with a key you&nbsp;add.</p>
+        <p>Juno is made by <a href="https://tushar.ai">Tushar</a>.</p>
+      </div>
+      <a class="top" href="#">Back to top</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/field.js"></script>
+<script src="/scene.js"></script>
+<script src="/features.js"></script>
+<script src="/script.js"></script>
 </body>
 </html>
