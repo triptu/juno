@@ -4,8 +4,6 @@
 
 A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.
 
-Created in [T3 Code](https://t3.codes).
-
 <!-- Trailer poster goes here, linking to the video. Until then, the screenshot below. -->
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/topic-release-dark.png">
@@ -99,7 +97,3 @@ xattr -d com.apple.quarantine /Applications/Juno.app
 Sign in to Slack's desktop app first. In Juno, choose "Use the Slack app's session" and allow the macOS password prompt.
 
 Add an OpenRouter key in Settings › Juno for AI titles, topic art, notification reading, Home suggestions and the message checks. The assistant can use OpenRouter or an OpenAI-compatible endpoint. These features send the relevant Slack text to OpenRouter, or to the endpoint you chose for the assistant.
-
-## Credits
-
-Home's gallery includes public-domain and Creative Commons images from museums and archives. Each picture lists its credit and links to its source.
