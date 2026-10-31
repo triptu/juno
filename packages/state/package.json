@@ -12,6 +12,8 @@
     "./react": "./src/react.ts",
     "./transport": "./src/transport.ts",
     "./socket": "./src/socket.ts",
+    "./demo": "./src/demo.ts",
+    "./demo-capture": "./src/demoCapture.ts",
     "./perf": "./src/perf.ts"
   },
   "scripts": {
