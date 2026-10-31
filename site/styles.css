@@ -99,10 +99,6 @@ p {
   margin: 0;
 }
 
-p + p {
-  margin-top: 0.75em;
-}
-
 code {
   font-family: var(--font-mono);
   font-size: 0.9em;
@@ -127,8 +123,10 @@ pre code {
   font-size: inherit;
 }
 
+/* One column, 960 wide: the trailer, each loop and the search still share it. */
+
 .wrap {
-  max-width: 1040px;
+  max-width: 1008px;
   margin: 0 auto;
   padding: 0 24px 56px;
 }
@@ -192,8 +190,7 @@ h1 {
 /* Trailer */
 
 .trailer {
-  margin: 0 auto;
-  max-width: 960px;
+  margin: 0;
 }
 
 .trailer video {
@@ -208,78 +205,73 @@ h1 {
   box-shadow: var(--shot-shadow);
 }
 
-.intro {
+/* Points: a heading, one or two sentences, then the picture at full width. */
+
+.point {
+  margin-top: 96px;
+}
+
+h2 {
+  font-size: 34px;
+  line-height: 1.2;
+  margin-bottom: 10px;
+}
+
+.point p {
   max-width: 640px;
-  margin: 64px auto 0;
-  text-align: center;
-  font-size: 20px;
+  color: var(--foreground-subtle);
+  font-size: 19px;
   line-height: 1.45;
   text-wrap: pretty;
 }
 
-/* Points */
-
-.point {
-  margin-top: 88px;
-}
-
-.point-text {
-  max-width: 600px;
-}
-
-h2 {
-  font-size: 32px;
-  line-height: 1.2;
-  margin-bottom: 12px;
-}
-
-.point-text p {
-  color: var(--foreground-subtle);
-  text-wrap: pretty;
-}
-
-.shot {
+.media {
   margin: 28px 0 0;
-  max-width: 720px;
 }
 
-.shot img {
+.media video,
+.media img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 10px;
+  background: var(--code-bg);
+  border-radius: 12px;
   outline: 1px solid var(--ring);
   outline-offset: -1px;
   box-shadow: var(--shot-shadow);
 }
 
-@media (min-width: 1100px) {
-  .point {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 720px;
-    gap: 40px;
-    align-items: center;
-  }
+.media video {
+  aspect-ratio: 32 / 15;
+}
 
-  .shot {
-    margin: 0;
-  }
+.media img {
+  aspect-ratio: 16 / 10;
 }
 
 /* Also and getting started */
 
-.also, .start {
-  margin-top: 88px;
+.also {
+  max-width: 640px;
+  margin-top: 96px;
+  color: var(--foreground-subtle);
+  font-size: 19px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.start {
+  margin-top: 96px;
   max-width: 640px;
 }
 
-.also ul, .start ol {
+.start ol {
   margin: 0;
   padding-left: 1.3em;
   color: var(--foreground-subtle);
 }
 
-.also li, .start li {
+.start li {
   margin-top: 0.5em;
   text-wrap: pretty;
 }
@@ -335,25 +327,25 @@ h2 {
     border-radius: 8px;
   }
 
-  .intro {
-    margin-top: 44px;
-    font-size: 18px;
-  }
-
   .point, .also, .start {
-    margin-top: 60px;
+    margin-top: 56px;
   }
 
   h2 {
     font-size: 27px;
   }
 
-  .shot {
-    margin-top: 20px;
+  .point p, .also {
+    font-size: 17px;
   }
 
-  .shot img {
-    border-radius: 6px;
+  .media {
+    margin-top: 16px;
+  }
+
+  .media video,
+  .media img {
+    border-radius: 8px;
   }
 
   .foot {
