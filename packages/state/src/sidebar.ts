@@ -43,14 +43,20 @@ export const topicSelectedAtom = Atom.family((id: string) => Atom.make((get) => 
 
 const MINUTE_MS = 60_000
 
+/** A time that stands in for the wall clock while set: the read-only demo's export time, so its dates read as they did then. */
+export const fixedNowAtom = Atom.make<number | undefined>(undefined).pipe(Atom.keepAlive)
+
 /**
  * Wall-clock milliseconds, refreshed on each minute boundary while
- * something reads it. Relative times change by the minute, so a label is
- * never late. Read it through a selector that returns the label
+ * something reads it, or `fixedNowAtom` while that is set. Relative times
+ * change by the minute, so a label is never late. Read it through a
+ * selector that returns the label
  * (`useAtomValue(nowAtom, (now) => relativeTime(at, now))`), so a tick
  * re-renders only the rows whose label changed (performance 5.1).
  */
 export const nowAtom = Atom.make<number>((get) => {
+  const fixed = get(fixedNowAtom)
+  if (fixed !== undefined) return fixed
   const now = Date.now()
   let interval: ReturnType<typeof setInterval> | undefined
   const timeout = setTimeout(() => {

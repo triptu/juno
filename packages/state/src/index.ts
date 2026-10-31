@@ -28,6 +28,7 @@ export {
   currentRowAtom,
   flushSidebar,
   focusedTopicAtom,
+  fixedNowAtom,
   nowAtom,
   openSidebarSheet,
   releaseSidebarTopic,
