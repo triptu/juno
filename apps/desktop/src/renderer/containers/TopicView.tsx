@@ -8,6 +8,7 @@ import { useMessageActions, type ComposerHandle, type MessageActionsOutput } fro
 import { showPersonMenu } from './notifyActions'
 import { closeMessageMenu } from './messageMenu'
 import { takeComposerFocus } from './pageFocus'
+import { readingOnly } from './readingOnly'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
 import { attach } from './attachments'
@@ -228,7 +229,24 @@ function drawnRows(list: MessageWindow, at: number, snapshot: Parameters<typeof 
 /** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
 const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
 
+/** What a row's links, files and images offer beyond opening a link: their menus, the file actions and the media viewer. */
+function fileActions(list: MessageWindow, openMedia: (viewing: MediaViewing) => void) {
+  return {
+    onLinkMenu: showMessageLinkMenu,
+    ...FILE_ACTIONS,
+    onOpenMedia: openMedia,
+    onImageMenu: (ts: string, fileId: string, event: MouseEvent) => showMessageImageMenu(list, ts, fileId, event, openMedia),
+  }
+}
+
+/**
+ * A topic's page or a peek's list. Reading only (the demo, `readingOnly`),
+ * a tab keeps its header, position and paging but has no composer, no
+ * message actions or menus, and no file or media actions; a peek is as it
+ * always is, without media.
+ */
 export function Topic({ id, view, detail, readOnly = false, peek = false, onOpenPreviewMedia, reader }: TopicProps) {
+  const writes = !readingOnly()
   const list = useAtomValue(messageListAtom(view))
   useReactionFailureToast(list)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -255,7 +273,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
   useMarkRead(detail.id, readOnly || !used || detail.notMember !== undefined, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
   const header = useTopicHeader(detail, readOnly, position.drawnAll, reader?.header)
   const composer = useRef<ComposerHandle>(null)
-  const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer, readOnly })
+  const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer, readOnly: readOnly || !writes })
   const jump = useJumpToLatest(position, view, list)
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
@@ -283,15 +301,14 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
       onChannel={scopeToChannel}
       onPerson={openPersonDm}
       onLink={openMessageLink}
-      linkInfo={messageLinkInfo} onLinkMenu={showMessageLinkMenu}
-      {...FILE_ACTIONS}
-      onOpenMedia={openMedia}
-      onImageMenu={(ts, fileId, event) => showMessageImageMenu(list, ts, fileId, event, openMedia)}
+      linkInfo={messageLinkInfo}
+      {...(writes ? fileActions(list, openMedia) : {})}
       {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
-      {...(readOnly ? {} : rowActions(list, messageActions, detail.kind === 'main' && reader === undefined))}
+      {...(readOnly || !writes ? {} : rowActions(list, messageActions, detail.kind === 'main' && reader === undefined))}
     />
   )
   if (readOnly) return messages
+  if (!writes) return <TopicViewFrame header={header} pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}>{messages}</TopicViewFrame>
   const sent = () => { use(); jump(); void markRead(detail.id) }
   return (
     <TopicViewFrame

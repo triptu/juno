@@ -36,6 +36,7 @@ import { runUndoCommand } from './topicActions'
 import { focusPage, forcePageFocus, pageComposer, takeForcedPageFocus, takeTypedAhead } from './pageFocus'
 import { loadSearchTab, loadSettingsTab, tabKindOf } from './tabKinds'
 import { preloadAfterSidebar } from './preloadAfterSidebar'
+import { readingOnly } from './readingOnly'
 import { loadChannelMenu } from './placeMenus'
 import { TitlebarNav } from './TitlebarNav'
 import { runSearchCommand } from './search/open'
@@ -137,10 +138,31 @@ function holdKeysAfterNewShortcut(event: KeyboardEvent): void {
   if (key === 'n' || key === 't') holdKeys()
 }
 
-/** The workspace's app-wide wiring: menu commands, notifications, idle preloads, per-tab focus and the mouse's back and forward buttons. */
+/** The workspace's wiring for reading: menu commands, per-tab focus and the mouse's back and forward buttons. */
 function useWorkspaceEffects(active: string | undefined): void {
-  useNotificationBridge()
   useEffect(() => onMenuCommand(runMenuCommand), [])
+  useEffect(() => {
+    document.addEventListener('focusin', onFocusIn)
+    return () => document.removeEventListener('focusin', onFocusIn)
+  }, [])
+  // After the pages' own effects, so a composer takes another tab's draft before it has focus again.
+  useEffect(() => {
+    if (active !== undefined) restoreFocus(active)
+  }, [active])
+  useEffect(() => {
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [])
+}
+
+/**
+ * The rest of the app-wide wiring: notifications, Undo, Search, the web
+ * panel, Juno, the visit log, tab expiry and the pages warmed when idle.
+ * Not mounted reading only, where nothing writes and no page it leaves out
+ * is warmed.
+ */
+function FullWiring() {
+  useNotificationBridge()
   useEffect(() => {
     window.addEventListener('keydown', holdKeysAfterNewShortcut, true)
     return () => window.removeEventListener('keydown', holdKeysAfterNewShortcut, true)
@@ -171,18 +193,7 @@ function useWorkspaceEffects(active: string | undefined): void {
     void loadChannelMenu()
     if (registry.get(junoAvailableAtom)) void preloadAgentClient()
   }), [])
-  useEffect(() => {
-    document.addEventListener('focusin', onFocusIn)
-    return () => document.removeEventListener('focusin', onFocusIn)
-  }, [])
-  // After the pages' own effects, so a composer takes another tab's draft before it has focus again.
-  useEffect(() => {
-    if (active !== undefined) restoreFocus(active)
-  }, [active])
-  useEffect(() => {
-    window.addEventListener('mouseup', onMouseUp)
-    return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [])
+  return null
 }
 
 /**
@@ -192,7 +203,8 @@ function useWorkspaceEffects(active: string | undefined): void {
  * snapshot. A tab's topic is keyed by its id, so Back and Forward mount the
  * topic they bring back. There is always a tab (`ensureTab`); until the saved tabs have
  * been read the page is blank. While the sidebar is hidden the strip
- * starts with its controls.
+ * starts with its controls. Reading only, the strip has no "+" and the
+ * last tab no close button.
  */
 export function Workspace() {
   const state = useAtomValue(tabsAtom)
@@ -218,16 +230,19 @@ export function Workspace() {
   }, [webTabOpen])
 
   const pages = state.tabs.filter((tab) => mounted.has(tab.id))
+  // Reading only, there is no Home for "+" or for the last tab to fall back to.
+  const reading = readingOnly()
 
   return (
     <>
+    {reading ? null : <FullWiring />}
     <WorkspaceView
       tabs={strip.map(stripTab)}
       {...(state.active === undefined ? {} : { activeId: state.active })}
       onSelectTab={selectTab}
-      onCloseTab={closeTabById}
+      onCloseTab={reading && state.tabs.length < 2 ? undefined : closeTabById}
       onMoveTab={moveTabTo}
-      onNewTab={openNewTab}
+      onNewTab={reading ? undefined : openNewTab}
       onTabContextMenu={tabMenu}
       {...(sidebarHidden ? { leading: <TitlebarNav /> } : {})}
       fullScreen={fullScreen}

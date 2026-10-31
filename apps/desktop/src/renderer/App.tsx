@@ -1,11 +1,12 @@
-import { Suspense, useEffect, useLayoutEffect } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
 import { accentAtom, closeSidebarSheet, densityAtom, topicTitleLinesAtom, junoSetupPendingAtom, openSidebarSheet, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { applyPrivacy, applyTheme, CodeHighlighterContext, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
+import { applyPrivacy, applyTheme, CodeHighlighterContext, PageNote, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk, usePreloaded } from './containers/chunks'
 import { Frame } from './containers/Frame'
 import { followFullScreen } from './containers/fullScreen'
 import { Peek } from './containers/Peek'
+import { readingOnly } from './containers/readingOnly'
 import { followSharingPrivacy } from './containers/privacy'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
@@ -34,6 +35,18 @@ const _densityFromContract: DensityName = null as unknown as Density
 const _densityFromViews: Density = null as unknown as DensityName
 void [_accentFromContract, _accentFromTokens, _themeFromContract, _themeFromViews, _preferenceFromContract, _preferenceFromViews, _densityFromContract, _densityFromViews]
 
+/** Narrower than this, the demo's panes do not fit (the sidebar alone is at least 312px), so it shows a note instead. */
+const NARROW = '(max-width: 899px)'
+
+function onNarrowChange(change: () => void): () => void {
+  if (!readingOnly()) return () => {}
+  const query = matchMedia(NARROW)
+  query.addEventListener('change', change)
+  return () => query.removeEventListener('change', change)
+}
+
+const narrowNow = (): boolean => readingOnly() && matchMedia(NARROW).matches
+
 /** Privacy mode's one attribute on <html>, set before paint. A leaf, so a toggle re-renders nothing else. */
 function PrivacyRoot() {
   const privacy = useAtomValue(privacyAtom)
@@ -52,6 +65,7 @@ export function App() {
   const sessionUnknown = useAtomValue(sessionUnknownAtom)
   const setUpPending = useAtomValue(junoSetupPendingAtom)
   const signedOutReady = usePreloaded(signedOut, signedIn === undefined && !sessionUnknown)
+  const narrow = useSyncExternalStore(onNarrowChange, narrowNow)
 
   useEffect(followFullScreen, [])
   // Main's idle CPU check hears the view and whether a sync runs (processes.ts).
@@ -74,6 +88,14 @@ export function App() {
   // "Set up Juno" on the same page first. Otherwise the sign-in page is the
   // whole page, with the appearance block under it. A relaunch with a
   // saved session starts on the shell (signedInAtom), never on this page.
+  // The demo in a narrow window is a note, not a squeezed app.
+  if (narrow) {
+    return (
+      <Shell>
+        <PageNote title="Juno is a desktop app" body="Open this page on a wider screen to try it." />
+      </Shell>
+    )
+  }
   if (signedIn !== undefined && setUpPending) {
     return (
       <Shell>

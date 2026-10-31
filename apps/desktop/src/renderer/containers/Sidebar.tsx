@@ -33,6 +33,7 @@ import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openSettings, warmHome } from './navigation'
 import { openSearch } from './search/open'
 import { setPrivacy } from './privacy'
+import { readingOnly } from './readingOnly'
 import { sidebarTop } from './sidebarTop'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
@@ -80,6 +81,13 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
 }
 
 /**
+ * Reading only: no page buttons, no account, no huddle bar, the views
+ * without their menu or reordering, and a note that the conversations are
+ * samples.
+ */
+const READING = { pages: [], note: 'Demo · sample conversations' } as const
+
+/**
  * Wires the sidebar chrome: the filters and scope (local UI state), the
  * filter dots (booleans from the counts live value, so a count that changes
  * without a dot changing re-renders nothing), the sync status card, and
@@ -88,13 +96,15 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
  * the rows.
  */
 export function Sidebar() {
+  const reading = readingOnly()
   useEffect(() => {
+    if (reading) return undefined
     const idle = requestIdleCallback(() => {
       void loadViewSheet()
       void loadAccountMenu()
     }, { timeout: 5_000 })
     return () => cancelIdleCallback(idle)
-  }, [])
+  }, [reading])
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
   const views = useAtomValue(viewPillsAtom)
   const sheet = useAtomValue(viewSheetAtom)
@@ -146,28 +156,35 @@ export function Sidebar() {
   }
 
   const dots = { channels: channelsDot, dms: dmsDot }
+  const full = {
+    top: sidebarTop,
+    account: { ...account, ...(presence === undefined ? {} : { presence: presence.seen ? ('active' as const) : ('away' as const) }), ...(paused === undefined ? {} : { paused }) },
+    accountMenuOpen: menuOpen,
+    onAccountMenu: setMenuOpen,
+    accountMenu: (
+      <AccountMenu
+        {...account}
+        workspace={user?.teamName ?? ''}
+        {...(presence === undefined ? {} : { presence })}
+        {...(paused === undefined ? {} : { paused })}
+        privacy={privacy}
+        onAction={accountAction}
+      />
+    ),
+    onNewView: newView,
+    newViewOpen: sheet?.mode === 'new',
+    onViewMenu: (id: string) => void showViewPillMenu(id),
+    onMoveView: moveView,
+  }
 
   return (
     <SidebarView
       titlebarLeading={<TitlebarNav />}
       fullScreen={fullScreen}
-      top={sidebarTop}
-      account={{ ...account, ...(presence === undefined ? {} : { presence: presence.seen ? 'active' : 'away' }), ...(paused === undefined ? {} : { paused }) }}
+      {...(reading ? READING : full)}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
       dots={dots}
       {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}
-      accountMenuOpen={menuOpen}
-      onAccountMenu={setMenuOpen}
-      accountMenu={
-        <AccountMenu
-          {...account}
-          workspace={user?.teamName ?? ''}
-          {...(presence === undefined ? {} : { presence })}
-          {...(paused === undefined ? {} : { paused })}
-          privacy={privacy}
-          onAction={accountAction}
-        />
-      }
       {...(activeNav === undefined ? {} : { activeNav })}
       junoUnread={junoUnread}
       junoBusy={junoBusy}
@@ -179,10 +196,6 @@ export function Sidebar() {
       onFilterKind={selectKind}
       views={views}
       onFilterView={selectView}
-      onNewView={newView}
-      newViewOpen={sheet?.mode === 'new'}
-      onViewMenu={(id) => void showViewPillMenu(id)}
-      onMoveView={moveView}
       {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
       onCloseViewSheet={closeViewSheet}
       onToggleUnread={toggleUnread}

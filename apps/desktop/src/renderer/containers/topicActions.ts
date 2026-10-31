@@ -29,6 +29,7 @@ import {
   flushSidebar,
   ignoreChannel,
   openInSlack,
+  popupContextMenu,
   registry,
   releaseSidebarTopic,
   renamingAtom,
@@ -40,6 +41,7 @@ import {
   type ToastContent,
 } from '@juno/state'
 import { openTopic, openTopicFromList } from './navigation'
+import { readingOnly } from './readingOnly'
 import { runViewMenuAction } from './viewActions'
 import { openNotificationsAt } from './notificationsAnchor'
 import { followsNew, setFollowNew, setNotifyLevel } from './notifyActions'
@@ -107,8 +109,11 @@ export function notifyTarget(topic: ActionTopic): { readonly target: NotifyTarge
 /** Warms the native topic menu after the first sidebar paint. */
 export const loadTopicMenu = () => import('./topicMenu')
 
+/** The topic menu (inventory 15.1). Reading only, just Open in new tab: everything else in it writes. */
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
-  return (await loadTopicMenu()).showTopicMenu(topic, from, at)
+  if (!readingOnly()) return (await loadTopicMenu()).showTopicMenu(topic, from, at)
+  const chosen = await popupContextMenu([{ id: 'open-new-tab', label: 'Open in new tab' }], at)
+  if (chosen === 'open-new-tab') runTopicAction(topic, 'open-new-tab', from)
 }
 
 /** The other person of a one-to-one DM, for What Juno knows about them. */

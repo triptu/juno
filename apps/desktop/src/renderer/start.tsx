@@ -18,9 +18,17 @@ import { TooltipLayer } from '@juno/views'
 import { App } from './App'
 import { clearCaretsLeftBehind } from './containers/caret'
 import { preloadHuddleHeader } from './containers/huddle/slots'
+import { setReadingOnly } from './containers/readingOnly'
+
+export interface RendererOptions {
+  /** The read-only demo: topics, tabs and peek, and nothing that writes, searches or needs the OS (`containers/readingOnly.ts`). */
+  readonly readingOnly?: boolean
+}
 
 /** Call once, after `configureConnection` (or the socket's) on the app registry. */
-export function startRenderer(): void {
+export function startRenderer(options: RendererOptions = {}): void {
+  const reading = options.readingOnly === true
+  if (reading) setReadingOnly()
   // The Juno Agent's port, through the bridge. Nothing asks for it until a Juno atom is read.
   configureAgentConnection(registry, { acquire: acquireAgentPort })
 
@@ -34,7 +42,7 @@ export function startRenderer(): void {
     (sections) => {
       if (!sections.ready || releaseSidebar === undefined) return
       // Warm picker ranking and composer recency after the first sidebar paint.
-      afterPaint(() => { registry.mount(frequentEmojiAtom); registry.mount(recentEmojiAtom) })
+      if (!reading) afterPaint(() => { registry.mount(frequentEmojiAtom); registry.mount(recentEmojiAtom) })
       const release = releaseSidebar
       releaseSidebar = undefined
       afterPaint(release)
@@ -64,7 +72,7 @@ export function startRenderer(): void {
   })
   afterPaint(() => measure('juno.shell-paint', 'juno.start'))
   // The huddle media service starts after the first paint, as a chunk of its own; Chime loads only on join.
-  afterPaint(() => {
+  if (!reading) afterPaint(() => {
     void import('./containers/huddle/media').then((module) => module.startHuddleMedia())
     preloadHuddleHeader()
   })

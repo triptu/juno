@@ -33,6 +33,7 @@ import { markFilterChange, takeFilterMark } from './filterMark'
 import { openAllTopics, openTopicFromList, warmTopic } from './navigation'
 import { typeOnRow } from './pageFocus'
 import { useRowAccessory } from './rowAccessories'
+import { readingOnly } from './readingOnly'
 import { cancelRename, loadTopicMenu, renameTopic, showRowMenu } from './topicActions'
 import { editSelectedView } from './viewActions'
 
@@ -249,7 +250,8 @@ export const TopicList = memo(function TopicList() {
 
   useSnapshotMark()
   useEffect(() => {
-    const idle = requestIdleCallback(() => { void loadSidebarMoves(); void loadTopicMenu() }, { timeout: 2_000 })
+    // Reading only, the topic menu is Open in new tab alone (`showTopicMenu`), with nothing to load.
+    const idle = requestIdleCallback(() => { void loadSidebarMoves(); if (!readingOnly()) void loadTopicMenu() }, { timeout: 2_000 })
     return () => cancelIdleCallback(idle)
   }, [])
 
@@ -301,8 +303,7 @@ export const TopicList = memo(function TopicList() {
       truncated={full && count >= SIDEBAR_WINDOW}
       moves={sections.moves}
       onClearFilters={clearFilters}
-      onViewAll={viewAllTopics}
-      onEditView={editSelectedView}
+      {...(readingOnly() ? {} : { onViewAll: viewAllTopics, onEditView: editSelectedView })}
       onRowFocus={focusRow}
       onEngagedChange={engage}
       onTouch={touch}

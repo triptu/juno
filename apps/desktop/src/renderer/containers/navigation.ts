@@ -111,6 +111,7 @@ import { expectComposerFocus, forcePageFocus, wantComposerFocus } from './pageFo
 import { toggleSidebar } from './layout'
 import { paletteTakesTabNumber } from './paletteActions'
 import { togglePrivacy } from './privacy'
+import { readingOnly } from './readingOnly'
 
 /** Longest an open waits for the first message window before it shows the tab anyway, with the list loading. It always waits for the header. */
 const READY_WAIT_MS = 150
@@ -158,10 +159,20 @@ const activeView = (tabs: Tabs): string | undefined => {
   return topic === undefined ? undefined : topicView(place?.kind === 'topic' ? place.viewId ?? topic : topic, tab!.id)
 }
 
+/** Reading only, every tab shows a topic and one always stays open: there is no page to open, and no Home to fall back to. */
+const readable = (tabs: Tabs): boolean => tabs.tabs.length > 0 && tabs.tabs.every((tab) => currentPlace(tab).kind === 'topic')
+
+/** Applies `change` to the tabs. Reading only, a change that would leave tabs the demo cannot show does nothing. */
 function apply(change: (tabs: Tabs) => Tabs): Tabs {
   const before = activeView(registry.get(tabsAtom))
   if (before !== undefined) leaving.get(before)?.()
-  const next = updateTabs(registry, change)
+  const allowed = readingOnly()
+    ? (tabs: Tabs) => {
+        const next = change(tabs)
+        return readable(next) ? next : tabs
+      }
+    : change
+  const next = updateTabs(registry, allowed)
   registry.set(selectedTopicAtom, activeTopic(next))
   traceSend('tabs applied', () => ({ active: next.active, topic: activeTopic(next) }))
   return next
@@ -869,7 +880,11 @@ export function warmHome(): void {
   prefetchHome(registry)
 }
 
-/** The tab menu (inventory 15.5). Copy Slack link and Open in Slack only on a topic tab whose header is local. */
+/**
+ * The tab menu (inventory 15.5). Copy Slack link and Open in Slack only on a
+ * topic tab whose header is local. Reading only, neither, no Close all tabs,
+ * and no Close tab on the last tab.
+ */
 export async function showTabMenu(tabId: string): Promise<void> {
   const tabs = registry.get(tabsAtom)
   const at = tabs.tabs.findIndex((tab) => tab.id === tabId)
@@ -878,14 +893,15 @@ export async function showTabMenu(tabId: string): Promise<void> {
   const topicId = tabTopic(tab)
   const header = topicId === undefined ? undefined : registry.get(topicAtom(topicId))
   const detail = header?._tag === 'Success' ? header.value : null
+  const reading = readingOnly()
   const chosen = await popupContextMenu([
     { id: 'pin', label: tab.pinned ? 'Unpin tab' : 'Pin tab' },
     { separator: true },
-    { id: 'close', label: 'Close tab', accelerator: 'CommandOrControl+W' },
+    { id: 'close', label: 'Close tab', accelerator: 'CommandOrControl+W', enabled: !reading || tabs.tabs.length > 1 },
     { id: 'close-others', label: 'Close other tabs', enabled: tabs.tabs.some((other) => other.id !== tabId && !other.pinned) },
     { id: 'close-right', label: 'Close tabs to the right', enabled: tabs.tabs.slice(at + 1).some((other) => !other.pinned) },
-    { id: 'close-all', label: 'Close all tabs', enabled: tabs.tabs.some((other) => !other.pinned) },
-    ...(detail === null
+    ...(reading ? [] : [{ id: 'close-all', label: 'Close all tabs', enabled: tabs.tabs.some((other) => !other.pinned) }]),
+    ...(detail === null || reading
       ? []
       : [{ separator: true } as const, { id: 'copy-link', label: 'Copy Slack link' }, { id: 'open-in-slack', label: 'Open in Slack' }]),
   ])

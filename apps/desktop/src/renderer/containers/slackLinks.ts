@@ -34,6 +34,7 @@ import {
   type SlackLinkTarget,
 } from '@juno/state'
 import { newMessage, openTopic, openTopicAt, openTopicAtInBackground, openTopicInBackground } from './navigation'
+import { readingOnly } from './readingOnly'
 
 /** The link read against the signed-in workspace; undefined for a link that is not to Slack, or when signed out. */
 function read(url: string): SlackLinkMatch | undefined {
@@ -113,14 +114,15 @@ const NO_CONVERSATION = 'Juno cannot reach that conversation'
  * A person, from a link to them or a click on them in a message (SPEC 7 and
  * 8): your DM with them at its Main, as a link to a topic opens it, or Home
  * addressed to them when you have never messaged them; with ⌘, either opens
- * behind the current tab. False when Juno does not know them.
+ * behind the current tab. Reading only, there is no Home, so a person
+ * never messaged opens nothing. False when Juno does not know them.
  */
 export async function openPerson(user: string, behind: boolean): Promise<boolean> {
   const found = await locatePerson(registry, user)
   const person = found._tag === 'Success' ? found.value : undefined
   if (person?.person === undefined) return false
   if (person.mainId !== undefined) openLinked(person.mainId, undefined, behind)
-  else newMessage({ key: `u:${user}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true }, behind)
+  else if (!readingOnly()) newMessage({ key: `u:${user}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true }, behind)
   return true
 }
 
@@ -147,9 +149,9 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
   }
 }
 
-/** A web link: in the web panel, or in the browser with ⌘ (SPEC 8). */
+/** A web link: in the web panel, or in the browser with ⌘ (SPEC 8). Reading only, there is no web panel: always the browser. */
 export function openWebLink(url: string, event: ActivateEvent): void {
-  if (event.metaKey) openExternal(url)
+  if (event.metaKey || readingOnly()) openExternal(url)
   else openWebPanel(registry, url)
 }
 
