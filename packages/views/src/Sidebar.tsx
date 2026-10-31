@@ -198,6 +198,7 @@ export function Sidebar({
   syncing = false,
 }: SidebarProps) {
   const shows = (target: SidebarNavTarget) => pages.includes(target)
+  const junoShown = shows('juno')
   // The pill that is selected: a view, else the kind.
   const selected = filter.view !== undefined && views.some((view) => view.id === filter.view) ? filter.view : undefined
   const kind = selected === undefined ? filter.kind : undefined
@@ -273,7 +274,7 @@ export function Sidebar({
 
       {top}
 
-      {shows('juno') ? <>
+      {junoShown ? <>
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
         <NavItem
           icon={junoBusy ? SparkleDuotone : Sparkle}
@@ -309,7 +310,7 @@ export function Sidebar({
         padding="md"
         label="View"
         anchor={
-          <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters, !shows('juno') && styles.filtersFirst)}>
+          <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters, !junoShown && styles.filtersFirst)}>
             <PillRow>
               <FilterPill>
                 <Button variant="filter" aria-label="All" pressed={kind === 'all'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('all'))}>
