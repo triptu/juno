@@ -87,15 +87,12 @@ export function demoReplyPayload(tag: string, payload: unknown): unknown {
 
 /**
  * Commands that normal reading sends by itself (saving the open tabs,
- * marking a topic read, telling the engine what is on screen). The demo
- * keeps nothing, so each succeeds with this value and changes nothing.
+ * marking a topic read). The demo keeps nothing, so each succeeds with
+ * this value and changes nothing.
  */
 const HOUSEKEEPING: Readonly<Record<string, unknown>> = {
   'prefs.set': undefined,
   'reads.markRead': {},
-  'emoji.use': undefined,
-  'huddle.report': undefined,
-  'home.visit': undefined,
 }
 
 interface Range {

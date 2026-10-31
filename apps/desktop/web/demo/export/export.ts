@@ -20,21 +20,10 @@ import { Logger, LogLevel } from 'effect'
 import {
   aiActivity,
   channelThreads,
-  draftsGet,
-  huddleCall,
-  huddleIncoming,
-  huddleRunning,
-  mentionsEmoji,
-  mentionsPeople,
-  newChatRanked,
-  notificationsSettings,
   presencePeople,
   notificationsStatus,
-  searchQuery,
   uploadsProgress,
   engineStatus,
-  emojiFrequent,
-  emojiRecent,
   messagesList,
   messagesLoadNewer,
   messagesLoadOlder,
@@ -151,19 +140,14 @@ async function settle(recorder: DemoRecorder): Promise<void> {
   await recorder.reply(prefsSet, { key: 'tabs', value: { tabs: [{ id: DEMO_TAB, pinned: false, place: { kind: 'topic', topicId: threads[0] ?? all[0]!.id } }], active: DEMO_TAB, recent: [DEMO_TAB] } })
 }
 
-/** What the shell reads as it starts, whatever is on screen. */
+/** What the shell reads as it starts, whatever is on screen. Reading only, it warms no composer, ⌘K or huddle. */
 async function recordShell(recorder: DemoRecorder): Promise<void> {
   await recorder.value(sessionStatus, undefined)
   await recorder.value(sessionProfile, undefined)
   await recorder.value(engineStatus, undefined)
-  await recorder.value(emojiRecent, {})
-  await recorder.value(emojiFrequent, {})
   for (const key of ['tabs', 'tourSeen']) await recorder.value(prefsGet, { key })
-  // The chrome's reads, all idle here: no call, no upload, notifications as they are.
-  for (const route of [notificationsStatus, notificationsSettings, huddleCall, huddleIncoming, huddleRunning, uploadsProgress, mentionsEmoji, presencePeople]) await recorder.value(route, undefined)
-  // ⌘K's empty state, which the shell warms when idle.
-  await recorder.value(newChatRanked, { query: '' })
-  await recorder.value(searchQuery, { query: '', limit: 6, places: false })
+  // The chrome's reads, idle here: no upload, notifications as they are, nobody's presence shown.
+  for (const route of [notificationsStatus, uploadsProgress, presencePeople]) await recorder.value(route, undefined)
 }
 
 /** Every list the sidebar can show: each quick filter, alone and in each view and each channel's scope. Returns All. */
@@ -188,10 +172,6 @@ async function recordSidebar(recorder: DemoRecorder): Promise<ReadonlyArray<Topi
 async function recordTopics(recorder: DemoRecorder, rows: ReadonlyArray<TopicListRow>): Promise<void> {
   for (const row of rows) {
     await recorder.value(topicsGet, { id: row.id })
-    await recorder.value(draftsGet, { topicId: row.id })
-    // The composer's mention suggestions, warmed with an empty query when a topic opens.
-    const thread = /^t:[^:]+:(.+)$/.exec(row.id)?.[1]
-    await recorder.value(mentionsPeople, { channel: row.channelId, ...(thread === undefined ? {} : { threadTs: thread }), query: '' })
     const messages = await recorder.list(messagesList, { id: row.id, range: { limit: MESSAGE_WINDOW_MAX } })
     if (messages.length >= MESSAGE_WINDOW_MAX) throw new Error(`demo export: ${row.id} has more messages than one window holds`)
     const first = messages[0]
