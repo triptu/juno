@@ -33,6 +33,7 @@
     "**/release/**",
     "**/playwright-report/**",
     "**/test-results/**",
-    "docs/**"
+    "docs/**",
+    "site/try/**"
   ]
 }
