@@ -26,7 +26,7 @@ test.describe('topic art', () => {
 
       test('art that arrived while its row was off screen shows whole on the row’s first frame', async ({ page }) => {
         await page.goto('/#/Sidebar?__state=art/off-screen')
-        const id = 'C0ENG:1760000000.000100:2'
+        const id = 'C0ENG:1760000000.000100:4'
         const tile = page.locator(`[data-topic-id="${id}"] [data-topic-art]`)
         await expect(tile).toHaveAttribute('data-topic-art', 'placeholder')
         // Far enough below that `content-visibility` skips the row's contents.

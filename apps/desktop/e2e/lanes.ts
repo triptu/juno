@@ -33,6 +33,7 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'peek.spec.ts',
   'person-links.spec.ts',
   'sidebar-hold.spec.ts',
+  'sidebar-jump.spec.ts',
   'sidebar-motion.spec.ts',
   'sidebar-first-sync.spec.ts',
   'tabs.spec.ts',
