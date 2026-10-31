@@ -4,6 +4,7 @@ import { copyImage, downloadFile, openFile, openViewerAtom, popupContextMenu, qu
 import { useAtomValue } from '@juno/state/react'
 import { viewingOf, type MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
+import { readingOnly } from '../readingOnly'
 
 const viewer = chunk(() => import('../TopicViewerPanel'))
 const TopicViewerPanel = viewer.component((module) => module.default)
@@ -93,7 +94,10 @@ export function useTopicFiles(view: string) {
   })
   const open = useAtomValue(openViewerAtom(view), (viewer) => viewer !== undefined)
   const progress = useAtomValue(uploadProgressAtom)
-  useEffect(preloadViewer, [])
+  // Reading only, nothing opens the viewer or a link's menu.
+  useEffect(() => {
+    if (!readingOnly()) preloadViewer()
+  }, [])
   const uploadProgress = progress._tag === 'Success' && Object.keys(progress.value).length > 0 ? progress.value : undefined
   const viewer = open ? <Suspense fallback={null}><TopicViewerPanel view={view} opener={opener} /></Suspense> : null
   return { dropping, setDropping, setViewing, uploadProgress, viewer }

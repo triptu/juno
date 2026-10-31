@@ -13,6 +13,7 @@ import { Suspense, useSyncExternalStore } from 'react'
 import { afterPaint, mark, measure } from '@juno/state/perf'
 import type { MenuPoint, MessageMenuEntry } from '@juno/views'
 import { chunk } from './chunks'
+import { readingOnly } from './readingOnly'
 
 type Menus = typeof import('./MessageMenuPanel')
 let menus: Menus | undefined
@@ -31,9 +32,12 @@ export function withMenus(open: (loaded: Menus) => void): void {
 }
 
 let preloaded = false
-/** Fetches the menu's chunk and the workspace's emoji when idle after a list has painted, so the first right-click and More reactions do not wait. */
+/**
+ * Fetches the menu's chunk and the workspace's emoji when idle after a list has painted, so the first right-click and More reactions do not wait.
+ * Reading only, no message has a menu.
+ */
 export function preloadMessageMenu(): void {
-  if (preloaded) return
+  if (preloaded || readingOnly()) return
   preloaded = true
   afterPaint(() =>
     window.requestIdleCallback(() => {

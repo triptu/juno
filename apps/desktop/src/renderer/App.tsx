@@ -72,7 +72,8 @@ export function App() {
   useEffect(() => registry.mount(reportAppStateAtom), [])
 
   useEffect(() => {
-    if (signedIn !== undefined) return
+    // Reading only, there is no sign-in and no setup.
+    if (signedIn !== undefined || readingOnly()) return
     const idle = requestIdleCallback(() => {
       void setup.load()
     })
