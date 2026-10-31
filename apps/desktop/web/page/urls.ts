@@ -18,30 +18,31 @@ export function pageUrl(value: string): string {
 
 const LOADING_ATTRIBUTES = new Set(['src', 'poster', 'href', 'srcset'])
 
-function patchProperty(prototype: object, name: string): void {
+function patchProperty(prototype: object, name: string, map: (value: string) => string): void {
   const descriptor = Object.getOwnPropertyDescriptor(prototype, name)
   const set = descriptor?.set
   if (descriptor === undefined || set === undefined) return
   Object.defineProperty(prototype, name, {
     ...descriptor,
     set(this: Element, value: unknown) {
-      set.call(this, typeof value === 'string' ? pageUrl(value) : value)
+      set.call(this, typeof value === 'string' ? map(value) : value)
     },
   })
 }
 
-export function installUrlRewrite(): void {
+/** Maps every loading address through `map`: `pageUrl` here, the read-only demo's own there (`web/demo/page`). */
+export function installUrlRewrite(map: (value: string) => string = pageUrl): void {
   const setAttribute = Element.prototype.setAttribute
   Element.prototype.setAttribute = function (this: Element, name: string, value: string) {
-    setAttribute.call(this, name, LOADING_ATTRIBUTES.has(name.toLowerCase()) && typeof value === 'string' ? pageUrl(value) : value)
+    setAttribute.call(this, name, LOADING_ATTRIBUTES.has(name.toLowerCase()) && typeof value === 'string' ? map(value) : value)
   }
-  patchProperty(HTMLImageElement.prototype, 'src')
-  patchProperty(HTMLMediaElement.prototype, 'src')
-  patchProperty(HTMLSourceElement.prototype, 'src')
-  patchProperty(HTMLIFrameElement.prototype, 'src')
-  patchProperty(HTMLVideoElement.prototype, 'poster')
-  patchProperty(HTMLAnchorElement.prototype, 'href')
+  patchProperty(HTMLImageElement.prototype, 'src', map)
+  patchProperty(HTMLMediaElement.prototype, 'src', map)
+  patchProperty(HTMLSourceElement.prototype, 'src', map)
+  patchProperty(HTMLIFrameElement.prototype, 'src', map)
+  patchProperty(HTMLVideoElement.prototype, 'poster', map)
+  patchProperty(HTMLAnchorElement.prototype, 'href', map)
 
   const fetch = window.fetch.bind(window)
-  window.fetch = (input, init) => fetch(typeof input === 'string' ? pageUrl(input) : input instanceof URL ? pageUrl(input.href) : input, init)
+  window.fetch = (input, init) => fetch(typeof input === 'string' ? map(input) : input instanceof URL ? map(input.href) : input, init)
 }
