@@ -138,9 +138,8 @@ function holdKeysAfterNewShortcut(event: KeyboardEvent): void {
   if (key === 'n' || key === 't') holdKeys()
 }
 
-/** The workspace's wiring for reading: menu commands, per-tab focus and the mouse's back and forward buttons. */
+/** The workspace's wiring for reading: per-tab focus and the mouse's back and forward buttons. */
 function useWorkspaceEffects(active: string | undefined): void {
-  useEffect(() => onMenuCommand(runMenuCommand), [])
   useEffect(() => {
     document.addEventListener('focusin', onFocusIn)
     return () => document.removeEventListener('focusin', onFocusIn)
@@ -153,6 +152,16 @@ function useWorkspaceEffects(active: string | undefined): void {
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [])
+}
+
+/**
+ * Menu commands, reading only too. This and `FullWiring` render after the
+ * pages, so their listeners register after the pages' own and before the
+ * workspace's focus effects.
+ */
+function MenuCommands() {
+  useEffect(() => onMenuCommand(runMenuCommand), [])
+  return null
 }
 
 /**
@@ -235,7 +244,6 @@ export function Workspace() {
 
   return (
     <>
-    {reading ? null : <FullWiring />}
     <WorkspaceView
       tabs={strip.map(stripTab)}
       {...(state.active === undefined ? {} : { activeId: state.active })}
@@ -272,6 +280,8 @@ export function Workspace() {
             </Activity>
           ))}
     </WorkspaceView>
+    <MenuCommands />
+    {reading ? null : <FullWiring />}
     </>
   )
 }
