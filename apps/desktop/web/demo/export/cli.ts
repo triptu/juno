@@ -9,7 +9,16 @@ import { exportDemo } from './export'
 
 const outDir = process.argv[2]
 if (outDir === undefined) throw new Error('usage: cli.ts <outDir>')
-const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+/** The checkout's commit; a copy without its history, as on the laptop, has none. */
+function commitOf(): string {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  } catch {
+    return 'unknown'
+  }
+}
+
+const commit = commitOf()
 const started = performance.now()
 const result = await exportDemo(outDir, commit)
 console.log(`demo export: ${Object.keys(result.snapshot.lists).length} lists, ${Object.keys(result.snapshot.values).length} values, ${Object.keys(result.snapshot.replies).length} replies, ${result.files} files, ${(result.bytes / 1024).toFixed(1)} KB in ${Math.round(performance.now() - started)} ms`)

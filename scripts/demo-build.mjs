@@ -17,7 +17,7 @@ if (built.status !== 0) process.exit(built.status ?? 1)
 
 const snapshot = JSON.parse(readFileSync(join(dist, 'demo/snapshot.json'), 'utf8'))
 const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim()
-if (snapshot.commit !== head) console.warn(`demo:build: the snapshot is from ${snapshot.commit.slice(0, 9)}, not HEAD ${head.slice(0, 9)}; commit, then build again`)
+if (snapshot.commit !== 'unknown' && snapshot.commit !== head) console.warn(`demo:build: the snapshot is from ${snapshot.commit.slice(0, 9)}, not HEAD ${head.slice(0, 9)}; commit, then build again`)
 
 const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)]))
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`
