@@ -1,0 +1,362 @@
+/* Juno's site. Values follow packages/tokens: warm paper, warm near-black
+   text, faint borders, Figtree for text and Instrument Serif for titles. */
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url(/fonts/figtree-latin-wght.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(/fonts/instrument-serif-latin-400.woff2) format('woff2');
+}
+
+:root {
+  --background: hsl(48, 50%, 98%);
+  --foreground: hsl(48, 15%, 12%);
+  --foreground-subtle: hsl(48, 8%, 35%);
+  --foreground-muted: hsl(48, 5%, 42%);
+  --border: hsl(48, 30%, 91%);
+  --code-bg: hsl(48, 30%, 94%);
+  --accent: hsl(48, 30%, 8%);
+  --accent-hover: hsl(48, 30%, 10%);
+  --accent-active: hsl(48, 30%, 13%);
+  --accent-foreground: hsl(48, 20%, 95%);
+  --ring: hsla(48, 15%, 12%, 0.08);
+  --shot-shadow: 0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07);
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1B1916;
+    --foreground: #EEEBE2;
+    --foreground-subtle: #C6C4BE;
+    --foreground-muted: #A09E9A;
+    --border: #32302D;
+    --code-bg: #252421;
+    --accent: hsl(48, 30%, 90%);
+    --accent-hover: hsl(48, 30%, 95%);
+    --accent-active: hsl(48, 30%, 99%);
+    --accent-foreground: hsl(48, 10%, 2%);
+    --ring: oklch(1 0 0 / 0.08);
+    --shot-shadow: 0 1px 2px 0 oklch(0 0 0 / 0.3), 0 6px 20px -4px oklch(0 0 0 / 0.35);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'tnum';
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--foreground-muted);
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  text-decoration-color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid #3B82F6;
+  outline-offset: 2px;
+}
+
+h1, h2 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+p + p {
+  margin-top: 0.75em;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--code-bg);
+  border-radius: 5px;
+  padding: 0.1em 0.35em;
+}
+
+pre {
+  margin: 0.6em 0 0;
+  padding: 10px 14px;
+  background: var(--code-bg);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+
+.wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 24px 56px;
+}
+
+/* Hero */
+
+.hero {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 72px 0 40px;
+}
+
+.hero-icon {
+  display: block;
+  margin: 0 auto 24px;
+  width: 72px;
+  height: 72px;
+}
+
+h1 {
+  font-size: 44px;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.hero-note {
+  color: var(--foreground-muted);
+  font-size: 15px;
+}
+
+.button {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 20px;
+  padding: 11px 20px;
+  border-radius: 10px;
+}
+
+.button:hover {
+  background: var(--accent-hover);
+  text-decoration: none;
+}
+
+.button:active {
+  background: var(--accent-active);
+}
+
+/* Trailer */
+
+.trailer {
+  margin: 0 auto;
+  max-width: 960px;
+}
+
+.trailer video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  background: var(--code-bg);
+  border-radius: 12px;
+  outline: 1px solid var(--ring);
+  outline-offset: -1px;
+  box-shadow: var(--shot-shadow);
+}
+
+.intro {
+  max-width: 640px;
+  margin: 64px auto 0;
+  text-align: center;
+  font-size: 20px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* Points */
+
+.point {
+  margin-top: 88px;
+}
+
+.point-text {
+  max-width: 600px;
+}
+
+h2 {
+  font-size: 32px;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+
+.point-text p {
+  color: var(--foreground-subtle);
+  text-wrap: pretty;
+}
+
+.shot {
+  margin: 28px 0 0;
+  max-width: 720px;
+}
+
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  outline: 1px solid var(--ring);
+  outline-offset: -1px;
+  box-shadow: var(--shot-shadow);
+}
+
+@media (min-width: 1100px) {
+  .point {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 720px;
+    gap: 40px;
+    align-items: center;
+  }
+
+  .shot {
+    margin: 0;
+  }
+}
+
+/* Also and getting started */
+
+.also, .start {
+  margin-top: 88px;
+  max-width: 640px;
+}
+
+.also ul, .start ol {
+  margin: 0;
+  padding-left: 1.3em;
+  color: var(--foreground-subtle);
+}
+
+.also li, .start li {
+  margin-top: 0.5em;
+  text-wrap: pretty;
+}
+
+.start li::marker {
+  color: var(--foreground-muted);
+  font-feature-settings: 'tnum';
+}
+
+.start-actions {
+  margin-top: 32px;
+}
+
+.foot {
+  margin-top: 96px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--foreground-muted);
+  font-size: 15px;
+}
+
+/* Phone */
+
+@media (max-width: 600px) {
+  html {
+    font-size: 16px;
+  }
+
+  .wrap {
+    padding: 0 20px 40px;
+  }
+
+  .hero {
+    padding: 48px 0 32px;
+  }
+
+  .hero-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-size: 30px;
+    line-height: 1.2;
+  }
+
+  .hero-actions {
+    margin-top: 24px;
+  }
+
+  .trailer video {
+    border-radius: 8px;
+  }
+
+  .intro {
+    margin-top: 44px;
+    font-size: 18px;
+  }
+
+  .point, .also, .start {
+    margin-top: 60px;
+  }
+
+  h2 {
+    font-size: 27px;
+  }
+
+  .shot {
+    margin-top: 20px;
+  }
+
+  .shot img {
+    border-radius: 6px;
+  }
+
+  .foot {
+    margin-top: 64px;
+  }
+}

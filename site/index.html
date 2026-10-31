@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Juno for Mac</title>
+  <meta name="description" content="A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="hsl(48, 50%, 98%)">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1B1916">
+  <meta property="og:title" content="Juno for Mac">
+  <meta property="og:description" content="A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.">
+  <meta property="og:image" content="https://juno.tushar.ai/trailer-poster.jpg">
+  <meta property="og:url" content="https://juno.tushar.ai/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/figtree-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/instrument-serif-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <img class="hero-icon" src="/icon.svg" width="72" height="72" alt="">
+      <h1>A Slack client for Mac that organises conversations into topics and decides which messages are worth a notification.</h1>
+      <p class="hero-actions">
+        <a class="button" href="https://github.com/triptu/juno-releases/releases/latest">Download for Mac</a>
+        <span class="hero-note">For Apple Silicon Macs.</span>
+      </p>
+    </header>
+
+    <figure class="trailer">
+      <video controls playsinline preload="none" poster="/trailer-poster.jpg" width="1920" height="1080">
+        <source src="/trailer.mp4" type="video/mp4">
+      </video>
+    </figure>
+
+    <p class="intro">Slack is organised by channel, and threads sit inside them. Juno shows one list of topics sorted by what happened last, and decides message by message whether to notify you, with a reason you can read.</p>
+
+    <section class="point">
+      <div class="point-text">
+        <h2>One list of topics</h2>
+        <p>A topic is a Slack thread, or the unthreaded messages of a channel or DM. The sidebar lists the threads you follow, the threads that mention you and the channel streams, newest activity first. Each row shows the title, the latest message, its channel or person, and what is unread.</p>
+        <p>Resolve marks a topic read and removes it from the list. If someone replies later, it comes back marked Reopened. Nothing is deleted. With an AI key, Juno names recent threads from their messages and draws a small picture for each row.</p>
+      </div>
+      <figure class="shot">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="/img/topics-dark.png">
+          <img src="/img/topics-light.png" width="1440" height="900" loading="lazy" alt="The Juno window. On the left, one list of topics with titles, the latest message and unread counts. On the right, an open thread from #design.">
+        </picture>
+      </figure>
+    </section>
+
+    <section class="point">
+      <div class="point-text">
+        <h2>Notifications decided for you</h2>
+        <p>Each message either notifies you or stays in Juno. Your notification hours and your Always and Never settings decide first. Simple rules handle the easy cases, such as a thanks after your own message. For the rest, Juno reads the message with its recent conversation and your instructions in your own words ("Production incidents", "Lunch and social plans"), and decides.</p>
+        <p>Juno keeps each decision and its reason. If one went the wrong way, a button says so, and Juno proposes an instruction. Your notification hours are written to Slack's own schedule, so your phone goes quiet at the same time.</p>
+      </div>
+      <figure class="shot">
+        <img src="/img/notifications.png" width="1440" height="900" loading="lazy" alt="Today's notifications in Settings: nine messages, each marked Notified or In Juno with its reason, such as Mentions always notify or Naomi thanked you. The top row is open and offers Should have notified.">
+      </figure>
+    </section>
+
+    <section class="point">
+      <div class="point-text">
+        <h2>Home</h2>
+        <p>Home lists questions you have not answered and things you said you would do, with links to their topics. It also suggests topics to resolve. When you are caught up, it shows a painting, print or photograph from the gallery, with one line about it.</p>
+      </div>
+      <figure class="shot">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="/img/home-dark.png">
+          <img src="/img/home-light.png" width="1440" height="900" loading="lazy" alt="Home: a greeting and three rows, a question Ruth asked you, something you said you would do, and two topics that look settled.">
+        </picture>
+      </figure>
+    </section>
+
+    <section class="point">
+      <div class="point-text">
+        <h2>⌘K and Search</h2>
+        <p>⌘K searches conversations and messages already on this Mac. Conversation search tolerates small spelling mistakes. With AI assist on, it also takes commands such as "resolve pricing" or "tell maya the wednesday slot works".</p>
+        <p>The Search tab searches Slack with filters for sender, place, date, and messages with a link, a file, a reaction or a pin. Selecting a result opens its topic beside the results, at that message.</p>
+      </div>
+      <figure class="shot">
+        <img src="/img/cmdk.png" width="1440" height="900" loading="lazy" alt="The ⌘K palette with the query recurring: matching topics and messages with the word marked.">
+      </figure>
+    </section>
+
+    <section class="point">
+      <div class="point-text">
+        <h2>Ask Juno</h2>
+        <p>Chat with Juno in its own tab or beside the topic you are reading (⌘J). Ask it to catch you up on a topic, and the answer links to the messages it read. Ask it to draft a reply, resolve topics, or check a channel every weekday at 9. Drafted messages and proposed resolutions come as cards, and Juno waits for your click before applying either.</p>
+      </div>
+      <figure class="shot">
+        <img src="/img/ask-juno.png" width="1920" height="900" loading="lazy" alt="A thread from #launch open beside the Juno panel. In the panel, Catch me up, a two-line answer, Say it's approved, and a Send message card marked Sent.">
+      </figure>
+    </section>
+
+    <section class="also">
+      <h2>Also</h2>
+      <ul>
+        <li>Tabs like a browser: ⌘T, ⌘W, ⌘⇧T to reopen, pin and drag, and back and forward per tab.</li>
+        <li>Views: your own sets of channels and DMs, and an Automated view Juno fills with bot and alert channels.</li>
+        <li>The pill in the header always says where a message will go. When a message typed in a channel reads like a reply to one of its threads, Juno offers to post it there.</li>
+        <li>Huddles: join and start Slack huddles, with audio and screen sharing.</li>
+        <li>Hide message text (⌃⌘H) blurs message previews and titles. A setting turns it on when another app starts sharing your screen.</li>
+        <li>Web links open in a panel beside the topic.</li>
+        <li>Light and dark themes, a choice of accent colours, and compact or comfortable density.</li>
+      </ul>
+    </section>
+
+    <section class="start" id="getting-started">
+      <h2>Getting started</h2>
+      <ol>
+        <li>Download the file ending in <code>-arm64.dmg</code> from the <a href="https://github.com/triptu/juno-releases/releases/latest">latest release</a>, then drag Juno to Applications.</li>
+        <li>If macOS blocks the first open, open System Settings › Privacy &amp; Security and choose Open Anyway, or run:
+          <pre><code>xattr -d com.apple.quarantine /Applications/Juno.app</code></pre></li>
+        <li>Sign in to Slack's desktop app first. In Juno, choose "Use the Slack app's session" and allow the macOS password prompt.</li>
+        <li>For the AI features, add an OpenRouter key in Settings › Juno. Juno uses it for titles, topic art, notification reading, Home suggestions and the message checks. These features send the relevant Slack text to OpenRouter, or to the endpoint you chose for the assistant. Without a key, direct messages and mentions notify.</li>
+      </ol>
+      <p class="start-actions"><a class="button" href="https://github.com/triptu/juno-releases/releases/latest">Download for Mac</a></p>
+    </section>
+
+    <footer class="foot">
+      <p>Juno is made by <a href="https://tushar.ai">Tushar</a>.</p>
+    </footer>
+  </main>
+</body>
+</html>
