@@ -13,7 +13,7 @@ import type { DemoSnapshot } from '@juno/state/demo'
  * request the renderer makes, show each topic whole, and fetch nothing but
  * the folder's own files.
  */
-const DIST = resolve(__dirname, '../../web/demo/dist')
+const DIST = resolve(import.meta.dirname, '../../web/demo/dist')
 const BASE = '/try/'
 const TYPES: Readonly<Record<string, string>> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' }
 
