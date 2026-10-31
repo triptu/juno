@@ -12,6 +12,7 @@ A Vercel project with this folder as its root deploys it on each push to main th
 - `img/`: `home-picture.jpg`, Home's caught-up painting, rendered from the film project (see "Stills"). The older screenshots there are no longer used by the page. A replaced image gets a new filename, or caches keep the old one.
 - `icon.svg`: the app icon from `assets/`.
 - `trailer-poster.jpg`: the trailer's poster, shown before the video plays.
+- `try/` (once published): the read-only demo at `/try/`, a copy of `bun run demo:build`'s output. Never edit it by hand; `docs/development.md`, "Demo", says how to publish it. `vercel.json` redirects `/try` to `/try/` and sets its cache times.
 
 ## Placeholders
 
