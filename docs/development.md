@@ -31,7 +31,7 @@ Images and videos under `docs/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.mp4
 
 The repo's scripts, its tool tests, the evals and most live scripts run on Bun. The root and package scripts call `bun`, and a script that starts another uses the running Bun (`process.execPath`). Bun runs TypeScript directly and resolves `./sync` to `./sync.ts`, so these need no resolve hook. These stay on Node:
 
-- **Scripts that open the store:** `bun run web`, `sync:live`, `sync:timeline`, `bench:sync`, `react:live`, `notif:replay`, `scripts/idle-live.ts` and the agent benchmarks in `packages/agent/bench`. `@effect/sql-sqlite-node` opens every database with `allowExtension: true`. Bun's `node:sqlite` on macOS uses the system SQLite, which is built without extension loading, so the open fails. These scripts start Node with `--import ./scripts/ts-resolve-hooks.mjs`, a small `module.registerHooks` resolver that tries `.ts`, `.tsx` and `/index.ts`.
+- **Scripts that open the store:** `bun run web`, the demo exporter (`build:demo`), `sync:live`, `sync:timeline`, `bench:sync`, `react:live`, `notif:replay`, `scripts/idle-live.ts` and the agent benchmarks in `packages/agent/bench`. `@effect/sql-sqlite-node` opens every database with `allowExtension: true`. Bun's `node:sqlite` on macOS uses the system SQLite, which is built without extension loading, so the open fails. These scripts start Node with `--import ./scripts/ts-resolve-hooks.mjs`, a small `module.registerHooks` resolver that tries `.ts`, `.tsx` and `/index.ts`.
 - **Knip**, in `bun run health` and lint. It asks the runtime which imports are built in, and Bun's `module.isBuiltin` counts `ws` and `undici`, so knip under Bun reported `ws` and `@types/ws` as unused in three packages. Knip takes the same 1.6 s on either runtime.
 - **electron-builder**, which supports only Node: `bun run package` runs `apps/desktop/build/package.cjs` with Node.
 - **Playwright's test runner.** `bun run` starts `playwright test` through the CLI's own `node` shebang. Playwright's library works under Bun (`huddle:live` and `build-icons.mjs` use it).
@@ -62,6 +62,7 @@ Run these from the repo root.
 | `bun run test:feel` | Builds, then records the feel suite in Electron on the Mac: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. Every full run checks six of them on the laptop. See "The feel suite". |
 | `bun run gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
 | `bun run web` | Starts the web shell: the real app in a browser against a fake Slack, for UI-only work. No build, no Electron. `--host` listens on the LAN; `--demo` uses the invented company for screenshots. See "Web shell". |
+| `bun run demo:build` | Exports a snapshot from the engine and builds the read-only demo, a folder of static files, into `apps/desktop/web/demo/dist/`, and prints its sizes. Heavy: run it with `bun run remote demo:build`. See "Demo". |
 | `bun run gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `bun run specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). It samples 500 traces per sync protocol under a fresh, printed seed (`--seed <n>` repeats one); `--no-cache` reruns every check. `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
 | `bun run specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 30 s on a remote machine when its traces are cached. |
@@ -940,6 +941,24 @@ What it cannot do:
 - Perf and feel numbers. It is a dev build with React in development mode and no Content Security Policy, so those come from Electron only (`bun run perf`, `bun run test:feel`).
 
 Desktop verification runs the browser and Electron lanes. The browser lane uses a production renderer build against a per-test engine and agent host; the web shell above stays a development tool. See [Desktop e2e](../apps/desktop/e2e/README.md#browser-lane).
+
+## Demo
+
+The read-only demo is the real renderer in a browser tab with no engine, no Slack and no server: a folder of static files a visitor downloads, for the product site. It shows the invented company in `demoSeed` (`bun run web --demo`'s data).
+
+```sh
+bun run demo:build                         # exports, builds, prints the sizes
+python3 -m http.server -d apps/desktop/web/demo/dist 8000   # any static server, any path
+```
+
+`bun run demo:build` (`scripts/demo-build.mjs`) builds `apps/desktop/web/demo/dist/` (gitignored) through `build-cached`, so an unchanged checkout reuses the last build, and prints what the first load fetches, plain and gzipped. Building the renderer is heavy for this Mac: run it on the laptop with `bun run remote demo:build`, which brings the folder back under `.remote/<run>/apps/desktop/web/demo/dist/`.
+
+- **Snapshot.** The exporter (`apps/desktop/web/demo/export/`, on Node because it opens the store, see "Runtimes") starts the fake Slack with the demo seed and the real engine with the fake AI and its background jobs, waits until the sync is done and every thread has its title and art, opens every topic, and reads through the engine's own routes everything the demo can show: the sidebar under each quick filter, view and channel scope, every topic's header and whole history, each channel's thread list, and what the chrome reads at start. `@juno/state/demo-capture` keeps each answer encoded by its route's schema, under its route and payload. The files the answers name (avatars, images) are copied into `demo/files/` and the answers point at the copies. The result is `demo/snapshot.json`.
+- **Page.** `web/demo/page/main.ts` replaces `main.tsx`: `@juno/state/demo` answers every engine request in the page from the snapshot (one message per live query, a window of a list cut from the whole list), and `web/demo/page/bridge.ts` answers `window.juno` with "not available" for everything native. A request the snapshot has no answer for is a miss: it is never answered, it is logged, and `window.__junoDemo.misses()` lists it. Commands that ordinary reading sends by itself (saving the tabs, read marks, Home's visit log) succeed and change nothing; nothing else writes.
+- **Shown.** The sidebar with its art, filters, views and channel scopes; every topic, whole; the header switcher and thread links; tabs, Back and Forward; peek. Dates are as of the export.
+- **Not yet hidden.** Home, Search and ⌘K, Settings, the Juno tab, the composer and message actions still show; using them misses. Hiding them is the next step.
+- **Dev server.** `vite -c vite.demo.config.ts` in `apps/desktop` serves the page with HMR against the last export in `web/demo/dist/demo/`. Run the exporter alone with `node --import ./scripts/ts-resolve-hooks.mjs apps/desktop/web/demo/export/cli.ts apps/desktop/web/demo/dist` (about 4 s).
+- **Test.** `apps/desktop/e2e/web/demo.spec.ts`, the desktop suite's `demo` Playwright project, serves the production build as static files under `/try/`, opens every topic in the sidebar and checks it shows every message the snapshot holds, then walks the filters, a channel scope, a thread link with Back and Forward, a second tab and peek. It fails on any miss, any page error, and any request that is not a GET of the folder's own files. `bun run remote test:desktop --project=demo web/demo.spec.ts` runs it.
 
 ## The feel suite
 
