@@ -90,7 +90,10 @@ export interface SidebarProps {
    * each bar brings its own insets and does not shrink.
    */
   readonly top?: ReactNode
-  readonly account: SidebarAccount
+  /** Which of Search, All topics, Home and the Juno item show, default all; without Juno the hairline under it goes too. */
+  readonly pages?: ReadonlyArray<SidebarNavTarget>
+  /** The account button and its menu. Without it the title bar has no account button. */
+  readonly account?: SidebarAccount
   /** Unread Juno messages: the count on the Juno item, in the sidebar's counter colours. */
   readonly junoUnread?: number
   /** A background job is running: the Juno item's sparkle turns duotone. A run alone does not light it (SPEC 13.2). */
@@ -100,9 +103,9 @@ export interface SidebarProps {
   readonly dots: SidebarDots
   readonly scope?: SidebarScope
   /** The account menu: open state and the panel's content (the owner fills it). */
-  readonly accountMenuOpen: boolean
+  readonly accountMenuOpen?: boolean
   readonly accountMenu?: ReactNode
-  readonly onAccountMenu: (open: boolean) => void
+  readonly onAccountMenu?: (open: boolean) => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   /** Right-click on a page item or button: its menu (Open in new tab). */
@@ -138,11 +141,15 @@ export interface SidebarProps {
   /** It is on because the screen is shared: the footer says so ("Message text hidden while sharing"). */
   readonly privacySharing?: boolean
   readonly onPrivacyOff?: () => void
+  /** A quiet line at the foot of the sidebar, after the status card: what the window shows, such as sample conversations. */
+  readonly note?: string
   /** The topic list. */
   readonly children: ReactNode
   /** The engine is not live yet or a sync cycle is running: the list may still change (`aria-busy` on the sidebar). */
   readonly syncing?: boolean
 }
+
+const ALL_PAGES: ReadonlyArray<SidebarNavTarget> = ['search', 'all-topics', 'home', 'juno']
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
@@ -150,13 +157,14 @@ export interface SidebarProps {
  * the Juno nav item, a
  * hairline, the quick filters with their dots and the Unread toggle, the
  * scope chip when scoped, the list the owner renders into it, and a footer
- * while there is something to say: the sync status card, and, while
- * privacy mode is on, a card that says so with a Show button.
+ * while there is something to say: the sync status card, while privacy
+ * mode is on a card that says so with a Show button, and the note.
  */
 export function Sidebar({
   titlebarLeading,
   fullScreen = false,
   top,
+  pages = ALL_PAGES,
   account,
   junoUnread = 0,
   junoBusy = false,
@@ -164,7 +172,7 @@ export function Sidebar({
   filter,
   dots,
   scope,
-  accountMenuOpen,
+  accountMenuOpen = false,
   accountMenu,
   onAccountMenu,
   onNavigate,
@@ -185,9 +193,11 @@ export function Sidebar({
   privacy = false,
   privacySharing = false,
   onPrivacyOff,
+  note,
   children,
   syncing = false,
 }: SidebarProps) {
+  const shows = (target: SidebarNavTarget) => pages.includes(target)
   // The pill that is selected: a view, else the kind.
   const selected = filter.view !== undefined && views.some((view) => view.id === filter.view) ? filter.view : undefined
   const kind = selected === undefined ? filter.kind : undefined
@@ -207,7 +217,7 @@ export function Sidebar({
         <div {...stylex.props(styles.titlebar, fullScreen && styles.titlebarFullScreen)}>
           {titlebarLeading}
           <div {...stylex.props(styles.icons)}>
-            <IconButton
+            {shows('search') ? <IconButton
               icon={MagnifyingGlass}
               label="Search"
               shortcut={menuKeys('search.open')}
@@ -215,16 +225,16 @@ export function Sidebar({
               current={activeNav === 'search'}
               {...activateHandlers<HTMLButtonElement>((event) => onNavigate('search', event))}
               onContextMenu={navMenu('search')}
-            />
-            <IconButton
+            /> : null}
+            {shows('all-topics') ? <IconButton
               icon={ListBullets}
               label="All topics"
               size={30}
               current={activeNav === 'all-topics'}
               {...activateHandlers<HTMLButtonElement>((event) => onNavigate('all-topics', event))}
               onContextMenu={navMenu('all-topics')}
-            />
-            <IconButton
+            /> : null}
+            {shows('home') ? <IconButton
               icon={House}
               label="Home"
               size={30}
@@ -232,11 +242,11 @@ export function Sidebar({
               {...activateHandlers<HTMLButtonElement>((event) => onNavigate('home', event))}
               onContextMenu={navMenu('home')}
               {...(onNavigatePrefetch === undefined ? {} : { onPointerEnter: () => onNavigatePrefetch('home'), onFocus: () => onNavigatePrefetch('home') })}
-            />
-            <span {...stylex.props(styles.account)}>
+            /> : null}
+            {account === undefined ? null : <span {...stylex.props(styles.account)}>
               <Popover
                 open={accountMenuOpen}
-                onClose={() => onAccountMenu(false)}
+                onClose={() => onAccountMenu?.(false)}
                 width="browse"
                 placement="bottom-center"
                 role="dialog"
@@ -247,7 +257,7 @@ export function Sidebar({
                     initials={account.initials}
                     hue={account.hue}
                     open={accountMenuOpen}
-                    onClick={() => onAccountMenu(!accountMenuOpen)}
+                    onClick={() => onAccountMenu?.(!accountMenuOpen)}
                     {...(account.avatarUrl === undefined ? {} : { src: account.avatarUrl })}
                     {...(account.presence === undefined ? {} : { presence: account.presence })}
                     {...(account.paused === undefined ? {} : { paused: account.paused })}
@@ -256,13 +266,14 @@ export function Sidebar({
               >
                 {accountMenu}
               </Popover>
-            </span>
+            </span>}
           </div>
         </div>
       </header>
 
       {top}
 
+      {shows('juno') ? <>
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
         <NavItem
           icon={junoBusy ? SparkleDuotone : Sparkle}
@@ -285,6 +296,7 @@ export function Sidebar({
       <div {...stylex.props(styles.rule)}>
         <Divider />
       </div>
+      </> : null}
 
       {/* Filters switch on mouse down, like the rows (performance.md 4.1). A dot is in the name ("Channels, unread"), so a screen reader hears it. The view sheet hangs under the row. */}
       <Popover
@@ -297,7 +309,7 @@ export function Sidebar({
         padding="md"
         label="View"
         anchor={
-          <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters)}>
+          <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters, !shows('juno') && styles.filtersFirst)}>
             <PillRow>
               <FilterPill>
                 <Button variant="filter" aria-label="All" pressed={kind === 'all'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('all'))}>
@@ -358,7 +370,7 @@ export function Sidebar({
 
       {children}
 
-      {status !== undefined || privacy ? (
+      {status !== undefined || privacy || note !== undefined ? (
         <div {...stylex.props(styles.footer)}>
           {status}
           {privacy ? (
@@ -372,6 +384,11 @@ export function Sidebar({
               </Button>
             </div>
           ) : null}
+          {note === undefined ? null : (
+            <Text variant="meta" tone="subtle" truncate sx={styles.note}>
+              {note}
+            </Text>
+          )}
         </div>
       ) : null}
     </aside>
@@ -519,6 +536,10 @@ const styles = stylex.create({
     paddingInline: layout['--sidebar-inset'],
     paddingBottom: spacing['--space-2-5'],
   },
+  // With no Juno item and hairline above, the filters keep the gap under the title bar that the item had.
+  filtersFirst: {
+    paddingTop: spacing['--space-1'],
+  },
   unread: {
     display: 'inline-flex',
     flexShrink: 0,
@@ -555,5 +576,9 @@ const styles = stylex.create({
   privacyText: {
     flexGrow: 1,
     minWidth: 0,
+  },
+  // At the row text's inset, as the privacy card's line is.
+  note: {
+    paddingInline: spacing['--space-2-5'],
   },
 })

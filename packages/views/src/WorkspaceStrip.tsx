@@ -51,7 +51,7 @@ export interface WorkspaceStripProps {
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onSelectTab?: ((id: string, event: ActivateEvent) => void) | undefined
   readonly onCloseTab?: ((id: string) => void) | undefined
-  /** The "+" button: a new tab with Home. */
+  /** The "+" button: a new tab with Home. Without it there is no "+". */
   readonly onNewTab?: (() => void) | undefined
   /**
    * A tab dragged, or moved with ⌃⇧← and ⌃⇧→, to `index` in the strip. The
@@ -174,7 +174,7 @@ export function WorkspaceStrip({ tabs = [], activeId, onSelectTab, onCloseTab, o
   }
   return (
     <>
-      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} {...(fullScreen === undefined ? {} : { fullScreen })} trailing={<IconButton icon={Plus} label="New tab" shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
+      <TabStrip onKeyDown={onKeyDown} {...(onMoveTab === undefined ? {} : { onMove: onDrop })} leading={leading} {...(fullScreen === undefined ? {} : { fullScreen })} trailing={onNewTab === undefined ? undefined : <IconButton icon={Plus} label="New tab" shortcut={menuKeys('tab.new')} size={28} iconSize={16} tone="muted" onClick={onNewTab} />}>
         {tabs.map((tab) => (
           <Tab
             key={tab.id}
