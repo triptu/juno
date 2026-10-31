@@ -213,7 +213,9 @@ export function Workspace() {
   const fullScreen = useAtomValue(fullScreenAtom)
   const mounted = mountedTabs(state)
   // The Juno panel shows beside a topic tab while it is open in that tab, and never on a page (SPEC 7).
-  const agentOn = useAtomValue(junoAvailableAtom)
+  // Reading only, there is no Juno, no Home for "+" and none for the last tab to fall back to.
+  const reading = readingOnly()
+  const agentOn = useAtomValue(junoAvailableAtom) && !reading
   const panelOpen = useAtomValue(junoPanelOpenAtom)
   const panelWidth = useAtomValue(junoPanelWidthAtom)
   const panelTopic = useAtomValue(tabsAtom, activeTopicOf)
@@ -230,8 +232,6 @@ export function Workspace() {
   }, [webTabOpen])
 
   const pages = state.tabs.filter((tab) => mounted.has(tab.id))
-  // Reading only, there is no Home for "+" or for the last tab to fall back to.
-  const reading = readingOnly()
 
   return (
     <>

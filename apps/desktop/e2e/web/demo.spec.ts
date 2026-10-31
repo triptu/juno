@@ -75,7 +75,7 @@ test('the demo shows every topic whole from its snapshot, over static files only
       await expect(shownMessages.first()).toBeVisible()
       await shownMessages.first().hover()
       await expect(main.getByRole('textbox')).toHaveCount(0)
-      await expect(main.getByRole('button', { name: /^(More actions|Resolve|Reopen|Follow|Juno)$/ })).toHaveCount(0)
+      await expect(main.getByRole('button', { name: /^(More actions|Resolve|Reopen|Follow|Juno\b.*)$/ })).toHaveCount(0)
     })
 
     await test.step('every topic in the sidebar opens with all its messages', async () => {

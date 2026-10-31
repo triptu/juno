@@ -55,7 +55,7 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
       onMenu={openMenu}
       onPill={() => scopeToChannel(detail.channel.id)}
       {...(writes ? { onPillMenu: () => void showChannelMenu(detail.channel) } : {})}
-      {...(agentOn && reader === undefined ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
+      {...(writes && agentOn && reader === undefined ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
       {...(reader === undefined ? {} : { reader })}
       {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
       {...(writes && topicHeaderActions.length > 0 ? { actions: topicHeaderActions.map((Action, index) => <Action key={index} detail={detail} />) } : {})}
