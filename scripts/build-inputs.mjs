@@ -42,6 +42,13 @@ export const builds = {
     copied: ['apps/desktop/dom/public'],
     tools: ['vite'],
   },
+  'apps/desktop web/demo/dist': {
+    configs: ['apps/desktop/vite.demo.config.ts'],
+    entries: ['apps/desktop/src/renderer/index.html', 'apps/desktop/web/demo/page/main.ts', 'apps/desktop/web/demo/export/cli.ts'],
+    read: ['packages/ui/src/duotone.ts'],
+    copied: ['apps/desktop/src/renderer/public'],
+    tools: ['vite'],
+  },
   'apps/gallery dist': {
     configs: ['apps/gallery/vite.config.ts'],
     entries: ['apps/gallery/index.html'],

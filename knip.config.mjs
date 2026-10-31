@@ -47,13 +47,16 @@ export default {
         // The web shell (`bun run web`): its host and the page entry it serves.
         'web/host/cli.ts',
         'web/page/main.ts',
+        // The read-only demo (`bun run demo:build`): its exporter and the page entry it builds.
+        'web/demo/export/cli.ts',
+        'web/demo/page/main.ts',
         // The DOM lane's bun test files (scripts/dom-tests.mjs).
         'dom/**/*.test.ts',
         'dom/profile.ts', // Preloaded only with JUNO_DOM_PROFILE=1.
       ],
       project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'dom/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', 'web/**/*.ts', '*.config.ts', '*.vite.ts'],
       playwright: { config: ['playwright*.config.ts'] },
-      vite: { config: ['electron.vite.config.ts', 'vite.web.config.ts', 'dom/vite.config.ts'] },
+      vite: { config: ['electron.vite.config.ts', 'vite.web.config.ts', 'vite.demo.config.ts', 'dom/vite.config.ts'] },
       // @vitejs/plugin-react imports the React Compiler by name when `compiler` is set (renderer.vite.ts).
       ignoreDependencies: ['oxc-transform-react'],
     },

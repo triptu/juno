@@ -101,6 +101,16 @@ const dirRules = [
     reason: 'The web shell\'s host is a Node program: the fake Slack, the engine and Vite. The renderer runs in the browser.',
   },
   {
+    dir: 'apps/desktop/web/demo/page',
+    ban: ['@juno/engine', '@juno/store', '@juno/slack', '@juno/fake-slack', '@juno/state/demo-capture', '@juno/state/socket', 'electron', NODE_BUILTIN],
+    reason: 'The read-only demo\'s page is the renderer\'s third entry: every engine request is answered from the snapshot in the page, with no engine, socket or host (docs/development.md, "Demo").',
+  },
+  {
+    dir: 'apps/desktop/web/demo/export',
+    ban: ['@juno/views', '@juno/ui', 'electron', 'react', 'react-dom'],
+    reason: 'The demo exporter is a Node program: the fake Slack, the engine and a recording client of it. The renderer runs in the browser.',
+  },
+  {
     dir: 'packages/huddle-media/src',
     ban: ['@juno/state', 'react', 'react-dom', 'electron', NODE_BUILTIN, EFFECT_ANY],
     reason: 'The media session is plain TypeScript outside React, loaded on join: no state, React, Effect or Electron (packages/huddle-media/README.md).',

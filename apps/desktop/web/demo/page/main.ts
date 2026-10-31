@@ -1,0 +1,28 @@
+/**
+ * The read-only demo's page entry, in place of the renderer's `main.tsx`
+ * (`docs/development.md`, "Demo"): the same renderer (`startRenderer`),
+ * with every engine request answered from the exported snapshot
+ * (`@juno/state/demo`) and `window.juno` answered in the page. It needs
+ * only static files: this script, the snapshot and the files it names.
+ */
+import './install'
+import { registry } from '@juno/state'
+import { configureDemoConnection, type DemoMiss, type DemoSnapshot } from '@juno/state/demo'
+import { mark } from '@juno/state/perf'
+import { startRenderer } from '../../../src/renderer/start'
+import type { DemoPageHandle } from './handle'
+
+mark('juno.start')
+const misses: Array<DemoMiss> = []
+const handle: DemoPageHandle = { misses: () => misses }
+Object.assign(window, { __junoDemo: handle })
+// Relative to the page, so the demo works under any path (`/try/`).
+const snapshot = fetch('demo/snapshot.json').then((response) => {
+  if (!response.ok) throw new Error(`demo: snapshot answered ${response.status}`)
+  return response.json() as Promise<DemoSnapshot>
+})
+configureDemoConnection(registry, snapshot, (miss) => {
+  misses.push(miss)
+  console.warn('demo: the snapshot has no answer for', miss.tag, JSON.stringify(miss.payload))
+})
+startRenderer()

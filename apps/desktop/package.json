@@ -13,6 +13,7 @@
     "dev": "bun ../../scripts/without-run-as-node.mjs electron-vite dev",
     "build": "bun ../../scripts/build-desktop.mjs && bun ../../scripts/check-bundle-size.mjs",
     "build:web": "rm -rf dist && vite build -c vite.web.config.ts && bun web/build-host.mjs",
+    "build:demo": "vite build -c vite.demo.config.ts && node --import ../../scripts/ts-resolve-hooks.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON web/demo/export/cli.ts web/demo/dist",
     "build:dom": "vite build -c dom/vite.config.ts && bun web/build-host.mjs dom/dist",
     "start": "bun ../../scripts/without-run-as-node.mjs electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json && tsc -p tsconfig.dom.json",
