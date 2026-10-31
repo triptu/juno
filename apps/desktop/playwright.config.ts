@@ -59,6 +59,7 @@ export default defineConfig<object, { lane: Lane }>({
   projects: [
     { name: 'build-electron', testMatch: 'setup/electron.setup.ts' },
     { name: 'build-web', testMatch: 'setup/web.setup.ts' },
+    { name: 'build-demo', testMatch: 'setup/demo.setup.ts' },
     // Before the browser project, so its long scenarios start first rather than hold the run open at its end (e2e/order.ts).
     {
       name: 'feel',
@@ -104,7 +105,7 @@ export default defineConfig<object, { lane: Lane }>({
     {
       name: 'electron',
       outputDir: join(results, 'electron'),
-      testIgnore: ['web/web-shell.spec.ts', 'setup/**', 'perf.spec.ts', '*.perf.spec.ts', ...(process.env.JUNO_SCREENS === '1' ? [] : ['screens.spec.ts', '**/screens/**'])],
+      testIgnore: ['web/web-shell.spec.ts', 'web/demo.spec.ts', 'setup/**', 'perf.spec.ts', '*.perf.spec.ts', ...(process.env.JUNO_SCREENS === '1' ? [] : ['screens.spec.ts', '**/screens/**'])],
       dependencies: ['build-electron'],
       // Each test is its own group, so one file's tests spread over the workers; the slowest start first (e2e/order.ts).
       fullyParallel: true,
@@ -122,6 +123,15 @@ export default defineConfig<object, { lane: Lane }>({
         viewport: { width: 1280, height: 800 },
         reducedMotion: 'reduce',
       },
+    },
+    {
+      // The read-only demo's production build, served as static files (docs/development.md, "Demo").
+      name: 'demo',
+      outputDir: join(results, 'demo'),
+      testMatch: 'web/demo.spec.ts',
+      dependencies: ['build-demo'],
+      timeout: BROWSER_LIMIT_MS * limitScale(),
+      use: { browserName: 'chromium', viewport: { width: 1440, height: 900 } },
     },
   ],
   globalSetup: './e2e/feel/sheet.ts',
