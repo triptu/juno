@@ -8,7 +8,7 @@ import { buildInputs, builds, sourceFiles } from './build-inputs.mjs'
 
 const repo = resolve(import.meta.dirname, '..')
 const tracked = sourceFiles(repo)
-const commands = { 'apps/desktop out': ['bun', 'run', 'build'], 'apps/desktop dist': ['bun', 'run', 'build:web'], 'apps/desktop dom/dist': ['bun', 'run', 'build:dom'], 'apps/gallery dist': ['vite', 'build'] }
+const commands = { 'apps/desktop out': ['bun', 'run', 'build'], 'apps/desktop dist': ['bun', 'run', 'build:web'], 'apps/desktop dom/dist': ['bun', 'run', 'build:dom'], 'apps/desktop web/demo/dist': ['bun', 'run', 'build:demo'], 'apps/gallery dist': ['vite', 'build'] }
 // Files no build bundles: tests, e2e specs, docs and repo tools.
 const outside = ['packages/engine/test/ai.test.ts', 'apps/desktop/e2e/app.spec.ts', 'apps/desktop/dom/live.test.ts', 'apps/gallery/shift-walk.ts', 'docs/development.md', 'scripts/remote/plan.mjs', 'scripts/build-cached.test.mjs']
 
