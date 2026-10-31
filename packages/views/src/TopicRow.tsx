@@ -383,9 +383,17 @@ const styles = stylex.create({
     userSelect: 'none',
     // Rows are independent layout and paint units, and off-screen rows are
     // skipped entirely; the estimate keeps the scrollbar steady
-    // (docs/performance.md 3.2).
+    // (docs/performance.md 3.2). Chromium draws a skipped row's contents a
+    // frame after a jump brings it into view, so its fill showed without its
+    // text. A screenful at each end of a section (a tall window at the
+    // shortest row), where Home, End and a scrollbar thumb at an end land, is
+    // never skipped.
     contain: 'content',
-    contentVisibility: 'auto',
+    contentVisibility: {
+      default: 'auto',
+      ':nth-child(-n + 32)': 'visible',
+      ':nth-last-child(-n + 32)': 'visible',
+    },
     containIntrinsicSize: `auto ${density['--density-row-estimate']}`,
     backgroundColor: {
       default: 'var(--reorder-background, transparent)',
