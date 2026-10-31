@@ -21,7 +21,10 @@ import {
   aiActivity,
   channelThreads,
   presencePeople,
+  notificationsSettings,
   notificationsStatus,
+  huddleRunning,
+  mentionsEmoji,
   uploadsProgress,
   engineStatus,
   messagesList,
@@ -146,8 +149,8 @@ async function recordShell(recorder: DemoRecorder): Promise<void> {
   await recorder.value(sessionProfile, undefined)
   await recorder.value(engineStatus, undefined)
   for (const key of ['tabs', 'tourSeen']) await recorder.value(prefsGet, { key })
-  // The chrome's reads, idle here: no upload, notifications as they are, nobody's presence shown.
-  for (const route of [notificationsStatus, uploadsProgress, presencePeople]) await recorder.value(route, undefined)
+  // The chrome's and the rows' reads, idle here: no huddle or upload, notifications as they are, the workspace's emoji, nobody's presence shown.
+  for (const route of [notificationsStatus, notificationsSettings, huddleRunning, uploadsProgress, mentionsEmoji, presencePeople]) await recorder.value(route, undefined)
 }
 
 /** Every list the sidebar can show: each quick filter, alone and in each view and each channel's scope. Returns All. */
