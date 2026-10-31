@@ -191,7 +191,6 @@ figcaption { font-size: 13px; line-height: 1.5; color: var(--muted); text-align:
 /* The film: full width on the page's own line, its own poster from the middle of the film. */
 .film { padding: 0 0 104px; }
 .film-head { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; margin-bottom: 28px; }
-.film-head p { font-size: 14px; color: var(--muted); }
 .player { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--sheet); border: 1px solid var(--sheet-line); box-shadow: var(--sheet-shadow); }
 .player video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .poster { position: absolute; inset: 0; }
@@ -239,7 +238,6 @@ figcaption { font-size: 13px; line-height: 1.5; color: var(--muted); text-align:
 .start { padding: 96px 0 88px; }
 .start-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; }
 .start-cta { text-align: right; }
-.start-cta .note { margin-top: 10px; }
 .steps { list-style: none; padding: 0; margin: 56px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px; counter-reset: step; }
 .steps li { counter-increment: step; padding-top: 18px; border-top: 1px solid var(--line-strong); }
 .steps li::before { content: counter(step); font-size: 14px; font-weight: 500; line-height: 1; color: var(--muted); display: block; margin-bottom: 22px; font-variant-numeric: lining-nums tabular-nums; }

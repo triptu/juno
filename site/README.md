@@ -15,7 +15,7 @@ A Vercel project with this folder as its root deploys it on each push to main th
 - `img/`: every picture, as 2x webp with a light and a dark file. `window-*` is the whole window the features section labels, and `inset-*` are the crops it opens for things the window does not show. They are cut from Remotion stills of Juno's real views with the film's sample data.
 - `video/`: the speed clip, light and dark, as mp4 and webm, with a poster for each.
 - `icon.svg`: the app icon from `assets/`.
-- `trailer.mp4`, `trailer-poster.jpg`: the launch film (1:46, 1080p H.264) and its poster. The 4K master and the Remotion project that draws it are in the launch work folder, `film/` (`out/final2/`).
+- `trailer.mp4`, `trailer-poster.jpg`: the launch film (1:45, 1080p H.264) and its poster. The 4K master and the Remotion project that draws it are in the launch work folder, `film/` (`out/final2/`).
 - `try/`: the read-only demo at `/try/`, a copy of `bun run demo:build`'s output. Never edit it by hand; `docs/development.md`, "Demo", says how to publish it.
 - `vercel.json`: redirects `/try` to `/try/` and sets cache times. Fonts, pictures and the demo's hashed assets are cached for a year, so a replaced picture needs a new filename. The speed clip is cached for a day.
 

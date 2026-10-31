@@ -51,13 +51,13 @@
         <a class="button" href="https://github.com/triptu/juno-releases/releases/latest">Download for Mac</a>
         <!-- The browser demo. Add class "try-on" to <html> to show it. -->
         <a class="button button-quiet try-button" href="/try/">Try it in your browser</a>
-        <a class="film-link" href="#film"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5v9l8-4.5Z" fill="currentColor"/></svg>Watch the film<span class="dim">2 min</span></a>
+        <a class="film-link" href="#film"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5v9l8-4.5Z" fill="currentColor"/></svg>Watch the film<span class="dim">1:45</span></a>
       </div>
       <p class="note">For Apple Silicon Macs. Signs in through your Slack desktop app. AI features are optional and use your own OpenRouter&nbsp;key.</p>
     </div>
     <figure class="hero-art">
       <div class="mat"><div class="print"><img src="/img/almond-blossom.webp" width="1400" height="1106" fetchpriority="high" alt="Almond Blossom by Vincent van Gogh: branches of white blossom against a blue sky."></div></div>
-      <figcaption><span>Home when everything is caught up.</span><span class="credit">Almond Blossom · Vincent van Gogh, 1890</span></figcaption>
+      <figcaption><span class="credit">Almond Blossom · Vincent van Gogh, 1890</span></figcaption>
     </figure>
   </section>
 </div>
@@ -89,13 +89,12 @@
 <section class="film wrap" id="film" aria-labelledby="film-title">
   <div class="film-head">
     <h2 id="film-title">The film</h2>
-    <p>Under two minutes, with sample conversations.</p>
   </div>
   <div class="player">
     <video id="trailer" playsinline preload="none" width="1920" height="1080" aria-label="The Juno film"><source src="/trailer.mp4" type="video/mp4"></video>
     <div class="poster">
       <img src="/trailer-poster.jpg" width="1920" height="1080" loading="lazy" alt="">
-      <button class="play" type="button" aria-label="Play the film, 1 minute 46 seconds"><svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5v9l8-4.5Z" fill="currentColor"/></svg><span class="play-text">Play the film</span><span class="dim">1:46</span></button>
+      <button class="play" type="button" aria-label="Play the film, 1 minute 45 seconds"><svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 1.5v9l8-4.5Z" fill="currentColor"/></svg><span class="play-text">Play the film</span><span class="dim">1:45</span></button>
     </div>
   </div>
 </section>
@@ -104,7 +103,7 @@
   <div class="field field-notify" data-field="notify" aria-hidden="true"><canvas></canvas></div>
   <div class="wrap">
     <h2 id="notify-title">Notifications</h2>
-    <p class="notify-line">Notifications are judged by AI, so you only get pinged when it matters. Simple rules settle the obvious ones first, like a thank-you or a message meant for someone else. AI reads the rest, following instructions you write in your own words. Every decision is saved with its reason, so you can always see why something stayed&nbsp;quiet.</p>
+    <p class="notify-line">Notifications are judged by AI, so you only get pinged when it matters. Tell it what matters in your own words, and see why each one stayed&nbsp;quiet.</p>
     <dl class="reasons">
       <div><dt>Notified</dt><dd>Ivo asks you something.</dd></div>
       <div><dt>Stayed in Juno</dt><dd>Talk you're not part of.</dd></div>
@@ -120,7 +119,7 @@
           <img class="dark-only" src="/img/decisions-dark.webp" width="1440" height="320" loading="lazy" alt="">
         </picture>
       </div>
-      <figcaption>Today's decisions, each with its reason, in Settings. Juno also copies your quiet hours to Slack, so your phone stays quiet too.</figcaption>
+      <figcaption>Juno also copies your quiet hours to Slack, so your phone stays quiet too.</figcaption>
     </figure>
   </div>
 </section>
@@ -145,7 +144,7 @@
 <section class="agent wrap" aria-labelledby="agent-title">
   <div class="copy">
     <h2 id="agent-title">Juno AI</h2>
-    <p>Press ⌘J and ask Juno anything about your Slack. Every answer links to the messages it used. It can look things up in Notion or any other tool you connect. Ask for a draft and Juno writes one. You edit it, and nothing is sent until you press&nbsp;Send.</p>
+    <p>Press ⌘J and ask Juno anything about your Slack. Answers link to the messages they came from. It can look things up in Notion or any tool you connect, and write drafts you edit before&nbsp;sending.</p>
   </div>
   <figure class="agent-figure">
     <div class="sheet agent-sheet">
@@ -156,7 +155,6 @@
       <img class="light-only" src="/img/agent-card-light.webp" width="896" height="540" loading="lazy" alt="A Send message card to Ivo Reed, direct message, with the draft in an editable field: Export notes: two of six testers missed the export button. The label now shows a file count. Dismiss and Send buttons.">
       <img class="dark-only" src="/img/agent-card-dark.webp" width="896" height="540" loading="lazy" alt="">
     </div>
-    <figcaption>Juno pulls the numbers from Notion and writes a draft. You edit it and send&nbsp;it.</figcaption>
   </figure>
 </section>
 
@@ -178,22 +176,28 @@
 <section class="features wrap" id="features" aria-labelledby="features-title">
   <h2 id="features-title">More features</h2>
   <ul class="feature-list">
-    <li><button type="button" class="feature" data-spot="29.5 0.8 70 5.6" aria-pressed="false">Tabs<span class="sr"> Tabs, like a browser. ⌘T opens one, ⌘W closes it, ⌘⇧T brings it back. Pin the ones you keep. Old tabs close themselves.</span></button></li>
-    <li><button type="button" class="feature" data-spot="65.6 5.8 34 93" aria-pressed="false">Built-in browser<span class="sr"> Built-in browser, so you don't have to switch apps. Links open inside Juno, and you stay signed in.</span></button></li>
-    <li><button type="button" class="feature" data-spot="0.5 5.4 28 9.4" aria-pressed="false">Huddles<span class="sr"> Huddles built in. Join or start one, with audio and screen sharing.</span></button></li>
-    <li><button type="button" class="feature" data-spot="0.5 21.6 13.2 4.8" aria-pressed="false">Views<span class="sr"> Group channels and DMs however you like, and hide the ones you don't want in your main list.</span></button></li>
-    <li><button type="button" class="feature" data-spot="0.5 45.6 28 19.8" aria-pressed="false">Auto titles<span class="sr"> AI gives every thread a clear title and a small drawing. If you rename one, Juno keeps your name.</span></button></li>
-    <li><button type="button" class="feature" data-spot="34.6 56 14 3.4" aria-pressed="false">Typo checks<span class="sr"> After you send, Juno catches typos and slips and offers the fix.</span></button></li>
-    <li><button type="button" class="feature" data-spot="30.4 13.2 33.6 84.6" aria-pressed="false">Keyboard<span class="sr"> Press ↑ to pick a message, then T to reply in a thread, Q to quote, E to edit or R to react.</span></button></li>
-    <li><button type="button" class="feature" data-inset="peek" aria-pressed="false">Peek<span class="sr"> Hold ⌥ over a topic to read it without opening it or marking it read.</span></button></li>
-    <li><button type="button" class="feature" data-inset="quote" aria-pressed="false">Quote<span class="sr"> Press Q to quote a message, or select a few words to quote just those.</span></button></li>
-    <li><button type="button" class="feature" data-inset="reactions" aria-pressed="false">Quick reactions<span class="sr"> Right-click a message to react. The emoji you use most come first.</span></button></li>
-    <li><button type="button" class="feature" data-inset="search" aria-pressed="false">Search<span class="sr"> Results show up as you type, starting with what's already on your Mac. Narrow them by person, channel or date.</span></button></li>
-    <li><button type="button" class="feature" data-inset="loops" aria-pressed="false">Follow-ups<span class="sr"> Ask Juno to tell you if nobody replies. It also keeps track of what you promised to do.</span></button></li>
-    <li><button type="button" class="feature" data-inset="tidyup" aria-pressed="false">Tidy up<span class="sr"> Threads that go quiet clear themselves. Juno suggests which ones look done, and says why.</span></button></li>
-    <li><button type="button" class="feature" data-inset="picture" aria-pressed="false">Art<span class="sr"> When you're caught up, Home shows a work of art. There's a gallery with all of them.</span></button></li>
-    <li><button type="button" class="feature" data-inset="connections" aria-pressed="false">Connections<span class="sr"> Connect Notion, Littlebird, T3 Code or any MCP server, and Juno can use them when it answers you.</span></button></li>
-    <li><button type="button" class="feature" data-inset="memory" aria-pressed="false">Memory<span class="sr"> Juno remembers who your colleagues are, what they work on and how you talk with them. You can edit or delete any note.</span></button></li>
+    <li><button type="button" class="feature" data-spot="29.5 0.8 70 5.6" aria-pressed="false">Tabs<span class="sr"> Tabs, like a browser, with the same shortcuts. Old tabs close themselves.</span></button></li>
+    <li><button type="button" class="feature" data-spot="65.6 5.8 34 93" aria-pressed="false">Built-in browser<span class="sr"> Links open inside Juno, so you don't have to switch apps.</span></button></li>
+    <li><button type="button" class="feature" data-inset="palette" aria-pressed="false">Command palette<span class="sr"> Press ⌘K to jump to any topic or run a command.</span></button></li>
+    <li><button type="button" class="feature" data-spot="0.5 5.4 28 9.4" aria-pressed="false">Huddles<span class="sr"> Join or start a huddle, with audio and screen sharing.</span></button></li>
+    <li><button type="button" class="feature" data-spot="0.5 21.6 13.2 4.8" aria-pressed="false">Views<span class="sr"> Group channels and DMs into views of your own.</span></button></li>
+    <li><button type="button" class="feature" data-inset="automated" aria-pressed="false">Automated<span class="sr"> Bot and app channels get their own view, out of your main list.</span></button></li>
+    <li><button type="button" class="feature" data-spot="0.5 45.6 28 19.8" aria-pressed="false">Auto titles<span class="sr"> AI gives every thread a clear title and a small drawing.</span></button></li>
+    <li><button type="button" class="feature" data-spot="34.6 56 14 3.4" aria-pressed="false">Typo checks<span class="sr"> After you send, Juno catches typos and offers the fix.</span></button></li>
+    <li><button type="button" class="feature" data-spot="30.4 13.2 33.6 84.6" aria-pressed="false">Keyboard<span class="sr"> Press ↑ to pick a message, then T, Q, E or R to reply, quote, edit or react.</span></button></li>
+    <li><button type="button" class="feature" data-inset="peek" aria-pressed="false">Peek<span class="sr"> Hold ⌥ over a topic to read it without marking it read.</span></button></li>
+    <li><button type="button" class="feature" data-inset="quote" aria-pressed="false">Quote<span class="sr"> Press Q to quote a message, or just the words you select.</span></button></li>
+    <li><button type="button" class="feature" data-inset="reactions" aria-pressed="false">Quick reactions<span class="sr"> Right-click a message to react, with your most-used emoji first.</span></button></li>
+    <li><button type="button" class="feature" data-inset="viewer" aria-pressed="false">Image viewer<span class="sr"> Pictures and PDFs open large, right in Juno.</span></button></li>
+    <li><button type="button" class="feature" data-inset="search" aria-pressed="false">Search<span class="sr"> Results show up as you type, starting with what's already on your Mac.</span></button></li>
+    <li><button type="button" class="feature" data-inset="loops" aria-pressed="false">Follow-ups<span class="sr"> Juno keeps track of what you promised to do.</span></button></li>
+    <li><button type="button" class="feature" data-inset="tidyup" aria-pressed="false">Tidy up<span class="sr"> Juno suggests which threads look done, and says why.</span></button></li>
+    <li><button type="button" class="feature" data-inset="handoff" aria-pressed="false">Hand-offs<span class="sr"> Ask Juno to hand a coding task to T3 Code. It starts when you press Start.</span></button></li>
+    <li><button type="button" class="feature" data-inset="connections" aria-pressed="false">Connections<span class="sr"> Connect Notion, Littlebird, T3 Code or any MCP server for Juno to use.</span></button></li>
+    <li><button type="button" class="feature" data-inset="memory" aria-pressed="false">Memory<span class="sr"> Juno remembers who your colleagues are and what they work on, in notes you can edit.</span></button></li>
+    <li><button type="button" class="feature" data-inset="picture" aria-pressed="false">Art<span class="sr"> Browse every work of art in the gallery.</span></button></li>
+    <li><button type="button" class="feature" data-inset="privacy" aria-pressed="false">Privacy blur<span class="sr"> Message previews blur while you share your screen.</span></button></li>
+    <li><button type="button" class="feature" data-inset="appearance" aria-pressed="false">Themes<span class="sr"> Light, dark or match your Mac, with eight accent colours and two densities.</span></button></li>
   </ul>
   <figure class="window-figure">
     <figcaption class="feature-caption">Hover or tap a feature to see it in the app.</figcaption>
@@ -211,7 +215,6 @@
     <h2 id="start-title">Get Juno</h2>
     <div class="start-cta">
       <a class="button" href="https://github.com/triptu/juno-releases/releases/latest">Download for Mac</a>
-      <p class="note">For Apple Silicon Macs</p>
     </div>
   </div>
   <ol class="steps">
