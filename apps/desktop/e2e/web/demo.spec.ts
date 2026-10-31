@@ -60,12 +60,14 @@ test('the demo shows every topic whole from its snapshot, over static files only
     const rows = sidebar.getByRole('listitem')
     const selectedTab = page.getByRole('tablist', { name: 'Tabs' }).getByRole('tab', { selected: true })
     const shownMessages = main.locator('[data-message-row]')
+    // The selected tab's full title, its tooltip; its text also holds an avatar's initial. A Main's is its channel's name.
+    const expectOpen = (title: string) => expect(selectedTab).toHaveAttribute('data-tooltip', title.replace(/^#/, ''))
     await expect(rows).toHaveCount(all.order.length)
 
     await test.step('every topic in the sidebar opens with all its messages', async () => {
       for (const [index, id] of all.order.entries()) {
         await rows.nth(index).click()
-        await expect(selectedTab).toHaveText(titleOf(id).replace(/^#/, ''))
+        await expectOpen(titleOf(id))
         await expect(shownMessages).toHaveCount(messagesOf(titleOf(id)))
       }
     })
@@ -97,14 +99,14 @@ test('the demo shows every topic whole from its snapshot, over static files only
 
     await test.step("a thread link in Main opens the thread, and Back and Forward move between them", async () => {
       await sidebar.getByRole('listitem', { name: '#eng' }).click()
-      await expect(selectedTab).toHaveText('eng')
+      await expectOpen('eng')
       await main.getByRole('button', { name: /^5 replies/ }).click()
-      await expect(selectedTab).toHaveText('Release 2.4 goes out Thursday')
+      await expectOpen('Release 2.4 goes out Thursday')
       await expect(shownMessages).toHaveCount(messagesOf('Release 2.4 goes out Thursday'))
       await page.keyboard.press('Meta+[')
-      await expect(selectedTab).toHaveText('eng')
+      await expectOpen('eng')
       await page.keyboard.press('Meta+]')
-      await expect(selectedTab).toHaveText('Release 2.4 goes out Thursday')
+      await expectOpen('Release 2.4 goes out Thursday')
     })
 
     await test.step('a topic opens in a second tab, and the tabs switch', async () => {
@@ -112,10 +114,10 @@ test('the demo shows every topic whole from its snapshot, over static files only
       await sidebar.getByRole('listitem', { name: 'Jonas' }).click({ modifiers: ['Meta'] })
       await expect(tabs).toHaveCount(2)
       await tabs.filter({ hasText: 'Jonas' }).click()
-      await expect(selectedTab).toHaveText('Jonas')
+      await expectOpen('Jonas')
       await expect(shownMessages).toHaveCount(messagesOf('Jonas'))
       await tabs.filter({ hasText: 'Release 2.4' }).click()
-      await expect(selectedTab).toHaveText('Release 2.4 goes out Thursday')
+      await expectOpen('Release 2.4 goes out Thursday')
     })
 
     await test.step('holding Option over a row peeks at the topic', async () => {
