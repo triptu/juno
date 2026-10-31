@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import type { DemoPageHandle } from '../../web/demo/page/handle'
-import type { DemoSnapshot } from '@juno/state/demo'
+import type { DemoList, DemoSnapshot } from '@juno/state/demo'
 
 /**
  * The read-only demo (docs/development.md, "Demo") as a visitor gets it: the
@@ -11,7 +11,9 @@ import type { DemoSnapshot } from '@juno/state/demo'
  * plain files under `/try/` with no engine, socket or host. A walk through
  * everything the demo shows must find an answer in the snapshot for every
  * request the renderer makes, show each topic whole, and fetch nothing but
- * the folder's own files. What the demo cannot do (pages, writing, ⌘K) is
+ * the folder's own files. The exporter checks each topic's history against
+ * the fake Slack's messages, so a topic is whole when it shows every message
+ * the snapshot holds. What the demo cannot do (pages, writing, ⌘K) is
  * not there to find, by pointer, menu or key.
  */
 const DIST = resolve(import.meta.dirname, '../../web/demo/dist')
@@ -47,7 +49,10 @@ test('the demo shows every topic whole from its snapshot, over static files only
   const listOf = (payload: string) => snapshot.lists[`topics.list ${payload}`]!
   const all = listOf('{"kind":"all","unreadOnly":false}')
   const titleOf = (id: string) => (all.rows[id] as { readonly title: string }).title
-  const messagesOf = (title: string) => snapshot.lists[`messages.list ${JSON.stringify({ id: all.order.find((id) => titleOf(id) === title) })}`]!.order.length
+  const historyOf = (id: string) => snapshot.lists[`messages.list ${JSON.stringify({ id })}`]
+  const messagesOf = (title: string) => historyOf(all.order.find((id) => titleOf(id) === title)!)!.order.length
+  const switcherOf = (channel: string) => snapshot.lists[`channel.threads ${JSON.stringify({ all: true, channel })}`]!
+  const rowsOf = (list: DemoList) => Object.values(list.rows) as ReadonlyArray<{ readonly id: string; readonly title?: string; readonly thread?: { readonly id: string } }>
   const site = await serveFolder()
   const elsewhere: Array<string> = []
   const errors: Array<string> = []
@@ -67,6 +72,15 @@ test('the demo shows every topic whole from its snapshot, over static files only
     // The selected tab's full title, its tooltip; its text also holds an avatar's initial. A Main's is its channel's name.
     const expectOpen = (title: string) => expect(selectedTab).toHaveAttribute('data-tooltip', title.replace(/^#/, ''))
     await expect(rows).toHaveCount(all.order.length)
+
+    await test.step('every topic a row, a switcher or a thread link reaches has its header, history and open answer', () => {
+      const switchers = Object.keys(snapshot.lists).filter((key) => key.startsWith('channel.threads ')).map((key) => snapshot.lists[key]!)
+      const histories = Object.keys(snapshot.lists).filter((key) => key.startsWith('messages.list ')).map((key) => snapshot.lists[key]!)
+      const reached = new Set([...all.order, ...switchers.flatMap((list) => list.order), ...histories.flatMap((list) => rowsOf(list).flatMap((row) => (row.thread === undefined ? [] : [row.thread.id])))])
+      const lacking = [...reached].filter((id) => historyOf(id) === undefined || !(`topics.get ${JSON.stringify({ id })}` in snapshot.values) || !(`topics.open ${JSON.stringify({ id })}` in snapshot.replies))
+      expect(lacking).toEqual([])
+      expect(JSON.stringify(snapshot)).not.toMatch(/127\.0\.0\.1|localhost/)
+    })
 
     await test.step('the window offers reading only', async () => {
       await expect(sidebar.getByText('Demo · sample conversations')).toBeVisible()
@@ -169,6 +183,34 @@ test('the demo shows every topic whole from its snapshot, over static files only
       for (const key of ['Meta+k', 'Meta+t', 'Meta+n', 'Meta+Comma', 'Meta+j', 'Meta+f', 'Meta+w', 'Meta+Shift+t']) await page.keyboard.press(key)
       await expect(tabs).toHaveCount(1)
       await expect(page.getByRole('dialog')).toHaveCount(0)
+    })
+
+    await test.step("a thread only the switcher offers opens whole", async () => {
+      const older = rowsOf(switcherOf('C0DESIGN')).find((thread) => !all.order.includes(thread.id))!
+      await sidebar.getByRole('listitem', { name: '#design' }).click()
+      await expectOpen('design')
+      await main.locator('[data-topic-header] h1 button').click()
+      await page.getByRole('dialog', { name: 'Topics in this channel' }).getByRole('option', { name: older.title!, exact: false }).first().click()
+      await expectOpen(older.title!)
+      await expect(shownMessages).toHaveCount(historyOf(older.id)!.order.length)
+    })
+
+    await test.step('a sender opens your DM with them, and an @person with no DM opens nothing', async () => {
+      const tabs = page.getByRole('tablist', { name: 'Tabs' }).getByRole('tab')
+      await sidebar.getByRole('listitem', { name: '#eng' }).click()
+      await shownMessages.filter({ hasText: 'please rebase on main before Thursday' }).locator('[data-message-header] [data-opens-person]').click()
+      await expectOpen('Jonas')
+      await expect(shownMessages).toHaveCount(messagesOf('Jonas'))
+      const thread = all.order.find((id) => JSON.stringify(historyOf(id)?.rows).includes('can you mock the new first screen'))!
+      await sidebar.getByRole('listitem', { name: titleOf(thread) }).click()
+      await expectOpen(titleOf(thread))
+      const before = await tabs.count()
+      const message = shownMessages.filter({ hasText: 'can you mock the new first screen' })
+      await message.locator('[data-opens-person]', { hasText: /^@Amara/ }).click()
+      // Naomi's lookup follows Amara's on the one connection, so once her DM opens Amara's has been answered; one more tab means Amara's opened none.
+      await message.locator('[data-message-header] [data-opens-person]').click()
+      await expectOpen('Naomi')
+      await expect(tabs).toHaveCount(before + 1)
     })
 
     await test.step('the pictures come from the folder', async () => {
