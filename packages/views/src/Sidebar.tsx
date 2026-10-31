@@ -310,7 +310,7 @@ export function Sidebar({
         padding="md"
         label="View"
         anchor={
-          <div role="group" aria-label="Quick filters" {...stylex.props(styles.filters, !junoShown && styles.filtersFirst)}>
+          <div role="group" aria-label="Quick filters" {...stylex.props(junoShown ? styles.filters : [styles.filters, styles.filtersFirst])}>
             <PillRow>
               <FilterPill>
                 <Button variant="filter" aria-label="All" pressed={kind === 'all'} {...activateHandlers<HTMLButtonElement>(() => onFilterKind('all'))}>

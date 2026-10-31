@@ -119,6 +119,11 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   bundle, runs at load and throws, and the renderer shows a blank window (10-18). The ancestor
   carries `stylex.defaultMarker()` in its `stylex.props`.
 - **Emoji and icon centring.** Apple Color Emoji draws high in a text line box, and an odd-size icon centred in an even box lands on a half pixel that Chrome rounds down. Emoji go through the shared `Emoji` component with `--font-emoji` and the emoji shift tokens; a measured optical offset is a token, never a raw number. A change to a control's size or its glyph size runs the alignment specs in `apps/gallery/` (`emoji-align.spec.ts`, `selection-bar-align.spec.ts`); a 1x screenshot is not a check.
+- **`cond && styles.x` with a `const` set by a call fails the build.** In `stylex.props(styles.a, shown && styles.b)`,
+  StyleX tries to evaluate `shown` when it is a `const` in scope, and a `const shown = list.includes(x)`
+  stops the build with "Unsupported expression: CallExpression" (the Sidebar, 10-31). A parameter is
+  fine, and so is a ternary: `stylex.props(shown ? styles.a : [styles.a, styles.b])`. Typecheck and
+  lint do not catch it; only a build does.
 - **Static values only.** `stylex.create` cannot call functions or read runtime values. For a value
   that varies at runtime use a function style: `stylex.create({ w: (px: number) => ({ width: px }) })`.
 - **Workspace setup.** Packages ship TypeScript source and list `@stylexjs/stylex` as their own
