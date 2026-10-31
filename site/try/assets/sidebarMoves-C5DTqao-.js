@@ -1,0 +1,1 @@
+function e(e,t,n,r){if(e===void 0||!e.ready||!t.ready||e.filter!==t.filter||r||n)return`instant`;for(let n of e.retained??[])if(!t.pinned.includes(n)&&!t.recent.includes(n))return`instant`;return`animate`}export{e as sidebarMoves};

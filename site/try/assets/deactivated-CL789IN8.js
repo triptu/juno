@@ -1,0 +1,1 @@
+import{t as e}from"./ReadOnlyNote-DOuqBcvB.js";import{na as t,ua as n}from"./index-Dl0zjKVQ.js";var r=n(),i=t();function a(t){let n=(0,r.c)(2),{name:a}=t,o=`${a}'s account is deactivated. You can read this conversation but not reply.`,s;return n[0]===o?s=n[1]:(s=(0,i.jsx)(e,{text:o}),n[0]=o,n[1]=s),s}export{a as DeactivatedNote};
