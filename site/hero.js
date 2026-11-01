@@ -1,43 +1,30 @@
-// The hero's hover, a prototype with three options picked by ?hero=glass, ?hero=breeze or ?hero=brush. With no
-// parameter it does nothing.
-// - glass: the print sits behind glass. A soft reflection crosses it as the pointer moves over the hero, the frame
-//   turns a degree toward the pointer and its shadow moves the other way.
-// - breeze: near the pointer the blossoms stir in the direction it moves and settle back, and now and then a petal
-//   comes loose and drifts down past the frame.
-// - brush: a low light across the paint shows its brushstrokes, from the side the pointer is on.
-// Each starts after the page has loaded and rides the hero field's one loop, so it runs only while the hero is on
-// screen, the tab is visible and motion is allowed. It writes transforms and opacity, plus one small canvas over the
-// print. A touch drag works like the pointer; on release the effect settles.
+// The hero's hover: a breeze through the print. Near the pointer the blossoms stir in the direction it moves and settle
+// back, and now and then a petal comes loose and drifts down past the frame. It starts after the page has loaded and
+// rides the hero field's one loop, so it runs only while the hero is on screen, the tab is visible and motion is
+// allowed. It writes transforms and opacity, plus one small canvas over the print. A touch drag works like the
+// pointer; on release the effect settles.
 (() => {
-  const mode = new URLSearchParams(location.search).get('hero')
   const art = document.querySelector('.hero-art')
   const opening = document.querySelector('.opening')
-  const mat = art?.querySelector('.mat')
   const print = art?.querySelector('.print')
   const img = print?.querySelector('img')
   const field = window.junoFields?.get('hero')
-  if (!['glass', 'breeze', 'brush'].includes(mode) || !img || !field) return
+  if (!img || !field) return
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
   const ease = (dt, tau) => 1 - Math.exp(-dt / tau)
 
   /** The pointer in the hero art's own pixels (its untransformed box), with its smoothed velocity and presence. */
   const ptr = { x: 0, y: 0, vx: 0, vy: 0, lastX: 0, lastY: 0, until: 0, lit: 0, seen: false }
-  /** The art's size and the print image's place inside it, in CSS pixels. Measured on resize, never in the loop. */
-  const box = { w: 1, h: 1, ix: 0, iy: 0, iw: 1, ih: 1, hw: 1, hh: 1 }
+  /** The print image's place inside the art, in CSS pixels. Measured on resize, never in the loop. */
+  const box = { ix: 0, iy: 0, iw: 1, ih: 1 }
   function measure() {
     const a = art.getBoundingClientRect()
     const i = img.getBoundingClientRect()
-    const o = opening.getBoundingClientRect()
-    box.w = art.offsetWidth || 1
-    box.h = mat.offsetHeight || 1
     box.ix = i.left - a.left
     box.iy = i.top - a.top
     box.iw = img.offsetWidth || 1
     box.ih = img.offsetHeight || 1
-    box.hw = o.width || 1
-    box.hh = o.height || 1
   }
 
   const locate = (e) => {
@@ -70,43 +57,7 @@
     return dt
   }
 
-  // ---- glass ----------------------------------------------------------------------------------------------------
-  function glass() {
-    const frame = document.createElement('div')
-    frame.className = 'frame'
-    const drop = document.createElement('div')
-    drop.className = 'drop'
-    mat.before(frame)
-    frame.append(drop, mat)
-    const pane = document.createElement('div')
-    pane.className = 'glass'
-    const sheen = document.createElement('div')
-    sheen.className = 'sheen'
-    pane.append(sheen)
-    mat.append(pane)
-    document.documentElement.classList.add('hero-glass')
-
-    const s = { nx: 0, ny: 0, sx: 0 }
-    let written = ''
-    return (dt) => {
-      // Where the pointer is from the frame's centre, -1 to 1 across the hero.
-      const tx = clamp((ptr.x - box.w / 2) / (box.hw * 0.5), -1, 1) * ptr.lit
-      const ty = clamp((ptr.y - box.h / 2) / (box.hh * 0.5), -1, 1) * ptr.lit
-      const k = ease(dt, 0.45)
-      s.nx += (tx - s.nx) * k
-      s.ny += (ty - s.ny) * k
-      // The reflection follows the pointer across the whole hero, slower than the tilt, and stays where it was left.
-      if (ptr.lit > 0.01) s.sx += (clamp((ptr.x - box.w / 2) / (box.hw * 0.5), -1, 1) - s.sx) * ease(dt, 0.6) * ptr.lit
-      const key = `${s.nx.toFixed(4)} ${s.ny.toFixed(4)} ${s.sx.toFixed(4)}`
-      if (key === written) return
-      written = key
-      mat.style.transform = `perspective(1600px) rotateY(${(s.nx * 1.6).toFixed(3)}deg) rotateX(${(-s.ny * 1).toFixed(3)}deg)`
-      drop.style.transform = `translate3d(${(-s.nx * 10).toFixed(2)}px, ${(-s.ny * 6).toFixed(2)}px, 0)`
-      sheen.style.transform = `translate3d(${(s.sx * box.w * 0.32).toFixed(2)}px, ${(s.ny * 14).toFixed(2)}px, 0) rotate(24deg)`
-    }
-  }
-
-  // ---- a canvas over the print, for breeze and brush ------------------------------------------------------------
+  // ---- a canvas over the print ----------------------------------------------------------------------------------
   /** Set by the print canvas, so a resize can size it again and ask for a fresh frame. */
   let onResize = null
   const VERT = 'attribute vec2 p; varying vec2 v_uv; void main() { v_uv = vec2(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5); gl_Position = vec4(p, 0.0, 1.0); }'
@@ -308,63 +259,9 @@ void main() {
     }
   }
 
-  // ---- brush ----------------------------------------------------------------------------------------------------
-  // The paint's relief is read from the picture's lightness: the thick white strokes of the blossoms stand up from
-  // the sky. Light from a low angle on the pointer's side brightens the faces towards it and darkens the others.
-  const BRUSH = `
-precision mediump float;
-uniform sampler2D u_img;
-uniform vec2 u_res;
-uniform vec3 u_l;
-uniform float u_s;
-varying vec2 v_uv;
-float h(vec2 uv) { return dot(texture2D(u_img, uv).rgb, vec3(0.3, 0.59, 0.11)); }
-void main() {
-  vec3 c = texture2D(u_img, v_uv).rgb;
-  vec2 e = vec2(1.1 / u_res.x, 1.1 / u_res.y);
-  float dx = h(v_uv - vec2(e.x, 0.0)) - h(v_uv + vec2(e.x, 0.0));
-  float dy = h(v_uv - vec2(0.0, e.y)) - h(v_uv + vec2(0.0, e.y));
-  vec3 n = normalize(vec3(dx * 4.0, -dy * 4.0, 1.0));
-  float lit = dot(n, u_l) - u_l.z;
-  vec3 col = c * (1.0 + u_s * lit);
-  gl_FragColor = vec4(col, 1.0);
-}`
-
-  function brush() {
-    const view = printCanvas(BRUSH, ['u_l', 'u_s'])
-    if (!view) return null
-    const { gl, u } = view
-    const s = { lx: 0, ly: 0, s: 0 }
-    let written = ''
-    return (dt) => {
-      // The light comes from the pointer's side of the painting, low across its surface.
-      const dx = (ptr.x - (box.ix + box.iw / 2)) / (box.hw * 0.5)
-      const dy = (ptr.y - (box.iy + box.ih / 2)) / (box.hh * 0.5)
-      const len = Math.hypot(dx, dy) || 1
-      const k = ease(dt, 0.35)
-      if (ptr.lit > 0.01) {
-        s.lx += (dx / Math.max(len, 0.35) - s.lx) * k
-        s.ly += (dy / Math.max(len, 0.35) - s.ly) * k
-      }
-      s.s += (ptr.lit * clamp(Math.hypot(s.lx, s.ly), 0.4, 1) - s.s) * k
-      const key = `${s.lx.toFixed(3)} ${s.ly.toFixed(3)} ${s.s.toFixed(3)}`
-      if (key === written && !view.stale) return
-      view.stale = false
-      written = key
-      view.show(clamp(s.s * 4, 0, 1))
-      if (s.s < 0.002) return
-      // A unit vector towards the light: mostly sideways, a little up from the surface.
-      const z = 0.55
-      const l = Math.hypot(s.lx, -s.ly, z)
-      gl.uniform3f(u.u_l, s.lx / l, -s.ly / l, z / l)
-      gl.uniform1f(u.u_s, s.s * 0.3)
-      view.draw()
-    }
-  }
-
   function start() {
     measure()
-    const run = { glass, breeze, brush }[mode]()
+    const run = breeze()
     if (!run) return
     new ResizeObserver(() => { measure(); onResize?.() }).observe(art)
     const before = field.onFrame
