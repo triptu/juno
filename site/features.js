@@ -47,6 +47,7 @@
 
   let chosen = null
   let showing = 0
+  let depth = 0
   async function choose(button) {
     if (chosen === button) return
     chosen = button
@@ -61,14 +62,31 @@
       spot.style.setProperty('--w', w)
       spot.style.setProperty('--h', h)
       frame.classList.add('lit')
-      for (const img of images.values()) img.classList.remove('on')
+      for (const img of images.values()) {
+        img.style.transition = ''
+        img.classList.remove('on')
+      }
       return
     }
     const img = image(name)
     await img.ready
+    // Decode again: a browser may drop a hidden image's pixels, and a new state must never fade in blank.
+    await img.decode().catch(() => {})
     if (ticket !== showing) return
     frame.classList.remove('lit')
-    for (const other of images.values()) other.classList.toggle('on', other === img)
+    // The new state fades in on top while the one before stays fully opaque under it, so the change never dips
+    // through to the window behind. Once it has faded in, the states under it go at once.
+    img.style.transition = ''
+    img.style.zIndex = String(++depth)
+    img.classList.add('on')
+    setTimeout(() => {
+      if (ticket !== showing) return
+      for (const other of images.values()) {
+        if (other === img || !other.classList.contains('on')) continue
+        other.style.transition = 'none'
+        other.classList.remove('on')
+      }
+    }, 260)
   }
 
   // A theme change shows the chosen state in the new theme and loads that theme's states.
