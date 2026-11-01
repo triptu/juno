@@ -1,5 +1,6 @@
 // The hero's hover: a breeze through the print. Near the pointer the blossoms stir in the direction it moves and settle
-// back, and petals come loose and drift down past the frame. It starts after the page has loaded and
+// back, and petals come loose and drift down past the frame. Holding the button down on the painting makes it a gust,
+// with a shower of petals. It starts after the page has loaded and
 // rides the hero field's one loop, so it runs only while the hero is on screen, the tab is visible and motion is
 // allowed. It writes transforms and opacity, plus one small canvas over the print. A touch drag works like the
 // pointer; on release the effect settles.
@@ -15,7 +16,7 @@
   const ease = (dt, tau) => 1 - Math.exp(-dt / tau)
 
   /** The pointer in the hero art's own pixels (its untransformed box), with its smoothed velocity and presence. */
-  const ptr = { x: 0, y: 0, vx: 0, vy: 0, lastX: 0, lastY: 0, until: 0, lit: 0, seen: false }
+  const ptr = { x: 0, y: 0, vx: 0, vy: 0, lastX: 0, lastY: 0, until: 0, lit: 0, seen: false, down: false, gust: 0 }
   /** The print image's place inside the art, in CSS pixels. Measured on resize, never in the loop. */
   const box = { ix: 0, iy: 0, iw: 1, ih: 1 }
   function measure() {
@@ -39,6 +40,12 @@
   opening.addEventListener('pointermove', (e) => { locate(e); if (!touch(e)) ptr.until = Infinity })
   const release = (e) => { if (touch(e)) ptr.until = performance.now() + 1200 }
   opening.addEventListener('pointerup', release)
+  // Holding the button down on the painting turns the breeze into a gust. The image never drags.
+  print.addEventListener('pointerdown', (e) => { if (e.button === 0) { e.preventDefault(); ptr.down = true } })
+  img.addEventListener('dragstart', (e) => e.preventDefault())
+  addEventListener('pointerup', () => { ptr.down = false })
+  addEventListener('pointercancel', () => { ptr.down = false })
+  addEventListener('blur', () => { ptr.down = false })
   opening.addEventListener('pointercancel', release)
   opening.addEventListener('pointerleave', (e) => { if (!touch(e)) ptr.until = performance.now() })
 
@@ -198,7 +205,7 @@ void main() {
       el.className = 'petal'
       layer.append(el)
       petals.push({
-        el, born: now, x: best[0] + box.ix, y: best[1] + box.iy, vx: w.vx * 4 + Math.sign(ptr.vx || 1) * 8,
+        el, born: now, x: best[0] + box.ix, y: best[1] + box.iy, vx: w.vx * 4 + Math.sign(ptr.vx || 1) * 8 + ptr.vx * 0.25 * ptr.gust,
         phase: Math.random() * 6.28, spin: (Math.random() - 0.5) * 70, r: Math.random() * 360,
       })
     }
@@ -211,14 +218,16 @@ void main() {
       const near = Math.exp(-(ex * ex + ey * ey) / (120 * 120)) * ptr.lit
       const speed = Math.hypot(ptr.vx, ptr.vy)
       // The pointer's motion pushes the air; the push is capped so a fast flick is still a breeze.
-      const cap = Math.min(1, 7 / Math.max(speed * 0.012, 1e-6))
+      ptr.gust += ((ptr.down ? 1 : 0) - ptr.gust) * ease(dt, ptr.down ? 0.15 : 0.6)
+      const g = ptr.gust
+      const cap = Math.min(1, (7 + 13 * g) / Math.max(speed * 0.012, 1e-6))
       const tx = ptr.vx * 0.012 * cap * near
       const ty = ptr.vy * 0.012 * cap * near
       w.vx += (K * (tx - w.x) - C * w.vx) * dt
       w.vy += (K * (ty - w.y) - C * w.vy) * dt
       w.x += w.vx * dt
       w.y += w.vy * dt
-      w.f += (Math.min(1, speed / 500) * near * 1.1 - w.f) * ease(dt, w.f < 0.3 ? 0.2 : 1.1)
+      w.f += (Math.min(1, speed / 500) * near * (1.1 + 1.6 * g) - w.f) * ease(dt, w.f < 0.3 ? 0.2 : 1.1)
       const k = ease(dt, 0.15)
       w.cx += (ptr.x - box.ix - w.cx) * (near > 0.01 ? k : 0)
       w.cy += (ptr.y - box.iy - w.cy) * (near > 0.01 ? k : 0)
@@ -238,10 +247,11 @@ void main() {
         w.still = true
       }
 
-      // Petals come loose soon after the pointer starts moving through the blossoms, a little over one a second.
+      // Petals come loose soon after the pointer starts moving through the blossoms, a little over one a second;
+      // in a gust they come off in a shower.
       const over = near > 0.6 && ptr.x > box.ix && ptr.x < box.ix + box.iw && ptr.y > box.iy && ptr.y < box.iy + box.ih
       if (over) w.gust += speed * dt
-      if (w.gust > 160 && now - w.lastPetal > 1000 && petals.length < 5) { w.gust = 0; loosen(now) }
+      if (w.gust > 160 - 130 * g && now - w.lastPetal > 1000 - 880 * g && petals.length < 5 + 25 * g) { w.gust = 0; loosen(now) }
 
       for (let i = petals.length - 1; i >= 0; i--) {
         const p = petals[i]
