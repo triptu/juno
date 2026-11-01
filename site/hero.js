@@ -1,5 +1,5 @@
 // The hero's hover: a breeze through the print. Near the pointer the blossoms stir in the direction it moves and settle
-// back, and now and then a petal comes loose and drifts down past the frame. It starts after the page has loaded and
+// back, and petals come loose and drift down past the frame. It starts after the page has loaded and
 // rides the hero field's one loop, so it runs only while the hero is on screen, the tab is visible and motion is
 // allowed. It writes transforms and opacity, plus one small canvas over the print. A touch drag works like the
 // pointer; on release the effect settles.
@@ -143,7 +143,7 @@ float noise(vec2 p) {
 }
 void main() {
   vec2 px = v_uv * u_res;
-  vec2 d = (px - u_p) / 160.0;
+  vec2 d = (px - u_p) / 200.0;
   float fall = exp(-dot(d, d));
   float n = noise(px / 34.0 + vec2(u_t * 0.5, u_t * 0.2));
   float m = noise(px / 19.0 - vec2(u_t * 0.8, u_t * 0.3));
@@ -182,10 +182,10 @@ void main() {
     function loosen(now) {
       // The whitest of a few spots near the pointer, if any is a blossom.
       let best = null
-      let bw = 0.72
-      for (let i = 0; i < 28; i++) {
+      let bw = 0.6
+      for (let i = 0; i < 40; i++) {
         const a = Math.random() * Math.PI * 2
-        const r = Math.random() * 70
+        const r = Math.random() * 110
         const x = ptr.x - box.ix + Math.cos(a) * r
         const y = ptr.y - box.iy + Math.sin(a) * r
         if (x < 4 || y < 4 || x > box.iw - 4 || y > box.ih - 4) continue
@@ -211,14 +211,14 @@ void main() {
       const near = Math.exp(-(ex * ex + ey * ey) / (120 * 120)) * ptr.lit
       const speed = Math.hypot(ptr.vx, ptr.vy)
       // The pointer's motion pushes the air; the push is capped so a fast flick is still a breeze.
-      const cap = Math.min(1, 3.2 / Math.max(speed * 0.006, 1e-6))
-      const tx = ptr.vx * 0.006 * cap * near
-      const ty = ptr.vy * 0.006 * cap * near
+      const cap = Math.min(1, 7 / Math.max(speed * 0.012, 1e-6))
+      const tx = ptr.vx * 0.012 * cap * near
+      const ty = ptr.vy * 0.012 * cap * near
       w.vx += (K * (tx - w.x) - C * w.vx) * dt
       w.vy += (K * (ty - w.y) - C * w.vy) * dt
       w.x += w.vx * dt
       w.y += w.vy * dt
-      w.f += (Math.min(1, speed / 700) * near * 0.55 - w.f) * ease(dt, w.f < 0.3 ? 0.2 : 1.1)
+      w.f += (Math.min(1, speed / 500) * near * 1.1 - w.f) * ease(dt, w.f < 0.3 ? 0.2 : 1.1)
       const k = ease(dt, 0.15)
       w.cx += (ptr.x - box.ix - w.cx) * (near > 0.01 ? k : 0)
       w.cy += (ptr.y - box.iy - w.cy) * (near > 0.01 ? k : 0)
@@ -238,10 +238,10 @@ void main() {
         w.still = true
       }
 
-      // A petal comes loose after the pointer has moved a good way through the blossoms, at most every few seconds.
+      // Petals come loose soon after the pointer starts moving through the blossoms, a little over one a second.
       const over = near > 0.6 && ptr.x > box.ix && ptr.x < box.ix + box.iw && ptr.y > box.iy && ptr.y < box.iy + box.ih
       if (over) w.gust += speed * dt
-      if (w.gust > 800 && now - w.lastPetal > 4000 && petals.length < 2) { w.gust = 0; loosen(now) }
+      if (w.gust > 160 && now - w.lastPetal > 1000 && petals.length < 5) { w.gust = 0; loosen(now) }
 
       for (let i = petals.length - 1; i >= 0; i--) {
         const p = petals[i]
@@ -249,7 +249,7 @@ void main() {
         if (age > 6.5) { p.el.remove(); petals.splice(i, 1); continue }
         p.vx *= Math.exp(-dt / 1.6)
         p.x += (p.vx + Math.sin(t * 1.7 + p.phase) * 16) * dt
-        p.y += (22 + Math.min(age, 2) * 14 + Math.cos(t * 1.7 + p.phase) * 6) * dt
+        p.y += (30 + Math.min(age, 2) * 16 + Math.cos(t * 1.7 + p.phase) * 6) * dt
         p.r += p.spin * dt
         const flip = Math.cos(t * 2.1 + p.phase)
         const o = Math.min(1, age / 0.3) * (age > 4.2 ? Math.max(0, 1 - (age - 4.2) / 2.3) : 1)
