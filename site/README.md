@@ -10,6 +10,7 @@ A Vercel project with this folder as its root deploys it on each push to main th
 - `script.js`: keeps the appearance choice, starts the film and the speed clip, and settles the notification toast into place.
 - `field.js`: draws the coloured field behind the hero, the notifications section and the footer, with WebGL.
 - `scene.js`: moves the footer's drawings and the seated j with the pointer.
+- `hero.js`: the breeze over the hero's print. Near the pointer the blossoms stir and settle, and now and then a petal comes loose and drifts down.
 - `features.js`: the features section. A tour moves through the labels while the section is in view and stops at the first hover, focus or tap. A label lights up part of the window, or swaps the window for the same window in that feature's state.
 - `fonts/`: Figtree (variable) and Instrument Serif, copied from the `@fontsource` packages the app bundles. Both are under the SIL Open Font License 1.1; the licence files sit beside them.
 - `img/`: every picture, as 2x webp with a light and a dark file. `window-*` is the whole window the features section labels, and `state-*` are that window in each feature's state (Search open, Settings › Connections, and so on). They are cut from Remotion stills of Juno's real views with the film's sample data.
