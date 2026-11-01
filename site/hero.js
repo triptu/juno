@@ -1,6 +1,6 @@
 // The hero's hover: a breeze through the print. Near the pointer the blossoms stir in the direction it moves and settle
 // back, and petals come loose and drift down past the frame. Holding the button down on the painting makes it a gust,
-// with a shower of petals. It starts after the page has loaded and
+// with a shower of petals, a soft wind and a bell for each petal. It starts after the page has loaded and
 // rides the hero field's one loop, so it runs only while the hero is on screen, the tab is visible and motion is
 // allowed. It writes transforms and opacity, plus one small canvas over the print. A touch drag works like the
 // pointer; on release the effect settles.
@@ -41,11 +41,73 @@
   const release = (e) => { if (touch(e)) ptr.until = performance.now() + 1200 }
   opening.addEventListener('pointerup', release)
   // Holding the button down on the painting turns the breeze into a gust. The image never drags.
-  print.addEventListener('pointerdown', (e) => { if (e.button === 0) { e.preventDefault(); ptr.down = true } })
+  // ---- the gust's sound -----------------------------------------------------------------------------------------
+  // Only a press starts it, so nothing plays on hover. Wind is soft noise through a band-pass whose loudness and
+  // pitch follow how fast the pointer drags; each petal that comes loose rings a quiet bell from one pentatonic scale.
+  const gustSound = (() => {
+    let audio = null
+    let wind = null
+    let pitch = null
+    let bells = null
+    const NOTES = [1174.7, 1318.5, 1480, 1760, 1979.5, 2349.3] // D6 pentatonic, up to D7
+    function start() {
+      if (!audio) {
+        const Ctx = window.AudioContext || window.webkitAudioContext
+        if (!Ctx) return
+        audio = new Ctx()
+        const length = audio.sampleRate * 2
+        const buffer = audio.createBuffer(1, length, audio.sampleRate)
+        const data = buffer.getChannelData(0)
+        let last = 0
+        for (let i = 0; i < length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; data[i] = last * 3.5 }
+        const noise = audio.createBufferSource()
+        noise.buffer = buffer
+        noise.loop = true
+        pitch = audio.createBiquadFilter()
+        pitch.type = 'bandpass'
+        pitch.Q.value = 0.9
+        pitch.frequency.value = 500
+        wind = audio.createGain()
+        wind.gain.value = 0
+        bells = audio.createGain()
+        bells.gain.value = 0.5
+        noise.connect(pitch).connect(wind).connect(audio.destination)
+        bells.connect(audio.destination)
+        noise.start()
+      }
+      if (audio.state === 'suspended') audio.resume()
+    }
+    /** Called every frame: `level` is the gust (0 to 1) times how fast the pointer moves (0 to 1). */
+    function blow(level, pace) {
+      if (!audio || audio.state !== 'running') return
+      const now = audio.currentTime
+      wind.gain.setTargetAtTime(0.3 * level, now, level > wind.gain.value ? 0.08 : 0.35)
+      pitch.frequency.setTargetAtTime(380 + 1100 * pace, now, 0.12)
+    }
+    function bell() {
+      if (!audio || audio.state !== 'running') return
+      const now = audio.currentTime
+      const tone = audio.createOscillator()
+      const env = audio.createGain()
+      tone.type = 'sine'
+      tone.frequency.value = NOTES[Math.floor(Math.random() * NOTES.length)]
+      env.gain.setValueAtTime(0.0001, now)
+      env.gain.exponentialRampToValueAtTime(0.08, now + 0.01)
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.9)
+      tone.connect(env).connect(bells)
+      tone.start(now)
+      tone.stop(now + 0.95)
+    }
+    return { start, blow, bell }
+  })()
+
+  print.addEventListener('pointerdown', (e) => { if (e.button === 0) { e.preventDefault(); ptr.down = true; gustSound.start() } })
   img.addEventListener('dragstart', (e) => e.preventDefault())
-  addEventListener('pointerup', () => { ptr.down = false })
-  addEventListener('pointercancel', () => { ptr.down = false })
-  addEventListener('blur', () => { ptr.down = false })
+  const hush = () => { ptr.down = false; gustSound.blow(0, 0) }
+  addEventListener('pointerup', hush)
+  addEventListener('pointercancel', hush)
+  document.addEventListener('visibilitychange', hush)
+  addEventListener('blur', hush)
   opening.addEventListener('pointercancel', release)
   opening.addEventListener('pointerleave', (e) => { if (!touch(e)) ptr.until = performance.now() })
 
@@ -203,6 +265,7 @@ void main() {
       w.lastPetal = now
       const el = document.createElement('span')
       el.className = 'petal'
+      if (ptr.gust > 0.5) gustSound.bell()
       layer.append(el)
       petals.push({
         el, born: now, x: best[0] + box.ix, y: best[1] + box.iy, vx: w.vx * 4 + Math.sign(ptr.vx || 1) * 8 + ptr.vx * 0.25 * ptr.gust,
@@ -220,6 +283,7 @@ void main() {
       // The pointer's motion pushes the air; the push is capped so a fast flick is still a breeze.
       ptr.gust += ((ptr.down ? 1 : 0) - ptr.gust) * ease(dt, ptr.down ? 0.15 : 0.6)
       const g = ptr.gust
+      gustSound.blow(g, Math.min(1, Math.hypot(ptr.vx, ptr.vy) / 900) * (ptr.down ? 1 : 0.6))
       const cap = Math.min(1, (7 + 13 * g) / Math.max(speed * 0.012, 1e-6))
       const tx = ptr.vx * 0.012 * cap * near
       const ty = ptr.vy * 0.012 * cap * near
