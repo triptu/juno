@@ -10,9 +10,9 @@ A Vercel project with this folder as its root deploys it on each push to main th
 - `script.js`: keeps the appearance choice, starts the film and the speed clip, and settles the notification toast into place.
 - `field.js`: draws the coloured field behind the hero, the notifications section and the footer, with WebGL.
 - `scene.js`: moves the footer's drawings and the seated j with the pointer.
-- `features.js`: lights up part of the window, or opens a crop over it, when you point at a feature label.
+- `features.js`: the features section. A tour moves through the labels while the section is in view and stops at the first hover, focus or tap. A label lights up part of the window, or swaps the window for the same window in that feature's state.
 - `fonts/`: Figtree (variable) and Instrument Serif, copied from the `@fontsource` packages the app bundles. Both are under the SIL Open Font License 1.1; the licence files sit beside them.
-- `img/`: every picture, as 2x webp with a light and a dark file. `window-*` is the whole window the features section labels, and `inset-*` are the crops it opens for things the window does not show. They are cut from Remotion stills of Juno's real views with the film's sample data.
+- `img/`: every picture, as 2x webp with a light and a dark file. `window-*` is the whole window the features section labels, and `state-*` are that window in each feature's state (Search open, Settings › Connections, and so on). They are cut from Remotion stills of Juno's real views with the film's sample data.
 - `video/`: the speed clip, light and dark, as mp4 and webm, with a poster for each.
 - `icon.svg`: the app icon from `assets/`.
 - `trailer.mp4`, `trailer-poster.jpg`: the launch film (1:45, 1080p H.264) and its poster. The 4K master and the Remotion project that draws it are in the launch work folder, `film/` (`out/final2/`).
@@ -31,7 +31,7 @@ It plays muted and looped in the page's appearance. With reduced motion on it sh
 
 ## Motion
 
-The fields and the footer scene run only while on screen, in a visible tab, with motion allowed. Under reduced motion the page is still and the feature crops appear without a transition.
+The fields and the footer scene run only while on screen, in a visible tab, with motion allowed. Under reduced motion the page is still: the features section runs no tour and changes the window without a fade.
 
 ## Rules
 

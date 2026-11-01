@@ -1,59 +1,134 @@
-// The features section: pointing at a label, or tapping it, lights up where that thing lives in the window and shows
-// its line underneath. A thing the window does not show opens a small crop over it instead. Nothing here runs in a
-// loop; each change sets a few CSS variables and a class, and the stylesheet moves the spot.
+// The features section. One feature is always chosen. A feature with a spot lights up where it lives in the window;
+// a feature with a state swaps the window for the same window in that state, with a short cross-fade.
+//
+// When the section comes into view, a tour moves through the features. The chosen label's fill runs a progress bar
+// (a CSS animation), and the bar's end moves the tour on, so there is no timer to keep in step. The tour pauses
+// while the section is off screen or the tab is hidden, and stops for good at the first hover, focus or tap on a
+// label; from then on the pointer chooses. Under reduced motion there is no tour and the first feature stays chosen.
 (() => {
   const section = document.querySelector('.features')
   if (!section) return
   const frame = section.querySelector('.window')
   const spot = section.querySelector('.spot')
-  const inset = section.querySelector('.inset')
-  const [insetLight, insetDark] = inset.querySelectorAll('img')
+  const layers = section.querySelector('.states')
   const caption = section.querySelector('.feature-caption')
-  const idle = caption.textContent
   const buttons = [...section.querySelectorAll('.feature')]
-  let shown = null
-  let held = null
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const systemDark = matchMedia('(prefers-color-scheme: dark)')
+  const theme = () => (document.documentElement.dataset.theme ?? (systemDark.matches ? 'dark' : 'light'))
 
-  function show(button) {
-    shown = button
-    const area = button.dataset.spot
-    if (area) {
-      const [x, y, w, h] = area.split(' ')
+  // One image per state and theme, made on first need. A state shows only once its image has loaded, so a change
+  // never flashes an empty window; until then the window before it stays.
+  const images = new Map()
+  function image(name, t = theme()) {
+    const key = `${name}-${t}`
+    let img = images.get(key)
+    if (!img) {
+      img = new Image()
+      img.alt = ''
+      img.decoding = 'async'
+      img.src = `/img/state-${key}.webp`
+      img.ready = img.decode().catch(() => {})
+      layers.append(img)
+      images.set(key, img)
+    }
+    return img
+  }
+
+  // Loads the current theme's states one after another, in tour order, once the section is near.
+  let warming = false
+  async function warm() {
+    if (warming) return
+    warming = true
+    const t = theme()
+    for (const b of buttons) if (b.dataset.state) await image(b.dataset.state, t).ready
+    warming = false
+  }
+
+  let chosen = null
+  let showing = 0
+  async function choose(button) {
+    if (chosen === button) return
+    chosen = button
+    for (const b of buttons) b.setAttribute('aria-pressed', String(b === button))
+    caption.textContent = button.querySelector('.sr').textContent.trim()
+    const ticket = ++showing
+    const name = button.dataset.state
+    if (!name) {
+      const [x, y, w, h] = button.dataset.spot.split(' ')
       spot.style.setProperty('--x', x)
       spot.style.setProperty('--y', y)
       spot.style.setProperty('--w', w)
       spot.style.setProperty('--h', h)
-      frame.classList.remove('whole')
-    } else {
-      insetLight.src = `/img/inset-${button.dataset.inset}-light.webp`
-      insetDark.src = `/img/inset-${button.dataset.inset}-dark.webp`
-      frame.classList.add('whole')
+      frame.classList.add('lit')
+      for (const img of images.values()) img.classList.remove('on')
+      return
     }
-    frame.classList.add('lit')
-    caption.textContent = button.querySelector('.sr').textContent.trim()
-  }
-  function hide() {
-    if (held) { show(held); return }
-    shown = null
+    const img = image(name)
+    await img.ready
+    if (ticket !== showing) return
     frame.classList.remove('lit')
-    caption.textContent = idle
-  }
-  function hold(button) {
-    held = held === button ? null : button
-    for (const b of buttons) b.setAttribute('aria-pressed', String(b === held))
-    if (held) show(held)
-    else hide()
+    for (const other of images.values()) other.classList.toggle('on', other === img)
   }
 
-  // A touch holds on release; the click that may follow is the same tap. Mouse and keyboard hold on click.
-  let tapped = 0
-  for (const button of buttons) {
-    button.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') show(button) })
-    button.addEventListener('focus', () => show(button))
-    button.addEventListener('blur', () => { if (shown === button) hide() })
-    button.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') { tapped = performance.now(); hold(button) } })
-    button.addEventListener('click', () => { if (performance.now() - tapped < 700) return; hold(button) })
+  // A theme change shows the chosen state in the new theme and loads that theme's states.
+  function retheme() {
+    const button = chosen
+    chosen = null
+    if (button) choose(button)
+    if (near) warm()
   }
-  section.querySelector('.feature-list').addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') hide() })
-  frame.addEventListener('click', () => { if (held) hold(held) })
+  systemDark.addEventListener('change', retheme)
+  new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+
+  // The tour.
+  let touring = !reduced
+  let near = false
+  let seen = false
+  const list = section.querySelector('.feature-list')
+  function pause() {
+    list.classList.toggle('paused', !seen || document.hidden)
+  }
+  function stop() {
+    if (!touring) return
+    touring = false
+    list.classList.remove('touring', 'paused')
+  }
+  list.addEventListener('animationend', (e) => {
+    if (!touring || e.target !== chosen) return
+    choose(buttons[(buttons.indexOf(chosen) + 1) % buttons.length])
+  })
+  document.addEventListener('visibilitychange', pause)
+
+  new IntersectionObserver(([entry]) => {
+    if (!entry.isIntersecting || near) return
+    near = true
+    warm()
+  }, { rootMargin: '800px 0px' }).observe(section)
+
+  new IntersectionObserver(([entry]) => {
+    seen = entry.isIntersecting
+    if (seen && touring) list.classList.add('touring')
+    pause()
+  }, { threshold: 0.35 }).observe(frame)
+
+  // A touch chooses on release; mouse and pen on hover; the keyboard on focus. Any of them ends the tour.
+  for (const button of buttons) {
+    button.addEventListener('pointerenter', (e) => {
+      if (e.pointerType === 'touch') return
+      stop()
+      choose(button)
+    })
+    button.addEventListener('pointerdown', stop)
+    button.addEventListener('focus', () => {
+      stop()
+      choose(button)
+    })
+    button.addEventListener('click', () => {
+      stop()
+      choose(button)
+    })
+  }
+
+  choose(buttons[0])
 })()
