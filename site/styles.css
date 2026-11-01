@@ -164,6 +164,11 @@ html.try-on .try-button { display: inline-flex; }
 .hero-art figcaption { text-align: center; margin-top: 22px; font-size: 13.5px; line-height: 1.5; }
 .hero-art figcaption span { display: block; }
 .credit { color: var(--muted); font-size: 12px; margin-top: 4px; font-variant-numeric: oldstyle-nums; }
+/* The breeze in hero.js: a canvas over the print, shown only while the blossoms move, and the petals that come loose. */
+.hero-art { position: relative; }
+.print-gl { position: absolute; inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); opacity: 0; pointer-events: none; }
+.petals { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.petal { position: absolute; left: -4px; top: -5px; width: 8px; height: 10px; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; background: radial-gradient(circle at 50% 90%, #e6c4bc 0 16%, #f8f4eb 48%, #eee7da); box-shadow: 0 1px 2px rgba(35, 33, 26, .2); opacity: 0; will-change: transform, opacity; }
 
 /* Sections */
 .copy h2, .speed-head h2, .start h2, .features h2 { font-size: 54px; line-height: 1.04; letter-spacing: -.015em; }
@@ -193,20 +198,17 @@ figcaption { font-size: 13px; line-height: 1.5; color: var(--muted); text-align:
 :root[data-theme="dark"] .poster img { filter: brightness(.82); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .poster img { filter: brightness(.82); } }
 /* In the dark the print is dimmed a little, as a lit painting in a dark room. */
-:root[data-theme="dark"] .print img { filter: brightness(.92); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .print img { filter: brightness(.92); } }
+:root[data-theme="dark"] :is(.print img, .print-gl, .petal) { filter: brightness(.92); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is(.print img, .print-gl, .petal) { filter: brightness(.92); } }
 .playing .poster { display: none; }
 .play { position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 20px 0 18px; border: 0; border-radius: 8px; background: var(--play); color: var(--play-ink); font-size: 14.5px; font-weight: 500; white-space: nowrap; box-shadow: inset 0 1px 0 var(--button-edge), 0 6px 18px -6px rgba(0, 0, 0, .45); }
 .play .dim { color: var(--play-dim); font-size: 13px; }
 .play:hover { filter: brightness(1.08); }
 
-/* Notifications: the high point. Centred, on the field, with the two reasons set large before the real rows at 1.5x. */
+/* Notifications: the high point. Centred, on the field, with the real rows at 1.5x. */
 .notify { padding: 96px 0 104px; text-align: center; }
 .notify h2 { font-size: 64px; line-height: 1.02; letter-spacing: -.018em; max-width: 13.5em; margin-inline: auto; }
 .notify-line { color: var(--muted); max-width: 30em; margin: 26px auto 0; font-size: 17.5px; }
-.reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 880px; margin: 56px auto 0; }
-.reasons dt { font-size: 12.5px; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
-.reasons dd { font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; line-height: 1.1; letter-spacing: -.01em; margin-top: 10px; text-wrap: balance; }
 .decisions-figure { margin-top: 48px; }
 .decisions-sheet { width: 1080px; max-width: 100%; margin-inline: auto; }
 .decisions-figure figcaption { max-width: 44em; margin-top: 22px; }
@@ -281,7 +283,6 @@ html.js .settle.in { opacity: 1; transform: none; transition: opacity .55s cubic
   h1 { font-size: clamp(54px, 7.2vw, 84px); }
   .copy h2, .speed-head h2, .start h2, .features h2 { font-size: 46px; }
   .notify h2 { font-size: 54px; }
-  .reasons dd { font-size: 38px; }
   .topics, .home, .agent, .speed-head { gap: 48px; }
   .mat { padding: 40px 40px 52px; }
   .steps { gap: 36px; }
@@ -345,8 +346,6 @@ html.js .settle.in { opacity: 1; transform: none; transition: opacity .55s cubic
   .notify { padding: 80px 0 88px; }
   .notify h2 { font-size: 42px; }
   .notify-line { margin-top: 18px; font-size: 16.5px; }
-  .reasons { grid-template-columns: 1fr; gap: 28px; margin-top: 44px; text-align: left; }
-  .reasons dd { font-size: 32px; }
   .decisions-figure { margin-top: 40px; }
   .decisions-sheet { width: 100%; }
 
