@@ -118,13 +118,13 @@
     <p class="notify-line">Notifications are judged by AI, so you only get pinged when it&nbsp;matters.</p>
     <figure class="decisions-figure">
       <div class="sheet decisions-sheet">
-        <picture>
-          <source media="(max-width: 720px)" srcset="/img/decisions-phone-light.webp" width="800" height="320">
-          <img class="light-only" src="/img/decisions-light.webp" width="1440" height="320" loading="lazy" alt="Two of today's decisions. Ivo Reed in #engineering, Cutover window: Can you sign off on the cutover window? Notified, Juno's reading: Ivo asks you something. Emil Park in #support: Lena and I will take the figures offline. In Juno, Juno's reading: Talk you're not part of.">
+        <picture class="light-only">
+          <source media="(max-width: 720px)" srcset="/img/today-phone-light.webp" width="840" height="554">
+          <img src="/img/today-light.webp" width="1440" height="554" loading="lazy" alt="Today's notifications, with the filter All 12, Notified 3, Stayed in Juno 9. Ivo Reed in #engineering, Cutover window, at 10:29: Can you sign off on the cutover window? Notified. Juno's reading: Ivo asks you something. Emil Park in #support at 10:28: Lena and I will take the figures offline. In Juno. Juno's reading: Talk you're not part of.">
         </picture>
-        <picture>
-          <source media="(max-width: 720px)" srcset="/img/decisions-phone-dark.webp" width="800" height="320">
-          <img class="dark-only" src="/img/decisions-dark.webp" width="1440" height="320" loading="lazy" alt="">
+        <picture class="dark-only">
+          <source media="(max-width: 720px)" srcset="/img/today-phone-dark.webp" width="840" height="554">
+          <img src="/img/today-dark.webp" width="1440" height="554" loading="lazy" alt="Today's notifications, with the filter All 12, Notified 3, Stayed in Juno 9. Ivo Reed in #engineering, Cutover window, at 10:29: Can you sign off on the cutover window? Notified. Juno's reading: Ivo asks you something. Emil Park in #support at 10:28: Lena and I will take the figures offline. In Juno. Juno's reading: Talk you're not part of.">
         </picture>
       </div>
     </figure>
@@ -132,35 +132,39 @@
 </section>
 
 <section class="home wrap" aria-labelledby="home-title">
-  <figure class="home-figure">
-    <picture>
-      <source media="(max-width: 720px)" srcset="/img/home-phone-light.webp" width="760" height="670">
-      <img class="light-only" src="/img/home-light.webp" width="1040" height="688" loading="lazy" alt="Home on a Monday morning: the Juno mark beside a cup of coffee, the greeting Morning, Arin, and three rows: something you said you would send Ivo, three topics that look settled, and a topic to pick up where you left off.">
-    </picture>
-    <picture>
-      <source media="(max-width: 720px)" srcset="/img/home-phone-dark.webp" width="760" height="670">
-      <img class="dark-only" src="/img/home-dark.webp" width="1040" height="688" loading="lazy" alt="">
-    </picture>
-  </figure>
   <div class="copy">
     <h2 id="home-title">Home</h2>
-    <p>Home shows the questions you haven't answered, the things you promised to do, and threads that look finished. When there's nothing left, it shows you a work of&nbsp;art.</p>
+    <p>Questions you haven't answered, things you promised to do, and threads you can close, in one&nbsp;place.</p>
   </div>
+  <figure class="home-figure">
+    <div class="sheet home-sheet">
+      <picture class="light-only">
+        <source media="(max-width: 720px)" srcset="/img/home-tab-phone-light.webp" width="880" height="1200">
+        <img src="/img/home-tab-light.webp" width="1088" height="1120" loading="lazy" alt="Juno's Home tab on a Monday morning: the Juno mark beside a cup of coffee, the greeting Morning, Arin, and three rows. Mira wants the launch page approved before 2. You said you'd send Ivo the export notes. 3 topics look settled, in design, product and support.">
+      </picture>
+      <picture class="dark-only">
+        <source media="(max-width: 720px)" srcset="/img/home-tab-phone-dark.webp" width="880" height="1200">
+        <img src="/img/home-tab-dark.webp" width="1088" height="1120" loading="lazy" alt="Juno's Home tab on a Monday morning: the Juno mark beside a cup of coffee, the greeting Morning, Arin, and three rows. Mira wants the launch page approved before 2. You said you'd send Ivo the export notes. 3 topics look settled, in design, product and support.">
+      </picture>
+    </div>
+  </figure>
 </section>
 
 <section class="agent wrap" aria-labelledby="agent-title">
   <div class="copy">
     <h2 id="agent-title">Juno AI</h2>
-    <p>Press ⌘J and ask Juno anything about your Slack. Answers link to the messages they came from. It can look things up in Notion or any tool you connect, and write drafts you edit before&nbsp;sending.</p>
+    <p>Press ⌘J to ask anything about your Slack, Notion or other tools you connect. Answers link to their sources, and nothing is sent until you press&nbsp;Send.</p>
   </div>
   <figure class="agent-figure">
     <div class="sheet agent-sheet">
-      <img class="light-only" src="/img/agent-light.webp" width="896" height="680" loading="lazy" alt="The Juno panel beside Launch approval. Catch me up. The answer: the preview is updated, Mira needs your approval on the page before 2, with the words linked to the messages. Then: Draft the export notes for Ivo. Take the numbers from Noor's doc in Notion. A status bubble reads Searching Notion.">
-      <img class="dark-only" src="/img/agent-dark.webp" width="896" height="680" loading="lazy" alt="">
-    </div>
-    <div class="sheet agent-sheet agent-card">
-      <img class="light-only" src="/img/agent-card-light.webp" width="896" height="540" loading="lazy" alt="A Send message card to Ivo Reed, direct message, with the draft in an editable field: Export notes: two of six testers missed the export button. The label now shows a file count. Dismiss and Send buttons.">
-      <img class="dark-only" src="/img/agent-card-dark.webp" width="896" height="540" loading="lazy" alt="">
+      <picture class="light-only">
+        <source media="(max-width: 720px)" srcset="/img/agent-panel-phone-light.webp" width="692" height="1680">
+        <img src="/img/agent-panel-light.webp" width="1280" height="1760" loading="lazy" alt="The Juno panel beside the Launch approval thread. You ask Catch me up. Juno answers: The preview is updated. Mira needs your approval on the page before 2, with both phrases linked to the messages they came from. You ask: Draft the export notes for Ivo. Take the numbers from Noor's doc in Notion. Juno says it took the numbers from Noor's Export test notes in Notion, and shows a draft to Ivo Reed in an editable field, with Dismiss and Send.">
+      </picture>
+      <picture class="dark-only">
+        <source media="(max-width: 720px)" srcset="/img/agent-panel-phone-dark.webp" width="692" height="1680">
+        <img src="/img/agent-panel-dark.webp" width="1280" height="1760" loading="lazy" alt="The Juno panel beside the Launch approval thread. You ask Catch me up. Juno answers: The preview is updated. Mira needs your approval on the page before 2, with both phrases linked to the messages they came from. You ask: Draft the export notes for Ivo. Take the numbers from Noor's doc in Notion. Juno says it took the numbers from Noor's Export test notes in Notion, and shows a draft to Ivo Reed in an editable field, with Dismiss and Send.">
+      </picture>
     </div>
   </figure>
 </section>

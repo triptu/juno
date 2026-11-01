@@ -15,6 +15,9 @@
   --sheet: #fcfbf8;
   --sheet-line: #e0dfd5;
   --sheet-shadow: 0 1px 2px rgba(35, 33, 26, .05), 0 18px 36px -24px rgba(35, 33, 26, .28);
+  /* The app's own page and popover colours, behind its pictures, so a sheet shows one tone. */
+  --app-page: #fcfbf7;
+  --app-popover: #fbfbf8;
   --button: #23241f;
   --button-ink: #f7f6f1;
   --button-edge: rgba(255, 255, 255, .14);
@@ -46,7 +49,7 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --paper: #292623; --paper-rgb: 41 38 35; --ink: #ece8df; --muted: #b1aca2; --faint: #9a958b; --line: #3a3733; --line-strong: #4b4742;
-    --well: #302d29; --sheet: #302d29; --sheet-line: #433f3a; --sheet-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 18px 36px -20px rgba(0, 0, 0, .55);
+    --well: #302d29; --sheet: #302d29; --sheet-line: #433f3a; --sheet-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 18px 36px -20px rgba(0, 0, 0, .55); --app-page: #1b1916; --app-popover: #373532;
     --button: #ece8df; --button-ink: #1f1d1a; --button-edge: rgba(255, 255, 255, .4);
     --mat: #343029; --mat-line: rgba(255, 246, 230, .13); --bevel-top: #1f1c19; --bevel-bottom: #3e3a34;
     --mat-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 30px 60px -30px rgba(0, 0, 0, .7), 0 2px 6px -2px rgba(0, 0, 0, .45);
@@ -65,7 +68,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --paper: #292623; --paper-rgb: 41 38 35; --ink: #ece8df; --muted: #b1aca2; --faint: #9a958b; --line: #3a3733; --line-strong: #4b4742;
-  --well: #302d29; --sheet: #302d29; --sheet-line: #433f3a; --sheet-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 18px 36px -20px rgba(0, 0, 0, .55);
+  --well: #302d29; --sheet: #302d29; --sheet-line: #433f3a; --sheet-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 18px 36px -20px rgba(0, 0, 0, .55); --app-page: #1b1916; --app-popover: #373532;
   --button: #ece8df; --button-ink: #1f1d1a; --button-edge: rgba(255, 255, 255, .4);
   --mat: #343029; --mat-line: rgba(255, 246, 230, .13); --bevel-top: #1f1c19; --bevel-bottom: #3e3a34;
   --mat-shadow: 0 1px 0 rgba(255, 255, 255, .05) inset, 0 30px 60px -30px rgba(0, 0, 0, .7), 0 2px 6px -2px rgba(0, 0, 0, .45);
@@ -205,22 +208,23 @@ figcaption { font-size: 13px; line-height: 1.5; color: var(--muted); text-align:
 .play .dim { color: var(--play-dim); font-size: 13px; }
 .play:hover { filter: brightness(1.08); }
 
-/* Notifications: the high point. Centred, on the field, with the real rows at 1.5x. */
-.notify { padding: 96px 0 104px; text-align: center; }
+/* Notifications: the high point. Centred, on the field, with Today's notifications at the app's own width. */
+.notify { padding: 96px 0; text-align: center; }
 .notify h2 { font-size: 64px; line-height: 1.02; letter-spacing: -.018em; max-width: 13.5em; margin-inline: auto; }
 .notify-line { color: var(--muted); max-width: 30em; margin: 26px auto 0; font-size: 17.5px; }
 .decisions-figure { margin-top: 48px; }
-.decisions-sheet { width: 1080px; max-width: 100%; margin-inline: auto; }
+.decisions-sheet { width: 720px; max-width: 100%; margin-inline: auto; background: var(--app-popover); }
 
-/* Home: the morning scene at 1.4x on the paper, copy to its right. */
-.home { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 72px; align-items: center; padding: 96px 0; }
-.home-figure { justify-self: center; width: 100%; max-width: 728px; }
-.home-figure img { width: 100%; }
+/* Home: the Home tab at 1.1x in its sheet, copy to its right, the heading level with the tab bar. */
+.home { display: grid; grid-template-columns: minmax(0, 600px) minmax(0, 1fr); gap: 72px; align-items: start; padding: 96px 0; }
+.home .copy { grid-column: 2; grid-row: 1; padding-top: 2px; }
+.home-figure { grid-column: 1; grid-row: 1; width: 100%; max-width: 600px; }
+.home-sheet, .agent-sheet { background: var(--app-page); }
 
-/* Ask Juno: copy left, the panel at 1.4x, cropped inside its own edge so it has one frame. */
-.agent { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 72px; align-items: center; padding: 0 0 104px; }
-.agent-figure { justify-self: center; width: 100%; max-width: 627px; }
-.agent-figure .sheet + .sheet { margin-top: 14px; }
+/* Juno AI: copy left, the panel beside a slice of its thread at 1x, the heading level with the tab bar. */
+.agent { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 640px); gap: 72px; align-items: start; padding: 0 0 96px; }
+.agent .copy { padding-top: 2px; }
+.agent-figure { width: 100%; max-width: 640px; }
 
 /* Speed: one band, one clip. */
 .speed { padding: 88px 0 96px; background: var(--well); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -290,7 +294,7 @@ html.js .settle.in { opacity: 1; transform: none; transition: opacity .55s cubic
 /* Below 960 the two-column sections stack, words first, and the steps go one under another. */
 @media (max-width: 960px) {
   .topics, .home, .agent { grid-template-columns: 1fr; gap: 44px; }
-  .home .home-figure { order: 2; }
+  .home .copy, .home-figure { grid-column: auto; grid-row: auto; }
   .copy p { max-width: 34em; }
   .list-figure, .home-figure, .agent-figure { justify-self: start; }
   .speed-head { grid-template-columns: 1fr; gap: 16px; align-items: start; }
@@ -342,17 +346,14 @@ html.js .settle.in { opacity: 1; transform: none; transition: opacity .55s cubic
   .play { left: auto; right: 12px; bottom: 12px; transform: none; width: 44px; height: 44px; padding: 0 0 0 2px; justify-content: center; border-radius: 50%; }
   .play span { display: none; }
 
-  .notify { padding: 80px 0 88px; }
+  .notify { padding: 80px 0; }
   .notify h2 { font-size: 42px; }
   .notify-line { margin-top: 18px; font-size: 16.5px; }
   .decisions-figure { margin-top: 40px; }
   .decisions-sheet { width: 100%; }
 
-  /* The app's crops run edge to edge, so a 390 px phone shows them near their own size. */
-  .home-figure, .agent-figure, .decisions-figure { max-width: none; width: 100vw; margin-inline: calc(50% - 50vw); }
-  .agent-sheet, .decisions-sheet { border-radius: 0; border-left: 0; border-right: 0; }
-  .home-figure img { width: 100%; }
-  .agent-figure figcaption { padding-inline: 22px; }
+  /* The sheets stay inside the gutters, each with its own phone-width capture. */
+  .home-figure, .agent-figure { max-width: none; }
 
   .speed { padding: 72px 0 80px; }
   .clip { margin-top: 32px; border-radius: 10px; width: 100vw; margin-inline: calc(50% - 50vw); border-radius: 0; border-left: 0; border-right: 0; }
