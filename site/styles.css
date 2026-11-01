@@ -228,6 +228,11 @@ figcaption { font-size: 13px; line-height: 1.5; color: var(--muted); text-align:
 .clip { position: relative; margin-top: 40px; border-radius: 12px; overflow: hidden; background: var(--sheet); border: 1px solid var(--sheet-line); box-shadow: var(--sheet-shadow); aspect-ratio: 16 / 9; }
 .clip video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; }
 .clip-play { bottom: 24px; }
+/* The macOS window buttons, drawn where the app leaves room for them (14 px in, centred in the 44 px title bar).
+   The screenshots are taken without them. Each position is a share of a 2x capture: 1280x720 here, 1320x800 below. */
+.lights { position: absolute; height: auto; pointer-events: none; }
+.clip .lights { left: 1.094%; top: 2.222%; width: 4.063%; }
+.window .lights { left: 1.061%; top: 2%; width: 3.939%; }
 
 /* Get Juno */
 .start { padding: 96px 0 88px; }
