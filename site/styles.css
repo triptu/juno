@@ -163,7 +163,8 @@ html.try-on .try-button { display: inline-flex; }
 .mat { background: var(--mat); border: 1px solid var(--mat-line); padding: 56px 56px 72px; box-shadow: var(--mat-shadow); }
 .print { position: relative; padding: 3px; background: linear-gradient(180deg, var(--bevel-top), var(--bevel-bottom)); }
 .print::after { content: ''; position: absolute; inset: 3px; box-shadow: var(--print-shadow); pointer-events: none; }
-.print img { width: 100%; -webkit-user-drag: none; user-select: none; }
+.print img { width: 100%; -webkit-user-drag: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.print { -webkit-tap-highlight-color: transparent; }
 .hero-art figcaption { text-align: center; margin-top: 22px; font-size: 13.5px; line-height: 1.5; }
 .hero-art figcaption span { display: block; }
 .credit { color: var(--muted); font-size: 12px; margin-top: 4px; font-variant-numeric: oldstyle-nums; }

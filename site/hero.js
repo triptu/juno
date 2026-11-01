@@ -2,8 +2,8 @@
 // back, and petals come loose and drift down past the frame. Holding the button down on the painting makes it a gust,
 // with a shower of petals, a soft wind and a bell for each petal. It starts after the page has loaded and
 // rides the hero field's one loop, so it runs only while the hero is on screen, the tab is visible and motion is
-// allowed. It writes transforms and opacity, plus one small canvas over the print. A touch drag works like the
-// pointer; on release the effect settles.
+// allowed. It writes transforms and opacity, plus one small canvas over the print. On a phone, a finger resting on the painting
+// starts the gust and then drives it, while a quick swipe still scrolls the page.
 (() => {
   const art = document.querySelector('.hero-art')
   const opening = document.querySelector('.opening')
@@ -101,9 +101,36 @@
     return { start, blow, bell }
   })()
 
-  print.addEventListener('pointerdown', (e) => { if (e.button === 0) { e.preventDefault(); ptr.down = true; gustSound.start() } })
+  // A mouse press starts the gust at once. A finger has to rest a moment first, so a quick swipe still scrolls the
+  // page; once the gust is on, the finger drives it and the page stays put.
+  let hold = 0
+  let gusted = false
+  let holdX = 0
+  let holdY = 0
+  print.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') {
+      holdX = e.clientX
+      holdY = e.clientY
+      clearTimeout(hold)
+      hold = setTimeout(() => {
+        ptr.down = true
+        gusted = true
+        gustSound.start()
+        navigator.vibrate?.(8)
+      }, 220)
+      return
+    }
+    if (e.button === 0) { e.preventDefault(); ptr.down = true; gustSound.start() }
+  })
+  print.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch' && !ptr.down && Math.hypot(e.clientX - holdX, e.clientY - holdY) > 10) clearTimeout(hold)
+  })
+  print.addEventListener('touchmove', (e) => { if (ptr.down) e.preventDefault() }, { passive: false })
+  // A touch's release is when the browser allows sound, so the first gust may be silent and the next ones play.
+  print.addEventListener('touchend', () => { if (gusted) gustSound.start() }, { passive: true })
+  print.addEventListener('contextmenu', (e) => e.preventDefault())
   img.addEventListener('dragstart', (e) => e.preventDefault())
-  const hush = () => { ptr.down = false; gustSound.blow(0, 0) }
+  const hush = () => { clearTimeout(hold); ptr.down = false; gustSound.blow(0, 0) }
   addEventListener('pointerup', hush)
   addEventListener('pointercancel', hush)
   document.addEventListener('visibilitychange', hush)
