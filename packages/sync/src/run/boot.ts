@@ -1,5 +1,5 @@
 import { SlackAuthRequired } from '@juno/slack'
-import { Clock, Deferred, Effect, Fiber, Scope } from 'effect'
+import { Clock, Deferred, Effect, Fiber, FiberSet, Scope } from 'effect'
 import { backfillWindow } from '../window'
 import { bootState, coldBoot, warmBoot } from '../boot'
 
@@ -50,13 +50,15 @@ export const bootFailure = (error: { readonly _tag: string }): SyncPhase => {
 export const makeBootLoop = (
   runtime: SyncRuntime,
   sweep: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope>,
+  reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope>,
 ) => {
-  const { state, config, cycle, phase, settle, refreshEmoji, refreshUsergroups } = runtime
+  const { state, config, cycle, phase, settle, refreshEmoji, refreshUsergroups, background } = runtime
   const attempt = bootOnce(runtime)
   /**
    * Boots until one attempt succeeds. A failure other than an expired
    * session shows as `offline` or `failed` and is tried again after
-   * `bootRetryMillis`, or at once on a `force_reload`. Once booted the phase settles.
+   * `bootRetryMillis`, or at once on a `force_reload`. Once booted the phase
+   * settles, and a socket drop the boot could not hear is caught up.
    */
   const bootUntilDone = Effect.gen(function* () {
     while (true) {
@@ -74,6 +76,8 @@ export const makeBootLoop = (
     }
     state.booted = true
     yield* settle()
+    // The socket dropped and came back while the boot ran: the gap is rechecked as after any other drop.
+    if (state.droppedAt !== undefined && state.connected) yield* FiberSet.run(background, reconcile)
   })
   /** A `force_reload`: boot again from the current store. */
   const reboot = cycle(bootUntilDone.pipe(

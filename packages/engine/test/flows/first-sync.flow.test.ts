@@ -422,3 +422,27 @@ it('a launch whose session check never reaches Slack still ends in session-expir
   await engine.status('authRequired')
   await engine.phase('session-expired')
 })
+
+// A socket drop during the first sync
+const storedText = (engine: RunningEngine, channel: string, ts: string) =>
+  readDb(engine, 'cache.db', (db) => (db.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get(channel, ts) as { text: string } | undefined)?.text)
+
+it('a socket drop and reconnect during the first sync is caught up when the boot ends: an edit and a message from the gap land', async () => {
+  const engine = await started({ initial: (fake) => (fake.holdNext({ method: 'conversations.history' }), fake.signIn()) })
+  await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
+  // The first conversation's page is on its way with its messages as they were; the socket drops and comes back before the boot goes on.
+  const channel = String(engine.fake.heldCalls({ method: 'conversations.history' })[0]!['channel'])
+  const target = engine.fake.workspace.main(channel).at(-1)!
+  engine.fake.dropSocket()
+  await waitFor(() => (engine.online() ? undefined : true), undefined, 'the socket down')
+  engine.fake.editMessage({ channel, ts: target.ts, text: 'Edited while the socket was down.' })
+  const posted = engine.fake.injectMessage({ channel, user: target.user, text: 'Posted while the socket was down.' })
+  await waitFor(() => (engine.online() ? true : undefined), undefined, 'the socket back')
+  engine.fake.release()
+  await engine.phase('live', 30_000)
+  await waitFor(
+    () => (storedText(engine, channel, target.ts) === 'Edited while the socket was down.' && storedText(engine, channel, posted.ts) !== undefined ? true : undefined),
+    undefined,
+    'the changes made during the drop',
+  )
+})
