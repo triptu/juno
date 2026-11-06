@@ -1038,6 +1038,18 @@ The user can delete Q by hand.
 - Test: a read-state flow in `packages/engine/test/flows` with a test clock.
 - Status: Open
 
+#### OUT-9. The action worker can run a channel's ready edit while the model holds it behind another channel's timed-out delete
+
+Found by `bun run specs:conformance` on 2026-11-07, in the random trace `outbox-copy-11.itf.json` (seed of that run; the trace file is kept under `specs/traces/conformance/`, which git ignores).
+
+1. Two posts in two channels, each with an action row: a delete for the first, an edit for the second that waits on its post.
+2. The first delete's `chat.delete` times out (`request_timeout`), so its row goes back to waiting with a backoff.
+3. The second post's answer arrives. The model keeps its edit waiting and puts the delete in transit again; the engine sends the edit (`chat.update`) and keeps the delete waiting.
+
+- Severity: low. Both rows reach Slack; only their order across channels differs from the model.
+- Evidence: the trace replays the same way every time. On the code before the outbox fixes it diverges one step later (`actAccept(1)`, step 21) instead of at `answer(2)`, step 20, so the difference predates them.
+- Status: Open. Decide whether the model or the worker is right about order across channels, then change the other.
+
 ### Issue 2: Engine phase can stick and never recover
 
 Shared cause: several paths leave the session or sync phase without a later transition that can move it. Phase reports carry no check that the sync is still in the state that produced them.
