@@ -67,7 +67,9 @@ export class EngineSupervisor {
     const child = this.deps.fork('engine.js', { serviceName: 'juno-engine', partition: 'persist:slack' })
     this.child = child
     child.on('spawn', () => this.send({ _tag: 'config', config: this.config }))
+    // Events from a process this supervisor stopped or gave up on: it is no longer the engine.
     child.on('message', (data: unknown) => {
+      if (this.child !== child) return
       let message: EngineToMain
       try {
         message = decodeFromEngine(data)
@@ -87,7 +89,10 @@ export class EngineSupervisor {
         this.onMessage(message)
       }
     })
-    child.on('exit', (code) => this.onExit(code))
+    child.on('exit', (code) => {
+      if (this.child !== child) return
+      this.onExit(code)
+    })
   }
 
   /** Calls `f` each time the engine reports ready, after a restart too. */
