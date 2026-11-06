@@ -267,29 +267,35 @@ export function createDispatcher(options: DispatcherOptions) {
   /**
    * Startup (§6.5): authorizations recovery classified `unknown` look for
    * positive evidence, once, in the background. A miss keeps them unknown.
+   * Either way the card's outcome is recorded, so the model learns it (done,
+   * or Failed), and a connection call's run goes on with it as it does after
+   * a click that ran.
    */
   const reconcile = async () => {
     const unknown = store.db
       .prepare(
         `SELECT authorizations.id AS authorizationId, attempts.id AS attemptId, intents.action_id AS actionId, intents.digest, intents.payload, intents.card_id AS cardId, authorizations.origin_op AS opId
-         FROM authorizations JOIN attempts ON attempts.authorization_id = authorizations.id JOIN intents ON intents.id = authorizations.intent_id
+         FROM authorizations JOIN intents ON intents.id = authorizations.intent_id LEFT JOIN attempts ON attempts.authorization_id = authorizations.id
          WHERE authorizations.outcome = 'unknown'`,
       )
-      .all() as Array<{ authorizationId: string; attemptId: string; actionId: string; digest: string; payload: string; cardId: string; opId: string | null }>
+      .all() as Array<{ authorizationId: string; attemptId: string | null; actionId: string; digest: string; payload: string; cardId: string; opId: string | null }>
     for (const row of unknown) {
       if (closed) return
       const payload = JSON.parse(row.payload) as ExecutableIdentity
       const found = executor(payload.tool)
-      if (found?.reconcile === undefined) continue
-      try {
-        const result = await found.reconcile({ ...row, payload, opId: row.opId ?? '' })
-        if (result._tag !== 'found') continue
-        recordReceipt(store, row.attemptId, result.receipt)
-        settleCard(row.cardId)
-        options.onChange()
-      } catch (error) {
-        options.onReport?.(error)
+      // No attempt: the crash came before the handoff, so there is nothing to look for.
+      if (row.attemptId !== null && found?.reconcile !== undefined) {
+        const attemptId = row.attemptId
+        try {
+          const result = await found.reconcile({ ...row, attemptId, payload, opId: row.opId ?? '' })
+          if (result._tag === 'found') recordReceipt(store, attemptId, result.receipt)
+        } catch (error) {
+          options.onReport?.(error)
+        }
       }
+      settleCard(row.cardId)
+      options.onChange()
+      options.onSettled?.(row.cardId)
     }
   }
 
