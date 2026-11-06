@@ -6,7 +6,9 @@
  * the user answers, and the other `before-quit` listeners skip a held quit.
  * A confirmed quit starts again and goes on as any other: the engine leaves
  * the huddle as it stops. When the engine stops for good the huddle it
- * reported is dropped, since nothing is left to leave. No business logic.
+ * reported is dropped, since nothing is left to leave. The window's close
+ * asks `hidesOnClose`: in a huddle, with no agreed quit under way, it hides
+ * instead (`index.ts`). No business logic.
  *
  * Under JUNO_E2E the dialog is recorded, not shown, and answered as the
  * test says (`testHooks`), Quit by default so a test that ends in a huddle
@@ -81,6 +83,8 @@ export function createHuddleQuit(e2e: boolean, appWindow: () => BrowserWindow | 
     engineFailed(): void {
       call = null
     },
+    /** The window hides on close instead of closing: the user is in a huddle and no agreed quit is under way. */
+    hidesOnClose: () => call !== null && !confirmed,
     confirm,
     testHooks: {
       huddleQuitAsked: () => askedForTests,

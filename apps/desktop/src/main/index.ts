@@ -289,13 +289,17 @@ app.whenReady().then(() => {
   setMenuCheckForUpdates(() => void updates.check())
   updates.start()
 
-  // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open.
+  // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open,
+  // and shows again after a close hid it for a huddle.
   app.on('activate', () => {
-    if (appWindow() === undefined) openWindow()
+    const window = appWindow()
+    if (window === undefined) openWindow()
+    else if (!window.isVisible()) window.show()
   })
   app.on('second-instance', () => {
     const window = appWindow()
     if (window === undefined) return void openWindow()
+    if (!window.isVisible()) window.show()
     if (window.isMinimized()) window.restore()
     window.focus()
   })
@@ -310,7 +314,15 @@ function openWindow(): BrowserWindow {
     notificationPermission.preload()
   })
   processes.watch(window)
-  window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
+  window.on('close', (event) => {
+    updateLaunch({ bounds: window.getNormalBounds() })
+    // Closing the window while in a huddle hides it; the huddle goes on, and the Dock icon brings it back
+    // (SPEC 20, "Quitting"). A quit closes it for good, after its own question.
+    if (huddleQuit.hidesOnClose()) {
+      event.preventDefault()
+      window.hide()
+    }
+  })
   window.on('closed', () => screenWatch.stop())
   return window
 }
@@ -321,7 +333,6 @@ app.on('window-all-closed', () => {
 
 /** The engine finishing its last requests as the app quits; undefined once it has exited. */
 let engineStopping: Promise<void> | undefined
-
 app.on('before-quit', (event) => {
   if (event.defaultPrevented) return // held for the huddle question (huddleQuit.ts)
   activity.stop()

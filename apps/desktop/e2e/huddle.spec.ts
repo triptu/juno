@@ -18,6 +18,12 @@ interface QuitHooks {
 }
 const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalThis as unknown as QuitHooks).junoTest.huddleQuitAsked()])
 const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
+/** The app window as the user sees it: hidden, shown, or gone. */
+const windowState = (app: ElectronApplication) =>
+  app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((each) => !each.isDestroyed())
+    return window === undefined ? 'gone' : window.isVisible() ? 'shown' : 'hidden'
+  })
 
 // Starts signed in and synced (README, "Synced start").
 syncedTest('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop; then Switch leaves the huddle for another', { tag: ['@heavy', '@heavy-huddle'] }, async ({ juno, fake, win }) => {
@@ -114,7 +120,7 @@ syncedTest('someone shares their screen: the bar says so, the tab shows it, two 
   })
 })
 
-syncedTest('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings; quitting in a huddle asks first', { tag: ['@electron', '@heavy', '@heavy-huddle'] }, async ({ juno, fake, win, app, running }) => {
+syncedTest('start, mute and leave a huddle from the palette, with the Huddle menu following; while macOS blocks the microphone, Mute says so and opens System Settings; closing the window hides it and the Dock brings it back; quitting in a huddle asks first', { tag: ['@electron', '@heavy', '@heavy-huddle'] }, async ({ juno, fake, win, app, running }) => {
   const { palette } = juno
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
 
@@ -195,7 +201,7 @@ syncedTest('start, mute and leave a huddle from the palette, with the Huddle men
     await expect.poll(() => huddleMenuItem(app, 'huddle-leave')).toEqual({ label: 'Leave Huddle', enabled: false })
   })
 
-  await test.step('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async () => {
+  await test.step('closing the window in a huddle hides it; the huddle goes on, and the Dock icon brings it back', async () => {
     await juno.sidebar.row('#eng').open()
     await juno.topic.expectTitle('Main')
     await juno.sidebar.leave()
@@ -203,6 +209,20 @@ syncedTest('start, mute and leave a huddle from the palette, with the Huddle men
     await juno.topic.chooseInMenu('huddle')
     await expect(bar).toBeVisible()
     await expect.poll(() => connection(win)).toBe('connected')
+
+    // ⌘⇧W or the red button: the window hides, and the call goes on with no leave.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close())
+    await expect.poll(() => windowState(app)).toBe('hidden')
+    expect(await connection(win)).toBe('connected')
+    // The Dock icon brings it back, still in the call.
+    await app.evaluate(({ app: electron }) => electron.emit('activate'))
+    await expect.poll(() => windowState(app)).toBe('shown')
+    await expect(bar).toBeVisible()
+    expect(await connection(win)).toBe('connected')
+    expect(fake.calls.filter((call) => call.method === 'rooms.leave')).toHaveLength(1)
+  })
+
+  await test.step('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async () => {
     const attendeeId = await attendee(win)
 
     // ⌘Q, the menu's Quit and the Dock's Quit all start the same app quit. Cancel keeps the huddle.
