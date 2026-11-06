@@ -95,7 +95,9 @@ export class AgentSupervisor {
     this.state = 'starting'
     const child = this.deps.fork('agent.js', { serviceName: 'juno-agent' })
     this.child = child
+    // Events from a process this supervisor stopped: it is no longer the agent.
     child.on('spawn', () => {
+      if (this.child !== child) return
       this.spawned = true
       this.send({ _tag: 'config', config: this.config })
       this.send({ _tag: 'provider', provider: this.provider })
@@ -104,6 +106,7 @@ export class AgentSupervisor {
       this.pendingRendererPorts.clear()
     })
     child.on('message', (data: unknown) => {
+      if (this.child !== child) return
       let message: AgentToMain
       try {
         message = decodeFromAgent(data)
@@ -142,8 +145,7 @@ export class AgentSupervisor {
       }
     })
     child.on('exit', (code) => {
-      // A process stopped for a provider change may exit after its successor started.
-      if (this.child !== undefined && this.child !== child) return
+      if (this.child !== child) return
       this.onExit(code)
     })
   }
@@ -213,7 +215,11 @@ export class AgentSupervisor {
     if (this.restartTimer) clearTimeout(this.restartTimer)
     this.restartTimer = undefined
     this.child?.kill()
+    // What the process had established goes with it, before its exit arrives: the next one starts fresh.
     this.child = undefined
+    this.spawned = false
+    this.hello = undefined
+    this.restartAsked = false
   }
 
   /** Closing the waiting ends makes each renderer ask again, and hear `failed`. */
