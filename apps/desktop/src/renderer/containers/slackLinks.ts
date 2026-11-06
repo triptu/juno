@@ -115,9 +115,9 @@ function openLinked(topicId: string, ts: string | undefined, behind: boolean): v
 const NO_CONVERSATION = 'Juno cannot reach that conversation'
 
 /** Whether the answer came too late to act on: the user went elsewhere since `since`. */
-function late(since: Shown, what: string): boolean {
+function late(since: Shown, link: string): boolean {
   if (!movedOn(since)) return false
-  traceSend('link dropped', () => ({ what }))
+  traceSend('link dropped', () => ({ link }))
   return true
 }
 
