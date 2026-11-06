@@ -183,3 +183,39 @@ domTest('⌘W held down closes a tab per press, even when the tabs it lands on w
   await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs.length).toBe(topics.length - 3)
   expect(await restarted.tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
 })
+
+domTest('⌘T before the saved tabs have loaded opens the new tab beside them, and keeps the Home draft saved with them', async ({ juno, relaunch, app, userData, fake, step }) => {
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  await juno.sidebar.row(RINA).openInNewTab()
+  await juno.topic.expectTitle(RINA)
+  await juno.home.navItem.click({ modifiers: ['Meta'] })
+  await juno.tabs.expectActive('Home')
+  await juno.write.write('Note kept across the relaunch')
+  await expect.poll(() => saved(userData, fake.teamId).tabs.some((tab) => tab.homeDraft?.draft === 'Note kept across the relaunch')).toBe(true)
+  const before = await juno.tabs.titles()
+
+  const restarted = await relaunch()
+  // The engine's answer with the saved tabs is held, as a slow disk holds it, while ⌘T lands on the blank page.
+  const release = app.holdReplies('prefs.get')
+  await step('the page is up with no tabs yet', async () => {
+    await restarted.sidebar.row(RINA).expectVisible()
+    await expect(restarted.tabs.root.getByRole('tab')).toHaveCount(0)
+  })
+  await restarted.tabs.menu('new-tab')
+  release()
+
+  await step('the saved tabs show, with the new Home tab after them', async () => {
+    await expect(restarted.tabs.root.getByRole('tab')).toHaveCount(4, { timeout: 5_000 })
+    await expect.poll(() => restarted.tabs.titles()).toEqual([...before, 'Home'])
+    await restarted.tabs.expectActiveAt('Home', 1)
+  })
+  await step('the first Home tab still has its draft, and the save holds every tab', async () => {
+    await restarted.tabs.selectAt('Home', 0)
+    await expect(restarted.write.composer).toHaveValue('Note kept across the relaunch')
+    await expect.poll(() => {
+      const state = saved(userData, fake.teamId)
+      return state.tabs.length === 4 && state.tabs.some((tab) => tab.homeDraft?.draft === 'Note kept across the relaunch')
+    }).toBe(true)
+  })
+})

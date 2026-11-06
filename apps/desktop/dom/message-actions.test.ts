@@ -17,6 +17,7 @@ const ENG_MAIN = '#eng'
 const POSTGRES = 'Draft plan is in the doc'
 
 type Context = Pick<DomContext, 'juno' | 'fake' | 'step'>
+type AppContext = Pick<DomContext, 'juno' | 'fake' | 'app'>
 
 async function openMain(juno: Juno): Promise<void> {
   await juno.sidebar.row(ENG_MAIN).open()
@@ -48,7 +49,7 @@ async function selectWords(text: Query, words: string): Promise<void> {
 }
 
 // One launch on #eng's Main: each step sends its own message, so ↑ from the composer selects the newest one.
-domTest('edits, deletes, reacts, quotes and opens threads from Main', async ({ juno, fake, step }) => {
+domTest('edits, deletes, reacts, quotes and opens threads from Main', async ({ juno, fake, app, step }) => {
   await openMain(juno)
   const context = { juno, fake, step }
   await step('the keyboard: ↑ selects, E edits, Delete asks once, and E and Delete do nothing on others’ messages', () => keyboardActions(context))
@@ -57,7 +58,50 @@ domTest('edits, deletes, reacts, quotes and opens threads from Main', async ({ j
   await step('Quote puts the message in the composer as "> " lines; a selection quotes only itself', () => quoteMessage(context))
   await step('Edit and Delete from the menus, and Edit after the message changed elsewhere', () => menuActions(context))
   await step('Open thread and Start thread from Main open the message’s thread, and ⌘-click opens it in a background tab', () => threads(context))
+  await step('an edit whose save fails while another message is being edited leaves that editor open', () => failedEditKeepsOtherEditor({ juno, fake, app }))
 })
+
+/**
+ * The save of one message is still out when the user opens the editor on another; then the engine connection
+ * drops, which fails the save. Only the failed edit ends: the open editor keeps its text.
+ */
+async function failedEditKeepsOtherEditor({ juno, fake, app }: AppContext): Promise<void> {
+  await openMain(juno)
+  await juno.topic.composer.fill('')
+  const { topic } = juno
+  await sendOwn(juno, fake, 'Deploy is at noon')
+  await sendOwn(juno, fake, 'Retro is at four')
+  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+
+  // The engine's answer to the save is held, as a slow engine holds it, so the save is still out when the connection drops.
+  const release = app.holdReplies('messages.edit')
+  await topic.composer.press('ArrowUp')
+  await juno.win.keyboard.press('ArrowUp')
+  await expect(topic.message('Deploy is at noon')).toBeFocused()
+  await juno.win.keyboard.press('e')
+  await expect(field).toHaveValue('Deploy is at noon')
+  await field.fill('Deploy is at one')
+  await field.press('Enter')
+  await expect(topic.composer).toBeFocused()
+
+  await topic.composer.press('ArrowUp')
+  await expect(topic.message('Retro is at four')).toBeFocused()
+  await juno.win.keyboard.press('e')
+  await expect(field).toHaveValue('Retro is at four')
+
+  // The connection drops: the save out on it fails. The editor on the other message is not the failed edit's.
+  const online = app.engineOffline()
+  await expect.poll(() => app.connection).toBe('reconnecting')
+  online()
+  await expect.poll(() => app.connection).toBe('connected')
+  release()
+  // The edit reached the engine before the drop; its text comes back with the window, after the failure was handled.
+  await expect(topic.message('Deploy is at one')).toBeVisible({ timeout: 15_000 })
+  await expect(field).toHaveValue('Retro is at four')
+  await field.press('Escape')
+  await expect(field).toHaveCount(0)
+  await expect(topic.composer).toBeFocused()
+}
 
 async function keyboardActions({ juno, fake, step }: Context): Promise<void> {
   await juno.topic.composer.fill('')

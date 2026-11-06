@@ -5,7 +5,8 @@
 // conversation Juno cannot reach opens in the browser, and another
 // workspace's link is handled as any web link. That the message is in view
 // and flashes is the browser lane's (the long thread journey in topic.spec.ts); here, the tab
-// and the message it opens at.
+// and the message it opens at. A link whose answer comes after the user moved on opens nothing, and a thread
+// opened while Slack is slowing Juno down says so until its replies come.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -13,10 +14,13 @@ import { domTest } from './test'
 
 const DAY = 86_400_000
 const POSTGRES = 'Draft plan is in the doc'
+const RINA = 'Rina finished the onsite'
 // A Main's tab is titled by the channel's name.
 const ENG = 'eng'
 const OTHER = 'https://other.slack.com/archives/C0ENG/p1712345678000200'
 const NOWHERE_TS = '1712345678.000200'
+const OLD_THREAD = 'Capacity review notes from last quarter'
+const OLD_REPLY = 'Replica count was fine then'
 
 const find = (fake: FakeSlack, start: string) => fake.messages('C0ENG').find((message) => message.text?.includes(start))!
 const permalink = (fake: FakeSlack, ts: string, threadTs?: string) =>
@@ -27,8 +31,10 @@ function seedLinks(fake: FakeSlack): void {
   const root = find(fake, POSTGRES)
   const main = find(fake, 'preview environments never shut down')
   const reply = find(fake, 'Please do.')
-  // Three weeks old: outside the first sync's window, so Juno has not stored it.
+  // Three weeks old: outside the first sync's window, so Juno has not stored them.
   const old = fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: 'Old capacity note from last month', at: fake.now() - 21 * DAY, silent: true })
+  const oldRoot = fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: OLD_THREAD, at: fake.now() - 21 * DAY, silent: true })
+  const oldReply = fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: OLD_REPLY, at: fake.now() - 21 * DAY + 60_000, threadTs: oldRoot.ts, silent: true })
   fake.workspace.post({
     channel: 'C0ENG',
     user: 'U0MAYA',
@@ -37,6 +43,7 @@ function seedLinks(fake: FakeSlack): void {
       `See <${permalink(fake, main.ts)}|the preview note>,`,
       `<${permalink(fake, reply.ts, reply.thread_ts)}|the reaper reply>,`,
       `<${permalink(fake, old.ts)}|the old note>,`,
+      `<${permalink(fake, oldReply.ts, oldRoot.ts)}|the old thread>,`,
       `<${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}|a closed room>`,
       `and <${OTHER}|elsewhere>.`,
     ].join(' '),
@@ -111,3 +118,48 @@ domTest('message links open inside Juno at the message: Main and a reply in new 
     await expect(topic.message('preview environments never shut down')).toBeVisible({ timeout: 15_000 })
   })
 })
+
+domTest('a message link whose fetch answers after the user moved on opens nothing: the tab and the composer stay where the user went', async ({ juno, fake, app }) => {
+  seedLinks(fake)
+  const link = await openLinks(juno)
+  const { topic, tabs } = juno
+  const trace = { events: [] as Array<{ readonly what: string }> }
+  ;(app.window as unknown as { __junoSendTrace: unknown }).__junoSendTrace = trace
+  // The engine's answer to the old note's fetch is held, as a slow Slack holds it, while the user goes elsewhere and types.
+  const release = app.holdReplies('messages.loadAt')
+  await link('the old note').click()
+  await juno.sidebar.row(RINA).openInNewTab()
+  await topic.expectTitle(RINA)
+  await tabs.expectCount(2)
+  await topic.composer.fill('Typed after moving on')
+  release()
+  const tabCount = () => tabs.root.getByRole('tab').count()
+  // The late answer is dropped, or (the bug) opens #eng over the tab the user is in.
+  await expect.poll(() => trace.events.some((event) => event.what === 'link dropped') || tabCount() !== 2, { timeout: 5_000 }).toBe(true)
+  expect(tabCount()).toBe(2)
+  await tabs.expectActive(RINA)
+  await expect(topic.composer).toHaveValue('Typed after moving on')
+  await expect(topic.composer).toBeFocused()
+})
+
+domTest('a thread opened while Slack is slowing Juno down says so, and shows its replies once the pause ends, in the same tab', async ({ juno, fake }) => {
+  seedLinks(fake)
+  const link = await openLinks(juno)
+  const { topic, tabs } = juno
+  // Slack's next answer to a thread fetch is a 429 whose Retry-After is longer than an interactive call waits out.
+  fake.force429({ method: 'conversations.replies', retryAfter: 2, times: 1 })
+
+  // The thread opens in a new tab with what the store has: nothing, since Juno never stored it, so not even its title.
+  await link('the old thread').click()
+  await tabs.expectCount(2)
+  await expect(topic.list.getByText('Slack asked Juno to slow down')).toBeVisible()
+  await juno.sidebar.expectSyncStatus('Slack asked us to slow down')
+
+  // The pause ends: the engine finishes the fetch by itself.
+  await juno.sidebar.expectNoSyncStatus()
+  await expect(topic.message(OLD_REPLY)).toBeVisible({ timeout: 15_000 })
+  await topic.expectTitle(OLD_THREAD)
+  await tabs.expectCount(2)
+  await expect(topic.list.getByText('Slack asked Juno to slow down')).toHaveCount(0)
+})
+

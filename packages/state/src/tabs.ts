@@ -138,7 +138,7 @@ export function tabTopic(tab: Tab): string | undefined {
   return place.kind === 'topic' ? place.topicId : undefined
 }
 /** Settings is one place whatever its section, so it shows in one tab. */
-const samePlace = (a: Place, b: Place) =>
+export const samePlace = (a: Place, b: Place) =>
   a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId
   : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page
   : a.kind === 'huddle' ? b.kind === 'huddle' && a.channelId === b.channelId
@@ -636,11 +636,45 @@ export const tabsAtom = Atom.make((get): Tabs => {
   return AsyncResult.isSuccess(saved) ? ensureTab(parseTabs(saved.value), homePlace) : noTabs
 }).pipe(Atom.withEquality((a: Tabs, b: Tabs) => a === b))
 
-/** Applies a rule to the tabs and saves the result. A change that leaves no tab leaves one with Home. */
+/** Changes asked for before the saved tabs had answered (⌘T on the blank launch page), by workspace; applied on top of them once they do. */
+const heldChanges = new Map<string, Array<(tabs: Tabs) => Tabs>>()
+
+/** Whether the workspace's tabs are known: changed in this run, or read back from the saved pref. */
+const tabsKnown = (registry: Registry, teamId: string): boolean => registry.get(changedTabsAtom(teamId)) !== undefined || AsyncResult.isSuccess(registry.get(savedTabsAtom))
+
+/** Keeps `change` until the saved tabs answer, then applies it. A change applied to no tabs would replace the saved ones instead of joining them. */
+function holdChange(registry: Registry, teamId: string, change: (tabs: Tabs) => Tabs): void {
+  const held = heldChanges.get(teamId)
+  if (held !== undefined) {
+    held.push(change)
+    return
+  }
+  heldChanges.set(teamId, [change])
+  const off = registry.subscribe(
+    savedTabsAtom,
+    (saved) => {
+      if (!AsyncResult.isSuccess(saved)) return
+      off()
+      const changes = heldChanges.get(teamId) ?? []
+      heldChanges.delete(teamId)
+      for (const kept of changes) updateTabs(registry, kept)
+    },
+    { immediate: false },
+  )
+}
+
+/**
+ * Applies a rule to the tabs and saves the result. A change that leaves no tab leaves one with Home. A change
+ * asked for before the saved tabs have answered waits for them (`holdChange`).
+ */
 export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Tabs {
   const teamId = registry.get(signedInAtom)?.teamId
   const current = registry.get(tabsAtom)
   if (teamId === undefined) return current
+  if (!tabsKnown(registry, teamId)) {
+    holdChange(registry, teamId, change)
+    return current
+  }
   const changed = change(current)
   const ensured = changed === current ? current : ensureTab(changed, homePlace)
   // The tab that became active and the one left are both viewed now; expiry counts from there.
