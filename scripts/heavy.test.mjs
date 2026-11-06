@@ -1,7 +1,7 @@
 import { toolFixture } from './tool-test-fixture.mjs'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
@@ -107,4 +107,19 @@ test('Mac app jobs serialize while ordinary jobs retain both slots', { skip: pro
     const start = events.find((event) => event.name === 'ordinary' && event.kind === 'start').time
     assert.ok(events.some((event) => event.name.startsWith('app-') && event.kind === 'start' && Math.abs(event.time - start) < 600), 'an ordinary job can overlap an app job')
   } finally { for (const child of children) if (child.exitCode === null) child.kill('SIGTERM') }
+})
+
+test('a ticket left by a dead job whose PID another process now has does not hold the queue', { timeout: 10_000 }, async (t) => {
+  const { root, env: fixtureEnv } = toolFixture(t)
+  const queueName = `reused-${process.pid}`
+  const env = { ...fixtureEnv, JUNO_HEAVY_SLOTS: '1' }
+  delete env.JUNO_HEAVY_HELD
+  const queueDir = join(env.TMPDIR, `juno-heavy-${queueName}`, 'queue')
+  mkdirSync(queueDir, { recursive: true })
+  // This test's own PID is alive but never queued: it stands for a reused PID.
+  writeFileSync(join(queueDir, `1-0-${process.pid}-left.json`), JSON.stringify({ pid: process.pid, start: 'Thu Jan  1 00:00:00 1970', label: 'left behind', queuedAt: '1970-01-01T00:00:00.000Z', priority: 'normal' }))
+  const ran = join(root, 'ran')
+  const job = launch(['--queue', queueName, process.execPath, '-e', `require('node:fs').writeFileSync(${JSON.stringify(ran)}, '')`], env)
+  assert.equal(await job.done, 0)
+  assert.ok(existsSync(ran), 'the queued job ran')
 })

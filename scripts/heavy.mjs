@@ -43,8 +43,15 @@ const queueDir = join(root, 'queue')
 const slots = queueAt ? 2 : Math.max(1, Number(process.env.JUNO_HEAVY_SLOTS ?? 2))
 mkdirSync(queueDir, { recursive: true })
 
-const alive = (pid) => {
-  try { process.kill(pid, 0); return true } catch { return false }
+/** When a process started, as `ps` prints it; undefined when there is none. */
+const startOf = (pid) => {
+  try { return execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], { encoding: 'utf8' }).trim() || undefined } catch { return undefined }
+}
+const start = startOf(process.pid)
+// A ticket or a slot names its process by PID and start: a PID the system gave to another process is not that job.
+const alive = (record) => {
+  try { process.kill(record.pid, 0) } catch { return false }
+  return record.start === undefined || startOf(record.pid) === record.start
 }
 const readJson = (path) => {
   try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return undefined }
@@ -52,7 +59,7 @@ const readJson = (path) => {
 const since = (iso) => `${Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000))}s`
 const ownerFor = (dir) => {
   const owner = readJson(join(dir, 'owner.json'))
-  if (owner && !alive(owner.pid)) {
+  if (owner && !alive(owner)) {
     rmSync(dir, { recursive: true, force: true })
     return undefined
   }
@@ -80,7 +87,7 @@ if (flags.includes('--status')) {
     const owner = ownerFor(dir)
     if (owner && !holders.some((holder) => holder.pid === owner.pid)) holders.push({ command: owner.label, pid: owner.pid, waited: `${Math.floor((owner.waitedMs ?? 0) / 1000)}s` })
   }
-  const queued = readdirSync(queueDir).map((file) => readJson(join(queueDir, file))).filter((job) => job && alive(job.pid))
+  const queued = readdirSync(queueDir).map((file) => readJson(join(queueDir, file))).filter((job) => job && alive(job))
     .toSorted((a, b) => (a.priority === 'release' ? 0 : 1) - (b.priority === 'release' ? 0 : 1) || a.queuedAt.localeCompare(b.queuedAt))
   console.log(JSON.stringify({ holders, queue: queued.map((job) => ({ command: job.label, pid: job.pid, waited: since(job.queuedAt), priority: job.priority })) }, null, 2))
   process.exit(0)
@@ -89,22 +96,22 @@ if (flags.includes('--status')) {
 const label = `${args.join(' ')} (${process.cwd()})`
 const queuedAt = new Date().toISOString()
 const ticket = join(queueDir, `${priority === 'release' ? '0' : '1'}-${Date.now()}-${process.pid}-${randomUUID()}.json`)
-writeFileSync(ticket, JSON.stringify({ pid: process.pid, label, queuedAt, priority }), { flag: 'wx' })
+writeFileSync(ticket, JSON.stringify({ pid: process.pid, start, label, queuedAt, priority }), { flag: 'wx' })
 
 const take = (dir, extra = {}) => {
   try {
     mkdirSync(dir)
-    writeFileSync(join(dir, 'owner.json'), JSON.stringify({ pid: process.pid, label, since: new Date().toISOString(), waitedMs: Date.now() - Date.parse(queuedAt), ...extra }))
+    writeFileSync(join(dir, 'owner.json'), JSON.stringify({ pid: process.pid, start, label, since: new Date().toISOString(), waitedMs: Date.now() - Date.parse(queuedAt), ...extra }))
     return true
   } catch {
     const owner = ownerFor(dir)
-    if (owner && !alive(owner.pid)) rmSync(dir, { recursive: true, force: true })
+    if (owner && !alive(owner)) rmSync(dir, { recursive: true, force: true })
     return false
   }
 }
 
 const queue = () => readdirSync(queueDir).map((file) => ({ file, job: readJson(join(queueDir, file)) }))
-  .filter(({ job }) => job && alive(job.pid))
+  .filter(({ job }) => job && alive(job))
   .toSorted((a, b) => a.file.localeCompare(b.file))
 const held = []
 const tryAcquire = () => {
