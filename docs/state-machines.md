@@ -1406,6 +1406,28 @@ Stale `ready`: a `ready` from A already in flight when `stop()` killed it sets `
 - Fix direction: reset `spawned` and `hello` in `stop()`, and check `this.child === child` in the `spawn` and `ready` handlers.
 - Status: Fixed in 466b8102c. The agent supervisor's `stop()` resets `spawned`, `hello` and `restartAsked`, and `spawn`, `message` and `exit` check the child. Test: `apps/desktop/test/supervisors.test.ts`.
 
+### Issue 7: Repo tooling can multiply or block on this machine's state
+
+Found while running the fixes, not by the audit. Both are in the scripts every agent runs.
+
+#### TOOL-1. `bun run lint` under a Bun without `bun lint` starts copies of itself without end
+
+1. `scripts/lint.mjs` runs `process.execPath lint --no-script --deny-warnings .` beside its other checks.
+2. A Bun build without the built-in `lint` (any build but the canary that `packageManager` pins, such as Homebrew's release) runs the package script `lint` instead, which is `lint.mjs` again.
+3. Each copy starts thirteen more checks and another copy. On 2026-11-07 this reached about 3,000 processes and a load average above 900 on the development Mac.
+
+- Severity: high for the machine, none for users.
+- Status: Fixed in 4c5081731. `lint.mjs` sets `JUNO_LINT_RUNNING` for its checks and a nested copy exits at once with a message that names the missing canary.
+
+#### TOOL-2. A heavy-lock ticket whose process died holds the queue once its PID is reused
+
+1. `scripts/heavy.mjs` keeps one ticket file per waiting job and treats a ticket as live while `process.kill(pid, 0)` succeeds.
+2. A job is killed without removing its ticket (SIGKILL).
+3. macOS gives the PID to another process (here `mdworker`). The ticket is "alive" again, it sorts first, and every later heavy job waits behind it.
+
+- Severity: medium (every heavy job on the machine waits until someone deletes the file).
+- Status: Fixed in 3adeeeda1. Tickets and slot owners record their process's start time (`ps -o lstart`), and a PID counts only while it has that start. Test: `scripts/heavy.test.mjs`, "a ticket left by a dead job whose PID another process now has does not hold the queue".
+
 ### Not scheduled
 
 These are low-impact or need rare timing. Each keeps its id so a later change can pick it up.
