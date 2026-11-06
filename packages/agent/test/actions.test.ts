@@ -4,7 +4,7 @@
 // reads with its next input. In-process, on the real engine, with the scripted model and the fake host.
 import { afterEach, expect, it } from 'bun:test'
 import { fakeActionHost, forgedSendReceipt, hostile, reply, TEST_CHANNEL, type FakeActionHost } from '@juno/agent-testing'
-import { ActionId, ConnectionId, AccountId, Digest, Revision, SourceGeneration, type CardPayload } from '@juno/agent-cards'
+import { ActionId, ConnectionId, AccountId, CARD_LIFETIME_MS, Digest, Revision, SourceGeneration, type CardPayload } from '@juno/agent-cards'
 import type { Card, CardBinding } from '@juno/agent-contract'
 import { liveGrant, mintGrant, question, resolveCard, type Executor } from '../src/index'
 import { fakeHost, say, textOf, turnsHarness } from './turns-harness'
@@ -121,6 +121,42 @@ it('Signed out: a click waits until an account is known, then sends once', async
   h.turns.actions.kick()
   await settle(h)
   expect(slack.messages().map((m) => m.text)).toEqual(['When I am back.'])
+})
+
+it('Waiting: a click whose destination cannot be checked yet holds no other card, and expires while it waits', async () => {
+  let now = 1_760_400_000_000
+  // A connection that never becomes ready: its click waits for as long as it is clicked.
+  const stuck: Executor = { tool: 'fake_write', tier: 3, deduped: false, check: async () => 'wait', run: async () => ({ _tag: 'failed', detail: 'never runs' }) }
+  const { h, slack } = await open({ actions: { executors: [stuck] }, now: () => now })
+  const payload = {
+    _tag: 'change', server: 'Notion', target: 'Roadmap',
+    action: {
+      id: ActionId.make('0199f0a0-0000-7000-8000-000000000003'), rev: Revision.make(1), tier: 3, deduped: false, source: SourceGeneration.make(0),
+      payload: {
+        connection_id: ConnectionId.make('notion'), account_id: AccountId.make('acct'), destination_ids: [], tool: 'fake_write',
+        schema_hash: Digest.make('0'.repeat(64)), args: { title: 'Q4' }, preconditions: {}, ops: [],
+      },
+    },
+  } as CardPayload
+  h.turns.actions.propose({ runId: 'run-c', callId: 'c-3', payload })
+  click(h, only(h))
+  await settle(h)
+  expect(statusOf(only(h))).toEqual({ _tag: 'working' })
+
+  // A Send card clicked later goes out while the Change card still waits.
+  now += 1
+  h.fake.script([sendCall('Still goes.'), reply(say('Drafted.'))])
+  await h.ended(h.send('reply to the thread for me'))
+  const send = cards(h).find((view) => view.card._tag === 'sendMessage')!
+  click(h, send)
+  await settle(h)
+  expect(slack.messages().map((m) => m.text)).toEqual(['Still goes.'])
+
+  // A week later the waiting click is refused as expired, and the card says so.
+  now += CARD_LIFETIME_MS
+  h.turns.actions.kick()
+  await settle(h)
+  expect(statusOf(cards(h).find((view) => view.card._tag === 'change')!)).toEqual({ _tag: 'expired' })
 })
 
 it('Unknown: a send whose answer was lost shows Failed, is never sent again, and turns Sent when reconcile finds it', async () => {

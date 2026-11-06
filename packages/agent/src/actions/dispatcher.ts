@@ -8,13 +8,16 @@
  *                                                      └▶ no answer: unknown
  *   startup: open authorizations ─▶ unknown ─reconcile─▶ done | unknown (kept)
  *
- * One worker drains approved children in click order, one at a time, so a
- * batch reaches its destination in the card's order. Before each it checks
- * the policy (`authorizeDecision`) on facts read in the same synchronous
- * step as `authorize` commits, so nothing can change in between. A refusal
- * for a reason that can pass (paused, off, not the owner) leaves the
- * approval waiting; any other refusal is written on the approval, and the
- * click never runs.
+ * The drain runs each card's approved children in click order, one at a
+ * time, so a batch reaches its destination in the card's order; cards run
+ * beside each other, so a click that waits (a connection not ready, a
+ * sign-in in progress) holds no other card. Before each child it checks the
+ * policy (`authorizeDecision`) on facts read in the same synchronous step as
+ * `authorize` commits, so nothing can change in between. A refusal for a
+ * reason that can pass (paused, off, not the owner) leaves the approval
+ * waiting; any other refusal is written on the approval, and the click never
+ * runs. Juno's own records (expiry, a redaction, an edit) are checked before
+ * the destination is asked, so a waiting click still expires.
  *
  * Nothing here retries. One authorization is one attempt, and an attempt
  * Juno cannot confirm stays `unknown` (the card shows "Failed"). A child
@@ -65,7 +68,12 @@ export function createDispatcher(options: DispatcherOptions) {
   const executor = (tool: string) => options.executors().find((e) => e.tool === tool)
   let closed = false
   let running: Promise<void> | undefined
+  /** A kick arrived: read the approvals again. */
   let again = false
+  /** Wakes the drain when a card's chain ends or a kick arrives. */
+  let wake: (() => void) | undefined
+  /** The chain running each card's children now. */
+  const chains = new Map<string, Promise<void>>()
 
   const pending = (): ReadonlyArray<Pending> =>
     (store.db
@@ -109,17 +117,27 @@ export function createDispatcher(options: DispatcherOptions) {
 
   const settleCard = (cardId: string) => settleCardOutcome(store, cardId)
 
-  /** One approved child: check, authorize, attempt, run, record. Returns false when the drain must wait (paused, off, not the owner, no account yet). */
-  const dispatch = async (item: Pending): Promise<boolean> => {
+  /**
+   * One approved child: check, authorize, attempt, run, record. `wait` when the
+   * card must wait (no account or connection yet, paused, off, not the owner),
+   * `rotated` when the journal moved under the position and the child goes again.
+   */
+  const dispatch = async (item: Pending): Promise<'done' | 'wait' | 'rotated'> => {
     const payload = JSON.parse(item.intent.payload) as ExecutableIdentity
     const found = executor(payload.tool)
     if (found === undefined) {
       refuse(item, 'unavailable')
-      return true
+      return 'done'
     }
-    // The destination's side of `valid` (account, schema, preconditions) needs I/O, so it is read first.
+    // Juno's own records first, so a click that waits on its destination still expires.
+    const early = recordsValid(item)
+    if (early !== 'valid') {
+      refuse(item, early)
+      return 'done'
+    }
+    // The destination's side of `valid` (account, schema, preconditions) needs I/O, so it is read before the step below.
     const identity = found.check === undefined ? 'valid' : await found.check(payload)
-    if (identity === 'wait') return false
+    if (identity === 'wait') return 'wait'
     const position = await options.position()
     // From here to `authorize` nothing awaits, so Juno's records cannot change under the decision.
     const records = recordsValid(item)
@@ -143,21 +161,17 @@ export function createDispatcher(options: DispatcherOptions) {
       done,
     })
     if (decision._tag === 'refused') {
-      if (decision.reason === 'paused' || decision.reason === 'off' || decision.reason === 'notOwner') return false
+      if (decision.reason === 'paused' || decision.reason === 'off' || decision.reason === 'notOwner') return 'wait'
       refuse(item, decision.reason === 'invalid' ? decision.invalid : decision.reason)
-      return true
+      return 'done'
     }
     const authorized = authorize(store, { intentId: item.intent.id, approvalId: item.approvalId, originOp: item.opId, position })
-    if (authorized._tag === 'refused') {
-      // The journal rotated under the position: read it again on the next pass.
-      if (authorized.reason !== 'rotated') return false
-      again = true
-      return true
-    }
+    // The journal rotated under the position: read it again and go once more.
+    if (authorized._tag === 'refused') return authorized.reason === 'rotated' ? 'rotated' : 'wait'
     options.onChange()
     const attemptId = recordAttempt(store, authorized.id)
     // Pause cancelled it before the handoff: nothing was sent.
-    if (attemptId === undefined) return true
+    if (attemptId === undefined) return 'done'
     const call: ExecutorCall = {
       actionId: item.intent.action_id, authorizationId: authorized.id, attemptId, digest: item.intent.digest,
       payload, cardId: item.cardId, opId: item.opId,
@@ -184,32 +198,68 @@ export function createDispatcher(options: DispatcherOptions) {
     settleCard(item.cardId)
     options.onChange()
     options.onSettled?.(item.cardId)
-    return true
+    return 'done'
   }
 
-  /** Dispatches in click order until nothing is pending, or the first child must wait. A kick meanwhile looks again. */
+  /** One card's approved children in click order; the rest of the card waits with the first child that must. */
+  const runCard = async (items: ReadonlyArray<Pending>) => {
+    for (const item of items) {
+      let result: Awaited<ReturnType<typeof dispatch>>
+      do {
+        if (closed) return
+        result = await dispatch(item)
+      } while (result === 'rotated')
+      if (result !== 'done') return
+    }
+  }
+
+  /** Starts a chain for every card with approved children and none running. */
+  const startChains = () => {
+    const byCard = new Map<string, Pending[]>()
+    for (const item of pending()) {
+      if (chains.has(item.cardId)) continue
+      byCard.set(item.cardId, [...(byCard.get(item.cardId) ?? []), item])
+    }
+    for (const [cardId, items] of byCard) {
+      const chain = runCard(items)
+        .catch((error: unknown) => options.onReport?.(error))
+        .finally(() => {
+          chains.delete(cardId)
+          wake?.()
+        })
+      chains.set(cardId, chain)
+    }
+  }
+
+  /** Runs the cards' chains until every one ended and no kick is waiting. A kick meanwhile reads the approvals again. */
   const drain = async () => {
     for (;;) {
-      again = false
-      for (const item of pending()) {
-        if (closed) return
-        if (!(await dispatch(item))) break
+      if (closed) break
+      if (again) {
+        again = false
+        startChains()
       }
-      if (!again || closed) return
+      if (chains.size === 0 && !again) return
+      if (!again) await new Promise<void>((resolve) => (wake = resolve))
+      wake = undefined
     }
+    await Promise.all(chains.values())
   }
 
   /** Runs the drain, or asks the running one to look again. */
   const kick = (): Promise<void> => {
     if (closed) return Promise.resolve()
+    again = true
     if (running !== undefined) {
-      again = true
+      wake?.()
       return running
     }
     running = drain()
       .catch((error: unknown) => options.onReport?.(error))
       .finally(() => {
         running = undefined
+        // A kick that landed as the drain ended starts the next one.
+        if (again && !closed) void kick()
       })
     return running
   }
@@ -252,6 +302,7 @@ export function createDispatcher(options: DispatcherOptions) {
     },
     close: async () => {
       closed = true
+      wake?.()
       await running
     },
   }
