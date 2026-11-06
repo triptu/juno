@@ -5,7 +5,7 @@ import { bootState, coldBoot, warmBoot } from '../boot'
 
 import type { SyncFailure, SyncPhase, SyncServices } from '../sync'
 import { followPassIfDue, repairAfterLive } from './reconcile'
-import { isNotAuth, type SyncRuntime } from './runtime'
+import type { SyncRuntime } from './runtime'
 
 const bootOnce = (runtime: SyncRuntime) => {
   const { state, ctx, options, reportBoot, work, step } = runtime
@@ -53,20 +53,12 @@ export const makeBootLoop = (
 ) => {
   const { state, config, cycle, phase, settle, refreshEmoji, refreshUsergroups } = runtime
   const attempt = bootOnce(runtime)
-  /** A `force_reload`: boot again from the current store. */
-  const reboot = cycle(attempt.pipe(
-    Effect.andThen(settle),
-    Effect.andThen(repairAfterLive(runtime)),
-    Effect.andThen(refreshUsergroups),
-    Effect.andThen(refreshEmoji),
-    Effect.andThen(followPassIfDue(runtime)),
-    Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { cause: error })),
-  ))
-
-  const initialize = cycle(Effect.gen(function* () {
-    // User groups and emoji are methods of their own, so they are read beside the boot rather than after it: a cold boot
-    // reads 30 or more emoji pages, which would keep the first sync running for another minute and a half (live, 10-17).
-    const refreshes = yield* Effect.forkChild(Effect.all([refreshUsergroups, refreshEmoji], { concurrency: 2 }))
+  /**
+   * Boots until one attempt succeeds. A failure other than an expired
+   * session shows as `offline` or `failed` and is tried again after
+   * `bootRetryMillis`, or at once on a `force_reload`. Once booted the phase settles.
+   */
+  const bootUntilDone = Effect.gen(function* () {
     while (true) {
       const result = yield* Effect.result(attempt)
       if (result._tag === 'Success') break
@@ -82,6 +74,20 @@ export const makeBootLoop = (
     }
     state.booted = true
     yield* settle()
+  })
+  /** A `force_reload`: boot again from the current store. */
+  const reboot = cycle(bootUntilDone.pipe(
+    Effect.andThen(repairAfterLive(runtime)),
+    Effect.andThen(refreshUsergroups),
+    Effect.andThen(refreshEmoji),
+    Effect.andThen(followPassIfDue(runtime)),
+  ))
+
+  const initialize = cycle(Effect.gen(function* () {
+    // User groups and emoji are methods of their own, so they are read beside the boot rather than after it: a cold boot
+    // reads 30 or more emoji pages, which would keep the first sync running for another minute and a half (live, 10-17).
+    const refreshes = yield* Effect.forkChild(Effect.all([refreshUsergroups, refreshEmoji], { concurrency: 2 }))
+    yield* bootUntilDone
     yield* repairAfterLive(runtime)
     // One that failed beside a boot that had to retry is read again now.
     const [usergroups, emoji] = yield* Fiber.join(refreshes)

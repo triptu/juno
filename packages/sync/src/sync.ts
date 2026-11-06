@@ -15,7 +15,8 @@
  * `SlackAuthRequired` and the engine ends the session. Any other boot
  * failure is logged and retried after `bootRetryMillis` with the phase at
  * `offline` when the network failed, else at `failed` with a safe reason;
- * `force_reload` cuts that wait short. Any other catch-up failure
+ * `force_reload` cuts that wait short, and the boot it starts otherwise
+ * fails and retries the same way. Any other catch-up failure
  * is logged, the phase settles, and the catch-up runs again after the rate
  * limit that stopped it or after `bootRetryMillis`. A store error is a bug; it is logged per event so one bad frame does not
  * end the sync, and surfaces in the engine log.

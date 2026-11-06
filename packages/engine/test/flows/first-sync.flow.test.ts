@@ -325,6 +325,14 @@ it('an interrupted cold boot does not fetch again the history it already has', a
   expect(apiCalls(engine, 'conversations.history')).toHaveLength(activeMains - 1)
 })
 
+it('a force_reload whose boot fails shows the failure and boots again after the retry wait', async () => {
+  const engine = await booted({ timing: { bootRetryMillis: 100 } })
+  engine.fake.forceError({ method: 'client.userBoot', error: 'not_allowed', times: 1 })
+  engine.fake.emitFrame({ type: 'force_reload', event_ts: `${Math.floor(Date.now() / 1000)}.000001` })
+  expect(await engine.phase('failed')).toEqual({ _tag: 'failed', reason: { error: 'SlackRejected', method: 'client.userBoot', detail: 'not_allowed' } })
+  await engine.phase('live')
+})
+
 it('reads history over the quiet window the user chose, finishes when discovery fails, and the next sweep searches the same gap', async () => {
   // The preview search after the quick start, then the discovery sweep, are refused.
   const engine = await booted({ quietDays: 3, initial: (fake) => (fake.forceError({ method: 'search.modules.messages', error: 'not_allowed', times: 2 }), fake.signIn()) })
