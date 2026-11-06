@@ -108,6 +108,7 @@ export {
   searchPlace,
   replaceInTab,
   updateTabs,
+  samePlace,
   setHomeDraft,
   type OpenOptions,
   type JunoTabPage,

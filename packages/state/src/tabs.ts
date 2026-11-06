@@ -138,7 +138,7 @@ export function tabTopic(tab: Tab): string | undefined {
   return place.kind === 'topic' ? place.topicId : undefined
 }
 /** Settings is one place whatever its section, so it shows in one tab. */
-const samePlace = (a: Place, b: Place) =>
+export const samePlace = (a: Place, b: Place) =>
   a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId
   : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page
   : a.kind === 'huddle' ? b.kind === 'huddle' && a.channelId === b.channelId

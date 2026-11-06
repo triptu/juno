@@ -15,6 +15,9 @@
  *   browser (or in Slack, for a `slack://` link) with a toast saying why.
  * - A click on a person in a message opens them as a link to them does
  *   (`openPerson`).
+ * - An answer that comes after the user went elsewhere (a slow fetch, a tab
+ *   switch meanwhile) opens nothing (`movedOn`): the tab and the composer's
+ *   focus stay where the user is.
  */
 import type { ActivateEvent, LinkInfo } from '@juno/views'
 import {
@@ -30,10 +33,11 @@ import {
   signedInAtom,
   tabsAtom,
   tabShowing,
+  traceSend,
   type SlackLinkMatch,
   type SlackLinkTarget,
 } from '@juno/state'
-import { newMessage, openTopic, openTopicAt, openTopicAtInBackground, openTopicInBackground } from './navigation'
+import { movedOn, newMessage, openTopic, openTopicAt, openTopicAtInBackground, openTopicInBackground, shown, type Shown } from './navigation'
 import { readingOnly } from './readingOnly'
 
 /** The link read against the signed-in workspace; undefined for a link that is not to Slack, or when signed out. */
@@ -110,6 +114,13 @@ function openLinked(topicId: string, ts: string | undefined, behind: boolean): v
 
 const NO_CONVERSATION = 'Juno cannot reach that conversation'
 
+/** Whether the answer came too late to act on: the user went elsewhere since `since`. */
+function late(since: Shown, what: string): boolean {
+  if (!movedOn(since)) return false
+  traceSend('link dropped', () => ({ what }))
+  return true
+}
+
 /**
  * A person, from a link to them or a click on them in a message (SPEC 7 and
  * 8): your DM with them at its Main, as a link to a topic opens it, or Home
@@ -118,9 +129,11 @@ const NO_CONVERSATION = 'Juno cannot reach that conversation'
  * never messaged opens nothing. False when Juno does not know them.
  */
 export async function openPerson(user: string, behind: boolean): Promise<boolean> {
+  const since = shown()
   const found = await locatePerson(registry, user)
   const person = found._tag === 'Success' ? found.value : undefined
   if (person?.person === undefined) return false
+  if (late(since, 'person')) return true
   if (person.mainId !== undefined) openLinked(person.mainId, undefined, behind)
   else if (!readingOnly()) newMessage({ key: `u:${user}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true }, behind)
   return true
@@ -128,6 +141,7 @@ export async function openPerson(user: string, behind: boolean): Promise<boolean
 
 async function openSlackLink(url: string, match: SlackLinkMatch, event: ActivateEvent): Promise<void> {
   const { target } = match
+  const since = shown()
   switch (target.kind) {
     case 'person':
       if (!(await openPerson(target.user, event.metaKey))) openOutside(url, match, 'Juno does not know that person')
@@ -135,6 +149,7 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
     case 'channel': {
       const located = await locateMessage(registry, target.channel, undefined)
       if (located._tag !== 'Success' || located.value.place === undefined) return openOutside(url, match, NO_CONVERSATION)
+      if (late(since, 'channel')) return
       return openLinked(located.value.topicId, undefined, event.metaKey)
     }
     case 'message': {
@@ -144,6 +159,7 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
         const loaded = await loadMessageAt(registry, topic.topicId, target.ts)
         if (loaded._tag === 'Success' && loaded.value.outcome === 'rejected') return openOutside(url, match, NO_CONVERSATION)
       }
+      if (late(since, 'message')) return
       return openLinked(topic.topicId, target.ts, event.metaKey)
     }
   }

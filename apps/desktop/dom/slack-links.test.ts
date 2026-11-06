@@ -5,7 +5,7 @@
 // conversation Juno cannot reach opens in the browser, and another
 // workspace's link is handled as any web link. That the message is in view
 // and flashes is the browser lane's (the long thread journey in topic.spec.ts); here, the tab
-// and the message it opens at.
+// and the message it opens at. A link whose answer comes after the user moved on opens nothing.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -13,6 +13,7 @@ import { domTest } from './test'
 
 const DAY = 86_400_000
 const POSTGRES = 'Draft plan is in the doc'
+const RINA = 'Rina finished the onsite'
 // A Main's tab is titled by the channel's name.
 const ENG = 'eng'
 const OTHER = 'https://other.slack.com/archives/C0ENG/p1712345678000200'
@@ -110,4 +111,27 @@ domTest('message links open inside Juno at the message: Main and a reply in new 
     await tabs.select(ENG)
     await expect(topic.message('preview environments never shut down')).toBeVisible({ timeout: 15_000 })
   })
+})
+
+domTest('a message link whose fetch answers after the user moved on opens nothing: the tab and the composer stay where the user went', async ({ juno, fake, app }) => {
+  seedLinks(fake)
+  const link = await openLinks(juno)
+  const { topic, tabs } = juno
+  const trace = { events: [] as Array<{ readonly what: string }> }
+  ;(app.window as unknown as { __junoSendTrace: unknown }).__junoSendTrace = trace
+  // The engine's answer to the old note's fetch is held, as a slow Slack holds it, while the user goes elsewhere and types.
+  const release = app.holdReplies('messages.loadAt')
+  await link('the old note').click()
+  await juno.sidebar.row(RINA).openInNewTab()
+  await topic.expectTitle(RINA)
+  await tabs.expectCount(2)
+  await topic.composer.fill('Typed after moving on')
+  release()
+  const tabCount = () => tabs.root.getByRole('tab').count()
+  // The late answer is dropped, or (the bug) opens #eng over the tab the user is in.
+  await expect.poll(() => trace.events.some((event) => event.what === 'link dropped') || tabCount() !== 2, { timeout: 5_000 }).toBe(true)
+  expect(tabCount()).toBe(2)
+  await tabs.expectActive(RINA)
+  await expect(topic.composer).toHaveValue('Typed after moving on')
+  await expect(topic.composer).toBeFocused()
 })

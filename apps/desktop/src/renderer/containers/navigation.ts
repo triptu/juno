@@ -74,6 +74,7 @@ import {
   prefetchTopic,
   registry,
   reopenClosedTab,
+  samePlace,
   scrollSnapshotAtom,
   selectedTopicAtom,
   setPinned,
@@ -280,6 +281,30 @@ let currentTicket = 0
  */
 export function afterNavigation(f: () => void): void {
   void queue.then(f)
+}
+
+/** What the window showed when an open started waiting on an answer: the active tab, its place and the ticket. */
+export interface Shown {
+  readonly tab: string | undefined
+  readonly place: Place | undefined
+  readonly ticket: number
+}
+
+export function shown(): Shown {
+  const tab = activeTab(registry.get(tabsAtom))
+  return { tab: tab?.id, place: tab === undefined ? undefined : currentPlace(tab), ticket: currentTicket }
+}
+
+/**
+ * Whether the user went elsewhere since `since`: another tab or place is
+ * active, or a change was asked for (SPEC 8, "Links"). An open whose answer
+ * (a Slack fetch, a local lookup) comes after that opens nothing, so it does
+ * not take the tab and the composer's focus from where the user now is.
+ */
+export function movedOn(since: Shown): boolean {
+  const now = shown()
+  if (now.ticket !== since.ticket || now.tab !== since.tab) return true
+  return now.place === undefined || since.place === undefined ? now.place !== since.place : !samePlace(now.place, since.place)
 }
 
 /** A topic a change brings on screen. A fresh open waits on the topic's own view; a tab coming back on its view. */
@@ -615,10 +640,13 @@ export function openTopicAtInBackground(id: string, ts: string): void {
   })
 }
 
-/** A Juno source link (SPEC 13.1): the topic that holds the message, opened at it, and the message flashes. */
+/** A Juno source link (SPEC 13.1): the topic that holds the message, opened at it, and the message flashes; nothing once the user moved on. */
 export async function openSlackMessage(channel: string, ts: string, options: OpenOptions = {}, threadTs?: string): Promise<void> {
+  const since = shown()
   const located = await locateMessage(registry, channel, ts, threadTs)
-  if (located._tag === 'Success') openTopicAt(located.value.topicId, ts, { ...options, flash: true })
+  if (located._tag !== 'Success') return
+  if (movedOn(since)) return traceSend('link dropped', () => ({ topic: located.value.topicId }))
+  openTopicAt(located.value.topicId, ts, { ...options, flash: true })
 }
 
 /** When the last All topics open started, for the page's first paint with rows to end its measure on. */
