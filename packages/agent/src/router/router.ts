@@ -247,13 +247,18 @@ class Router {
     return answered ? { _tag: 'complete' } : { _tag: 'interrupted', ...retry }
   }
 
-  private finish = (run: Live, ending: Ending) => {
+  /** What the store keeps of an ending: the run's row, its inputs settled, and the bodies a complete run no longer needs. Safe to repeat. */
+  private record = (run: Live, ending: Ending) => {
     transaction(this.store.db, () => {
       this.store.db.prepare('UPDATE runs SET ended_at = ?, ending = ? WHERE id = ? AND ended_at IS NULL').run(this.store.now(), JSON.stringify(ending), run.runId)
     })
     for (const opId of run.inputs.keys()) settle(this.store, opId, stateFor(ending), reasonFor(ending))
     // Only the run a file arrived in sends it; Try again needs it after an interruption or a failure.
     if (ending._tag === 'complete') clearBodies(this.store, [...run.inputs.keys()])
+  }
+
+  private finish = (run: Live, ending: Ending) => {
+    this.record(run, ending)
     if (this.current === run) this.current = undefined
     this.emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
     this.options.onRunEnded?.()
@@ -564,6 +569,11 @@ class Router {
 
   /** One step: the live run to its end, a rotation, or the next run. False when nothing waits. */
   private step = async (): Promise<boolean> => {
+    if (this.broken !== undefined) {
+      // Its row is still the one live run: nothing else can begin until it is ended.
+      this.record(this.broken.run, this.broken.ending)
+      this.broken = undefined
+    }
     if (this.current !== undefined) {
       await this.runToEnd(this.current)
       return true
@@ -597,6 +607,9 @@ class Router {
     return true
   }
 
+  /** A run whose ending the store refused: the chat already saw it end, and its record is written at the next step. */
+  private broken: { readonly run: Live; readonly ending: Ending } | undefined
+
   /** A run the loop could not carry to its end: it ends as interrupted, with Try again, so the chat does not show it live for good. */
   private endBroken = () => {
     const run = this.current
@@ -606,8 +619,10 @@ class Router {
       this.finish(run, ending)
     } catch (error) {
       this.options.onReport?.(error)
+      this.broken = { run, ending }
       this.current = undefined
       this.emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
+      this.options.onRunEnded?.()
     }
   }
 
