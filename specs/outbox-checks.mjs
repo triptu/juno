@@ -18,6 +18,7 @@ export const outboxPairs = [
   ['deletedOffline', 'keepsRealSends', 'outbox-deleted-offline'],
   ['uncoveredRecheck', 'keepsRealSends', 'outbox-uncovered-recheck'],
   ['deleteWhileUnknown', 'deletedNeverQueued', 'outbox-delete-while-unknown'],
+  ['refusedLookup', 'drainBound', 'outbox-refused-lookup'],
 ]
 // Corrected schedules with no broken variant.
 export const outboxSchedules = ['pendingRoot', 'failedRoot', 'answerBeforeEcho', 'lostLookupAbsent', 'reconnectPage', 'dependentDelete', 'actionRetry', 'uploadRetry']

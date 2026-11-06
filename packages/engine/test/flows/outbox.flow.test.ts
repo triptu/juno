@@ -232,6 +232,32 @@ it('keeps a draft and a post whose answer a restart cut off, and never posts it 
   })
 })
 
+// A reply's answer is lost, and the thread's root is deleted before the lookup asks: Slack refuses
+// `conversations.replies` for good (`thread_not_found`), so no lookup can ever find the reply. The row ends as
+// failed, for Retry or Delete draft, and the channel's later posts go. Before, the lookup was asked again with
+// backoff forever, and held every later post to the channel.
+it('fails a post whose lookup Slack refuses for good, so later posts to the channel go', async () => {
+  const engine = await booted()
+  const rows = await opened(engine)
+  // A root with no replies yet: deleted, it is gone, not a tombstone.
+  const root = engine.fake.messages('C0ENG').find((m) => m.thread_ts === undefined && (m.reply_count ?? 0) === 0 && m.user !== undefined)!
+  engine.fake.holdFrames({ types: ['message'] })
+  engine.fake.gate((method) => method === 'chat.postMessage')
+  valueOf(await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, 'Reply to a root about to go'))
+  const call = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the reply at Slack')
+  const id = call.args['client_msg_id']!
+  // The connection closes before Slack runs it, and the root goes before the lookup asks.
+  engine.fake.decide(call.id, 'drop')
+  engine.fake.deleteMessage({ channel: 'C0ENG', ts: root.ts })
+  engine.fake.gate(undefined)
+  const later = await send(engine, 'Behind the refused lookup', rows)
+  await rows(settled('Behind the refused lookup'), 'the later post went')
+  const reply = readDb(engine, 'user.db', (db) => db.prepare('SELECT state, last_error FROM pending_messages WHERE client_msg_id = ?').get(id) as { state: string; last_error: string | null } | undefined)
+  expect(reply).toEqual({ state: 'failed', last_error: 'thread_not_found' })
+  expect(apiCalls(engine, 'chat.postMessage').map((c) => c.args['client_msg_id'])).toEqual([id, later])
+  engine.fake.releaseFrames({ drop: true })
+})
+
 it('flushes when a catch-up ends: a lookup waiting out its backoff runs at once', async () => {
   const time = await controlledClock()
   const engine = await booted({ clock: time.clock, timing: { socketPingMillis: 86_400_000, socketPongTimeoutMillis: 86_400_000 } })

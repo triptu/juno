@@ -250,6 +250,19 @@ export const requeuePost = (clientMsgId: string, nextAt: number, error: string |
 export const deferLookup = (clientMsgId: string, nextAt: number) => move(clientMsgId, ['unknown'], 'unknown', { nextAt, attempt: true })
 
 /**
+ * Slack refuses the lookup for good (`thread_not_found`, `channel_not_found`): no lookup can read the message,
+ * so the row waits for Retry or Delete draft instead of asking forever and holding the channel's later posts.
+ */
+export const failLookup = (clientMsgId: string, error: string) => move(clientMsgId, ['unknown'], 'failed', { lastError: error })
+
+/** When the post's request last left (`recordSend`), in epoch millis; undefined when it never did. */
+export const sentAt = (clientMsgId: string): Effect.Effect<number | undefined, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    return (yield* sql<{ sent_at: number }>`SELECT sent_at FROM sent_posts WHERE client_msg_id = ${clientMsgId}`)[0]?.sent_at
+  })
+
+/**
  * One of a queued post's files is in Slack: its id is kept, so the next
  * try uploads only the files still missing. False when the row is gone.
  */
@@ -339,7 +352,11 @@ export const reconcilePost = (clientMsgId: string): Effect.Effect<void, SqlError
 /** How long a sent post's row is kept. A copy shows within seconds; a week covers a long time offline. */
 const KEEP_MILLIS = 7 * 24 * 60 * 60_000
 
-/** `userId` is about to send the post with `clientMsgId` to `channel` (`sent.ts`). Drops rows older than a week. */
+/**
+ * `userId` is about to send the post with `clientMsgId` to `channel` (`sent.ts`). A post sent again (after a
+ * 429, or a lookup that found it absent) keeps its row and takes the new time, which bounds its next lookup.
+ * Drops rows older than a week.
+ */
 export const recordSend = (clientMsgId: string, channel: string, userId: string): Effect.Effect<void, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
@@ -347,7 +364,7 @@ export const recordSend = (clientMsgId: string, channel: string, userId: string)
     yield* sql`DELETE FROM sent_posts WHERE sent_at < ${now - KEEP_MILLIS}`
     yield* sql`DELETE FROM kept_copies WHERE kept_at < ${now - KEEP_MILLIS}`
     yield* sql`INSERT INTO sent_posts (client_msg_id, channel, user_id, ts, sent_at) VALUES (${clientMsgId}, ${channel}, ${userId}, NULL, ${now})
-      ON CONFLICT (client_msg_id) DO NOTHING`
+      ON CONFLICT (client_msg_id) DO UPDATE SET sent_at = excluded.sent_at`
   })
 
 /**
