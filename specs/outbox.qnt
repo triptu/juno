@@ -96,7 +96,7 @@ module outboxProtocol {
   // A reply queued from that view keeps the root's outbox identity until
   // writeMessage acknowledges it. No provisional timestamp goes to Slack.
   action sendReply(k: int, root: int): bool = all {
-    not(s.sealed), not(s.created.contains(k)), s.created.contains(root), k != root,
+    not(s.sealed), not(s.created.contains(k)), s.created.contains(root), k != root, not(s.discarded.contains(root)),
     s' = { ...s, created: s.created.union(Set(k)), parent: s.parent.set(k, root),
       row: s.row.set(k, "queued"), due: s.due.union(Set(k)), label: "sendReply", target: k }
   }
@@ -346,10 +346,20 @@ module outboxProtocol {
     not(s.sealed), s.row.get(k) == "failed", not(actPending(k) and s.actKind.get(k) == "delete"),
     s' = { ...s, row: s.row.set(k, "queued"), due: s.due.union(Set(k)), label: "retry", target: k }
   }
-  action discard(k: int): bool = all {
-    not(s.sealed), s.row.get(k) == "failed",
-    s' = { ...s, row: s.row.set(k, "gone"), discarded: s.discarded.union(Set(k)), label: "discard", target: k }
+  // The user removes a row Slack has not got (Delete draft, or a delete of
+  // a queued post). A root started from Home takes the replies that waited
+  // on it: the thread never existed, so they can never go. With the guard
+  // off they stay queued, and nothing can ever claim or fail them.
+  def discardedWith(k: int, guard: bool): State = {
+    val gone = Set(k).union(if (guard) drafts.filter(j => s.parent.get(j) == k and s.row.get(j) != "gone") else Set())
+    { ...s, row: drafts.mapBy(j => if (gone.contains(j)) "gone" else s.row.get(j)),
+      due: s.due.exclude(gone), discarded: s.discarded.union(gone) }
   }
+  action discardWith(k: int, guard: bool): bool = all {
+    not(s.sealed), s.row.get(k) == "failed",
+    s' = { ...discardedWith(k, guard), label: "discard", target: k }
+  }
+  action discard(k: int): bool = discardWith(k, true)
   // Time until the next due attempt is abstracted to one worker transition.
   action wake(k: int): bool = all {
     Set("queued", "unknown").contains(s.row.get(k)), not(s.due.contains(k)),
@@ -367,8 +377,7 @@ module outboxProtocol {
   // Its text is older, so the newest edit wins.
   def localAction(k: int, kind: str): State = {
     val ended = { ...s, act: if (actPending(k)) s.act.set(k, "dropped") else s.act, stale: s.stale.exclude(Set(k)) }
-    if (kind == "delete") { ...ended, row: s.row.set(k, "gone"), due: s.due.exclude(Set(k)),
-      discarded: s.discarded.union(Set(k)) } else ended
+    if (kind == "delete") { ...discardedWith(k, true), act: ended.act, stale: ended.stale } else ended
   }
   // A post back in the queue (a 429, a signed-out answer, a lookup that found
   // it absent) is not in Slack: an edit or delete the user queued while it
@@ -470,13 +479,11 @@ module outboxProtocol {
   // ends, and a delete discards the row.
   action dropAction(k: int): bool = {
     val discard = s.row.get(k) == "failed" and s.actKind.get(k) == "delete"
+    val after = if (discard) discardedWith(k, true) else s
     all {
       s.act.get(k) == "waiting", not(s.stored.contains(k)),
       Set("failed", "gone").contains(s.row.get(k)),
-      s' = { ...s, act: s.act.set(k, "dropped"), stale: s.stale.exclude(Set(k)),
-        row: if (discard) s.row.set(k, "gone") else s.row,
-        discarded: if (discard) s.discarded.union(Set(k)) else s.discarded,
-        label: "dropAction", target: k }
+      s' = { ...after, act: s.act.set(k, "dropped"), stale: s.stale.exclude(Set(k)), label: "dropAction", target: k }
     }
   }
 
@@ -545,6 +552,8 @@ module outboxProtocol {
   val sendsWaitOffline = not(s.claimedOffline)
   // A post the user deleted is never back in the queue, so the worker never sends it after the delete.
   val deletedNeverQueued = drafts.forall(k => (actPending(k) and s.actKind.get(k) == "delete") implies s.row.get(k) != "queued")
+  // A reply that waited on a root the user removed went with it: nothing could ever send or fail it.
+  val repliesFollowRoot = drafts.forall(k => (s.parent.get(k) != 0 and s.discarded.contains(s.parent.get(k))) implies s.row.get(k) == "gone")
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   // Juno never shows a reaction as made that Slack refused.
   val reactionsLand = s.phantom == Set()
@@ -555,7 +564,7 @@ module outboxProtocol {
     s.parent.get(k) != 0 and (s.server.get(k) > 0 or s.row.get(k) == "sending") implies s.stored.contains(s.parent.get(k)))
   val invariants = repliesWaitForRoot and atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
     actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot and
-    ownDeleteHolds and reactionsLand and actionRetryBound and deletedNeverQueued
+    ownDeleteHolds and reactionsLand and actionRetryBound and deletedNeverQueued and repliesFollowRoot
 
   action work = any {
     goOnline, reconnect, { nondet covered = drafts.powerset().oneOf(); catchUpWith(covered) },
@@ -831,6 +840,23 @@ module outboxProtocol {
   ) }
   action refusedLookupStep = refusedLookupWith(true)
   action refusedLookupBugStep = refusedLookupWith(false)
+
+  // A root started from Home is refused, and the user deletes the draft
+  // while a reply waits on it. The reply goes with the root. The bug leaves
+  // it queued forever: nothing can claim it without a root, and it never
+  // fails, so it shows as sending in a thread with no root.
+  action discardedRootWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) sendReply(2, 1) else
+    if (turn == 3) refuse(1, false) else
+    if (turn == 4) refused(1) else
+    if (turn == 5) discardWith(1, guard) else
+    seal
+  ) }
+  action discardedRootStep = discardedRootWith(true)
+  action discardedRootBugStep = discardedRootWith(false)
 
   // An edit on a stored message: Slack applies it, a newer edit arrives while
   // the call is out, the answer is lost. The worker sends the newer text and

@@ -21,6 +21,7 @@ import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { storedMe } from './me'
 import { reindexTopics } from './reindex'
+import { discardStartedThread } from './startedThreads'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
 
@@ -319,10 +320,21 @@ export const discardPost = (clientMsgId: string): Effect.Effect<boolean, SqlErro
   Effect.gen(function* () {
     const post = yield* readPost(clientMsgId)
     if (post === undefined || post.state !== 'failed') return false
-    const sql = yield* StoreWriter
-    yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${clientMsgId}`
-    yield* touch(post)
+    yield* removePost(post)
     return true
+  })
+
+/**
+ * Removes a post Slack has not got: Delete draft on a failed row, or the
+ * user's delete of a queued one (`actions.ts`). A root started from Home
+ * takes its thread and the replies that waited on it (`startedThreads.ts`).
+ */
+export const removePost = (post: PendingPost): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${post.clientMsgId}`
+    if (post.threadTs === undefined) yield* discardStartedThread(post.channel, post.clientMsgId)
+    yield* touch(post)
   })
 
 /** After a restart: a row left `sending` may have reached Slack, so it is `unknown`, due at `now`. */

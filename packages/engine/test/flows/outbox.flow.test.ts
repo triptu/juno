@@ -232,6 +232,27 @@ it('keeps a draft and a post whose answer a restart cut off, and never posts it 
   })
 })
 
+// A thread started from Home whose root Slack refuses, with a reply waiting on it: Delete draft on the root
+// takes the reply and the thread with it, since the thread never existed. Before, the reply stayed queued
+// forever: it could never be claimed without a root, never failed, and showed as sending in the thread.
+it('removes the replies and the thread of a started root the user deletes', async () => {
+  const engine = await booted()
+  engine.fake.forceError({ method: 'chat.postMessage', error: 'restricted_action' })
+  const started = valueOf(await sendMessage(engine.registry, eng, 'Root Slack refuses', undefined, undefined, true))
+  const thread = watch(engine, started.topicId)
+  const root = (await thread((list) => list[0]?.pending === 'failed', 'the root refused'))[0]!
+  valueOf(await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, 'Reply to a refused root'))
+  await thread((list) => list.length === 2 && rowWith(list, 'Reply to a refused root')?.pending === 'sending', 'the reply waiting on the root')
+  valueOf(await discardMessage(engine.registry, root.clientMsgId!))
+  const pendingRows = () => readDb(engine, 'user.db', (db) => db.prepare('SELECT client_msg_id FROM pending_messages').all() as Array<{ client_msg_id: string }>)
+  await waitFor(() => (pendingRows().length === 0 ? true : undefined), WAIT_MS, 'the reply gone with its root')
+  expect(readDb(engine, 'user.db', (db) => db.prepare('SELECT topic_id FROM started_threads WHERE topic_id = ?').get(started.topicId))).toBeUndefined()
+  expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT topic_id FROM topic_index WHERE topic_id = ?').get(started.topicId))).toBeUndefined()
+  expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT thread_ts FROM thread_subs WHERE thread_ts = ?').get(root.ts))).toBeUndefined()
+  await quiet(engine)
+  expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(1)
+})
+
 // A reply's answer is lost, and the thread's root is deleted before the lookup asks: Slack refuses
 // `conversations.replies` for good (`thread_not_found`), so no lookup can ever find the reply. The row ends as
 // failed, for Retry or Delete draft, and the channel's later posts go. Before, the lookup was asked again with

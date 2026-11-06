@@ -28,7 +28,7 @@
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
-import { postTopic, readPost, recordOwnDelete, reindexPostTopic, type PendingPost } from './posts'
+import { postTopic, readPost, recordOwnDelete, reindexPostTopic, removePost, type PendingPost } from './posts'
 
 export type ActionKind = 'edit' | 'delete' | 'react' | 'broadcast'
 
@@ -264,10 +264,7 @@ export const queueDelete = (input: DeleteInput): Effect.Effect<ActionRefusal | u
     if (actions.some((action) => action.kind === 'delete')) return undefined
     yield* deleteActions(actions)
     if (target.kind === 'pending' && (target.post.state === 'queued' || target.post.state === 'failed')) {
-      const sql = yield* StoreWriter
-      yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${target.post.clientMsgId}`
-      yield* touch([postTopic(target.post)])
-      yield* reindexPostTopic(target.post)
+      yield* removePost(target.post)
       return undefined
     }
     const { channel, dependsOn, ...fields } = targetFields(target)
