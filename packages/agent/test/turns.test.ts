@@ -48,6 +48,22 @@ it('one owner message is one run: dots, then the bubble whole, and the archive a
   expect(h.turns.memory().covered).toBe(2)
 })
 
+it('an error inside Juno as a run begins is reported, and the messages after it are still answered', async () => {
+  h = await turnsHarness({ compaction: false })
+  h.fake.script([reply(say('First.')), reply(say('Second.')), reply(say('Third.'))])
+  expect((await h.ended(h.send('one'))).ending).toEqual({ _tag: 'complete' })
+  // The store refuses writes (a full or read-only disk) as the next run begins.
+  const second = h.send('two')
+  h.turns.store.db.exec('PRAGMA query_only = ON')
+  await eventually(() => expect(h!.reports.length).toBeGreaterThan(0))
+  h.turns.store.db.exec('PRAGMA query_only = OFF')
+  // The next message wakes the loop: the held message runs, and this one joins its run.
+  const third = h.send('three')
+  expect((await h.ended(second)).ending).toEqual({ _tag: 'complete' })
+  expect(h.turns.op(third)?.state).toBe('done')
+  expect(h.bubbles().map(([text]) => text)).toEqual(['First.', 'Second.', 'Third.'])
+})
+
 it('a message sent while Juno is answering joins the same run at its next step, and the reply acknowledges it', async () => {
   h = await turnsHarness()
   const inFlight = deferred()

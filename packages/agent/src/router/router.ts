@@ -562,29 +562,72 @@ class Router {
 
   // ---- The loop
 
+  /** One step: the live run to its end, a rotation, or the next run. False when nothing waits. */
+  private step = async (): Promise<boolean> => {
+    if (this.current !== undefined) {
+      await this.runToEnd(this.current)
+      return true
+    }
+    if (this.rotateWaiters.length > 0 || this.options.rotationDue()) {
+      const waiting = this.rotateWaiters.splice(0)
+      try {
+        await this.options.rotate()
+      } catch (error) {
+        // A rotation asked for stands until one succeeds.
+        this.rotateWaiters.unshift(...waiting)
+        throw error
+      }
+      for (const resolve of waiting) resolve()
+      return true
+    }
+    const op = this.admitting() ? nextAccepted(this.store) : undefined
+    if (op === undefined) return false
+    await this.options.beforeRun?.()
+    try {
+      await this.begin(op)
+    } catch (error) {
+      // The input never reached pi: it reads Interrupted with Try again, instead of holding every later message.
+      try {
+        settle(this.store, op.opId, 'interrupted', 'interrupted')
+      } catch (again) {
+        this.options.onReport?.(again)
+      }
+      throw error
+    }
+    return true
+  }
+
+  /** A run the loop could not carry to its end: it ends as interrupted, with Try again, so the chat does not show it live for good. */
+  private endBroken = () => {
+    const run = this.current
+    if (run === undefined) return
+    const ending: Ending = { _tag: 'interrupted', ...(run.retryable ? { retry: run.opId as OpId } : {}) }
+    try {
+      this.finish(run, ending)
+    } catch (error) {
+      this.options.onReport?.(error)
+      this.current = undefined
+      this.emit({ _tag: 'ended', runId: run.runId, opId: run.opId, ending })
+    }
+  }
+
+  /** Runs steps until closed. An error ends the step's run visibly and the loop goes on at the next signal, never spinning. */
   private loop = async () => {
     for (;;) {
       if (this.closing) return
       this.signalled = false
-      if (this.current !== undefined) {
-        await this.runToEnd(this.current)
-        continue
+      let busy = false
+      try {
+        busy = await this.step()
+      } catch (error) {
+        if (this.closing) return
+        this.options.onReport?.(error)
+        this.endBroken()
       }
-      if (this.rotateWaiters.length > 0 || this.options.rotationDue()) {
-        const waiting = this.rotateWaiters.splice(0)
-        await this.options.rotate()
-        for (const resolve of waiting) resolve()
-        continue
-      }
-      const op = this.admitting() ? nextAccepted(this.store) : undefined
-      if (op === undefined) {
-        this.notifyIdle()
-        if (!this.signalled) await new Promise<void>((resolve) => (this.wake = resolve))
-        this.wake = undefined
-        continue
-      }
-      await this.options.beforeRun?.()
-      await this.begin(op)
+      if (busy) continue
+      this.notifyIdle()
+      if (!this.signalled) await new Promise<void>((resolve) => (this.wake = resolve))
+      this.wake = undefined
     }
   }
 
