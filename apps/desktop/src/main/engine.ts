@@ -9,11 +9,10 @@
  * after a crash just waits. Once the supervisor has given up, a request is
  * answered `failed` and the renderer shows it.
  */
-import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
-import { join } from 'node:path'
+import type { MessagePortMain, UtilityProcess, WebContents } from 'electron'
 import { Schema } from 'effect'
 import { Events, EngineToMain, type EngineConfig, type MainToEngine, type PortRequestResult } from '@juno/contract'
-import { startupMark } from './startupMarks'
+import type { ProcessDeps } from './processDeps'
 import { restartBackoff } from './restartBackoff'
 
 const CRASH_WINDOW_MS = 120_000
@@ -22,6 +21,11 @@ const CRASH_LIMIT = 5
 const QUIT_TIMEOUT_MS = 3_000
 
 export type SupervisorState = 'starting' | 'ready' | 'restarting' | 'failed' | 'stopped'
+
+export interface EngineProcessDeps extends ProcessDeps {
+  /** Records a start-up step (`startupMarks.ts`). */
+  readonly mark: (name: 'engine-fork' | 'engine-ready') => void
+}
 
 const decodeFromEngine = Schema.decodeUnknownSync(EngineToMain)
 
@@ -39,7 +43,8 @@ export class EngineSupervisor {
   constructor(
     private readonly config: EngineConfig,
     /** Every message from the engine other than `ready`. */
-    private readonly onMessage: (message: EngineToMain) => void = () => {},
+    private readonly onMessage: (message: EngineToMain) => void,
+    private readonly deps: EngineProcessDeps,
   ) {}
 
   setAiKey(key: string | null): void {
@@ -58,15 +63,13 @@ export class EngineSupervisor {
   start(): void {
     if (this.child) return
     this.state = 'starting'
-    startupMark('engine-fork')
-    const child = utilityProcess.fork(join(__dirname, 'engine.js'), [], {
-      serviceName: 'juno-engine',
-      partition: 'persist:slack',
-      stdio: 'inherit',
-    })
+    this.deps.mark('engine-fork')
+    const child = this.deps.fork('engine.js', { serviceName: 'juno-engine', partition: 'persist:slack' })
     this.child = child
     child.on('spawn', () => this.send({ _tag: 'config', config: this.config }))
+    // Events from a process this supervisor stopped or gave up on: it is no longer the engine.
     child.on('message', (data: unknown) => {
+      if (this.child !== child) return
       let message: EngineToMain
       try {
         message = decodeFromEngine(data)
@@ -75,7 +78,7 @@ export class EngineSupervisor {
         return
       }
       if (message._tag === 'ready') {
-        startupMark('engine-ready')
+        this.deps.mark('engine-ready')
         this.state = 'ready'
         this.send({ _tag: 'aiKey', key: this.aiKey })
         this.attempt = 0
@@ -86,7 +89,10 @@ export class EngineSupervisor {
         this.onMessage(message)
       }
     })
-    child.on('exit', (code) => this.onExit(code))
+    child.on('exit', (code) => {
+      if (this.child !== child) return
+      this.onExit(code)
+    })
   }
 
   /** Calls `f` each time the engine reports ready, after a restart too. */
@@ -102,7 +108,7 @@ export class EngineSupervisor {
   /** Connects a renderer: one new channel, one end to each side. */
   connect(target: WebContents): PortRequestResult {
     if (this.state === 'failed' || this.state === 'stopped') return 'failed'
-    const { port1, port2 } = new MessageChannelMain()
+    const { port1, port2 } = this.deps.channel()
     if (this.state === 'ready') {
       this.send({ _tag: 'port' }, [port1])
     } else {
@@ -191,33 +197,4 @@ export class EngineSupervisor {
       if (this.state === 'restarting') this.start()
     }, delay)
   }
-}
-
-export function createSupervisor(options: { readonly fakeSlackUrl?: string; readonly onMessage?: (message: EngineToMain) => void } = {}): EngineSupervisor {
-  const e2e = process.env.JUNO_E2E === '1'
-  // ProviderStore sends the shared key after loading and on every change.
-  const ai = e2e || process.env.JUNO_AI === 'fake' ? 'fake' : 'live'
-  // An e2e run can make the fake AI slow, to watch a check give up at its timeout.
-  const fakeAiDelayMillis = e2e ? Number(process.env.JUNO_FAKE_AI_DELAY_MS) : Number.NaN
-  // An e2e run can play the next build, which adds a cache migration.
-  const cacheMigrationProbe = e2e && process.env.JUNO_E2E_CACHE_MIGRATION === '1'
-  // An e2e run can keep production request pacing against the fake, to time a first sync.
-  const fakeSlackPaced = e2e && process.env.JUNO_E2E_FAKE_PACED === '1'
-  // An e2e run keeps the background AI jobs off unless the test opts in.
-  const aiJobs = !e2e || process.env.JUNO_E2E_AI_JOBS === '1'
-  return new EngineSupervisor(
-    {
-      userData: app.getPath('userData'),
-      e2e,
-      dev: !app.isPackaged,
-      ...(options.fakeSlackUrl === undefined ? {} : { fakeSlackUrl: options.fakeSlackUrl }),
-      ...(fakeSlackPaced ? { fakeSlackPaced } : {}),
-      ai,
-      ...(aiJobs ? {} : { aiJobs }),
-      ...(e2e && process.env.JUNO_FAKE_AI_REQUIRES_KEY === '1' ? { fakeAiRequiresKey: true } : {}),
-      ...(Number.isFinite(fakeAiDelayMillis) ? { fakeAiDelayMillis } : {}),
-      ...(cacheMigrationProbe ? { cacheMigrationProbe } : {}),
-    },
-    options.onMessage,
-  )
 }

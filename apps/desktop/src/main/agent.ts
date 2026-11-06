@@ -33,13 +33,14 @@
  * and starts it again at once, without counting the exit as a crash, and the
  * next open installs the restore.
  */
-import { app, MessageChannelMain, utilityProcess, type MessagePortMain, type UtilityProcess, type WebContents } from 'electron'
+import type { MessagePortMain, UtilityProcess, WebContents } from 'electron'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { Schema } from 'effect'
 import { AgentToMain, type AgentConfig, type AgentProvider, type CredentialRequest, type HostHello, type MainToAgent, type SecretRequest } from '@juno/agent-contract'
 import { Events } from '@juno/contract/channels'
 import type { PortRequestResult } from '@juno/contract'
+import type { ProcessDeps } from './processDeps'
 import { restartBackoff } from './restartBackoff'
 
 const CRASH_WINDOW_MS = 120_000
@@ -74,6 +75,7 @@ export class AgentSupervisor {
     private readonly credential: (request: CredentialRequest) => Promise<string | null | undefined>,
     /** Answers a backup secret request (`backupSecrets.ts`). */
     private readonly secret: (request: SecretRequest) => Promise<string | null | undefined>,
+    private readonly deps: ProcessDeps,
   ) {}
 
   get currentState(): AgentState {
@@ -91,9 +93,11 @@ export class AgentSupervisor {
   start(): void {
     if (this.child) return
     this.state = 'starting'
-    const child = utilityProcess.fork(join(__dirname, 'agent.js'), [], { serviceName: 'juno-agent', stdio: 'inherit' })
+    const child = this.deps.fork('agent.js', { serviceName: 'juno-agent' })
     this.child = child
+    // Events from a process this supervisor stopped: it is no longer the agent.
     child.on('spawn', () => {
+      if (this.child !== child) return
       this.spawned = true
       this.send({ _tag: 'config', config: this.config })
       this.send({ _tag: 'provider', provider: this.provider })
@@ -102,6 +106,7 @@ export class AgentSupervisor {
       this.pendingRendererPorts.clear()
     })
     child.on('message', (data: unknown) => {
+      if (this.child !== child) return
       let message: AgentToMain
       try {
         message = decodeFromAgent(data)
@@ -140,8 +145,7 @@ export class AgentSupervisor {
       }
     })
     child.on('exit', (code) => {
-      // A process stopped for a provider change may exit after its successor started.
-      if (this.child !== undefined && this.child !== child) return
+      if (this.child !== child) return
       this.onExit(code)
     })
   }
@@ -180,7 +184,7 @@ export class AgentSupervisor {
   /** A new channel between the engine's AgentHost server and the agent. Call when the engine is ready. */
   linkHost(): void {
     if (!this.child || !this.spawned) return
-    const { port1, port2 } = new MessageChannelMain()
+    const { port1, port2 } = this.deps.channel()
     this.sendToEngine(port1)
     this.send({ _tag: 'hostPort' }, [port2])
   }
@@ -188,7 +192,7 @@ export class AgentSupervisor {
   /** A new channel between a renderer and the agent's RPCs. `failed` when no agent will run. */
   connect(target: WebContents): PortRequestResult {
     if (this.state === 'failed' || this.state === 'stopped') return 'failed'
-    const { port1, port2 } = new MessageChannelMain()
+    const { port1, port2 } = this.deps.channel()
     if (this.child && this.spawned) {
       this.send({ _tag: 'rendererPort' }, [port1])
     } else {
@@ -211,7 +215,11 @@ export class AgentSupervisor {
     if (this.restartTimer) clearTimeout(this.restartTimer)
     this.restartTimer = undefined
     this.child?.kill()
+    // What the process had established goes with it, before its exit arrives: the next one starts fresh.
     this.child = undefined
+    this.spawned = false
+    this.hello = undefined
+    this.restartAsked = false
   }
 
   /** Closing the waiting ends makes each renderer ask again, and hear `failed`. */
@@ -254,37 +262,4 @@ export class AgentSupervisor {
       if (this.state === 'restarting') this.start()
     }, delay)
   }
-}
-
-export function createAgentSupervisor(
-  sendToEngine: (port: MessagePortMain) => void,
-  engineReady: () => boolean,
-  credential: (request: CredentialRequest) => Promise<string | null | undefined>,
-  secret: (request: SecretRequest) => Promise<string | null | undefined>,
-): AgentSupervisor {
-  const e2e = process.env.JUNO_E2E === '1'
-  // Read only under JUNO_E2E, so a real run can never be pointed elsewhere.
-  const openRouterOrigin = e2e ? process.env.JUNO_FAKE_OPENROUTER_URL : undefined
-  // Two test apps play two Macs: each has a name, and the backup exports often enough to see the other.
-  const deviceName = e2e ? process.env.JUNO_E2E_DEVICE_NAME : undefined
-  const interval = e2e ? Number(process.env.JUNO_E2E_BACKUP_INTERVAL_MS) : Number.NaN
-  // The `agent.codemode` flag, off unless set.
-  const codemode = process.env.JUNO_AGENT_CODEMODE === '1'
-  // Background updates of person files call the model, so a test opts in.
-  const peopleRefresh = !e2e || process.env.JUNO_E2E_PEOPLE_REFRESH === '1'
-  return new AgentSupervisor(
-    {
-      agentDir: join(app.getPath('userData'), 'agent'),
-      e2e,
-      ...(openRouterOrigin === undefined ? {} : { openRouterOrigin }),
-      ...(deviceName === undefined ? {} : { deviceName }),
-      ...(Number.isFinite(interval) && interval > 0 ? { backupIntervalMs: interval } : {}),
-      ...(codemode ? { codemode } : {}),
-      peopleRefresh,
-    },
-    sendToEngine,
-    engineReady,
-    credential,
-    secret,
-  )
 }

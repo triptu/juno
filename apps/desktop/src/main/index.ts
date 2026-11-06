@@ -1,16 +1,15 @@
 // Must run before any module captures a test switch.
 import './environment'
-import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, session as electronSession, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
 import { createDockBadge, createDockBounce } from './dockBadge'
 import { testNotificationPermission } from './notificationTestHooks'
 import { createActivityWatch } from './activity'
-import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
 import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
-import { createSupervisor } from './engine'
+import { createAgentSupervisor, createSupervisor } from './supervisors'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
 import { clearTemporaryFiles, copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
@@ -22,7 +21,8 @@ import { registerMediaPermissions } from './media'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
-import { slackKeychainReads } from './slackImport'
+import { forgetSlackKeychain, importFromSlackApp, slackKeychainReads } from './slackImport'
+import { SLACK_PARTITION } from './slackSession'
 import { Notifier, type ShownNotification } from './notifier'
 import { createNotificationPermission, loadPermissionBridge, openSettings } from './notificationPermission'
 import { mainLog as processLog } from './logging'
@@ -218,8 +218,11 @@ const providers = new ProviderStore(
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
   send: (message) => supervisor.send(message),
-  importOptions: { ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) },
+  importSession: () => importFromSlackApp({ ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) }),
+  forgetKeychain: forgetSlackKeychain,
+  slackSession: () => electronSession.fromPartition(SLACK_PARTITION),
   saveSession: (session) => void (launch = withSession(launch, session, launchFile)),
+  log: (level, message, data) => processLog.log(level, message, data),
 })
 
 app.whenReady().then(() => {

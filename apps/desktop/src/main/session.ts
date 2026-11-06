@@ -8,28 +8,44 @@
  *   `secrets` or `sessionFailed`. The engine verifies it; only then does it
  *   send `storeSecrets`.
  * - `signOut`: delete `secrets.bin`, clear the `persist:slack` session and
- *   forget the Slack keychain password an import read.
+ *   forget the Slack keychain password an import read. The engine always
+ *   hears `signedOut`, even when a stage fails.
  * - `sessionReady`: keep the verified session, with no secrets, for the next
  *   launch's first frame (`launch.json`). `signOut` and `authRequired` drop it.
  * - `handshake`: the cookie header, origin, user agent and proxy for a
  *   socket URL (ADR 0007). `setCookies`: store `Set-Cookie` values from an
  *   upgrade response.
  */
-import { session as electronSession } from 'electron'
-import type { EngineToMain, MainToEngine, ReadySession, SessionSecrets } from '@juno/contract'
-import { mainLog as log } from './logging'
+import type { EngineToMain, MainToEngine, ReadySession } from '@juno/contract'
+import type { Level } from '../logging'
 import type { SecretsStore } from './secrets'
-import { forgetSlackKeychain, importFromSlackApp, type ImportOptions } from './slackImport'
-import { SLACK_PARTITION } from './slackSession'
+import type { ImportResult } from './slackImport'
 
 const SOCKET_ORIGIN = 'https://app.slack.com'
 
+/** What main asks of the `persist:slack` Electron session. */
+export interface SlackSession {
+  clearStorageData(): Promise<void>
+  clearCache(): Promise<void>
+  readonly cookies: {
+    get(filter: { readonly url: string }): Promise<ReadonlyArray<{ readonly name: string; readonly value: string }>>
+    set(details: { readonly url: string } & ParsedCookie): Promise<void>
+  }
+  resolveProxy(url: string): Promise<string>
+  getUserAgent(): string
+}
+
 export interface SessionHostDeps {
-  readonly secrets: SecretsStore
+  readonly secrets: Pick<SecretsStore, 'read' | 'write' | 'delete'>
   readonly send: (message: MainToEngine) => void
-  readonly importOptions: ImportOptions
+  /** Captures the installed Slack app's session (`slackImport.ts`). */
+  readonly importSession: () => Promise<ImportResult>
+  /** Forgets the Slack keychain password an import read. */
+  readonly forgetKeychain: () => void
+  readonly slackSession: () => SlackSession
   /** Keeps the verified session for the next launch, or drops it. */
   readonly saveSession: (session: ReadySession | undefined) => void
+  readonly log: (level: Level, message: string, data?: Record<string, unknown>) => void
 }
 
 export class SessionHost {
@@ -42,13 +58,13 @@ export class SessionHost {
 
   /** Handles one message from the engine. Returns false for messages that are not about the session. */
   handle(message: EngineToMain): boolean {
-    if (['requestSecrets', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'].includes(message._tag)) log.log('INFO', 'sign-in step', { step: message._tag })
+    if (['requestSecrets', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'].includes(message._tag)) this.#deps.log('INFO', 'sign-in step', { step: message._tag })
     switch (message._tag) {
       case 'requestSecrets':
         void this.#deps.secrets.read().then((secrets) => this.#deps.send({ _tag: 'secrets', secrets }))
         return true
       case 'importFromSlackApp':
-        void this.#capture('import', () => importFromSlackApp(this.#deps.importOptions))
+        void this.#capture('import', this.#deps.importSession)
         return true
       case 'storeSecrets':
         void this.#deps.secrets.write(message.secrets).then(() => {
@@ -79,10 +95,7 @@ export class SessionHost {
     }
   }
 
-  async #capture(
-    method: 'import',
-    run: () => Promise<{ ok: true; secrets: SessionSecrets } | { ok: false; kind: MainToEngineFailure['kind']; message: string; details?: string }>,
-  ): Promise<void> {
+  async #capture(method: 'import', run: () => Promise<ImportResult>): Promise<void> {
     if (this.#busy) {
       this.#deps.send({ _tag: 'sessionFailed', method, kind: 'other', message: 'A sign-in is already in progress.' })
       return
@@ -107,18 +120,30 @@ export class SessionHost {
     }
   }
 
+  /**
+   * Every stage runs, and the engine hears `signedOut` whatever failed: it has
+   * closed the workspace and waits for the answer before it reports the user
+   * signed out. A failed stage is logged with its name.
+   */
   async #signOut(): Promise<void> {
     this.#deps.saveSession(undefined)
-    await this.#deps.secrets.delete()
-    forgetSlackKeychain()
-    const slackSession = electronSession.fromPartition(SLACK_PARTITION)
-    await slackSession.clearStorageData()
-    await slackSession.clearCache()
+    const stage = async (name: string, run: () => Promise<void>) => {
+      try {
+        await run()
+      } catch (cause) {
+        this.#deps.log('ERROR', 'sign-out stage failed', { stage: name, error: cause instanceof Error ? cause.message : String(cause) })
+      }
+    }
+    await stage('delete secrets.bin', () => this.#deps.secrets.delete())
+    this.#deps.forgetKeychain()
+    const slackSession = this.#deps.slackSession()
+    await stage('clear storage', () => slackSession.clearStorageData())
+    await stage('clear cache', () => slackSession.clearCache())
     this.#deps.send({ _tag: 'signedOut' })
   }
 
   async #handshake(id: number, url: string): Promise<void> {
-    const slackSession = electronSession.fromPartition(SLACK_PARTITION)
+    const slackSession = this.#deps.slackSession()
     const httpUrl = url.replace(/^ws/, 'http')
     const cookies = await slackSession.cookies.get({ url: httpUrl })
     const proxy = await slackSession.resolveProxy(httpUrl).catch(() => 'DIRECT')
@@ -133,7 +158,7 @@ export class SessionHost {
   }
 
   async #setCookies(url: string, cookies: ReadonlyArray<string>): Promise<void> {
-    const slackSession = electronSession.fromPartition(SLACK_PARTITION)
+    const slackSession = this.#deps.slackSession()
     const httpUrl = url.replace(/^ws/, 'http')
     for (const header of cookies) {
       const parsed = parseSetCookie(header)
@@ -146,8 +171,6 @@ export class SessionHost {
     }
   }
 }
-
-type MainToEngineFailure = Extract<MainToEngine, { _tag: 'sessionFailed' }>
 
 interface ParsedCookie {
   readonly name: string
