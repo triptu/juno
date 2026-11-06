@@ -25,11 +25,14 @@
  *   friends), makes it `unknown`. `files.share` and `chat.shareMessage`
  *   answer without the message, so such a post becomes `unknown` too and
  *   waits for the echo.
- * - `unknown`: after `timing.postSettleMillis`, the worker reads the topic's recent
- *   messages from Slack. The message is there: it is stored, which ends the
- *   row. A complete read without it: the row is `queued` again, except a
- *   post Slack said it shared, which is asked about again later. No answer:
- *   it asks again with backoff.
+ * - `unknown`: after `timing.postSettleMillis`, the worker reads the topic's
+ *   messages from Slack since shortly before the request left. The message
+ *   is there: it is stored, which ends the row. A complete read without it:
+ *   the row is `queued` again, except a post Slack said it shared, which is
+ *   asked about again later. No answer: it asks again with backoff. A read
+ *   Slack refuses for good (the root deleted, the channel left): the row is
+ *   `failed`, for Retry or Delete draft, so it does not hold the channel's
+ *   later posts forever.
  *
  * Any write of the message (the echo, a page, the answer, the lookup) ends
  * the row in the same transaction (`writeMessage`), whichever comes first.
@@ -52,6 +55,7 @@ import {
   claimPost,
   deferLookup,
   deferPost,
+  failLookup,
   failPost,
   failUpload,
   fileStaged,
@@ -61,6 +65,7 @@ import {
   postUnknown,
   recoverPosts,
   requeuePost,
+  sentAt,
   storedMe,
   type PendingPost,
   type TopicFetcher,
@@ -80,7 +85,7 @@ type Message = Parameters<TopicFetcher['sent']>[0]['message']
 const LOOKUP_MARGIN_MILLIS = 5 * 60_000
 /** Pages the lookup reads at most before it gives up and asks again later. */
 const LOOKUP_PAGES = 5
-/** Refusals that Slack may give after running the call: the answer is unknown, not a refusal. */
+/** Refusals Slack gives when it could not run the call, and may on a retry: a post may have been run (unknown, not refused); a lookup is asked again. */
 const MAYBE_POSTED = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable'])
 /** `last_error` of a post Slack accepted without sending the message back (`files.share`, `chat.shareMessage`). */
 const SHARED = 'shared'
@@ -212,9 +217,11 @@ export class PostWorker extends Context.Service<
           if (!(yield* link.online)) return
           // Recorded as the user's send, so a copy the network makes is deleted (ADR 0014).
           const me = (yield* local(storedMe))?.userId ?? ''
-          if (!(yield* local(transaction(claimPost(row.clientMsgId, me))))) return
+          // The request carries the row as claimed, not as the pass read it: an edit meanwhile is what goes to Slack.
+          const claimed = yield* local(transaction(claimPost(row.clientMsgId, me)))
+          if (claimed === undefined) return
           const result = yield* outbox
-            .sendOnce((api) => request(api, row, fileIds))
+            .sendOnce((api) => request(api, claimed, fileIds))
             .pipe(
               Effect.result,
               // A bug after the request left may still have posted: unknown, never failed.
@@ -245,11 +252,16 @@ export class PostWorker extends Context.Service<
           }
         })
 
-      /** Reads the topic's recent messages for the row's `client_msg_id`, newest pages first. */
+      /**
+       * Reads the topic's messages since shortly before the row's request
+       * last left, for its `client_msg_id`: the pages of a thread come oldest
+       * first, so a window from the send would never reach a reply queued
+       * long before it went into a busy thread.
+       */
       const lookUp = (open: OpenWorkspace, fetcher: TopicFetcher, row: PendingPost) =>
         Effect.gen(function* () {
           const local = inStore(open)
-          const oldest = millisToTs(row.createdAt - LOOKUP_MARGIN_MILLIS)
+          const oldest = millisToTs(((yield* local(sentAt(row.clientMsgId))) ?? row.createdAt) - LOOKUP_MARGIN_MILLIS)
           let cursor: string | undefined
           for (let page = 0; page < LOOKUP_PAGES; page++) {
             const answer = yield* outbox
@@ -258,13 +270,21 @@ export class PostWorker extends Context.Service<
                   ? api.call('conversations.history', { channel: row.channel, oldest, limit: 100, ...(cursor === undefined ? {} : { cursor }) })
                   : api.call('conversations.replies', { channel: row.channel, ts: row.threadTs as Ts, oldest, limit: 100, ...(cursor === undefined ? {} : { cursor }) }),
               )
-              .pipe(Effect.option)
+              .pipe(Effect.result)
             const now = yield* Clock.currentTimeMillis
-            if (answer._tag === 'None') return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
-            const found = answer.value.messages.find((message) => message.client_msg_id === row.clientMsgId)
+            if (answer._tag === 'Failure') {
+              const error = answer.failure
+              // Slack will never answer this read (the root deleted, the channel left): the row is decided, for the user.
+              if (error._tag === 'Rejected' && !MAYBE_POSTED.has(error.code)) {
+                yield* Effect.logWarning('send: Slack refused the lookup of a post', { id: row.clientMsgId, code: error.code })
+                return yield* local(transaction(failLookup(row.clientMsgId, error.code)))
+              }
+              return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
+            }
+            const found = answer.success.messages.find((message) => message.client_msg_id === row.clientMsgId)
             if (found !== undefined) return yield* fetcher.sent({ channel: row.channel, message: found }).pipe(Effect.orDie)
-            cursor = answer.value.response_metadata?.next_cursor || undefined
-            if (!answer.value.has_more || cursor === undefined) {
+            cursor = answer.success.response_metadata?.next_cursor || undefined
+            if (!answer.success.has_more || cursor === undefined) {
               // Slack said it took the post (files, a forward): the message is there even if the read does not show it yet.
               if (row.lastError === SHARED) return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
               // Slack has decided the lost request by now (specs/outbox.qnt): it is not there, so it may go again.

@@ -46,7 +46,10 @@ module outboxProtocol {
     // store has. `inStep` is false from a socket drop until the catch-up.
     // `gapped`: posts sent before the last drop. `rechecked`: posts whose
     // topic the catch-up after that drop read again.
-    slack: Set[Change], seen: Set[Change], inStep: bool, gapped: Set[int], rechecked: Set[int]
+    slack: Set[Change], seen: Set[Change], inStep: bool, gapped: Set[int], rechecked: Set[int],
+    // Posts whose thread or channel Slack can no longer read or take posts
+    // for: the root was deleted, or the user left the channel.
+    unreachable: Set[int]
   }
   type Change = { key: int, what: str }
   var s: State
@@ -63,7 +66,7 @@ module outboxProtocol {
       actSent: Set(), acted: Set(), missing: Set(), phantom: Set(),
       dup: drafts.mapBy(_ => 0), deletes: drafts.mapBy(_ => 0), copyRow: drafts.mapBy(_ => "none"),
       kept: drafts.mapBy(_ => "first"), slack: Set(), seen: Set(), inStep: true,
-      gapped: Set(), rechecked: Set() },
+      gapped: Set(), rechecked: Set(), unreachable: Set() },
     remaining' = drainLimit, turn' = 0
   }
 
@@ -93,7 +96,7 @@ module outboxProtocol {
   // A reply queued from that view keeps the root's outbox identity until
   // writeMessage acknowledges it. No provisional timestamp goes to Slack.
   action sendReply(k: int, root: int): bool = all {
-    not(s.sealed), not(s.created.contains(k)), s.created.contains(root), k != root,
+    not(s.sealed), not(s.created.contains(k)), s.created.contains(root), k != root, not(s.discarded.contains(root)),
     s' = { ...s, created: s.created.union(Set(k)), parent: s.parent.set(k, root),
       row: s.row.set(k, "queued"), due: s.due.union(Set(k)), label: "sendReply", target: k }
   }
@@ -113,15 +116,16 @@ module outboxProtocol {
   }
   action claim(k: int): bool = claimWith(k, true)
   action accept(k: int, withEcho: bool): bool = all {
-    s.request.get(k) == "transit",
+    s.request.get(k) == "transit", not(s.unreachable.contains(k)),
     s' = { ...s, server: s.server.set(k, s.server.get(k) + 1),
       request: s.request.set(k, "accepted"),
       events: if (withEcho and s.connected) s.events.union(Set(k)) else s.events,
       label: "accept", target: k }
   }
-  // A permanent refusal, 429, or signed-out answer means not posted.
+  // A permanent refusal, 429, or signed-out answer means not posted. A post
+  // to an unreachable thread or channel is refused for good, after the seal too.
   action refuse(k: int, retryLater: bool): bool = all {
-    not(s.sealed), s.request.get(k) == "transit",
+    not(s.sealed) or (s.unreachable.contains(k) and not(retryLater)), s.request.get(k) == "transit",
     s' = { ...s, request: s.request.set(k, if (retryLater) "later" else "refused"),
       label: "refuse", target: k }
   }
@@ -235,12 +239,16 @@ module outboxProtocol {
       row: s.row.set(k, if (guard) "gone" else "sending"), label: "answer", target: k }
   }
   action answer(k: int): bool = answerWith(k, true)
-  action refused(k: int): bool = all {
-    Set("refused", "later").contains(s.request.get(k)),
-    s' = { ...s, request: s.request.set(k, "idle"),
-      row: if (s.row.get(k) == "sending") s.row.set(k, if (s.request.get(k) == "later") "queued" else "failed") else s.row,
-      label: "refused", target: k }
+  action refusedWith(k: int, guard: bool): bool = {
+    val settled = if (s.row.get(k) != "sending") s
+      else if (s.request.get(k) == "later") requeueWith(k, guard)
+      else { ...s, row: s.row.set(k, "failed") }
+    all {
+      Set("refused", "later").contains(s.request.get(k)),
+      s' = { ...settled, request: s.request.set(k, "idle"), label: "refused", target: k }
+    }
   }
+  action refused(k: int): bool = refusedWith(k, true)
   // An ambiguous failure is observable only after Slack has decided the
   // request. It cannot still be in transit when an absent lookup permits resend.
   // An accepted `files.share` or `chat.shareMessage` (a forward) answers without the message, which is this
@@ -298,28 +306,60 @@ module outboxProtocol {
   }
   action lookup(k: int): bool = startFetch(k, "lookup")
   action page(k: int): bool = startFetch(k, "page")
-  action finishFetch(f: Fetch): bool = {
+  action finishFetchWith(f: Fetch, guard: bool): bool = {
     val absent = f.kind == "lookup" and s.row.get(f.key) == "unknown"
-    val observed = if (f.found) writeMessage(f.key) else { ...s,
-      row: if (absent) s.row.set(f.key, "queued") else s.row,
-      due: if (absent) s.due.union(Set(f.key)) else s.due }
+    val observed = if (f.found) writeMessage(f.key) else if (absent) requeueWith(f.key, guard) else s
     all {
-      s.fetches.contains(f),
+      s.fetches.contains(f), not(s.unreachable.contains(f.key)),
       s' = { ...observed, fetches: s.fetches.exclude(Set(f)), label: "finishFetch", target: f.key }
     }
   }
+  action finishFetch(f: Fetch): bool = finishFetchWith(f, true)
+  // Slack can no longer read or take posts for the message's thread or
+  // channel: the root was deleted, or the user left the channel.
+  action loseThread(k: int): bool = all {
+    not(s.sealed), s.created.contains(k), not(s.unreachable.contains(k)),
+    s' = { ...s, unreachable: s.unreachable.union(Set(k)), label: "loseThread", target: k }
+  }
+  // Slack refuses a read of an unreachable thread or channel for good
+  // (thread_not_found, channel_not_found). A page changes nothing. A lookup
+  // can never be answered, so its row is failed: the user chooses Retry or
+  // Delete draft, and the channel's later posts go. With the guard off the
+  // row stays unknown and is asked about again, and again.
+  action refuseFetchWith(f: Fetch, guard: bool): bool = {
+    val lookup = f.kind == "lookup" and s.row.get(f.key) == "unknown"
+    all {
+      s.fetches.contains(f), s.unreachable.contains(f.key),
+      s' = { ...s, fetches: s.fetches.exclude(Set(f)),
+        row: if (guard and lookup) s.row.set(f.key, "failed") else s.row,
+        due: if (not(guard) and lookup) s.due.union(Set(f.key)) else s.due,
+        label: "refuseFetch", target: f.key }
+    }
+  }
+  action refuseFetch(f: Fetch): bool = refuseFetchWith(f, true)
   action failLookup(f: Fetch): bool = all {
     not(s.sealed), f.kind == "lookup", s.fetches.contains(f),
     s' = { ...s, fetches: s.fetches.exclude(Set(f)), label: "failLookup", target: f.key }
   }
+  // The list hides a message whose delete waits, so Retry is not offered on it.
   action retry(k: int): bool = all {
-    not(s.sealed), s.row.get(k) == "failed",
+    not(s.sealed), s.row.get(k) == "failed", not(actPending(k) and s.actKind.get(k) == "delete"),
     s' = { ...s, row: s.row.set(k, "queued"), due: s.due.union(Set(k)), label: "retry", target: k }
   }
-  action discard(k: int): bool = all {
-    not(s.sealed), s.row.get(k) == "failed",
-    s' = { ...s, row: s.row.set(k, "gone"), discarded: s.discarded.union(Set(k)), label: "discard", target: k }
+  // The user removes a row Slack has not got (Delete draft, or a delete of
+  // a queued post). A root started from Home takes the replies that waited
+  // on it: the thread never existed, so they can never go. With the guard
+  // off they stay queued, and nothing can ever claim or fail them.
+  def discardedWith(k: int, guard: bool): State = {
+    val gone = Set(k).union(if (guard) drafts.filter(j => s.parent.get(j) == k and s.row.get(j) != "gone") else Set())
+    { ...s, row: drafts.mapBy(j => if (gone.contains(j)) "gone" else s.row.get(j)),
+      due: s.due.exclude(gone), discarded: s.discarded.union(gone) }
   }
+  action discardWith(k: int, guard: bool): bool = all {
+    not(s.sealed), s.row.get(k) == "failed",
+    s' = { ...discardedWith(k, guard), label: "discard", target: k }
+  }
+  action discard(k: int): bool = discardWith(k, true)
   // Time until the next due attempt is abstracted to one worker transition.
   action wake(k: int): bool = all {
     Set("queued", "unknown").contains(s.row.get(k)), not(s.due.contains(k)),
@@ -337,8 +377,17 @@ module outboxProtocol {
   // Its text is older, so the newest edit wins.
   def localAction(k: int, kind: str): State = {
     val ended = { ...s, act: if (actPending(k)) s.act.set(k, "dropped") else s.act, stale: s.stale.exclude(Set(k)) }
-    if (kind == "delete") { ...ended, row: s.row.set(k, "gone"), due: s.due.exclude(Set(k)),
-      discarded: s.discarded.union(Set(k)) } else ended
+    if (kind == "delete") { ...discardedWith(k, true), act: ended.act, stale: ended.stale } else ended
+  }
+  // A post back in the queue (a 429, a signed-out answer, a lookup that found
+  // it absent) is not in Slack: an edit or delete the user queued while it
+  // was out applies to the row now, as on a queued row, so the edit's text
+  // goes with the post and the worker never sends a post the user deleted.
+  // A reaction waits for the stored message. With the guard off the row is
+  // queued as it was, with the delete waiting on it.
+  def requeueWith(k: int, guard: bool): State = {
+    val applied = if (guard and actPending(k) and s.actKind.get(k) != "react") localAction(k, s.actKind.get(k)) else s
+    if (applied.row.get(k) == "gone") applied else { ...applied, row: applied.row.set(k, "queued"), due: applied.due.union(Set(k)) }
   }
   // On a sending or unknown post the row depends on the post (depends_on);
   // on a stored message it carries the ts. A newer intent replaces a waiting
@@ -430,13 +479,11 @@ module outboxProtocol {
   // ends, and a delete discards the row.
   action dropAction(k: int): bool = {
     val discard = s.row.get(k) == "failed" and s.actKind.get(k) == "delete"
+    val after = if (discard) discardedWith(k, true) else s
     all {
       s.act.get(k) == "waiting", not(s.stored.contains(k)),
       Set("failed", "gone").contains(s.row.get(k)),
-      s' = { ...s, act: s.act.set(k, "dropped"), stale: s.stale.exclude(Set(k)),
-        row: if (discard) s.row.set(k, "gone") else s.row,
-        discarded: if (discard) s.discarded.union(Set(k)) else s.discarded,
-        label: "dropAction", target: k }
+      s' = { ...after, act: s.act.set(k, "dropped"), stale: s.stale.exclude(Set(k)), label: "dropAction", target: k }
     }
   }
 
@@ -493,7 +540,9 @@ module outboxProtocol {
       s.copyRow.get(k) != "hidden" and not(copyUnseen(k)))
   val agreed = s.created.forall(k => s.discarded.contains(k) or
     (s.row.get(k) == "gone" and s.stored.contains(k) and s.server.get(k) == 1 and held(k) == expectedHeld(k) and keptHeld(k)) or
-    (s.row.get(k) == "failed" and not(s.stored.contains(k)) and held(k) == 0)) and
+    (s.row.get(k) == "failed" and not(s.stored.contains(k)) and held(k) == 0) or
+    // What Slack holds for an unreachable thread cannot be read: the row is decided, failed or gone.
+    (s.unreachable.contains(k) and Set("failed", "gone").contains(s.row.get(k)))) and
     drafts.forall(k => s.act.get(k) == "done" implies s.acted.contains(k))
   val quietAgreement = (s.sealed and quiet) implies agreed
   val reachedAgreement = s.sealed and quiet and agreed
@@ -501,6 +550,10 @@ module outboxProtocol {
   val actionNeedsMessage = s.actSent.subseteq(s.stored) and s.acted.subseteq(s.stored)
   val noActionOnDiscarded = s.actSent.intersect(s.discarded) == Set()
   val sendsWaitOffline = not(s.claimedOffline)
+  // A post the user deleted is never back in the queue, so the worker never sends it after the delete.
+  val deletedNeverQueued = drafts.forall(k => (actPending(k) and s.actKind.get(k) == "delete") implies s.row.get(k) != "queued")
+  // A reply that waited on a root the user removed went with it: nothing could ever send or fail it.
+  val repliesFollowRoot = drafts.forall(k => (s.parent.get(k) != 0 and s.discarded.contains(s.parent.get(k))) implies s.row.get(k) == "gone")
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   // Juno never shows a reaction as made that Slack refused.
   val reactionsLand = s.phantom == Set()
@@ -511,18 +564,19 @@ module outboxProtocol {
     s.parent.get(k) != 0 and (s.server.get(k) > 0 or s.row.get(k) == "sending") implies s.stored.contains(s.parent.get(k)))
   val invariants = repliesWaitForRoot and atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
     actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot and
-    ownDeleteHolds and reactionsLand and actionRetryBound
+    ownDeleteHolds and reactionsLand and actionRetryBound and deletedNeverQueued and repliesFollowRoot
 
   action work = any {
     goOnline, reconnect, { nondet covered = drafts.powerset().oneOf(); catchUpWith(covered) },
     { nondet k = drafts.oneOf(); nondet withEcho = Set(true, false).oneOf(); any {
       claim(k), accept(k, withEcho), answer(k), refused(k), lookup(k), wake(k),
       runAction(k), actAccept(k), actAnswer(k), dropAction(k), observeCopy(k), deleteCopy(k), keepCopy(k),
-      all { s.request.get(k) == "dropped", lost(k) }
+      all { s.request.get(k) == "dropped", lost(k) },
+      all { s.unreachable.contains(k), refuse(k, false) }
     } },
     { nondet k = s.events.oneOf(); echo(k) },
     { nondet k = s.scan.oneOf(); startFetch(k, "catchup") },
-    { nondet f = s.fetches.oneOf(); finishFetch(f) }
+    { nondet f = s.fetches.oneOf(); any { finishFetch(f), refuseFetch(f) } }
   }
   action progress = any { work, all { quiet, s' = { ...s, label: "idle" } } }
   action input = {
@@ -530,7 +584,7 @@ module outboxProtocol {
     nondet later = Set(true, false).oneOf()
     nondet kind = Set("change", "react", "delete").oneOf()
     any {
-      send(k), refuse(k, later), drop(k), resend(k), lost(k), crash, retry(k), discard(k), uploadFail(k),
+      send(k), refuse(k, later), drop(k), resend(k), lost(k), crash, retry(k), discard(k), uploadFail(k), loseThread(k),
       queueAction(k, kind), actFail(k), actRefuse(k), dismissAction(k), deleteElsewhere(k), remoteChange(k, "gone"), remoteChange(k, "reply"),
       page(k), disconnect, goOffline, seal,
       { nondet f = s.fetches.oneOf(); failLookup(f) }
@@ -749,6 +803,61 @@ module outboxProtocol {
     if (turn == 5) dropAction(1) else
     seal
   ) }
+  // The user deletes a post whose answer was lost, and the lookup finds
+  // Slack never ran it: the delete applies to the row, which goes. The bug
+  // puts the row back in the queue with the delete waiting on it, so the
+  // worker posts it and then deletes it, and everyone else saw it.
+  action deleteWhileUnknownWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) drop(1) else
+    if (turn == 3) lost(1) else
+    if (turn == 4) queueAction(1, "delete") else
+    if (turn == 5) wake(1) else
+    if (turn == 6) lookup(1) else
+    if (turn == 7) { nondet f = s.fetches.oneOf(); finishFetchWith(f, guard) } else
+    seal
+  ) }
+  action deleteWhileUnknownStep = deleteWhileUnknownWith(true)
+  action deleteWhileUnknownBugStep = deleteWhileUnknownWith(false)
+
+  // A reply's answer is lost, and its thread's root is deleted before the
+  // lookup asks: Slack refuses the read for good. The row fails, for Retry
+  // or Delete draft, and the channel's later posts go. The bug asks again
+  // with backoff, forever, and never drains.
+  action refusedLookupWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) (if (guard) progress else any { lookup(1), { nondet f = s.fetches.oneOf(); refuseFetchWith(f, false) } }) else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) drop(1) else
+    if (turn == 3) lost(1) else
+    if (turn == 4) loseThread(1) else
+    if (turn == 5) wake(1) else
+    if (turn == 6) lookup(1) else
+    if (turn == 7) { nondet f = s.fetches.oneOf(); refuseFetchWith(f, guard) } else
+    seal
+  ) }
+  action refusedLookupStep = refusedLookupWith(true)
+  action refusedLookupBugStep = refusedLookupWith(false)
+
+  // A root started from Home is refused, and the user deletes the draft
+  // while a reply waits on it. The reply goes with the root. The bug leaves
+  // it queued forever: nothing can claim it without a root, and it never
+  // fails, so it shows as sending in a thread with no root.
+  action discardedRootWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) sendReply(2, 1) else
+    if (turn == 3) refuse(1, false) else
+    if (turn == 4) refused(1) else
+    if (turn == 5) discardWith(1, guard) else
+    seal
+  ) }
+  action discardedRootStep = discardedRootWith(true)
+  action discardedRootBugStep = discardedRootWith(false)
+
   // An edit on a stored message: Slack applies it, a newer edit arrives while
   // the call is out, the answer is lost. The worker sends the newer text and
   // the row ends.

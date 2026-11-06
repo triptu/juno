@@ -205,6 +205,30 @@ it('waits for a post still being sent before editing, deleting or reacting to it
     await quiet(engine)
     expect(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === pending.clientMsgId)?.text).toBe('Edit while queued')
   })
+
+  // The worker reads the queue once per pass. An edit of a later row, made while an earlier row's call was out,
+  // must be what reaches Slack: the request is built from the row as it is at the claim, not from that read.
+  await step('posts the text edited while an earlier post of the same pass was at Slack', async () => {
+    await fresh(engine)
+    const product = watch(engine, 'm:C0PRODUCT')
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    // Both rows wait for the socket, so one pass takes them both.
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    valueOf(await sendMessage(engine.registry, eng, 'First of the pass', MAIN))
+    valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'Second of the pass', 'm:C0PRODUCT'))
+    const second = rowWith(await product((list) => rowWith(list, 'Second of the pass') !== undefined, 'the second row shown'), 'Second of the pass')!
+    engine.fake.goOnline()
+    const first = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the first post at Slack')
+    valueOf(await editMessage(engine.registry, { channelId: 'C0PRODUCT', ts: second.ts, clientMsgId: second.clientMsgId! }, 'Second, edited while queued'))
+    await product((list) => rowWith(list, 'Second, edited while queued')?.pending === 'sending', 'the edit shown')
+    engine.fake.decide(first.id, 'run')
+    engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === first.id && c.stage === 'answer'), WAIT_MS, 'the first answer')).id, 'answer')
+    const call = await waitFor(() => engine.fake.gated().find((c) => c.id !== first.id), WAIT_MS, 'the second post at Slack')
+    engine.fake.gate(undefined)
+    expect(call.args['text']).toBe('Second, edited while queued')
+    await product((list) => rowWith(list, 'Second, edited while queued')?.pending === undefined && rowWith(list, 'Second, edited while queued') !== undefined, 'stored as edited')
+  })
 })
 
 it('deletes a message at once and reconciles it with Slack in every order', async () => {
@@ -250,6 +274,28 @@ it('deletes a message at once and reconciles it with Slack in every order', asyn
     engine.fake.gate(undefined)
     await actionsEnded(engine)
     expect(inSlack(engine, message.ts)).toBeUndefined()
+  })
+
+  // The user deletes a post whose answer was lost, and the lookup finds Slack never ran it. The delete applies
+  // to the row as on a queued post, and nothing goes out. Before, the row went back to the queue, was posted,
+  // and then deleted: a message the user had deleted reached everyone else first.
+  await step('never posts a message deleted while its send was unknown', async () => {
+    await fresh(engine)
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    valueOf(await sendMessage(engine.registry, eng, 'Deleted while unknown', MAIN))
+    const call = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the post at Slack')
+    const pending = rowWith(await rows((list) => rowWith(list, 'Deleted while unknown')?.pending === 'sending', 'sending'), 'Deleted while unknown')!
+    // The connection closes before Slack runs it: nothing posted, and the answer lost.
+    engine.fake.decide(call.id, 'drop')
+    const state = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT state FROM pending_messages WHERE client_msg_id = ?').get(pending.clientMsgId!) as { state: string } | undefined)?.state)
+    await waitFor(() => (state() === 'unknown' ? true : undefined), WAIT_MS, 'the send unknown')
+    valueOf(await deleteMessage(engine.registry, refOf(pending)))
+    await rows((list) => !list.some((row) => row.clientMsgId === pending.clientMsgId), 'gone at once')
+    engine.fake.gate(undefined)
+    await waitFor(() => (state() === undefined ? true : undefined), WAIT_MS, 'the row ended')
+    await actionsEnded(engine)
+    expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(1)
+    expect(engine.fake.messages('C0ENG').some((m) => m.client_msg_id === pending.clientMsgId)).toBe(false)
   })
 })
 
