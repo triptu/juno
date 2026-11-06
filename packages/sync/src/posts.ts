@@ -216,9 +216,35 @@ export const claimPost = (clientMsgId: string, userId: string): Effect.Effect<Pe
 /** The answer was lost: Slack may hold the message. Look it up at `nextAt`. */
 export const postUnknown = (clientMsgId: string, nextAt: number, error: string) => move(clientMsgId, ['sending'], 'unknown', { nextAt, lastError: error })
 
-/** Slack did not post it and may later (rate limited, signed out), or a lookup found no message: send again at `nextAt`. */
-export const requeuePost = (clientMsgId: string, nextAt: number, error: string | null) =>
-  move(clientMsgId, ['sending', 'unknown'], 'queued', { nextAt, lastError: error })
+/**
+ * Slack did not post it and may later (rate limited, signed out), or a
+ * lookup found no message: send again at `nextAt`. Slack has nothing, so an
+ * edit or delete the user queued while the post was out (`actions.ts`,
+ * `depends_on`) applies to the row now, as on a queued row: the edit's text
+ * goes into the row, a delete removes it, and those rows end. The worker
+ * never sends a post the user deleted.
+ */
+export const requeuePost = (clientMsgId: string, nextAt: number, error: string | null): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    if (!(yield* move(clientMsgId, ['sending', 'unknown'], 'queued', { nextAt, lastError: error }))) return false
+    const sql = yield* StoreWriter
+    const dependents = yield* sql<{ id: number; kind: string; payload_json: string }>`SELECT id, kind, payload_json FROM outbox WHERE depends_on = ${clientMsgId} ORDER BY id`
+    const post = yield* readPost(clientMsgId)
+    if (post === undefined || dependents.length === 0) return true
+    if (dependents.some((row) => row.kind === 'delete')) {
+      yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${clientMsgId}`
+      yield* sql`DELETE FROM outbox WHERE depends_on = ${clientMsgId}`
+      yield* touch(post)
+      return true
+    }
+    for (const edit of dependents.filter((row) => row.kind === 'edit')) {
+      const payload = JSON.parse(edit.payload_json) as { readonly text?: string; readonly blocksJson?: string | null }
+      if (payload.text !== undefined) yield* sql`UPDATE pending_messages SET text = ${payload.text}, blocks_json = ${payload.blocksJson ?? null} WHERE client_msg_id = ${clientMsgId}`
+      yield* sql`DELETE FROM outbox WHERE id = ${edit.id}`
+      yield* touch(post)
+    }
+    return true
+  })
 
 /** A lookup could not answer: ask again at `nextAt`. Counts as an attempt, so the backoff grows. */
 export const deferLookup = (clientMsgId: string, nextAt: number) => move(clientMsgId, ['unknown'], 'unknown', { nextAt, attempt: true })

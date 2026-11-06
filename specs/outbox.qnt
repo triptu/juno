@@ -235,12 +235,16 @@ module outboxProtocol {
       row: s.row.set(k, if (guard) "gone" else "sending"), label: "answer", target: k }
   }
   action answer(k: int): bool = answerWith(k, true)
-  action refused(k: int): bool = all {
-    Set("refused", "later").contains(s.request.get(k)),
-    s' = { ...s, request: s.request.set(k, "idle"),
-      row: if (s.row.get(k) == "sending") s.row.set(k, if (s.request.get(k) == "later") "queued" else "failed") else s.row,
-      label: "refused", target: k }
+  action refusedWith(k: int, guard: bool): bool = {
+    val settled = if (s.row.get(k) != "sending") s
+      else if (s.request.get(k) == "later") requeueWith(k, guard)
+      else { ...s, row: s.row.set(k, "failed") }
+    all {
+      Set("refused", "later").contains(s.request.get(k)),
+      s' = { ...settled, request: s.request.set(k, "idle"), label: "refused", target: k }
+    }
   }
+  action refused(k: int): bool = refusedWith(k, true)
   // An ambiguous failure is observable only after Slack has decided the
   // request. It cannot still be in transit when an absent lookup permits resend.
   // An accepted `files.share` or `chat.shareMessage` (a forward) answers without the message, which is this
@@ -298,22 +302,22 @@ module outboxProtocol {
   }
   action lookup(k: int): bool = startFetch(k, "lookup")
   action page(k: int): bool = startFetch(k, "page")
-  action finishFetch(f: Fetch): bool = {
+  action finishFetchWith(f: Fetch, guard: bool): bool = {
     val absent = f.kind == "lookup" and s.row.get(f.key) == "unknown"
-    val observed = if (f.found) writeMessage(f.key) else { ...s,
-      row: if (absent) s.row.set(f.key, "queued") else s.row,
-      due: if (absent) s.due.union(Set(f.key)) else s.due }
+    val observed = if (f.found) writeMessage(f.key) else if (absent) requeueWith(f.key, guard) else s
     all {
       s.fetches.contains(f),
       s' = { ...observed, fetches: s.fetches.exclude(Set(f)), label: "finishFetch", target: f.key }
     }
   }
+  action finishFetch(f: Fetch): bool = finishFetchWith(f, true)
   action failLookup(f: Fetch): bool = all {
     not(s.sealed), f.kind == "lookup", s.fetches.contains(f),
     s' = { ...s, fetches: s.fetches.exclude(Set(f)), label: "failLookup", target: f.key }
   }
+  // The list hides a message whose delete waits, so Retry is not offered on it.
   action retry(k: int): bool = all {
-    not(s.sealed), s.row.get(k) == "failed",
+    not(s.sealed), s.row.get(k) == "failed", not(actPending(k) and s.actKind.get(k) == "delete"),
     s' = { ...s, row: s.row.set(k, "queued"), due: s.due.union(Set(k)), label: "retry", target: k }
   }
   action discard(k: int): bool = all {
@@ -339,6 +343,16 @@ module outboxProtocol {
     val ended = { ...s, act: if (actPending(k)) s.act.set(k, "dropped") else s.act, stale: s.stale.exclude(Set(k)) }
     if (kind == "delete") { ...ended, row: s.row.set(k, "gone"), due: s.due.exclude(Set(k)),
       discarded: s.discarded.union(Set(k)) } else ended
+  }
+  // A post back in the queue (a 429, a signed-out answer, a lookup that found
+  // it absent) is not in Slack: an edit or delete the user queued while it
+  // was out applies to the row now, as on a queued row, so the edit's text
+  // goes with the post and the worker never sends a post the user deleted.
+  // A reaction waits for the stored message. With the guard off the row is
+  // queued as it was, with the delete waiting on it.
+  def requeueWith(k: int, guard: bool): State = {
+    val applied = if (guard and actPending(k) and s.actKind.get(k) != "react") localAction(k, s.actKind.get(k)) else s
+    if (applied.row.get(k) == "gone") applied else { ...applied, row: applied.row.set(k, "queued"), due: applied.due.union(Set(k)) }
   }
   // On a sending or unknown post the row depends on the post (depends_on);
   // on a stored message it carries the ts. A newer intent replaces a waiting
@@ -501,6 +515,8 @@ module outboxProtocol {
   val actionNeedsMessage = s.actSent.subseteq(s.stored) and s.acted.subseteq(s.stored)
   val noActionOnDiscarded = s.actSent.intersect(s.discarded) == Set()
   val sendsWaitOffline = not(s.claimedOffline)
+  // A post the user deleted is never back in the queue, so the worker never sends it after the delete.
+  val deletedNeverQueued = drafts.forall(k => (actPending(k) and s.actKind.get(k) == "delete") implies s.row.get(k) != "queued")
   val actionsDrain = remaining > 0 or drafts.forall(k => not(actPending(k)))
   // Juno never shows a reaction as made that Slack refused.
   val reactionsLand = s.phantom == Set()
@@ -511,7 +527,7 @@ module outboxProtocol {
     s.parent.get(k) != 0 and (s.server.get(k) > 0 or s.row.get(k) == "sending") implies s.stored.contains(s.parent.get(k)))
   val invariants = repliesWaitForRoot and atMostOnce and noDoubleShow and noSilentLoss and quietAgreement and drainBound and
     actionNeedsMessage and noActionOnDiscarded and actionsDrain and sendsWaitOffline and shownOnce and keepsRealSends and repliesKeepRoot and
-    ownDeleteHolds and reactionsLand and actionRetryBound
+    ownDeleteHolds and reactionsLand and actionRetryBound and deletedNeverQueued
 
   action work = any {
     goOnline, reconnect, { nondet covered = drafts.powerset().oneOf(); catchUpWith(covered) },
@@ -749,6 +765,25 @@ module outboxProtocol {
     if (turn == 5) dropAction(1) else
     seal
   ) }
+  // The user deletes a post whose answer was lost, and the lookup finds
+  // Slack never ran it: the delete applies to the row, which goes. The bug
+  // puts the row back in the queue with the delete waiting on it, so the
+  // worker posts it and then deletes it, and everyone else saw it.
+  action deleteWhileUnknownWith(guard: bool): bool = all { not(reachedAgreement), tick(
+    if (s.sealed) progress else
+    if (turn == 0) send(1) else
+    if (turn == 1) claim(1) else
+    if (turn == 2) drop(1) else
+    if (turn == 3) lost(1) else
+    if (turn == 4) queueAction(1, "delete") else
+    if (turn == 5) wake(1) else
+    if (turn == 6) lookup(1) else
+    if (turn == 7) { nondet f = s.fetches.oneOf(); finishFetchWith(f, guard) } else
+    seal
+  ) }
+  action deleteWhileUnknownStep = deleteWhileUnknownWith(true)
+  action deleteWhileUnknownBugStep = deleteWhileUnknownWith(false)
+
   // An edit on a stored message: Slack applies it, a newer edit arrives while
   // the call is out, the answer is lost. The worker sends the newer text and
   // the row ends.
