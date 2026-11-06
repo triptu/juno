@@ -173,7 +173,8 @@ export function useMessageActions({ detail, list, scrollRef, composer, readOnly 
                   if (editing.text === message.editText) return setEditing(undefined)
                   setEditing({ ...editing, savedRev: message.rev })
                   void editMessage(registry, refOf(channel, message), encoded).then((exit) => {
-                    if (exit._tag === 'Failure') setEditing(undefined)
+                    // A failed save ends this edit; an editor opened on another message since stays as it is.
+                    if (exit._tag === 'Failure') setEditing((current) => (current?.ts === message.ts && current.savedRev === message.rev ? undefined : current))
                   })
                 }}
               />
