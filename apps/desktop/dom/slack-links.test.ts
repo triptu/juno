@@ -6,7 +6,7 @@
 // workspace's link is handled as any web link. That the message is in view
 // and flashes is the browser lane's (the long thread journey in topic.spec.ts); here, the tab
 // and the message it opens at. A link whose answer comes after the user moved on opens nothing, and a thread
-// opened while offline is fetched once Slack can be reached again.
+// opened while Slack is slowing Juno down says so until its replies come.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -142,21 +142,24 @@ domTest('a message link whose fetch answers after the user moved on opens nothin
   await expect(topic.composer).toBeFocused()
 })
 
-domTest('a thread opened while offline shows its replies once Slack can be reached again, in the same tab', async ({ juno, fake }) => {
+domTest('a thread opened while Slack is slowing Juno down says so, and shows its replies once the pause ends, in the same tab', async ({ juno, fake }) => {
   seedLinks(fake)
   const link = await openLinks(juno)
-  const { topic } = juno
-  // The network is down: the socket drops and every call for the thread's replies gets no answer (three tries a call).
-  fake.goOffline()
-  fake.loseResponse({ method: 'conversations.replies', times: 12 })
-  await juno.sidebar.expectSyncStatus("You're offline")
+  const { topic, tabs } = juno
+  // Slack's next answer to a thread fetch is a 429 whose Retry-After is longer than an interactive call waits out.
+  fake.force429({ method: 'conversations.replies', retryAfter: 2, times: 1 })
 
+  // The thread opens in a new tab with what the store has: nothing, since Juno never stored it, so not even its title.
   await link('the old thread').click()
-  await topic.expectTitle(OLD_THREAD)
-  await expect(topic.list.getByText("Slack couldn't be reached")).toBeVisible()
+  await tabs.expectCount(2)
+  await expect(topic.list.getByText('Slack asked Juno to slow down')).toBeVisible()
+  await juno.sidebar.expectSyncStatus('Slack asked us to slow down')
 
-  fake.goOnline()
+  // The pause ends: the engine finishes the fetch by itself.
   await juno.sidebar.expectNoSyncStatus()
   await expect(topic.message(OLD_REPLY)).toBeVisible({ timeout: 15_000 })
-  await expect(topic.list.getByText("Slack couldn't be reached")).toHaveCount(0)
+  await topic.expectTitle(OLD_THREAD)
+  await tabs.expectCount(2)
+  await expect(topic.list.getByText('Slack asked Juno to slow down')).toHaveCount(0)
 })
+
