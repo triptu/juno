@@ -5,13 +5,13 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { readsMarkRead } from '@juno/contract'
-import { dividerIndex, engineStatusAtom, messageListAtom, openedAtNewAtom, openTopic as fetchTopic, refreshMessages, registry, runCommand, shouldMarkRead, type MessageWindow } from '@juno/state'
+import { dividerIndex, messageListAtom, openedAtNewAtom, openTopic as fetchTopic, refreshMessages, registry, runCommand, shouldMarkRead, type MessageWindow } from '@juno/state'
 import type { MessageListStatus } from '@juno/views'
 
 /** No "Loading messages" line before this (performance 4.4). */
 const LOADING_DELAY_MS = 300
 
-/** `offline` and `rate-limited`: Slack could not be asked; the fetch runs again once the engine is live again (`useTopicFetch`). */
+/** `offline` and `rate-limited`: Slack could not be asked, and the engine fetches the topic by itself once it can (`useTopicFetch`). */
 export type FetchState = 'pending' | 'done' | 'offline' | 'rate-limited'
 
 /** Slack could not be asked, and the topic shows what the store has. */
@@ -62,14 +62,14 @@ export function useDivider(id: string, lastReadTs: string | undefined, markedUnr
  * ask again. `slow`: still asking after 300 ms. The fetch's rows reach the window in a later update than the
  * fetch's own answer, so a window not yet `shown` settles on `done` only with the window's next answer: on the
  * answer alone it painted what it held before and then the rows the fetch brought (one reply, then 31).
- * A fetch Slack could not answer (`offline`, `rate-limited`) runs again when the engine's phase next becomes
- * live or catching up: the view promised to fetch the topic once Slack can be reached, and nothing else fetches
- * a topic that is neither followed nor a member Main.
+ * A fetch Slack could not answer (`offline`, `rate-limited`) is the engine's to finish, not the view's: after a
+ * reconnect the sync fetches every topic on screen again (`sync/run/reconcile.ts`), and a rate-limited fetch runs
+ * again on the background lane once the pause ends (`sync/run/fetcher.ts`), so the rows reach the window without
+ * another open. The state stays as it was, which the list shows only while it has no rows.
  */
 export function useTopicFetch(id: string, view: string, enabled = true, shown = false) {
   'use no memo'
   const [fetchState, setFetchState] = useState<FetchState>('pending')
-  const [attempt, setAttempt] = useState(0)
   const fetched = useRef(false)
   const shownRef = useRef(shown)
   useEffect(() => {
@@ -106,26 +106,7 @@ export function useTopicFetch(id: string, view: string, enabled = true, shown = 
       })
       stopWaiting.current = off
     })
-  }, [id, view, enabled, attempt])
-  useEffect(() => {
-    if (!unreached(fetchState)) return
-    const phaseOf = () => {
-      const status = registry.get(engineStatusAtom)
-      return status._tag === 'Success' ? status.value.phase._tag : undefined
-    }
-    const failedIn = phaseOf()
-    return registry.subscribe(
-      engineStatusAtom,
-      () => {
-        const phase = phaseOf()
-        if (phase === failedIn || (phase !== 'live' && phase !== 'catching-up')) return
-        fetched.current = false
-        setFetchState('pending')
-        setAttempt((count) => count + 1)
-      },
-      { immediate: false },
-    )
-  }, [fetchState])
+  }, [id, view, enabled])
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     if (fetchState !== 'pending') return
