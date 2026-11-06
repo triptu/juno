@@ -398,3 +398,19 @@ it('a boot that never reaches Slack is offline, not failed, through the 30 s ret
     await Promise.all([time.close(), grace.close()])
   }
 })
+
+// A launch whose session check cannot reach Slack (SPEC 5, item 5): the stored session is used as it is, and the sync's boot decides.
+it('a launch whose session check never reaches Slack still syncs once Slack answers', async () => {
+  // The client's three attempts at `auth.test` get no answer; the sync's own boot does.
+  const engine = await started({ initial: (fake) => (fake.loseResponse({ method: 'auth.test', times: 3 }), fake.signIn()) })
+  await engine.phase('live', 30_000)
+  await engine.rowsUntil((rows) => rows.length > 0, 'rows after a launch that could not check the session')
+})
+
+it('a launch whose session check never reaches Slack still ends in session-expired when Slack rejects the session', async () => {
+  const engine = await started({ initial: (fake) => (fake.loseResponse({ method: 'auth.test', times: 3 }), fake.signIn()) })
+  // Slack rejects the session from now on: the sync finds out, since the launch's check could not.
+  engine.fake.expireSession()
+  await engine.status('authRequired')
+  await engine.phase('session-expired')
+})
