@@ -167,7 +167,8 @@ function connectionAuthorization(context: ManagerContext, lifecycle: ReturnType<
     if (!signingIn) await signIns.get(id)
     delete s.client
     delete s.auth
-    save({ ...stored(id).config, enabled: false })
+    // A sign-in keeps the connection on: a relaunch cut in during it connects again and asks for the sign-in, instead of reading Off.
+    save({ ...stored(id).config, enabled: signingIn })
     if (forget) {
       await credentials.clear(id)
     }
