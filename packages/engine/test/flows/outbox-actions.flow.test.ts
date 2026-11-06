@@ -205,6 +205,30 @@ it('waits for a post still being sent before editing, deleting or reacting to it
     await quiet(engine)
     expect(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === pending.clientMsgId)?.text).toBe('Edit while queued')
   })
+
+  // The worker reads the queue once per pass. An edit of a later row, made while an earlier row's call was out,
+  // must be what reaches Slack: the request is built from the row as it is at the claim, not from that read.
+  await step('posts the text edited while an earlier post of the same pass was at Slack', async () => {
+    await fresh(engine)
+    const product = watch(engine, 'm:C0PRODUCT')
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    // Both rows wait for the socket, so one pass takes them both.
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    valueOf(await sendMessage(engine.registry, eng, 'First of the pass', MAIN))
+    valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'Second of the pass', 'm:C0PRODUCT'))
+    const second = rowWith(await product((list) => rowWith(list, 'Second of the pass') !== undefined, 'the second row shown'), 'Second of the pass')!
+    engine.fake.goOnline()
+    const first = await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the first post at Slack')
+    valueOf(await editMessage(engine.registry, { channelId: 'C0PRODUCT', ts: second.ts, clientMsgId: second.clientMsgId! }, 'Second, edited while queued'))
+    await product((list) => rowWith(list, 'Second, edited while queued')?.pending === 'sending', 'the edit shown')
+    engine.fake.decide(first.id, 'run')
+    engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === first.id && c.stage === 'answer'), WAIT_MS, 'the first answer')).id, 'answer')
+    const call = await waitFor(() => engine.fake.gated().find((c) => c.id !== first.id), WAIT_MS, 'the second post at Slack')
+    engine.fake.gate(undefined)
+    expect(call.args['text']).toBe('Second, edited while queued')
+    await product((list) => rowWith(list, 'Second, edited while queued')?.pending === undefined && rowWith(list, 'Second, edited while queued') !== undefined, 'stored as edited')
+  })
 })
 
 it('deletes a message at once and reconciles it with Slack in every order', async () => {

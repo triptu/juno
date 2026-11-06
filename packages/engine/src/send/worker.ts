@@ -212,9 +212,11 @@ export class PostWorker extends Context.Service<
           if (!(yield* link.online)) return
           // Recorded as the user's send, so a copy the network makes is deleted (ADR 0014).
           const me = (yield* local(storedMe))?.userId ?? ''
-          if (!(yield* local(transaction(claimPost(row.clientMsgId, me))))) return
+          // The request carries the row as claimed, not as the pass read it: an edit meanwhile is what goes to Slack.
+          const claimed = yield* local(transaction(claimPost(row.clientMsgId, me)))
+          if (claimed === undefined) return
           const result = yield* outbox
-            .sendOnce((api) => request(api, row, fileIds))
+            .sendOnce((api) => request(api, claimed, fileIds))
             .pipe(
               Effect.result,
               // A bug after the request left may still have posted: unknown, never failed.

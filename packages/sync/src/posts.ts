@@ -200,15 +200,17 @@ const move = (
 
 /**
  * `queued` to `sending`, before the one request leaves, and the post is
- * recorded as sent by `userId` (`sent.ts`). False when the row is gone or
- * not queued.
+ * recorded as sent by `userId` (`sent.ts`). Answers the row as it is at the
+ * claim, which the request is built from: the user may have edited it
+ * since the worker read the queue. Undefined when the row is gone or not
+ * queued.
  */
-export const claimPost = (clientMsgId: string, userId: string): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+export const claimPost = (clientMsgId: string, userId: string): Effect.Effect<PendingPost | undefined, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const post = yield* readPost(clientMsgId)
-    if (!(yield* move(clientMsgId, ['queued'], 'sending', { attempt: true })) || post === undefined) return false
+    if (post === undefined || !(yield* move(clientMsgId, ['queued'], 'sending', { attempt: true }))) return undefined
     yield* recordSend(clientMsgId, post.channel, userId)
-    return true
+    return { ...post, state: 'sending', attempts: post.attempts + 1 }
   })
 
 /** The answer was lost: Slack may hold the message. Look it up at `nextAt`. */
