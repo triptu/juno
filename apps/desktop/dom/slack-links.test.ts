@@ -5,7 +5,8 @@
 // conversation Juno cannot reach opens in the browser, and another
 // workspace's link is handled as any web link. That the message is in view
 // and flashes is the browser lane's (the long thread journey in topic.spec.ts); here, the tab
-// and the message it opens at. A link whose answer comes after the user moved on opens nothing.
+// and the message it opens at. A link whose answer comes after the user moved on opens nothing, and a thread
+// opened while offline is fetched once Slack can be reached again.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect } from './expect'
@@ -18,6 +19,8 @@ const RINA = 'Rina finished the onsite'
 const ENG = 'eng'
 const OTHER = 'https://other.slack.com/archives/C0ENG/p1712345678000200'
 const NOWHERE_TS = '1712345678.000200'
+const OLD_THREAD = 'Capacity review notes from last quarter'
+const OLD_REPLY = 'Replica count was fine then'
 
 const find = (fake: FakeSlack, start: string) => fake.messages('C0ENG').find((message) => message.text?.includes(start))!
 const permalink = (fake: FakeSlack, ts: string, threadTs?: string) =>
@@ -28,8 +31,10 @@ function seedLinks(fake: FakeSlack): void {
   const root = find(fake, POSTGRES)
   const main = find(fake, 'preview environments never shut down')
   const reply = find(fake, 'Please do.')
-  // Three weeks old: outside the first sync's window, so Juno has not stored it.
+  // Three weeks old: outside the first sync's window, so Juno has not stored them.
   const old = fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: 'Old capacity note from last month', at: fake.now() - 21 * DAY, silent: true })
+  const oldRoot = fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: OLD_THREAD, at: fake.now() - 21 * DAY, silent: true })
+  const oldReply = fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: OLD_REPLY, at: fake.now() - 21 * DAY + 60_000, threadTs: oldRoot.ts, silent: true })
   fake.workspace.post({
     channel: 'C0ENG',
     user: 'U0MAYA',
@@ -38,6 +43,7 @@ function seedLinks(fake: FakeSlack): void {
       `See <${permalink(fake, main.ts)}|the preview note>,`,
       `<${permalink(fake, reply.ts, reply.thread_ts)}|the reaper reply>,`,
       `<${permalink(fake, old.ts)}|the old note>,`,
+      `<${permalink(fake, oldReply.ts, oldRoot.ts)}|the old thread>,`,
       `<${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}|a closed room>`,
       `and <${OTHER}|elsewhere>.`,
     ].join(' '),
@@ -134,4 +140,23 @@ domTest('a message link whose fetch answers after the user moved on opens nothin
   await tabs.expectActive(RINA)
   await expect(topic.composer).toHaveValue('Typed after moving on')
   await expect(topic.composer).toBeFocused()
+})
+
+domTest('a thread opened while offline shows its replies once Slack can be reached again, in the same tab', async ({ juno, fake }) => {
+  seedLinks(fake)
+  const link = await openLinks(juno)
+  const { topic } = juno
+  // The network is down: the socket drops and every call for the thread's replies gets no answer (three tries a call).
+  fake.goOffline()
+  fake.loseResponse({ method: 'conversations.replies', times: 12 })
+  await juno.sidebar.expectSyncStatus("You're offline")
+
+  await link('the old thread').click()
+  await topic.expectTitle(OLD_THREAD)
+  await expect(topic.list.getByText("Slack couldn't be reached")).toBeVisible()
+
+  fake.goOnline()
+  await juno.sidebar.expectNoSyncStatus()
+  await expect(topic.message(OLD_REPLY)).toBeVisible({ timeout: 15_000 })
+  await expect(topic.list.getByText("Slack couldn't be reached")).toHaveCount(0)
 })

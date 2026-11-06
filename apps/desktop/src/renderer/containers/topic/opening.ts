@@ -5,13 +5,17 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { readsMarkRead } from '@juno/contract'
-import { dividerIndex, messageListAtom, openedAtNewAtom, openTopic as fetchTopic, refreshMessages, registry, runCommand, shouldMarkRead, type MessageWindow } from '@juno/state'
+import { dividerIndex, engineStatusAtom, messageListAtom, openedAtNewAtom, openTopic as fetchTopic, refreshMessages, registry, runCommand, shouldMarkRead, type MessageWindow } from '@juno/state'
 import type { MessageListStatus } from '@juno/views'
 
 /** No "Loading messages" line before this (performance 4.4). */
 const LOADING_DELAY_MS = 300
 
-export type FetchState = 'pending' | 'done' | 'offline'
+/** `offline` and `rate-limited`: Slack could not be asked; the fetch runs again once the engine is live again (`useTopicFetch`). */
+export type FetchState = 'pending' | 'done' | 'offline' | 'rate-limited'
+
+/** Slack could not be asked, and the topic shows what the store has. */
+export const unreached = (state: FetchState): boolean => state === 'offline' || state === 'rate-limited'
 
 export const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
 
@@ -58,10 +62,14 @@ export function useDivider(id: string, lastReadTs: string | undefined, markedUnr
  * ask again. `slow`: still asking after 300 ms. The fetch's rows reach the window in a later update than the
  * fetch's own answer, so a window not yet `shown` settles on `done` only with the window's next answer: on the
  * answer alone it painted what it held before and then the rows the fetch brought (one reply, then 31).
+ * A fetch Slack could not answer (`offline`, `rate-limited`) runs again when the engine's phase next becomes
+ * live or catching up: the view promised to fetch the topic once Slack can be reached, and nothing else fetches
+ * a topic that is neither followed nor a member Main.
  */
 export function useTopicFetch(id: string, view: string, enabled = true, shown = false) {
   'use no memo'
   const [fetchState, setFetchState] = useState<FetchState>('pending')
+  const [attempt, setAttempt] = useState(0)
   const fetched = useRef(false)
   const shownRef = useRef(shown)
   useEffect(() => {
@@ -83,7 +91,7 @@ export function useTopicFetch(id: string, view: string, enabled = true, shown = 
       // A view gone meanwhile asks for nothing more.
       if (!mounted.current) return
       const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
-      if (!done) return setFetchState('offline')
+      if (!done) return setFetchState(exit._tag === 'Success' && exit.value.outcome === 'rate-limited' ? 'rate-limited' : 'offline')
       if (shownRef.current) return setFetchState('done')
       // Asked again: the window can also have started while the fetch was writing the history it covers (a first
       // send to someone never messaged) and missed that change. The list keeps its last value while the
@@ -98,7 +106,26 @@ export function useTopicFetch(id: string, view: string, enabled = true, shown = 
       })
       stopWaiting.current = off
     })
-  }, [id, view, enabled])
+  }, [id, view, enabled, attempt])
+  useEffect(() => {
+    if (!unreached(fetchState)) return
+    const phaseOf = () => {
+      const status = registry.get(engineStatusAtom)
+      return status._tag === 'Success' ? status.value.phase._tag : undefined
+    }
+    const failedIn = phaseOf()
+    return registry.subscribe(
+      engineStatusAtom,
+      () => {
+        const phase = phaseOf()
+        if (phase === failedIn || (phase !== 'live' && phase !== 'catching-up')) return
+        fetched.current = false
+        setFetchState('pending')
+        setAttempt((count) => count + 1)
+      },
+      { immediate: false },
+    )
+  }, [fetchState])
   const [slow, setSlow] = useState(false)
   useEffect(() => {
     if (fetchState !== 'pending') return
@@ -122,7 +149,7 @@ export function windowShown(positioned: boolean, list: MessageWindow, readAtOpen
   // A thread's root has nothing before it, so a window from the root reaches any pointer, a thread never read too.
   const contextLoaded = readAtOpen === undefined || (first !== undefined && (first <= readAtOpen || list.rows.get(first)?.root === true))
   const held = list.meta.windowCovered === true || list.meta.standIn === true
-  return positioned || (held && (contextLoaded || fetchState === 'done')) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
+  return positioned || (held && (contextLoaded || fetchState === 'done')) || unreached(fetchState) || (fetchState === 'done' && list.order.length >= list.spec.limit)
 }
 
 /**
@@ -143,7 +170,7 @@ export const standingIn = (list: MessageWindow, fetchState: FetchState): boolean
 
 /** An empty list says nothing until Slack has answered or 300 ms have passed. */
 export function listStatus(showWindow: boolean, list: MessageWindow, { fetchState, slow }: { readonly fetchState: FetchState; readonly slow: boolean }): MessageListStatus {
-  return showWindow && list.order.length > 0 ? 'ready' : fetchState === 'offline' ? 'offline' : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
+  return showWindow && list.order.length > 0 ? 'ready' : fetchState === 'offline' || fetchState === 'rate-limited' ? fetchState : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
 }
 
 /**

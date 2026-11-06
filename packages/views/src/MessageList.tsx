@@ -25,9 +25,9 @@ export interface MessageListItem {
 /**
  * What the list shows while it has no rows. `pending`: nothing yet, for the
  * first 300 ms of an open. `offline`: the topic is not cached and Slack
- * could not be reached.
+ * could not be reached; `rate-limited`: Slack asked Juno to wait.
  */
-export type MessageListStatus = 'ready' | 'pending' | 'loading' | 'offline'
+export type MessageListStatus = 'ready' | 'pending' | 'loading' | 'offline' | 'rate-limited'
 
 /**
  * Whether older messages can come above the window: `more`, `loading` (a
@@ -474,6 +474,9 @@ function Empty({ main, status }: { readonly main: boolean; readonly status: Mess
   }
   if (status === 'offline') {
     return <EmptyState illustration="nothing-here" title="Nothing here yet" body="Slack couldn't be reached. Juno fetches this topic when you're back online." enter={false} />
+  }
+  if (status === 'rate-limited') {
+    return <EmptyState illustration="nothing-here" title="Nothing here yet" body="Slack asked Juno to slow down. Juno fetches this topic in a moment." enter={false} />
   }
   return main ? (
     <EmptyState illustration="nothing-here" title="Quiet in here" body="New messages in this channel show up here. Click Main above for its threads." enter={false} />
