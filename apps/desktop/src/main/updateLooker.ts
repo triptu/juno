@@ -91,5 +91,3 @@ export function createLooker(deps: LookerDeps, events: LookEvents) {
     install: () => updater?.quitAndInstall(),
   }
 }
-
-export type Looker = ReturnType<typeof createLooker>
