@@ -19,10 +19,11 @@
  * The credentials from `huddle.start` go to the session and nowhere else:
  * never log, store or report them.
  */
-import type { HuddleCall, HuddleCredentials, HuddleMediaEnd, HuddleMenu, HuddlePageReport, HuddleRegistration } from '@juno/contract'
+import type { HuddleCall, HuddleMediaEnd, HuddleMenu, HuddlePageReport, HuddleRegistration } from '@juno/contract'
 import { huddleSounds, type Devices, type EndReason, type MediaSession, type MediaSnapshot, type ShareEnd, type ShareSource, type SoundView } from '@juno/huddle-media'
 import { connectionStateAtom, huddleCallValueAtom, leaveHuddle, onMenuCommand, registry, reportHuddleMedia, sessionProfileAtom, showToast, startHuddle } from '@juno/state'
 import { openHuddle } from '../navigation'
+import { moveWith, noHold, type PageHold } from './handOff'
 import joinSound from './sounds/huddle-join.wav?url'
 import leaveSound from './sounds/huddle-leave.wav?url'
 import { openSharePicker } from './shareSheet'
@@ -55,11 +56,8 @@ const endOf: Record<EndReason, HuddleMediaEnd> = {
 let registration: Promise<HuddleRegistration> | undefined
 let loading: Promise<MediaSession> | undefined
 let session: MediaSession | undefined
-/** Credentials handed to this page that wait for `huddle.call` to name their attendee. */
-let pending: { readonly attendeeId: string; readonly credentials: HuddleCredentials } | undefined
-/** The attendee the session runs for, from `join` until it ends. */
-let holding: string | null = null
-let received: string | null = null
+/** The credentials in hand and the attendee the session runs for (`handOff.ts`). */
+let hold: PageHold = noHold
 let ended: HuddlePageReport['ended'] = null
 let seq = 0
 let lastSent = ''
@@ -115,9 +113,9 @@ function onSnapshot(): void {
   const snapshot = session?.getSnapshot()
   if (snapshot === undefined) return
   const connection = snapshot.connection
-  if (connection.state === 'ended' && connection.attendeeId === holding) {
+  if (connection.state === 'ended' && connection.attendeeId === hold.holding) {
     ended = { attendeeId: connection.attendeeId, reason: endOf[connection.reason] }
-    holding = null
+    hold = { ...hold, holding: null }
   }
   for (const listener of listeners) listener()
   void report()
@@ -193,8 +191,8 @@ async function report(force = false): Promise<void> {
   const live = state === 'connecting' || state === 'connected' || state === 'reconnecting'
   const body = {
     generation,
-    holds: holding,
-    received,
+    holds: hold.holding,
+    received: hold.received,
     // The engine reads the connection only while the page holds a session.
     connection: live ? state : 'connecting',
     muted: snapshot?.local.muted ?? false,
@@ -207,35 +205,28 @@ async function report(force = false): Promise<void> {
   await reportHuddleMedia(registry, { ...body, seq: ++seq })
 }
 
-/** Starts or stops the session to match the engine's call. */
+/** Starts or stops the session to match the engine's call (`handOff.ts`). */
 function reconcile(call: HuddleCall | undefined): void {
   if (call === undefined) return
-  if (holding !== null && call.attendeeId !== holding) {
-    // The engine's call no longer names this session: stop it. Its end reports `left`.
-    void session?.leave()
-  }
-  if (pending !== undefined && call.attendeeId === pending.attendeeId && holding === null && session !== undefined) {
-    const { attendeeId, credentials } = pending
-    pending = undefined
-    holding = attendeeId
-    received = attendeeId
+  const move = moveWith(hold, call)
+  const changed = move.next.holding !== hold.holding || move.next.received !== hold.received
+  hold = move.next
+  // The engine's call no longer names this session: stop it. Its end reports `left`.
+  if (move.leave) void session?.leave()
+  if (move.start !== undefined && session !== undefined) {
+    const { attendeeId, credentials } = move.start
     const picks = readPicks()
     void session
       .join({ meeting: credentials.meeting, attendee: credentials.attendee, microphone: picks.microphone, speaker: picks.speaker, noiseSuppression: picks.noiseSuppression })
       .catch(() => {
-        if (holding === attendeeId) {
-          holding = null
+        if (hold.holding === attendeeId) {
+          hold = { ...hold, holding: null }
           ended = { attendeeId, reason: 'failed' }
           void report()
         }
       })
-    void report()
-  } else if (pending !== undefined && (call.phase === 'idle' || (call.attendeeId !== null && call.attendeeId !== pending.attendeeId))) {
-    // Replaced before it started: the page received it and holds nothing for it.
-    received = pending.attendeeId
-    pending = undefined
-    void report()
   }
+  if (changed) void report()
 }
 
 /** Starts the service: called once at the app root, after the first paint. */
@@ -259,7 +250,7 @@ export function startHuddleMedia(): void {
   watchHuddleEnds((channelId) => void joinHuddle(channelId))
   // ⌘⇧Space mutes and unmutes while Juno is the active app (SPEC 20).
   window.addEventListener('keydown', (event) => {
-    if (event.code !== 'Space' || !event.metaKey || !event.shiftKey || event.altKey || event.ctrlKey || holding === null) return
+    if (event.code !== 'Space' || !event.metaKey || !event.shiftKey || event.altKey || event.ctrlKey || hold.holding === null) return
     event.preventDefault()
     toggleHuddleMuted()
   })
@@ -288,7 +279,7 @@ export async function joinHuddle(channelId: string): Promise<JoinOutcome> {
   }
   const result = exit.value
   if (result._tag !== 'joined') return 'cancelled'
-  pending = { attendeeId: result.attendeeId, credentials: result.credentials }
+  hold = { ...hold, pending: { attendeeId: result.attendeeId, credentials: result.credentials } }
   reconcile(registry.get(huddleCallValueAtom))
   return 'joined'
 }
@@ -300,7 +291,7 @@ export function leaveCurrentHuddle(): void {
 
 export function toggleHuddleMuted(): void {
   const snapshot = session?.getSnapshot()
-  if (snapshot !== undefined && holding !== null) session?.setMuted(!snapshot.local.muted)
+  if (snapshot !== undefined && hold.holding !== null) session?.setMuted(!snapshot.local.muted)
 }
 
 /** Slack allows two shares at once: while two others share, the user cannot (SPEC 20, "Two at once"). */
@@ -312,13 +303,13 @@ export function shareFull(snapshot: MediaSnapshot | undefined): boolean {
 export function toggleSharing(): void {
   const snapshot = session?.getSnapshot()
   if (snapshot?.localShare !== undefined) stopSharing()
-  else if (holding !== null && !shareFull(snapshot)) openSharePicker()
+  else if (hold.holding !== null && !shareFull(snapshot)) openSharePicker()
 }
 
 /** Shares the screen or window the sheet picked, in place of anything shared before. */
 export function shareScreen(source: ShareSource): Promise<void> {
   const snapshot = session?.getSnapshot()
-  return holding === null || shareFull(snapshot) ? Promise.resolve() : (session?.shareScreen(source) ?? Promise.resolve())
+  return hold.holding === null || shareFull(snapshot) ? Promise.resolve() : (session?.shareScreen(source) ?? Promise.resolve())
 }
 
 export function stopSharing(): void {

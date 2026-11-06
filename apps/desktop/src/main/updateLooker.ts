@@ -88,6 +88,11 @@ export function createLooker(deps: LookerDeps, events: LookEvents) {
       looking = undefined
       cancel?.()
     },
-    install: () => updater?.quitAndInstall(),
+    /** Quits into the downloaded update; false when no updater can. */
+    install: () => {
+      if (updater === undefined) return false
+      updater.quitAndInstall()
+      return true
+    },
   }
 }
