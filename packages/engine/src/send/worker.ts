@@ -281,10 +281,10 @@ export class PostWorker extends Context.Service<
               }
               return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
             }
-            const found = answer.value.messages.find((message) => message.client_msg_id === row.clientMsgId)
+            const found = answer.success.messages.find((message) => message.client_msg_id === row.clientMsgId)
             if (found !== undefined) return yield* fetcher.sent({ channel: row.channel, message: found }).pipe(Effect.orDie)
-            cursor = answer.value.response_metadata?.next_cursor || undefined
-            if (!answer.value.has_more || cursor === undefined) {
+            cursor = answer.success.response_metadata?.next_cursor || undefined
+            if (!answer.success.has_more || cursor === undefined) {
               // Slack said it took the post (files, a forward): the message is there even if the read does not show it yet.
               if (row.lastError === SHARED) return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
               // Slack has decided the lost request by now (specs/outbox.qnt): it is not there, so it may go again.
