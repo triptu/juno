@@ -22,6 +22,8 @@ export const handleSocketEvent = (runtime: SyncRuntime, reconcile: Effect.Effect
           Effect.andThen(state.booted ? FiberSet.run(background, reconcile).pipe(Effect.asVoid) : Effect.void),
         )
       case 'Disconnected': {
+        // The socket also says so after an attempt that never connected: only a drop opens a gap.
+        const dropped = state.connected
         state.connected = false
         // Before anything yields: a page that lands from now on cannot write a live tail.
         ctx.socket.connected = false
@@ -32,12 +34,12 @@ export const handleSocketEvent = (runtime: SyncRuntime, reconcile: Effect.Effect
         const ended = transaction(endEventCoverage.pipe(Effect.flatMap((topics) => reindexTopics(topics, reindexOptions(ctx))))).pipe(
           Effect.catchCause((cause) => Effect.logError('sync: coverage not reset', { cause })),
         )
-        if (!state.booted) return ended.pipe(Effect.andThen(options.onConnection?.(false) ?? Effect.void))
+        // The gap is kept until a catch-up rechecks it; during a boot that is the catch-up the boot runs once it ends.
         return Clock.currentTimeMillis.pipe(
-          Effect.tap((now) => Effect.sync(() => { state.droppedAt ??= now })),
+          Effect.tap((now) => Effect.sync(() => { if (dropped) state.droppedAt ??= now })),
           Effect.andThen(options.onConnection?.(false) ?? Effect.void),
           Effect.andThen(ended),
-          Effect.andThen(phase({ _tag: 'offline' })),
+          Effect.andThen(state.booted ? phase({ _tag: 'offline' }) : Effect.void),
         )
       }
       case 'Frame':

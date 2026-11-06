@@ -97,7 +97,8 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     Effect.as(true),
     Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: user groups refresh failed', { cause: error }), false)),
   )
-  const reportBoot: Phase = phase
+  // A boot's or catch-up's progress; after the boot, none while the socket is down, so `offline` holds until it settles.
+  const reportBoot: Phase = (next) => Effect.suspend(() => (state.booted && !state.connected ? Effect.void : phase(next)))
   // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
   const background = yield* FiberSet.make<void, SlackAuthRequired>()
   return { socket, ctx, state, work, phase, cycle, step, settle, refreshEmoji, refreshUsergroups, reportBoot, background, config, options }
