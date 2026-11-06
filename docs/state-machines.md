@@ -589,7 +589,7 @@ Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, 
 
 Each tab holds a history (`entries`, `index`, at most 50). The strip keeps a `closed` list (at most 20). `updateTabs` writes `changedTabsAtom` and saves the whole set, Home drafts and Search sessions included, through `prefs.set`.
 
-Invariant: no change is applied before the saved tabs are known. Nothing enforces it (**bug** REN-1).
+Invariant: no change is applied before the saved tabs are known. A change asked for earlier waits for them (REN-1, fixed). The variant across a workspace switch in the same run is still open, since the saved-tabs atom is shared across teams.
 
 ### Navigation queue
 
@@ -603,7 +603,7 @@ Where: `containers/navigation.ts`. A global promise `queue`, `currentTicket` (l.
 | `whenReady` | resolves when the header and window are local, on a Failure, or on a null header; the `READY_WAIT_MS` (150 ms) timer only runs `check` again | `navigation.ts:221-270` |
 
 Invariants:
-1. A change asked for before a newer one never applies after it. REN-2 breaks it: a change that takes its ticket after an await is never stale.
+1. A change asked for before a newer one never applies after it. A link open records the active tab, place and ticket before its fetch and opens nothing if any changed (REN-2, fixed).
 2. Every `whenReady` settles. REN-4 breaks it while the engine is down.
 
 ### Topic composer send check
@@ -633,7 +633,7 @@ Where: `containers/messageActions.tsx:85-180`, `containers/topic/messageCommands
 | any | E or Edit | editing this message (replaces any current editor, no guard) | `messageCommands.ts:97` |
 | editing | Save | `savedRev = row.rev`; command in flight | `messageActions.tsx:169-178` |
 | saved | the row's rev changes | closed | `messageActions.tsx:107` |
-| saved | command Failure | closed, whatever editor is open (**bug** REN-5) | `messageActions.tsx:176` |
+| saved | command Failure | closed only if the open editor is still the failed edit (REN-5, fixed) | `messageActions.tsx` |
 | editing | a sending message lands | `ts` moves to Slack's ts | |
 
 `confirming = {ts, sent}` ends when the row leaves.
@@ -647,7 +647,7 @@ Where: `useTopicFetch` in `containers/topic/opening.ts:62-108`. `fetchState`, `f
 | pending | fresh window answer, fetched or cached | done | `opening.ts:82-86` |
 | pending | any other outcome or error | offline | `opening.ts:86` |
 | pending | 300 ms pass | `slow = true` | |
-| offline | network back | no transition (**bug** REN-3) | |
+| offline | network back | the engine refetches every on-screen topic in the catch-up (`refreshOpenTopics` in `packages/sync/src/run/reconcile.ts`); a rate-limited fetch reruns on the background lane when the pause ends (`run/fetcher.ts`) | |
 
 `fetched.current` (l.80-81) makes the fetch once per mount, so `offline` is terminal for the mount.
 
@@ -1290,7 +1290,7 @@ Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` is
 - Severity: medium-high. Confirmed. Impact: Open tabs, pins and Home drafts (unsent text the user wrote) are lost after a relaunch where the user acts quickly. The window is longer after an update migration or on a slow disk. It breaks the tabs invariant.
 - Test: DOM lane, `apps/desktop/dom/tabs-relaunch.test.ts`. Save tabs including a Home tab with a draft, relaunch, hold the workspace open, send ⌘T before the first sidebar row, then expect the saved tabs and the Home draft after load and in `prefs.tabs`.
 - Fix direction: gate `updateTabs` on a "saved tabs known" flag, or merge into the saved set once it arrives.
-- Status: Open
+- Status: Fixed in 8a94b311b. A change asked for before the saved tabs load waits for them. Test: `tabs-relaunch.test.ts`, "⌘T before the saved tabs have loaded opens the new tab beside them, and keeps the Home draft saved with them". The variant across a workspace switch is still open.
 
 #### REN-2. A Slack link, source link or person link opens its topic seconds after the user moved on, and takes the tab and focus
 
@@ -1304,21 +1304,16 @@ Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` is
 - Severity: medium. Confirmed. Impact: The view jumps, focus is taken, and a reply may go to the wrong conversation. It breaks navigation queue invariant 1.
 - Test: DOM lane, `apps/desktop/dom/slack-links.test.ts`. Hold fake Slack's answer for the linked message, click the link, open a different topic and type, release, and expect the second topic to stay active with the text in its composer.
 - Fix direction: take the ticket before the await and drop the open if `currentTicket` moved.
-- Status: Open
+- Status: Fixed in 771395859 and b61e461e7. A Slack, source or person link records the active tab, place and ticket before its fetch and opens nothing if any changed. Test: `slack-links.test.ts`, "a message link whose fetch answers after the user moved on opens nothing".
 
-#### REN-3. A topic opened offline or rate-limited stays "Nothing here yet" after the network returns
+#### REN-3. A topic opened while rate-limited said Slack could not be reached
 
-1. The user opens a topic whose history is not stored (a thread from a link or search, an unread channel Main) while offline or rate-limited.
-2. `useTopicFetch` calls `topics.open`, gets `offline` or `rate-limited`, and sets `fetchState` to `offline` (`containers/topic/opening.ts:82-86`).
-3. `fetched.current = true` (`opening.ts:80-81`), so the hook never asks again for this mount. Nothing calls `topics.open` on reconnect. `MessageList` shows "Slack couldn't be reached. Juno fetches this topic when you're back online." (`packages/views/src/MessageList.tsx:476`).
-4. Back online, the engine's catch-up covers followed threads, member Mains and a 10-topic recheck, not this topic's missing history. A tab stays mounted (up to 5), so switching away and back does not help.
+The audit reported that a topic opened offline is never fetched again. That part is not a bug: after a reconnect the sync's catch-up fetches every on-screen topic again (`refreshOpenTopics`), and a rate-limited fetch reruns once the pause ends. A DOM test of the offline case passed on the code before the fix, which confirmed it.
 
-`rate-limited` shows the same "couldn't be reached" text. `standingIn` is false once the state is `offline` (`opening.ts:142`), so older-page steps run against a window the open never proved.
+What was wrong is the text. `useTopicFetch` mapped `rate-limited` to the `offline` state, so `MessageList` said "Slack couldn't be reached" while Slack was only asking Juno to slow down.
 
-- Severity: medium. Renderer side confirmed; the engine catch-up for the topic is plausible. Impact: An empty topic whose own text promises a fetch that never happens, until the tab is remounted.
-- Test: DOM lane, `apps/desktop/dom/topic.test.ts`. Take fake Slack offline, open an unstored thread, bring it back, and expect its replies in the same tab.
-- Fix direction: fetch again when the connection or engine phase returns to live while `fetchState === 'offline'`.
-- Status: Open
+- Severity: low. Impact: wrong text while rate-limited.
+- Status: Fixed in 6a745837d and 7a006cb20. The topic has its own `rate-limited` state and text, with a gallery fixture. Test: `topic.test.ts`, "a thread opened while Slack is slowing Juno down says so, and shows its replies once the pause ends, in the same tab" (7c665ada7).
 
 #### REN-5. A failed message edit closes whatever editor is open by then and drops its text
 
@@ -1331,7 +1326,7 @@ A's own text is also lost, with no toast. Commands are not retried on transport 
 - Severity: low. Confirmed. Impact: Lost edit text.
 - Test: DOM lane, `apps/desktop/dom/message-actions.test.ts`. Make the edit fail (delete the message in fake Slack first), open a second editor before the answer, and expect it to stay open.
 - Fix direction: clear `editing` on failure only if it still holds the message that failed.
-- Status: Open
+- Status: Fixed in e847ec8a7. A failed save closes the editor only if it is still the failed edit. Test: `message-actions.test.ts`, step "an edit whose save fails while another message is being edited leaves that editor open".
 
 #### REN-4. While the engine is unreachable, opening an uncached topic freezes all later queued navigation
 
