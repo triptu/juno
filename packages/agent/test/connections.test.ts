@@ -323,6 +323,21 @@ test('a Connect click whose sign-in is still open holds no other card: a Littleb
   expect(c.turns.actions.views().find((view) => view.card._tag === 'connect')?.card).toMatchObject({ status: { _tag: 'failed' } })
 })
 
+test('a sign-in cut off by a relaunch leaves the connection needing a sign-in, not Off', async () => {
+  const server = await startFakeNotion()
+  closeAfter(server.close)
+  // The browser's sign-in page opens, and the app quits before the owner finishes.
+  let pageOpened: () => void = () => {}
+  const opened = new Promise<void>((resolve) => { pageOpened = resolve })
+  const creds = { ...credentials(server.oauth.approve), openAuthorization: async () => pageOpened() }
+  const c = await connections({ credentials: creds, defaults: [{ ...NOTION, url: server.url }] })
+  void c.manager.authorize('notion')
+  await opened
+  await c.restart()
+  await c.manager.start()
+  expect(c.manager.page().connections[0]).toMatchObject({ state: 'needsSignIn', enabled: true })
+})
+
 test('offers Notion, Littlebird and T3 Code, and adds a server by address that signs in only when it asks', async () => {
   const server = await startFakeLittlebird()
   closeAfter(server.close)
