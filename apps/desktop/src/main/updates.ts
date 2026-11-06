@@ -139,7 +139,12 @@ function createLooker(config: UpdateConfig, feed: Feed, events: LookEvents) {
       looking = undefined
       cancel?.()
     },
-    install: () => updater?.quitAndInstall(),
+    /** Quits into the downloaded update; false when no updater can. */
+    install: () => {
+      if (updater === undefined) return false
+      updater.quitAndInstall()
+      return true
+    },
   }
 }
 
@@ -221,7 +226,8 @@ export function createUpdates(initial: boolean, save: (enabled: boolean) => void
     },
     start: () => { if (enabled) timer = setTimeout(background, 30_000) },
     stop: () => { enabled = false; clearTimeout(timer); looker?.reset() },
-    restart: () => { if (state.kind === 'ready') looker?.install() },
+    /** Restart to update: quits into the downloaded update, and says whether it did. */
+    install: () => state.kind === 'ready' && (looker?.install() ?? false),
     /** "Download the new version". Answers at once; the state moves on through `updates.changed`. */
     download: () => {
       const release = found

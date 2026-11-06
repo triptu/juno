@@ -244,7 +244,7 @@ app.whenReady().then(() => {
   })
   const fakeSlackOrigin = fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin
   registerIpc({
-    updates: { ...updates, restart: () => void huddleQuit.confirm('restart').then((ok) => ok && updates.restart()) },
+    updates: { ...updates, restart: () => void huddleQuit.confirm('restart', updates.install) },
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
@@ -333,6 +333,7 @@ app.on('window-all-closed', () => {
 
 /** The engine finishing its last requests as the app quits; undefined once it has exited. */
 let engineStopping: Promise<void> | undefined
+
 app.on('before-quit', (event) => {
   if (event.defaultPrevented) return // held for the huddle question (huddleQuit.ts)
   activity.stop()

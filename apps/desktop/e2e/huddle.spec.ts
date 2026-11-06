@@ -225,11 +225,19 @@ syncedTest('start, mute and leave a huddle from the palette, with the Huddle men
 
   await test.step('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async () => {
     const attendeeId = await attendee(win)
+    const restartAsked = { title: 'Leave the huddle and restart?', detail: "You're in a huddle in #eng.", confirm: 'Restart' }
+    const quitAskedFor = { title: 'Leave the huddle and quit?', detail: "You're in a huddle in #eng.", confirm: 'Quit' }
 
-    // ⌘Q, the menu's Quit and the Dock's Quit all start the same app quit. Cancel keeps the huddle.
+    // Restart to update asks the same. With no update ready nothing restarts, and the huddle goes on.
+    await answerQuit(app, 'confirm')
+    await win.evaluate(() => window.juno.updates.restart())
+    await expect.poll(() => quitAsked(app)).toEqual([restartAsked])
+    await expect(bar).toBeVisible()
+
+    // ⌘Q, the menu's Quit and the Dock's Quit all start the same app quit. It asks again, and Cancel keeps the huddle.
     await answerQuit(app, 'cancel')
     await app.evaluate(({ app: electron }) => electron.quit())
-    await expect.poll(() => quitAsked(app)).toEqual([{ title: 'Leave the huddle and quit?', detail: "You're in a huddle in #eng.", confirm: 'Quit' }])
+    await expect.poll(() => quitAsked(app)).toEqual([restartAsked, quitAskedFor])
     await expect(bar).toBeVisible()
     expect(await connection(win)).toBe('connected')
     expect(fake.calls.filter((call) => call.method === 'rooms.leave')).toHaveLength(1)

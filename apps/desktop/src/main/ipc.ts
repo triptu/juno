@@ -81,7 +81,8 @@ const shareSources = createScreenShareSources(e2e)
 export const huddleSettingsForTests = { microphoneSettingsOpened: () => microphoneSettingsForTests.opened, ...shareSources.testHooks }
 
 export interface IpcDeps {
-  readonly updates: Updates
+  /** The updater, with Restart to update asking about a huddle first (`huddleQuit.ts`). */
+  readonly updates: Updates & { readonly restart: () => void }
   readonly supervisor: EngineSupervisor
   /** The agent's supervisor; absent while the agent is off. */
   readonly agent: AgentSupervisor
