@@ -219,6 +219,7 @@ syncedTest('start, mute and leave a huddle from the palette, with the Huddle men
     await expect.poll(() => windowState(app)).toBe('shown')
     await expect(bar).toBeVisible()
     expect(await connection(win)).toBe('connected')
+    // Settled: the page answered, so it never died, and only a dead page would have made the engine send a leave.
     expect(fake.calls.filter((call) => call.method === 'rooms.leave')).toHaveLength(1)
   })
 

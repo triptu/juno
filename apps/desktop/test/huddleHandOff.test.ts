@@ -61,8 +61,9 @@ describe('credentials that land', () => {
   })
 
   it('once the call has ended or names someone else are acknowledged', () => {
-    expect(play(2, [call('joined', 'A'), call('idle', null)], creds('A')).state.received).toBe('A')
-    expect(play(2, [call('joined', 'A'), call('joined', 'B')], creds('A')).state.received).toBe('A')
+    const acknowledged = { pending: undefined, holding: null, received: 'A', named: 'A' }
+    expect(play(2, [call('joined', 'A'), call('idle', null)], creds('A')).state).toEqual(acknowledged)
+    expect(play(2, [call('joined', 'A'), call('joined', 'B')], creds('A')).state).toEqual({ ...acknowledged, named: 'B' })
   })
 })
 
