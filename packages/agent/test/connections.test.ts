@@ -9,7 +9,7 @@ import { LITTLEBIRD, NOTION, T3, serveMcp } from '../src/mcp'
 import { slackTool } from '../src/mcp/catalogue'
 import { activityActions } from '../src/actions/activity'
 import { activityPage } from '../src/serve/pages'
-import { callTool, callsOf, closeAfter, closeConnections, connections, credentials, until, type ConnectionsOptions } from './connections-harness'
+import { callTool, callsOf, closeAfter, closeConnections, connections, credentials, findTools, until, type ConnectionsOptions } from './connections-harness'
 
 afterEach(closeConnections)
 
@@ -294,6 +294,33 @@ test("keeps the owner's tool switches, rules and the connection's identity acros
   expect(c.manager.definitions('notion').some((tool) => tool.name === 'notion-get-self')).toBe(false)
   expect(c.manager.rule('notion', 'notion-update-page')).toBe('always')
   expect(c.manager.rule('notion', 'notion-create-pages')).toBe('never')
+})
+
+test('a Connect click whose sign-in is still open holds no other card: a Littlebird write clicked meanwhile runs', async () => {
+  const lb = await startFakeLittlebird()
+  closeAfter(lb.close)
+  const notionServer = await startFakeNotion()
+  closeAfter(notionServer.close)
+  const base = credentials(lb.oauth.approve)
+  // The owner leaves the browser's sign-in page open: the callback never comes.
+  let signInOpen = false
+  const creds = { ...base, openAuthorization: async (url: string) => { if (!signInOpen) await base.openAuthorization(url) } }
+  const c = await connections({ credentials: creds, defaults: [{ ...LITTLEBIRD, url: lb.url }, { ...NOTION, url: notionServer.url }] })
+  await c.manager.authorize('littlebird')
+  await c.ask('What does the roadmap say in Notion?', findTools({ server: 'notion' }))
+  await c.ask('Keep this for later.', callTool('littlebird', 'add_material', { title: 'Plan', text: 'Ship on Tuesday.' }))
+  const connect = c.turns.actions.views().find((view) => view.card._tag === 'connect')
+  const note = c.turns.actions.views().find((view) => view.card._tag === 'change')
+  if (!connect?.binding || !note?.binding) throw new Error('No cards')
+  signInOpen = true
+  c.turns.actions.approve('click-connect', connect.binding.identity, connect.binding.children)
+  c.turns.actions.approve('click-note', note.binding.identity, note.binding.children)
+  await until((listener) => c.turns.actions.subscribe(listener), () => callsOf(lb, 'add_material').length === 1)
+  // The note landed while the sign-in was still open.
+  expect(c.manager.state('notion')).toBe('connecting')
+  await c.manager.disconnect('notion')
+  await c.turns.actions.idle()
+  expect(c.turns.actions.views().find((view) => view.card._tag === 'connect')?.card).toMatchObject({ status: { _tag: 'failed' } })
 })
 
 test('offers Notion, Littlebird and T3 Code, and adds a server by address that signs in only when it asks', async () => {
