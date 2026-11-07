@@ -73,8 +73,7 @@ it('engine: the old process exiting after give-up and restart leaves the new one
   const supervisor = new EngineSupervisor(engineConfig, () => {}, { ...deps, mark: () => {} })
   supervisor.start()
   const first = forked[0]!
-  first.emit('spawn')
-  first.emit('message', { _tag: 'ready' })
+  // The e2e hook gives up on a process that has not even reported its spawn yet.
   supervisor.giveUp()
   expect(first.killed).toBe(true)
   supervisor.restart()
