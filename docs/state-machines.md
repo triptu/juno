@@ -497,13 +497,13 @@ Where: `outbox` rows of kind `follow`, one per thread, present only while a comm
 |---|---|---|---|
 | none | command | txn 1: `thread_subs` set to the intent; `follow` row inserted | `follow.ts:159` |
 | pending | event or page about the thread | ignored; `seen` set | `subscriptions.ts:87`, l.171-179 |
-| pending | call ends | txn 2: row deleted; root lookup if `seen` | `follow.ts:123` |
-| pending | command fiber interrupted | no transition; the row stays (OUT-5) | |
+| pending | call ends | txn 2: row deleted; root lookup if `seen` | `follow.ts (setSubscribed)` |
+| pending | command fiber cut off during the call (window closed, `FollowNewJob` restarted) | txn 2: row deleted; root lookup in the background | `follow.ts (setSubscribed)`, `uninterruptibleMask` |
 | pending | `runSync` starts | row deleted | `packages/sync/src/sync.ts:149` |
 
-Invariant: the command that inserted the row also ends it. An interrupt breaks it (OUT-5).
+Invariant: the command that inserted the row also ends it, a cut-off one too: only the call is interruptible (OUT-5, fixed).
 
-Spec: `follow.qnt`, `follow-bounded.qnt`. Neither models an interrupt or a crash.
+Spec: `follow.qnt`, `follow-bounded.qnt`. A cut-off command takes `reject`'s path (the row ends, one lookup), so neither needs an interrupt action. Neither models a crash; sync start clears what one leaves.
 
 ### Follow new threads
 
@@ -1016,6 +1016,16 @@ The user can delete Q by hand.
 - Fix direction: in `discardPost` and `queueDelete` of a root with dependents, fail or remove rows whose `thread_ts = 'pending:' || cmid`, and drop the started thread.
 - Status: Fixed in 104da4db8. `discardStartedThread` removes the waiting replies, the started thread, its topic row and pending follow when the root is deleted or discarded. Spec: `discardedWith`, invariant `repliesFollowRoot`, pair `discardedRoot`. Test: `outbox.flow.test.ts`, "removes the replies and the thread of a started root the user deletes". A review of that fix found two delete paths it missed: a delete that waited on the root while its send was out, applied when the root came back to the queue or was refused, removed the root's row alone with raw SQL and left its replies and thread. The rule has one copy now, `applyWaitingActions` in `actions.ts`, which goes through `removePost`. Test: "removes the replies and the thread of a started root deleted while its send was out".
 
+#### OUT-5. A follow command cut off mid-call leaves its pending row
+
+1. The user clicks Subscribe. `setSubscribed` writes `thread_subs` and the `follow` outbox row, then calls `subscriptions.thread.add` (`packages/engine/src/follow.ts`).
+2. The window closes while the call is out. The RPC server interrupts every fiber of that port (`protocol/runner.ts`), and the command fiber ends between the call and `endPendingFollow`. `FollowNewJob`'s `switchMap` restarting its pass cuts an auto follow off the same way.
+3. The row stays. Every event and page about the thread is noted and ignored (`notePendingFollow`) until the next sync start clears it, so an unfollow from a phone does not show until then.
+
+- Severity: medium. Confirmed. Impact: The thread's follow state freezes until the next sync start.
+- Test: `packages/engine/test/flows/follow.flow.test.ts`. Hold the add's answer, close the window that sent the command, release, and expect the row gone, a lookup, and a later `thread_unsubscribed` to apply.
+- Status: Fixed in SHA_OUT5. The command runs under `uninterruptibleMask` with only the Slack call restored, so a cut-off command still ends its row and asks Slack in the background, as after a failure. The protocol is unchanged (`reject`'s path), so `follow.qnt` needs no new action. Test: `follow.flow.test.ts`, "a Subscribe whose window closes while Slack has the call still ends its pending row, so later news about the thread applies".
+
 #### OUT-6. Retry on a post that failed with file_not_staged can never succeed
 
 1. The user attaches a file and sends while it is still staging. The post's file JSON has `staging: true`.
@@ -1457,7 +1467,6 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | Id | Bug | Severity |
 |---|---|---|
 | ENG-6 | A refused interactive call during a pause calls `queue.pause` again through `withRetries`, which pushes `decayAt` out by 5 minutes each time (`packages/slack/src/client/queue.ts:103-104`, `api.ts:254-255`, `pacing.ts:42`). Departs from `requestqueue.qnt`, where only a real 429 is `limited`. | low |
-| OUT-5 | A follow command interrupted mid-call (window closed, or `FollowNewJob`'s `switchMap` restarting) leaves its `follow` row, so events and pages for the thread are ignored until the next sync start (`packages/engine/src/follow.ts:111-123`, `topics/handlers.ts:146` is not uninterruptible). `follow.qnt` has no interrupt action. | medium |
 | OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
 | REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
