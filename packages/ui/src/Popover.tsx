@@ -37,6 +37,8 @@ export interface PopoverProps {
    * The panel still hangs below or above the whole anchor.
    */
   readonly alignTo?: string
+  /** A selector for an ancestor the panel stays inside, edge to edge (a page's column), in place of its pane less a gap. */
+  readonly within?: string
   readonly children?: ReactNode
 }
 
@@ -59,10 +61,14 @@ function clipOf(node: HTMLElement): HTMLElement | undefined {
  * the rest scrolls. The boxes are read once, then written, before the
  * first paint.
  */
-function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
+function clamp(panel: HTMLElement, placement: PopoverPlacement, within: string | undefined): void {
   const clip = clipOf(panel)
-  const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth, top: 0, bottom: document.documentElement.clientHeight }
+  const pane = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth, top: 0, bottom: document.documentElement.clientHeight }
+  const column = within === undefined ? null : panel.parentElement?.closest(within)?.getBoundingClientRect()
+  // A column bounds the sides only: the height still comes from the pane.
+  const bounds = column == null ? pane : { left: column.left, right: column.right, top: pane.top, bottom: pane.bottom }
   const gap = Number.parseFloat(getComputedStyle(panel).getPropertyValue(EDGE_GAP)) || 0
+  const side = column == null ? gap : 0
   // A ref attached again (development's second pass) measures the panel where the first pass put it: take that
   // shift back, so every pass works from the panel's own place and writes the same answer.
   const shifted = Number.parseFloat(panel.style.translate) || 0
@@ -76,9 +82,9 @@ function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
     const own = Number.parseFloat(getComputedStyle(surface).maxHeight)
     if (!(own <= room)) surface.style.maxHeight = `${room}px`
   }
-  const room = bounds.right - bounds.left - 2 * gap
+  const room = bounds.right - bounds.left - 2 * side
   const width = Math.min(box.width, room)
-  const left = Math.max(bounds.left + gap, Math.min(box.left, bounds.right - gap - width))
+  const left = Math.max(bounds.left + side, Math.min(box.left, bounds.right - side - width))
   if (width < box.width) panel.style.maxWidth = `${width}px`
   // A narrowed panel keeps its right edge when right-anchored and its centre when centred; account for that before shifting.
   const narrowedLeft =
@@ -139,6 +145,7 @@ export function Popover({
   closeOnBlur = true,
   returnFocusTo = FOCUSABLE,
   alignTo,
+  within,
   children,
 }: PopoverProps) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -159,9 +166,9 @@ export function Popover({
       }
       const trigger = alignTo === undefined || !placement.endsWith('-start') ? null : root?.querySelector(alignTo)
       if (root && trigger) panel.style.left = `${trigger.getBoundingClientRect().left - root.getBoundingClientRect().left}px`
-      clamp(panel, placement)
+      clamp(panel, placement, within)
     },
-    [placement, alignTo],
+    [placement, alignTo, within],
   )
 
   useLayoutEffect(() => {

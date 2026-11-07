@@ -260,22 +260,21 @@ export function AllTopics({
   return (
     <div {...stylex.props(styles.page)}>
       <div {...stylex.props(styles.head)}>
-        <PageHeader
-          title="All topics"
-          size="compact"
-          subtitle="Everything you're part of, including quiet, resolved and unfollowed topics."
-          trailing={
+        <div {...stylex.props(styles.titleRow)}>
+          <div {...stylex.props(styles.titleText)}>
+            <PageHeader title="All topics" size="compact" subtitle="Everything you're part of, including quiet, resolved and unfollowed topics." />
+          </div>
+          <span {...stylex.props(styles.query)}>
             <TextField
               size={34}
               leadingIcon={MagnifyingGlass}
               placeholder="Filter by title or message"
-              width="search"
               label="Filter topics"
               value={query}
               onChange={(event) => onQueryChange(event.currentTarget.value)}
             />
-          }
-        />
+          </span>
+        </div>
         <div data-all-topics-filters="" {...stylex.props(styles.filters)}>
           <span {...stylex.props(styles.statusTabs)}>
             <Segmented
@@ -451,6 +450,24 @@ const styles = stylex.create({
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-subtle'],
+  },
+  // The title, with the filter field at the end. On a narrow page the field goes under the title and spans the
+  // controls' width, so both its edges line up with theirs.
+  titleRow: {
+    display: 'flex',
+    flexDirection: { default: 'row', [NARROW]: 'column' },
+    alignItems: { default: 'flex-end', [NARROW]: 'stretch' },
+    gap: spacing['--space-4'],
+  },
+  titleText: {
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
+  },
+  query: {
+    display: 'flex',
+    flexShrink: 0,
+    width: { default: layout['--search-field-width'], [NARROW]: 'auto' },
   },
   // The status tabs, then the other controls at the end; on a narrow window the controls wrap under the tabs, then onto more lines.
   // Compact, a grid of two columns: the status pop-up and Where take the rest, Kind and Sort share the second column, so
