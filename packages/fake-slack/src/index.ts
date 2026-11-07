@@ -42,6 +42,8 @@ export interface FakeSlackOptions {
   readonly enterpriseId?: string
   /** The workspace's name in place of "Juno Fake", as a seed of another company wants (`DEMO_TEAM_NAME`). */
   readonly teamName?: string
+  /** The team id in place of `TEAM.id`, for a second workspace beside the default one. */
+  readonly teamId?: string
 }
 
 export interface Credentials {
@@ -83,7 +85,7 @@ export class FakeSlack {
     const registry = mergeFeatures(features)
     const handlers = registry.methods satisfies Handlers
     const clock = new Clock(options.now ?? options.seedTime)
-    const named = options.teamName === undefined ? TEAM : { ...TEAM, name: options.teamName }
+    const named = { ...TEAM, ...(options.teamId === undefined ? {} : { id: options.teamId }), ...(options.teamName === undefined ? {} : { name: options.teamName }) }
     const team = options.enterpriseId === undefined ? named : { ...named, enterprise_id: options.enterpriseId, enterprise_name: 'Juno Fake Org' }
     const workspace = new Workspace(clock, SELF_ID, team)
     let fake: FakeSlack | undefined

@@ -46,17 +46,22 @@ export function connectionReporter(target: Registry): (state: 'connected' | 'dis
   }
 }
 
+/** How many times Restart was asked for. A port request made before the latest one may still answer `failed`, for the engine that was. */
+const restartsAtom = Atom.make(0).pipe(Atom.keepAlive)
+
 /** The engine over one port at a time, from main (the renderer) or a `MessageChannel` (tests). */
 export function configureConnection(target: Registry, connection: PortConnection): void {
   const report = connectionReporter(target)
   target.set(
     engineProtocolAtom,
     portProtocol({
-      acquire: () =>
-        connection.acquire().catch((cause: unknown) => {
-          if (cause instanceof EngineFailed) target.set(connectionStateAtom, 'failed')
+      acquire: () => {
+        const restarts = target.get(restartsAtom)
+        return connection.acquire().catch((cause: unknown) => {
+          if (cause instanceof EngineFailed && target.get(restartsAtom) === restarts) target.set(connectionStateAtom, 'failed')
           throw cause
-        }),
+        })
+      },
       onState: (state) => {
         connection.onState?.(state)
         report(state)
@@ -69,9 +74,10 @@ export function configureConnection(target: Registry, connection: PortConnection
  * The sidebar's Restart after the engine failed: main starts it again, and
  * the transport, which keeps asking for a port every second, connects to it.
  */
-export async function restartEngine(target: Registry): Promise<void> {
+export async function restartEngine(target: Registry, request: () => Promise<unknown> = requestEngineRestart): Promise<void> {
+  target.set(restartsAtom, target.get(restartsAtom) + 1)
   target.set(connectionStateAtom, 'reconnecting')
-  await requestEngineRestart()
+  await request()
 }
 
 export class EngineClient extends AtomRpc.Service<EngineClient>()('juno/state/EngineClient', {

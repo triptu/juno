@@ -78,10 +78,9 @@ class ChimeMediaSession implements MediaSession {
     let configuration: MeetingSessionConfiguration
     try {
       configuration = new MeetingSessionConfiguration(info.meeting, info.attendee)
-    } catch {
-      this.#store.update(startCall(''))
-      this.#store.update(setConnection({ state: 'ended', reason: 'failed', attendeeId: '', code: 'BadJoinInfo' }))
-      return
+    } catch (cause) {
+      // Rejected, not ended: an end names the call's attendee, and no call exists to name.
+      throw new Error('huddle-media: the join answer has no meeting Chime can use', { cause })
     }
     configuration.reconnectTimeoutMs = RECONNECT_TIMEOUT_MS
     const attendeeId = configuration.credentials?.attendeeId ?? ''
@@ -378,7 +377,12 @@ class ChimeMediaSession implements MediaSession {
       stream = await call.av.startAudioInput(null).catch(() => undefined)
       call.av.realtimeMuteLocalAudio()
     }
-    if (call.ended) return
+    if (call.ended) {
+      // The call ended before this start ran: `#end`'s stop went first through Chime's queue (a Voice Focus wrap in flight, or the fallback above), so release it here.
+      for (const track of stream?.getTracks() ?? []) track.stop()
+      void call.av.stopAudioInput().catch(() => {})
+      return
+    }
     this.#watchTrack(call, stream?.getAudioTracks()[0])
     call.av.realtimeSetCanUnmuteLocalAudio(access === 'granted')
     this.#store.update((s) => ({ ...s, microphoneAccess: access, devices: { ...s.devices, microphoneInUse: id } }))

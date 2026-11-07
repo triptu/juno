@@ -155,10 +155,13 @@ async function settle(recorder: DemoRecorder, workspace: Workspace): Promise<voi
 
 /** What the shell reads as it starts, whatever is on screen. Reading only, it warms no composer, ⌘K or huddle. */
 async function recordShell(recorder: DemoRecorder): Promise<void> {
-  await recorder.value(sessionStatus, undefined)
+  const session = await recorder.value(sessionStatus, undefined)
+  if (session._tag !== 'ready') throw new Error(`demo export: the session is ${session._tag}, not ready`)
   await recorder.value(sessionProfile, undefined)
   await recorder.value(engineStatus, undefined)
-  for (const key of ['tabs', 'tourSeen']) await recorder.value(prefsGet, { key })
+  // The tabs are read per workspace, keyed by the id the session carries.
+  await recorder.value(prefsGet, { key: 'tabs', workspace: session.workspaceId })
+  await recorder.value(prefsGet, { key: 'tourSeen' })
   // The chrome's and the rows' reads, idle here: no huddle or upload, notifications as they are, the workspace's emoji, nobody's presence shown.
   for (const route of [notificationsStatus, notificationsSettings, huddleRunning, uploadsProgress, mentionsEmoji, presencePeople]) await recorder.value(route, undefined)
 }

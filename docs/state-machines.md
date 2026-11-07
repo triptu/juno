@@ -563,8 +563,9 @@ States: `connecting`, `connected`, `reconnecting`, `failed`.
 |---|---|---|---|
 | any | port opens | connected | `transport.ts:57`, `client.ts:43-46` |
 | any | port scope closes | reconnecting if ever connected, else connecting | `transport.ts:43-48`, `client.ts:45` |
-| any | `acquire` rejects with `EngineFailed` | failed | `port.ts:78-80`, `client.ts:57` |
-| failed | sidebar Restart | reconnecting; then main's `supervisor.restart()` | `client.ts:72 (restartEngine)` |
+| any | `acquire` rejects with `EngineFailed`, no Restart since that request went out | failed | `port.ts:78-80`, `client.ts (configureConnection)` |
+| any | `acquire` rejects with `EngineFailed` for a request made before the latest Restart | unchanged (REN-6, fixed) | `client.ts (restartsAtom)` |
+| failed | sidebar Restart | reconnecting; `restartsAtom` counts up; then main's `supervisor.restart()` | `client.ts (restartEngine)` |
 
 The RPC pool retries the spawn forever, once a second (`Effect.retry(Schedule.spaced(1000))` in Effect's `RpcClient` `makeProtocolWorker`). Main answers each port request at once, even while the engine starts (`main/engine.ts:103-114`). So `connected` means "holds a port", not "engine ready".
 
@@ -585,7 +586,7 @@ Invariant: after a resubscribe, `applyListDelta` rebuilds rows from the `reset: 
 
 ### Tabs
 
-Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, per team, keepAlive), `savedTabsAtom` (l.586, `prefs.get('tabs')`, one atom for all teams), `tabsKnown` and `whenTabsKnown` (l.640-665), `updateTabs` (l.668), `saveTabsSoon` (l.612), `savedHomeDraftAtom` (l.594).
+Where: `tabsAtom` (`packages/state/src/tabs.ts`), `changedTabsAtom` (per team, keepAlive), `savedTabsAtom` (`prefs.get('tabs')` with the signed-in workspace's key, one subscription per workspace), `tabsKnown` and `whenTabsKnown`, `updateTabs`, `saveTabsSoon`, `savedHomeDraftAtom`.
 
 | Condition | `tabsAtom` value |
 |---|---|
@@ -597,7 +598,7 @@ Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, 
 
 Each tab holds a history (`entries`, `index`, at most 50). The strip keeps a `closed` list (at most 20). `updateTabs` writes `changedTabsAtom` and saves the whole set, Home drafts and Search sessions included, through `prefs.set`.
 
-Invariant: no change is applied before the saved tabs are known. The navigation queue waits for them (`whenTabsKnown`) before each step, so the step runs against the real tabs and its follow-up work (the selected topic, a fresh open's window and position, a background tab's window) sees the real result; `updateTabs` before that returns the tabs unchanged (REN-1, fixed). The variant across a workspace switch in the same run is still open, since the saved-tabs atom is shared across teams.
+Invariant: no change is applied before the saved tabs are known. The navigation queue waits for them (`whenTabsKnown`) before each step, so the step runs against the real tabs and its follow-up work (the selected topic, a fresh open's window and position, a background tab's window) sees the real result; `updateTabs` before that returns the tabs unchanged (REN-1, fixed). After a sign-in to another workspace in the same run its tabs are unknown again until its own pref answers, since each workspace's saved tabs are their own subscription, keyed by the workspace id the engine sends in `ReadySession` (REN-1 variant, fixed).
 
 ### Navigation queue
 
@@ -608,11 +609,11 @@ Where: `containers/navigation.ts`. A global promise `queue` and `enqueue` (l.275
 | `show(change, topic)` | takes a ticket; chains `whenReady(view)` before `apply` | `navigation.ts:305-330` |
 | ticket replaced before apply | change dropped (`tabs dropped`) | `navigation.ts:310`, l.328 |
 | `switchToTab` to a mounted tab, `changeTabs` with no topic | applied at once; ticket bumped | |
-| `whenReady` | resolves when the header and window are local, on a Failure, or on a null header; the `READY_WAIT_MS` (150 ms) timer only runs `check` again | `navigation.ts:221-270` |
+| `whenReady` | resolves when the header and window are local, on a Failure, on a null header, or after `READY_WAIT_MS` (150 ms) while the connection is `reconnecting` or `failed`; otherwise the timer only runs `check` again | `navigation.ts (whenReady)` |
 
 Invariants:
 1. A change asked for before a newer one never applies after it. A link open records the active tab, place and ticket before its fetch and opens nothing if any changed; a foreground link open also takes a request number (`latestRequest`), so of two link opens waiting together only the one clicked last opens, whichever answers first (REN-2, fixed).
-2. Every `whenReady` settles. REN-4 breaks it while the engine is down.
+2. Every `whenReady` settles: while the engine is down it settles after `READY_WAIT_MS` (REN-4, fixed).
 
 ### Topic composer send check
 
@@ -729,7 +730,7 @@ Invariants:
 2. A record is durable before its credentials leave the engine (`core.ts:252`).
 3. No join goes out while a same-workspace pending record exists or another workspace's media may run.
 4. The current call's own record is never sent as a leave (`toSend`, `toClear`).
-5. Every handed-out attendee is eventually acknowledged by the page, so its media can be proven stopped. HUD-4 still breaks it; HUD-2 is fixed.
+5. Every handed-out attendee is eventually acknowledged by the page, so its media can be proven stopped (HUD-2 and HUD-4, fixed).
 
 Spec: `huddle.qnt`.
 
@@ -799,14 +800,14 @@ States: `idle`, `connecting`, `connected`, `reconnecting`, `ended(reason)`.
 | From | Event | To | Code |
 |---|---|---|---|
 | idle | `join()` | connecting | `session.ts` |
-| connecting | bad join payload | ended(failed), `attendeeId: ''` (**bug** HUD-4) | `session.ts:79-85` |
+| idle | bad join payload | idle; `join` rejects (HUD-4, fixed) | `session.ts (join)` |
 | connecting | Chime connects | connected | |
 | connected | network loss | reconnecting, then connected or ended | |
 | any | `leave()` before the `Call` exists, before start, or after start (5 s timeout) | ended(left) | `session.ts:131-147` |
 
 Invariants:
 1. `#end` is idempotent (`session.ts:324-336`).
-2. After `#end`, no device stays captured. HUD-3 breaks it when a microphone start resolves after the end.
+2. After `#end`, no device stays captured: a microphone start in flight at the end is stopped by the `stopAudioInput` the end queued behind it, and one that starts after the end stops what it got (HUD-3, fixed).
 
 ### Smaller huddle machines
 
@@ -1306,7 +1307,7 @@ The same race applies to a device re-apply in flight when the call ends (`listDe
 - Severity: medium. Plausible: whether Chime's `stopAudioInput` cancels an in-flight start was not checked. Impact: The microphone stays captured, with the orange indicator, until reload. No audio is sent. It breaks Chime media session invariant 2.
 - Test: browser lane with a stubbed `getUserMedia` that resolves after `leave()`. `packages/huddle-media/test/` has no Chime harness.
 - Fix direction: when `call.ended` after the await, stop the returned stream's tracks and call `stopAudioInput()`.
-- Status: Open
+- Status: Fixed in 94a245c7a. `#applyMicrophone` stops the stream it got and calls `stopAudioInput()` again when the call ended before the microphone started. The trace above is not the case that leaks: Chime's device controller runs `startAudioInput` and `stopAudioInput` through one promise queue, so the `stopAudioInput()` `#end` makes while the prompt is up runs once the start resolves and stops its tracks. Test: `packages/huddle-media/test/microphone-after-leave.test.ts`, "a microphone granted after the user left is stopped, and the call stays ended", the real Chime session against a `getUserMedia` the test answers after `leave()`; it passes with and without the fix, which is the evidence for the queue. The case the fix covers is a start queued after that stop: the end lands while `#applyMicrophone` waits on Voice Focus's `wrap`, or the silent fallback after a failed start; the harness cannot reach it, since Voice Focus needs its model from Chime's CDN, so that path is read against `session.ts` only.
 
 #### HUD-4. A malformed join payload leaves the page holding an attendee forever
 
@@ -1318,7 +1319,7 @@ The same race applies to a device re-apply in flight when the call ends (`listDe
 - Severity: medium; low likelihood. Confirmed by reading. Impact: Huddles unusable until reload. It breaks call lifecycle invariant 5.
 - Test: DOM lane, with fake Slack returning a `rooms.join` whose Chime payload the fake media session rejects. The fake needs the same constructor check.
 - Fix direction: end with the credentials' attendee id, or make `join` reject.
-- Status: Open
+- Status: Fixed in 2d83d7c17. `join` rejects on a join answer Chime cannot use, and the page's `.catch` lets go of the attendee and reports it ended `failed`; the fake session rejects the same answers. Test: `apps/desktop/dom/huddle.test.ts`, "a join answer whose meeting Chime cannot use ends the call, and the next Start joins".
 
 ### Issue 5: Renderer applies stale results and loses tabs
 
@@ -1333,12 +1334,12 @@ Shared cause: renderer containers apply the result of an async step without chec
 5. From then on `tabsAtom` returns the changed set and never the saved one. The saved tabs, pins, history and closed list are out of reach for this run.
 6. `prefs.set` fails with `NotSignedIn` before the workspace opens (`prefs/handlers.ts:42-45`). The next `updateTabs` or `saveTabsSoon` (any Home keystroke, `tabs.ts:612`) after it opens overwrites `prefs.tabs` with the current tabs only. The old Home tabs' unsent drafts and destinations are deleted (`savedHomeDraftAtom` reads them from the same pref, `tabs.ts:594`).
 
-Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` is one atom for all teams and still holds A's value, so a change before B's pref answers saves A's tabs into B's pref.
+Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` was one query for all teams and still held A's value, so a change before B's pref answered saved A's tabs into B's pref. Fixed in 04bf52286: `prefs.get` takes a `workspace` key and the engine answers it only while that workspace is open, so the tabs read a subscription per workspace that can never carry another's answer. Test: `packages/engine/test/flows/tabs-workspaces.flow.test.ts`, "a tab change made just after signing in to another workspace neither shows the first workspace's tabs nor saves them there". Review found the renderer computed that key itself, from the session's team and enterprise ids, while the engine computed it from `auth.test` and the secrets; a difference would have held every navigation step forever, with nothing failing. Now `ReadySession` carries the engine's `workspaceId` and the tabs key on it, so only the engine computes the key. A `launch.json` session saved before this field has no key and is dropped at read, so the launch after the update waits for the engine's `ready` before its first frame, once.
 
 - Severity: medium-high. Confirmed. Impact: Open tabs, pins and Home drafts (unsent text the user wrote) are lost after a relaunch where the user acts quickly. The window is longer after an update migration or on a slow disk. It breaks the tabs invariant.
 - Test: DOM lane, `apps/desktop/dom/tabs-relaunch.test.ts`. Save tabs including a Home tab with a draft, relaunch, hold the workspace open, send ⌘T before the first sidebar row, then expect the saved tabs and the Home draft after load and in `prefs.tabs`.
 - Fix direction: gate `updateTabs` on a "saved tabs known" flag, or merge into the saved set once it arrives.
-- Status: Fixed in 8a94b311b. A change asked for before the saved tabs load waits for them. Test: `tabs-relaunch.test.ts`, "⌘T before the saved tabs have loaded opens the new tab beside them, and keeps the Home draft saved with them". The variant across a workspace switch is still open.
+- Status: Fixed in 8a94b311b. A change asked for before the saved tabs load waits for them. Test: `tabs-relaunch.test.ts`, "⌘T before the saved tabs have loaded opens the new tab beside them, and keeps the Home draft saved with them". The variant across a workspace switch is fixed above.
 - Review found two faults in that fix. The tabs reducer held the change and returned the tabs unchanged, so the caller's follow-up ran against no tabs: `apply` cleared the selected topic, a fresh open skipped its landing window and position, and a background open found no tab for its window; and a failed saved-tabs read kept every change held for the run. Fixed: the hold moved out of the reducer into the navigation queue, which waits for `whenTabsKnown` before each step (a failed read counts as known, so the app goes on with no tabs, as before 8a94b311b), and `updateTabs` before that returns the tabs unchanged. Test: `tabs-relaunch.test.ts`, "a topic clicked before the saved tabs have loaded opens in them once they load, and is the selected row".
 
 #### REN-2. A Slack link, source link or person link opens its topic seconds after the user moved on, and takes the tab and focus
@@ -1389,7 +1390,7 @@ A's own text is also lost, with no toast. Commands are not retried on transport 
 - Severity: medium-low. Confirmed. Impact: Settings and other pages seem not to open while sync is stopped, which is when the user may look for help, and then open late. It breaks navigation queue invariant 2.
 - Test: DOM lane, `apps/desktop/dom/strict-sync-failed.test.ts`. With the engine stopped, click an uncached topic, press ⌘,, and expect Settings to open.
 - Fix direction: give `whenReady` a hard limit, or skip waiting when the connection is not `connected`.
-- Status: Open
+- Status: Fixed in e7ecafff0. After `READY_WAIT_MS`, `whenReady` resolves without the header while the connection is `reconnecting` or `failed`, and follows the connection so a drop during the wait ends it too. Test: `apps/desktop/dom/strict-sync-failed.test.ts`, "while the engine is unreachable, a topic open does not hold Settings from opening after it".
 
 ### Issue 6: Main process supervisors and sign-out can hang or double up
 
@@ -1492,7 +1493,7 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | Id | Bug | Severity |
 |---|---|---|
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
-| REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
+| REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Confirmed. Fixed in 05e6797b6: a `failed` answer sets the state only when no Restart was asked for since that port request went out (`restartsAtom`). Test: `packages/state/test/connection.test.ts`, "a port request already out when Restart is pressed does not show the engine failed again". | low |
 | MAIN-6 | Sign-in answers carried no request id: after an engine crash during a keychain import, the import's `secrets` could be taken as the stored session, which was never written to `secrets.bin`. An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131), which stays as it is: the engine's check needs the cookie in the Slack session. Status: Fixed in da399658a. Every sign-in request carries an id the engine makes and main echoes; the engine waits for the answer with its id (`Session.ts`, `main/session.ts`, `contract/protocol.ts`). Test: `packages/engine/test/session.test.ts`, "ignores the answer to an import a crashed engine asked for, and starts signed out". | low |
 | MAIN-7 | `juno-provider.json` was written with a plain `writeFile` and `set()` calls were not serialized: a crash could leave invalid JSON, and a change made while the keychain held an earlier one was overtaken by it (a removal after a save left the endpoint active and its key in the keychain). Status: Fixed in b102aa59e. `set()` queues behind the previous change and the file goes through a temporary file and a rename (`main/providers.ts`). Test: `apps/desktop/test/providers.test.ts`, "a removal made while the endpoint is still being saved lands after it, in the keychain and the file". | low |
 | MAIN-8 | Smaller main items: `EngineSupervisor.pendingPorts` kept a destroyed renderer's port until the next `ready`; `codex.signIn` had no single-flight and its `codex login` child was not killed on quit; an MCP credential save wrote chunks before the count, so a save that stopped part way mixed old and new chunks. The `huddleQuit.confirmed` latch is HUD-5. Status: Fixed in caf2f6388. The engine supervisor drops a waiting renderer's port on its `destroyed` (as the agent supervisor already did); `codexHome` runs one sign-in and `stop()` kills its child from `before-quit`; a credential save drops the count before the chunks and writes it last. Tests: `apps/desktop/test/supervisors.test.ts`, "engine: a renderer closed while it waited for a port gets none at ready, and its port is closed"; `apps/desktop/test/codex.test.ts`, "two sign-in clicks run one codex login, and quitting ends it"; `apps/desktop/test/mcpCredentials.test.ts`, "a save that stops part way leaves no state rather than a mix of old and new chunks". A review of that fix found that a `stop()` during the sign-in's status check killed nothing, so the login still started after the quit began; `stop()` now marks the home stopped and kills the status child too, and the sign-in checks that after each wait (d195aefc4). Test: `apps/desktop/test/codex.test.ts`, "quitting while the sign-in is still checking the status starts no codex login". The same review found that the chunks an interrupted save left, with no count pointing at them, were never deleted: `clear` and a save's cleanup trusted the count. They now delete chunk by chunk until one is missing (b752d7030). Test: the same credentials test, which clears after the interrupted save and expects no item left. It also found that each port request made while a process was down left a `destroyed` listener on the window for good, in both supervisors; the held ports now live in `main/pendingPorts.ts`, which removes the listener when the port is sent, replaced or closed (b3fff88cc). Tests: `apps/desktop/test/supervisors.test.ts`, "engine: a renderer that waited for a port keeps no destroyed listener once the port is sent or replaced" and "agent: a renderer that waited for a port keeps no destroyed listener once the port is sent or dropped". | low |

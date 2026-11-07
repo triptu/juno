@@ -31,7 +31,7 @@ import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
-import { WorkControl, type WorkControlOptions } from '../workControl'
+import { observeLiveRead, WorkControl } from '../workControl'
 import { Workspace, type StoreServices } from '../workspace'
 import { keepSuggested, keepTopicOpen, renameTopic, reopenTopic, resolveTopic, restoreTopic, setChannelIgnored, setPinned } from '../topicActions'
 import { listAllTopics, matchQuery, summarizeAllTopics } from './allTopics'
@@ -51,15 +51,6 @@ const IGNORED_KEYS: InvalidationKeys = ['ignored_channels', 'conversations', 'me
 const IGNORABLE_KEYS: InvalidationKeys = ['ignored_channels', 'conversations']
 
 const encodeRow = Schema.encodeSync(Schema.toCodecJson(TopicListRow))
-
-/** The query, telling a test's `onLiveRun` when it has read and waiting while the test holds it there. */
-const observed = <A, E, R>(route: string, query: Effect.Effect<A, E, R>, control: WorkControlOptions): Effect.Effect<A, E, R> =>
-  control.onLiveRun === undefined
-    ? query
-    : Effect.tap(query, () => {
-        const hold = control.onLiveRun?.(route, 'read')
-        return hold === undefined ? Effect.void : Effect.promise(() => hold)
-      })
 
 /**
  * Query runs from the current store; nothing while no workspace is open.
@@ -82,7 +73,7 @@ function liveRuns<A>(
       if (open === undefined) return Stream.empty
       const opened = Effect.gen(function* () {
         const control = yield* WorkControl
-        const query = observed(route, yield* setup, control)
+        const query = observeLiveRead(route, yield* setup, control)
         // `Stream.tick` emits at once; the live query already runs at subscribe time.
         const minutes = Stream.tick(QUIET_TICK).pipe(Stream.drop(1), Stream.tap(() => Effect.sync(() => control.onLiveRun?.(route, 'tick'))))
         return liveQuery(keys, timed(query), { triggers: tick ? minutes : undefined })

@@ -247,3 +247,28 @@ async function joinAgain({ juno, fake }: Context): Promise<void> {
   await expect(bar).toBeHidden()
   await chimeDrops(win, fake, second!)
 }
+
+domTest('a join answer whose meeting Chime cannot use ends the call, and the next Start joins', async ({ juno, fake }) => {
+  const { win } = juno
+  const bar = barOf(juno)
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.expectTitle('Main')
+  await juno.sidebar.leave()
+  fake.control('breakJoinMeeting', { times: 1 })
+  await startHuddleFromMenu(juno)
+  // The page lets go of the attendee it was handed, so the call ends instead of joining forever.
+  await juno.expectToast('Lost the connection to the huddle')
+  await expect(bar).toBeHidden()
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.join').length).toBe(1)
+
+  // Slack still lists that huddle until Chime drops the attendee; once it is over, the page can start another.
+  fake.control('endHuddle', { channel: 'C0ENG' })
+  await expect(juno.sidebar.row('#eng').root.locator('[data-huddle-indicator]')).toHaveCount(0)
+  await startHuddleFromMenu(juno)
+  await expect(bar).toBeVisible()
+  await expect.poll(() => connection(win)).toBe('connected')
+  const attendeeId = await attendee(win)
+  await bar.getByRole('button', { name: 'Leave' }).click()
+  await expect(bar).toBeHidden()
+  await chimeDrops(win, fake, attendeeId!)
+})

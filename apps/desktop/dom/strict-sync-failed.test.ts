@@ -24,3 +24,16 @@ domTest('a boot Slack answers with data Juno cannot read shows the sync failure 
   expect(copied).toContain('Sync: failed (SlackDecodeError, client.userBoot)')
   expect(copied).toMatch(line)
 }, { synced: false })
+
+// With the engine gone, a topic never opened in this run cannot arrive. The open must not hold every later change.
+domTest('while the engine is unreachable, a topic open does not hold Settings from opening after it', async ({ juno, app }) => {
+  const online = app.engineOffline()
+  try {
+    await expect.poll(() => app.connection).toBe('reconnecting')
+    await juno.sidebar.row('#product').open()
+    await juno.openSettings()
+  } finally {
+    online()
+  }
+  await expect.poll(() => app.connection).toBe('connected')
+})

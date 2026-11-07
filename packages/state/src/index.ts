@@ -97,6 +97,7 @@ export {
   acknowledgeTopic,
   tabByNumber,
   tabsAtom,
+  TABS_PREF,
   tabShowing,
   tabShowingPlace,
   tabStripAtom,

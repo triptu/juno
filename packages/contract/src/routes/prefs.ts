@@ -3,8 +3,13 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 
-/** One workspace preference. Missing keys are null; values must be JSON. */
-export const prefsGet = liveValueRoute('prefs.get', { payload: { key: Schema.String }, value: Schema.Json })
+/**
+ * One workspace preference. Missing keys are null; values must be JSON. With
+ * `workspace` (a `ReadySession.workspaceId`), the engine answers only while
+ * that workspace is open, so a subscription keyed by it never carries another
+ * workspace's value.
+ */
+export const prefsGet = liveValueRoute('prefs.get', { payload: { key: Schema.String, workspace: Schema.optionalKey(Schema.String) }, value: Schema.Json })
 export const prefsSet = Rpc.make('prefs.set', {
   payload: { key: Schema.String, value: Schema.Json }, success: Schema.Void, error: NotSignedIn,
 })

@@ -43,6 +43,8 @@ interface Huddles {
   infoLagMs: number
   /** What `huddles/info` would have answered after each change, oldest first, while `infoLagMs` is set. */
   readonly listed: Array<{ readonly at: number; readonly huddles: ReadonlyArray<Listed> }>
+  /** How many more `rooms.join` answers carry a meeting without its media placement (`breakJoinMeeting`). */
+  brokenJoins: number
 }
 
 /** One running huddle as `huddles/info` lists it. */
@@ -60,7 +62,7 @@ const state = new WeakMap<Workspace, Huddles>()
 function huddlesOf(ws: Workspace): Huddles {
   const existing = state.get(ws)
   if (existing !== undefined) return existing
-  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0, arch: 'v2', leaveDelayMs: 1_000, emptyDelayMs: 3_000, statusExpiresAt: undefined, infoLagMs: 0, listed: [] }
+  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0, arch: 'v2', leaveDelayMs: 1_000, emptyDelayMs: 3_000, statusExpiresAt: undefined, infoLagMs: 0, listed: [], brokenJoins: 0 }
   state.set(ws, created)
   return created
 }
@@ -176,7 +178,8 @@ function running(fake: FakeSlack, channel: string): FakeHuddle {
  * (another user starts or joins), `leaveHuddle` (another user leaves) and
  * `endHuddle` (the huddle ends for everyone, as a room update with
  * `has_ended`). `setHuddleInfoLag` makes `huddles/info` answer from a
- * while ago, as Slack's edge does.
+ * while ago, as Slack's edge does. `breakJoinMeeting` makes the next
+ * `rooms.join` answers carry a meeting Chime cannot use.
  */
 export const huddlesFeature = {
   methods: {
@@ -191,6 +194,8 @@ export const huddlesFeature = {
       huddle.attendees.add(attendeeId)
       join(ws, conversation.id, ws.selfId)
       const host = 'fake-chime.invalid'
+      const broken = huddles.brokenJoins > 0
+      if (broken) huddles.brokenJoins -= 1
       return {
         call: {
           call_id: huddle.callId,
@@ -199,12 +204,16 @@ export const huddlesFeature = {
               MeetingId: `fake-meeting-${huddle.callId}`,
               ExternalMeetingId: `${ws.team.id}-${huddle.callId}`,
               MediaRegion: args.regions?.[0] ?? 'us-east-1',
-              MediaPlacement: {
-                AudioHostUrl: `${host}:3478`,
-                SignalingUrl: `wss://${host}/control`,
-                TurnControlUrl: `https://${host}/v2/turn_sessions`,
-                EventIngestionUrl: `https://${host}/v2/client-events`,
-              },
+              ...(broken
+                ? {}
+                : {
+                    MediaPlacement: {
+                      AudioHostUrl: `${host}:3478`,
+                      SignalingUrl: `wss://${host}/control`,
+                      TurnControlUrl: `https://${host}/v2/turn_sessions`,
+                      EventIngestionUrl: `https://${host}/v2/client-events`,
+                    },
+                  }),
             },
             // As recorded: team id, room id, user id.
             attendee: { AttendeeId: attendeeId, ExternalUserId: `${ws.team.id}-${huddle.callId}-${ws.selfId}`, JoinToken: 'fake-join-token' },
@@ -235,6 +244,10 @@ export const huddlesFeature = {
     },
   },
   controls: {
+    /** The next `times` `rooms.join` answers (default 1) carry a meeting without its media placement, which Chime's session rejects. */
+    breakJoinMeeting: (fake, input: { times?: number }) => {
+      huddlesOf(fake.workspace).brokenJoins = input.times ?? 1
+    },
     /** Self's huddle status expiry in epoch seconds, or null before any was set. */
     huddleStatus: (fake) => huddlesOf(fake.workspace).statusExpiresAt ?? null,
     /** `arch`, and on v2 the two delays (see `Huddles`). */

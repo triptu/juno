@@ -35,7 +35,7 @@ import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { JunoPage } from '@juno/agent-contract'
-import { mainTopicOf, PickConversation, prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
+import { mainTopicOf, PickConversation, prefsGet, prefsSet, SettingsSectionSchema, type ReadySession, type SettingsSection, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
@@ -583,7 +583,21 @@ const savedHomeDraft = (draft: HomeDraft) => ({
   ...(draft.thread === undefined ? {} : { thread: draft.thread }),
 })
 
-const savedTabsAtom = liveQuery(prefsGet)({ key: TABS_PREF })
+const savedTabsOf = (session: ReadySession) => liveQuery(prefsGet)({ key: TABS_PREF, workspace: session.workspaceId })
+
+const unknownTabs = AsyncResult.initial<never, never>()
+
+/**
+ * The signed-in workspace's saved tabs: a subscription per workspace, which
+ * the engine answers only while that one is open. One for every workspace
+ * would still hold the first workspace's answer after a sign-out and a
+ * sign-in to another in the same run, and a change made before the other's
+ * answer would save the first's tabs into it (REN-1).
+ */
+const savedTabsAtom = Atom.make((get) => {
+  const session = get(signedInAtom)
+  return session === undefined ? unknownTabs : get(savedTabsOf(session))
+})
 
 const savedHomeDraftsAtom = Atom.make((get): ReadonlyMap<string, HomeDraft> => {
   const saved = get(savedTabsAtom)
