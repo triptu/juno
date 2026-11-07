@@ -70,10 +70,8 @@ export {
   failStaging,
   failUpload,
   fileStaged,
-  fileUploaded,
   flushPosts,
   pendingPosts,
-  uploadedNames,
   postUnknown,
   queuePost,
   readPost,
@@ -84,6 +82,7 @@ export {
   type PendingPost,
   type PendingShare,
 } from './posts'
+export { fileUploaded, fileUploading, uploadedNames } from './uploads'
 export { type Acted } from './acted'
 export {
   actionDone,

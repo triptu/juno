@@ -321,6 +321,30 @@ it('sends files with their message, uploads each file once across Retry, and kee
   }
 })
 
+// Architecture 9 "Upload": a file's id is kept as soon as Slack has its bytes, so a completion whose answers
+// were lost is completed later, not uploaded again as a second file that no message shares.
+it('completes an upload whose completion answers were all lost, instead of making a second file in Slack', async () => {
+  const engine = await booted()
+  const rows = await opened(engine)
+  const unmount = engine.registry.mount(attachmentsAtom(MAIN))
+  try {
+    clearAttachments(engine.registry, MAIN)
+    await attachFiles(engine.registry, MAIN, [notes()])
+    const ids = readyFiles(engine.registry, MAIN)!
+    // Slack takes each completion, and the client's three attempts hear nothing: the post waits out the backoff.
+    engine.fake.loseResponse({ method: 'files.completeUpload', times: 3 })
+    valueOf(await sendMessage(engine.registry, eng, 'Lost completion', MAIN, ids))
+    await rows(settled('Lost completion'), 'sent once Slack answers a completion')
+    await quiet(engine)
+    expect(apiCalls(engine, 'files.getUploadURL')).toHaveLength(1)
+    expect(apiCalls(engine, 'files.completeUpload').map((call) => call.ok)).toEqual([false, false, false, true])
+    expect([...engine.fake.workspace.files.values()].filter((file) => file.name === 'notes.txt')).toHaveLength(1)
+    expect(engine.fake.messages('C0ENG').find((m) => m.text === 'Lost completion')?.files?.map((file) => file.name)).toEqual(['notes.txt'])
+  } finally {
+    unmount()
+  }
+})
+
 it('shows each kind of file someone else posts as something Juno can open, play or download', async () => {
   const engine = await booted()
   const at = (id: string, name: string) => `${engine.fake.url}/files/${id}/${name}`

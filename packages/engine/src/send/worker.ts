@@ -60,6 +60,7 @@ import {
   failStaging,
   failUpload,
   fileStaged,
+  fileUploading,
   fileUploaded,
   flushPosts,
   pendingPosts,
@@ -68,6 +69,7 @@ import {
   requeueUnsentPost,
   sentAt,
   storedMe,
+  type PendingFile,
   type PendingPost,
   type TopicFetcher,
 } from '@juno/sync'
@@ -122,11 +124,45 @@ export class PostWorker extends Context.Service<
       const wake = queue.wake
 
       /**
+       * One file up, as the official client does when a file is attached:
+       * `files.getUploadURL`, the bytes, `files.completeUpload`. The upload's
+       * id is written to the row once Slack has the bytes, so a completion
+       * whose answer is lost is completed next time, not uploaded again as a
+       * second file. Answers the file's id in Slack.
+       */
+      const uploadFile = (open: OpenWorkspace, row: PendingPost, file: PendingFile) =>
+        staging.read(open, file).pipe(
+          Effect.flatMap((bytes) =>
+            outbox.send((api) =>
+              Effect.gen(function* () {
+                const target = yield* api.call('files.getUploadURL', { filename: file.name, length: bytes.byteLength }, { reason: 'upload-queue' })
+                yield* api.upload(target.upload_url, { name: file.name, mimetype: file.mimetype, bytes }).pipe(
+                  // Slack's upload host answered but did not take the bytes: a failure the user retries, not a lost connection.
+                  Effect.catchIf(
+                    (error) => error.status !== undefined,
+                    (error) => Effect.fail(new SlackRejected({ method: 'upload', error: `upload_failed_${error.status}` })),
+                  ),
+                )
+                yield* inStore(open)(transaction(fileUploading(row.clientMsgId, file.id, target.file)))
+                yield* api.call('files.completeUpload', { files: [{ id: target.file, title: file.name }] }, { reason: 'upload-queue' })
+                return target.file
+              }),
+            ),
+          ),
+        )
+
+      /** Completes an upload Slack has the bytes of. A refusal (the upload expired, or Slack takes no second completion) uploads the file again. */
+      const completeUpload = (open: OpenWorkspace, row: PendingPost, file: PendingFile, uploadId: string) =>
+        outbox.send((api) => api.call('files.completeUpload', { files: [{ id: uploadId, title: file.name }] }, { reason: 'upload-queue' })).pipe(
+          Effect.as(uploadId),
+          Effect.catchTag('Rejected', () => inStore(open)(transaction(fileUploading(row.clientMsgId, file.id, undefined))).pipe(Effect.andThen(uploadFile(open, row, file)))),
+        )
+
+      /**
        * Uploads the files of a queued post that Slack does not have yet, one
-       * at a time, as the official client does when a file is attached:
-       * `files.getUploadURL`, the bytes, `files.completeUpload`. Each file's
-       * id is kept as soon as it is in Slack. Answers the post with every
-       * file id, or undefined when the post must wait or failed.
+       * at a time. Each file's id is kept as soon as it is in Slack. Answers
+       * the post with every file id, or undefined when the post must wait or
+       * failed.
        */
       const upload = (open: OpenWorkspace, row: PendingPost) =>
         Effect.gen(function* () {
@@ -137,25 +173,7 @@ export class PostWorker extends Context.Service<
           let files = row.files
           for (const file of row.files) {
             if (file.fileId !== undefined) continue
-            const result = yield* staging.read(open, file).pipe(
-              Effect.flatMap((bytes) =>
-                outbox.send((api) =>
-                  Effect.gen(function* () {
-                    const target = yield* api.call('files.getUploadURL', { filename: file.name, length: bytes.byteLength }, { reason: 'upload-queue' })
-                    yield* api.upload(target.upload_url, { name: file.name, mimetype: file.mimetype, bytes }).pipe(
-                      // Slack's upload host answered but did not take the bytes: a failure the user retries, not a lost connection.
-                      Effect.catchIf(
-                        (error) => error.status !== undefined,
-                        (error) => Effect.fail(new SlackRejected({ method: 'upload', error: `upload_failed_${error.status}` })),
-                      ),
-                    )
-                    yield* api.call('files.completeUpload', { files: [{ id: target.file, title: file.name }] }, { reason: 'upload-queue' })
-                    return target.file
-                  }),
-                ),
-              ),
-              Effect.result,
-            )
+            const result = yield* (file.uploadId === undefined ? uploadFile(open, row, file) : completeUpload(open, row, file, file.uploadId)).pipe(Effect.result)
             const now = yield* Clock.currentTimeMillis
             if (result._tag === 'Failure') {
               yield* progress.clear(row.clientMsgId)

@@ -393,6 +393,8 @@ stateDiagram-v2
 | queued | a file a restart forgot has every declared byte on disk | queued, the file complete (`fileStaged`) | | `staging.ts (recover)`, `worker.ts (staged)` |
 | queued | a file will never be staged (the composer could not read it, or a restart lost its bytes) | failed, without that file; its staged bytes released | | `posts.ts (failStaging)`, `worker.ts (staged)` |
 | queued | upload refused | failed | | `posts.ts (failUpload)`, `worker.ts (upload)` |
+| queued | Slack has a file's bytes | queued, the file's `uploadId` kept until `files.completeUpload` answers; a try that finds one completes that upload instead of uploading again | | `posts.ts (fileUploading)`, `worker.ts (uploadFile, completeUpload)` |
+| queued | completion of a kept upload refused | `uploadId` forgotten; the file goes up again in the same try | | `worker.ts (completeUpload)` |
 | queued | upload offline, 429 or no session | queued; attempt + 1; backoff | | `posts.ts:265 (deferPost)` |
 | queued | claim | sending; attempt + 1; `sent_posts` row; the request is built from the row the claim read | socket online (`worker.ts:212`) | `posts.ts (claimPost)`, `worker.ts (post)` |
 | sending | answer with a message | gone | | `fetcher.sent`, `posts.ts:305 (reconcilePost)` |
@@ -1040,6 +1042,16 @@ The user can delete Q by hand.
 - Fix direction: hide Retry for this code, or clear the flag when the staged file is complete on disk.
 - Status: Fixed in SHA_OUT6. A restart no longer loses a file whose declared bytes are all on disk: `Staging.recover` completes it as the last chunk would. A file whose bytes will never all come is dropped from the post (`failStaging`), its staged bytes released, and the row fails with `file_not_staged` as before, so Retry sends what the row shows (decision 2026-11-07 19:56). Test: `outbox.flow.test.ts`, "after a restart, sends a post that named a file still being read whose bytes are all on disk, and drops a file the restart lost so Retry sends the rest".
 
+#### OUT-7. Uploads can leave orphan private files in Slack
+
+1. A queued post's file goes up: `files.getUploadURL`, the bytes, `files.completeUpload`. Slack takes the completion, and every answer to it is lost (the client's three attempts). The worker defers the post (`Offline`).
+2. The next try starts over with `files.getUploadURL`: a second file in Slack. The message shares the second; the first stays as a private file no message shows. Measured with the fake: three lost completion answers gave two `files.getUploadURL` calls and two `notes.txt` files.
+3. Separately, a queued post deleted after some of its files got a `fileId` (`removePost`, `discardMessage`) makes no Slack call: those files stay private and unshared.
+
+- Severity: low. Confirmed. Impact: Private files in the user's Slack that no message shows, counted against the workspace's storage.
+- Test: `packages/engine/test/flows/outbox-copies.flow.test.ts`. Attach a file, lose every answer to `files.completeUpload`, and expect one `files.getUploadURL`, one file in Slack and the message sharing it.
+- Status: Step 1 and 2 fixed in SHA_OUT7. The upload's id is written to the row once Slack has the bytes (`fileUploading`); a try that finds one completes that upload instead of uploading again, and a completion Slack refuses forgets the id and uploads afresh, which is the old path. Whether real Slack accepts a second `files.completeUpload` for a file it already completed is unknown (`docs/research/slack-data-access.md`); the client already sends one when the first answer is lost, and a refusal costs one extra call, no extra file. Test: `outbox-copies.flow.test.ts`, "completes an upload whose completion answers were all lost, instead of making a second file in Slack". Step 3 is open: removing the files needs `files.delete`, which Juno has never called and the research has not observed; check it live in the private test channel before adding it.
+
 #### OUT-8. A newer mark can be delayed by an older mark's backoff
 
 1. A mark call for topic T is in flight.
@@ -1469,7 +1481,6 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | Id | Bug | Severity |
 |---|---|---|
 | ENG-6 | A refused interactive call during a pause calls `queue.pause` again through `withRetries`, which pushes `decayAt` out by 5 minutes each time (`packages/slack/src/client/queue.ts:103-104`, `api.ts:254-255`, `pacing.ts:42`). Departs from `requestqueue.qnt`, where only a real 429 is `limited`. | low |
-| OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
 | REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
 | MAIN-6 | Sign-in answers carry no request id: after an engine crash during a keychain import, the import's `secrets` can be taken as the stored session, which was never written to `secrets.bin` (`Session.ts:173-188`, `main/session.ts:47-52`, l.93). An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131). | low |
