@@ -26,6 +26,8 @@
 //   (`firstSent`: the draft sent first).
 // - An action call that failed goes again after a backoff, so it is a
 //   timed step and other calls can take the lane meanwhile (`retrying`).
+//   A post Slack rate-limited goes again after its Retry-After, likewise
+//   (`limited`); the model makes it due at once.
 // - A channel's action rows go in order. The user's change waits behind a
 //   copy's delete queued before it, and the other way round (`actFirst`:
 //   drafts whose own pending row came first).
@@ -43,7 +45,13 @@
 // A copy's delete whose try already waits for the send lane is checked
 // again only when the lane frees, so the engine keeps the copy then; the
 // model keeps it at its next step. The kept message is not deleted
-// elsewhere while a copy is hidden and a call holds the lane.
+// elsewhere while a copy is hidden and a call holds the lane. The action
+// worker waits in the lane with that try, so a change the user queues
+// meanwhile, in any channel, is not run until the lane frees, while the
+// model runs it at once (`copyTry`: a try may be in the lane). A change
+// queued and replaced during that wait would then go out once in the
+// engine and twice in the model, so the user queues no change while a try
+// may be in the lane.
 //
 // The model's pending edit or delete follows `kept` to the copy when the
 // kept message is deleted elsewhere; the engine's targets the message the
@@ -53,7 +61,9 @@
 // another device (the model allows it; the engine answers NotFound).
 // Two workers waking at the same reconnect race for the lane, and a due
 // lookup races the catch-up, so no reconnect comes while both a post and an
-// action wait, or while a post is unknown (except the start after a crash).
+// action wait, or while a post is unknown. The start after a crash makes
+// every row due, so no crash comes while a post is sending: its lookup
+// would race the boot's catch-up.
 //
 // Only steps the harness can drive are taken. Left out: `page`,
 // `uploadFail` and `failLookup`, the catch-up deadline (`keepCopy` before
@@ -77,8 +87,10 @@ module outbox_conformance {
   var freed: str
   var firstSent: int
   var retrying: Set[int]
+  var copyTry: bool
+  var limited: Set[int]
 
-  action conformanceInit = all { init, lane' = List(), actFirst' = Set(), copyFrame' = Set(), closed' = false, by' = "init", freed' = "", firstSent' = 0, retrying' = Set() }
+  action conformanceInit = all { init, lane' = List(), actFirst' = Set(), copyFrame' = Set(), closed' = false, by' = "init", freed' = "", firstSent' = 0, retrying' = Set(), copyTry' = false, limited' = Set() }
 
   pure def postCall(k: int): str = if (k == 1) "post1" else "post2"
   pure def actCall(k: int): str = if (k == 1) "act1" else "act2"
@@ -92,7 +104,9 @@ module outbox_conformance {
   val postWorkerFree = drafts.forall(j => not(posting(j)) and not(hasLookup(j)))
   val actionWorkerFree = drafts.forall(j => not(actInFlight(j)))
   // The post worker's next row: due rows go in send order.
-  def postDue(j: int): bool = (s.row.get(j) == "queued" and s.due.contains(j)) or (s.row.get(j) == "unknown" and s.due.contains(j) and not(hasLookup(j)))
+  // A rate-limited post is not due until its Retry-After has passed (`limited`).
+  def postDue(j: int): bool = not(limited.contains(j)) and
+    ((s.row.get(j) == "queued" and s.due.contains(j)) or (s.row.get(j) == "unknown" and s.due.contains(j) and not(hasLookup(j))))
   def postTurn(k: int): bool = drafts.forall(j => j == k or firstSent != j or not(postDue(j)))
   // A message the user sees: a pending post, or a stored message not deleted elsewhere. Once the
   // first is deleted elsewhere, a copy kept beside it (for a reply) is shown, but the model's action
@@ -128,16 +142,23 @@ module outbox_conformance {
   // (a backoff, the 2 s before a lookup, the next try of a copy's delete).
   // The engine takes the first kind before a timer fires.
   val junoNow = canCatchUp or s.fetches.exists(f => f.kind == "catchup") or drafts.exists(k =>
-    canClaim(k) or canLookup(k) or s.request.get(k) == "dropped" or canRunAction(k) or canDropAction(k) or
+    (canClaim(k) and not(limited.contains(k))) or canLookup(k) or s.request.get(k) == "dropped" or canRunAction(k) or canDropAction(k) or
     canKeepNow(k) or canSeeCopy(k) or canPage(k))
-  val junoLater = drafts.exists(k => canWake(k) or canKeepLater(k) or (retrying.contains(k) and canRetryAction(k)))
+  val junoLater = drafts.exists(k => canWake(k) or canKeepLater(k) or (retrying.contains(k) and canRetryAction(k)) or (limited.contains(k) and canClaim(k)))
+  // The next try of a copy's delete can leave the free worker while a call
+  // holds the lane; it then waits in the lane, and the worker with it, until
+  // the lane frees, whether or not the copy is kept meanwhile.
+  def mayTry(k: int): bool = s.copyRow.get(k) == "hidden" and lane.length() > 0 and actionWorkerFree and not(copyHeld(k)) and
+    s.online and s.connected and s.inStep and not(keepReasonSeen(k) or unchecked(k))
+  val copyTryMaybe = copyTry or drafts.exists(k => mayTry(k))
 
-  action auxAll(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str, first: int, r: Set[int]): bool = all {
-    by' = step, lane' = l, actFirst' = a, copyFrame' = c, closed' = d, freed' = f, firstSent' = first, retrying' = r
+  action auxAll(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str, first: int, r: Set[int], lim: Set[int]): bool = all {
+    by' = step, lane' = l, actFirst' = a, copyFrame' = c, closed' = d, freed' = f, firstSent' = first, retrying' = r,
+    copyTry' = (l.length() > 0 and copyTryMaybe), limited' = lim
   }
   // No drop while a call waits for the lane: whether it left its worker before the drop is not observable.
   val dropSafe = lane.length() <= 1
-  action aux(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str): bool = auxAll(step, l, a, c, d, f, firstSent, retrying)
+  action aux(step: str, l: List[str], a: Set[int], c: Set[int], d: bool, f: str): bool = auxAll(step, l, a, c, d, f, firstSent, retrying, limited)
   action juno(l: List[str], a: Set[int], c: Set[int]): bool = aux("juno", l, a, c, closed, freed)
   action timed(l: List[str], a: Set[int], c: Set[int]): bool = aux("juno", l, a, c, closed, "")
   action world(l: List[str], a: Set[int], c: Set[int], d: bool): bool = aux("world", l, a, c, d, "")
@@ -151,13 +172,15 @@ module outbox_conformance {
       all { canWake(k), wake(k), timed(lane, actFirst, copyFrame) },
       all { canKeepLater(k), keepCopy(k), timed(lane, actFirst, copyFrame) },
       all { retrying.contains(k), canRetryAction(k), runAction(k),
-        auxAll("juno", lane.append(actCall(k)), actFirst, copyFrame, closed, "", firstSent, retrying.exclude(Set(k))) }
+        auxAll("juno", lane.append(actCall(k)), actFirst, copyFrame, closed, "", firstSent, retrying.exclude(Set(k)), limited) },
+      all { limited.contains(k), canClaim(k), claim(k),
+        auxAll("juno", lane.append(postCall(k)), actFirst, copyFrame, closed, "", firstSent, retrying, limited.exclude(Set(k))) }
     }
   }
 
   action junoStep = any {
     { nondet k = drafts.oneOf(); any {
-      all { canClaim(k), claim(k), juno(join(postCall(k), "post"), actFirst, copyFrame) },
+      all { canClaim(k), not(limited.contains(k)), claim(k), juno(join(postCall(k), "post"), actFirst, copyFrame) },
       all { canLookup(k), lookup(k), juno(lane, actFirst, copyFrame) },
       all { s.request.get(k) == "dropped", lost(k), aux("juno", without(postCall(k)), actFirst, copyFrame, closed, "post") },
       all { canRunAction(k), runAction(k), juno(join(actCall(k), "act"), actFirst, copyFrame) },
@@ -187,24 +210,27 @@ module outbox_conformance {
     val atPost = atSlack(postCall(k))
     val atAct = atSlack(actCall(k))
     any {
-      all { open, send(k), auxAll("world", lane, actFirst, copyFrame, closed, "", if (firstSent == 0) k else firstSent, retrying) }, all { open, retry(k), same }, all { open, discard(k), same },
-      all { open, shown(k), queueAction(k, kind), world(lane, first, copyFrame, closed) },
+      all { open, send(k), auxAll("world", lane, actFirst, copyFrame, closed, "", if (firstSent == 0) k else firstSent, retrying, limited) }, all { open, retry(k), same }, all { open, discard(k), same },
+      all { open, shown(k), not(copyTryMaybe), queueAction(k, kind), world(lane, first, copyFrame, closed) },
       all { atPost, accept(k, withEcho), same }, all { atPost, refuse(k, later), same }, all { atPost, drop(k), same },
       all { Set("accepted", "refused", "later").contains(s.request.get(k)), lost(k), ended("post", without(postCall(k)), actFirst) },
       all { answer(k), ended("post", without(postCall(k)), actFirst) },
-      all { refused(k), ended("post", without(postCall(k)), actFirst) },
+      // A rate-limited post waits out its Retry-After before the post worker claims it again.
+      all { refused(k), auxAll("world", without(postCall(k)), actFirst, copyFrame, closed, "post", firstSent, retrying,
+        if (s.request.get(k) == "later") limited.union(Set(k)) else limited) },
       all { resend(k), world(lane, actFirst, if (s.connected) copyFrame.union(Set(k)) else copyFrame, closed) },
       all { s.events.contains(k), echo(k), same },
       all { copyFrame.contains(k), observeCopy(k), world(lane, actFirst, copyFrame.exclude(Set(k)), closed) },
       all { actionWorkerFree, lane.length() == 0, not(copyHeld(k)), deleteCopy(k), same },
-      all { not(actPending(k)), not(s.copyRow.get(k) == "hidden" and lane.length() > 0), remoteChange(k, "gone"), same }, all { s.connected or not(copyUnseen(k)), remoteChange(k, "reply"), same },
+      // A message the user's own delete removed is not deleted elsewhere too.
+      all { not(actPending(k)), not(deleted(k)), not(s.copyRow.get(k) == "hidden" and lane.length() > 0), remoteChange(k, "gone"), same }, all { s.connected or not(copyUnseen(k)), remoteChange(k, "reply"), same },
       all { atAct, actAccept(k), same },
       all { actAnswer(k), ended("act", without(actCall(k)), if (s.stale.contains(k)) actFirst else actFirst.exclude(Set(k))) },
       // A lost answer to an edit that changed meanwhile: the client sends the old text again first (README).
       // A delete that replaced the edit is a new row with no backoff, so it goes at once.
       all { atAct, s.act.get(k) == "transit" or not(s.stale.contains(k)), actFail(k),
         auxAll("world", without(actCall(k)), actFirst, copyFrame, closed, "act", firstSent,
-          if (s.stale.contains(k) and s.actKind.get(k) == "delete") retrying else retrying.union(Set(k))) },
+          if (s.stale.contains(k) and s.actKind.get(k) == "delete") retrying else retrying.union(Set(k)), limited) },
       all { atAct, actRefuse(k), ended("act", without(actCall(k)), actFirst.exclude(Set(k))) },
       { nondet f = s.fetches.filter(f => f.kind == "lookup").oneOf(); all { finishFetch(f), same } },
       all { rare == 0, dropSafe, disconnect, world(lane, actFirst, Set(), closed) },
@@ -213,8 +239,9 @@ module outbox_conformance {
       all { goOnline, same },
       // A lookup that is due races the catch-up after a reconnect, so none is due then.
       all { not(drafts.exists(j => s.row.get(j) == "queued") and drafts.exists(j => s.act.get(j) == "waiting")),
-        closed or drafts.forall(j => s.row.get(j) != "unknown"), reconnect, world(lane, actFirst, copyFrame, false) },
-      all { rare == 0, open, not(s.connected), crash, auxAll("world", List(), actFirst, Set(), true, "", firstSent, Set()) },
+        drafts.forall(j => s.row.get(j) != "unknown"), reconnect, world(lane, actFirst, copyFrame, false) },
+      all { rare == 0, open, not(s.connected), not(drafts.exists(j => s.row.get(j) == "sending")), crash,
+        auxAll("world", List(), actFirst, Set(), true, "", firstSent, Set(), Set()) },
       all { rare == 0, open, seal, same },
       all { quiet, s' = { ...s, label: "idle" }, same }
     }
