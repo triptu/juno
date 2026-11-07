@@ -34,7 +34,6 @@ import { EmojiPicker, SheetLayer, StatusSheet as StatusSheetView, type StatusShe
 import { useEmojiSearchReady } from './useEmojiSearchReady'
 
 const searchIndex = { warmEmojiSearch, isEmojiSearchWarm }
-warmWorkspaceEmoji(emojiCatalog)
 
 /** A Clear after choice, or `keep`: the time the status already clears at. */
 type ClearAfter = StatusClearAfter | 'keep'
@@ -97,6 +96,8 @@ function useKeptExpiry(expiresAt: number | undefined): number | undefined {
 }
 
 export function StatusSheet({ onClose }: { readonly onClose: () => void }) {
+  // The chunk loads when idle, so the workspace's emoji are read once the sheet opens, not at startup.
+  warmWorkspaceEmoji(emojiCatalog)
   const draft = useDraft()
   const { emoji, text, clearAfter, keep } = draft
   const [picking, setPicking] = useState(false)
