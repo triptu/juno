@@ -6,6 +6,9 @@
  *   object Slack sends (the boot's `self`, the edge `users/info` and
  *   `user_change`). It is null when they have none, and becomes null at
  *   `expiresAt`: the engine sends the change at that moment, so nothing polls.
+ * - `status.refresh` says the pointer rests on a person's avatar: the sync
+ *   asks Slack for their user object again when the stored one is more than
+ *   a few minutes old, so the tooltip shows their status as it is now.
  * - `status.set` sets or clears the user's own with `users.profile.set`.
  *   `clearAfter` is a choice the engine turns into a time, or `{ at }` to
  *   keep the time an existing status clears at.
@@ -15,7 +18,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveValueRoute } from '../live'
 
-export { STATUS_CLEAR_AFTER, STATUS_PRESETS, STATUS_TEXT_MAX, statusUntil, type StatusClearAfter } from '@juno/domain'
+export { STATUS_CLEAR_AFTER, STATUS_DEFAULT_EMOJI, STATUS_PRESETS, STATUS_TEXT_MAX, statusUntil, type StatusClearAfter } from '@juno/domain'
 
 /** The status's emoji: a standard emoji's text, or a custom emoji's image; neither when the workspace no longer has it. */
 export const StatusEmoji = Schema.Struct({
@@ -35,6 +38,9 @@ export type ProfileStatus = typeof ProfileStatus.Type
 
 export const statusOf = liveValueRoute('status.of', { payload: { userId: Schema.String }, value: Schema.NullOr(ProfileStatus) })
 
+/** Fire and forget: returns at once, and `status.of` brings any change. */
+export const statusRefresh = Rpc.make('status.refresh', { payload: { userId: Schema.String } })
+
 export const StatusClearAfterChoice = Schema.Union([Schema.Literals(['never', '30m', '1h', '4h', 'today', 'week']), Schema.Struct({ at: Schema.Number })])
 export type StatusClearAfterChoice = typeof StatusClearAfterChoice.Type
 
@@ -48,4 +54,4 @@ export const statusSet = Rpc.make('status.set', {
   error: StatusError,
 })
 
-export const StatusRoutes = RpcGroup.make(statusOf, statusSet)
+export const StatusRoutes = RpcGroup.make(statusOf, statusRefresh, statusSet)

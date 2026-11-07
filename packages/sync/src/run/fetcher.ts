@@ -4,7 +4,7 @@ import { applyActed } from '../acted'
 import { applyMembership, applyOpened, applySent } from '../events'
 import { applyRenamed } from '../metadata'
 import { fetchAt, fetchNewer, fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
-import { wantUsers } from '../users'
+import { refreshUsers, wantUsers } from '../users'
 import { fetchFullReactions } from '../whoReacted'
 import { queueTopicFiles } from './files'
 
@@ -83,6 +83,7 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
     sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
     acted: (acted, alongside) => applyActed(ctx, acted, alongside).pipe(Effect.provide(services)),
     wantUsers: (ids) => Effect.sync(() => wantUsers(ctx, ids)),
+    refreshUsers: (ids) => refreshUsers(ctx, ids),
     reactors,
   }
   return fetcher

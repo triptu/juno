@@ -4,8 +4,12 @@
  * `status.of` reads one person's status from the `users` row, which every
  * user object Slack sends keeps current (`@juno/sync` `upsertUsers`). A
  * status with an expiry is served until that moment and then as none: the
- * stream sleeps until `expiresAt` on the engine's clock and sends the
- * change, and a new run (the row changed) cancels the wait. Nothing polls.
+ * stream waits for `expiresAt` on the engine's clock and sends the change,
+ * and a new run (the row changed) cancels the wait. Nothing polls.
+ *
+ * `status.refresh` hands a hovered person to the sync (`refreshUsers`),
+ * which asks Slack for their user object when the stored one is old; the
+ * row it writes reaches `status.of` like any other change.
  *
  * `status.set` writes the user's own with `users.profile.set` on the send
  * lane, as `presence.set` is sent: one call that settles while the sheet
@@ -18,11 +22,14 @@ import { STATUS_DEFAULT_EMOJI, statusExpiry } from '@juno/domain'
 import { emojiUnicode, splitEmojiName } from '@juno/richtext'
 import { liveQuery, StoreReader, transaction } from '@juno/store'
 import { writeOwnStatus } from '@juno/sync'
-import { Clock, Duration, Effect, Result, Stream } from 'effect'
+import { Clock, Effect, PubSub, Stream } from 'effect'
 import { EngineConfig } from '../config'
 import { reactionEmoji, readEmoji } from '../emojiLookup'
 import { Outbox } from '../outbox'
-import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
+import { HostLink } from '../protocol/host'
+import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
+import { untilExpiry } from './expiry'
+import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
 
 interface StatusRow {
@@ -52,22 +59,6 @@ const emojiOf = (sql: StoreReader['Service'], name: string) =>
     return { name, ...reactionEmoji(name, cache) }
   })
 
-/**
- * A run whose status clears later, then the same run with no status at
- * that moment. One already past its expiry is sent as none.
- */
-const untilExpiry = <E>(run: Run<ProfileStatus | null, E>): Stream.Stream<Run<ProfileStatus | null, E>> => {
-  if (run._tag === 'Failure') return Stream.succeed(run)
-  const expiresAt = run.success.value?.expiresAt
-  if (expiresAt === undefined) return Stream.succeed(run)
-  const cleared: Run<ProfileStatus | null, E> = Result.succeed({ ...run.success, value: null })
-  return Stream.unwrap(
-    Effect.map(Clock.currentTimeMillis, (now) =>
-      now >= expiresAt ? Stream.succeed(cleared) : Stream.concat(Stream.succeed(run), Stream.fromEffect(Effect.as(Effect.sleep(Duration.millis(expiresAt - now)), cleared))),
-    ),
-  )
-}
-
 /** The expiry Slack takes, in epoch seconds (0 for never), from the sheet's choice and the engine's clock. */
 const expirationOf = (choice: StatusClearAfterChoice) =>
   Effect.map(Clock.currentTimeMillis, (now) => (typeof choice === 'string' ? statusExpiry(choice, new Date(now)) : Math.floor(choice.at / 1000)))
@@ -77,15 +68,22 @@ export const ProfileStatusHandlers = StatusRoutes.toLayer(
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const measure = (yield* EngineConfig).e2e
+    const sync = yield* SyncLink
+    // Main says when the Mac wakes; every expiry wait checks the clock then.
+    const wakes = yield* PubSub.unbounded<void>()
+    const fromMain = yield* (yield* HostLink).messages
+    yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => (message._tag === 'wake' ? PubSub.publish(wakes, undefined) : Effect.void)))
+    const onExpiry = untilExpiry(Stream.fromPubSub(wakes))
     return {
       'status.of': ({ userId }) =>
         serveLiveValue(
           workspace.changes.pipe(
             Stream.switchMap((open) => (open === undefined ? Stream.empty : liveQuery(['users', 'emoji'], timed(readStatus(userId))).pipe(Stream.provide(open.context)))),
-            Stream.switchMap(untilExpiry),
+            Stream.switchMap(onExpiry),
           ),
           { measure },
         ).pipe(retryFirstRun('status.of'), Stream.orDie),
+      'status.refresh': ({ userId }) => Effect.flatMap(sync.fetcher, (fetcher) => fetcher?.refreshUsers([userId]) ?? Effect.void),
       'status.set': ({ text, emoji, clearAfter }) =>
         Effect.gen(function* () {
           const open = yield* workspace.current

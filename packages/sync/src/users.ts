@@ -23,11 +23,17 @@
  * second later, so `chunks` asks again as Slack's client does. Ids in
  * `failed_ids` or `invalid_ids` are not asked for again in the session
  * (research section 10, "Users").
+ *
+ * A person's status is part of their user object, and Slack does not send
+ * every change (research section 3, "Profile status"). So when the pointer
+ * rests on someone's avatar, `refreshUsers` asks for their object again if
+ * Juno has not read it in the last five minutes of this session, in time
+ * for the tooltip (SPEC 7, "People").
  */
 import { SlackEdge, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import type { Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
-import { Deferred, Effect, Queue } from 'effect'
+import { Clock, Deferred, Effect, Queue } from 'effect'
 import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { reindexTopics } from './reindex'
 import { upsertUsers } from './write'
@@ -153,6 +159,8 @@ const chunks = (ctx: SyncContext, ids: ReadonlyArray<string>, lane: Lane): Effec
       // any still pending are left for the next sweep.
       for (let round = 1; asking.length > 0; round++) {
         const answer = yield* edge.usersInfo(asking, { lane })
+        const readAt = yield* Clock.currentTimeMillis
+        for (const user of answer.results) ctx.userRefresh.readAt.set(user.id, readAt)
         // Ids the edge does not know stay unknown; asking again every sweep would never answer differently.
         const unknown = [...(answer.failed_ids ?? []), ...(answer.invalid_ids ?? [])]
         for (const id of unknown) ctx.unknownUsers.add(id)
@@ -255,4 +263,55 @@ export const nameUsers = (ctx: SyncContext): Effect.Effect<never, SlackAuthRequi
         ),
       )
     }).pipe(Effect.catchTag('SqlError', (cause) => Effect.logError('sync: users not stored', { cause }))),
+  )
+
+/** How long a user object read from Slack counts as current for its status: a hover after this asks again. */
+export const USER_FRESH_MILLIS = 5 * 60_000
+
+/**
+ * Asks for the stored users among `ids` whose object Slack has not sent in
+ * the last `USER_FRESH_MILLIS` of this session, for a status about to show.
+ * Returns at once; `refreshStaleUsers` asks for them together. Each id is
+ * marked as asked for, so hovering on it again asks for nothing; a failed
+ * ask clears the mark.
+ */
+export const refreshUsers = (ctx: SyncContext, ids: ReadonlyArray<string>): Effect.Effect<void> =>
+  Effect.map(Clock.currentTimeMillis, (now) => {
+    let added = false
+    for (const id of ids) {
+      if (!USER_ID.test(id) || ctx.unknownUsers.has(id) || now - (ctx.userRefresh.readAt.get(id) ?? Number.NEGATIVE_INFINITY) < USER_FRESH_MILLIS) continue
+      ctx.userRefresh.readAt.set(id, now)
+      ctx.userRefresh.queued.add(id)
+      added = true
+    }
+    if (added) Queue.offerUnsafe(ctx.userRefresh.wanted, undefined)
+  })
+
+/**
+ * The fiber behind `refreshUsers`: waits `usersBatchMillis` so one call
+ * carries a sweep of the pointer over several avatars, then asks on the
+ * interactive lane. When Slack holds that lane back, or the call fails,
+ * nothing is retried: the marks clear and the next hover asks again.
+ */
+export const refreshStaleUsers = (ctx: SyncContext): Effect.Effect<never, SlackAuthRequired, UsersServices> =>
+  Effect.forever(
+    Effect.gen(function* () {
+      yield* Queue.take(ctx.userRefresh.wanted)
+      yield* Effect.sleep(ctx.config.usersBatchMillis)
+      const ids = [...ctx.userRefresh.queued]
+      ctx.userRefresh.queued.clear()
+      if (ids.length === 0) return
+      yield* fetchUsers(ctx, ids, 'interactive').pipe(
+        Effect.catchIf(
+          (error) => error._tag !== 'SlackAuthRequired',
+          (error) =>
+            Effect.andThen(
+              Effect.sync(() => {
+                for (const id of ids) ctx.userRefresh.readAt.delete(id)
+              }),
+              Effect.logWarning('sync: users not refreshed', { cause: error }),
+            ),
+        ),
+      )
+    }),
   )

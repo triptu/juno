@@ -592,10 +592,13 @@ export class FakeSlack {
   /**
    * Another user sets or clears their status (`emoji` as ":name:",
    * `expiration` epoch seconds, 0 for never) from their own client; every
-   * socket gets `user_change` with the whole user.
+   * socket gets `user_change` with the whole user, unless `quiet`: Slack
+   * sends a client that has not subscribed to the person only some of these
+   * (research section 3, "Profile status"), and then only a fresh user
+   * object (`users/info`) carries it.
    */
-  setStatus(input: { user: string; text: string; emoji: string; expiration?: number }): void {
-    this.workspace.setStatus(input.user, { text: input.text, emoji: input.emoji, expiration: input.expiration ?? 0 })
+  setStatus(input: { user: string; text: string; emoji: string; expiration?: number; quiet?: boolean }): void {
+    this.workspace.setStatus(input.user, { text: input.text, emoji: input.emoji, expiration: input.expiration ?? 0 }, input.quiet !== true)
   }
 
   /** The ids the open sockets subscribed to with their last `presence_sub`. */

@@ -29,8 +29,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
   const quietDays = quietDaysOf({ now: 0, quietDays: typeof saved === 'number' ? saved : config.quietDays })
   const session = yield* SlackSession
   const socket = yield* SlackSocket
-  // The user groups from the last boot until this one's `client.userBoot` answers, so a re-index before then
-  // counts group mentions as later ones do, and keeps the rows computed for the same user (`reindex.ts`).
+  // The last boot's user groups until this one's `client.userBoot` answers, so a re-index before then counts group mentions as later ones do (`reindex.ts`).
   const stored = yield* getSyncState<Me>(ME_KEY).pipe(Effect.orDie)
   const ctx: SyncContext = {
     me: stored?.userId === session.userId ? stored : { userId: session.userId as Me['userId'] },
@@ -51,6 +50,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     lateReactions: new Map(),
     fetchesInFlight: new Set(),
     usersInFlight: new Map(),
+    userRefresh: { readAt: new Map(), queued: new Set(), wanted: yield* Queue.sliding<void>(1) },
     metadata: new Set(),
     socket: { connected: false, epoch: 0, since: undefined },
     liveRoots: new Set(),

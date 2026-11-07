@@ -6,7 +6,7 @@
  */
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { statusOf, statusSet, type ProfileStatus, type StatusClearAfterChoice } from '@juno/contract'
+import { statusOf, statusRefresh, statusSet, type ProfileStatus, type StatusClearAfterChoice } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 
@@ -27,3 +27,14 @@ export const personStatusAtom = Atom.family((userId: string) =>
 /** Sets your status, or clears it with empty text and emoji. Settles once Slack has answered. */
 export const setOwnStatus = (registry: Registry, input: { readonly text: string; readonly emoji: string; readonly clearAfter: StatusClearAfterChoice }) =>
   runCommand(registry, statusSet, input)
+
+/**
+ * The pointer rests on a person's avatar: from now until `release` runs,
+ * their status is followed, and the sync asks Slack again when Juno's copy
+ * is a few minutes old, so the tooltip that opens after the delay shows it
+ * as it is now (SPEC 7, "People").
+ */
+export function preparePersonStatus(registry: Registry, userId: string): () => void {
+  void runCommand(registry, statusRefresh, { userId })
+  return registry.mount(personStatusAtom(userId))
+}

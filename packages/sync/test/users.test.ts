@@ -87,6 +87,7 @@ const context = (): Effect.Effect<SyncContext> =>
       lateReactions: new Map(),
       fetchesInFlight: new Set(),
       usersInFlight: new Map(),
+      userRefresh: { readAt: new Map(), queued: new Set(), wanted: yield* Queue.sliding(1) },
       metadata: new Set(),
       socket: { connected: true, epoch: 0, since: 0 },
       liveRoots: new Set(),
