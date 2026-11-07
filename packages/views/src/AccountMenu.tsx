@@ -211,7 +211,11 @@ function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { read
           <OptionRow
             {...props}
             active={row.active || sub.open}
-            trailing={<Icon icon={CaretRight} size={13} />}
+            trailing={
+              <span {...stylex.props(styles.caret)}>
+                <Icon icon={CaretRight} size={13} />
+              </span>
+            }
             onActivate={() => {
               row.onActivate()
               sub.hoverTrigger()
@@ -265,6 +269,12 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     minWidth: 0,
+  },
+  // The caret's glyph leaves empty room on its right. Pulled out by 52 of its 256 units, the tip's ink ends where the
+  // shortcut hints' ink does (measured at 2x, within half a pixel).
+  caret: {
+    display: 'inline-flex',
+    marginInlineEnd: `calc(${sizes['--icon-13']} * -52 / 256)`,
   },
   avatar: {
     position: 'relative',
