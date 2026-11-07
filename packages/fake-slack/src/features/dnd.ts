@@ -5,7 +5,8 @@
  * does; Slack's own client reads only `user` from them and asks again.
  * `setUserDnd({ user, dnd })` sets another user's pause (Unix seconds,
  * `{ next_dnd_start_ts, next_dnd_end_ts, snooze_endtime? }`; no `dnd`
- * clears it).
+ * clears it). `workspace.setSnooze(end)` changes the user's own snooze as
+ * another of their clients would.
  */
 import { ApiError } from '../methods.ts'
 import type { UserDnd } from '../state.ts'

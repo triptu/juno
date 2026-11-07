@@ -217,6 +217,12 @@ export class Workspace {
     this.emit({ type: 'dnd_updated_user', user: userId, event_ts: this.eventTs() })
   }
 
+  /** Sets self's snooze end in Unix seconds (undefined ends it) and sends `dnd_updated`, as Slack does when another of the user's clients changes it. */
+  setSnooze(end: number | undefined): void {
+    this.snoozeEnd = end
+    this.emit({ type: 'dnd_updated', user: this.selfId, event_ts: this.eventTs() })
+  }
+
   /** Self's snooze while it runs: its end in Unix seconds. */
   activeSnooze(): number | undefined {
     return this.snoozeEnd !== undefined && this.snoozeEnd > this.clock.now() / 1000 ? this.snoozeEnd : undefined
