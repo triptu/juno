@@ -26,7 +26,7 @@ export const PICTURE_RETRY_DELAYS_MS: ReadonlyArray<number> = [2_000, 8_000, 30_
 export interface PictureLoad {
   /** The `src` last loaded in full: shown under a new one while it loads. */
   readonly shownSrc: string | undefined
-  /** Whether `src` has failed and not loaded since: the broken glyph, over a retry in flight too. */
+  /** Whether `src` has failed and not loaded since: the broken glyph stays, over a retry in flight too. */
   readonly failed: boolean
   /** Changes with each try: the `<img>`'s key, so it remounts and fetches again. */
   readonly attempt: number
@@ -43,25 +43,29 @@ interface State {
   readonly shownSrc: string | undefined
   readonly failures: number
   readonly failed: boolean
+  /** A retry's `<img>` is mounted and has not answered yet: another trigger adds nothing. */
+  readonly trying: boolean
   readonly attempt: number
 }
 
+const fresh = (src: string, shownSrc: string | undefined): State => ({ src, shownSrc, failures: 0, failed: false, trying: false, attempt: 0 })
+
 export function usePictureLoad(src: string): PictureLoad {
-  const [state, setState] = useState<State>({ src, shownSrc: undefined, failures: 0, failed: false, attempt: 0 })
-  const current = state.src === src ? state : { ...state, src, failures: 0, failed: false, attempt: 0 }
+  const [state, setState] = useState<State>(() => fresh(src, undefined))
+  const current = state.src === src ? state : fresh(src, state.shownSrc)
   if (current !== state) setState(current)
 
   const retry = useCallback(() => {
-    setState((s) => (s.failed ? { ...s, failed: false, attempt: s.attempt + 1 } : s))
+    setState((s) => (s.failed && !s.trying ? { ...s, trying: true, attempt: s.attempt + 1 } : s))
   }, [])
   const onLoad = useCallback(() => {
-    setState((s) => ({ ...s, shownSrc: s.src, failures: 0, failed: false }))
+    setState((s) => ({ ...s, shownSrc: s.src, failures: 0, failed: false, trying: false }))
   }, [])
   // Set when the picture left view, or its effects were torn down (a hidden tab), while failed.
   const wasAway = useRef(false)
   const onError = useCallback(() => {
     wasAway.current = false
-    setState((s) => ({ ...s, failed: true, failures: s.failures + 1 }))
+    setState((s) => ({ ...s, failed: true, trying: false, failures: s.failures + 1 }))
   }, [])
 
   const { failed, failures } = current
