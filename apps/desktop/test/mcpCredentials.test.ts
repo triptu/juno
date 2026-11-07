@@ -62,6 +62,10 @@ it('a save that stops part way leaves no state rather than a mix of old and new 
   security.failWritesAfter(1)
   await expect(ask({ _tag: 'save', id: 'notion', state: JSON.stringify({ tokens: { access_token: 'n'.repeat(7000) } }) })).rejects.toThrow()
   expect(await ask({ _tag: 'load', id: 'notion' })).toBeNull()
+  // The owner disconnects the server: the old chunks, which no count points at any more, go too.
+  security.failWritesAfter(Number.POSITIVE_INFINITY)
+  await ask({ _tag: 'clear', id: 'notion' })
+  expect(security.items.size).toBe(0)
 })
 
 it('runs one connection’s writes in order', async () => {

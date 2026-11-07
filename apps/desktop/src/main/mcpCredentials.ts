@@ -11,7 +11,9 @@
  * to one connection run one at a time, so a save and a clear never interleave.
  * A save drops the count before it writes the chunks and sets it last, so a
  * save that stops part way (a kill, a locked keychain) leaves no state, never
- * a mix of old and new chunks: the agent signs the connection in again.
+ * a mix of old and new chunks: the agent signs the connection in again. The
+ * chunks such a save leaves have no count, so removals never trust the count:
+ * they delete chunk by chunk until one is missing.
  *
  * `open` shows an authorization URL in the system browser. pi-mcp finishes
  * sign-in only on a loopback redirect, which the agent listens on. Under
@@ -61,20 +63,24 @@ export function mcpCredentials({ keychain, open }: McpCredentialsOptions) {
     }
     return Buffer.from(parts.join(''), 'base64').toString('utf8')
   }
+  /** Removes the chunks from `from` up, until one is missing. */
+  const removeChunks = async (id: string, from: number) => {
+    for (let index = from; index < MAX_CHUNKS; index++) {
+      if (!(await item(`${id}.${index}`).remove())) return
+    }
+  }
   const save = async (id: string, state: string) => {
     const encoded = Buffer.from(state, 'utf8').toString('base64')
     const parts = encoded.match(new RegExp(`.{1,${CHUNK}}`, 'g')) ?? []
     if (parts.length === 0 || parts.length > MAX_CHUNKS) throw new Error('state too large')
-    const before = await count(id)
-    if (before > 0) await item(id).remove()
+    await item(id).remove()
     for (const [index, part] of parts.entries()) await item(`${id}.${index}`).write(part)
     await item(id).write(String(parts.length))
-    for (let index = parts.length; index < before; index++) await item(`${id}.${index}`).remove()
+    await removeChunks(id, parts.length)
   }
   const clear = async (id: string) => {
-    const n = await count(id)
     await item(id).remove()
-    for (let index = 0; index < n; index++) await item(`${id}.${index}`).remove()
+    await removeChunks(id, 0)
   }
   /** What main answers: the loaded state for `load`, else nothing. Throws on a refused request. */
   return async (request: CredentialRequest): Promise<string | null | undefined> => {

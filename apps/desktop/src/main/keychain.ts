@@ -19,7 +19,8 @@ export interface Keychain {
   /** The stored value, or undefined when there is none. */
   readonly read: () => Promise<string | undefined>
   readonly write: (value: string) => Promise<void>
-  readonly remove: () => Promise<void>
+  /** Resolves true when there was an item to remove. */
+  readonly remove: () => Promise<boolean>
 }
 
 /** Runs `security` with `args`, writing `stdin` if given. Resolves with its exit code and stdout. */
@@ -64,6 +65,7 @@ export function macKeychain({ service, account }: KeychainItem, run: SecurityRun
       const answer = await run(['delete-generic-password', '-s', service, '-a', account])
       // 44: no such item, which is the goal.
       if (answer.code !== 0 && answer.code !== 44) throw new Error('the keychain refused the delete')
+      return answer.code === 0
     },
   }
 }
@@ -77,7 +79,9 @@ export function memoryKeychain(initial?: string): Keychain {
       value = next
     },
     remove: async () => {
+      const had = value !== undefined
       value = undefined
+      return had
     },
   }
 }
