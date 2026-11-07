@@ -153,8 +153,11 @@ const styles = stylex.create({
     // zoom) the pane shrinks to nothing; its content must not paint over the
     // sidebar. `clip`, not `hidden`: a hidden box is a scroll container, and a
     // popover's field taking focus scrolled the whole pane, tab strip included,
-    // sideways to show it.
-    overflow: 'clip',
+    // sideways to show it. Only the x axis clips, as on the shell: clipping the
+    // y axis at the window's edge cuts Chromium's lazy-image margin, and a
+    // photo just below the fold never loads until it is scrolled to.
+    overflowX: 'clip',
+    overflowY: 'visible',
     backgroundColor: colors['--background'],
   },
   // The page and the Juno panel side by side under the strip. A named
