@@ -13,6 +13,7 @@
 import type { MessagePortMain, UtilityProcess, WebContents } from 'electron'
 import { Schema } from 'effect'
 import { Events, EngineToMain, type EngineConfig, type MainToEngine, type PortRequestResult } from '@juno/contract'
+import { PendingPorts } from './pendingPorts'
 import type { ProcessDeps } from './processDeps'
 import { restartBackoff } from './restartBackoff'
 
@@ -33,7 +34,7 @@ const decodeFromEngine = Schema.decodeUnknownSync(EngineToMain)
 export class EngineSupervisor {
   private child: UtilityProcess | undefined
   private state: SupervisorState = 'stopped'
-  private readonly pendingPorts = new Map<WebContents, MessagePortMain>()
+  private readonly pendingPorts = new PendingPorts()
   private readonly exits: Array<number> = []
   private readonly readyListeners = new Set<() => void>()
   private readonly failedListeners = new Set<() => void>()
@@ -86,8 +87,7 @@ export class EngineSupervisor {
         this.state = 'ready'
         this.send({ _tag: 'aiKey', key: this.aiKey })
         this.attempt = 0
-        for (const port of this.pendingPorts.values()) this.send({ _tag: 'port' }, [port])
-        this.pendingPorts.clear()
+        this.pendingPorts.flush((port) => this.send({ _tag: 'port' }, [port]))
         for (const listener of this.readyListeners) listener()
       } else {
         this.onMessage(message)
@@ -117,13 +117,7 @@ export class EngineSupervisor {
       this.send({ _tag: 'port' }, [port1])
     } else {
       // A renderer that asks again while waiting replaces its earlier request.
-      this.pendingPorts.get(target)?.close()
-      this.pendingPorts.set(target, port1)
-      target.once('destroyed', () => {
-        if (this.pendingPorts.get(target) !== port1) return
-        port1.close()
-        this.pendingPorts.delete(target)
-      })
+      this.pendingPorts.hold(target, port1)
     }
     target.postMessage(Events.enginePort, null, [port2])
     return 'sent'
@@ -169,8 +163,7 @@ export class EngineSupervisor {
     this.state = 'failed'
     this.end()
     // Renderers waiting on a port see it close and ask again, and get `failed`.
-    for (const port of this.pendingPorts.values()) port.close()
-    this.pendingPorts.clear()
+    this.pendingPorts.close()
     for (const listener of this.failedListeners) listener()
   }
 

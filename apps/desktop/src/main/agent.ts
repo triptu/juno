@@ -40,6 +40,7 @@ import { Schema } from 'effect'
 import { AgentToMain, type AgentConfig, type AgentProvider, type CredentialRequest, type HostHello, type MainToAgent, type SecretRequest } from '@juno/agent-contract'
 import { Events } from '@juno/contract/channels'
 import type { PortRequestResult } from '@juno/contract'
+import { PendingPorts } from './pendingPorts'
 import type { ProcessDeps } from './processDeps'
 import { restartBackoff } from './restartBackoff'
 
@@ -59,7 +60,7 @@ export class AgentSupervisor {
   private attempt = 0
   private restartTimer: NodeJS.Timeout | undefined
   /** Renderer ports asked for while the agent was not spawned, by renderer. */
-  private readonly pendingRendererPorts = new Map<WebContents, MessagePortMain>()
+  private readonly pendingRendererPorts = new PendingPorts()
   /** The active provider; the agent runs only while there is one. */
   private provider: AgentProvider | null = null
   /** The running process said it exits to install a restore. */
@@ -102,8 +103,7 @@ export class AgentSupervisor {
       this.send({ _tag: 'config', config: this.config })
       this.send({ _tag: 'provider', provider: this.provider })
       if (this.engineReady()) this.linkHost()
-      for (const port of this.pendingRendererPorts.values()) this.send({ _tag: 'rendererPort' }, [port])
-      this.pendingRendererPorts.clear()
+      this.pendingRendererPorts.flush((port) => this.send({ _tag: 'rendererPort' }, [port]))
     })
     child.on('message', (data: unknown) => {
       if (this.child !== child) return
@@ -197,13 +197,7 @@ export class AgentSupervisor {
       this.send({ _tag: 'rendererPort' }, [port1])
     } else {
       // A renderer that asks again while waiting replaces its earlier request.
-      this.pendingRendererPorts.get(target)?.close()
-      this.pendingRendererPorts.set(target, port1)
-      target.once('destroyed', () => {
-        if (this.pendingRendererPorts.get(target) !== port1) return
-        port1.close()
-        this.pendingRendererPorts.delete(target)
-      })
+      this.pendingRendererPorts.hold(target, port1)
     }
     target.postMessage(Events.agentPort, null, [port2])
     return 'sent'
@@ -224,8 +218,7 @@ export class AgentSupervisor {
 
   /** Closing the waiting ends makes each renderer ask again, and hear `failed`. */
   private dropPendingRendererPorts(): void {
-    for (const port of this.pendingRendererPorts.values()) port.close()
-    this.pendingRendererPorts.clear()
+    this.pendingRendererPorts.close()
   }
 
   private send(message: MainToAgent, ports?: Array<MessagePortMain>): void {
