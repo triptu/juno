@@ -90,11 +90,11 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, stati
   - AI assist (`sparkles`) — [proposed] right side is a switch; prototype shows nothing
   - separator
   - Switch workspace (`arrow-left-right`)
-  - Sign out (`log-out`)
+  - Sign out (`sign-out`) — "Signed in to Kestrel as alex" under the label (meta muted); disabled while the sign-out runs
 - Closes on Esc, outside click, or picking an item. Opened from the keyboard, the list takes focus, so ↓ works at once; opened with the pointer it does not, so no focus ring shows.
 - [built] Hide or Show message text, after Set yourself away or active.
 - [built 11-07] Pause notifications (with its submenu) and Resume notifications, after Notification settings.
-- [built M10] Header, Set yourself away or active, Notifications (with "Paused until 9am") and Settings ("⌘,", also Juno › Settings… in the app menu). AI assist, Switch workspace and Sign out as an item are not built; the Session block (with Sign out) stays under the items until they are: the account line, then Sign out under it, its text starting on the line's edge at the menu's inset. The diagnostics (build line, engine state, Ping engine) moved to Settings › About on 10-16. The line under the name is the workspace until presence is known. The away dot's ring is 1px.
+- [built M10] Header, Set yourself away or active, Notifications (with "Paused until 9am") and Settings ("⌘,", also Juno › Settings… in the app menu). AI assist and Switch workspace are not built. Sign out (`SignOut`) is the last item, after a hairline, with "Signed in to Kestrel as alex" (the team, its Enterprise Grid organisation in brackets, and your handle) under its label as a hint, meta muted, so both start in the label column; disabled while the sign-out runs. The diagnostics (build line, engine state, Ping engine) moved to Settings › About on 10-16. The line under the name is the workspace until presence is known. The away dot's ring is 1px.
 - [built 10-16] One active item, as in a native menu: the pointer and the arrow keys move the same highlight (`useMenuActive` in `@juno/ui`), and the pointer leaving the list clears it. Rows have no hover style of their own. Every OptionList (menus, the palette, @ suggestions, the view sheet, Home's destination list) works this way, and lists opt out of the title bar's drag region, which otherwise swallows the pointer over a menu that hangs off it.
 - [built 11-07] Set a status and your status, first in the list. The header carries no status: the row under it shows it. Gallery: `AccountMenu` › Status (`missing-emoji` for a long text with a missing custom emoji).
 

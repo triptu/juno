@@ -1,19 +1,15 @@
 import { defineFixtures, fixture } from '@juno/ui'
 import { AccountMenu } from './AccountMenu'
-import { SessionView } from './SessionView'
 
 const noop = () => {}
 
 // When each choice would end if picked at 2:30pm on a Thursday.
-const pauseEnds = { '30m': '3pm', '1h': '3:30pm', '2h': '4:30pm', tomorrow: '9am', nextWeek: 'Mon 9am' } as const
+const pauseEnds = { '30m': '3pm', '1h': '3:30pm', '2h': '4:30pm', tomorrow: 'Fri 9am', nextWeek: 'Mon 9am' } as const
 
-const base = { name: 'Tushar', initials: 'T', hue: 'cyan', workspace: 'juno-fake.slack.com', onAction: noop, sections: [] } as const
+const base = { name: 'Tushar', initials: 'T', hue: 'cyan', workspace: 'juno-fake.slack.com', onAction: noop } as const
 
-// The app's Session block: the account line and Sign out (containers/Session.tsx).
-const session = {
-  title: 'Session',
-  content: <SessionView teamName="Juno Fake" userName="tushar" onSignOut={noop} />,
-}
+// Sign out with who is signed in, as the app passes it once the session is ready (containers/AccountMenuContent.tsx).
+const session = { line: 'Signed in to Juno Fake as tushar', onSignOut: noop }
 
 export default defineFixtures(
   AccountMenu,
@@ -43,8 +39,9 @@ export default defineFixtures(
     Privacy: {
       on: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, privacy: true }),
     },
-    Sections: {
-      'with-session': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, sections: [session] }),
+    Session: {
+      'with-session': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, session }),
+      'signing-out': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, session: { ...session, signingOut: true } }),
     },
     Interaction: {
       'hover-item': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' } }, { hover: '[role="menuitem"]:nth-of-type(2)' }),

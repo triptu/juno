@@ -1,9 +1,9 @@
 import type { ProviderState, SignInFailed } from '@juno/contract'
-import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signOutCommand } from '@juno/state'
+import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom } from '@juno/state'
 import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { useEffect, type ReactNode } from 'react'
-import { SessionView, SignInView } from '@juno/views'
+import { SignInView } from '@juno/views'
 
 /** UI copy for a failed attempt (SPEC section 17: plain, one sentence, says what to do next). */
 function failureLine(error: SignInFailed): string {
@@ -44,15 +44,13 @@ function setUpAfterFirstSignIn(): void {
 }
 
 /**
- * Wires the session live value and the session commands to the sign-in and
- * session views. `signInFooter` goes at the foot of the sign-in page.
+ * Wires the session live value and the sign-in command to the sign-in page.
+ * `signInFooter` goes at the foot of it.
  */
 export function Session({ signInFooter }: { readonly signInFooter?: ReactNode }) {
   const status = useAtomValue(sessionStatusAtom)
   const importResult = useAtomValue(importFromSlackAppCommand)
-  const signOutResult = useAtomValue(signOutCommand)
   const importSession = useAtomSet(importFromSlackAppCommand)
-  const signOut = useAtomSet(signOutCommand)
   // Ask main now, so the answer is usually here by the time the owner presses a sign-in button.
   useEffect(() => registry.mount(agentProviderAtom), [])
   const failed = importResult.waiting ? undefined : errorOf(importResult)
@@ -63,17 +61,8 @@ export function Session({ signInFooter }: { readonly signInFooter?: ReactNode })
   if (status._tag !== 'Success') return null
   const value = status.value
 
-  if (value._tag === 'ready') {
-    return (
-      <SessionView
-        teamName={value.teamName}
-        userName={value.userName}
-        {...(value.enterprise?.name === undefined ? {} : { enterpriseName: value.enterprise.name })}
-        signingOut={signOutResult.waiting}
-        onSignOut={() => signOut(undefined)}
-      />
-    )
-  }
+  // Signed in: the account menu offers Sign out (`AccountMenuContent`).
+  if (value._tag === 'ready') return null
 
   const mode = value._tag === 'authRequired' ? 'expired' : 'first-run'
   return (

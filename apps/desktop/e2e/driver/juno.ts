@@ -582,7 +582,7 @@ export class AccountMenu implements AccountMenuVerbs {
   }
 
   get signOutButton() {
-    return this.root.locator('button', { hasText: whole('Sign out') })
+    return this.item(/^Sign out/)
   }
 
   /** Set yourself away or active, Hide message text, Notifications, Settings (inventory 2.1). */

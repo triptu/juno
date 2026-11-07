@@ -7,16 +7,21 @@ import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
+import { SignOut } from '@phosphor-icons/react/dist/icons/SignOut'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
-import { useEffect, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, type KeyboardEvent, type ReactNode } from 'react'
 import type { PauseChoice, StatusEmoji } from '@juno/contract'
 import { sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, SmileyPlus, Submenu, Text, lastInputWasKeyboard, useMenuActive, useSubmenu, type HueName, type PhosphorIcon } from '@juno/ui'
 import { EmojiFace } from './StatusLine'
 
-export interface AccountMenuSection {
-  readonly title: string
-  readonly content: ReactNode
+/** Who is signed in, under Sign out, and the way out. */
+export interface AccountSession {
+  /** "Signed in to Kestrel as alex". */
+  readonly line: string
+  /** True while the sign-out runs: the row is disabled. */
+  readonly signingOut?: boolean
+  readonly onSignOut: () => void
 }
 
 export type AccountMenuAction = 'status' | 'presence' | 'privacy' | 'notifications' | 'resume' | 'settings'
@@ -59,17 +64,20 @@ export interface AccountMenuProps {
   /** Privacy mode is on: the item offers Show message text instead of Hide (SPEC section 5). */
   readonly privacy?: boolean
   readonly onAction?: (action: AccountMenuAction) => void
-  /** Titled blocks under the items, separated by hairlines. */
-  readonly sections: ReadonlyArray<AccountMenuSection>
+  /** Sign out, after a hairline at the end, with the account line under it. None while the session is not ready. */
+  readonly session?: AccountSession | undefined
 }
 
 interface Item {
-  readonly id: AccountMenuAction | 'pause'
+  readonly id: AccountMenuAction | 'pause' | 'signOut'
   readonly leading: ReactNode
   readonly label: string
   readonly hint?: string
   /** The hint is a sentence ("Paused until Sun 9am"): on a second line, so the label is not cut. */
   readonly hintBelow?: boolean
+  /** A hairline above the row: Sign out, apart from the rest. */
+  readonly apart?: boolean
+  readonly disabled?: boolean
 }
 
 /** Slack's Pause notifications choices, in its order and words. */
@@ -82,6 +90,7 @@ const pauseItems: ReadonlyArray<{ readonly id: PauseChoice; readonly label: stri
 ]
 
 const PAUSE_ROW = 'account-pause'
+const SIGN_OUT_ROW = 'account-signOut'
 const pauseIds = pauseItems.map((item) => `account-pause-${item.id}`)
 
 const icon = (glyph: PhosphorIcon) => <Icon icon={glyph} size={15} />
@@ -93,9 +102,9 @@ const icon = (glyph: PhosphorIcon) => <Icon icon={glyph} size={15} />
  * Show message text (privacy mode), Notification settings and Settings
  * (both open Settings, at Notifications and at General), Pause
  * notifications (Slack's snooze, its choices in a submenu beside the menu)
- * or Resume notifications while snoozed, then the blocks the owner passes.
+ * or Resume notifications while snoozed, then Sign out with who is signed in.
  */
-export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, status, snoozed = false, snoozeLabel, pauseEnds, onPause, privacy = false, onAction, sections }: AccountMenuProps) {
+export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, status, snoozed = false, snoozeLabel, pauseEnds, onPause, privacy = false, onAction, session }: AccountMenuProps) {
   const avatar = <Avatar label={initials} name={name} hue={hue} size={32} {...(avatarUrl === undefined ? {} : { src: avatarUrl })} />
   return (
     <div {...stylex.props(styles.root)}>
@@ -115,28 +124,18 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
       />
       {onAction === undefined ? null : (
         <AccountItems
-          items={accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy, canPause: onPause !== undefined })}
+          items={accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy, canPause: onPause !== undefined, session })}
           onAction={onAction}
+          {...(session === undefined ? {} : { onSignOut: session.onSignOut })}
           {...(pauseEnds === undefined ? {} : { pauseEnds })}
           {...(snoozed || onPause === undefined ? {} : { onPause })}
         />
       )}
-      {sections.map((section) => (
-        <div key={section.title} {...stylex.props(styles.section)}>
-          <OptionSeparator />
-          <section aria-label={section.title} {...stylex.props(styles.block)}>
-            <Text variant="sectionLabel" tone="muted" as="h3">
-              {section.title}
-            </Text>
-            {section.content}
-          </section>
-        </div>
-      ))}
     </div>
   )
 }
 
-function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy, canPause }: Pick<AccountMenuProps, 'status' | 'presence' | 'paused' | 'snoozeLabel'> & { readonly snoozed: boolean; readonly privacy: boolean; readonly canPause: boolean }): ReadonlyArray<Item> {
+function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy, canPause, session }: Pick<AccountMenuProps, 'status' | 'presence' | 'paused' | 'snoozeLabel' | 'session'> & { readonly snoozed: boolean; readonly privacy: boolean; readonly canPause: boolean }): ReadonlyArray<Item> {
   // While snoozed, Resume says until when; the settings row says it only when the notification hours pause notifications.
   const settingsHint = snoozed || paused === undefined ? {} : { hint: paused, hintBelow: true }
   return [
@@ -157,6 +156,7 @@ function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy,
         ? [{ id: 'pause', leading: icon(BellSlash), label: 'Pause notifications' } as const]
         : []),
     { id: 'settings', leading: icon(Gear), label: 'Settings', hint: '⌘,' },
+    ...(session === undefined ? [] : [{ id: 'signOut', leading: icon(SignOut), label: 'Sign out', hint: session.line, hintBelow: true, apart: true, disabled: session.signingOut === true } as const]),
   ]
 }
 
@@ -165,10 +165,14 @@ function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy,
  * (`useSubmenu`): on a rest of the pointer, a click, → or Enter. The list takes focus when the menu opens from the
  * keyboard, so ↓ works at once.
  */
-function AccountItems({ items, onAction, onPause, pauseEnds }: { readonly items: ReadonlyArray<Item>; readonly onAction: (action: AccountMenuAction) => void; readonly onPause?: (choice: PauseChoice) => void; readonly pauseEnds?: Readonly<Record<PauseChoice, string>> }) {
-  const ids = items.map((item) => `account-${item.id}`)
+function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { readonly items: ReadonlyArray<Item>; readonly onAction: (action: AccountMenuAction) => void; readonly onSignOut?: () => void; readonly onPause?: (choice: PauseChoice) => void; readonly pauseEnds?: Readonly<Record<PauseChoice, string>> }) {
+  const ids = items.filter((item) => item.disabled !== true).map((item) => `account-${item.id}`)
   const select = (id: string) => {
     if (id === PAUSE_ROW) return
+    if (id === SIGN_OUT_ROW) {
+      if (ids.includes(id)) onSignOut?.()
+      return
+    }
     onAction(id.slice('account-'.length) as AccountMenuAction)
   }
   const menu = useMenuActive(ids, select)
@@ -196,7 +200,7 @@ function AccountItems({ items, onAction, onPause, pauseEnds }: { readonly items:
       label: below ? (
         <span {...stylex.props(styles.stack)}>
           {item.label}
-          <Text variant="meta" tone="muted" truncate>
+          <Text variant="meta" tone="muted" truncate {...(item.id === 'signOut' ? { role: 'status', 'aria-label': 'Session status' } : {})}>
             {item.hint}
           </Text>
         </span>
@@ -207,7 +211,15 @@ function AccountItems({ items, onAction, onPause, pauseEnds }: { readonly items:
       leadingOnFirstLine: below,
     }
     if (item.id !== 'pause' || onPause === undefined) {
-      return <OptionRow key={item.id} {...props} onActivate={() => sub.hoverOther(row.onActivate)} onSelect={() => select(id)} />
+      const option = item.disabled === true ? <OptionRow key={item.id} {...props} active={false} disabled /> : <OptionRow key={item.id} {...props} onActivate={() => sub.hoverOther(row.onActivate)} onSelect={() => select(id)} />
+      return item.apart === true ? (
+        <Fragment key={item.id}>
+          <OptionSeparator />
+          {option}
+        </Fragment>
+      ) : (
+        option
+      )
     }
     return (
       <Submenu
@@ -273,16 +285,5 @@ const styles = stylex.create({
     flexDirection: 'column',
     paddingBlockStart: `calc((${sizes['--control-32']} - ${text['--text-ui-size']} * ${text['--text-ui-leading']}) / 2)`,
     paddingBlockEnd: spacing['--space-1'],
-  },
-  section: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  block: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-2-5'],
-    paddingBlock: spacing['--space-2'],
-    paddingInline: spacing['--space-2'],
   },
 })

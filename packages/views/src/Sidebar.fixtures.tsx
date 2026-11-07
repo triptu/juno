@@ -356,9 +356,9 @@ export default defineFixtures(
             <AccountMenu
               {...account}
               workspace="juno-fake.slack.com"
-              sections={[
-                { title: 'Appearance', content: <GalleryAppearanceSettings layout="stack" onThemeChange={noop} onAccentChange={noop} /> },
-              ]}
+              presence={{ active: true, seen: true, label: 'Active' }}
+              onAction={noop}
+              session={{ line: 'Signed in to Juno Fake as tushar', onSignOut: noop }}
             />
           ),
         }),
