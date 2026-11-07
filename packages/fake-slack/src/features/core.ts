@@ -50,6 +50,7 @@ export const coreFeature = {
     received: (fake) => fake.received,
     selfPresence: (fake) => fake.selfPresence(),
     setPresence: (fake, i) => fake.setPresence(i),
+    setStatus: (fake, i) => fake.setStatus(i),
     presenceSubscriptions: (fake) => fake.presenceSubscriptions(),
     credentials: (fake) => fake.credentials(),
     signIn: (fake) => fake.signIn(),

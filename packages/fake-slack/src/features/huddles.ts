@@ -171,7 +171,7 @@ function running(fake: FakeSlack, channel: string): FakeHuddle {
  * removes it. Self leaves once they hold no attendee; the last one out ends
  * the huddle. Each change sends its room frame. The edge `huddles/info`
  * lists the running huddles of the channels asked for. `users.profile.set`
- * keeps self's huddle status expiry, the only profile field it takes.
+ * keeps self's huddle status expiry, or sets self's own status.
  *
  * Controls: `setHuddleArch`, `stopMedia` (Chime dropped self's attendee),
  * `huddleStatus` (self's status expiry), `startHuddle` and `joinHuddle`
@@ -222,8 +222,11 @@ export const huddlesFeature = {
         huddle: { id: huddle.callId, channels: [conversation.id], participants: [...huddle.participants], date_start: huddle.dateStart, created_by: huddle.createdBy },
       }
     },
+    // The huddle's expiry, or the user's own status (Slack sends `user_change` after it).
     'users.profile.set': (ctx, args) => {
-      huddlesOf(ctx.workspace).statusExpiresAt = args.profile.huddle_state_expiration_ts
+      const profile = args.profile
+      if ('huddle_state_expiration_ts' in profile) huddlesOf(ctx.workspace).statusExpiresAt = profile.huddle_state_expiration_ts
+      else ctx.workspace.setStatus(ctx.workspace.selfId, { text: profile.status_text, emoji: profile.status_emoji, expiration: profile.status_expiration })
       return {}
     },
     'rooms.leave': (ctx, args) => {

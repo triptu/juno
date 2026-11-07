@@ -83,9 +83,9 @@ import {
   FilesInfoArgs,
   FilesInfoFields,
 } from './files.ts'
-import { RoomsJoinArgs, RoomsJoinFields, RoomsLeaveArgs, RoomsLeaveFields, UsersProfileSetArgs, UsersProfileSetFields } from './huddles.ts'
+import { RoomsJoinArgs, RoomsJoinFields, RoomsLeaveArgs, RoomsLeaveFields } from './huddles.ts'
 import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
-import { AuthTestArgs, AuthTestFields, UsergroupsListArgs, UsergroupsListFields } from './users.ts'
+import { AuthTestArgs, AuthTestFields, UsergroupsListArgs, UsergroupsListFields, UsersProfileSetArgs, UsersProfileSetFields } from './users.ts'
 import {
   ThreadGetViewArgs,
   ThreadGetViewFields,

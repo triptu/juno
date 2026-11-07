@@ -589,6 +589,15 @@ export class FakeSlack {
     this.server.presenceChanged(input.users, input.presence)
   }
 
+  /**
+   * Another user sets or clears their status (`emoji` as ":name:",
+   * `expiration` epoch seconds, 0 for never) from their own client; every
+   * socket gets `user_change` with the whole user.
+   */
+  setStatus(input: { user: string; text: string; emoji: string; expiration?: number }): void {
+    this.workspace.setStatus(input.user, { text: input.text, emoji: input.emoji, expiration: input.expiration ?? 0 })
+  }
+
   /** The ids the open sockets subscribed to with their last `presence_sub`. */
   presenceSubscriptions(): ReadonlyArray<string> {
     return this.server.presenceSubscriptions()
