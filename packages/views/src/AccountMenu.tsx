@@ -7,7 +7,7 @@ import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import type { ReactNode } from 'react'
 import type { StatusEmoji } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import { sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, SmileyPlus, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
 import { EmojiFace } from './StatusLine'
 
@@ -73,7 +73,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
       : [
           status === undefined
             ? { id: 'status', leading: icon(SmileyPlus), label: 'Set a status' }
-            : { id: 'status', leading: status.emoji === undefined ? icon(SmileyPlus) : <EmojiFace emoji={status.emoji} size={16} />, label: status.text === '' ? 'Edit your status' : status.text, ...(status.until === undefined ? {} : { hint: status.until }) },
+            : { id: 'status', leading: status.emoji === undefined ? icon(SmileyPlus) : <span {...stylex.props(styles.statusFace)}><EmojiFace emoji={status.emoji} size={14} /></span>, label: status.text === '' ? 'Edit your status' : status.text, ...(status.until === undefined ? {} : { hint: status.until }) },
           presence?.active === false ? { id: 'presence', leading: icon(Sun), label: 'Set yourself active' } : { id: 'presence', leading: icon(Moon), label: 'Set yourself away' },
           privacy ? { id: 'privacy', leading: icon(Eye), label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', leading: icon(EyeSlash), label: 'Hide message text', hint: '⌃⌘H' },
           { id: 'notifications', leading: icon(Bell), label: 'Notifications', ...(paused === undefined ? {} : { hint: paused }) },
@@ -133,6 +133,16 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
 }
 
 const styles = stylex.create({
+  // The status emoji in the icons' column: a 14px emoji centred in the 15px box the row icons use, so it reads as
+  // the same size as a line icon and lines up with them.
+  statusFace: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: sizes['--icon-15'],
+    height: sizes['--icon-15'],
+  },
   root: {
     display: 'flex',
     flexDirection: 'column',
