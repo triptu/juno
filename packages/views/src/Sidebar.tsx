@@ -136,6 +136,8 @@ export interface SidebarProps {
    * set, or while privacy mode is on.
    */
   readonly status?: ReactNode
+  /** A downloaded update with Restart (`UpdateReady`), after the status card. The footer shows while it is set too. */
+  readonly update?: ReactNode
   /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
   readonly privacy?: boolean
   /** It is on because the screen is shared: the footer says so ("Message text hidden while sharing"). */
@@ -157,8 +159,9 @@ const ALL_PAGES: ReadonlyArray<SidebarNavTarget> = ['search', 'all-topics', 'hom
  * the Juno nav item, a
  * hairline, the quick filters with their dots and the Unread toggle, the
  * scope chip when scoped, the list the owner renders into it, and a footer
- * while there is something to say: the sync status card, while privacy
- * mode is on a card that says so with a Show button, and the note.
+ * while there is something to say: the sync status card, a downloaded
+ * update, while privacy mode is on a card that says so with a Show button,
+ * and the note.
  */
 export function Sidebar({
   titlebarLeading,
@@ -190,6 +193,7 @@ export function Sidebar({
   onToggleUnread,
   onClearScope,
   status,
+  update,
   privacy = false,
   privacySharing = false,
   onPrivacyOff,
@@ -371,9 +375,10 @@ export function Sidebar({
 
       {children}
 
-      {status !== undefined || privacy || note !== undefined ? (
+      {status !== undefined || update !== undefined || privacy || note !== undefined ? (
         <div {...stylex.props(styles.footer)}>
           {status}
+          {update}
           {privacy ? (
             <div role="status" data-privacy-footer="" {...stylex.props(styles.privacy)}>
               <Icon icon={EyeSlash} size={14} />
