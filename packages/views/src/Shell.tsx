@@ -77,7 +77,9 @@ const styles = stylex.create({
     display: 'flex',
     width: '100%',
     height: '100%',
-    overflow: 'hidden',
+    // Clips without being a scroll container: a hidden box still scrolls when something in it takes focus or
+    // asks to be shown, and the whole window would move sideways. The shell never scrolls.
+    overflow: 'clip',
     backgroundColor: colors['--background'],
     color: colors['--foreground-default'],
   },

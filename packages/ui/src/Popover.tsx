@@ -58,8 +58,12 @@ function clipOf(node: HTMLElement): HTMLElement | undefined {
 function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
   const clip = clipOf(panel)
   const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth, top: 0 }
-  const box = panel.getBoundingClientRect()
   const gap = Number.parseFloat(getComputedStyle(panel).getPropertyValue(EDGE_GAP)) || 0
+  // A ref attached again (development's second pass) measures the panel where the first pass put it: take that
+  // shift back, so every pass works from the panel's own place and writes the same answer.
+  const shifted = Number.parseFloat(panel.style.translate) || 0
+  const measured = panel.getBoundingClientRect()
+  const box = { left: measured.left - shifted, right: measured.right - shifted, width: measured.width, bottom: measured.bottom }
   const surface = panel.firstElementChild
   if (placement.startsWith('top') && surface instanceof HTMLElement) {
     // The panel's bottom is fixed to the anchor, so the room does not depend on what the panel holds yet.
@@ -75,7 +79,7 @@ function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
   const narrowedLeft =
     width === box.width ? box.left : placement === 'bottom-center' ? box.left + (box.width - width) / 2 : getComputedStyle(panel).right !== 'auto' ? box.right - width : box.left
   const shift = left - narrowedLeft
-  if (shift !== 0) panel.style.translate = `${shift}px 0`
+  panel.style.translate = shift === 0 ? '' : `${shift}px 0`
 }
 
 /** What can take focus in the anchor. */

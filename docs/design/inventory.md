@@ -25,7 +25,7 @@ All menu and popover triggers open on primary mouse-down, before release; pressi
 
 **Shows:** S01.
 
-- Two panes: sidebar on the left, 384px by default (`--sidebar-width`), resizable and collapsible (below); workspace fills the rest. Root is `display: flex; height: 100%; overflow: hidden`.
+- Two panes: sidebar on the left, 384px by default (`--sidebar-width`), resizable and collapsible (below); workspace fills the rest. Root is `display: flex; height: 100%; overflow: clip`. The shell, the workspace pane, the Juno panel's body and the peek clip with `clip`, never `hidden`: a hidden box is a scroll container, and a field in a popover taking focus scrolled the whole pane sideways to show it (decided 11-07).
 - Root text: 14px, line-height 1.5, letter-spacing 0.01em, `--font-sans`, colour `--foreground-default`, background `--background`.
 - Sidebar top bar: 44px, padding `0 10px 0 16px`, background `--background-subtle`. Traffic lights live here (Electron `titleBarStyle: 'hiddenInset'`; the prototype fakes them as 12px circles with 6px gaps). The bar is a drag region (`-webkit-app-region: drag`); each group of buttons inside is `no-drag` on its container, not on every button (performance.md 8.5).
 - Workspace top bar: the tab strip, 44px, also a drag region. Border-bottom 1px `--border-default`, background `--tab-strip`, a step below the sidebar (§4).

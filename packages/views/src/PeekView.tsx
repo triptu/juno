@@ -119,7 +119,7 @@ const styles = stylex.create({
     flexDirection: 'column',
     minWidth: 0,
     minHeight: 0,
-    overflow: 'hidden',
+    overflow: 'clip',
     overscrollBehavior: 'contain',
   },
   // Its start lines up with the avatars below: the list's even scrollbar inset, the focus ring's room and the row's own inset.
