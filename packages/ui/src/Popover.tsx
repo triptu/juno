@@ -57,17 +57,18 @@ function clipOf(node: HTMLElement): HTMLElement | undefined {
  */
 function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
   const clip = clipOf(panel)
-  const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth, top: 0 }
+  const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth, top: 0, bottom: document.documentElement.clientHeight }
   const gap = Number.parseFloat(getComputedStyle(panel).getPropertyValue(EDGE_GAP)) || 0
   // A ref attached again (development's second pass) measures the panel where the first pass put it: take that
   // shift back, so every pass works from the panel's own place and writes the same answer.
   const shifted = Number.parseFloat(panel.style.translate) || 0
   const measured = panel.getBoundingClientRect()
-  const box = { left: measured.left - shifted, right: measured.right - shifted, width: measured.width, bottom: measured.bottom }
+  const box = { left: measured.left - shifted, right: measured.right - shifted, width: measured.width, top: measured.top, bottom: measured.bottom }
   const surface = panel.firstElementChild
-  if (placement.startsWith('top') && surface instanceof HTMLElement) {
-    // The panel's bottom is fixed to the anchor, so the room does not depend on what the panel holds yet.
-    const room = Math.max(0, box.bottom - bounds.top - gap)
+  if (surface instanceof HTMLElement) {
+    // The panel's edge at the anchor is fixed, so the room does not depend on what the panel holds yet. The pane
+    // clips and never scrolls, so a panel taller than its room scrolls inside instead of running past the edge.
+    const room = Math.max(0, placement.startsWith('top') ? box.bottom - bounds.top - gap : bounds.bottom - box.top - gap)
     const own = Number.parseFloat(getComputedStyle(surface).maxHeight)
     if (!(own <= room)) surface.style.maxHeight = `${room}px`
   }
