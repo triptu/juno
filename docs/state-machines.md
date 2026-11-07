@@ -410,9 +410,9 @@ stateDiagram-v2
 | unknown | lookup refused for good (`thread_not_found`, `channel_not_found`, `is_archived`, `not_in_channel`; `LOOKUP_REFUSED`) | failed, `last_error` = the code | | `worker.ts (lookUp)` |
 | unknown | lookup fails for a transient reason, is refused with a code that does not decide the post (`invalid_cursor`, a code Slack adds later), is incomplete, or is `shared` and absent | unknown; attempt + 1; backoff | the lookup reads from the last claim (`sent_posts.sent_at`) | `posts.ts (deferLookup)`, `worker.ts (lookUp)` |
 | failed | Retry | queued | | `posts.ts:274 (retryPost)` |
-| failed | Delete draft | gone | | `posts.ts:277 (discardPost)` |
+| failed | Delete draft | gone; a `deleteFile` row per file it had uploaded, unless its lookup was refused because the channel was archived, left or removed (`MAYBE_IN_SLACK`: Slack may show it) | | `posts.ts (discardPost, removePost)`, `fileDeletes.ts` |
 | queued, failed | user edit | same state, text replaced | | `actions.ts:218 (queueEdit)` |
-| queued, failed | user delete | gone; for a New chat root, its waiting replies, started thread, topic row and pending follow go too | | `actions.ts (queueDelete)`, `posts.ts (removePost, discardStartedThread)` |
+| queued, failed | user delete | gone; for a New chat root, its waiting replies, started thread, topic row and pending follow go too; a `deleteFile` row per file the post, or a removed reply, had uploaded (OUT-7, fixed) | | `actions.ts (queueDelete)`, `posts.ts (removePost, discardStartedThread)`, `fileDeletes.ts` |
 | any | echo, page or lookup stores the cmid | gone | | `writeMessage` |
 | any | catch-up ends | due now | | `posts.ts:295 (flushPosts)` |
 
@@ -429,7 +429,7 @@ Spec: `outbox.qnt` (`claimWith`, `finishFetch`, `requeueWith`, `refuseFetch`, `d
 
 ### Action row
 
-Where: `outbox` rows of kind `edit`, `delete`, `react` and `broadcast`. Fields: `payload.failed`, `payload.stalled`, `rev` (edit), `want` and `base` (react), `depends_on`, `attempts`, `next_at`. Writers: `packages/sync/src/actions.ts`, `reactions.ts`, `broadcasts.ts`, `actionFailure.ts`. Driver: `packages/engine/src/send/actionWorker.ts:256 (pass)`.
+Where: `outbox` rows of kind `edit`, `delete`, `react` and `broadcast`, keyed by the channel, and `deleteFile`, keyed by the file's id. Fields: `payload.failed`, `payload.stalled`, `rev` (edit), `want` and `base` (react), `fileId` (deleteFile), `depends_on`, `attempts`, `next_at`. Writers: `packages/sync/src/actions.ts`, `reactions.ts`, `broadcasts.ts`, `actionFailure.ts`, `fileDeletes.ts`. Driver: `packages/engine/src/send/actionWorker.ts (pass)`.
 States: waiting (the post it depends on is not stored), ready, in flight, done (row deleted), deferred, failed (waits for Retry or Dismiss), dropped.
 
 | From | Event | To | Code |
@@ -443,10 +443,15 @@ States: waiting (the post it depends on is not stored), ready, in flight, done (
 | ready | call succeeds and the intent changed | ready again | `actions.ts:343` |
 | ready | transient error | deferred (attempts + 1) | `deferAction` |
 | ready | refusal | failed | `failAction` |
+| none | a post Slack has not got is removed with uploaded files | `deleteFile`, ready, one per file no other pending row names | `fileDeletes.ts (queueFileDeletes)` |
+| `deleteFile` ready | `files.delete` answers `ok`, `file_deleted` or `file_not_found` | done | `actionWorker.ts (run, alreadyDone)` |
+| `deleteFile` ready | transient error, 429, offline or no session | deferred (attempts + 1); dropped when the attempts are spent | `actionWorker.ts (settle, defer)` |
+| `deleteFile` ready | another refusal, or a defect | dropped | `actionWorker.ts (giveUp)` |
 
 Invariants:
 1. A stale answer never ends or fails a newer intent: `dropAction`, `deferAction` and `failAction` compare the payload, `actionDone` compares `rev` and `want`.
 2. A copy delete (`clientMsgId = null`, `dependsOn = null`) is rechecked while it holds the send lane (`checkCopyDelete`, `packages/sync/src/sent.ts:247`).
+3. A `deleteFile` row names only a file a removed post of Juno's uploaded, holds no channel's edits and deletes (`actionTarget`), and never becomes `failed`: nothing shows it or offers Retry, so it ends or is dropped.
 
 Spec: `outbox.qnt`.
 
@@ -1054,7 +1059,7 @@ The user can delete Q by hand.
 
 - Severity: low. Confirmed. Impact: Private files in the user's Slack that no message shows, counted against the workspace's storage.
 - Test: `packages/engine/test/flows/outbox-copies.flow.test.ts`. Attach a file, lose every answer to `files.completeUpload`, and expect one `files.getUploadURL`, one file in Slack and the message sharing it.
-- Status: Step 1 and 2 fixed in df01c17fb. The upload's id is written to the row once Slack has the bytes (`fileUploading`); a try that finds one completes that upload instead of uploading again, and a completion Slack refuses forgets the id and uploads afresh, which is the old path. Whether real Slack accepts a second `files.completeUpload` for a file it already completed is unknown (`docs/research/slack-data-access.md`); the client already sends one when the first answer is lost, and a refusal costs one extra call, no extra file. Test: `outbox-copies.flow.test.ts`, "completes an upload whose completion answers were all lost, instead of making a second file in Slack". Step 3 is open: removing the files needs `files.delete`, which Juno has never called and the research has not observed; check it live in the private test channel before adding it.
+- Status: Fixed. Steps 1 and 2 in df01c17fb: the upload's id is written to the row once Slack has the bytes (`fileUploading`); a try that finds one completes that upload instead of uploading again, and a completion Slack refuses forgets the id and uploads afresh, which is the old path. The live check of 2026-11-07 (`docs/research/slack-data-access.md`, "Files") saw Slack accept a second `files.completeUpload` for a file it had completed. Test: `outbox-copies.flow.test.ts`, "completes an upload whose completion answers were all lost, instead of making a second file in Slack". Step 3 in c07a4ccc1: `removePost` and `discardStartedThread` queue a `deleteFile` row per uploaded file (`fileDeletes.ts`, keyed by the file's id, skipped for a file another pending row still names), and `ActionWorker` sends `files.delete`, ended on `ok`, `file_deleted` or `file_not_found` (what the live check saw for a repeat and for an upload never completed), retried with backoff on transient errors, dropped when its attempts are spent since nothing offers Retry. Test: `outbox-files.flow.test.ts`, "deletes the uploaded file of a post the user deletes before Slack shares it" and "ends the delete when its first answer is lost and the retry hears file_deleted". A failed row whose lookup Slack refused with `channel_not_found`, `is_archived` or `not_in_channel` keeps its files (`posts.ts`, `MAYBE_IN_SLACK`): its answer was lost, so Slack may show the message, and deleting its files would empty a message people can still read. Test: "keeps the file of a post Slack may show when its lookup is refused because the channel was archived". A file whose completion answers were all lost is named by its `uploadId` until a completion is heard, and is deleted the same way (`fileDeletes.ts`, `slackIds`). Test: "deletes the file of a queued post whose completion answers were lost".
 
 #### OUT-8. A newer mark can be delayed by an older mark's backoff
 
