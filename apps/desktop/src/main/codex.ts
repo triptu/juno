@@ -5,10 +5,13 @@
  * with that home, which opens the browser, as the Codex README asks the
  * owner to do in Terminal. The agent keeps its own check
  * (`packages/agent/src/providers/codex/local.ts`); main may not import the
- * agent (architecture 3). Under JUNO_E2E the executable is `JUNO_E2E_CODEX`,
- * or none, so a developer's own Codex never shows in a test.
+ * agent (architecture 3). One sign-in runs at a time: a second click joins
+ * it. Quitting (`stop`) kills every Codex child, the status check included,
+ * and a sign-in still waiting on that check starts no login. The executable comes
+ * from `index.ts`: under JUNO_E2E it is `JUNO_E2E_CODEX`, or none, so a
+ * developer's own Codex never shows in a test.
  */
-import { execFile, spawn } from 'node:child_process'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CodexSetup } from '@juno/contract'
@@ -18,11 +21,16 @@ const SIGN_IN_TIMEOUT_MS = 10 * 60_000
 
 export interface CodexHome {
   readonly status: () => Promise<CodexSetup>
+  /** Runs `codex login`, or joins the one running, and answers with the status after it. */
   readonly signIn: () => Promise<CodexSetup>
+  /** On quit: kills every running Codex child, and no sign-in starts a login after it. */
+  readonly stop: () => void
 }
 
-export function codexHome(agentDir: string, e2e: boolean): CodexHome {
-  const executable = e2e ? (process.env.JUNO_E2E_CODEX ?? 'juno-e2e-no-codex') : 'codex'
+/** The Codex executable for this run: the owner's `codex`, or the test's stand-in under JUNO_E2E. */
+export const codexExecutable = (e2e: boolean): string => (e2e ? (process.env.JUNO_E2E_CODEX ?? 'juno-e2e-no-codex') : 'codex')
+
+export function codexHome(agentDir: string, executable: string): CodexHome {
   const home = join(agentDir, 'codex')
   // Juno's own Codex home, and nothing else from the environment: no inherited keys or configuration.
   const env: Record<string, string> = { CODEX_HOME: home }
@@ -30,31 +38,50 @@ export function codexHome(agentDir: string, e2e: boolean): CodexHome {
     const value = process.env[name]
     if (value !== undefined) env[name] = value
   }
+  let stopped = false
+  const children = new Set<ChildProcess>()
   const status = async (): Promise<CodexSetup> => {
     await mkdir(home, { recursive: true, mode: 0o700 })
     return new Promise((resolve) => {
-      execFile(executable, ['login', 'status'], { env, timeout: 10_000, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
+      const child = execFile(executable, ['login', 'status'], { env, timeout: 10_000, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
+        children.delete(child)
         if (error !== null && 'code' in error && error.code === 'ENOENT') return resolve('missing')
         // Signed in prints the ChatGPT account; anything else, a failure included, reads as signed out.
         resolve(error === null && /ChatGPT/i.test(`${stdout}${stderr}`) ? 'signedIn' : 'signedOut')
       })
+      children.add(child)
+      if (stopped) child.kill()
     })
+  }
+  let signingIn: Promise<CodexSetup> | undefined
+  const signIn = async (): Promise<CodexSetup> => {
+    const before = await status()
+    if (before === 'missing' || stopped) return before
+    await new Promise<void>((resolve) => {
+      const child = spawn(executable, ['login'], { env, stdio: 'ignore' })
+      children.add(child)
+      const timer = setTimeout(() => child.kill(), SIGN_IN_TIMEOUT_MS)
+      const done = () => {
+        clearTimeout(timer)
+        children.delete(child)
+        resolve()
+      }
+      child.once('exit', done)
+      child.once('error', done)
+    })
+    return stopped ? 'signedOut' : status()
   }
   return {
     status,
-    signIn: async () => {
-      if ((await status()) === 'missing') return 'missing'
-      await new Promise<void>((resolve) => {
-        const child = spawn(executable, ['login'], { env, stdio: 'ignore' })
-        const timer = setTimeout(() => child.kill(), SIGN_IN_TIMEOUT_MS)
-        const done = () => {
-          clearTimeout(timer)
-          resolve()
-        }
-        child.once('exit', done)
-        child.once('error', done)
+    signIn: () => {
+      signingIn ??= signIn().finally(() => {
+        signingIn = undefined
       })
-      return status()
+      return signingIn
+    },
+    stop: () => {
+      stopped = true
+      for (const child of children) child.kill()
     },
   }
 }

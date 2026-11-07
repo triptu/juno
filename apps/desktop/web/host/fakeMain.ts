@@ -69,19 +69,19 @@ export function fakeMain(host: ReturnType<typeof memoryHost>, options: FakeMainO
   host.onEngine((message) => {
     switch (message._tag) {
       case 'requestSecrets':
-        host.deliver({ _tag: 'secrets', secrets: options.store.load()?.secrets ?? null })
+        host.deliver({ _tag: 'secrets', id: message.id, secrets: options.store.load()?.secrets ?? null })
         return
       case 'importFromSlackApp':
         void options.signIn().then((credentials) => {
           pending = storedSession(credentials)
-          host.deliver({ _tag: 'secrets', secrets: pending.secrets })
+          host.deliver({ _tag: 'secrets', id: message.id, secrets: pending.secrets })
         })
         return
       case 'storeSecrets': {
         const cookieFrom = pending?.secrets.token === message.secrets.token ? pending.cookie : (options.store.load()?.cookie ?? '')
         options.store.save({ secrets: message.secrets, cookie: cookieFrom })
         pending = undefined
-        host.deliver({ _tag: 'secretsStored' })
+        host.deliver({ _tag: 'secretsStored', id: message.id })
         return
       }
       case 'signOut':

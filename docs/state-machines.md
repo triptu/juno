@@ -84,7 +84,7 @@ stateDiagram-v2
 | stopped, failed | child `exit` | no change | | `engine.ts (onExit)` |
 | any | `message` or `exit` from a process the supervisor stopped or gave up on | ignored | `this.child !== child` | `engine.ts (start)` |
 
-`connect(webContents)` (`engine.ts:103`) answers `failed` in `failed` and `stopped`, sends the port at once in `ready`, and otherwise holds one port per renderer in `pendingPorts`.
+`connect(webContents)` (`engine.ts (connect)`) answers `failed` in `failed` and `stopped`, sends the port at once in `ready`, and otherwise holds one port per renderer in `pendingPorts` (`main/pendingPorts.ts`, shared with the agent supervisor); a renderer destroyed while it waits has its port closed and dropped, and the `destroyed` listener leaves with the port when it is sent, replaced or closed (MAIN-8, fixed).
 
 Invariants:
 1. `failed` and `stopped` are terminal: `failed` leaves only by `restart()`, `stopped` never leaves.
@@ -173,20 +173,20 @@ Where: `agent/index.ts`. `started` (l.121), host port queue `ports` and `waiting
 
 Where: `main/session.ts` (`#busy` l.37, `#signOut` l.110), `packages/engine/src/session/Session.ts` (`askHost` l.173, `storeSecrets` wait l.228-235, `signOut` l.252-268).
 
-The engine and main talk in requests and answers with no request id:
+The engine and main talk in requests and answers. Each sign-in request carries an `id` the engine makes (`randomUUID`), main's answer echoes it, and the engine waits for the answer with its id; sign-out has no id:
 
 | Engine sends | Main answers | Engine waits for | Code |
 |---|---|---|---|
-| `requestSecrets` | `secrets` | first `secrets` or `sessionFailed` | `Session.ts:173-188` |
-| `importFromSlackApp` | `secrets` after the keychain import | first `secrets` or `sessionFailed` | `Session.ts:212`, `main/session.ts:86-106` |
-| `storeSecrets` | `secretsStored` | first `secretsStored` or `sessionFailed` | `Session.ts:228-235` |
-| `signOut` | `signedOut` after main clears its side | first `signedOut`, no timeout | `Session.ts:258`, `main/session.ts:110-118` |
+| `requestSecrets {id}` | `secrets {id}` | `secrets` or `sessionFailed` with that id | `Session.ts (askHost)` |
+| `importFromSlackApp {id}` | `secrets {id}` after the keychain import | `secrets` or `sessionFailed` with that id | `Session.ts (signIn)`, `main/session.ts (#capture)` |
+| `storeSecrets {id}` | `secretsStored {id}` | `secretsStored` or `sessionFailed` with that id | `Session.ts (signIn, stored)` |
+| `signOut` | `signedOut` after main clears its side | first `signedOut`, no timeout | `Session.ts (signOut)`, `main/session.ts (#signOut)` |
 
-Main's `#signOut` drops the launch session, removes `secrets.bin`, forgets the Slack keychain passwords, clears `persist:slack` storage and cache, then sends `signedOut`. Each stage runs on its own; a failed stage is logged and `signedOut` is still sent (MAIN-2, fixed).
+Main's `#signOut` drops the launch session, removes `secrets.bin` (or empties it in place when the folder refuses the unlink; an empty file reads as no session), forgets the Slack keychain passwords, clears `persist:slack` storage and cache, then sends `signedOut`. Each stage runs on its own; a failed stage is logged and `signedOut` is still sent (MAIN-2, fixed).
 
 Invariants:
 1. `#busy` allows one import at a time.
-2. Each answer belongs to the latest request of its kind. Nothing checks it (**bug** MAIN-6).
+2. An engine takes only the answers to its own requests, by id (MAIN-6, fixed).
 3. Every `signOut` gets a `signedOut`.
 
 ### Auto-update
@@ -216,10 +216,10 @@ Invariants:
 | Screen watch | `probe`, `sharing`, `trueSince`, `timer` in `main/screenWatch.ts`; privacy from sharing in `privacyBySharing` (`main/index.ts:65`) | Start is guarded by `timer` (`screenWatch.ts:152`); stop on window `closed`. |
 | Activity | one interval in `main/activity.ts` | `start()` clears the old interval first (`activity.ts:39-43`). |
 | Dock badge and notification permission | `asking`, persisted `notificationPermissionAsked` in `main/dockBadge.ts`, `main/notificationPermission.ts` | `asked` is persisted before asking; waiters fall back after 3 s and 120 s. |
-| Provider store | `#loading`, `#active`, `#baseUrl` in `main/providers.ts` | `set()` writes the keychain, memory, then `juno-provider.json`, then notifies. The file write is not atomic (**bug** MAIN-7). |
-| MCP credentials | per-id promise queue `serial` (`main/mcpCredentials.ts:38`); chunks, then a count | A save is all or nothing. It is not (MAIN-8). |
+| Provider store | `#loading`, `#active`, `#baseUrl`, `#last` in `main/providers.ts` | `set()` calls run one at a time in order; each writes the keychain, memory, then `juno-provider.json` through a temporary file and a rename, then notifies (MAIN-7, fixed). |
+| MCP credentials | per-id promise queue `serial` (`main/mcpCredentials.ts`); count dropped, chunks, then the count | A save is all or nothing: a save that stops part way leaves no state. Removals never trust the count: they delete chunk by chunk until one is missing, so the chunks such a save leaves go at the next clear or save (MAIN-8, fixed). |
 | launch.json writer | chained writes, temp file and rename (`main/launch.ts:92-111`) | `will-quit` waits for the pending write. |
-| Codex sign-in | `codex login` child in `main/codex.ts:45 (signIn)` | One sign-in at a time. Nothing enforces it (MAIN-8). |
+| Codex sign-in | `signingIn` promise, `stopped` flag and `children` set in `main/codex.ts (signIn, stop)` | One sign-in at a time: a second call joins the running one; `stop()` on quit kills every Codex child, the status check included, and a sign-in still waiting on that check starts no login (MAIN-8, fixed). |
 
 ## Engine and sync
 
@@ -1394,7 +1394,7 @@ If the engine is restarting when main answers, `supervisor.send` drops `signedOu
 - Severity: medium; low likelihood. Confirmed. Impact: Stuck "signing out" with Sign out disabled until relaunch, with the session half cleared. This is a concrete candidate for the backlog item "Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled" (`docs/backlog.md`). It breaks sign-in handshake invariant 3.
 - Test: engine side in `packages/engine/test/session.test.ts` with a host fake that never answers `signedOut` (expect a timeout outcome); main side in `e2e/session.spec.ts`.
 - Fix direction: `try` and `finally` in `#signOut` so main always answers, with a failure tag if needed, and a bounded wait in the engine.
-- Status: Partly fixed in 53bbd4679. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent. Test: `apps/desktop/test/session.test.ts`. Partly fixed: the engine can no longer hang. Still open: when deleting `secrets.bin` fails, the engine hears `signedOut` anyway and the next launch reads the stored session and signs the user back in (review finding, 2026-11-07; in `docs/backlog.md`).
+- Status: Fixed in 53bbd4679 and 8b072a0de. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent (53bbd4679; test: `apps/desktop/test/session.test.ts`, "answers signedOut when secrets.bin cannot be deleted, after clearing the Slack session and logging what failed"). A review of that fix found that when the unlink of `secrets.bin` failed, the next launch read the stored session and signed the user back in. `SecretsStore.delete` now empties the file in place when the folder refuses the unlink, so `requestSecrets` finds no session; only a file that can be neither unlinked nor opened for writing still serves, and the stage is logged (8b072a0de). Test: `apps/desktop/test/session.test.ts`, "serves no stored session after a sign-out whose unlink the folder refused, as at the next launch". A review of that fix found that the emptied file made every later launch log the "could not be read" warning; `read` now takes an empty file as no session, with no warning (dfdc98ff5). Test: `apps/desktop/test/session.test.ts`, "a secrets.bin emptied by such a sign-out reads as no session at the next launch, with nothing to warn about".
 
 #### MAIN-3. A late ready takes the engine supervisor out of stopped during quit
 
@@ -1469,9 +1469,9 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
 | REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
-| MAIN-6 | Sign-in answers carry no request id: after an engine crash during a keychain import, the import's `secrets` can be taken as the stored session, which was never written to `secrets.bin` (`Session.ts:173-188`, `main/session.ts:47-52`, l.93). An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131). | low |
-| MAIN-7 | `juno-provider.json` is written with a plain `writeFile` and `set()` calls are not serialized; a crash or two overlapping sets can leave invalid JSON, which loses the custom base URL (`main/providers.ts:172-174`, l.89-96). | low |
-| MAIN-8 | Smaller main items: `EngineSupervisor.pendingPorts` keeps a destroyed renderer's port until the next `ready` (`main/engine.ts:110-111`); `codex.signIn` has no single-flight and its `codex login` child is not killed on quit (`main/codex.ts:45-58`); an MCP credential save writes chunks before the count, so a crash mid-save mixes chunks (`main/mcpCredentials.ts:61-69`). The `huddleQuit.confirmed` latch is HUD-5. | low |
+| MAIN-6 | Sign-in answers carried no request id: after an engine crash during a keychain import, the import's `secrets` could be taken as the stored session, which was never written to `secrets.bin`. An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131), which stays as it is: the engine's check needs the cookie in the Slack session. Status: Fixed in da399658a. Every sign-in request carries an id the engine makes and main echoes; the engine waits for the answer with its id (`Session.ts`, `main/session.ts`, `contract/protocol.ts`). Test: `packages/engine/test/session.test.ts`, "ignores the answer to an import a crashed engine asked for, and starts signed out". | low |
+| MAIN-7 | `juno-provider.json` was written with a plain `writeFile` and `set()` calls were not serialized: a crash could leave invalid JSON, and a change made while the keychain held an earlier one was overtaken by it (a removal after a save left the endpoint active and its key in the keychain). Status: Fixed in b102aa59e. `set()` queues behind the previous change and the file goes through a temporary file and a rename (`main/providers.ts`). Test: `apps/desktop/test/providers.test.ts`, "a removal made while the endpoint is still being saved lands after it, in the keychain and the file". | low |
+| MAIN-8 | Smaller main items: `EngineSupervisor.pendingPorts` kept a destroyed renderer's port until the next `ready`; `codex.signIn` had no single-flight and its `codex login` child was not killed on quit; an MCP credential save wrote chunks before the count, so a save that stopped part way mixed old and new chunks. The `huddleQuit.confirmed` latch is HUD-5. Status: Fixed in caf2f6388. The engine supervisor drops a waiting renderer's port on its `destroyed` (as the agent supervisor already did); `codexHome` runs one sign-in and `stop()` kills its child from `before-quit`; a credential save drops the count before the chunks and writes it last. Tests: `apps/desktop/test/supervisors.test.ts`, "engine: a renderer closed while it waited for a port gets none at ready, and its port is closed"; `apps/desktop/test/codex.test.ts`, "two sign-in clicks run one codex login, and quitting ends it"; `apps/desktop/test/mcpCredentials.test.ts`, "a save that stops part way leaves no state rather than a mix of old and new chunks". A review of that fix found that a `stop()` during the sign-in's status check killed nothing, so the login still started after the quit began; `stop()` now marks the home stopped and kills the status child too, and the sign-in checks that after each wait (d195aefc4). Test: `apps/desktop/test/codex.test.ts`, "quitting while the sign-in is still checking the status starts no codex login". The same review found that the chunks an interrupted save left, with no count pointing at them, were never deleted: `clear` and a save's cleanup trusted the count. They now delete chunk by chunk until one is missing (b752d7030). Test: the same credentials test, which clears after the interrupted save and expects no item left. It also found that each port request made while a process was down left a `destroyed` listener on the window for good, in both supervisors; the held ports now live in `main/pendingPorts.ts`, which removes the listener when the port is sent, replaced or closed (b3fff88cc). Tests: `apps/desktop/test/supervisors.test.ts`, "engine: a renderer that waited for a port keeps no destroyed listener once the port is sent or replaced" and "agent: a renderer that waited for a port keeps no destroyed listener once the port is sent or dropped". | low |
 
 ## Checked and ruled out
 
@@ -1484,7 +1484,7 @@ These candidates were checked and hold. Each row says why.
 | Agent credential or secret replies reaching a restarted agent | sent only if `this.child === child` | `main/agent.ts:115`, l.124 |
 | Quit before the engine spawned | `config` is never sent; the engine gets only `quit` and exits | `apps/desktop/src/engine/index.ts:111` |
 | Engine `stop()` hanging | killed after 3 s and resolved | `main/engine.ts:131-134` |
-| Agent renderer ports held while restarting | dropped on give-up and stop; destroyed renderers cleaned | `main/agent.ts:198-221`, l.245 |
+| Agent renderer ports held while restarting | dropped on give-up and stop; destroyed renderers cleaned; the `destroyed` listener leaves with the port | `main/agent.ts (connect, dropPendingRendererPorts)`, `main/pendingPorts.ts` |
 | Agent `restart` after restore counted as a crash | not counted, by design; only after a staged restore | `main/agent.ts:231-232` |
 | launch.json write races | chained and atomic; `will-quit` waits | `main/launch.ts:96-108` |
 | Backoff `attempt` reset on every `ready` | the 5-in-2-minutes limit still bounds crash loops | `main/engine.ts:180-183` |

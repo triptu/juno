@@ -10,7 +10,7 @@ import { EventEmitter } from 'node:events'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
-import type { MessagePortMain, UtilityProcess } from 'electron'
+import type { MessagePortMain, UtilityProcess, WebContents } from 'electron'
 import type { MainToAgent } from '@juno/agent-contract'
 import type { MainToEngine } from '@juno/contract'
 import { AgentSupervisor } from '../src/main/agent'
@@ -34,15 +34,28 @@ class FakeProcess extends EventEmitter {
 
 function fakeDeps() {
   const forked: FakeProcess[] = []
+  const closed: MessagePortMain[] = []
+  const port = () => {
+    const made = { close: () => { closed.push(made) } } as unknown as MessagePortMain
+    return made
+  }
   const deps: ProcessDeps = {
     fork: () => {
       const child = new FakeProcess()
       forked.push(child)
       return child as unknown as UtilityProcess
     },
-    channel: () => ({ port1: { close: () => {} } as unknown as MessagePortMain, port2: { close: () => {} } as unknown as MessagePortMain }),
+    channel: () => ({ port1: port(), port2: port() }),
   }
-  return { forked, deps }
+  return { forked, closed, deps }
+}
+
+/** A renderer as the supervisors see it: a port handed over, and `destroyed` when its window closes. */
+class FakeRenderer extends EventEmitter {
+  readonly ports: Array<unknown> = []
+  postMessage(_channel: string, _message: unknown, transfer?: Array<unknown>): void {
+    this.ports.push(...(transfer ?? []))
+  }
 }
 
 const engineConfig = { userData: join(tmpdir(), 'juno-supervisor-test'), e2e: true, dev: true }
@@ -66,6 +79,42 @@ it('engine: a ready that arrives after the quit began leaves the supervisor stop
   await stopping
   expect(supervisor.currentState).toBe('stopped')
   expect(forked).toHaveLength(1)
+})
+
+it('engine: a renderer closed while it waited for a port gets none at ready, and its port is closed', () => {
+  const { forked, closed, deps } = fakeDeps()
+  const supervisor = new EngineSupervisor(engineConfig, () => {}, { ...deps, mark: () => {} })
+  supervisor.start()
+  const engine = forked[0]!
+  engine.emit('spawn')
+  // The window asks for its port while the engine is still starting, then closes.
+  const renderer = new FakeRenderer()
+  expect(supervisor.connect(renderer as unknown as WebContents)).toBe('sent')
+  renderer.emit('destroyed')
+  expect(closed).toHaveLength(1)
+  engine.emit('message', { _tag: 'ready' })
+  expect(tags(engine)).toEqual(['config', 'aiKey'])
+})
+
+it('engine: a renderer that waited for a port keeps no destroyed listener once the port is sent or replaced', () => {
+  const { forked, deps } = fakeDeps()
+  const supervisor = new EngineSupervisor(engineConfig, () => {}, { ...deps, mark: () => {} })
+  supervisor.start()
+  const engine = forked[0]!
+  engine.emit('spawn')
+  const renderer = new FakeRenderer()
+  supervisor.connect(renderer as unknown as WebContents)
+  // Asking again replaces the earlier request, listener included.
+  supervisor.connect(renderer as unknown as WebContents)
+  expect(renderer.listenerCount('destroyed')).toBe(1)
+  engine.emit('message', { _tag: 'ready' })
+  expect(renderer.listenerCount('destroyed')).toBe(0)
+  // The engine crashes and the renderer waits again across the restart.
+  engine.emit('exit', 1)
+  supervisor.connect(renderer as unknown as WebContents)
+  expect(renderer.listenerCount('destroyed')).toBe(1)
+  supervisor.giveUp()
+  expect(renderer.listenerCount('destroyed')).toBe(0)
 })
 
 it('engine: the old process exiting after give-up and restart leaves the new one running alone', () => {
@@ -127,6 +176,23 @@ it('agent: a provider set again before the stopped process exits links the new p
   first.emit('exit', 0)
   expect(supervisor.currentState).toBe('starting')
   expect(supervisor.pid).toBe(second.pid)
+})
+
+it('agent: a renderer that waited for a port keeps no destroyed listener once the port is sent or dropped', () => {
+  const { forked, deps } = fakeDeps()
+  const { supervisor } = agentSupervisor(deps)
+  supervisor.setProvider(provider)
+  const agent = forked[0]!
+  const renderer = new FakeRenderer()
+  supervisor.connect(renderer as unknown as WebContents)
+  expect(renderer.listenerCount('destroyed')).toBe(1)
+  agent.emit('spawn')
+  expect(renderer.listenerCount('destroyed')).toBe(0)
+  supervisor.setProvider(null)
+  supervisor.setProvider(provider)
+  supervisor.connect(renderer as unknown as WebContents)
+  supervisor.setProvider(null)
+  expect(renderer.listenerCount('destroyed')).toBe(0)
 })
 
 it('agent: a ready in flight from a process just stopped does not make the supervisor ready', () => {

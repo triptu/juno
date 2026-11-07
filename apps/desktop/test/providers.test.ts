@@ -141,6 +141,24 @@ it('shares the keychain OpenRouter key with the engine independently of the chat
   expect(engineKeys.at(-1)).toBeNull()
 })
 
+it('a removal made while the endpoint is still being saved lands after it, in the keychain and the file', async () => {
+  // The keychain is slow (a prompt is up): the save holds in its write until the test lets it go.
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  const custom = memoryKeychain()
+  const keychains = { openRouter: memoryKeychain(), custom: { ...custom, write: async (key: string) => { await held; await custom.write(key) } } }
+  const { dir, store, sent } = await setup({ keychains })
+  const saving = store.set({ _tag: 'custom', baseUrl: LOCAL, key: 'local-secret' })
+  const removing = store.set({ _tag: 'custom', baseUrl: '' })
+  release()
+  expect(await saving).toBe('saved')
+  expect(await removing).toBe('removed')
+  expect(store.state).toEqual({ active: null, openRouter: { key: 'missing' }, custom: { baseUrl: '', key: 'missing' } })
+  expect(sent.at(-1)).toBeNull()
+  expect(await custom.read()).toBeUndefined()
+  expect(JSON.parse(await readFile(join(dir, PROVIDER_FILE), 'utf8'))).toEqual({ active: null, baseUrl: '' })
+})
+
 it('a removed key leaves the engine even when the provider file cannot be written', async () => {
   const keychains = { openRouter: memoryKeychain('fake-router-key'), custom: memoryKeychain() }
   const missing = await mkdtemp(join(tmpdir(), 'juno-providers-'))

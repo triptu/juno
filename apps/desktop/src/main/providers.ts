@@ -13,8 +13,12 @@
  * - One provider is active at a time. Setting one up makes it active;
  *   removing the active one falls back to the other if it is set up, else
  *   to none. With none, the agent does not run (`index.ts`).
+ * - Changes run one at a time, in the order they were asked, and the file is
+ *   written through a temporary file and a rename, so a change made while
+ *   the keychain holds an earlier one lands after it and the file is never
+ *   half written.
  */
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import type { AgentProvider } from '@juno/agent-contract'
@@ -47,6 +51,7 @@ export class ProviderStore {
   #baseUrl = ''
   #active: ProviderState['active'] = null
   #loading: Promise<void> | undefined
+  #last: Promise<unknown> = Promise.resolve()
   readonly #file: string
 
   constructor(
@@ -99,7 +104,13 @@ export class ProviderStore {
     return this.#loading
   }
 
-  async set(change: ProviderChange): Promise<ProviderResult> {
+  set(change: ProviderChange): Promise<ProviderResult> {
+    const next = this.#last.then(() => this.#apply(change))
+    this.#last = next.catch(() => undefined)
+    return next
+  }
+
+  async #apply(change: ProviderChange): Promise<ProviderResult> {
     await this.load()
     let result: ProviderResult
     switch (change._tag) {
@@ -170,7 +181,9 @@ export class ProviderStore {
   }
 
   async #save(): Promise<void> {
-    await writeFile(this.#file, JSON.stringify({ active: this.#active, baseUrl: this.#baseUrl }), { mode: 0o600 })
+    const temporary = `${this.#file}.tmp`
+    await writeFile(temporary, JSON.stringify({ active: this.#active, baseUrl: this.#baseUrl }), { mode: 0o600 })
+    await rename(temporary, this.#file)
   }
 
   #notify(): void {

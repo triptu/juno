@@ -6,7 +6,8 @@
  * - `requestSecrets`: read `secrets.bin`.
  * - `importFromSlackApp`: capture a session and answer with
  *   `secrets` or `sessionFailed`. The engine verifies it; only then does it
- *   send `storeSecrets`.
+ *   send `storeSecrets`. Every answer echoes the request's `id`, so an
+ *   engine started after a crash ignores an import the crashed one began.
  * - `signOut`: delete `secrets.bin`, clear the `persist:slack` session and
  *   forget the Slack keychain password an import read. The engine always
  *   hears `signedOut`, even when a stage fails.
@@ -61,17 +62,17 @@ export class SessionHost {
     if (['requestSecrets', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'].includes(message._tag)) this.#deps.log('INFO', 'sign-in step', { step: message._tag })
     switch (message._tag) {
       case 'requestSecrets':
-        void this.#deps.secrets.read().then((secrets) => this.#deps.send({ _tag: 'secrets', secrets }))
+        void this.#deps.secrets.read().then((secrets) => this.#deps.send({ _tag: 'secrets', id: message.id, secrets }))
         return true
       case 'importFromSlackApp':
-        void this.#capture('import', this.#deps.importSession)
+        void this.#capture(message.id, 'import', this.#deps.importSession)
         return true
       case 'storeSecrets':
         void this.#deps.secrets.write(message.secrets).then(() => {
-          this.#deps.send({ _tag: 'secretsStored' })
+          this.#deps.send({ _tag: 'secretsStored', id: message.id })
         }).catch((cause: unknown) => {
           console.error('main: could not write secrets.bin', cause instanceof Error ? cause.name : '')
-          this.#deps.send({ _tag: 'sessionFailed', method: message.method, kind: 'other', message: 'Juno could not save the Slack session. Try signing in again.' })
+          this.#deps.send({ _tag: 'sessionFailed', id: message.id, method: message.method, kind: 'other', message: 'Juno could not save the Slack session. Try signing in again.' })
         })
         return true
       case 'signOut':
@@ -95,18 +96,19 @@ export class SessionHost {
     }
   }
 
-  async #capture(method: 'import', run: () => Promise<ImportResult>): Promise<void> {
+  async #capture(id: string, method: 'import', run: () => Promise<ImportResult>): Promise<void> {
     if (this.#busy) {
-      this.#deps.send({ _tag: 'sessionFailed', method, kind: 'other', message: 'A sign-in is already in progress.' })
+      this.#deps.send({ _tag: 'sessionFailed', id, method, kind: 'other', message: 'A sign-in is already in progress.' })
       return
     }
     this.#busy = true
     try {
       const result = await run()
-      if (result.ok) this.#deps.send({ _tag: 'secrets', secrets: result.secrets })
+      if (result.ok) this.#deps.send({ _tag: 'secrets', id, secrets: result.secrets })
       else
         this.#deps.send({
           _tag: 'sessionFailed',
+          id,
           method,
           kind: result.kind,
           message: result.message,
@@ -114,7 +116,7 @@ export class SessionHost {
         })
     } catch (cause) {
       console.error('main: sign-in failed', cause instanceof Error ? cause.name : '')
-      this.#deps.send({ _tag: 'sessionFailed', method, kind: 'other', message: 'The sign-in did not finish.' })
+      this.#deps.send({ _tag: 'sessionFailed', id, method, kind: 'other', message: 'The sign-in did not finish.' })
     } finally {
       this.#busy = false
     }
