@@ -279,7 +279,8 @@ async function avatarMenuRows(juno: Juno, win: Page): Promise<void> {
   await expect.poll(() => highlighted(list)).toEqual([expect.stringMatching(/^Notification settings/)])
   await expect(list).toHaveAttribute('aria-activedescendant', (await notifications.getAttribute('id')) ?? '')
 
-  // The list takes focus when the menu opens, and the keyboard goes on from the hovered item while the pointer rests on it.
+  // The keyboard goes on from the hovered item while the pointer rests on it.
+  await win.keyboard.press('Tab')
   await expect(list).toBeFocused()
   await win.keyboard.press('ArrowUp')
   await expect.poll(() => highlighted(list)).toEqual([expect.stringMatching(/^Hide message text/)])

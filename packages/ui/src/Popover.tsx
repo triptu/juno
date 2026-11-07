@@ -243,6 +243,7 @@ const styles = stylex.create({
   // A submenu's panel hangs off the menu's panel, outside the menu's scrolling surface.
   rootSide: {
     position: 'static',
+    flexDirection: 'column',
   },
   // A panel that hangs off the title bar (the avatar menu) is not part of its drag region.
   panel: {
