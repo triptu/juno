@@ -7,7 +7,7 @@ import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/token
 import { activateHandlers, Button, Icon, Text, type ActivateEvent } from '@juno/ui'
 import { HomePicture, type HomePictureView } from './HomePicture'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from './homeRows'
+import { buttonsAtRest, metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from './homeRows'
 import { PlaceTile } from './PlaceTile'
 import { tileOf } from './tileModel'
 
@@ -149,7 +149,8 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
 /**
  * One row: a link to the topic (a review card's opens its review), and its buttons in
  * a slot that is always there: Mark done, Resolve all, Automated's Keep
- * in All and Move, or Dismiss on Automated's record. Automated's row opens the conversation's menu on
+ * in All and Move, or Dismiss on Automated's record. The buttons show on
+ * hover and focus, except Tidy up's Resolve all, which always shows. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
 function HomeRow({ item, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk }: HomeRowProps) {
@@ -206,7 +207,7 @@ function HomeRow({ item, now, onOpen, onMarkDone, onResolveAll, onReview, onSort
         </a>
       )}
       {buttons.length === 0 ? null : (
-        <span {...stylex.props(styles.slot)}>
+        <span {...stylex.props(styles.slot, buttonsAtRest(item.kind) && styles.slotAtRest)}>
           {buttons.map((button) => (
             <Button key={button.label} variant={button.primary ? 'raised' : 'ghost'} size="sm" tone={button.primary ? 'default' : 'muted'} onClick={button.run}>
               {button.label}
@@ -431,4 +432,6 @@ const styles = stylex.create({
     flexShrink: 0,
     opacity: 'var(--home-action-opacity)',
   },
+  // A card whose one action is the point of the card (Tidy up's Resolve all): shown at rest, so it is found without hovering.
+  slotAtRest: { opacity: 1 },
 })

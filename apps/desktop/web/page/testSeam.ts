@@ -11,6 +11,8 @@
  * - `browserLinks`, `slackLinks`: links that would have opened outside.
  * - `menu`: an app-menu command, as main sends one when a menu item is
  *   clicked.
+ * - `updates`: the updater main would run. `set` reports a state, as
+ *   main's `Events.updatesChanged` does; `restarts` counts Restart to update.
  */
 import type { ContextMenuAt, ContextMenuItem, ContextMenuLeaf, MenuCommand } from '@juno/contract/channels'
 
@@ -28,6 +30,12 @@ export interface WebTestSeam {
   /** How many times the page asked to show the microphone's System Settings. */
   microphoneSettingsOpened: number
   menu: (command: MenuCommand) => void
+  readonly updates: {
+    state: unknown
+    restarts: number
+    readonly listeners: Set<(state: unknown) => void>
+    set: (state: unknown) => void
+  }
 }
 
 export const testing = new URLSearchParams(location.search).has('e2e')
@@ -38,6 +46,15 @@ export const seam: WebTestSeam = {
   slackLinks: [],
   microphoneSettingsOpened: 0,
   menu: () => {},
+  updates: {
+    state: { kind: 'unavailable' },
+    restarts: 0,
+    listeners: new Set(),
+    set(state) {
+      this.state = state
+      for (const listener of this.listeners) listener(state)
+    },
+  },
 }
 
 /** As main's `testLabel`: "-" for a separator, "(label)" when disabled, "label ✓" when checked, "label · sublabel". */

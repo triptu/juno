@@ -13,6 +13,7 @@ import { relativeTime } from './time'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList, type TopicListProps } from './TopicList'
 import { TopicRow } from './TopicRow'
+import { UpdateReady } from './UpdateReady'
 import { ViewSheet, type ViewSheetProps } from './ViewSheet'
 
 const noop = () => {}
@@ -268,6 +269,15 @@ export default defineFixtures(
       'off-screen': scene(() => <ArtOffScreen />),
       'every-row': scene(() => allArt()),
       'every-row-privacy': scene(() => <PrivacyOn>{allArt({ privacy: true, onPrivacyOff: noop })}</PrivacyOn>),
+    },
+    // A downloaded update (SPEC 5, item 5): a pill over the list's foot, with room at the list's end, at the default width and the narrowest.
+    Update: {
+      ready: scene(() => full({ update: <UpdateReady onRestart={noop} onOpen={noop} /> }, { selected: rows.postgres.id, pillRoom: true })),
+      narrow: scene(() => full({ update: <UpdateReady onRestart={noop} onOpen={noop} /> }, { pillRoom: true }), { ...frame, width: 312 }),
+      'with sync status': scene(() => full({ status: <EngineNotice kind="offline" />, update: <UpdateReady onRestart={noop} onOpen={noop} /> }, { pillRoom: true })),
+      'with privacy': scene(() => <PrivacyOn>{full({ update: <UpdateReady onRestart={noop} onOpen={noop} />, privacy: true, onPrivacyOff: noop }, { pillRoom: true })}</PrivacyOn>),
+      'restart-hover': scene(() => full({ update: <UpdateReady onRestart={noop} onOpen={noop} /> }, { pillRoom: true }), { hover: '[aria-label="Restart to update"]' }),
+      'text-focus': scene(() => full({ update: <UpdateReady onRestart={noop} onOpen={noop} /> }, { pillRoom: true }), { focus: '[data-update-status] button' }),
     },
     // Privacy mode (SPEC section 5): previews and first-words titles blurred, the footer with Show.
     // Sharing: turned on because the screen is shared, and the footer says so.

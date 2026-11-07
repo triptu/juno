@@ -38,6 +38,7 @@ import PresenceSection from './PresenceSection.fixtures'
 import NotificationDetails from './NotificationDetails.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
+import UpdateReady from './UpdateReady.fixtures'
 import SettingsPage from './SettingsPage.fixtures'
 import TabExpirySetting from './TabExpirySetting.fixtures'
 import TopicSwitcher from './TopicSwitcher.fixtures'
@@ -158,6 +159,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   OwnerBubble,
   SettingsPage,
   UpdateSettings,
+  UpdateReady,
   ProposedScheduleCard: proposedScheduleCard,
   ProposedTaskCard: proposedTaskCard,
   ProviderCard: providerCard,
