@@ -40,6 +40,7 @@ import {
   sessionProfile,
   sessionStatus,
   SIDEBAR_WINDOW,
+  statusOf,
   THREADS_WINDOW_MAX,
   topicsCounts,
   topicsGet,
@@ -162,6 +163,8 @@ async function recordShell(recorder: DemoRecorder): Promise<void> {
   // The tabs are read per workspace, keyed by the id the session carries.
   await recorder.value(prefsGet, { key: 'tabs', workspace: session.workspaceId })
   await recorder.value(prefsGet, { key: 'tourSeen' })
+  // The avatar menu follows the signed-in user's status.
+  await recorder.value(statusOf, { userId: session.userId })
   // The chrome's and the rows' reads, idle here: no huddle or upload, notifications as they are, the workspace's emoji, nobody's presence shown.
   for (const route of [notificationsStatus, notificationsSettings, huddleRunning, uploadsProgress, mentionsEmoji, presencePeople]) await recorder.value(route, undefined)
 }
@@ -255,7 +258,7 @@ function fakeMessages(workspace: Workspace, id: string): ReadonlyArray<string> {
  * Where a click on each person the snapshot shows goes: everyone in a list's
  * refs (as `Message` opens them, an app's post by the user behind it) and
  * every @person in a message. One with no DM gets the engine's answer too,
- * which opens nothing.
+ * which opens nothing. Each person's status too, for their avatar's tooltip.
  */
 async function recordPeople(recorder: DemoRecorder): Promise<void> {
   const people = new Set<string>()
@@ -265,7 +268,10 @@ async function recordPeople(recorder: DemoRecorder): Promise<void> {
     if (node !== null && typeof node === 'object' && node.kind === 'user' && typeof node.id === 'string') people.add(node.id)
     return value
   })
-  for (const user of people) await recorder.reply(peopleLocate, { user })
+  for (const user of people) {
+    await recorder.reply(peopleLocate, { user })
+    await recorder.value(statusOf, { userId: user })
+  }
 }
 
 const EXTENSIONS: Readonly<Record<string, string>> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' }

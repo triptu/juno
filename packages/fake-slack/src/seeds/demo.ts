@@ -19,8 +19,8 @@ export const DEMO_TEAM_NAME = 'Kestrel'
 const SELF = 'U0TUSHAR'
 
 const PEOPLE: ReadonlyArray<SeedUser> = [
-  { id: SELF, name: 'alex', realName: 'Alex Rivera', title: 'Head of engineering', color: '3b6ea8', tz: 'Europe/London' },
-  { id: 'U0NAOMI', name: 'naomi', realName: 'Naomi Brandt', title: 'Product lead', color: 'b0496b', tz: 'Europe/Berlin' },
+  { id: SELF, name: 'alex', realName: 'Alex Rivera', title: 'Head of engineering', color: '3b6ea8', tz: 'Europe/London', status: { emoji: ':headphones:', text: 'Heads down' } },
+  { id: 'U0NAOMI', name: 'naomi', realName: 'Naomi Brandt', title: 'Product lead', color: 'b0496b', tz: 'Europe/Berlin', status: { emoji: ':calendar:', text: 'In meetings' } },
   { id: 'U0JONAS', name: 'jonas', realName: 'Jonas Berg', title: 'Staff engineer', color: '2f6f5e', tz: 'Europe/Stockholm' },
   { id: 'U0AMARA', name: 'amara', realName: 'Amara Nwosu', title: 'Product designer', color: 'c26a2e', tz: 'Europe/London' },
   { id: 'U0KENJI', name: 'kenji', realName: 'Kenji Mori', title: 'iOS engineer', color: '5b4aa0', tz: 'Europe/Amsterdam' },

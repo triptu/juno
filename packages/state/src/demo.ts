@@ -93,6 +93,8 @@ export function demoReplyPayload(tag: string, payload: unknown): unknown {
 const HOUSEKEEPING: Readonly<Record<string, unknown>> = {
   'prefs.set': undefined,
   'reads.markRead': {},
+  // A hovered avatar asks the sync to read the person again; the snapshot is what it is.
+  'status.refresh': undefined,
 }
 
 interface Range {
