@@ -45,6 +45,8 @@ export interface TopicHeaderProps {
    * say it. Shown whatever the sidebar setting.
    */
   readonly presence?: 'active' | 'away'
+  /** With `presence`: the person has notifications paused (SPEC 14, "Paused colleagues"), so the snooze glyph takes the dot's place. */
+  readonly paused?: boolean
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
   /** The topic as the Search tab's reader (SPEC 10a): Back to results, the matches' arrows, Open in new tab. */
@@ -80,7 +82,7 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * last. The islands line up with the reading column. Rename turns the title
  * into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, presence, juno, reader }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, presence, paused = false, juno, reader }: TopicHeaderProps) {
   const main = detail.kind === 'main'
 
   // Icons alone, with the word as the tooltip and the name. Reopen is the filled check: the thread is done, and a click undoes that.
@@ -100,7 +102,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
       left={
         <>
           {reader?.onBack === undefined ? null : <ReaderBack onBack={reader.onBack} />}
-          <PlacePill detail={detail} presence={presence} onPill={onPill} onPillMenu={onPillMenu} />
+          <PlacePill detail={detail} presence={presence} paused={paused} onPill={onPill} onPillMenu={onPillMenu} />
           {rename === undefined || main ? (
             switcher === undefined ? (
               <HeaderTitleButton title={main ? 'Main' : detail.title} expanded={menuOpen} onOpen={onMenu} />
@@ -142,12 +144,12 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
  * tooltip and the accessible name. In a 1:1 DM the icon is the person's
  * presence once known.
  */
-function PlacePill({ detail, presence, onPill, onPillMenu }: Pick<TopicHeaderProps, 'detail' | 'presence' | 'onPill' | 'onPillMenu'>) {
+function PlacePill({ detail, presence, paused = false, onPill, onPillMenu }: Pick<TopicHeaderProps, 'detail' | 'presence' | 'paused' | 'onPill' | 'onPillMenu'>) {
   const { channel } = detail
   const kind = kindLabels[channel.kind]
   const dot = channel.kind === 'im' ? presence : undefined
   // "eng, public channel", "Maya and Leo, group DM", "Maya, direct message, active": only the first letter steps down, so DM stays DM.
-  const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}${dot === undefined ? '' : `, ${dot}`}`
+  const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}${dot === undefined ? '' : `, ${dot}`}${dot !== undefined && paused ? ', notifications paused' : ''}`
   return (
     <span
       onContextMenu={
@@ -168,7 +170,7 @@ function PlacePill({ detail, presence, onPill, onPillMenu }: Pick<TopicHeaderPro
         size={24}
         // A Main's title is the one word "Main": the channel's name keeps its place there.
         iconWhenNarrow={detail.kind !== 'main'}
-        {...(dot === undefined ? {} : { presence: dot })}
+        {...(dot === undefined ? {} : { presence: dot, paused })}
         {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
       />
     </span>

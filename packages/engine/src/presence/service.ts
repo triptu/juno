@@ -22,15 +22,26 @@
  * when the sync ends, because Juno cannot know it then. The user's own goes
  * to `SelfPresence`, apart from the others', so it never shows as a DM
  * partner's.
+ *
+ * Whether each followed person has notifications paused (SPEC 14, "Paused
+ * colleagues") comes from Slack's Do Not Disturb, kept the same way: one
+ * `dnd.teamInfo` for the people not yet asked about, each time the set
+ * changes, and for everyone after each connect; one again for a person on
+ * each `dnd_updated_user`, as Slack's client does, batched with any that
+ * arrive while a call runs. One timer wakes at the earliest time anyone's
+ * pause starts or ends, publishes, and asks again about each person whose
+ * scheduled pause just ended, since Slack names only the next one. Nothing
+ * polls.
  */
 import { SHOW_PRESENCE_PREF, type PresencePeople } from '@juno/contract'
 import { parseTopicId } from '@juno/domain'
 import { SlackSession, SlackSocket } from '@juno/slack'
 import { liveQuery, prefs, StoreReader } from '@juno/store'
-import { Context, Effect, Layer, Semaphore, Stream, SubscriptionRef } from 'effect'
+import { Clock, Context, Effect, Layer, Semaphore, Stream, SubscriptionRef } from 'effect'
 import { SelfPresence } from '../selfPresence'
 import { SocketEvents, type SessionStart } from '../socketEvents'
 import { SyncLink } from '../syncLink'
+import { pausedPeople } from './dnd'
 
 /** How many recent DM partners Juno follows at most while the sidebar setting is on. */
 export const PRESENCE_LIMIT = 100
@@ -38,7 +49,7 @@ export const PRESENCE_LIMIT = 100
 /** How long the set of people must hold before it is sent, so switching through tabs sends once. */
 const SUB_SETTLE = '100 millis'
 
-const unknown: PresencePeople = { active: [], away: [] }
+const unknown: PresencePeople = { active: [], away: [], paused: [] }
 
 export class OthersPresence extends Context.Service<OthersPresence, {
   /** What Slack last said about each followed user other than the user, sorted; the current value first. */
@@ -94,12 +105,13 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
   /** What Slack last said for each followed user on this connection. */
   const presence = new Map<string, 'active' | 'away'>()
 
-  const publish = Effect.suspend(() => {
-    const { active, away } = split(wanted, presence, session.userId)
-    return SubscriptionRef.update(people, (last) => (sameIds(last.active, active) && sameIds(last.away, away) ? last : { active, away })).pipe(
-      Effect.andThen(self.set(presence.get(session.userId))),
-    )
+  const publish: Effect.Effect<void> = Effect.gen(function* () {
+    const next = { ...split(wanted, presence, session.userId), paused: paused.now((yield* Clock.currentTimeMillis) / 1000) }
+    yield* SubscriptionRef.update(people, (last) => (samePeople(last, next) ? last : next))
+    yield* self.set(presence.get(session.userId))
   })
+
+  const paused = yield* pausedPeople({ selfId: session.userId, wanted: () => wanted, lock, publish: Effect.suspend(() => publish) })
   // Sends the list when it differs from the last one sent; nothing before the first read.
   const subscribe = Effect.suspend(() => {
     if (sent === wantedKey || (sent === undefined && wanted.size === 0)) return Effect.void
@@ -111,6 +123,7 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
   const forget = Effect.suspend(() => {
     sent = undefined
     presence.clear()
+    paused.forget()
     return publish
   })
 
@@ -131,7 +144,9 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
       wanted = new Set(result.success)
       wantedKey = key
       for (const id of presence.keys()) if (!wanted.has(id)) presence.delete(id)
-      return Effect.andThen(publish, subscribe)
+      const unasked = paused.keepOnly(wanted)
+      // Before the first connect there is nothing to ask with yet; the connect asks about everyone.
+      return Effect.andThen(publish, subscribe).pipe(Effect.andThen(sent === undefined ? Effect.void : paused.askAbout(unasked)))
     })).pipe(
       // A failed send is logged, and the next change or connect sends again.
       Effect.catchDefect((defect) => Effect.logWarning('presence: could not subscribe', { defect })),
@@ -141,14 +156,15 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
   return (input) => lock.withPermits(1)(Effect.suspend(() => {
     switch (input._tag) {
       case 'Connected':
-        return Effect.andThen(forget, subscribe)
+        return Effect.andThen(forget, subscribe).pipe(Effect.andThen(paused.askAbout(wanted)))
       case 'Disconnected':
         return forget
       // Changes were dropped: subscribing again makes Slack send the current presence.
       case 'Overflowed':
-        return Effect.andThen(forget, subscribe)
+        return Effect.andThen(forget, subscribe).pipe(Effect.andThen(paused.askAbout(wanted)))
       case 'Frame': {
         const frame = input.frame
+        if (frame.type === 'dnd_updated_user') return frame.user !== undefined && wanted.has(frame.user) ? paused.askAbout([frame.user]) : Effect.void
         // The official client reads only `users`; a frame with a single `user` it logs and drops.
         if (frame.type !== 'presence_change' || frame.users === undefined) return Effect.void
         for (const id of frame.users) if (wanted.has(id)) presence.set(id, frame.presence)
@@ -159,7 +175,7 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
 })
 
 /** The followed people other than the user, by what Slack last said, sorted; those it has not answered for are left out. */
-const split = (wanted: ReadonlySet<string>, presence: ReadonlyMap<string, 'active' | 'away'>, selfId: string): PresencePeople => {
+const split = (wanted: ReadonlySet<string>, presence: ReadonlyMap<string, 'active' | 'away'>, selfId: string): Omit<PresencePeople, 'paused'> => {
   const active: Array<string> = []
   const away: Array<string> = []
   for (const id of [...wanted].toSorted()) {
@@ -171,3 +187,4 @@ const split = (wanted: ReadonlySet<string>, presence: ReadonlyMap<string, 'activ
 }
 
 const sameIds = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) => a.length === b.length && a.every((id, index) => id === b[index])
+const samePeople = (a: PresencePeople, b: PresencePeople) => sameIds(a.active, b.active) && sameIds(a.away, b.away) && sameIds(a.paused, b.paused)

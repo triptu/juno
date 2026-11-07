@@ -46,6 +46,8 @@ export interface ContextPillProps {
    * The tooltip says it in words; a button's `label` should too.
    */
   readonly presence?: 'active' | 'away'
+  /** With `presence`: the person has notifications paused, so the snooze glyph takes the dot's place, green when active. */
+  readonly paused?: boolean
 }
 
 const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 28: 14 }
@@ -57,10 +59,11 @@ const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 
  * name takes an ellipsis, the icon and the kind keep their size, and the
  * pill never gets narrower than those two, so nothing spills out of it.
  */
-export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label, iconWhenNarrow = false, presence }: ContextPillProps) {
+export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label, iconWhenNarrow = false, presence, paused = false }: ContextPillProps) {
   const kind = showKind && kindLabel ? kindLabel : undefined
   const presenceWord = presence === undefined ? undefined : presence === 'active' ? 'Active' : 'Away'
-  const hintKind = [kindLabel, presenceWord].filter((part) => part !== undefined).join(' · ') || undefined
+  const pausedWords = presence !== undefined && paused ? 'Notifications paused' : undefined
+  const hintKind = [kindLabel, presenceWord, pausedWords].filter((part) => part !== undefined).join(' · ') || undefined
   // The tooltip names the place too when the name can be hidden; otherwise the native title says the kind, as before.
   const hint = iconWhenNarrow ? tooltip(hintKind === undefined ? name : `${name} · ${hintKind}`) : { title: hintKind }
   const content = (
@@ -69,7 +72,7 @@ export function ContextPill({ tint, icon, name, kindLabel, showKind = false, siz
         <Icon icon={icon} size={iconBySize[size]} />
       ) : (
         <span data-pill-presence={presence} {...stylex.props(styles.dotSlot, slot.box(iconBySize[size]))}>
-          <PresenceDot active={presence === 'active'} surface="inline" />
+          <PresenceDot active={presence === 'active'} paused={paused} surface="inline" />
         </span>
       )}
       <span {...stylex.props(styles.name, iconWhenNarrow && kind === undefined && styles.nameNarrow)}>{name}</span>

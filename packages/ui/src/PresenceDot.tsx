@@ -7,15 +7,15 @@ type PresenceDotSurface = 'subtle' | 'raised'
 /**
  * A sidebar row, plain or selected. As the avatar stack's rings on the same
  * rows, the ring keeps the plain fill under the pointer: following the hover
- * fill would not fit the initial style sheet's budget. A row shows only the
- * active dot: away and paused draw nothing there.
+ * fill would not fit the initial style sheet's budget. A row shows the
+ * active dot and the paused badge; away alone draws nothing there.
  */
 type RowSurface = 'row' | 'rowSelected'
 
 /**
  * `inline`: in a line of text, in place of an icon (the topic header's DM
  * pill), not on an avatar. 8px with no ring; away is a hollow ring in the
- * text's colour.
+ * text's colour. Paused, the snooze glyph alone at 12px.
  */
 type InlineSurface = 'inline'
 
@@ -23,7 +23,7 @@ export interface PresenceDotProps {
   /** Slack shows the person as active. A green dot when true, a hollow ring when false (nothing on a row). */
   readonly active: boolean
   readonly surface: PresenceDotSurface | RowSurface | InlineSurface
-  /** Notifications are paused: a snooze badge (a "z" in an open circle) takes the dot's place, as Slack shows it, green while active. Not on a row. */
+  /** Notifications are paused: a snooze badge (a "z" in an open circle) takes the dot's place, as Slack shows it, green while active. */
   readonly paused?: boolean
 }
 
@@ -41,6 +41,7 @@ const BADGE_INSET = `calc(14.645% - ${BADGE} / 2)`
 /** The inline dot, as wide as the 13px icon it stands in for, less its side bearings. */
 const INLINE_DOT = '8px' // tokens-allow: the inline presence dot
 const GLYPH = 10
+const INLINE_GLYPH = 12
 
 /**
  * Whether Slack shows you, or the person on a DM row, as active, drawn on
@@ -55,25 +56,32 @@ const GLYPH = 10
  */
 export function PresenceDot({ active, surface, paused = false }: PresenceDotProps) {
   if (surface === 'inline') {
+    if (paused) {
+      return (
+        <span aria-hidden data-paused data-presence={active ? 'active' : 'away'} {...stylex.props(styles.inlineBadge, active && styles.badgeActive)}>
+          <Snooze size={INLINE_GLYPH} />
+        </span>
+      )
+    }
     return <span aria-hidden data-presence={active ? 'active' : 'away'} {...stylex.props(styles.inline, active ? styles.active : styles.inlineAway)} />
-  }
-  if (surface === 'row' || surface === 'rowSelected') {
-    return active ? <span aria-hidden data-presence="active" {...stylex.props(styles.dot, rowRings[surface], styles.active)} /> : null
   }
   if (paused) {
     return (
       <span aria-hidden data-paused data-presence={active ? 'active' : 'away'} {...stylex.props(styles.dot, styles.badge, rings[surface], fills[surface], active && styles.badgeActive)}>
-        <Snooze />
+        <Snooze size={GLYPH} />
       </span>
     )
+  }
+  if (surface === 'row' || surface === 'rowSelected') {
+    return active ? <span aria-hidden data-presence="active" {...stylex.props(styles.dot, rings[surface], styles.active)} /> : null
   }
   return <span aria-hidden data-presence={active ? 'active' : 'away'} {...stylex.props(styles.dot, rings[surface], active ? styles.active : holes[surface])} />
 }
 
 /** Slack's snooze mark: a "z" breaking out of an open circle. Phosphor has no such glyph. */
-function Snooze() {
+function Snooze({ size }: { readonly size: number }) {
   return (
-    <svg width={GLYPH} height={GLYPH} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
       <path d="M3.6 2.2 A4.9 4.9 0 1 0 10.9 8" />
       <path d="M5.6 1 H11 L5.6 6.2 H11" />
     </svg>
@@ -121,19 +129,23 @@ const styles = stylex.create({
   badgeActive: {
     color: colors['--presence-active'],
   },
+  inlineBadge: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    color: 'currentColor',
+  },
 })
 
 const fills = stylex.create({
   subtle: { backgroundColor: colors['--background-subtle'] },
   raised: { backgroundColor: colors['--surface-raised'] },
+  row: { backgroundColor: colors['--background-subtle'] },
+  rowSelected: { backgroundColor: colors['--secondary-default'] },
 })
 
 const rings = stylex.create({
   subtle: { borderColor: colors['--background-subtle'] },
   raised: { borderColor: colors['--surface-raised'] },
-})
-
-const rowRings = stylex.create({
   row: { borderColor: colors['--background-subtle'] },
   rowSelected: { borderColor: colors['--secondary-default'] },
 })

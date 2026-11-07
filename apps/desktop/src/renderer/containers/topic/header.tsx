@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
-import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, personPresenceAtom, registry, topicAtom } from '@juno/state'
+import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, personPausedAtom, personPresenceAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { TopicHeader, type MenuAnchor, type TopicHeaderProps, type TopicHeaderReader } from '@juno/views'
 import { chunk } from '../chunks'
@@ -72,5 +72,6 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
  */
 function PresenceHeader({ partnerId, ...props }: TopicHeaderProps & { readonly partnerId: string }) {
   const presence = useAtomValue(personPresenceAtom(partnerId))
-  return <TopicHeader {...props} {...(presence === undefined ? {} : { presence })} />
+  const paused = useAtomValue(personPausedAtom(partnerId))
+  return <TopicHeader {...props} {...(presence === undefined ? {} : { presence, paused })} />
 }
