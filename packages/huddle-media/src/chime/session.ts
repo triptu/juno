@@ -78,10 +78,9 @@ class ChimeMediaSession implements MediaSession {
     let configuration: MeetingSessionConfiguration
     try {
       configuration = new MeetingSessionConfiguration(info.meeting, info.attendee)
-    } catch {
-      this.#store.update(startCall(''))
-      this.#store.update(setConnection({ state: 'ended', reason: 'failed', attendeeId: '', code: 'BadJoinInfo' }))
-      return
+    } catch (cause) {
+      // Rejected, not ended: an end names the call's attendee, and no call exists to name.
+      throw new Error('huddle-media: the join answer has no meeting Chime can use', { cause })
     }
     configuration.reconnectTimeoutMs = RECONNECT_TIMEOUT_MS
     const attendeeId = configuration.credentials?.attendeeId ?? ''

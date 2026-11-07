@@ -174,7 +174,7 @@ import type { HuddleSound } from './sounds.ts'
  * is connecting or connected throws. After it ends, `join` may start a new one.
  */
 export interface MediaSession {
-  /** Starts the call. Resolves once Chime is starting; follow `connection` for the rest. */
+  /** Starts the call. Resolves once Chime is starting; follow `connection` for the rest. Rejects on a join answer Chime cannot use: no call starts, and the snapshot does not change. */
   join(info: JoinInfo): Promise<void>
   /** Stops the call. Resolves when it has stopped, within 5 s. Safe to call in any state. */
   leave(): Promise<void>

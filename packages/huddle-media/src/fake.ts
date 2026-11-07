@@ -36,6 +36,13 @@ interface Shown {
   pattern: TestPattern | undefined
 }
 
+/** What Chime's `MeetingSessionConfiguration` reads from the meeting and throws without: its media placement, under `Meeting` or at the top. */
+function hasMediaPlacement(meeting: unknown): boolean {
+  const top = meeting as { readonly Meeting?: { readonly MediaPlacement?: unknown }; readonly MediaPlacement?: unknown } | null
+  const placement = top?.Meeting === undefined ? top?.MediaPlacement : top.Meeting.MediaPlacement
+  return typeof placement === 'object' && placement !== null
+}
+
 const FAKE_TEAM = 'T0FAKETEAM0'
 const FAKE_ROOM = 'R0FAKEROOM0'
 
@@ -68,6 +75,7 @@ export class FakeMediaSession implements MediaSession {
     const state = this.getSnapshot().connection.state
     if (state === 'connecting' || state === 'connected' || state === 'reconnecting') throw new Error('huddle-media: a call is already running')
     const attendee = info.attendee as { AttendeeId?: unknown } | null
+    if (!hasMediaPlacement(info.meeting)) throw new Error('huddle-media: the join answer has no meeting Chime can use')
     this.#speaking = []
     this.#store.update(startCall(typeof attendee?.AttendeeId === 'string' ? attendee.AttendeeId : 'fake-self'))
     // As the real session: without a microphone it can use, the call starts muted.
