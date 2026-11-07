@@ -21,6 +21,7 @@ import { observeMetadata, patchMetadata, type MetadataFence } from './metadata'
 import { reindexOptions, wantMembers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
+import { noteFeedReaction } from './reactionFeed'
 import { reindexTopics, topicsOfMessages } from './reindex'
 import { liveRootRange, noteLiveRoot } from './liveRoots'
 import { provenToEnd } from './threadRanges'
@@ -124,7 +125,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'reaction_removed': {
         if (frame.item.type !== 'message') return
         const { channel, ts } = frame.item
-        return yield* transaction(writeReaction(ctx, { channel, ts, name: frame.reaction, user: frame.user, added: frame.type === 'reaction_added' }, frame.event_ts))
+        return yield* transaction(writeReaction(ctx, { channel, ts, name: frame.reaction, user: frame.user, added: frame.type === 'reaction_added' }, frame.event_ts).pipe(Effect.andThen(noteFeedReaction(ctx, frame))))
       }
       // A rename carries a partial object (`id`, `name`, `name_normalized`, `created`): only the name changes.
       case 'channel_rename':
