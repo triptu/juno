@@ -1123,7 +1123,7 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 - Severity: low to medium. Plausible: each step is confirmed, the frequency depends on the network. Impact: On bad Wi-Fi, bursts of redundant interactive-lane calls, more 429s, and `syncing` held true for a long time.
 - Test: `gap-and-restart.flow.test.ts`. Hold `client.counts`, drop and reconnect three times, release, and expect 2 `client.counts` calls, not 4.
 - Fix direction: one "catch-up wanted" flag; do not queue a reconcile while one is queued and not started.
-- Status: Fixed in SHA_ENG5. `makeReconcile` queues no reconcile while one waits for the work permit; the waiting one reads the earliest `droppedAt` when it starts. Test: `gap-and-restart.flow.test.ts`, "a socket that flaps during a slow catch-up queues one more catch-up, not one per reconnect".
+- Status: Fixed in cb268fe76. `makeReconcile` queues no reconcile while one waits for the work permit; the waiting one reads the earliest `droppedAt` when it starts. Test: `gap-and-restart.flow.test.ts`, "a socket that flaps during a slow catch-up queues one more catch-up, not one per reconnect".
 
 #### ENG-6. A call refused during a pause counts as another rate limit
 
@@ -1132,7 +1132,7 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 3. `withRetries` cannot tell the refusal from a 429 and calls `queue.pause` again (`api.ts:254-255`), which sets `decayAt` five minutes from now. Every attempt does, up to `maxAttempts`.
 
 - Severity: low. Confirmed. Impact: the method's doubled background spacing lasts five minutes past the last refused call, not past the 429. Departs from `requestqueue.qnt`, where only a real 429 is `limited`.
-- Status: Fixed in SHA_ENG6. `withRetries` runs the exchange's result inside the queue, so the queue's own failure is a refusal: final, with no pause. Test: `packages/slack/test/api.test.ts`, "a call refused during a pause is not another rate limit: the method recovers its spacing five minutes after the 429".
+- Status: Fixed in c7cdb504a. `withRetries` runs the exchange's result inside the queue, so the queue's own failure is a refusal: final, with no pause. Test: `packages/slack/test/api.test.ts`, "a call refused during a pause is not another rate limit: the method recovers its spacing five minutes after the 429".
 
 #### ENG-7. EnginePhases can publish a phase computed from stale inputs
 
@@ -1142,7 +1142,7 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 
 - Severity: low. Plausible: it needs a fiber yield between the two steps. Impact: A wrong offline or live display until the next input change. It breaks the engine phase invariant.
 - Fix direction: compute and set under one lock (`SubscriptionRef.modifyEffect` or a semaphore), or derive from `Stream.zipLatestAll`.
-- Status: Fixed in SHA_ENG7 by construction: the three input streams are merged and one fiber applies each change and publishes its phase in order. No test: the race needs a fiber yield between two synchronous steps of one fiber, which no test can force.
+- Status: Fixed in 0742cf6c2 by construction: the three input streams are merged and one fiber applies each change and publishes its phase in order. No test: the race needs a fiber yield between two synchronous steps of one fiber, which no test can force.
 
 ### Issue 3: Juno Agent approvals and runs can stall for good
 
