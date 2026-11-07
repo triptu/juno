@@ -290,8 +290,8 @@ async function avatarMenuRows(juno: Juno, win: Page): Promise<void> {
   await win.keyboard.press('ArrowDown')
   await expect.poll(() => highlighted(list)).toEqual([expect.stringMatching(/^Hide message text/)])
 
-  // Leaving the menu clears the highlight, as a native menu does.
-  await accountMenu.root.getByRole('heading', { name: 'Session' }).hover()
+  // Leaving the items for the header above them clears the highlight, as a native menu does.
+  await accountMenu.root.getByText(/^(Active|Away)/).first().hover()
   await expect.poll(() => highlighted(list)).toEqual([])
   await accountMenu.close()
 }
