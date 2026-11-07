@@ -556,8 +556,9 @@ States: `connecting`, `connected`, `reconnecting`, `failed`.
 |---|---|---|---|
 | any | port opens | connected | `transport.ts:57`, `client.ts:43-46` |
 | any | port scope closes | reconnecting if ever connected, else connecting | `transport.ts:43-48`, `client.ts:45` |
-| any | `acquire` rejects with `EngineFailed` | failed | `port.ts:78-80`, `client.ts:57` |
-| failed | sidebar Restart | reconnecting; then main's `supervisor.restart()` | `client.ts:72 (restartEngine)` |
+| any | `acquire` rejects with `EngineFailed`, no Restart since that request went out | failed | `port.ts:78-80`, `client.ts (configureConnection)` |
+| any | `acquire` rejects with `EngineFailed` for a request made before the latest Restart | unchanged (REN-6, fixed) | `client.ts (restartsAtom)` |
+| failed | sidebar Restart | reconnecting; `restartsAtom` counts up; then main's `supervisor.restart()` | `client.ts (restartEngine)` |
 
 The RPC pool retries the spawn forever, once a second (`Effect.retry(Schedule.spaced(1000))` in Effect's `RpcClient` `makeProtocolWorker`). Main answers each port request at once, even while the engine starts (`main/engine.ts:103-114`). So `connected` means "holds a port", not "engine ready".
 
@@ -1459,7 +1460,7 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | OUT-5 | A follow command interrupted mid-call (window closed, or `FollowNewJob`'s `switchMap` restarting) leaves its `follow` row, so events and pages for the thread are ignored until the next sync start (`packages/engine/src/follow.ts:111-123`, `topics/handlers.ts:146` is not uninterruptible). `follow.qnt` has no interrupt action. | medium |
 | OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
-| REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
+| REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Confirmed. Fixed in REN6SHA: a `failed` answer sets the state only when no Restart was asked for since that port request went out (`restartsAtom`). Test: `packages/state/test/connection.test.ts`, "a port request already out when Restart is pressed does not show the engine failed again". | low |
 | MAIN-6 | Sign-in answers carry no request id: after an engine crash during a keychain import, the import's `secrets` can be taken as the stored session, which was never written to `secrets.bin` (`Session.ts:173-188`, `main/session.ts:47-52`, l.93). An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131). | low |
 | MAIN-7 | `juno-provider.json` is written with a plain `writeFile` and `set()` calls are not serialized; a crash or two overlapping sets can leave invalid JSON, which loses the custom base URL (`main/providers.ts:172-174`, l.89-96). | low |
 | MAIN-8 | Smaller main items: `EngineSupervisor.pendingPorts` keeps a destroyed renderer's port until the next `ready` (`main/engine.ts:110-111`); `codex.signIn` has no single-flight and its `codex login` child is not killed on quit (`main/codex.ts:45-58`); an MCP credential save writes chunks before the count, so a crash mid-save mixes chunks (`main/mcpCredentials.ts:61-69`). The `huddleQuit.confirmed` latch is HUD-5. | low |
