@@ -1,0 +1,1 @@
+- 11-08 02:15 · pause-notify · When the notification hours (not a snooze) pause notifications, the avatar menu says "Paused until Mon 9am" under Pause notifications, not under Notification settings · The menu said the pause twice, once on each row; the Pause notifications row is where the pause lives, and Resume notifications already shows a snooze's end the same way.

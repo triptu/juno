@@ -135,8 +135,9 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
 }
 
 function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy, canPause, session }: Pick<AccountMenuProps, 'status' | 'presence' | 'paused' | 'snoozeLabel' | 'session'> & { readonly snoozed: boolean; readonly privacy: boolean; readonly canPause: boolean }): ReadonlyArray<Item> {
-  // While snoozed, Resume says until when; the settings row says it only when the notification hours pause notifications.
-  const settingsHint = snoozed || paused === undefined ? {} : { hint: paused, hintBelow: true }
+  // While snoozed, Resume says until when. When the notification hours pause notifications, Pause notifications says it
+  // (or Notification settings, in a menu that cannot pause).
+  const pausedHint = snoozed || paused === undefined ? {} : { hint: paused, hintBelow: true }
   return [
     status === undefined
       ? { id: 'status', leading: icon(SmileyPlus), label: 'Set a status' }
@@ -148,11 +149,11 @@ function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy,
         },
     presence?.active === false ? { id: 'presence', leading: icon(Sun), label: 'Set yourself active' } : { id: 'presence', leading: icon(Moon), label: 'Set yourself away' },
     privacy ? { id: 'privacy', leading: icon(Eye), label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', leading: icon(EyeSlash), label: 'Hide message text', hint: '⌃⌘H' },
-    { id: 'notifications', leading: icon(Bell), label: 'Notification settings', ...settingsHint },
+    { id: 'notifications', leading: icon(Bell), label: 'Notification settings', ...(canPause ? {} : pausedHint) },
     ...(snoozed
       ? [{ id: 'resume', leading: icon(BellRinging), label: 'Resume notifications', ...(snoozeLabel === undefined ? {} : { hint: snoozeLabel, hintBelow: true }) } as const]
       : canPause
-        ? [{ id: 'pause', leading: icon(BellSlash), label: 'Pause notifications' } as const]
+        ? [{ id: 'pause', leading: icon(BellSlash), label: 'Pause notifications', ...pausedHint } as const]
         : []),
     { id: 'settings', leading: icon(Gear), label: 'Settings', hint: '⌘,' },
     ...(session === undefined ? [] : [{ id: 'signOut', leading: icon(SignOut), label: 'Sign out', hint: session.line, hintBelow: true, apart: true, disabled: session.signingOut === true } as const]),
