@@ -198,8 +198,10 @@ A round is one step the harness drives, followed by the steps Juno takes on its 
 - **Each worker settles one row at a time.** The post worker waits for its post or lookup before it claims or looks up another, and the action worker waits for its call before it runs, checks or drops another row.
 - **A channel's edits and deletes go in order.** The user's edit or delete waits behind a copy's delete queued before it, and the other way round (review S3).
 - **The post worker takes due rows in the order they were sent**, and **after a reconnect the catch-up stores what it finds before a lookup goes**.
-- **An action call that failed goes again after a backoff**, so other calls can take the lane meanwhile. The model sends it again at once.
+- **An action call that failed goes again after a backoff**, so other calls can take the lane meanwhile. The model sends it again at once. **A post Slack rate-limited goes again after its Retry-After**, likewise; the model makes it due at once.
+- **A copy's delete tries again after a backoff, and its try can wait in the lane** behind a post, with the action worker. A change the user queues meanwhile is not run until the lane frees; the model runs it at once. The harness cannot see that wait, so the user queues no change while a try may be in the lane (`copyTry`).
 - **Going offline fails calls that wait for the lane.** The model keeps them in transit until Slack decides them.
+- **The start after a crash makes every row due**, so a lookup would race the boot's catch-up: no crash comes while a post is sending, and no reconnect while a post is unknown.
 
 None of these weakens the model's safety properties: the engine's schedules are a subset of the model's.
 
@@ -246,6 +248,11 @@ The first runs found these. A real bug has a test marked `it.fails` while it is 
 | A row that ended mid-pass held its channel until the next pass, so a later channel's row went first; after a lookup that found nothing, the pass went on to later rows before the post went again. Juno now frees the channel and starts the post pass again. | engine order, fixed | `actionWorker.ts`, `worker.ts` |
 | After a lost answer to an edit that changed meanwhile, the client sends the old text again before the worker sends the new one. One extra call; the end state agrees. | small difference | `outbox-actionRetry` is not replayed |
 | The model's `crash` keeps the socket up and reads nothing; the engine's restart boots warm and reads history, so it stores the post without a lookup. | model | crashes only while the socket is down |
+| A reply that kept a copy left the copy's delete row in the outbox: the row given to `dropAction` was built with made-up fields, and the drop matches on them. The row held the channel's later changes until its next try, when the check dropped it. Fixed: `copyDeleteOf` reads the stored row. | fixed bug | `flows/outbox-copies.flow.test.ts`, "lets the user’s edit go at once when a reply keeps a copy whose delete waits out a backoff" |
+| A copy's delete try that waits in the lane behind a post holds the action worker, so a change queued meanwhile goes after the lane frees; replaced during that wait, it goes out once in the engine and twice in the model. | scheduling | no change queued while a try may be in the lane (`copyTry`) |
+| After a 429 the post worker claims the post again only after its Retry-After, so an edit already waiting takes the lane first and the other channel's due post goes; the model makes the post due at once. | scheduling | `limited` in `outbox-conformance.qnt` |
+| The model lets another device delete a message the user's own delete already removed; the fake has no such message. | model | no `remoteChange` "gone" once the user's delete is done |
+| After a crash the start makes every row due, so an unknown post's lookup races the boot's catch-up and may go out on a loaded machine. | timing | no crash while a post is sending |
 
 ## Catch-up rules and assumptions
 
