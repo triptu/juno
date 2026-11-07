@@ -296,6 +296,21 @@ export const deferPost = (clientMsgId: string, nextAt: number, error: string) =>
 /** A file of a queued post could not be uploaded: nothing was posted, so it waits for Retry or Delete draft. */
 export const failUpload = (clientMsgId: string, error: string) => move(clientMsgId, ['queued'], 'failed', { lastError: error, attempt: true })
 
+/**
+ * A file a queued post took while it was staging will never be complete
+ * (the composer could not read it, or a restart lost its bytes): the post
+ * goes on without it and fails with `error`, so Retry sends what the row
+ * shows and Delete draft drops it. False when the row is gone.
+ */
+export const failStaging = (clientMsgId: string, stagedId: string, error: string): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const post = yield* readPost(clientMsgId)
+    if (post === undefined) return false
+    const sql = yield* StoreWriter
+    yield* sql`UPDATE pending_messages SET file_ids_json = ${JSON.stringify(post.files.filter((file) => file.id !== stagedId))} WHERE client_msg_id = ${clientMsgId}`
+    return yield* failUpload(clientMsgId, error)
+  })
+
 /** Slack refused the post. It waits for Retry or Delete draft. */
 export const failPost = (clientMsgId: string, error: string) => move(clientMsgId, ['sending'], 'failed', { lastError: error })
 

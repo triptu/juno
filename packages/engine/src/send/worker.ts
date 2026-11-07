@@ -57,6 +57,7 @@ import {
   deferPost,
   failLookup,
   failPost,
+  failStaging,
   failUpload,
   fileStaged,
   fileUploaded,
@@ -199,14 +200,18 @@ export class PostWorker extends Context.Service<
             if (file.staging !== true) continue
             const status = yield* staging.status(file.id)
             if (status._tag === 'writing') return WAITING
-            if (status._tag === 'ready') {
-              if (!(yield* local(transaction(fileStaged(row.clientMsgId, status.file))))) return undefined
-              files = files.map((each) => (each.id === file.id ? status.file : each))
+            // A restart forgets the file, but keeps the bytes it had written.
+            const complete = status._tag === 'ready' ? status.file : status._tag === 'unknown' ? yield* staging.recover(open, file) : undefined
+            if (complete !== undefined) {
+              if (!(yield* local(transaction(fileStaged(row.clientMsgId, complete))))) return undefined
+              files = files.map((each) => (each.id === file.id ? complete : each))
               continue
             }
-            // The composer could not read the rest, or a restart lost it: nothing was posted, so it waits for Retry or Delete draft.
+            // The composer could not read the rest, or a restart lost it: nothing was posted, and the post goes on
+            // without the file, failed, so Retry sends what the row shows and Delete draft drops it.
             yield* Effect.logWarning('send: a file was not staged')
-            yield* local(transaction(failUpload(row.clientMsgId, NOT_STAGED)))
+            yield* local(transaction(failStaging(row.clientMsgId, file.id, NOT_STAGED)))
+            yield* staging.release(open, [file])
             return undefined
           }
           return { ...row, files }

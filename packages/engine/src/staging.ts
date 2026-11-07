@@ -75,6 +75,8 @@ export class Staging extends Context.Service<
     readonly take: (ids: ReadonlyArray<string>) => Effect.Effect<ReadonlyArray<PendingFile>, Rejected>
     /** How far a file a post took while it was staging has got. A ready file is forgotten once asked about; a failed one at `release`. */
     readonly status: (id: string) => Effect.Effect<StagingStatus>
+    /** A file a post took while it was staging that `status` does not know (a restart): the complete file when every declared byte is on disk. */
+    readonly recover: (open: OpenWorkspace, file: PendingFile) => Effect.Effect<PendingFile | undefined>
     /** A file a post took while it was staging finished, or will not. */
     readonly settled: Stream.Stream<void>
     /** A staged file's bytes, for the upload. */
@@ -148,15 +150,32 @@ export class Staging extends Context.Service<
           return stagedOf(file)
         })
 
-      /** The last chunk is written: the file's size, and an image's pixel size from its header. */
+      /** The file with every byte written: its size, and an image's pixel size from its header. */
+      const complete = (file: PendingFile, filePath: string, written: number): Effect.Effect<PendingFile> =>
+        Effect.gen(function* () {
+          const header = yield* io(() => readHead(filePath)).pipe(Effect.orDie)
+          const size = IMAGE_EXTENSIONS[file.mimetype] === undefined ? undefined : imageSize(header)
+          const { staging: _, ...rest } = file
+          return { ...rest, size: written, ...(size === undefined ? {} : { width: size.width, height: size.height }) }
+        })
+
+      /** The last chunk is written. */
       const finish = (entry: Entry) =>
         Effect.gen(function* () {
           entry.done = true
-          const header = yield* io(() => readHead(entry.path)).pipe(Effect.orDie)
-          const size = IMAGE_EXTENSIONS[entry.file.mimetype] === undefined ? undefined : imageSize(header)
-          const { staging: _, ...rest } = entry.file
-          entry.file = { ...rest, size: entry.written, ...(size === undefined ? {} : { width: size.width, height: size.height }) }
+          entry.file = yield* complete(entry.file, entry.path, entry.written)
           return entry.file
+        })
+
+      const recover = (open: OpenWorkspace, file: PendingFile) =>
+        Effect.gen(function* () {
+          const filePath = path.join(open.paths.uploads, file.stagedName)
+          const written = yield* io(() => stat(filePath)).pipe(
+            Effect.map((info) => info.size),
+            Effect.catch(() => Effect.succeed(-1)),
+          )
+          if (file.size <= 0 || written !== file.size) return undefined
+          return yield* complete(file, filePath, written)
         })
 
       const status = (id: string): Effect.Effect<StagingStatus> =>
@@ -247,7 +266,7 @@ export class Staging extends Context.Service<
         ),
       )
 
-      return Staging.of({ stage, unstage, take, status, settled: Stream.fromPubSub(settles), read, release })
+      return Staging.of({ stage, unstage, take, status, recover, settled: Stream.fromPubSub(settles), read, release })
     }),
   )
 }

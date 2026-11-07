@@ -67,6 +67,7 @@ export {
   discardPost,
   failLookup,
   failPost,
+  failStaging,
   failUpload,
   fileStaged,
   fileUploaded,

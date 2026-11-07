@@ -389,8 +389,10 @@ stateDiagram-v2
 | From | Event | To | Guard | Code |
 |---|---|---|---|---|
 | none | `sendMessage`, forward, agent send | queued | `pending:` thread resolved through `started_threads` at insert | `posts.ts:140 (queuePost)`, l.154 |
-| queued | a file is still staging | queued | | `worker.ts:183 (staged)` |
-| queued | file not stageable or upload refused | failed | | `posts.ts:268 (failUpload)`, `worker.ts:154`, `worker.ts:198` |
+| queued | a file is still staging | queued | | `worker.ts (staged)` |
+| queued | a file a restart forgot has every declared byte on disk | queued, the file complete (`fileStaged`) | | `staging.ts (recover)`, `worker.ts (staged)` |
+| queued | a file will never be staged (the composer could not read it, or a restart lost its bytes) | failed, without that file; its staged bytes released | | `posts.ts (failStaging)`, `worker.ts (staged)` |
+| queued | upload refused | failed | | `posts.ts (failUpload)`, `worker.ts (upload)` |
 | queued | upload offline, 429 or no session | queued; attempt + 1; backoff | | `posts.ts:265 (deferPost)` |
 | queued | claim | sending; attempt + 1; `sent_posts` row; the request is built from the row the claim read | socket online (`worker.ts:212`) | `posts.ts (claimPost)`, `worker.ts (post)` |
 | sending | answer with a message | gone | | `fetcher.sent`, `posts.ts:305 (reconcilePost)` |
@@ -542,7 +544,7 @@ Where: in memory, `packages/engine/src/staging.ts`. `entries` (composer chips) a
 | claimed, unfinished | `unstage` | failed | `staging.ts:164-187` |
 | any | workspace change | both maps cleared | |
 
-After a restart `claimed` is empty, so every file with `staging: true` reads `unknown` (see OUT-6).
+After a restart `claimed` is empty, so every file with `staging: true` reads `unknown`: the worker asks `recover`, which answers the complete file when every declared byte is on disk, and otherwise drops the file from the post (OUT-6, fixed).
 
 ## Renderer and state client
 
@@ -1033,10 +1035,10 @@ The user can delete Q by hand.
 3. The worker asks `status` and gets `unknown`, so it calls `failUpload(NOT_STAGED)` (`worker.ts:189-199`).
 4. The user clicks Retry. `retryPost` only changes the state (`posts.ts:274`). The file still has `staging: true`, so the next pass fails the same way.
 
-- Severity: low. Confirmed. Impact: A Retry button that never works. Nothing special-cases `file_not_staged`.
-- Test: `outbox.flow.test.ts`. Restart the engine between `files.stage` chunks and a send, then Retry.
+- Severity: low. Confirmed. Impact: A Retry button that never works. Nothing special-cases `file_not_staged`. The same loop runs without a restart when the composer could not read the file (`files.unstage` marks the claimed entry failed, and `status` answers failed on every Retry).
+- Test: `outbox.flow.test.ts`. Name two files with their empty first chunk, send, stage one in full, restart, then Retry.
 - Fix direction: hide Retry for this code, or clear the flag when the staged file is complete on disk.
-- Status: Open
+- Status: Fixed in SHA_OUT6. A restart no longer loses a file whose declared bytes are all on disk: `Staging.recover` completes it as the last chunk would. A file whose bytes will never all come is dropped from the post (`failStaging`), its staged bytes released, and the row fails with `file_not_staged` as before, so Retry sends what the row shows (decision 2026-11-07 19:56). Test: `outbox.flow.test.ts`, "after a restart, sends a post that named a file still being read whose bytes are all on disk, and drops a file the restart lost so Retry sends the rest".
 
 #### OUT-8. A newer mark can be delayed by an older mark's backoff
 
