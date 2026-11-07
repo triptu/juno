@@ -29,7 +29,7 @@ function injectFiles(fake: FakeSlack, input: { channel: string; user?: string; t
   const isPublic = ws.conversations.get(input.channel)?.kind === 'public'
   const stored = input.files.map((each) => {
     const made = sample(each.kind, { ...(each.name === undefined ? {} : { name: each.name }), ...(each.seconds === undefined ? {} : { seconds: each.seconds }) })
-    const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
+    const id = ws.nextFileId()
     const file = { id, name: made.name, length: made.bytes.length, user, created: ws.clock.now(), bytes: made.bytes, mimetype: made.mimetype, ...(made.extra === undefined ? {} : { extra: made.extra }) }
     ws.files.set(id, file)
     return file

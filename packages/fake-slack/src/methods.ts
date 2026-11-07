@@ -568,7 +568,7 @@ export const coreMethods = {
 
   'files.getUploadURL': (ctx, args) => {
     const ws = ctx.workspace
-    const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
+    const id = ws.nextFileId()
     ws.files.set(id, {
       id,
       name: args.filename,
@@ -577,6 +577,7 @@ export const coreMethods = {
       created: ws.clock.now(),
       bytes: undefined,
       mimetype: 'application/octet-stream',
+      uploading: true,
       ...(ws.holdThumbnails ? { thumbsHeld: true } : {}),
     })
     return { upload_url: ctx.uploadUrl(id), file: id }
@@ -590,7 +591,10 @@ export const coreMethods = {
       if (file?.bytes === undefined) return new ApiError('file_not_found')
       stored.push({ file, title: entry.title })
     }
-    for (const { file, title } of stored) if (title !== undefined && title !== '') file.title = title
+    for (const { file, title } of stored) {
+      delete file.uploading
+      if (title !== undefined && title !== '') file.title = title
+    }
     return { files: stored.map(({ file }) => fileObject(ctx.baseUrl, file)) }
   },
 
@@ -628,10 +632,28 @@ export const coreMethods = {
   },
 
   'files.info': (ctx, args) => {
-    if (!ctx.workspace.filesInfoSupported) return new ApiError('unknown_method')
-    const file = ctx.workspace.files.get(args.file)
+    const ws = ctx.workspace
+    if (!ws.filesInfoSupported) return new ApiError('unknown_method')
+    if (ws.deletedFiles.has(args.file)) return new ApiError('file_deleted')
+    const file = ws.files.get(args.file)
     if (file?.bytes === undefined) return new ApiError('file_not_found')
     return { file: fileObject(ctx.baseUrl, file) }
+  },
+
+  /**
+   * Removes a file. As seen live (research section 10, "Files"): a second
+   * delete, and a delete of an upload never completed, answer `file_deleted`.
+   * A message that shares the file keeps its copy of the file object, as
+   * Slack's history does.
+   */
+  'files.delete': (ctx, args) => {
+    const ws = ctx.workspace
+    if (ws.deletedFiles.has(args.file)) return new ApiError('file_deleted')
+    const file = ws.files.get(args.file)
+    if (file === undefined) return new ApiError('file_not_found')
+    ws.files.delete(args.file)
+    ws.deletedFiles.add(args.file)
+    return file.uploading === true ? new ApiError('file_deleted') : {}
   },
 
 } satisfies Partial<Handlers>

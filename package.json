@@ -48,6 +48,7 @@
     "probe:live": "bun scripts/probe-live.ts",
     "react:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/react-live.ts",
     "forward:live": "bun scripts/forward-live.ts",
+    "files:live": "bun scripts/files-live.ts",
     "broadcast:live": "bun scripts/broadcast-live.ts",
     "huddle:live": "bun scripts/huddle-live.ts",
     "sync:timeline": "node --import ./scripts/ts-resolve-hooks.mjs scripts/first-sync-live.ts",
