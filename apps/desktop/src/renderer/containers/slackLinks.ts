@@ -16,8 +16,8 @@
  * - A click on a person in a message opens them as a link to them does
  *   (`openPerson`).
  * - An answer that comes after the user went elsewhere (a slow fetch, a tab
- *   switch meanwhile) opens nothing (`movedOn`): the tab and the composer's
- *   focus stay where the user is.
+ *   switch meanwhile), or after a later link was clicked, opens nothing
+ *   (`movedOn`): the tab and the composer's focus stay where the user is.
  */
 import type { ActivateEvent, LinkInfo } from '@juno/views'
 import {
@@ -129,7 +129,7 @@ function late(since: Shown, link: string): boolean {
  * never messaged opens nothing. False when Juno does not know them.
  */
 export async function openPerson(user: string, behind: boolean): Promise<boolean> {
-  const since = shown()
+  const since = shown(!behind)
   const found = await locatePerson(registry, user)
   const person = found._tag === 'Success' ? found.value : undefined
   if (person?.person === undefined) return false
@@ -141,11 +141,12 @@ export async function openPerson(user: string, behind: boolean): Promise<boolean
 
 async function openSlackLink(url: string, match: SlackLinkMatch, event: ActivateEvent): Promise<void> {
   const { target } = match
-  const since = shown()
+  if (target.kind === 'person') {
+    if (!(await openPerson(target.user, event.metaKey))) openOutside(url, match, 'Juno does not know that person')
+    return
+  }
+  const since = shown(!event.metaKey)
   switch (target.kind) {
-    case 'person':
-      if (!(await openPerson(target.user, event.metaKey))) openOutside(url, match, 'Juno does not know that person')
-      return
     case 'channel': {
       const located = await locateMessage(registry, target.channel, undefined)
       if (located._tag !== 'Success' || located.value.place === undefined) return openOutside(url, match, NO_CONVERSATION)

@@ -95,6 +95,7 @@ import {
   traceSend,
   untouched,
   updateTabs,
+  whenTabsKnown,
   type MessageWindowSpec,
   type OpenOptions,
   type Place,
@@ -270,8 +271,16 @@ function whenReady(view: string, fresh: boolean, target?: string): Promise<void>
   })
 }
 
-/** Changes apply in the order they were asked for. */
+/** Changes apply in the order they were asked for, and none before the saved tabs are known: one applied to no tabs would replace them (`whenTabsKnown`). */
 let queue: Promise<void> = Promise.resolve()
+
+/** Adds `step` to the queue, after the saved tabs are known and `wait` has settled. */
+function enqueue(wait: Promise<void> | undefined, step: () => void): void {
+  queue = queue
+    .then(() => whenTabsKnown(registry))
+    .then(() => wait)
+    .then(step)
+}
 /** Bumped by each change of what the window shows: a change that waited applies only if nothing replaced it since. */
 let currentTicket = 0
 
@@ -283,26 +292,39 @@ export function afterNavigation(f: () => void): void {
   void queue.then(f)
 }
 
-/** What the window showed when an open started waiting on an answer: the active tab, its place and the ticket. */
+/** Counts the foreground opens that waited on an answer: the newest one is the user's latest ask. */
+let latestRequest = 0
+
+/** What the window showed when an open started waiting on an answer: the active tab, its place, the ticket and the open's own request. */
 export interface Shown {
   readonly tab: string | undefined
   readonly place: Place | undefined
   readonly ticket: number
+  /** This open's place among the foreground opens; undefined for one behind the current tab, which takes nothing from where the user is. */
+  readonly request: number | undefined
 }
 
-export function shown(): Shown {
+const current = (): Omit<Shown, 'request'> => {
   const tab = activeTab(registry.get(tabsAtom))
   return { tab: tab?.id, place: tab === undefined ? undefined : currentPlace(tab), ticket: currentTicket }
 }
 
+/** Taken as an open starts waiting. A `foreground` open also reserves its place in line, so an older open's answer loses to it. */
+export function shown(foreground = true): Shown {
+  return { ...current(), request: foreground ? ++latestRequest : undefined }
+}
+
 /**
  * Whether the user went elsewhere since `since`: another tab or place is
- * active, or a change was asked for (SPEC 8, "Links"). An open whose answer
- * (a Slack fetch, a local lookup) comes after that opens nothing, so it does
- * not take the tab and the composer's focus from where the user now is.
+ * active, a change was asked for, or a later foreground open started
+ * waiting (SPEC 8, "Links"). An open whose answer (a Slack fetch, a local
+ * lookup) comes after that opens nothing, so it does not take the tab and
+ * the composer's focus from where the user now is, and two opens that wait
+ * together end on the one asked for last, whichever answers first.
  */
 export function movedOn(since: Shown): boolean {
-  const now = shown()
+  if (since.request !== undefined && since.request !== latestRequest) return true
+  const now = current()
   if (now.ticket !== since.ticket || now.tab !== since.tab) return true
   return now.place === undefined || since.place === undefined ? now.place !== since.place : !samePlace(now.place, since.place)
 }
@@ -330,7 +352,7 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
   const ticket = replaceable ? ++currentTicket : currentTicket
   traceSend('tabs asked', () => ({ ticket, replaceable, ...(topic === undefined ? {} : { view: (topic.view ?? topic.id).replace('\u0000', '@'), fresh: topic.fresh }) }))
   if (topic === undefined) {
-    queue = queue.then(() => ready).then(() => {
+    enqueue(ready, () => {
       if (!replaceable || ticket === currentTicket) apply(change)
       else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
     })
@@ -346,12 +368,10 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
         return next
       }
     : change
-  queue = queue
-    .then(() => topicReady)
-    .then(() => {
-      if (!replaceable || ticket === currentTicket) apply(landing)
-      else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
-    })
+  enqueue(topicReady, () => {
+    if (!replaceable || ticket === currentTicket) apply(landing)
+    else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
+  })
 }
 
 /**
@@ -382,7 +402,7 @@ export function openTopicFromList(id: string, options: OpenOptions = {}): void {
  * the topic is enough (SPEC 12).
  */
 export function openTopicInBackground(id: string, { after, unlessShown = false }: { readonly after?: string; readonly unlessShown?: boolean } = {}): void {
-  queue = queue.then(() => {
+  enqueue(undefined, () => {
     const shownIn = unlessShown ? tabShowing(registry.get(tabsAtom), id) : undefined
     traceSend('background', () => ({ topic: id, ...(shownIn === undefined ? {} : { reused: shownIn.id }) }))
     if (shownIn !== undefined) return
@@ -629,7 +649,7 @@ export function openTopicAt(id: string, ts: string, options: OpenOptions & { rea
 export function openTopicAtInBackground(id: string, ts: string): void {
   flushSidebar(registry)
   flashMessage(registry, id, ts)
-  queue = queue.then(() => {
+  enqueue(undefined, () => {
     const before = new Set(registry.get(tabsAtom).tabs.map((tab) => tab.id))
     const next = updateTabs(registry, (tabs) => openPlace(tabs, topicPlace(id), { newTab: true, background: true }))
     const tab = next.tabs.find((each) => !before.has(each.id))
@@ -700,12 +720,9 @@ export function openAllTopics(options: OpenOptions = {}): void {
   }
   const ticket = ++currentTicket
   allTopicsOpenStart = performance.now()
-  const ready = whenAllTopicsReady()
-  queue = queue
-    .then(() => ready)
-    .then(() => {
-      if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
-    })
+  enqueue(whenAllTopicsReady(), () => {
+    if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
+  })
 }
 
 /** The topic a tab change brings on screen, if it has to wait for one. */
