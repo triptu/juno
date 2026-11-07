@@ -177,6 +177,8 @@ export function Sidebar() {
         {...(presence === undefined ? {} : { presence })}
         {...(paused === undefined ? {} : { paused })}
         snoozed={snoozed}
+        {...(status._tag === 'Success' && status.value.snoozeLabel !== undefined ? { snoozeLabel: status.value.snoozeLabel } : {})}
+        {...(status._tag === 'Success' ? { pauseEnds: status.value.pauseEnds } : {})}
         onPause={pause}
         privacy={privacy}
         onAction={accountAction}

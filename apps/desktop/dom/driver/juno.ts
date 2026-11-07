@@ -211,7 +211,7 @@ export class Juno implements JunoVerbs {
   }
 
   async openNotifications(): Promise<void> {
-    await this.accountMenu.choose(/^Notifications/)
+    await this.accountMenu.choose(/^Notification settings/)
     await this.tabs.expectActive('Settings')
     await expect(this.settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
   }

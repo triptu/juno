@@ -1,17 +1,17 @@
 import * as stylex from '@stylexjs/stylex'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
+import { BellRinging } from '@phosphor-icons/react/dist/icons/BellRinging'
 import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
-import { CaretLeft } from '@phosphor-icons/react/dist/icons/CaretLeft'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, type KeyboardEvent, type ReactNode } from 'react'
 import type { PauseChoice } from '@juno/contract'
-import { sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
+import { spacing } from '@juno/tokens/tokens.stylex'
+import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, Submenu, Text, useMenuActive, useSubmenu, type HueName, type PhosphorIcon } from '@juno/ui'
 
 export interface AccountMenuSection {
   readonly title: string
@@ -33,10 +33,17 @@ export interface AccountMenuProps {
    * Slack shows you away".
    */
   readonly presence?: { readonly active: boolean; readonly seen: boolean; readonly label: string }
-  /** "Paused until 9am" while notifications are paused (outside notification hours or snoozed), beside Notifications. */
+  /**
+   * "Paused until 9am" while notifications are paused (outside notification hours or snoozed): the avatar's paused
+   * badge, and beside Notification settings when the hours, not a snooze, pause them.
+   */
   readonly paused?: string
   /** Slack's snooze runs: the menu offers Resume notifications in place of Pause notifications. */
   readonly snoozed?: boolean
+  /** While snoozed, "Paused until 11:11pm" beside Resume notifications: the snooze's own end. */
+  readonly snoozeLabel?: string
+  /** When each Pause notifications choice would end if picked now, beside it: "3:47pm", "9am", "Mon 9am". */
+  readonly pauseEnds?: Readonly<Record<PauseChoice, string>>
   /** One of Pause notifications' choices: Slack's snooze for that long. */
   readonly onPause?: (choice: PauseChoice) => void
   /** Privacy mode is on: the item offers Show message text instead of Hide (SPEC section 5). */
@@ -62,14 +69,18 @@ const pauseItems: ReadonlyArray<{ readonly id: PauseChoice; readonly label: stri
   { id: 'nextWeek', label: 'Until next week' },
 ]
 
+const PAUSE_ROW = 'account-pause'
+const pauseIds = pauseItems.map((item) => `account-pause-${item.id}`)
+
 /**
  * What the avatar button opens (inventory 2.1): who is signed in and
  * whether Slack shows them active, Set yourself away or active, Hide or
- * Show message text (privacy mode), Notifications and Settings (both
- * open Settings, at Notifications and at General), Pause or Resume
- * notifications (Slack's snooze), then the blocks the owner passes.
+ * Show message text (privacy mode), Notification settings and Settings
+ * (both open Settings, at Notifications and at General), Pause
+ * notifications (Slack's snooze, its choices in a submenu beside the menu)
+ * or Resume notifications while snoozed, then the blocks the owner passes.
  */
-export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, snoozed = false, onPause, privacy = false, onAction, sections }: AccountMenuProps) {
+export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, snoozed = false, snoozeLabel, pauseEnds, onPause, privacy = false, onAction, sections }: AccountMenuProps) {
   const avatar = <Avatar label={initials} name={name} hue={hue} size={32} {...(avatarUrl === undefined ? {} : { src: avatarUrl })} />
   return (
     <div {...stylex.props(styles.root)}>
@@ -89,8 +100,9 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
       />
       {onAction === undefined ? null : (
         <AccountItems
-          items={accountItems({ presence, paused, snoozed, privacy, canPause: onPause !== undefined })}
+          items={accountItems({ presence, paused, snoozed, snoozeLabel, privacy, canPause: onPause !== undefined })}
           onAction={onAction}
+          {...(pauseEnds === undefined ? {} : { pauseEnds })}
           {...(snoozed || onPause === undefined ? {} : { onPause })}
         />
       )}
@@ -109,62 +121,90 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
   )
 }
 
-function accountItems({ presence, paused, snoozed, privacy, canPause }: Pick<AccountMenuProps, 'presence' | 'paused'> & { readonly snoozed: boolean; readonly privacy: boolean; readonly canPause: boolean }): ReadonlyArray<Item> {
+function accountItems({ presence, paused, snoozed, snoozeLabel, privacy, canPause }: Pick<AccountMenuProps, 'presence' | 'paused' | 'snoozeLabel'> & { readonly snoozed: boolean; readonly privacy: boolean; readonly canPause: boolean }): ReadonlyArray<Item> {
+  // While snoozed, Resume says until when; the settings row says it only when the notification hours pause notifications.
+  const settingsHint = snoozed || paused === undefined ? {} : { hint: paused }
   return [
     presence?.active === false ? { id: 'presence', icon: Sun, label: 'Set yourself active' } : { id: 'presence', icon: Moon, label: 'Set yourself away' },
     privacy ? { id: 'privacy', icon: Eye, label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', icon: EyeSlash, label: 'Hide message text', hint: '⌃⌘H' },
-    { id: 'notifications', icon: Bell, label: 'Notifications', ...(paused === undefined ? {} : { hint: paused }) },
-    ...(snoozed ? [{ id: 'resume', icon: Bell, label: 'Resume notifications' } as const] : canPause ? [{ id: 'pause', icon: BellSlash, label: 'Pause notifications' } as const] : []),
+    { id: 'notifications', icon: Bell, label: 'Notification settings', ...settingsHint },
+    ...(snoozed
+      ? [{ id: 'resume', icon: BellRinging, label: 'Resume notifications', ...(snoozeLabel === undefined ? {} : { hint: snoozeLabel }) } as const]
+      : canPause
+        ? [{ id: 'pause', icon: BellSlash, label: 'Pause notifications' } as const]
+        : []),
     { id: 'settings', icon: Gear, label: 'Settings', hint: '⌘,' },
   ]
 }
 
 /**
- * The menu's items. Pause notifications (with `onPause`) shows Slack's choices in their place; → on it opens
- * them, and the first row or ← goes back.
+ * The menu's items. Pause notifications (with `onPause`) opens Slack's choices in a submenu beside the menu
+ * (`useSubmenu`): on a rest of the pointer, a click, → or Enter. The list takes focus when the menu opens, so ↓
+ * works at once from the keyboard.
  */
-function AccountItems({ items, onAction, onPause }: { readonly items: ReadonlyArray<Item>; readonly onAction: (action: AccountMenuAction) => void; readonly onPause?: (choice: PauseChoice) => void }) {
-  const [page, setPage] = useState<'items' | 'pause'>('items')
-  const pausing = page === 'pause' && onPause !== undefined
-  const ids = pausing ? ['account-back', ...pauseItems.map((item) => `account-pause-${item.id}`)] : items.map((item) => `account-${item.id}`)
+function AccountItems({ items, onAction, onPause, pauseEnds }: { readonly items: ReadonlyArray<Item>; readonly onAction: (action: AccountMenuAction) => void; readonly onPause?: (choice: PauseChoice) => void; readonly pauseEnds?: Readonly<Record<PauseChoice, string>> }) {
+  const ids = items.map((item) => `account-${item.id}`)
   const select = (id: string) => {
-    if (id === 'account-back') return setPage('items')
-    if (id === 'account-pause') return setPage('pause')
-    if (id.startsWith('account-pause-')) return onPause?.(id.slice('account-pause-'.length) as PauseChoice)
+    if (id === PAUSE_ROW) return
     onAction(id.slice('account-'.length) as AccountMenuAction)
   }
   const menu = useMenuActive(ids, select)
-  const keys = (event: KeyboardEvent<HTMLElement>) => {
-    const toPage = pausing ? (event.key === 'ArrowLeft' ? 'items' : undefined) : event.key === 'ArrowRight' && menu.list.activeId === 'account-pause' ? 'pause' : undefined
-    if (toPage === undefined) return menu.list.onKeyDown(event)
-    event.preventDefault()
-    setPage(toPage)
+  const choose = (id: string) => onPause?.(id.slice('account-pause-'.length) as PauseChoice)
+  const sub = useSubmenu({ triggerId: PAUSE_ROW, ids: pauseIds, onSelect: choose })
+  useEffect(() => {
+    document.getElementById(ids[0] ?? '')?.closest<HTMLElement>('[role="menu"]')?.focus({ preventScroll: true })
+    // Once, when the menu opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const keys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (sub.keyDown(event, menu.list.activeId)) return
+    menu.list.onKeyDown(event)
+  }
+  const rowOf = (item: Item) => {
+    const id = `account-${item.id}`
+    const row = menu.row(id)
+    const props = {
+      ...row,
+      leading: <Icon icon={item.icon} size={15} />,
+      label: item.label,
+      ...(item.hint === undefined ? {} : { sub: item.hint }),
+    }
+    if (item.id !== 'pause' || onPause === undefined) {
+      return <OptionRow key={item.id} {...props} onActivate={() => sub.hoverOther(row.onActivate)} onSelect={() => select(id)} />
+    }
+    return (
+      <Submenu
+        key={item.id}
+        open={sub.open}
+        onClose={sub.hide}
+        label="Pause notifications"
+        list={sub.list}
+        trigger={
+          <OptionRow
+            {...props}
+            active={row.active || sub.open}
+            trailing={<Icon icon={CaretRight} size={13} />}
+            onActivate={() => {
+              row.onActivate()
+              sub.hoverTrigger()
+            }}
+            onSelect={sub.clickTrigger}
+          />
+        }
+      >
+        {pauseItems.map((choice) => {
+          const end = pauseEnds?.[choice.id]
+          return <OptionRow key={choice.id} {...sub.row(`account-pause-${choice.id}`)} label={choice.label} {...(end === undefined ? {} : { sub: end })} onSelect={() => choose(`account-pause-${choice.id}`)} />
+        })}
+      </Submenu>
+    )
   }
   return (
     <>
       <OptionSeparator />
-      {pausing ? (
-        <OptionList role="menu" label="Pause notifications" {...menu.list} onKeyDown={keys}>
-          <OptionRow {...menu.row('account-back')} leading={<Icon icon={CaretLeft} size={15} />} label="Pause notifications" onSelect={() => select('account-back')} />
-          {pauseItems.map((item) => (
-            <OptionRow key={item.id} {...menu.row(`account-pause-${item.id}`)} leading={<span {...stylex.props(styles.inset)} />} label={item.label} onSelect={() => select(`account-pause-${item.id}`)} />
-          ))}
-        </OptionList>
-      ) : (
-        <OptionList role="menu" label="Account" {...menu.list} onKeyDown={keys}>
-          {items.map((item) => (
-            <OptionRow
-              key={item.id}
-              {...menu.row(`account-${item.id}`)}
-              leading={<Icon icon={item.icon} size={15} />}
-              label={item.label}
-              {...(item.hint === undefined ? {} : { sub: item.hint })}
-              {...(item.id === 'pause' ? { trailing: <Icon icon={CaretRight} size={13} /> } : {})}
-              onSelect={() => select(`account-${item.id}`)}
-            />
-          ))}
-        </OptionList>
-      )}
+      <OptionList role="menu" label="Account" {...menu.list} onKeyDown={keys} onPointerMove={sub.trackPointer}>
+        {items.map(rowOf)}
+      </OptionList>
     </>
   )
 }
@@ -178,12 +218,6 @@ const styles = stylex.create({
   avatar: {
     position: 'relative',
     display: 'inline-flex',
-  },
-  // The choices' text lines up with the items' labels, past the 15px icon slot.
-  inset: {
-    display: 'inline-block',
-    width: sizes['--icon-15'],
-    flexShrink: 0,
   },
   section: {
     display: 'flex',

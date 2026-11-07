@@ -13,7 +13,7 @@ const title = (values: ProbeFrame['values']): string => (typeof values['title'] 
 
 test('menu hover: the avatar menu highlights the item under the pointer in the next frame', { tag: '@on-demand' }, async ({ juno, win, feel }) => {
   await juno.accountMenu.open()
-  const item = await tag(juno.accountMenu.item(/^Notifications/), 'menu-item')
+  const item = await tag(juno.accountMenu.item(/^Notification settings/), 'menu-item')
   await juno.accountMenu.item(/^Set yourself/).hover()
   await win.waitForTimeout(300)
   await feel.run(
@@ -25,7 +25,7 @@ test('menu hover: the avatar menu highlights the item under the pointer in the n
     },
     async (rec) => {
       await rec.mark('go')
-      await juno.accountMenu.item(/^Notifications/).hover()
+      await juno.accountMenu.item(/^Notification settings/).hover()
     },
   )
   await juno.accountMenu.close()

@@ -4,6 +4,9 @@ import { SessionView } from './SessionView'
 
 const noop = () => {}
 
+// When each choice would end if picked at 2:30pm on a Thursday.
+const pauseEnds = { '30m': '3pm', '1h': '3:30pm', '2h': '4:30pm', tomorrow: '9am', nextWeek: 'Mon 9am' } as const
+
 const base = { name: 'Tushar', initials: 'T', hue: 'cyan', workspace: 'juno-fake.slack.com', onAction: noop, sections: [] } as const
 
 // The app's Session block: the account line and Sign out (containers/Session.tsx).
@@ -26,10 +29,10 @@ export default defineFixtures(
       'active-connecting': fixture({ ...base, presence: { active: true, seen: false, label: 'Active. Connecting to Slack' } }),
       unknown: fixture({ ...base }),
     },
-    // Pause notifications (Slack's snooze): the item, and Resume while snoozed.
+    // Pause notifications (Slack's snooze): the item, and Resume while snoozed. The submenu needs the app's popover around the menu: the screenshots in the browser lane show it.
     Pause: {
-      offered: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, onPause: noop }),
-      snoozed: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, paused: 'Paused until 3:30pm', snoozed: true, onPause: noop }),
+      offered: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, pauseEnds, onPause: noop }),
+      snoozed: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, paused: 'Paused until 3:30pm', snoozed: true, snoozeLabel: 'Paused until 3:30pm', onPause: noop }),
     },
     Privacy: {
       on: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, privacy: true }),
