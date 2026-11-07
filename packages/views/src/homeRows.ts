@@ -18,6 +18,13 @@ export const TILE_ICONS: Partial<Record<HomeItemKind, PhosphorIcon>> = { ask: Br
 /** The cards whose row opens a review sheet. */
 export const opensReview = (kind: HomeItemKind): boolean => kind === 'tidyUp' || kind === 'doneFollowUps' || kind === 'oldDrafts' || kind === 'unfollow' || kind === 'ignore' || kind === 'automatedMoves'
 
+/**
+ * The cards whose button shows at rest, not only on hover and focus: one
+ * obvious action on every topic the card lists, with Undo (Tidy up's
+ * Resolve all). Other rows keep their buttons for hover and focus.
+ */
+export const buttonsAtRest = (kind: HomeItemKind): boolean => kind === 'tidyUp'
+
 /** How long a missed huddle lasted: "Lasted under a minute", "Lasted 8 min", "Lasted 1 hr 12 min". */
 export function lastedOf(minutes: number): string {
   if (minutes < 1) return 'Lasted under a minute'
@@ -47,7 +54,7 @@ export type HomeAskAnswer = 'start' | 'dismiss' | 'open'
 export interface RowButton {
   readonly label: string
   readonly run: () => void
-  /** The row's main action, drawn raised: Automated's Move, an ask's Start. */
+  /** The row's main action, drawn raised: Automated's Move, an ask's Start, Tidy up's Resolve all. */
   readonly primary?: boolean
 }
 
@@ -65,7 +72,7 @@ export function rowButtons(item: HomeItem, onMarkDone: (itemId: string) => void,
     item.kind === 'followUp'
       ? [{ label: 'Mark done', run: () => onMarkDone(item.id) }]
       : item.kind === 'tidyUp'
-        ? [{ label: 'Resolve all', run: () => onResolveAll(item.id) }]
+        ? [{ label: 'Resolve all', run: () => onResolveAll(item.id), primary: true }]
         : item.kind === 'automatedMoves'
           ? onDismiss === undefined ? [] : [{ label: 'Dismiss', run: () => onDismiss(item.id) }]
         : item.kind === 'automated'
