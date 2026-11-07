@@ -98,7 +98,7 @@ export function hourLabel(minutesOfDay: number): string {
 
 export const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
-/** When something ends, as `untilPhrase` reads it. */
+/** When something ends, as `endTime` and `untilPhrase` read it. */
 export interface UntilParts {
   /** Whole local days from today to the day it ends on. */
   readonly daysAhead: number
@@ -111,16 +111,21 @@ export interface UntilParts {
 }
 
 /**
- * "until 5:30pm", "until tomorrow 9am", "until Fri 9am", "until Nov 20 3pm":
- * the one "until" for a status, Away and Paused. An end at 23:59 or at
- * midnight names its day only, and midnight belongs to the day before it:
- * "until today", "until Fri", never "until tomorrow 12am".
+ * When something ends, in the one form every end time uses: "5:30pm" today,
+ * "Sat 9am" on another day within a week, "Nov 20 3pm" later. An end at 23:59
+ * or at midnight names its day only, and midnight belongs to the day before it:
+ * "today", "Fri", never "Sat 12am".
  */
-export function untilPhrase({ daysAhead, weekday, minutes, date }: UntilParts): string {
+export function endTime({ daysAhead, weekday, minutes, date }: UntilParts): string {
   const midnight = minutes === 0 && daysAhead > 0
   const days = midnight ? daysAhead - 1 : daysAhead
   const day = SHORT_DAYS[((midnight ? weekday - 1 : weekday) + 7) % 7]!
-  const name = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days < 7 || date === undefined ? day : date
-  if (midnight || minutes >= 1439) return `until ${name}`
-  return days <= 0 ? `until ${hourLabel(minutes)}` : `until ${name} ${hourLabel(minutes)}`
+  const name = days <= 0 ? 'today' : days < 7 || date === undefined ? day : date
+  if (midnight || minutes >= 1439) return name
+  return days <= 0 ? hourLabel(minutes) : `${name} ${hourLabel(minutes)}`
+}
+
+/** "until 5:30pm", "until Sat 9am", "until Fri": the one "until" for a status, Away and Paused (`endTime`). */
+export function untilPhrase(parts: UntilParts): string {
+  return `until ${endTime(parts)}`
 }

@@ -57,7 +57,7 @@ test('message content paints: photos load everywhere and unfurls keep text when 
   })
   await juno.sidebar.expectTop('#eng')
 
-  await test.step('photos load in messages, sidebar stacks, a DM row and the account menu, and unfurls keep text when images fail', async () => {
+  await test.step('photos load in messages, sidebar stacks, a DM row and the account menu, and unfurls keep text when images fail; the avatar button draws its focus ring only after a key', async () => {
     // The sidebar's people are the senders of unread messages, so check them before opening marks #eng read.
     fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Unread from Leo' })
     const stack = juno.sidebar.row('#eng').root.locator(`img${schemeSrc('files')}[src*="/avatar"]`)
@@ -93,6 +93,15 @@ test('message content paints: photos load everywhere and unfurls keep text when 
     await juno.accountMenu.open()
     const accountPhoto = juno.accountMenu.root.locator(`img${schemeSrc('files')}[src*="/avatar"]`)
     await expect.poll(() => accountPhoto.evaluateAll((images) => images.some((img) => img instanceof HTMLImageElement && img.naturalWidth > 0))).toBe(true)
+    // Opened with the mouse, the button has focus and no ring; closed with Escape, the ring shows.
+    const ringed = () => juno.sidebar.accountButton.evaluate((button) => document.activeElement === button && button.matches(':focus-visible'))
+    expect(await juno.sidebar.accountButton.evaluate((button) => document.activeElement === button)).toBe(true)
+    expect(await ringed()).toBe(false)
+    await juno.accountMenu.close()
+    await expect.poll(ringed).toBe(true)
+    // A mouse press after the key takes the ring away again.
+    await juno.accountMenu.open()
+    expect(await ringed()).toBe(false)
     await juno.accountMenu.close()
   })
 

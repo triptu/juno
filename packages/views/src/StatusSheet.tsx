@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { StatusEmoji } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Button, focusRing, IconButton, OptionList, OptionRow, Select, SmileyPlus, Surface, Text, TextField, useOptionListKeys } from '@juno/ui'
@@ -69,8 +69,10 @@ export function StatusSheet<V extends string>(props: StatusSheetProps<V>) {
   const anchorRef = useRef<HTMLSpanElement>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
   usePickerFocus(anchorRef, pickerRef, picker !== undefined, onClosePicker)
-  usePickerPlace(anchorRef, pickerRef, picker !== undefined)
   const { fieldRef, listId, active, setActive, presetId, pick, onFieldKey } = usePresetKeys(presets, showPresets, onPreset)
+  // Under the field's frame (its label), as wide as it.
+  const fieldBox = useCallback(() => fieldRef.current?.closest('label') ?? null, [fieldRef])
+  usePickerPlace(anchorRef, pickerRef, picker !== undefined, fieldBox)
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -337,11 +339,18 @@ const styles = stylex.create({
   spacer: {
     flex: 1,
   },
+  // Over the sheet, which is a popover too: the hairline gives it an edge in dark, where the shadow does not show
+  // against the sheet. Its width comes from the field (`usePickerPlace`).
   picker: {
     position: 'fixed',
     top: 0,
     left: 0,
     zIndex: z['--z-picker'],
+    borderRadius: radii['--radius-menu'],
+    outlineWidth: '1px',
+    outlineStyle: 'solid',
+    outlineOffset: '-1px', // tokens-allow: the hairline drawn on the picker's own edge
+    outlineColor: colors['--border-strong'],
   },
 
 

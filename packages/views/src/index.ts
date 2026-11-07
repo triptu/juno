@@ -47,7 +47,6 @@ export { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 
 export { PeekView, type PeekPlacement } from './PeekView'
 
-export { SessionView } from './SessionView'
 export { SetUpJunoView, type SetUpChoice, type SetUpCodex } from './SetUpJunoView'
 export { SignInView } from './SignInView'
 export { WelcomeCard } from './WelcomeCard'
@@ -123,7 +122,7 @@ export { type ReviewStatus } from './reviewModel'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export { ChannelSheet } from './ChannelSheet'
-export { StatusLine } from './StatusLine'
+export { PersonDetail } from './StatusLine'
 export { StatusSheet, type StatusSheetPreset } from './StatusSheet'
 export type { ViewIconName } from '@juno/ui'
 

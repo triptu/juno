@@ -38,6 +38,8 @@ export interface SelectButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   readonly placeholder?: boolean
   /** The list is showing: `aria-expanded`. */
   readonly expanded?: boolean
+  /** As wide as its box (a grid cell), not its value. */
+  readonly fill?: boolean
   readonly children: ReactNode
 }
 
@@ -46,9 +48,9 @@ export interface SelectButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
  * list in a `Popover`), where the OS menu cannot filter. It shrinks with its
  * row and cuts a long value with an ellipsis.
  */
-export function SelectButton({ ref, size = 32, leading, placeholder = false, expanded, children, type = 'button', ...rest }: SelectButtonProps) {
+export function SelectButton({ ref, size = 32, leading, placeholder = false, expanded, fill = false, children, type = 'button', ...rest }: SelectButtonProps) {
   return (
-    <button ref={ref} type={type} aria-haspopup="dialog" aria-expanded={expanded} {...rest} {...menuTriggerHandlers({ ...rest, 'aria-haspopup': 'dialog' })} {...stylex.props(styles.select, styles.button, typeVariants.ui, sizeStyles[size], placeholder && styles.placeholder)}>
+    <button ref={ref} type={type} aria-haspopup="dialog" aria-expanded={expanded} {...rest} {...menuTriggerHandlers({ ...rest, 'aria-haspopup': 'dialog' })} {...stylex.props(styles.select, styles.button, typeVariants.ui, sizeStyles[size], placeholder && styles.placeholder, fill && styles.fill)}>
       {leading === undefined ? null : <span {...stylex.props(styles.leading)}>{leading}</span>}
       <span {...stylex.props(styles.value)}>{children}</span>
     </button>
@@ -99,6 +101,9 @@ const styles = stylex.create({
   },
   placeholder: {
     color: colors['--foreground-muted'],
+  },
+  fill: {
+    width: '100%',
   },
   leading: {
     display: 'inline-flex',

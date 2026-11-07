@@ -16,10 +16,7 @@ export interface OptionListProps extends Omit<HTMLAttributes<HTMLDivElement>, 's
   readonly label?: string
   /** The active (highlighted) row, as `OptionRow` ids. Sets aria-activedescendant. */
   readonly activeId?: string
-  /**
-   * Make the list itself focusable and handle arrow keys on it. Lists that
-   * sit over an input leave this off and use `useOptionListKeys` on the input.
-   */
+  /** Make the list itself focusable and handle arrow keys on it. Lists over an input use `useOptionListKeys` on it. */
   readonly focusable?: boolean
   readonly onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
   readonly children?: ReactNode
@@ -71,6 +68,8 @@ export interface OptionRowProps {
   readonly selected?: boolean
   readonly disabled?: boolean
   readonly size?: OptionRowSize
+  /** A 32px row with a second line under its label (the account menu's hints): the icon stays centred on the first line. */
+  readonly leadingOnFirstLine?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
   /** Called when the pointer moves over the row, so the owner can move `active`. Rows without it show no pointer highlight. */
@@ -93,6 +92,7 @@ export function OptionRow({
   selected = false,
   disabled = false,
   size = 32,
+  leadingOnFirstLine = false,
   onSelect,
   onActivate,
   onContextMenu,
@@ -124,7 +124,7 @@ export function OptionRow({
         disabled && styles.rowDisabled,
       )}
     >
-      {leading ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
+      {leading ? <span {...stylex.props(styles.leading, leadingOnFirstLine && styles.leadingFirstLine)}>{leading}</span> : null}
       <span {...stylex.props(styles.body, twoLine && styles.bodyColumn, size === 44 && styles.bodyColumnCompact)}>
         <span data-option-label="" {...stylex.props(styles.label, twoLine ? typeVariants.body : typeVariants.ui, size === 44 && styles.labelCompact)}>{label}</span>
         {sub !== undefined && subPlacement !== 'end' ? (
@@ -176,14 +176,8 @@ export function OptionHeader({ leading, title, sub }: OptionHeaderProps) {
     <div {...stylex.props(styles.header)}>
       {leading}
       <span {...stylex.props(styles.headerText)}>
-        <Text variant="ui" weight="semibold" truncate>
-          {title}
-        </Text>
-        {sub !== undefined ? (
-          <Text variant="meta" tone="muted" truncate>
-            {sub}
-          </Text>
-        ) : null}
+        <Text variant="ui" weight="semibold" truncate>{title}</Text>
+        {sub !== undefined ? <Text variant="meta" tone="muted" truncate>{sub}</Text> : null}
       </span>
     </div>
   )
@@ -315,6 +309,8 @@ const styles = stylex.create({
     flexShrink: 0,
     color: colors['--foreground-subtle'],
   },
+  // The first line's 32px, where a one-line row centres its icon.
+  leadingFirstLine: { alignSelf: 'flex-start', alignItems: 'center', height: sizes['--control-32'] },
   body: {
     display: 'flex',
     alignItems: 'baseline',

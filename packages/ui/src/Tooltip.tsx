@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { colors, layout, motion, radii, shadows, spacing, z } from '@juno/tokens/tokens.stylex'
+import { colors, layout, motion, radii, shadows, spacing, weights, z } from '@juno/tokens/tokens.stylex'
 import { variants as typeVariants } from './internal/type'
 
 /** How long the pointer or keyboard focus rests on a control before its tooltip shows, as on macOS. */
@@ -253,7 +253,7 @@ export function TooltipLayer({ detail, prepare }: { readonly detail?: (target: H
         line
       ) : (
         <span {...stylex.props(styles.stack)}>
-          <span {...stylex.props(styles.line)}>{line}</span>
+          <span {...stylex.props(styles.line, styles.title)}>{line}</span>
           {more}
         </span>
       )}
@@ -313,6 +313,10 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-2'],
+  },
+  // Over detail lines the label is the title: one weight up from them.
+  title: {
+    fontWeight: weights['--weight-medium'],
   },
   keys: {
     display: 'inline-flex',

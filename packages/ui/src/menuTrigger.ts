@@ -13,7 +13,7 @@ export function menuTriggerHandlers({ 'aria-haspopup': popup, onClick, onPointer
       if (event.defaultPrevented || event.pointerType !== 'mouse' || event.button !== 0 || event.ctrlKey) return
       // Keep the browser's later mouse-down focus from taking focus back out of the panel.
       event.preventDefault()
-      event.currentTarget.focus({ preventScroll: true })
+      focusWithoutRing(event.currentTarget)
       onClick(event)
     },
     onClick: (event) => {
@@ -27,4 +27,14 @@ export function menuTriggerHandlers({ 'aria-haspopup': popup, onClick, onPointer
       event.currentTarget.click()
     },
   }
+}
+
+/**
+ * Focus for a mouse press, with no focus ring: Chrome's `:focus-visible` matches focus a script moves, so a click
+ * would draw the ring, and a button that took focus from Escape keeps its ring until it is focused again. Blurring
+ * first makes the new focus count. The ring returns with the next key.
+ */
+function focusWithoutRing(button: HTMLButtonElement): void {
+  if (document.activeElement === button && button.matches(':focus-visible')) button.blur()
+  button.focus({ preventScroll: true, focusVisible: false } as FocusOptions)
 }

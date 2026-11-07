@@ -125,7 +125,7 @@ function RowTile({ item }: { readonly item: HomeItem }) {
   if (tileIcon !== undefined || topic === undefined) {
     return (
       <span {...stylex.props(styles.iconTile)}>
-        <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
+        <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={20} />
       </span>
     )
   }
@@ -150,8 +150,8 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
  * One row: a link to the topic (a review card's opens its review), and its buttons in
  * a slot that is always there: Mark done, Resolve all, Automated's Keep
  * in All and Move, or Dismiss on Automated's record. The buttons show on
- * hover and focus, except Tidy up's Resolve all, which always shows. Automated's row opens the conversation's menu on
- * right-click, where Ignore is.
+ * hover and focus, except Tidy up's Resolve all, which always shows. A row with buttons has no caret, so every
+ * row ends at the same edge. Automated's row opens the conversation's menu on right-click, where Ignore is.
  */
 function HomeRow({ item, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk }: HomeRowProps) {
   const topic = item.topics[0]
@@ -170,6 +170,13 @@ function HomeRow({ item, now, onOpen, onMarkDone, onResolveAll, onReview, onSort
     </>
   )
   const buttons = rowButtons(item, onMarkDone, onResolveAll, onSort, onDismiss, onAsk)
+  // A row with buttons ends in them; only a row without shows the caret, so the row's end lines up across cards.
+  const caret =
+    buttons.length === 0 ? (
+      <span {...stylex.props(styles.caret)}>
+        <Icon icon={CaretRight} size={13} />
+      </span>
+    ) : null
   const handlers = topic === undefined ? undefined : activateHandlers<HTMLAnchorElement>((event) => onOpen(topic.id, event))
   const menu =
     item.kind === 'automated' || item.kind === 'mentioned'
@@ -184,9 +191,7 @@ function HomeRow({ item, now, onOpen, onMarkDone, onResolveAll, onReview, onSort
         // A review card opens its sheet; a proactive ask opens the Juno chat at it.
         <button type="button" aria-haspopup={item.kind === 'ask' ? undefined : 'dialog'} onClick={() => (item.kind === 'ask' ? onAsk?.(item.id, 'open') : onReview(item.id))} {...stylex.props(styles.link, styles.button, styles.focusable)} data-home-review="">
           {body}
-          <span {...stylex.props(styles.caret)}>
-            <Icon icon={CaretRight} size={13} />
-          </span>
+          {caret}
         </button>
       ) : handlers === undefined ? (
         <div {...stylex.props(styles.link)}>{body}</div>
@@ -201,9 +206,7 @@ function HomeRow({ item, now, onOpen, onMarkDone, onResolveAll, onReview, onSort
           {...stylex.props(styles.link, styles.focusable)}
         >
           {body}
-          <span {...stylex.props(styles.caret)}>
-            <Icon icon={CaretRight} size={13} />
-          </span>
+          {caret}
         </a>
       )}
       {buttons.length === 0 ? null : (
@@ -377,10 +380,9 @@ const styles = stylex.create({
     flexShrink: 0,
     width: sizes['--tile-36'],
     height: sizes['--tile-36'],
-    // In the 44px slot a topic's tile takes, so every row's text starts at one line.
+    // In the 44px slot a topic's tile takes, so every row's text starts at one line. No fill: the glyph stands
+    // alone, as a topic's art does.
     marginInline: spacing['--space-1'],
-    borderRadius: radii['--radius-xl'],
-    backgroundColor: colors['--secondary-default'],
     color: colors['--foreground-subtle'],
   },
   markedTile: {
@@ -418,9 +420,11 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     fontVariantNumeric: 'tabular-nums',
   },
+  // 2px in from the link's end, so its ink ends where a row button's text does (17px from the row's edge).
   caret: {
     display: 'inline-flex',
     flexShrink: 0,
+    marginInlineEnd: spacing['--space-0-5'],
     color: colors['--foreground-muted'],
     opacity: 'var(--home-action-opacity)',
   },

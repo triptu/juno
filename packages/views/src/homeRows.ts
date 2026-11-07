@@ -54,7 +54,7 @@ export type HomeAskAnswer = 'start' | 'dismiss' | 'open'
 export interface RowButton {
   readonly label: string
   readonly run: () => void
-  /** The row's main action, drawn raised: Automated's Move, an ask's Start, Tidy up's Resolve all. */
+  /** The row's main action, drawn raised: Automated's Move, an ask's Start. */
   readonly primary?: boolean
 }
 
@@ -72,7 +72,7 @@ export function rowButtons(item: HomeItem, onMarkDone: (itemId: string) => void,
     item.kind === 'followUp'
       ? [{ label: 'Mark done', run: () => onMarkDone(item.id) }]
       : item.kind === 'tidyUp'
-        ? [{ label: 'Resolve all', run: () => onResolveAll(item.id), primary: true }]
+        ? [{ label: 'Resolve all', run: () => onResolveAll(item.id) }]
         : item.kind === 'automatedMoves'
           ? onDismiss === undefined ? [] : [{ label: 'Dismiss', run: () => onDismiss(item.id) }]
         : item.kind === 'automated'

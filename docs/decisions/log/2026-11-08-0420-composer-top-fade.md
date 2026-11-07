@@ -1,0 +1,1 @@
+- 11-08 04:20 · composer · A grown composer's text fades out over its top 16px once scrolled, through a mask a scroll-driven animation slides in, not through more padding · Its 9px top padding scrolls with the text, so a cut line sat on the frame's border; the fade keeps every line clear of the edge, and a field at its top keeps its 40px single line and fades nothing.

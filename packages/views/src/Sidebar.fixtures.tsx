@@ -1,7 +1,6 @@
 import { defineFixtures, scene, TooltipLayer, type FixtureFrame } from '@juno/ui'
 import { useState } from 'react'
 import { AccountMenu } from './AccountMenu'
-import { GalleryAppearanceSettings } from './fixtures/appearance'
 import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { artRows } from './fixtures/artRows'
@@ -356,9 +355,9 @@ export default defineFixtures(
             <AccountMenu
               {...account}
               workspace="juno-fake.slack.com"
-              sections={[
-                { title: 'Appearance', content: <GalleryAppearanceSettings layout="stack" onThemeChange={noop} onAccentChange={noop} /> },
-              ]}
+              presence={{ active: true, seen: true, label: 'Active' }}
+              onAction={noop}
+              session={{ line: 'Signed in to Juno Fake as tushar', onSignOut: noop }}
             />
           ),
         }),

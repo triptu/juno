@@ -1,0 +1,1 @@
+- 11-08 03:55 · all-topics · All topics' place filter is a `SelectButton` 28, outlined like the status and sort pop-ups, without the place's tint; on a compact page the four controls sit on a two-column grid so both lines share their edges · The filled pill at 600 was the one control in the row drawn differently, and the wrapped lines ended 35px apart on the right.

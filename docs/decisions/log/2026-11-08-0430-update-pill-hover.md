@@ -1,0 +1,1 @@
+- 11-08 04:30 · Updates · The Update ready pill's "Update ready" half shows `--surface-hover` under the pointer, in a 22px pill as tall as Restart · It opens Settings › About, but nothing showed it was a button until it was clicked.

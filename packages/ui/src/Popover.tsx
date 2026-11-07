@@ -121,8 +121,8 @@ const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:n
  * in its final place, as a native menu does: the panel mounts and unmounts
  * with no fade or scale. Scrolling is contained so the page behind
  * never moves. The panel stays inside its pane: one that would run past an
- * edge moves in, and one wider than the pane narrows. Closing with Escape while focus is inside puts focus back on
- * the anchor, so the next Tab goes on from there instead of from the top.
+ * edge moves in, and one wider than the pane narrows. Closing with Escape while focus is inside, or still on the anchor
+ * after a mouse open, puts focus back on the anchor with its ring, so the next Tab goes on from there.
  */
 export function Popover({
   open,
@@ -167,7 +167,10 @@ export function Popover({
   useLayoutEffect(() => {
     if (open || !restoreFocus.current) return
     restoreFocus.current = false
-    rootRef.current?.querySelector<HTMLElement>(returnFocusTo)?.focus()
+    const target = rootRef.current?.querySelector<HTMLElement>(returnFocusTo)
+    // Still focused from a mouse press, it would keep no ring: focus it again after the key, so the ring shows.
+    if (target !== null && target !== undefined && document.activeElement === target) target.blur()
+    target?.focus()
   }, [open, returnFocusTo])
 
   useEffect(() => {
@@ -183,14 +186,14 @@ export function Popover({
         restoreFocus.current = false
         return
       }
-      if (panel === null || !panel.contains(document.activeElement)) return
+      if (panel === null || !rootRef.current?.contains(document.activeElement)) return
       restoreFocus.current = true
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        const panel = panelRef.current
-        restoreFocus.current = panel !== null && panel.contains(document.activeElement)
+        // Focus in the panel, or still on the anchor after a mouse open: the anchor takes it back with its ring.
+        restoreFocus.current = rootRef.current?.contains(document.activeElement) ?? false
         onClose()
       }
     }

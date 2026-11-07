@@ -1,5 +1,6 @@
 /**
- * A person's status under their avatar's tooltip (SPEC 7, "People"): the
+ * A person's status, and "Notifications paused" while they have them paused, under their avatar's tooltip (SPEC 7,
+ * "People"): the
  * tooltip layer asks for it when the hovered control names a person
  * (`data-tooltip-person`). As the pointer reaches the avatar, before the
  * tooltip's delay ends, the status is followed and the sync asks Slack
@@ -9,16 +10,17 @@
  */
 import { useState, type ReactNode } from 'react'
 import { statusUntil } from '@juno/contract'
-import { personStatusAtom, preparePersonStatus, registry } from '@juno/state'
+import { personPausedAtom, personStatusAtom, preparePersonStatus, registry } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { StatusLine } from '@juno/views'
+import { PersonDetail } from '@juno/views'
 
 function PersonStatus({ userId }: { readonly userId: string }) {
   const status = useAtomValue(personStatusAtom(userId))
+  const paused = useAtomValue(personPausedAtom(userId))
   // "until" is read as of the hover: a tooltip shows for seconds.
   const [shownAt] = useState(() => new Date())
-  if (status === undefined || status === null) return null
-  return <StatusLine emoji={status.emoji} text={status.text} until={status.expiresAt === undefined ? undefined : statusUntil(status.expiresAt, shownAt)} />
+  const shown = status === undefined || status === null ? undefined : { emoji: status.emoji, text: status.text, until: status.expiresAt === undefined ? undefined : statusUntil(status.expiresAt, shownAt) }
+  return <PersonDetail status={shown} paused={paused} />
 }
 
 const personOf = (target: HTMLElement) => {

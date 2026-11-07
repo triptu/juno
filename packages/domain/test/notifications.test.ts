@@ -171,7 +171,7 @@ describe('hours', () => {
   it('finds the next switch and says until when', () => {
     expect(nextSwitch(at(MON, 12), work)).toMatchObject({ starts: false, inMinutes: 7 * 60 })
     expect(untilLabel(at(MON, 12), work)).toBe('until 7pm')
-    expect(untilLabel(at(MON, 20), work)).toBe('until tomorrow 9am')
+    expect(untilLabel(at(MON, 20), work)).toBe('until Tue 9am')
     expect(untilLabel(at(5, 20), work)).toBe('until Mon 9am')
     expect(untilLabel(at(MON, 7, 30), work)).toBe('until 9am')
     expect(untilLabel(at(MON, 12), { days: [], from: 0, to: 60 })).toBeUndefined()
@@ -197,7 +197,7 @@ describe('hours', () => {
     expect(pausedLabel(dateAt(4, 20), { ...week, days: [1, 2, 3, 4, 6] })).toBe('Paused until Sat 11am')
     // A snooze inside the hours ends with the snooze; one that runs past their end lasts until they start again.
     expect(pausedLabel(dateAt(MON, 12), week, dateAt(MON, 13, 30))).toBe('Paused until 1:30pm')
-    expect(pausedLabel(dateAt(MON, 18), week, dateAt(MON, 20))).toBe('Paused until tomorrow 9am')
+    expect(pausedLabel(dateAt(MON, 18), week, dateAt(MON, 20))).toBe('Paused until Tue 9am')
     // A snooze that ends before the hours start again changes nothing about when they do.
     expect(pausedLabel(dateAt(SAT, 15), week, dateAt(SAT, 16))).toBe('Paused until Mon 9am')
 
@@ -240,7 +240,7 @@ describe('hours by row', () => {
     expect(scheduledPresence(at(SAT, 12), active)).toBe('active')
     expect(scheduledPresence(at(SAT, 15), active)).toBe('away')
     expect(scheduledPresence(at(0, 12), active)).toBe('away')
-    expect(presenceLabel(at(5, 20), 'away', active)).toBe('Away until tomorrow 11am')
+    expect(presenceLabel(at(5, 20), 'away', active)).toBe('Away until Sat 11am')
   })
 })
 
@@ -256,7 +256,7 @@ describe('presence', () => {
   it('set by hand against the hours, lasts until the hours change it', () => {
     const work = presenceHours
     // Away by hand inside the hours lasts until they start again.
-    expect(presenceLabel(at(MON, 12), 'away', work)).toBe('Away until tomorrow 9am')
+    expect(presenceLabel(at(MON, 12), 'away', work)).toBe('Away until Tue 9am')
     // Active by hand before the hours runs to their end.
     expect(presenceLabel(at(MON, 8), 'active', work)).toBe('Active until 8pm')
   })

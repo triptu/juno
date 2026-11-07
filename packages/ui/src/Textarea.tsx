@@ -187,6 +187,14 @@ const styles = stylex.create({
   },
 })
 
+/** How far a scrolled composer's text fades under its top edge. */
+const TOP_FADE = spacing['--space-4']
+
+const topFade = stylex.keyframes({
+  from: { maskPosition: `0 calc(-1 * ${TOP_FADE})` },
+  to: { maskPosition: '0 0' },
+})
+
 const variants = stylex.create({
   inline: {
     // 9 + 22 + 9 = the 40px single-line composer.
@@ -202,6 +210,18 @@ const variants = stylex.create({
     fieldSizing: 'content',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
+    // Scrolled, a line under the top edge fades out over 16px instead of being cut against the frame. The mask sits
+    // above the box at rest and slides down over the first 16px of scroll (a scroll-driven animation), so a field at
+    // its top fades nothing. The layer that draws marked text uses this style too, and scrolls with the field.
+    maskImage: `linear-gradient(to bottom, transparent, black ${TOP_FADE})`, // tokens-allow: a mask's alpha, not a colour that shows.
+    maskSize: `100% calc(100% + ${TOP_FADE})`,
+    maskRepeat: 'no-repeat',
+    maskPosition: `0 calc(-1 * ${TOP_FADE})`,
+    animationName: topFade,
+    animationTimingFunction: 'linear',
+    animationFillMode: 'both',
+    animationTimeline: 'scroll(self)',
+    animationRange: `0 ${TOP_FADE}`,
   },
   card: {
     paddingBlock: spacing['--space-2'],

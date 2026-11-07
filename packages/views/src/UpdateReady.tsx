@@ -54,7 +54,7 @@ const styles = stylex.create({
     animationTimingFunction: motion['--ease-out'],
     animationFillMode: 'both',
   },
-  // The icon and text as a button keep their look; only the keyboard's ring shows.
+  // The icon and text as a button: the hover fill in its own pill, as tall as Restart, and the keyboard's ring.
   open: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -63,7 +63,11 @@ const styles = stylex.create({
     paddingInline: spacing['--space-2'],
     borderWidth: 0,
     borderRadius: radii['--radius-full'],
-    backgroundColor: 'transparent',
+    backgroundColor: {
+      default: 'transparent',
+      ':hover': { default: null, '@media (hover: hover)': colors['--surface-hover'] },
+      ':active': { default: colors['--surface-active'], '@media (hover: hover)': colors['--surface-active'] },
+    },
     color: 'inherit',
     font: 'inherit',
     cursor: 'default',
