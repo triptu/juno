@@ -26,6 +26,11 @@ export default defineFixtures(
       'active-connecting': fixture({ ...base, presence: { active: true, seen: false, label: 'Active. Connecting to Slack' } }),
       unknown: fixture({ ...base }),
     },
+    // Pause notifications (Slack's snooze): the item, and Resume while snoozed.
+    Pause: {
+      offered: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, onPause: noop }),
+      snoozed: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, paused: 'Paused until 3:30pm', snoozed: true, onPause: noop }),
+    },
     Privacy: {
       on: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, privacy: true }),
     },
