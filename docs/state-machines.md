@@ -182,7 +182,7 @@ The engine and main talk in requests and answers with no request id:
 | `storeSecrets` | `secretsStored` | first `secretsStored` or `sessionFailed` | `Session.ts:228-235` |
 | `signOut` | `signedOut` after main clears its side | first `signedOut`, no timeout | `Session.ts:258`, `main/session.ts:110-118` |
 
-Main's `#signOut` drops the launch session, removes `secrets.bin`, forgets the Slack keychain passwords, clears `persist:slack` storage and cache, then sends `signedOut`. Each stage runs on its own; a failed stage is logged and `signedOut` is still sent (MAIN-2, fixed).
+Main's `#signOut` drops the launch session, removes `secrets.bin` (or empties it in place when the folder refuses the unlink), forgets the Slack keychain passwords, clears `persist:slack` storage and cache, then sends `signedOut`. Each stage runs on its own; a failed stage is logged and `signedOut` is still sent (MAIN-2, fixed).
 
 Invariants:
 1. `#busy` allows one import at a time.
@@ -1384,7 +1384,7 @@ If the engine is restarting when main answers, `supervisor.send` drops `signedOu
 - Severity: medium; low likelihood. Confirmed. Impact: Stuck "signing out" with Sign out disabled until relaunch, with the session half cleared. This is a concrete candidate for the backlog item "Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled" (`docs/backlog.md`). It breaks sign-in handshake invariant 3.
 - Test: engine side in `packages/engine/test/session.test.ts` with a host fake that never answers `signedOut` (expect a timeout outcome); main side in `e2e/session.spec.ts`.
 - Fix direction: `try` and `finally` in `#signOut` so main always answers, with a failure tag if needed, and a bounded wait in the engine.
-- Status: Partly fixed in 53bbd4679. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent. Test: `apps/desktop/test/session.test.ts`. Partly fixed: the engine can no longer hang. Still open: when deleting `secrets.bin` fails, the engine hears `signedOut` anyway and the next launch reads the stored session and signs the user back in (review finding, 2026-11-07; in `docs/backlog.md`).
+- Status: Fixed in 53bbd4679 and 9958a4716. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent (53bbd4679; test: `apps/desktop/test/session.test.ts`, "answers signedOut when secrets.bin cannot be deleted, after clearing the Slack session and logging what failed"). A review of that fix found that when the unlink of `secrets.bin` failed, the next launch read the stored session and signed the user back in. `SecretsStore.delete` now empties the file in place when the folder refuses the unlink, so `requestSecrets` finds no session; only a file that can be neither unlinked nor opened for writing still serves, and the stage is logged (9958a4716). Test: `apps/desktop/test/session.test.ts`, "serves no stored session after a sign-out whose unlink the folder refused, as at the next launch".
 
 #### MAIN-3. A late ready takes the engine supervisor out of stopped during quit
 

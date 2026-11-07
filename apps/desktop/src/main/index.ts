@@ -1,6 +1,6 @@
 // Must run before any module captures a test switch.
 import './environment'
-import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, session as electronSession, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, safeStorage, session as electronSession, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
 import { createDockBadge, createDockBounce } from './dockBadge'
@@ -19,7 +19,7 @@ import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, withSession, type Launch } from './launch'
 import { registerMediaPermissions } from './media'
 import { registerAppScheme, serveAppScheme } from './scheme'
-import { SecretsStore } from './secrets'
+import { plainCipher, SecretsStore } from './secrets'
 import { SessionHost } from './session'
 import { forgetSlackKeychain, importFromSlackApp, slackKeychainReads } from './slackImport'
 import { SLACK_PARTITION } from './slackSession'
@@ -216,7 +216,7 @@ const providers = new ProviderStore(
 )
 
 const sessionHost = new SessionHost({
-  secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
+  secrets: new SecretsStore(app.getPath('userData'), e2e ? plainCipher : { encrypt: (json) => safeStorage.encryptString(json), decrypt: (bytes) => safeStorage.decryptString(bytes) }),
   send: (message) => supervisor.send(message),
   importSession: () => importFromSlackApp({ ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) }),
   forgetKeychain: forgetSlackKeychain,

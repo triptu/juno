@@ -4,10 +4,14 @@
  * so main must answer whatever a clean-up step does; the whole journey is
  * e2e/session.spec.ts. Electron's session and secrets.bin are faked here.
  */
+import { chmod, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, it } from 'bun:test'
 import type { MainToEngine } from '@juno/contract'
 import { eventually } from '@juno/testing/eventually'
-import { SessionHost, type SlackSession } from '../src/main/session'
+import { plainCipher, SecretsStore } from '../src/main/secrets'
+import { SessionHost, type SessionHostDeps, type SlackSession } from '../src/main/session'
 
 /** A Slack session that records what was cleared; nothing else is asked of it here. */
 function slackSession(cleared: string[]): SlackSession {
@@ -19,6 +23,46 @@ function slackSession(cleared: string[]): SlackSession {
     getUserAgent: () => 'test',
   }
 }
+
+/** A host whose deps are the fakes above unless a test replaces one. */
+function sessionHost(sent: MainToEngine[], overrides: Partial<SessionHostDeps> = {}) {
+  const logged: Array<{ level: string; message: string; data: Record<string, unknown> | undefined }> = []
+  const host = new SessionHost({
+    secrets: { read: async () => null, write: async () => {}, delete: async () => {} },
+    send: (message) => sent.push(message),
+    importSession: () => Promise.reject(new Error('no import in this test')),
+    forgetKeychain: () => {},
+    slackSession: () => slackSession([]),
+    saveSession: () => {},
+    log: (level, message, data) => logged.push({ level, message, data }),
+    ...overrides,
+  })
+  return { host, logged }
+}
+
+const session = { teamId: 'T1', userId: 'U1', workspaceUrl: 'https://juno.slack.com/', token: 'xoxc-test', teamName: 'Juno' }
+
+it('serves no stored session after a sign-out whose unlink the folder refused, as at the next launch', async () => {
+  const userData = await mkdtemp(join(tmpdir(), 'juno-session-'))
+  const secrets = new SecretsStore(userData, plainCipher)
+  await secrets.write(session)
+  // A userData folder the user cannot write (restored with the wrong owner): unlink fails, the file itself is still ours.
+  await chmod(userData, 0o500)
+  try {
+    const sent: MainToEngine[] = []
+    const { host, logged } = sessionHost(sent, { secrets })
+    host.handle({ _tag: 'signOut' })
+    await eventually(() => expect(sent).toContainEqual({ _tag: 'signedOut' }), { timeout: 2_000 })
+    // The next engine, or the next launch, asks for the stored session.
+    host.handle({ _tag: 'requestSecrets' })
+    await eventually(() => expect(sent.at(-1)?._tag).toBe('secrets'), { timeout: 2_000 })
+    expect(sent.at(-1)).toEqual({ _tag: 'secrets', secrets: null })
+    expect(logged.filter((line) => line.level === 'ERROR')).toEqual([])
+  } finally {
+    await chmod(userData, 0o700)
+    await rm(userData, { recursive: true, force: true })
+  }
+})
 
 it('answers signedOut when secrets.bin cannot be deleted, after clearing the Slack session and logging what failed', async () => {
   const sent: MainToEngine[] = []
