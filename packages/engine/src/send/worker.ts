@@ -64,7 +64,7 @@ import {
   pendingPosts,
   postUnknown,
   recoverPosts,
-  requeuePost,
+  requeueUnsentPost,
   sentAt,
   storedMe,
   type PendingPost,
@@ -87,6 +87,12 @@ const LOOKUP_MARGIN_MILLIS = 5 * 60_000
 const LOOKUP_PAGES = 5
 /** Refusals Slack gives when it could not run the call, and may on a retry: a post may have been run (unknown, not refused); a lookup is asked again. */
 const MAYBE_POSTED = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable'])
+/**
+ * Refusals of a lookup that no later read can change: the thread or channel is gone for the user, and a post to
+ * it would be refused the same way, so Retry on the failed row cannot post a second copy. Any other code
+ * (`invalid_cursor`, one Slack adds later) says nothing about the message, so the row is asked about again.
+ */
+const LOOKUP_REFUSED = new Set(['thread_not_found', 'channel_not_found', 'is_archived', 'not_in_channel'])
 /** `last_error` of a post Slack accepted without sending the message back (`files.share`, `chat.shareMessage`). */
 const SHARED = 'shared'
 /** What `post` answers while a file the post took is still staging. */
@@ -244,9 +250,9 @@ export class PostWorker extends Context.Service<
               yield* Effect.logWarning('send: Slack refused a message', { id: row.clientMsgId, attempts: row.attempts, code: error.code })
               return yield* local(transaction(failPost(row.clientMsgId, error.code)))
             case 'RateLimited':
-              return yield* local(transaction(requeuePost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
+              return yield* local(transaction(requeueUnsentPost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
             case 'NotSignedIn':
-              return yield* local(transaction(requeuePost(row.clientMsgId, now + timing.noSessionMillis, error._tag)))
+              return yield* local(transaction(requeueUnsentPost(row.clientMsgId, now + timing.noSessionMillis, error._tag)))
             case 'Offline':
               return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, error._tag)))
           }
@@ -275,7 +281,7 @@ export class PostWorker extends Context.Service<
             if (answer._tag === 'Failure') {
               const error = answer.failure
               // Slack will never answer this read (the root deleted, the channel left): the row is decided, for the user.
-              if (error._tag === 'Rejected' && !MAYBE_POSTED.has(error.code)) {
+              if (error._tag === 'Rejected' && LOOKUP_REFUSED.has(error.code)) {
                 yield* Effect.logWarning('send: Slack refused the lookup of a post', { id: row.clientMsgId, code: error.code })
                 return yield* local(transaction(failLookup(row.clientMsgId, error.code)))
               }
@@ -288,7 +294,7 @@ export class PostWorker extends Context.Service<
               // Slack said it took the post (files, a forward): the message is there even if the read does not show it yet.
               if (row.lastError === SHARED) return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
               // Slack has decided the lost request by now (specs/outbox.qnt): it is not there, so it may go again.
-              return yield* local(transaction(requeuePost(row.clientMsgId, now, 'lost')))
+              return yield* local(transaction(requeueUnsentPost(row.clientMsgId, now, 'lost')))
             }
           }
           const now = yield* Clock.currentTimeMillis
