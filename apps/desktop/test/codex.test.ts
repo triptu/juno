@@ -16,17 +16,28 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true })
 })
 
+interface FakeCodexOptions {
+  /** `login status` answers only once `releaseStatus` is called, as a slow Codex would. */
+  readonly holdStatus?: boolean
+  /** `login` exits at once instead of waiting for the browser. */
+  readonly loginExits?: boolean
+}
+
 /** A Codex that is installed and signed out: `login status` says so, and `login` waits for the browser until it is killed. */
-async function fakeCodex(): Promise<{ readonly agentDir: string; readonly executable: string; readonly ran: () => string[] }> {
+async function fakeCodex({ holdStatus = false, loginExits = false }: FakeCodexOptions = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'juno-codex-'))
   dirs.push(dir)
   const executable = join(dir, 'codex')
   const log = join(dir, 'calls')
-  await writeFile(executable, `#!/bin/sh\necho "$*" >> "${log}"\nif [ "$2" = "status" ]; then echo "Not logged in"; exit 0; fi\nexec sleep 600\n`)
+  const gate = join(dir, 'status-released')
+  const wait = holdStatus ? `while [ ! -e "${gate}" ]; do sleep 0.02; done\n` : ''
+  const login = loginExits ? 'exit 0' : 'exec sleep 600'
+  await writeFile(executable, `#!/bin/sh\necho "$*" >> "${log}"\nif [ "$2" = "status" ]; then ${wait}echo "Not logged in"; exit 0; fi\n${login}\n`)
   await chmod(executable, 0o755)
   return {
     agentDir: join(dir, 'agent'),
     executable,
+    releaseStatus: () => writeFile(gate, ''),
     ran: () => {
       let lines = ''
       try {
@@ -50,4 +61,16 @@ it('two sign-in clicks run one codex login, and quitting ends it', async () => {
   expect(await second).toBe('signedOut')
   // Both sign-ins have ended, so the child has exited and the log is final.
   expect(codex.ran().filter((line) => line === 'login')).toHaveLength(1)
+})
+
+it('quitting while the sign-in is still checking the status starts no codex login', async () => {
+  const codex = await fakeCodex({ holdStatus: true, loginExits: true })
+  const home = codexHome(codex.agentDir, codex.executable)
+  const signingIn = home.signIn()
+  await eventually(() => expect(codex.ran()).toContain('login status'), { timeout: 5_000 })
+  // The app quits while `codex login status` has not answered yet.
+  home.stop()
+  await codex.releaseStatus()
+  expect(await signingIn).toBe('signedOut')
+  expect(codex.ran()).not.toContain('login')
 })

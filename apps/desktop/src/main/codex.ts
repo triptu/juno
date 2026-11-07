@@ -6,7 +6,8 @@
  * owner to do in Terminal. The agent keeps its own check
  * (`packages/agent/src/providers/codex/local.ts`); main may not import the
  * agent (architecture 3). One sign-in runs at a time: a second click joins
- * it. Quitting kills the `codex login` child (`stop`). The executable comes
+ * it. Quitting (`stop`) kills every Codex child, the status check included,
+ * and a sign-in still waiting on that check starts no login. The executable comes
  * from `index.ts`: under JUNO_E2E it is `JUNO_E2E_CODEX`, or none, so a
  * developer's own Codex never shows in a test.
  */
@@ -22,7 +23,7 @@ export interface CodexHome {
   readonly status: () => Promise<CodexSetup>
   /** Runs `codex login`, or joins the one running, and answers with the status after it. */
   readonly signIn: () => Promise<CodexSetup>
-  /** Kills a running `codex login`, on quit. */
+  /** On quit: kills every running Codex child, and no sign-in starts a login after it. */
   readonly stop: () => void
 }
 
@@ -37,33 +38,38 @@ export function codexHome(agentDir: string, executable: string): CodexHome {
     const value = process.env[name]
     if (value !== undefined) env[name] = value
   }
+  let stopped = false
+  const children = new Set<ChildProcess>()
   const status = async (): Promise<CodexSetup> => {
     await mkdir(home, { recursive: true, mode: 0o700 })
     return new Promise((resolve) => {
-      execFile(executable, ['login', 'status'], { env, timeout: 10_000, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
+      const child = execFile(executable, ['login', 'status'], { env, timeout: 10_000, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
+        children.delete(child)
         if (error !== null && 'code' in error && error.code === 'ENOENT') return resolve('missing')
         // Signed in prints the ChatGPT account; anything else, a failure included, reads as signed out.
         resolve(error === null && /ChatGPT/i.test(`${stdout}${stderr}`) ? 'signedIn' : 'signedOut')
       })
+      children.add(child)
+      if (stopped) child.kill()
     })
   }
-  let login: ChildProcess | undefined
   let signingIn: Promise<CodexSetup> | undefined
   const signIn = async (): Promise<CodexSetup> => {
-    if ((await status()) === 'missing') return 'missing'
+    const before = await status()
+    if (before === 'missing' || stopped) return before
     await new Promise<void>((resolve) => {
       const child = spawn(executable, ['login'], { env, stdio: 'ignore' })
-      login = child
+      children.add(child)
       const timer = setTimeout(() => child.kill(), SIGN_IN_TIMEOUT_MS)
       const done = () => {
         clearTimeout(timer)
-        if (login === child) login = undefined
+        children.delete(child)
         resolve()
       }
       child.once('exit', done)
       child.once('error', done)
     })
-    return status()
+    return stopped ? 'signedOut' : status()
   }
   return {
     status,
@@ -73,6 +79,9 @@ export function codexHome(agentDir: string, executable: string): CodexHome {
       })
       return signingIn
     },
-    stop: () => login?.kill(),
+    stop: () => {
+      stopped = true
+      for (const child of children) child.kill()
+    },
   }
 }
