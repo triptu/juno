@@ -69,15 +69,15 @@ const readAccount = Effect.gen(function* () {
   return team === undefined || team.self_user_id === null ? undefined : { id: `${team.id}:${team.self_user_id}` as AccountId, userId: team.self_user_id }
 })
 
-type Hours = Pick<NotificationSettings, 'notificationHours' | 'presenceHours' | 'awayOutsideHours'>
+type Hours = Pick<NotificationSettings, 'notificationHours' | 'presenceHours' | 'awayOutsideHours' | 'snoozedUntil'>
 
-/** Whether `millis` is outside notification hours, and not outside active hours while they set presence, in local time. */
+/** Whether notifications are paused at `millis` (outside notification hours, or by Slack's snooze), and not outside active hours while they set presence, in local time. */
 const hoursAt = (millis: number, hours: Hours) => {
   const date = new Date(millis)
   const at = { weekday: date.getDay() as 0, minutes: date.getHours() * 60 + date.getMinutes() }
   const active = awayHours(hours)
   return {
-    quietHours: notificationsPaused(at, hours.notificationHours),
+    quietHours: (hours.snoozedUntil !== undefined && millis < hours.snoozedUntil) || notificationsPaused(at, hours.notificationHours),
     ownerActive: active === undefined || inHours(at, active),
   }
 }

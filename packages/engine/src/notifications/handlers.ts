@@ -15,6 +15,9 @@
  * hours through `SlackSchedule` (`../slackSchedule.ts`), which watches the
  * hours itself, so every way of changing them reaches it. The page carries
  * its state; Use Juno's hours is served here.
+ *
+ * Pause and Resume notifications are Slack's snooze, through `SlackSnooze`
+ * (`../snooze.ts`); the status says "Paused until" for it too.
  */
 import { randomUUID } from 'node:crypto'
 import { Clock, Effect, Semaphore, Stream } from 'effect'
@@ -28,12 +31,16 @@ import {
   type NotificationsPage,
   type NotificationStatus,
   type NotifyTargetView,
+  type PauseChoice,
 } from '@juno/contract'
 import {
   alwaysNotifyOf,
   awayHours,
   localTime,
   notifyChoice,
+  pauseChoices,
+  pauseEndHint,
+  pauseMinutes,
   parseTopicId,
   pausedLabel,
   presenceLabel,
@@ -52,6 +59,7 @@ import { NotificationControl } from '../notificationRuntime'
 import { SelfPresence } from '../selfPresence'
 import { Outbox } from '../outbox'
 import { SlackSchedule, slackScheduleView } from '../slackSchedule'
+import { SlackSnooze } from '../snooze'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
 import { setSubscribed } from '../follow'
 import { followNewChannels } from '../followNew'
@@ -137,6 +145,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     const control = yield* NotificationControl
     const selfPresence = yield* SelfPresence
     const slackSchedule = yield* SlackSchedule
+    const snooze = yield* SlackSnooze
     const ai = yield* AiProvider
     // Read-modify-write of one pref: one writer at a time, so two quick changes never lose one.
     const writes = yield* Semaphore.make(1)
@@ -182,7 +191,8 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     })
 
     const status = Effect.gen(function* () {
-      const now = localTime(yield* Clock.currentTimeMillis)
+      const millis = yield* Clock.currentTimeMillis
+      const now = localTime(millis)
       const { settings } = yield* readSettings
       const presence = (yield* control.currentPresence) ?? null
       const seen = yield* selfPresence.current
@@ -190,8 +200,15 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       const shown = presence ?? (hours === undefined ? 'active' : scheduledPresence(now, hours))
       const label = presenceLabel(now, shown, hours)
       const note = presence === null ? undefined : seenNote(presence, seen)
-      const paused = pausedLabel(now, settings.notificationHours)
-      return { presence, seen: seen ?? null, presenceLabel: note === undefined ? label : `${label}. ${note}`, ...(paused === undefined ? {} : { paused }) } satisfies NotificationStatus
+      const paused = pausedLabel(millis, settings.notificationHours, settings.snoozedUntil)
+      const snoozeLabel = settings.snoozedUntil === undefined ? undefined : pausedLabel(millis, undefined, settings.snoozedUntil)
+      return {
+        presence, seen: seen ?? null, presenceLabel: note === undefined ? label : `${label}. ${note}`,
+        ...(paused === undefined ? {} : { paused }),
+        ...(settings.snoozedUntil === undefined ? {} : { snoozedUntil: settings.snoozedUntil }),
+        ...(snoozeLabel === undefined ? {} : { snoozeLabel }),
+        pauseEnds: Object.fromEntries(pauseChoices.map((choice) => [choice, pauseEndHint(choice, millis, settings.notificationHours)])) as Record<PauseChoice, string>,
+      } satisfies NotificationStatus
     })
 
     const setLevel = (target: NotifyTargetView, choice: NotifyChoice) =>
@@ -294,6 +311,19 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           if ((yield* workspace.current) === undefined) return yield* new NotSignedIn()
           return { sent: yield* control.setPresence(presence) }
         }),
+      'notifications.pause': ({ choice }) =>
+        inWorkspace(Effect.gen(function* () {
+          const { settings } = yield* readSettings
+          const minutes = pauseMinutes(choice, yield* Clock.currentTimeMillis, settings.notificationHours)
+          return { until: yield* snooze.pause(minutes) }
+        }).pipe(
+          Effect.catch((error) => error._tag === 'SqlError' ? Effect.die(error) : Effect.as(Effect.logWarning('notifications: pause not set', { error: error._tag }), { until: null })),
+        )),
+      'notifications.resume': () =>
+        inWorkspace(snooze.resume.pipe(
+          Effect.as({ resumed: true }),
+          Effect.catch((error) => error._tag === 'SqlError' ? Effect.die(error) : Effect.as(Effect.logWarning('notifications: resume not sent', { error: error._tag }), { resumed: false })),
+        )),
       'notifications.useJunoHours': () => inWorkspace(slackSchedule.useJunoHours.pipe(Effect.orDie)),
     }
   }),

@@ -34,6 +34,7 @@ import {
   ReactionsGetFields,
 } from './chat.ts'
 import { ErrorResponse, okResponse } from './common.ts'
+import { DndEndSnoozeArgs, DndEndSnoozeFields, DndInfoArgs, DndInfoFields, DndSetSnoozeArgs, DndSetSnoozeFields, DndTeamInfoArgs, DndTeamInfoFields } from './dnd.ts'
 import {
   DraftsCreateArgs,
   DraftsDeleteArgs,
@@ -106,12 +107,10 @@ export const Methods = {
   'auth.test': method(AuthTestArgs, AuthTestFields),
   'client.userBoot': method(ClientUserBootArgs, ClientUserBootFields),
   'client.counts': method(ClientCountsArgs, ClientCountsFields),
-  'dnd.info': method(S.Struct({}), {
-    dnd_enabled: S.Boolean,
-    next_dnd_start_ts: S.Number,
-    next_dnd_end_ts: S.Number,
-    snooze_enabled: S.Boolean,
-  }),
+  'dnd.info': method(DndInfoArgs, DndInfoFields),
+  'dnd.setSnooze': method(DndSetSnoozeArgs, DndSetSnoozeFields),
+  'dnd.endSnooze': method(DndEndSnoozeArgs, DndEndSnoozeFields),
+  'dnd.teamInfo': method(DndTeamInfoArgs, DndTeamInfoFields),
   'users.prefs.get': method(UsersPrefsGetArgs, UsersPrefsGetFields),
   'users.prefs.set': method(UsersPrefsSetArgs, UsersPrefsSetFields),
   'client.getWebSocketURL': method(GetWebSocketUrlArgs, GetWebSocketUrlFields),

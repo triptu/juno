@@ -1,6 +1,6 @@
 import { defaultNotificationSettings, readLevel, sameHours, slackScheduleHours, startingHours, type Hours, type NotificationSettings, type NotifyLevel } from '@juno/domain'
 import { prefs, StoreReader, transaction } from '@juno/store'
-import { Effect, Option, Schema } from 'effect'
+import { Clock, Effect, Option, Schema } from 'effect'
 
 const minute = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 1439 }))
 const weekday = Schema.Literals([0, 1, 2, 3, 4, 5, 6])
@@ -124,15 +124,33 @@ export const readOwnSettings = Effect.gen(function* () {
 /** The hours Slack's own schedule lets notifications through, as the sync last stored it. Undefined pauses nothing. */
 export const slackHours = Effect.map(slackPrefs, (cached) => (cached === undefined ? undefined : slackScheduleHours(cached)))
 
+/** The pref that holds Slack's snooze as the engine last heard it: `{ until }` in epoch milliseconds, or null. */
+export const SNOOZE_PREF = 'slackSnooze'
+
+/** When Slack's snooze ends, as last heard; undefined when there is none. It may have ended already. */
+export const readSnooze = Effect.map(prefs.get(SNOOZE_PREF), (raw) => {
+  const until = typeof raw === 'object' && raw !== null ? (raw as { until?: unknown }).until : undefined
+  return typeof until === 'number' ? until : undefined
+})
+
+/** Saves Slack's snooze end (undefined: none), only when it changed, so an unchanged answer invalidates nothing. */
+export const writeSnooze = (until: number | undefined) => transaction(Effect.gen(function* () {
+  if ((yield* readSnooze) === until) return
+  yield* prefs.set(SNOOZE_PREF, until === undefined ? null : { until })
+}))
+
 /**
- * The settings as they decide: the notification hours are the ones in effect. Reads Slack's prefs (the `team`
- * row) while the owner has not set them.
+ * The settings as they decide: the notification hours are the ones in effect, and `snoozedUntil` is there while
+ * Slack's snooze runs now. Reads Slack's prefs (the `team` row) while the owner has not set the hours.
  */
 export const readSettings = Effect.gen(function* () {
   const own = yield* readOwnSettings
-  if (own.settings.notificationHours !== undefined) return own
+  const until = yield* readSnooze
+  const now = yield* Clock.currentTimeMillis
+  const snoozed = until !== undefined && until > now ? { ...own, settings: { ...own.settings, snoozedUntil: until } } : own
+  if (own.settings.notificationHours !== undefined) return snoozed
   const notificationHours = yield* slackHours
-  return { ...own, settings: notificationHours === undefined ? own.settings : { ...own.settings, notificationHours } }
+  return { ...snoozed, settings: notificationHours === undefined ? snoozed.settings : { ...snoozed.settings, notificationHours } }
 })
 
 /**

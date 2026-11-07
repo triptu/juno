@@ -108,6 +108,12 @@ export interface NotificationSettings {
   readonly matters?: string
   /** Ring for huddles: an incoming huddle that would ring plays its sound. Missing means on. */
   readonly huddleRing?: boolean
+  /**
+   * When Slack's snooze ends (Pause notifications), in epoch milliseconds. Never saved: present only while a snooze
+   * runs at the time the settings were read (`readSettings` in `@juno/notifications`), so a reader that has it is
+   * paused now.
+   */
+  readonly snoozedUntil?: number
 }
 
 const weekdays: ReadonlyArray<Weekday> = [1, 2, 3, 4, 5]
@@ -283,11 +289,44 @@ export function notificationsPaused(at: LocalTime, notificationHours: Hours | un
   return notificationHours !== undefined && !inHours(at, notificationHours)
 }
 
-/** The avatar menu's hint on Notifications: "Paused until 9am" outside notification hours, nothing inside. */
-export function pausedLabel(at: LocalTime, notificationHours: Hours | undefined): string | undefined {
-  if (notificationHours === undefined || inHours(at, notificationHours)) return undefined
-  const next = nextBoundary(at, notificationHours, true)
-  return next === undefined ? 'Paused' : `Paused ${until(at, next.inMinutes, next.at)}`
+/**
+ * When notifications come back after `now` (epoch milliseconds): the first time neither a snooze nor the time
+ * outside notification hours holds them. Undefined when they are not paused now; null when the hours never start.
+ */
+export function pausedUntil(now: number, notificationHours: Hours | undefined, snoozedUntil: number | undefined): number | null | undefined {
+  let at = now
+  // A snooze can end outside the hours and the hours can end inside a snooze; each step moves past one of them.
+  for (let step = 0; step < 4; step++) {
+    if (snoozedUntil !== undefined && at < snoozedUntil) at = snoozedUntil
+    else if (notificationHours !== undefined && !inHours(localTime(at), notificationHours)) {
+      const start = nextHoursStart(at, notificationHours)
+      if (start === undefined) return null
+      at = start
+    } else break
+  }
+  return at === now ? undefined : at
+}
+
+/**
+ * The avatar menu's hint on Notifications while they are paused, by the notification hours or Slack's snooze:
+ * "Paused until 9am", "Paused until tomorrow 9am", "Paused until Mon 9am". Nothing while they are not.
+ */
+export function pausedLabel(now: number, notificationHours: Hours | undefined, snoozedUntil?: number): string | undefined {
+  const end = pausedUntil(now, notificationHours, snoozedUntil)
+  if (end === undefined) return undefined
+  if (end === null) return 'Paused'
+  const { days, time, day } = endParts(now, end)
+  if (days === 0) return `Paused until ${time}`
+  if (days === 1) return `Paused until tomorrow ${time}`
+  return `Paused until ${day} ${time}`
+}
+
+/** A time `end` after `now` (epoch milliseconds) in local time: days ahead by the calendar, "9am", and "Mon". */
+export function endParts(now: number, end: number): { readonly days: number; readonly time: string; readonly day: string } {
+  const from = new Date(now)
+  const to = new Date(end)
+  const days = Math.round((new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime() - new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()) / 86_400_000)
+  return { days, time: hourLabel(to.getHours() * 60 + to.getMinutes()), day: dayNames[to.getDay()] as string }
 }
 
 export type Presence = 'active' | 'away'
@@ -345,7 +384,7 @@ export function decideHuddleAlert(
   huddle: { readonly channelId: string; readonly startedBy: string; readonly at: LocalTime },
   settings: NotificationSettings,
 ): HuddleAlertDecision {
-  if (notificationsPaused(huddle.at, settings.notificationHours)) return 'quiet'
+  if (settings.snoozedUntil !== undefined || notificationsPaused(huddle.at, settings.notificationHours)) return 'quiet'
   const levels = [settings.channels[huddle.channelId], settings.people[huddle.startedBy]]
   return levels.includes('always') || !levels.includes('never') ? 'ring' : 'quiet'
 }

@@ -143,8 +143,10 @@ export default defineFixtures(
       'dm-thread-art': state(rows.offsite),
       'dm-main-photo': state(rows.mayaMain),
       // Slack shows Maya active: the presence dot on her photo, ringed in the sidebar's or the selected fill.
-      'dm-main-active': state(rows.mayaMain, { partnerActive: true }),
-      'dm-main-active-selected': state(rows.mayaMain, { partnerActive: true, selected: true }),
+      'dm-main-active': state(rows.mayaMain, { partnerPresence: 'active' }),
+      'dm-main-active-selected': state(rows.mayaMain, { partnerPresence: 'active', selected: true }),
+      'dm-main-paused': state(rows.mayaMain, { partnerPresence: 'pausedAway' }),
+      'dm-main-paused-active-selected': state(rows.mayaMain, { partnerPresence: 'pausedActive', selected: true }),
       'dm-main-yours': state(devMain),
       'main-art': state(rows.alertsMain),
       'main-placeholder': state({ ...rows.alertsMain, art: undefined }),

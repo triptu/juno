@@ -33,5 +33,8 @@
  * the index imports; the rows do not differ, as for 10.
  * 15: the profile status touched the users table, its row type and the
  * Slack schema, which the index imports; the rows do not differ, as for 10.
+ * 16: Pause notifications and paused colleagues added Slack's Do Not
+ * Disturb to the domain and the Slack schema, which the index imports; the
+ * rows do not differ, as for 10.
  */
-export const INDEX_VERSION = 15
+export const INDEX_VERSION = 16

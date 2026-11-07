@@ -55,8 +55,11 @@ export interface TopicRowProps {
   readonly accessory?: ReactNode
   /** What `accessory` says, added to the row's description ("huddle with 3 people"). */
   readonly accessoryLabel?: string
-  /** A DM's Main only: Slack shows the person as active, drawn as the presence dot on their photo. */
-  readonly partnerActive?: boolean
+  /**
+   * A DM's Main only: what is drawn on the person's photo. `active` is the presence dot; while they have
+   * notifications paused, the snooze badge, green when active (`pausedActive`) or not (`pausedAway`).
+   */
+  readonly partnerPresence?: 'active' | 'pausedActive' | 'pausedAway'
 }
 
 const HOVER = '@media (hover: hover)'
@@ -97,7 +100,7 @@ export const TopicRow = memo(function TopicRow({
   newThreads = 0,
   accessory,
   accessoryLabel,
-  partnerActive = false,
+  partnerPresence,
 }: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
@@ -115,8 +118,8 @@ export const TopicRow = memo(function TopicRow({
   const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
   const mark = main && accessory !== undefined && accessory !== null
-  const active = partnerActive && main && row.channel.kind === 'im'
-  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined, active)
+  const partner = main && row.channel.kind === 'im' ? partnerPresence : undefined
+  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined, partner)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
   // Line three's tags, or line one's on a two-line row. Never a Main tag: Main is the default.
@@ -213,7 +216,7 @@ export const TopicRow = memo(function TopicRow({
       {...stylex.props(styles.row, focusRing.inset, twoLine && styles.twoLineRow, selected && styles.selected)}
     >
       <span {...stylex.props(styles.tile, main && styles.mainTile, quiet && styles.quietTile)}>
-        <Tile row={row} dot={active ? (selected ? 'rowSelected' : 'row') : undefined} />
+        <Tile row={row} dot={partner === undefined ? undefined : { surface: selected ? 'rowSelected' : 'row', presence: partner }} />
       </span>
       <span {...stylex.props(styles.body)}>
         <span {...stylex.props(styles.line1)}>
@@ -293,7 +296,7 @@ export const TopicRow = memo(function TopicRow({
  * Tide placeholder until the art exists or while AI assist is off. The art
  * is 40px in a 44px slot, so its text column lines up with a photo row's.
  */
-function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' | 'rowSelected' | undefined }) {
+function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: { readonly surface: 'row' | 'rowSelected'; readonly presence: NonNullable<TopicRowProps['partnerPresence']> } | undefined }) {
   const { channel } = row
   if (row.kind === 'main' && channel.kind === 'im') {
     const partner = channel.partner
@@ -305,7 +308,7 @@ function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' |
     return (
       <span {...stylex.props(styles.photo)}>
         {photo}
-        <PresenceDot active surface={dot} />
+        <PresenceDot active={dot.presence !== 'pausedAway'} paused={dot.presence !== 'active'} surface={dot.surface} />
       </span>
     )
   }
@@ -354,9 +357,10 @@ function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
 }
 
 /** What the tags and icons say, for the row's description: "active, 2 unread, mentions you." */
-function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined, active: boolean): string | undefined {
+function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined, partner: TopicRowProps['partnerPresence']): string | undefined {
   const parts = [
-    active ? 'active' : undefined,
+    partner === 'active' || partner === 'pausedActive' ? 'active' : undefined,
+    partner === 'pausedActive' || partner === 'pausedAway' ? 'notifications paused' : undefined,
     row.unreadCount > 0 ? unreadLabel : undefined,
     row.mentionsMe ? 'mentions you' : undefined,
     threadsLabel,

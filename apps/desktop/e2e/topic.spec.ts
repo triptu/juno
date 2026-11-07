@@ -273,10 +273,10 @@ async function avatarMenuRows(juno: Juno, win: Page): Promise<void> {
   expect(Math.abs(menu!.x + menu!.width / 2 - (avatar!.x + avatar!.width / 2))).toBeLessThanOrEqual(1)
   expect(menu!.y).toBeGreaterThan(avatar!.y + avatar!.height)
   const list = accountMenu.root.locator('[role="menu"][aria-label="Account"]')
-  const notifications = accountMenu.item(/^Notifications/)
+  const notifications = accountMenu.item(/^Notification settings/)
 
   await notifications.hover()
-  await expect.poll(() => highlighted(list)).toEqual([expect.stringMatching(/^Notifications/)])
+  await expect.poll(() => highlighted(list)).toEqual([expect.stringMatching(/^Notification settings/)])
   await expect(list).toHaveAttribute('aria-activedescendant', (await notifications.getAttribute('id')) ?? '')
 
   // The keyboard goes on from the hovered item while the pointer rests on it.

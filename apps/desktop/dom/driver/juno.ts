@@ -211,13 +211,16 @@ export class Juno implements JunoVerbs {
   }
 
   async openNotifications(): Promise<void> {
-    await this.accountMenu.choose(/^Notifications/)
+    await this.accountMenu.choose(/^Notification settings/)
     await this.tabs.expectActive('Settings')
     await expect(this.settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
   }
 
-  /** Notification hours around now (or, with `outside`, away from now) on every day, saved, as the Playwright driver's. */
-  notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+  /**
+   * Notification hours around now (or, with `outside`, away from now) on every day, saved, as the Playwright driver's.
+   * With `wide`, six hours either side of now, so a test that moves the clock an hour or two stays inside them.
+   */
+  notificationHoursNow(options: { readonly outside?: boolean; readonly wide?: boolean } = {}): Promise<void> {
     return this.#hoursNow(['Notifications'], options)
   }
 
@@ -237,12 +240,13 @@ export class Juno implements JunoVerbs {
     await this.tabs.close('Settings')
   }
 
-  async #hoursNow(sections: ReadonlyArray<HoursSection>, options: { readonly outside?: boolean }): Promise<void> {
+  async #hoursNow(sections: ReadonlyArray<HoursSection>, options: { readonly outside?: boolean; readonly wide?: boolean }): Promise<void> {
     await this.openNotifications()
     const now = new this.dom.window.Date()
     const half = Math.floor((now.getHours() * 60 + now.getMinutes()) / 30) * 30
-    const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
-    const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
+    const before = options.wide === true ? 360 : 60
+    const from = options.outside === true ? (half + 360) % 1440 : (half + 1440 - before) % 1440
+    const to = options.outside === true ? (half + 1080) % 1440 : (from + 2 * before) % 1440
     if (sections.includes('Active in Slack')) await this.notifications.turnOnAwayOutsideHours()
     for (const section of sections) for (const row of hoursRows) await this.notifications.setRow(section, row, { from, to })
     await this.tabs.close('Settings')

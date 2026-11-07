@@ -16,6 +16,8 @@ import {
   notificationsSetAwayOutsideHours,
   notificationsSetHuddleRing,
   notificationsSetGroupHours,
+  notificationsPause,
+  notificationsResume,
   notificationsSetPresence,
   notificationsSettings,
   notificationsStatus,
@@ -27,6 +29,7 @@ import {
   type NotificationSettingsView,
   type NotifyChoice,
   type NotifyTargetView,
+  type PauseChoice,
   type PresenceValue,
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
@@ -160,6 +163,20 @@ export async function setPresence(registry: Registry, presence: PresenceValue): 
   const exit = await runCommand(registry, notificationsSetPresence, { presence })
   if (Exit.isSuccess(exit) && exit.value.sent) return
   showToast(registry, { text: presence === 'away' ? "Couldn't set you away. Try again." : "Couldn't set you active. Try again." })
+}
+
+/** Pause notifications with Slack's snooze. The paused badge and "Paused until" follow from the status; a toast says when Slack did not take it. */
+export async function pauseNotifications(registry: Registry, choice: PauseChoice): Promise<void> {
+  const exit = await runCommand(registry, notificationsPause, { choice })
+  if (Exit.isSuccess(exit) && exit.value.until !== null) return
+  showToast(registry, { text: "Couldn't pause notifications. Try again." })
+}
+
+/** Resume notifications: ends Slack's snooze. */
+export async function resumeNotifications(registry: Registry): Promise<void> {
+  const exit = await runCommand(registry, notificationsResume, {})
+  if (Exit.isSuccess(exit) && exit.value.resumed) return
+  showToast(registry, { text: "Couldn't resume notifications. Try again." })
 }
 
 /** Use Juno's hours: writes the notification hours to Slack's schedule again after it was changed in Slack. */

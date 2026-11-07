@@ -31,10 +31,11 @@ export type AlwaysNotifyKey = 'dms' | 'groupDms' | 'mentions' | 'startedThreads'
 export type AlwaysNotify = Readonly<Record<AlwaysNotifyKey, boolean>>
 
 /** What decided one message, first that applied. */
-export type DecidedBy = 'hours' | 'always' | 'never' | 'ignored' | 'directMention' | 'alwaysNotify' | 'aiOff' | 'closer' | 'addressedElsewhere' | 'live' | 'instruction' | 'reading' | 'timeout' | 'burst'
+export type DecidedBy = 'snooze' | 'hours' | 'always' | 'never' | 'ignored' | 'directMention' | 'alwaysNotify' | 'aiOff' | 'closer' | 'addressedElsewhere' | 'live' | 'instruction' | 'reading' | 'timeout' | 'burst'
 
 /** The short name of what decided, in the Details dialog. */
 export const decidedByLabels: Readonly<Record<DecidedBy, string>> = {
+  snooze: 'Paused notifications',
   hours: 'Notification hours',
   always: 'Your setting',
   never: 'Your setting',

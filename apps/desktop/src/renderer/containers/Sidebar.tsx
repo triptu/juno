@@ -12,6 +12,8 @@ import {
   privacySharingAtom,
   registry,
   setPresence,
+  pauseNotifications,
+  resumeNotifications,
   sidebarDotAtom,
   sidebarFilterAtom,
   sidebarListAtom,
@@ -27,7 +29,7 @@ import {
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { statusUntil, type ProfileStatus } from '@juno/contract'
+import { statusUntil, type PauseChoice, type ProfileStatus } from '@juno/contract'
 import { hueFor, initials, Sidebar as SidebarView, UpdateReady, type AccountMenuAction, type AccountStatus, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { chunk } from './chunks'
 import { SyncNotice, useSyncNoticeReady } from './SyncNotice'
@@ -153,9 +155,15 @@ export function Sidebar() {
   // The setting drives the menu's toggle; the dot shows what Slack shows colleagues, away until Slack says.
   const presence = status._tag === 'Success' && status.value.presence !== null ? { active: status.value.presence === 'active', seen: status.value.seen === 'active', label: status.value.presenceLabel } : undefined
   const paused = status._tag === 'Success' ? status.value.paused : undefined
+  const snoozed = status._tag === 'Success' && status.value.snoozedUntil !== undefined
+  const pause = (choice: PauseChoice) => {
+    setMenuOpen(false)
+    void pauseNotifications(registry, choice)
+  }
   const accountAction = (action: AccountMenuAction) => {
     setMenuOpen(false)
     if (action === 'notifications') return openSettings('notifications')
+    if (action === 'resume') return void resumeNotifications(registry)
     if (action === 'settings') return openSettings()
     if (action === 'privacy') return setPrivacy(!privacy)
     if (action === 'status') return registry.set(statusSheetOpenAtom, true)
@@ -185,6 +193,10 @@ export function Sidebar() {
         {...(presence === undefined ? {} : { presence })}
         {...(paused === undefined ? {} : { paused })}
         status={accountStatus(ownStatus)}
+        snoozed={snoozed}
+        {...(status._tag === 'Success' && status.value.snoozeLabel !== undefined ? { snoozeLabel: status.value.snoozeLabel } : {})}
+        {...(status._tag === 'Success' ? { pauseEnds: status.value.pauseEnds } : {})}
+        onPause={pause}
         privacy={privacy}
         onAction={accountAction}
       />

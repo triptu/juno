@@ -1,7 +1,7 @@
 /**
  * How one incoming message is decided (spec section 14). It notifies (a
  * banner) or stays (unread in Juno). The first step that applies decides:
- * notification hours, Always, Never or an ignored channel (a direct mention
+ * Slack's snooze (Pause notifications), notification hours, Always, Never or an ignored channel (a direct mention
  * gets through), the Always notify switches, AI assist off, then Auto: a
  * closer, a message addressed to someone else, a live conversation, Juno's
  * reading. A banner then holds the conversation quiet for 10 seconds.
@@ -65,7 +65,7 @@ export const BURST_SECONDS = 10
 
 export type NotificationOutcome = 'notify' | 'stay'
 export type DecidedBy =
-  | 'hours' | 'always' | 'never' | 'ignored' | 'directMention' | 'alwaysNotify' | 'aiOff'
+  | 'snooze' | 'hours' | 'always' | 'never' | 'ignored' | 'directMention' | 'alwaysNotify' | 'aiOff'
   | 'closer' | 'addressedElsewhere' | 'live' | 'instruction' | 'reading' | 'timeout' | 'burst'
 
 /** What a Notify me choice applies to: a thread topic id, a channel or DM id, or a user id. */
@@ -144,6 +144,7 @@ interface Names {
 }
 
 function decideOnce(candidate: NotificationCandidate, settings: NotificationSettings, context: DecisionContext, reading: Reading | 'failed' | undefined): NotificationDecision | NeedsReading {
+  if (settings.snoozedUntil !== undefined) return { outcome: 'stay', decidedBy: 'snooze', reason: 'Notifications are paused.' }
   if (notificationsPaused(candidate.at, settings.notificationHours)) return { outcome: 'stay', decidedBy: 'hours', reason: 'Outside your notification hours.' }
   const name = context.userName?.(candidate.senderId)
   const names: Names = { sender: name ?? candidate.senderId, first: name === undefined ? 'Someone' : firstName(name), where: channelLabel(candidate.channel) }

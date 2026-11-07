@@ -16,7 +16,7 @@ export {
 } from './allTopics'
 export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
-export { personPresenceAtom, setShowPresence, showPresenceAtom, sidebarPersonActiveAtom } from './presence'
+export { personPausedAtom, personPresenceAtom, setShowPresence, showPresenceAtom, sidebarPersonDotAtom } from './presence'
 export { personStatusAtom, preparePersonStatus, setOwnStatus, statusSheetOpenAtom } from './profileStatus'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { openViewerAtom } from './mediaViewer'
@@ -173,6 +173,8 @@ export {
   setAwayOutsideHours,
   setHuddleRing,
   setPresence,
+  pauseNotifications,
+  resumeNotifications,
   applyJunoHours,
 } from './notifications'
 export { ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, stopIgnoring } from './ignored'

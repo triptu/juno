@@ -198,8 +198,6 @@ export const coreMethods = {
     }
   },
 
-  'dnd.info': () => ({ dnd_enabled: false, next_dnd_start_ts: 0, next_dnd_end_ts: 0, snooze_enabled: false }),
-
   'users.prefs.get': (ctx, args) => {
     const prefs = ctx.workspace.prefs
     if (args.prefs === undefined) return { prefs }
