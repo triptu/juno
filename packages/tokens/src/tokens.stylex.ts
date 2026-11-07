@@ -945,7 +945,12 @@ export const layout = stylex.defineVars({
   '--juno-panel-inset': '8px',
   '--juno-panel-resize-hit': '8px',
   '--composer-width': '752px',
-  '--composer-max-height': '194px',
+  // A topic's composer (and a message's edit field) grows to about half the
+  // topic's height, as Slack's does, never under 8 lines (9 + 8×22 + 9);
+  // then it scrolls inside. `cqh` is the topic's height (`TopicView` is a
+  // size container; Home is one too). 45, not 50: the composer's own
+  // padding and attachments come on top of the field.
+  '--composer-max-height': 'max(194px, 45cqh)',
   '--composer-line-height': '22px',
   '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',

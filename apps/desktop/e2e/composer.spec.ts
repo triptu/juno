@@ -31,7 +31,7 @@ test('the topic composer: a reply settles in place and the field grows; a mentio
   await topic.expectTitle(POSTGRES)
   await topic.expectAtBottom()
   await test.step('a reply in a thread shows at once and settles in place, posted once', () => sendReply(juno, fake))
-  await test.step('the composer grows to about eight lines, then scrolls inside, and Shift Enter adds a line', () => composerGrowth(juno, fake))
+  await test.step('the composer grows to about half the topic’s height, then scrolls inside, and Shift Enter adds a line', () => composerGrowth(juno, fake))
   await topic.composer.fill('')
   await test.step('mention a person in a reply: Backspace removes it whole, ⌘Z brings it back, and it posts as <@U…> and shows as a mention', () => mentionPerson({ juno, fake }))
   await test.step('⌘B wraps the selection in one edit, and ⌘Z takes it back', () => boldSelection({ juno }))
@@ -101,10 +101,13 @@ async function composerGrowth(juno: Fixtures['juno'], fake: Fixtures['fake']): P
   await topic.composer.fill('one\ntwo\nthree')
   const three = (await topic.composer.boundingBox())!.height
   expect(three).toBeGreaterThan(one)
-  await topic.composer.fill(Array.from({ length: 14 }, (_, i) => `Line ${i + 1}`).join('\n'))
+  // A long message grows the field to about half the topic's height, never under 8 lines, then it scrolls inside.
+  await topic.composer.fill(Array.from({ length: 60 }, (_, i) => `Line ${i + 1}`).join('\n'))
   const capped = (await topic.composer.boundingBox())!.height
-  expect(capped).toBeGreaterThan(150)
-  expect(capped).toBeLessThanOrEqual(194)
+  const pane = await topic.composer.evaluate((field) => field.closest('[data-topic-view]')!.getBoundingClientRect().height)
+  expect(capped).toBeGreaterThan(194)
+  expect(capped).toBeGreaterThan(pane * 0.4)
+  expect(capped).toBeLessThanOrEqual(pane * 0.5)
   expect(await topic.composer.evaluate((field) => field.scrollHeight > field.clientHeight)).toBe(true)
   // Shift Enter adds a line, it does not send.
   await topic.composer.fill('first line')

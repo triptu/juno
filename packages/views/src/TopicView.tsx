@@ -83,9 +83,11 @@ const styles = stylex.create({
   // Fills whatever holds it (the workspace page, a gallery frame) and
   // keeps its own height to that, so the list scrolls instead of growing.
   // Positioned and isolated, so the viewer covers this topic and stays under the Juno panel when that covers the page.
+  // A size container: the composer's field grows to a share of the topic's height (`--composer-max-height`).
   root: {
     position: 'relative',
     isolation: 'isolate',
+    containerType: 'size',
     display: 'flex',
     flexDirection: 'column',
     flexGrow: 1,
