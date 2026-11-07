@@ -1,0 +1,1 @@
+- 11-07 23:23 · pause-notify · The snooze badge is a plain "z", 8px with a 2px stroke on whole pixels, with Slack's arc left out, on your avatar and colleagues' alike · At 10px the arc blurred the "z" at 1x; the "z" alone reads at a 24px avatar and on a sidebar row.
