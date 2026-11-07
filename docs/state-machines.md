@@ -351,6 +351,23 @@ Invariants:
 3. An invalidation during a run or the window gives exactly one trailing run.
 4. The first message of every subscription is `reset: true` (`live.ts:193`).
 
+### Profile status expiry
+
+Where: `untilExpiry` and the `status.of` handler in `packages/engine/src/profileStatus/handlers.ts`, one per subscription (a person's status in the avatar menu or an avatar's tooltip).
+States: none (no status, or past its expiry), shown without expiry, shown until `expiresAt` (a sleep on the engine's clock is pending).
+
+| From | Event | To | Guard | Code |
+|---|---|---|---|---|
+| any | the `users` row or a custom emoji changes (a run) | none | no text and no emoji, or the clock is at or past `expiresAt` | `readStatus`, `untilExpiry` |
+| any | a run | shown without expiry | `status_expiration` is 0 | `untilExpiry` |
+| any | a run | shown until `expiresAt` | `expiresAt` is later than the clock | `untilExpiry` (`Stream.concat` with `Effect.sleep`) |
+| shown until `expiresAt` | the sleep ends | none | | `untilExpiry` |
+
+Invariants:
+1. A new run cancels the pending sleep (`Stream.switchMap`), so a status changed or cleared before it expires never sends a stale "none" later.
+2. Nothing polls: the only timer is the one sleep to the current status's `expiresAt`.
+3. The stored row keeps Slack's expiry; hiding an expired status changes nothing in the store, and the next `user_change` replaces the row.
+
 ### Smaller engine machines
 
 | Machine | States and where | Rules it relies on |

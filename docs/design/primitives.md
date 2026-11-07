@@ -207,6 +207,7 @@ Mono 12.5 lh 1.6 inside a `Surface inset`, pre-wrap, max-height 150 with contain
 - Under the control, 6px away, or over it when there is no room below; never on it. Moved in to stay 8px inside the window, or inside a `data-tooltip-bounds` ancestor (the gallery frame). Fixed in a portal on `body`, `--z-tooltip`, so it moves nothing.
 - `--surface-raised`, `--pop-shadow`, radius 6, padding 4 / 8, meta type in the default colour, at most `--tooltip-max-width` (280) wide. Keys sit 8px after the label as 16px keycaps, one per modifier (⌃ ⌘ S), `--secondary-default` with subtle mono text. Fades in over `--duration-fast` the first time; warm ones appear at once.
 - `role="tooltip"`; the control's `aria-describedby` points at it while it shows.
+- A detail line under the label, from the layer's `detail(target)` (the app passes one that reads `data-tooltip-person` and shows that person's Slack status, inventory 2.1b). The line can arrive after the tip shows; the tip is placed again when its size changes.
 
 Shortcuts come from `menuShortcuts` in `@juno/contract` (the app menu's accelerators) through `menuKeys('history.back')`, so a key changes in one place.
 

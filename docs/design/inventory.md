@@ -78,12 +78,12 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, stati
 
 **Avatar menu** (popover, 248px wide, centred under the avatar 4px below it, moved in from the window's edge when it would run past (decided 10-17; it hung off the avatar's right edge and opened to its left), z 20, padding 6, radius 13, `--pop-shadow`):
 
-- Header: avatar 32 with a presence dot (10px, 2px ring in the menu surface `--surface-raised`: `--presence-active` green when Slack shows you active, hollow `--foreground-muted` ring otherwise, as on the avatar button; the snooze badge of §2.1 in its place while notifications are paused) + "Tushar" 13/600 + "Active" or "Away until 9am" 12 muted (the setting: `untilLabel` on the active hours; "Active until 8pm" when a change by hand runs to the next switch), then ". Slack shows you away" or ". Connecting to Slack" when what Slack shows differs from the setting; padding `8 8 10`.
+- Header: avatar 32 with a presence dot (10px, 2px ring in the menu surface `--surface-raised`: `--presence-active` green when Slack shows you active, hollow `--foreground-muted` ring otherwise, as on the avatar button; the snooze badge of §2.1 in its place while notifications are paused) + "Tushar" 13/600, followed 4px later by your status's emoji at 14 when you have a status (`data-account-status-emoji`) + "Active" or "Away until 9am" 12 muted (the setting: `untilLabel` on the active hours; "Active until 8pm" when a change by hand runs to the next switch), then ". Slack shows you away" or ". Connecting to Slack" when what Slack shows differs from the setting; padding `8 8 10`.
 - Separator 1px `--border-default`, margin `2 6 4`.
 - Items 32px, radius 6, padding 0 8, gap 10, icon 15 `--foreground-subtle`, label 13, right hint 11 muted:
+  - Set a status (`SmileyPlus`, the reactions icon) — with a status, the row is its emoji at 16 in the icon's place, its text as the label ("Edit your status" for an emoji alone) and "until 3:30pm" as the hint when it clears; opens the status sheet (§2.1b)
   - Set yourself away (`moon`) / Set yourself active (`sun`) — by state; shows at once, calls `presence.set` and lasts until the next switch in the active hours, through a wake or a relaunch
   - Hide message text (`eye-slash`) / Show message text (`eye`) — by state, hint "⌃⌘H"; privacy mode (SPEC section 5)
-  - Set status (`circle-dot`)
   - Notifications (`bell`) — hint "Paused until 9am" outside notification hours, none inside
   - Settings (`settings`) — hint "⌘,"; opens Settings at General (§14). Notifications opens it at Notifications
   - AI assist (`sparkles`) — [proposed] right side is a switch; prototype shows nothing
@@ -92,8 +92,23 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, stati
   - Sign out (`log-out`)
 - Closes on Esc, outside click, or picking an item.
 - [built] Hide or Show message text, after Set yourself away or active.
-- [built M10] Header, Set yourself away or active, Notifications (with "Paused until 9am") and Settings ("⌘,", also Juno › Settings… in the app menu). Set status, AI assist, Switch workspace and Sign out as an item are not built; the Session block (with Sign out) stays under the items until they are: the account line, then Sign out under it, its text starting on the line's edge at the menu's inset. The diagnostics (build line, engine state, Ping engine) moved to Settings › About on 10-16. The line under the name is the workspace until presence is known. The away dot's ring is 1px.
+- [built M10] Header, Set yourself away or active, Notifications (with "Paused until 9am") and Settings ("⌘,", also Juno › Settings… in the app menu). AI assist, Switch workspace and Sign out as an item are not built; the Session block (with Sign out) stays under the items until they are: the account line, then Sign out under it, its text starting on the line's edge at the menu's inset. The diagnostics (build line, engine state, Ping engine) moved to Settings › About on 10-16. The line under the name is the workspace until presence is known. The away dot's ring is 1px.
 - [built 10-16] One active item, as in a native menu: the pointer and the arrow keys move the same highlight (`useMenuActive` in `@juno/ui`), and the pointer leaving the list clears it. Rows have no hover style of their own. Every OptionList (menus, the palette, @ suggestions, the view sheet, Home's destination list) works this way, and lists opt out of the title bar's drag region, which otherwise swallows the pointer over a menu that hangs off it.
+- [built 11-07] Set a status and your status, first in the list, and the emoji in the header. Gallery: `AccountMenu` › Status.
+
+### 2.1b Status sheet
+
+SPEC 14, "Your status". A centred sheet over the dimmed window (`SheetLayer`, as the channel sheet §2.3a), `Surface popover`, at most `--status-sheet-width` 400 wide, padding 16 20, gap 12, `role="dialog"` named "Set a status":
+
+- Title "Set a status", heading.
+- The field: `TextField` 32 named "Status", placeholder "What’s your status?", at most 100 characters, focused on open. Leading: a 24px ghost `IconButton` with `SmileyPlus` ("Choose an emoji") while there is no emoji, else the emoji at 16 in a 24px button (radius `--radius-sm`, `--secondary-hover` under the pointer, `--secondary-active` pressed). Trailing, when there is an emoji or text: a 24px ghost `X` ("Clear") that empties both. Slack's refusal under it in `--danger` 12, `role="alert"`.
+- Presets, while the field and emoji are empty: an `OptionList` "Presets" of 30px rows, the emoji at 16, the text, and the Clear after it sets inline and muted (In a meeting 1 hour, Commuting 30 minutes, Out sick Today, Vacationing Don’t clear, Working remotely Today).
+- Clear after: "Clear after" 12/500 muted on the left, a native `Select` 30 on the right (Don’t clear, 30 minutes, 1 hour, 4 hours, Today, This week; first, for a status that already clears, its own time: "Until 3:30pm"). Disabled while there is nothing to save.
+- Buttons, 4 above: Clear status (ghost subtle md, only with a status) on the left; Cancel (secondary md) and Save (primary md, disabled until there is an emoji or text, and while Slack answers) on the right. Enter in the field is Save.
+- The emoji button shows the emoji picker (`EmojiPicker`, as the message menu's) in the sheet's place, with the workspace's custom emoji; a pick or Escape brings the sheet back with the field as it was. Escape on the sheet closes it.
+- [built 11-07] `StatusSheet` in `@juno/views`; the container `containers/StatusSheet.tsx`, its own chunk, warmed when idle. Gallery: `StatusSheet` › New and Edit.
+
+**Status in an avatar's tooltip.** A message avatar's tooltip ("Message Maya") adds a second line with the person's status when they have one: the emoji at 14, the text, then " · until 6pm" in `--foreground-muted`, gap 6 (`StatusLine`). The tooltip's detail line is the layer's `detail` (primitives 14a), asked for by `data-tooltip-person` on the avatar; the tip is placed again when the line arrives. Never in message headers or sidebar rows.
 
 **Sync status card** (SPEC section 5, item 5). Shown during the first sync and while the rows may be behind Slack; later catch-ups show nothing. It sits in the footer strip under the topic list (the same strip as the privacy footer: the sidebar inset on all four sides, a 1px `--border-subtle` top rule; with both, the status card is first and they are 8 apart). The card: radius 8, bg `--secondary-default`, colour `--foreground-subtle`, padding 10 on every side, gap 10; a 20px leading slot, then two lines, then an optional raised xs button. Line one 13.5/500 `--foreground-default`, line height 20, `role="status"` named "Sync status"; line two 12.5 subtle with tabular figures, line height 16, one line with an ellipsis. So the card is 56px in every state. It fades in over `--duration-appear`; nothing else moves. [built]
 
