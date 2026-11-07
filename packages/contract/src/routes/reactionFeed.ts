@@ -1,11 +1,11 @@
 /**
  * The sidebar's Reactions view (SPEC 5, "Reactions"): the user's messages
- * that someone else reacted to lately, newest first by when the latest of
- * those reactions came.
+ * that someone else reacted to lately, one row each as Slack's Activity
+ * lists them, newest first by the headline reaction's time.
  *
  * `reactions.feed` reads the store. While it is subscribed the engine reads
  * Slack's `activity.feed` once, again each time the socket connects, and
- * fetches the messages of rows the store lacks; the rows update as those land
+ * reads the messages of rows the store lacks; the rows update as those land
  * and as reactions come and go on the socket. Nothing polls.
  */
 import { Schema } from 'effect'
@@ -34,16 +34,16 @@ export const ReactionRow = Schema.Struct({
   /** The topic that shows the message: its thread for a reply or a root with replies, else the conversation's Main. */
   topicId: Schema.String,
   ts: Schema.String,
-  /** When the latest reaction by someone else came, epoch milliseconds. */
+  /** When the headline's reaction came (the feed entry's `feed_ts`, or the live event's time), epoch milliseconds. */
   at: Schema.Number,
-  /** Who reacted, never you: the latest first, at most two. */
-  reactors: Schema.Array(Person),
-  /** The other people who reacted, beyond `reactors`. */
-  moreReactors: Schema.Int,
-  /** Line one's names: the reactors' first names (a last initial tells two apart), then "+N" for the rest: "Maya, Sam +2". */
+  /** The headline's reactor, never you: the feed entry's, or the latest live reaction's. */
+  reactor: Person,
+  /** How many other people have any reaction on the message now, from the stored message. */
+  others: Schema.Int,
+  /** Line one's text: the reactor's first name (a last initial tells two apart), then "+N" when `others` is not 0: "Maya +2". */
   who: Schema.String,
-  /** Their emoji, the latest first, at most three. */
-  emoji: Schema.Array(ReactionRowEmoji),
+  /** The headline's emoji. */
+  emoji: ReactionRowEmoji,
   /** The message's first words, or a label for what it carries ("Image"). Message text: privacy mode blurs it. */
   preview: Schema.String,
   /** Where the message is. */

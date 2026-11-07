@@ -1,16 +1,19 @@
 /**
  * The `reactions.feed` query (SPEC 5, "Reactions"): the newest rows of
- * `reaction_feed` within `REACTION_DAYS`, at most `REACTION_ROWS`, each
- * shaped from its stored message. A row shows who reacted and with what as
- * the message's reactions say now, so a removed reaction changes the row and
- * one with no one else's reaction left drops out.
+ * `reaction_feed` within `REACTION_DAYS`, at most `REACTION_ROWS`, in
+ * conversations the user is in that are not archived or ignored.
  *
- * Rows whose message the store lacks, or whose stored reactions may be
- * older than the row (`fetched_at`), are reported as `missing`; the handler
- * asks the sync to fetch them. Until then the feed's own reaction shows. Statements are exported for the plan test.
+ * A row reads as Slack's Activity does: its headline is the row's own
+ * reactor and emoji (the feed entry, or the latest live `reaction_added`),
+ * then "+N", how many other people have any reaction on the message now,
+ * from the stored message. A row drops out once the stored message has no
+ * reaction left from anyone but the user, unless the store has not yet seen
+ * the headline's reaction (`known`). Rows whose message the store lacks are
+ * hidden and reported as `missing`; the handler asks the sync to read them.
+ * Statements are exported for the plan test.
  */
 import { Effect } from 'effect'
-import { REACTION_DAYS, REACTION_ROWS, type Person, type ReactionRow, type ReactionRowEmoji, type RowChannel } from '@juno/contract'
+import { REACTION_DAYS, REACTION_ROWS, type Person, type ReactionRow, type RowChannel } from '@juno/contract'
 import { firstWords, mainTopicId, mentionedUserIds, messagePreviewText, shortName, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { emojiUnicode, splitEmojiName } from '@juno/richtext'
 import { StoreReader, type SqlError } from '@juno/store'
@@ -21,12 +24,10 @@ import { reactionsStatement } from './window'
 const DAY = 24 * 60 * 60 * 1000
 
 type PreviewInput = Parameters<typeof messagePreviewText>[0]
-const SHOWN_REACTORS = 2
-const SHOWN_EMOJI = 3
 
 export interface ReactionFeedRun {
   readonly rows: ReadonlyArray<ReactionRow>
-  /** Rows of the window whose message the store does not have, or has from before the row's reaction. */
+  /** Rows of the window whose message the store does not have. */
   readonly missing: ReadonlyArray<{ readonly channel: string; readonly ts: string }>
 }
 
@@ -36,7 +37,7 @@ interface FeedRow {
   readonly at: number
   readonly feed_user: string
   readonly feed_name: string
-  readonly fetched_at: number | null
+  readonly known: 0 | 1
   readonly m_ts: string | null
   readonly user_id: string | null
   readonly text: string | null
@@ -56,14 +57,14 @@ interface FeedRow {
 export function reactionFeedStatements(since: number) {
   return {
     feed: {
-      sql: `SELECT f.channel, f.ts, f.at, f.user_id AS feed_user, f.name AS feed_name, f.fetched_at,
+      sql: `SELECT f.channel, f.ts, f.at, f.user_id AS feed_user, f.name AS feed_name, f.known,
           m.ts AS m_ts, m.user_id, m.text, m.blocks_json, m.files_json, m.attachments_json, m.subtype, m.thread_ts, m.deleted,
           c.kind AS c_kind, c.name AS c_name, c.user_id AS c_user_id, c.member_ids_json AS c_members
         FROM reaction_feed f INDEXED BY reaction_feed_at
         JOIN conversations c ON c.id = f.channel
         LEFT JOIN messages m ON m.channel = f.channel AND m.ts = f.ts
         LEFT JOIN ignored_channels ig ON ig.channel = f.channel
-        WHERE f.at > ? AND ig.channel IS NULL
+        WHERE f.at > ? AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
         ORDER BY f.at DESC LIMIT ?`,
       params: [since, REACTION_ROWS],
     },
@@ -88,29 +89,12 @@ const parseJson = <A>(json: string | null): A | undefined => {
 
 const isReply = (row: Pick<FeedRow, 'ts' | 'thread_ts'>): boolean => row.thread_ts !== null && row.thread_ts !== row.ts
 
-/** The stored reactions include the row's own: a socket event wrote them, or a fetch since it came. */
-const fresh = (row: Pick<FeedRow, 'at' | 'fetched_at'>): boolean => row.fetched_at !== null && row.fetched_at >= row.at
-
 type StoredReactions = ReadonlyArray<{ readonly name: string; readonly users: ReadonlyArray<string> }>
 type ThreadTitle = { readonly text: string; readonly manual: string | null; readonly ai: string | null }
 
-/** Who reacted, the latest first (the feed's reactor, then Slack's order backwards), and their emoji. Empty when no one else has a reaction left. */
-function pickReactors(row: FeedRow, reactions: StoredReactions, selfId: string | undefined): { readonly people: ReadonlyArray<string>; readonly names: ReadonlyArray<string> } {
-  const people = new Set<string>()
-  const names = new Set<string>()
-  // Until the message is fetched again, the feed's reaction is newer than what the store says.
-  if (row.feed_user !== selfId && (!fresh(row) || reactions.some((reaction) => reaction.name === row.feed_name && reaction.users.includes(row.feed_user)))) {
-    people.add(row.feed_user)
-    names.add(row.feed_name)
-  }
-  for (const reaction of reactions.toReversed()) {
-    const users = reaction.users.filter((user) => user !== selfId)
-    if (users.length === 0) continue
-    names.add(reaction.name)
-    for (const user of users.toReversed()) people.add(user)
-  }
-  return { people: [...people], names: [...names].slice(0, SHOWN_EMOJI) }
-}
+/** Everyone but the user with a reaction on the stored message. */
+const reactorsOf = (reactions: StoredReactions, selfId: string | undefined): ReadonlySet<string> =>
+  new Set(reactions.flatMap((reaction) => reaction.users.filter((user) => user !== selfId)))
 
 /** The shown rows' reactions and their replies' thread roots, one statement each per conversation. */
 const readMessageParts = (rows: ReadonlyArray<FeedRow>, statements: ReturnType<typeof reactionFeedStatements>) =>
@@ -144,7 +128,7 @@ interface Shaper {
   readonly emoji: Parameters<typeof reactionEmoji>[1]
 }
 
-function shapeRow(row: FeedRow, people: ReadonlyArray<string>, names: ReadonlyArray<string>, shaper: Shaper): ReactionRow {
+function shapeRow(row: FeedRow, others: number, shaper: Shaper): ReactionRow {
   const { selfId, users } = shaper
   const person = (id: string): Person => personFrom(id, users.get(id))
   const nameOf = (id: string) => userName(id, users.get(id))
@@ -162,19 +146,18 @@ function shapeRow(row: FeedRow, people: ReadonlyArray<string>, names: ReadonlyAr
   const reply = isReply(row)
   const thread = reply ? shaper.titles.get(`${row.channel}:${row.thread_ts}`) : undefined
   const threadTitle = thread === undefined ? undefined : (thread.manual ?? thread.ai ?? firstWords(thread.text, undefined, lookups))
-  const reactors = people.slice(0, SHOWN_REACTORS).map(person)
-  const more = people.length - reactors.length
-  const realName = (id: string) => users.get(id)?.real_name ?? undefined
-  const firstNames = reactors.map((each) => shortName({ id: each.id, name: each.name, ...(realName(each.id) === undefined ? {} : { realName: realName(each.id)! }) }, reactors)).join(', ')
+  const reactor = person(row.feed_user)
+  const realName = users.get(row.feed_user)?.real_name ?? undefined
+  const first = shortName({ id: reactor.id, name: reactor.name, ...(realName === undefined ? {} : { realName }) }, [])
   return {
     id: `${row.channel}:${row.ts}`,
     topicId: reply ? threadTopicId(row.channel as ChannelId, row.thread_ts as Ts) : mainTopicId(row.channel as ChannelId),
     ts: row.ts,
     at: row.at,
-    reactors,
-    moreReactors: more,
-    who: more > 0 ? `${firstNames} +${more}` : firstNames,
-    emoji: names.map((name): ReactionRowEmoji => ({ name, ...reactionEmoji(name, shaper.emoji) })),
+    reactor,
+    others,
+    who: others > 0 ? `${first} +${others}` : first,
+    emoji: { name: row.feed_name, ...reactionEmoji(row.feed_name, shaper.emoji) },
     preview,
     channel,
     ...(threadTitle === undefined || threadTitle === '' ? {} : { threadTitle }),
@@ -192,19 +175,20 @@ export const readReactionFeed = (selfId: string | undefined, now: number): Effec
     const stored: Array<FeedRow> = []
     for (const row of feed) {
       const lacking = row.m_ts === null || (row.user_id === null && row.text === '' && row.blocks_json === null)
-      if (lacking || !fresh(row)) missing.push({ channel: row.channel, ts: row.ts })
-      if (!lacking && row.deleted !== 1 && row.user_id === selfId) stored.push(row)
+      if (lacking) missing.push({ channel: row.channel, ts: row.ts })
+      else if (row.deleted !== 1 && row.user_id === selfId) stored.push(row)
     }
     const { reactions, titles } = yield* readMessageParts(stored, statements)
     const picked = stored.flatMap((row) => {
-      const { people, names } = pickReactors(row, reactions.get(`${row.channel}:${row.ts}`) ?? [], selfId)
-      return people.length === 0 ? [] : [{ row, people, names }]
+      const reactors = reactorsOf(reactions.get(`${row.channel}:${row.ts}`) ?? [], selfId)
+      if (reactors.size === 0 && row.known === 1) return []
+      return [{ row, others: reactors.size - (reactors.has(row.feed_user) ? 1 : 0) }]
     })
 
-    // The reactors shown, the DM partners and group members for line three, and the people the previews mention.
+    // The headline reactors, the DM partners and group members for line three, and the people the previews mention.
     const ids = new Set<string>()
-    for (const { row, people } of picked) {
-      for (const id of [...people.slice(0, SHOWN_REACTORS), ...parseIds(row.c_members), ...mentionedUserIds(row.text ?? '')]) ids.add(id)
+    for (const { row } of picked) {
+      for (const id of [row.feed_user, ...parseIds(row.c_members), ...mentionedUserIds(row.text ?? '')]) ids.add(id)
       if (row.c_user_id !== null) ids.add(row.c_user_id)
     }
     const users = new Map<string, MessageUser>()
@@ -213,9 +197,9 @@ export const readReactionFeed = (selfId: string | undefined, now: number): Effec
       for (const user of yield* sql.unsafe<MessageUser>(read.sql, read.params)) users.set(user.id, user)
     }
     const emoji = { emoji: new Map<string, string | null>(), emojiAliases: new Map<string, string>() }
-    const custom = [...new Set(picked.flatMap((each) => each.names))].filter((name) => emojiUnicode(name) === undefined).map((name) => splitEmojiName(name).name)
+    const custom = [...new Set(picked.map(({ row }) => row.feed_name))].filter((name) => emojiUnicode(name) === undefined).map((name) => splitEmojiName(name).name)
     if (custom.length > 0) yield* readEmoji(sql, emoji, custom)
 
     const shaper: Shaper = { selfId, users, titles, emoji }
-    return { rows: picked.map(({ row, people, names }) => shapeRow(row, people, names, shaper)), missing }
+    return { rows: picked.map(({ row, others }) => shapeRow(row, others, shaper)), missing }
   })
