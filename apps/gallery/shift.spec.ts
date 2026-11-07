@@ -158,11 +158,16 @@ test.describe('Message thumbnail', () => {
     await page.goto('/#/MessageList?__state=files/thumbnail-pending')
     const thumb = page.getByRole('img', { name: 'staging-screenshot.png' })
     await expect(thumb.locator('img')).toHaveCount(1)
+    await expect(thumb.locator('[data-broken]')).toHaveCount(0)
     const before = await thumb.boundingBox()
     await expectNoLayoutShift(page, async () => {
       release()
-      await expect(thumb.locator('img')).toHaveCount(0)
+      // The picture failed: the glyph shows in the same box, and stays while the picture is asked for again.
+      await expect(thumb.locator('[data-broken]')).toHaveCount(1)
     })
+    // The image is kept, hidden, so a retry can swap it in; the browser's own broken-image mark never shows.
+    await expect(thumb.locator('img')).toHaveCount(1)
+    await expect(thumb.locator('img')).toHaveCSS('opacity', '0')
     expect(await thumb.boundingBox()).toEqual(before)
   })
 })

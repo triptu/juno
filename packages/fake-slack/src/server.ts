@@ -31,7 +31,7 @@ export interface Session {
 
 export interface CallRecord {
   readonly at: number
-  readonly kind: 'api' | 'edge' | 'upload' | 'control'
+  readonly kind: 'api' | 'edge' | 'upload' | 'file' | 'control'
   readonly method: string
   /** Form fields as received, token redacted. */
   readonly args: Readonly<Record<string, string>>
@@ -144,6 +144,7 @@ export class FakeServer {
   #latencyMs = 0
   #failedUploads = 0
   #uploadsBeforeFailing = 0
+  #failedFiles: { remaining: number; status: number; retryAfter: number | undefined } | undefined
   readonly #heldFrames: RtmFrame[] = []
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
@@ -404,6 +405,11 @@ export class FakeServer {
 
   #wait(): Promise<void> | undefined {
     return this.#latencyMs > 0 ? new Promise((resolve) => setTimeout(resolve, this.#latencyMs)) : undefined
+  }
+
+  /** The next `times` file downloads answer `status` with no bytes (and `Retry-After` on a 429), as a file host that is down or rate limiting does. */
+  failFiles(times: number, status = 503, retryAfter?: number): void {
+    this.#failedFiles = { remaining: times, status, retryAfter }
   }
 
   /** After `after` more upload POSTs succeed, the next `times` answer HTTP 500 and store nothing. */
@@ -812,8 +818,20 @@ export class FakeServer {
     await this.#hold(this.#stalls, 'file:bytes', { fileId })
     await this.#hold(this.#holds, 'file:bytes', { fileId })
     if (this.#fileDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, this.#fileDelayMs))
+    const record = (status: number) => this.calls.push({ at: this.workspace.clock.now(), kind: 'file', method: fileId, args: {}, status, ok: status === 200 })
+    const failing = this.#failedFiles
+    if (failing !== undefined && failing.remaining > 0) {
+      failing.remaining -= 1
+      record(failing.status)
+      response.writeHead(failing.status, { 'content-type': 'text/plain', ...(failing.retryAfter === undefined ? {} : { 'retry-after': String(failing.retryAfter) }) })
+      return void response.end('Unavailable')
+    }
     const stored = this.workspace.files.get(fileId)
-    if (stored?.bytes === undefined) return json(response, 404, { ok: false, error: 'file_not_found' })
+    if (stored?.bytes === undefined) {
+      record(404)
+      return json(response, 404, { ok: false, error: 'file_not_found' })
+    }
+    record(200)
     if (poster && stored.poster !== undefined) {
       response.writeHead(200, { 'content-type': 'image/png', 'content-length': stored.poster.bytes.length })
       return void response.end(stored.poster.bytes)

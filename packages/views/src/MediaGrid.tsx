@@ -8,10 +8,10 @@ import * as stylex from '@stylexjs/stylex'
 import { ArrowsOut } from '@phosphor-icons/react/dist/icons/ArrowsOut'
 import { Image } from '@phosphor-icons/react/dist/icons/Image'
 import { Play } from '@phosphor-icons/react/dist/icons/Play'
-import { useState } from 'react'
 import type { FileThumb, FileView } from '@juno/contract'
 import { colors, layout, motion, radii, spacing } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, IconButton, Text } from '@juno/ui'
+import { usePictureLoad } from './pictureLoad'
 
 /** Tiles a message's grid shows; the last says "+N" for the rest. */
 const GRID_TILES = 4
@@ -126,35 +126,41 @@ interface ThumbnailProps {
   readonly more?: number | undefined
 }
 
-/** With `onOpen` the box is a button with the same look; Enter and Space open it too. */
+/**
+ * With `onOpen` the box is a button with the same look; Enter and Space open
+ * it too. A picture that failed to load shows the glyph in the same box and
+ * is asked for again (`usePictureLoad`); clicking it then tries again
+ * instead of opening the viewer.
+ */
 function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false, tall = false, more }: ThumbnailProps) {
-  const [loaded, setLoaded] = useState<string | undefined>(undefined)
-  const [failed, setFailed] = useState<string | undefined>(undefined)
+  const { shownSrc, failed, attempt, onLoad, onError, retry, observe } = usePictureLoad(thumb.src)
   const box = thumbnailBox(thumb.width, thumb.height)
-  const broken = failed === thumb.src
   const sx = stylex.props(styles.thumb, tile ? styles.tile : styles.box(box.width, box.height, thumb.width, thumb.height), tall && styles.tall, onOpen !== undefined && styles.thumbButton, onOpen !== undefined && focusRing.outside)
   const label = more === undefined ? file.name : `${file.name}, and ${more} more`
   const image = file.kind === 'image' ? file.id : ''
+  const shown = shownSrc === thumb.src
   // While a new src loads (the staged image giving way to Slack's), the one already shown stays under it.
-  const previous = loaded !== undefined && loaded !== thumb.src ? loaded : undefined
-  const content = broken ? (
-    <span {...stylex.props(styles.brokenGlyph)}>
-      <Icon icon={Image} size={18} />
-    </span>
-  ) : (
+  const previous = shownSrc !== undefined && !shown ? shownSrc : undefined
+  const content = (
     <>
       {previous === undefined ? null : <img src={previous} alt="" draggable={false} decoding="async" {...stylex.props(styles.image, styles.imageShown)} />}
       <img
+        key={attempt}
         src={thumb.src}
         alt=""
         draggable={false}
         decoding="async"
         loading="lazy"
-        onLoad={() => setLoaded(thumb.src)}
-        onError={() => setFailed(thumb.src)}
-        {...stylex.props(styles.image, loaded === thumb.src && styles.imageShown)}
+        onLoad={onLoad}
+        onError={onError}
+        {...stylex.props(styles.image, shown && styles.imageShown)}
       />
-      {file.kind === 'video' && more === undefined ? (
+      {failed ? (
+        <span data-broken="" {...stylex.props(styles.brokenGlyph)}>
+          <Icon icon={Image} size={18} />
+        </span>
+      ) : null}
+      {file.kind === 'video' && more === undefined && !failed ? (
         <span {...stylex.props(styles.playBadge)}>
           <Icon icon={Play} size={14} weight="fill" />
         </span>
@@ -166,15 +172,16 @@ function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false, tall = false, 
       )}
     </>
   )
+  const title = failed ? `Couldn't load ${file.name}. Click to try again` : file.name
   if (onOpen !== undefined) {
     return (
-      <button type="button" aria-label={`Open ${label}`} title={file.name} tabIndex={tabIndex} data-thumbnail={image} onClick={() => onOpen(file)} {...sx}>
+      <button type="button" ref={observe} aria-label={failed ? `Try loading ${label} again` : `Open ${label}`} title={title} tabIndex={tabIndex} data-thumbnail={image} onClick={() => (failed ? retry() : onOpen(file))} {...sx}>
         {content}
       </button>
     )
   }
   return (
-    <figure role="img" aria-label={label} title={file.name} data-thumbnail={image} {...sx}>
+    <figure ref={observe} role="img" aria-label={label} title={title} data-thumbnail={image} onClick={failed ? retry : undefined} {...sx}>
       {content}
     </figure>
   )
