@@ -3,7 +3,8 @@
  * whatever Settings asks, and none left running when the app quits. The
  * executable is a script standing in for Codex, so a real process is run.
  */
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
@@ -16,7 +17,7 @@ afterEach(async () => {
 })
 
 /** A Codex that is installed and signed out: `login status` says so, and `login` waits for the browser until it is killed. */
-async function fakeCodex(): Promise<{ readonly agentDir: string; readonly executable: string; readonly calls: () => Promise<string[]> }> {
+async function fakeCodex(): Promise<{ readonly agentDir: string; readonly executable: string; readonly ran: () => string[] }> {
   const dir = await mkdtemp(join(tmpdir(), 'juno-codex-'))
   dirs.push(dir)
   const executable = join(dir, 'codex')
@@ -26,7 +27,15 @@ async function fakeCodex(): Promise<{ readonly agentDir: string; readonly execut
   return {
     agentDir: join(dir, 'agent'),
     executable,
-    calls: async () => (await readFile(log, 'utf8').catch(() => '')).split('\n').filter((line) => line !== ''),
+    ran: () => {
+      let lines = ''
+      try {
+        lines = readFileSync(log, 'utf8')
+      } catch {
+        lines = ''
+      }
+      return lines.split('\n').filter((line) => line !== '')
+    },
   }
 }
 
@@ -35,9 +44,10 @@ it('two sign-in clicks run one codex login, and quitting ends it', async () => {
   const home = codexHome(codex.agentDir, codex.executable)
   const first = home.signIn()
   const second = home.signIn()
-  await eventually(async () => expect(await codex.calls()).toContain('login'), { timeout: 5_000 })
+  await eventually(() => expect(codex.ran()).toContain('login'), { timeout: 5_000 })
   home.stop()
   expect(await first).toBe('signedOut')
   expect(await second).toBe('signedOut')
-  expect((await codex.calls()).filter((line) => line === 'login')).toHaveLength(1)
+  // Both sign-ins have ended, so the child has exited and the log is final.
+  expect(codex.ran().filter((line) => line === 'login')).toHaveLength(1)
 })
