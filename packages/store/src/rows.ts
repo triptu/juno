@@ -82,6 +82,12 @@ export interface UserRow {
   readonly is_bot: Flag
   readonly deleted: Flag
   readonly updated: string | null
+  /** The status as Slack last sent it: "" when cleared, null when no user object carried it. */
+  readonly status_text?: string | null
+  /** ":palm_tree:", "" when cleared. */
+  readonly status_emoji?: string | null
+  /** Epoch seconds the status clears at; 0 for never. */
+  readonly status_expiration?: number | null
 }
 
 export interface TopicIndexRow {

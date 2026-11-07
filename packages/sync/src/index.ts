@@ -34,6 +34,7 @@ export {
   setThreadSub,
   threadSub,
   writeLocalMark,
+  writeOwnStatus,
   type ThreadSubRow,
 } from './write'
 export {
