@@ -351,6 +351,26 @@ Invariants:
 3. An invalidation during a run or the window gives exactly one trailing run.
 4. The first message of every subscription is `reset: true` (`live.ts:193`).
 
+### Notifications pause
+
+Where: `packages/engine/src/snooze.ts (SlackSnooze, endAt, sessionSnooze)`; the `slackSnooze` pref (`readSnooze`, `writeSnooze` and `readSettings` in `packages/notifications/src/settings.ts`); `pausedUntil` and `pausedLabel` in `packages/domain/src/notifications.ts`. Short paths are relative to `packages/engine/src`.
+States: notifications on; paused by the schedule (outside the notification hours); paused by the snooze (`slackSnooze` holds an end in the future); paused by both. The schedule part is a pure function of the clock and the hours. The snooze part is the pref, which holds Slack's last answer, `{ until }` or null. `readSettings` gives `snoozedUntil` only while `until` is after now, so a pref left behind by a quit reads as on.
+
+| From | Event | To | Guard | Code |
+|---|---|---|---|---|
+| any | Pause notifications picked | snooze, or both | Slack answers `dnd.setSnooze`; the pref takes `snooze_endtime` | `snooze.ts (pause)`, `notifications/handlers.ts ('notifications.pause')` |
+| snooze or both | Resume notifications picked | on, or schedule | `dnd.endSnooze` answered, or refused as not active; any other failure leaves the pref and shows a toast | `snooze.ts (resume)` |
+| any | socket connects, or `dnd_updated` for the user | snooze or not, as `dnd.info` says | the pref is written only when the answer differs | `snooze.ts (sessionSnooze)` |
+| snooze or both | the end time passes | on, or schedule | the timer clears the pref only if it still holds that end; a newer value interrupts the wait | `snooze.ts (endAt)` |
+| on or snooze | the hours end or start | schedule or both, and back | none: read from the clock at each decision and each status run (the status also ticks each minute) | `pausedUntil` |
+
+Invariants:
+1. While `readSettings` has `snoozedUntil`, every decision is `stay` with `decidedBy: 'snooze'`, an incoming huddle is quiet, and the agent host counts the time as quiet hours.
+2. "Paused until" is the first time neither part holds (`pausedUntil`): a snooze that ends outside the hours runs on to their next start, and hours that end inside a snooze run on to its end.
+3. Calls answer in order on the session's listener, and the last `dnd_updated` always reads `dnd.info` again, so an older answer stored late is replaced by the next read. One write keyed by Slack's answer, with no queue or merge: no Quint spec.
+
+Colleagues' pauses (`presence/dnd.ts (pausedPeople)`) live in memory beside presence, per followed person: unknown (not asked yet, or forgotten when the socket drops), known with Slack's next scheduled pause and any snooze, paused at a time inside it (`dndPaused`). Each connect and each new followed person asks `dnd.teamInfo` in batches of at most 100; a `dnd_updated_user` asks again about that person. One timer waits for the earliest start or end of anyone's pause (`dndNextChange`), publishes, and asks again about each person whose scheduled pause ended, since Slack names only the next one. Answers are applied under the presence service's lock.
+
 ### Smaller engine machines
 
 | Machine | States and where | Rules it relies on |
