@@ -28,6 +28,7 @@
  * follows the session status and the sync; the composition layer wires that
  * (`layer.ts`), so this folder depends on no other feature.
  */
+import { randomUUID } from 'node:crypto'
 import { rm } from 'node:fs/promises'
 import { Context, Effect, Exit, Fiber, Layer, Ref, Scope, Stream, SubscriptionRef } from 'effect'
 import { NotSignedIn, SignInFailed, type MainToEngine, type SessionSecrets, type SessionStatus, type SignInMethod } from '@juno/contract'
@@ -185,15 +186,20 @@ export class Session extends Context.Service<
           yield* setStatus(readyStatus(secrets, auth))
         })
 
-      /** Sends `request` and waits for main's `secrets` or `sessionFailed` answer. */
+      /**
+       * Sends `request` and waits for main's `secrets` or `sessionFailed`
+       * answer to it. The id is this engine's: an answer to a request from an
+       * engine that crashed while main was importing is not for us.
+       */
       const askHost = (request: 'requestSecrets' | 'importFromSlackApp') =>
         Effect.scoped(
           Effect.gen(function* () {
+            const id = randomUUID()
             const messages = yield* host.messages
             const answer = yield* Effect.forkScoped(
-            Stream.runHead(Stream.filter(messages, (m): m is SessionAnswer => m._tag === 'secrets' || m._tag === 'sessionFailed')),
+              Stream.runHead(Stream.filter(messages, (m): m is SessionAnswer => (m._tag === 'secrets' || m._tag === 'sessionFailed') && m.id === id)),
             )
-            yield* host.send({ _tag: request })
+            yield* host.send({ _tag: request, id })
             const value = yield* Fiber.join(answer)
             return value._tag === 'None' ? undefined : value.value
           }),
@@ -242,11 +248,12 @@ export class Session extends Context.Service<
           }
           const secrets = answer.secrets
           const stored = Effect.scoped(Effect.gen(function* () {
+            const id = randomUUID()
             const messages = yield* host.messages
             const storedAnswer = yield* Effect.forkScoped(
-              Stream.runHead(Stream.filter(messages, (m): m is Extract<MainToEngine, { _tag: 'secretsStored' | 'sessionFailed' }> => m._tag === 'secretsStored' || m._tag === 'sessionFailed')),
+              Stream.runHead(Stream.filter(messages, (m): m is Extract<MainToEngine, { _tag: 'secretsStored' | 'sessionFailed' }> => (m._tag === 'secretsStored' || m._tag === 'sessionFailed') && m.id === id)),
             )
-            yield* host.send({ _tag: 'storeSecrets', method, secrets })
+            yield* host.send({ _tag: 'storeSecrets', id, method, secrets })
             const stored = yield* Fiber.join(storedAnswer)
             if (stored._tag === 'None') return yield* new SignInFailed({ kind: 'other', message: 'Juno could not save the Slack session. Try signing in again.' })
             if (stored.value._tag === 'sessionFailed') return yield* new SignInFailed({ kind: stored.value.kind, message: stored.value.message })

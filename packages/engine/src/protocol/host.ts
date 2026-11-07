@@ -59,7 +59,7 @@ export function memoryHost(): MemoryHost {
 export const silentHost = (): Host => {
   const host = memoryHost()
   host.onEngine((message) => {
-    if (message._tag === 'requestSecrets') host.deliver({ _tag: 'secrets', secrets: null })
+    if (message._tag === 'requestSecrets') host.deliver({ _tag: 'secrets', id: message.id, secrets: null })
   })
   return host
 }

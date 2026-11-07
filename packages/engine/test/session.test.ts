@@ -54,6 +54,16 @@ describe('session', () => {
     expect(e.main.host.fromEngine.find((m) => m._tag === 'sessionReady')).toMatchObject({ session: { teamName: 'Juno Fake' } })
   })
 
+  it('ignores the answer to an import a crashed engine asked for, and starts signed out', async () => {
+    // Main was still importing the Slack app's session when the engine crashed. The new engine asks for the
+    // stored session; the import's answer lands first. That session was never verified or written to secrets.bin,
+    // so taking it would sign the user in until the next launch, and then not.
+    const e = await boot({ staleImport: true })
+    expect((await e.status('signedOut'))._tag).toBe('signedOut')
+    expect(e.fake.callCount('auth.test')).toBe(0)
+    expect(e.main.stored).toBeNull()
+  })
+
   it('imports through main the same way and records the enterprise on Grid', async () => {
     const e = await boot({ enterpriseId: 'E0ORG' })
     await e.status('signedOut')

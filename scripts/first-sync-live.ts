@@ -176,7 +176,7 @@ const guarded = async (input: Parameters<typeof fetch>[0], init: Parameters<type
 
 const host = memoryHost()
 host.onEngine((message) => {
-  if (message._tag === 'requestSecrets') host.deliver({ _tag: 'secrets', secrets: { teamId: session.teamId, userId: session.userId, workspaceUrl: session.workspaceUrl, token: session.token, teamName: 'Timeline' } })
+  if (message._tag === 'requestSecrets') host.deliver({ _tag: 'secrets', id: message.id, secrets: { teamId: session.teamId, userId: session.userId, workspaceUrl: session.workspaceUrl, token: session.token, teamName: 'Timeline' } })
   else if (message._tag === 'handshake') host.deliver({ _tag: 'handshake', id: message.id, cookie, origin: 'https://app.slack.com', userAgent: 'Juno first sync timeline', proxy: 'DIRECT' })
 })
 

@@ -54,9 +54,9 @@ it('serves no stored session after a sign-out whose unlink the folder refused, a
     host.handle({ _tag: 'signOut' })
     await eventually(() => expect(sent).toContainEqual({ _tag: 'signedOut' }), { timeout: 2_000 })
     // The next engine, or the next launch, asks for the stored session.
-    host.handle({ _tag: 'requestSecrets' })
+    host.handle({ _tag: 'requestSecrets', id: 'next-engine' })
     await eventually(() => expect(sent.at(-1)?._tag).toBe('secrets'), { timeout: 2_000 })
-    expect(sent.at(-1)).toEqual({ _tag: 'secrets', secrets: null })
+    expect(sent.at(-1)).toEqual({ _tag: 'secrets', id: 'next-engine', secrets: null })
     expect(logged.filter((line) => line.level === 'ERROR')).toEqual([])
   } finally {
     await chmod(userData, 0o700)

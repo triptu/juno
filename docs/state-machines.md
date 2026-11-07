@@ -173,20 +173,20 @@ Where: `agent/index.ts`. `started` (l.121), host port queue `ports` and `waiting
 
 Where: `main/session.ts` (`#busy` l.37, `#signOut` l.110), `packages/engine/src/session/Session.ts` (`askHost` l.173, `storeSecrets` wait l.228-235, `signOut` l.252-268).
 
-The engine and main talk in requests and answers with no request id:
+The engine and main talk in requests and answers. Each sign-in request carries an `id` the engine makes (`randomUUID`), main's answer echoes it, and the engine waits for the answer with its id; sign-out has no id:
 
 | Engine sends | Main answers | Engine waits for | Code |
 |---|---|---|---|
-| `requestSecrets` | `secrets` | first `secrets` or `sessionFailed` | `Session.ts:173-188` |
-| `importFromSlackApp` | `secrets` after the keychain import | first `secrets` or `sessionFailed` | `Session.ts:212`, `main/session.ts:86-106` |
-| `storeSecrets` | `secretsStored` | first `secretsStored` or `sessionFailed` | `Session.ts:228-235` |
-| `signOut` | `signedOut` after main clears its side | first `signedOut`, no timeout | `Session.ts:258`, `main/session.ts:110-118` |
+| `requestSecrets {id}` | `secrets {id}` | `secrets` or `sessionFailed` with that id | `Session.ts (askHost)` |
+| `importFromSlackApp {id}` | `secrets {id}` after the keychain import | `secrets` or `sessionFailed` with that id | `Session.ts (signIn)`, `main/session.ts (#capture)` |
+| `storeSecrets {id}` | `secretsStored {id}` | `secretsStored` or `sessionFailed` with that id | `Session.ts (signIn, stored)` |
+| `signOut` | `signedOut` after main clears its side | first `signedOut`, no timeout | `Session.ts (signOut)`, `main/session.ts (#signOut)` |
 
 Main's `#signOut` drops the launch session, removes `secrets.bin` (or empties it in place when the folder refuses the unlink), forgets the Slack keychain passwords, clears `persist:slack` storage and cache, then sends `signedOut`. Each stage runs on its own; a failed stage is logged and `signedOut` is still sent (MAIN-2, fixed).
 
 Invariants:
 1. `#busy` allows one import at a time.
-2. Each answer belongs to the latest request of its kind. Nothing checks it (**bug** MAIN-6).
+2. An engine takes only the answers to its own requests, by id (MAIN-6, fixed).
 3. Every `signOut` gets a `signedOut`.
 
 ### Auto-update
@@ -1460,7 +1460,7 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
 | REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
-| MAIN-6 | Sign-in answers carry no request id: after an engine crash during a keychain import, the import's `secrets` can be taken as the stored session, which was never written to `secrets.bin` (`Session.ts:173-188`, `main/session.ts:47-52`, l.93). An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131). | low |
+| MAIN-6 | Sign-in answers carried no request id: after an engine crash during a keychain import, the import's `secrets` could be taken as the stored session, which was never written to `secrets.bin`. An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131), which stays as it is: the engine's check needs the cookie in the Slack session. Status: Fixed in MAIN6SHA. Every sign-in request carries an id the engine makes and main echoes; the engine waits for the answer with its id (`Session.ts`, `main/session.ts`, `contract/protocol.ts`). Test: `packages/engine/test/session.test.ts`, "ignores the answer to an import a crashed engine asked for, and starts signed out". | low |
 | MAIN-7 | `juno-provider.json` is written with a plain `writeFile` and `set()` calls are not serialized; a crash or two overlapping sets can leave invalid JSON, which loses the custom base URL (`main/providers.ts:172-174`, l.89-96). | low |
 | MAIN-8 | Smaller main items: `EngineSupervisor.pendingPorts` keeps a destroyed renderer's port until the next `ready` (`main/engine.ts:110-111`); `codex.signIn` has no single-flight and its `codex login` child is not killed on quit (`main/codex.ts:45-58`); an MCP credential save writes chunks before the count, so a crash mid-save mixes chunks (`main/mcpCredentials.ts:61-69`). The `huddleQuit.confirmed` latch is HUD-5. | low |
 

@@ -66,31 +66,40 @@ export const toSecrets = (c: Credentials): SessionSecrets => ({
 /**
  * What main does for the engine, in miniature: keeps `stored`, answers
  * `requestSecrets`, performs a "sign-in" by minting a fresh fake session,
- * serialises the cookie for the socket, and clears on sign-out.
+ * serialises the cookie for the socket, and clears on sign-out. With
+ * `staleImport`, the first `requestSecrets` is preceded by the answer to an
+ * import the previous engine asked for before it crashed: a session main
+ * captured but never stored.
  */
-export function fakeMain(fake: FakeSlack, initial?: Credentials) {
+export function fakeMain(fake: FakeSlack, initial?: Credentials, staleImport = false) {
   const host = memoryHost()
   let current = initial
   let stored: SessionSecrets | null = initial === undefined ? null : toSecrets(initial)
   let nextSignIn: (() => Credentials | { failed: { kind: 'keychain'; message: string } }) | undefined
+  let stale = staleImport
   host.onEngine((message) => {
     switch (message._tag) {
       case 'requestSecrets':
-        host.deliver({ _tag: 'secrets', secrets: stored })
+        if (stale) {
+          stale = false
+          current = fake.signIn()
+          host.deliver({ _tag: 'secrets', id: 'an-engine-that-crashed', secrets: toSecrets(current) })
+        }
+        host.deliver({ _tag: 'secrets', id: message.id, secrets: stored })
         break
       case 'importFromSlackApp': {
         const outcome = nextSignIn === undefined ? fake.signIn() : nextSignIn()
         if ('failed' in outcome) {
-          host.deliver({ _tag: 'sessionFailed', method: 'import', ...outcome.failed })
+          host.deliver({ _tag: 'sessionFailed', id: message.id, method: 'import', ...outcome.failed })
         } else {
           current = outcome
-          host.deliver({ _tag: 'secrets', secrets: toSecrets(outcome) })
+          host.deliver({ _tag: 'secrets', id: message.id, secrets: toSecrets(outcome) })
         }
         break
       }
       case 'storeSecrets':
         stored = message.secrets
-        host.deliver({ _tag: 'secretsStored' })
+        host.deliver({ _tag: 'secretsStored', id: message.id })
         break
       case 'signOut':
         stored = null
@@ -188,6 +197,8 @@ export interface EngineOptions {
   readonly notifications?: EngineHostOptions['notifications']
   /** A session main already holds, as after a relaunch. */
   readonly initial?: (fake: FakeSlack) => Credentials
+  /** Main is still importing for an engine that crashed: that import's answer arrives before the answer to this engine's `requestSecrets`. */
+  readonly staleImport?: boolean
   readonly enterpriseId?: string
   readonly fakeOptions?: FakeSlackOptions
   /** Reuse a user-data directory (a warm boot) and a fake. */
@@ -233,7 +244,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
       ...(options.enterpriseId === undefined ? {} : { enterpriseId: options.enterpriseId }),
     })))
   const credentials = options.reuse?.credentials ?? options.initial?.(fake)
-  const main = fakeMain(fake, credentials)
+  const main = fakeMain(fake, credentials, options.staleImport === true)
   const userData = options.reuse?.userData ?? join(tmpdir(), `juno-engine-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(userData, { recursive: true })
   if (options.reuse === undefined) {
