@@ -66,7 +66,10 @@ export class EngineSupervisor {
     this.deps.mark('engine-fork')
     const child = this.deps.fork('engine.js', { serviceName: 'juno-engine', partition: 'persist:slack' })
     this.child = child
-    child.on('spawn', () => this.send({ _tag: 'config', config: this.config }))
+    child.on('spawn', () => {
+      if (this.child !== child) return
+      this.send({ _tag: 'config', config: this.config })
+    })
     // Events from a process this supervisor stopped or gave up on: it is no longer the engine.
     child.on('message', (data: unknown) => {
       if (this.child !== child) return

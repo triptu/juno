@@ -80,7 +80,8 @@ it('engine: the old process exiting after give-up and restart leaves the new one
   supervisor.restart()
   const second = forked[1]!
   expect(supervisor.pid).toBe(second.pid)
-  // The killed process exits only now.
+  // The killed process reports its spawn and exit only now.
+  first.emit('spawn')
   first.emit('exit', 1)
   expect(supervisor.currentState).toBe('starting')
   expect(supervisor.pid).toBe(second.pid)
@@ -88,6 +89,7 @@ it('engine: the old process exiting after give-up and restart leaves the new one
   second.emit('message', { _tag: 'ready' })
   expect(supervisor.currentState).toBe('ready')
   expect(forked).toHaveLength(2)
+  expect(tags(second).filter((tag) => tag === 'config')).toHaveLength(1)
 })
 
 const provider = { _tag: 'openRouter', key: 'k' } as const
