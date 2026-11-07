@@ -9,6 +9,9 @@
  * base64 chunks of `CHUNK` characters: generic passwords `<id>.0`, `<id>.1`,
  * ... under the service `juno-mcp`, and `<id>` holds the chunk count. Writes
  * to one connection run one at a time, so a save and a clear never interleave.
+ * A save drops the count before it writes the chunks and sets it last, so a
+ * save that stops part way (a kill, a locked keychain) leaves no state, never
+ * a mix of old and new chunks: the agent signs the connection in again.
  *
  * `open` shows an authorization URL in the system browser. pi-mcp finishes
  * sign-in only on a loopback redirect, which the agent listens on. Under
@@ -63,6 +66,7 @@ export function mcpCredentials({ keychain, open }: McpCredentialsOptions) {
     const parts = encoded.match(new RegExp(`.{1,${CHUNK}}`, 'g')) ?? []
     if (parts.length === 0 || parts.length > MAX_CHUNKS) throw new Error('state too large')
     const before = await count(id)
+    if (before > 0) await item(id).remove()
     for (const [index, part] of parts.entries()) await item(`${id}.${index}`).write(part)
     await item(id).write(String(parts.length))
     for (let index = parts.length; index < before; index++) await item(`${id}.${index}`).remove()

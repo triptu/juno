@@ -12,7 +12,7 @@ import { ProviderStore } from '../../src/main/providers'
 import { memoryKeychain } from '../../src/main/keychain'
 import { appMcpCredentials } from '../../src/main/mcpCredentials'
 import { appBackupSecrets } from '../../src/main/backupSecrets'
-import { codexHome } from '../../src/main/codex'
+import { codexExecutable, codexHome } from '../../src/main/codex'
 import { createLog } from '../../src/logging'
 
 export interface AgentOptions {
@@ -45,7 +45,7 @@ export class BrowserAgent {
 
   constructor(readonly userData: string, readonly options: AgentOptions, readonly send: (message: MainToEngine) => void, readonly changed: (state: ProviderState) => void) {
     this.#log = createLog('agent', join(userData, 'logs'))
-    this.codex = codexHome(join(userData, 'agent'), true)
+    this.codex = codexHome(join(userData, 'agent'), codexExecutable(true))
     this.providers = new ProviderStore(userData, {
       openRouter: memoryKeychain(options.agent ? 'sk-or-v1-e2e-launch-0123456789abcdef' : undefined), custom: memoryKeychain(),
     }, undefined, (state, provider, key) => {

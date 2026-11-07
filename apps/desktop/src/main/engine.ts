@@ -6,8 +6,9 @@
  * minutes; the user's Restart starts it again. Hands out MessagePorts: one end to the engine, the other to a
  * renderer. A port requested while the engine is down is held, at most one
  * per renderer, and sent once it reports `ready`, so a renderer reconnecting
- * after a crash just waits. Once the supervisor has given up, a request is
- * answered `failed` and the renderer shows it.
+ * after a crash just waits; a renderer destroyed while it waits drops its
+ * port. Once the supervisor has given up, a request is answered `failed` and
+ * the renderer shows it.
  */
 import type { MessagePortMain, UtilityProcess, WebContents } from 'electron'
 import { Schema } from 'effect'
@@ -118,6 +119,11 @@ export class EngineSupervisor {
       // A renderer that asks again while waiting replaces its earlier request.
       this.pendingPorts.get(target)?.close()
       this.pendingPorts.set(target, port1)
+      target.once('destroyed', () => {
+        if (this.pendingPorts.get(target) !== port1) return
+        port1.close()
+        this.pendingPorts.delete(target)
+      })
     }
     target.postMessage(Events.enginePort, null, [port2])
     return 'sent'

@@ -84,7 +84,7 @@ stateDiagram-v2
 | stopped, failed | child `exit` | no change | | `engine.ts (onExit)` |
 | any | `message` or `exit` from a process the supervisor stopped or gave up on | ignored | `this.child !== child` | `engine.ts (start)` |
 
-`connect(webContents)` (`engine.ts:103`) answers `failed` in `failed` and `stopped`, sends the port at once in `ready`, and otherwise holds one port per renderer in `pendingPorts`.
+`connect(webContents)` (`engine.ts (connect)`) answers `failed` in `failed` and `stopped`, sends the port at once in `ready`, and otherwise holds one port per renderer in `pendingPorts`; a renderer destroyed while it waits has its port closed and dropped (MAIN-8, fixed).
 
 Invariants:
 1. `failed` and `stopped` are terminal: `failed` leaves only by `restart()`, `stopped` never leaves.
@@ -217,9 +217,9 @@ Invariants:
 | Activity | one interval in `main/activity.ts` | `start()` clears the old interval first (`activity.ts:39-43`). |
 | Dock badge and notification permission | `asking`, persisted `notificationPermissionAsked` in `main/dockBadge.ts`, `main/notificationPermission.ts` | `asked` is persisted before asking; waiters fall back after 3 s and 120 s. |
 | Provider store | `#loading`, `#active`, `#baseUrl`, `#last` in `main/providers.ts` | `set()` calls run one at a time in order; each writes the keychain, memory, then `juno-provider.json` through a temporary file and a rename, then notifies (MAIN-7, fixed). |
-| MCP credentials | per-id promise queue `serial` (`main/mcpCredentials.ts:38`); chunks, then a count | A save is all or nothing. It is not (MAIN-8). |
+| MCP credentials | per-id promise queue `serial` (`main/mcpCredentials.ts`); count dropped, chunks, then the count | A save is all or nothing: a save that stops part way leaves no state (MAIN-8, fixed). |
 | launch.json writer | chained writes, temp file and rename (`main/launch.ts:92-111`) | `will-quit` waits for the pending write. |
-| Codex sign-in | `codex login` child in `main/codex.ts:45 (signIn)` | One sign-in at a time. Nothing enforces it (MAIN-8). |
+| Codex sign-in | `signingIn` promise and `login` child in `main/codex.ts (signIn)` | One sign-in at a time: a second call joins the running one; `stop()` kills the child on quit (MAIN-8, fixed). |
 
 ## Engine and sync
 
@@ -1462,7 +1462,7 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
 | MAIN-6 | Sign-in answers carried no request id: after an engine crash during a keychain import, the import's `secrets` could be taken as the stored session, which was never written to `secrets.bin`. An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131), which stays as it is: the engine's check needs the cookie in the Slack session. Status: Fixed in MAIN6SHA. Every sign-in request carries an id the engine makes and main echoes; the engine waits for the answer with its id (`Session.ts`, `main/session.ts`, `contract/protocol.ts`). Test: `packages/engine/test/session.test.ts`, "ignores the answer to an import a crashed engine asked for, and starts signed out". | low |
 | MAIN-7 | `juno-provider.json` was written with a plain `writeFile` and `set()` calls were not serialized: a crash could leave invalid JSON, and a change made while the keychain held an earlier one was overtaken by it (a removal after a save left the endpoint active and its key in the keychain). Status: Fixed in MAIN7SHA. `set()` queues behind the previous change and the file goes through a temporary file and a rename (`main/providers.ts`). Test: `apps/desktop/test/providers.test.ts`, "a removal made while the endpoint is still being saved lands after it, in the keychain and the file". | low |
-| MAIN-8 | Smaller main items: `EngineSupervisor.pendingPorts` keeps a destroyed renderer's port until the next `ready` (`main/engine.ts:110-111`); `codex.signIn` has no single-flight and its `codex login` child is not killed on quit (`main/codex.ts:45-58`); an MCP credential save writes chunks before the count, so a crash mid-save mixes chunks (`main/mcpCredentials.ts:61-69`). The `huddleQuit.confirmed` latch is HUD-5. | low |
+| MAIN-8 | Smaller main items: `EngineSupervisor.pendingPorts` kept a destroyed renderer's port until the next `ready`; `codex.signIn` had no single-flight and its `codex login` child was not killed on quit; an MCP credential save wrote chunks before the count, so a save that stopped part way mixed old and new chunks. The `huddleQuit.confirmed` latch is HUD-5. Status: Fixed in MAIN8SHA. The engine supervisor drops a waiting renderer's port on its `destroyed` (as the agent supervisor already did); `codexHome` runs one sign-in and `stop()` kills its child from `before-quit`; a credential save drops the count before the chunks and writes it last. Tests: `apps/desktop/test/supervisors.test.ts`, "engine: a renderer closed while it waited for a port gets none at ready, and its port is closed"; `apps/desktop/test/codex.test.ts`, "two sign-in clicks run one codex login, and quitting ends it"; `apps/desktop/test/mcpCredentials.test.ts`, "a save that stops part way leaves no state rather than a mix of old and new chunks". | low |
 
 ## Checked and ruled out
 

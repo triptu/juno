@@ -7,7 +7,7 @@ import { createDockBadge, createDockBounce } from './dockBadge'
 import { testNotificationPermission } from './notificationTestHooks'
 import { createActivityWatch } from './activity'
 import { appBackupSecrets } from './backupSecrets'
-import { codexHome } from './codex'
+import { codexExecutable, codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createAgentSupervisor, createSupervisor } from './supervisors'
 import { createEngineTestHooks } from './engineTestHooks'
@@ -215,6 +215,8 @@ const providers = new ProviderStore(
   },
 )
 
+const codex = codexHome(agent.agentDir, codexExecutable(e2e))
+
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), e2e ? plainCipher : { encrypt: (json) => safeStorage.encryptString(json), decrypt: (bytes) => safeStorage.decryptString(bytes) }),
   send: (message) => supervisor.send(message),
@@ -264,7 +266,7 @@ app.whenReady().then(() => {
     },
     agent,
     providers,
-    codex: codexHome(agent.agentDir, e2e),
+    codex,
     backupSecrets,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
@@ -346,6 +348,7 @@ app.on('before-quit', (event) => {
     engineStopping = undefined
   })
   agent.stop()
+  codex.stop()
 })
 
 // The window's close writes its bounds as the app quits; a process that

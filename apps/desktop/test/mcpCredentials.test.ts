@@ -9,9 +9,13 @@ import { mcpCredentials } from '../src/main/mcpCredentials'
 function fakeSecurity() {
   const items = new Map<string, string>()
   const lines: string[] = []
+  /** Writes left before `security` starts failing (a locked keychain, a kill mid-save); none set, it never fails. */
+  let writesLeft = Number.POSITIVE_INFINITY
   const run: SecurityRunner = async (args, stdin) => {
     const flag = (name: string, from: ReadonlyArray<string>) => from[from.indexOf(name) + 1] ?? ''
     if (args[0] === '-i') {
+      if (writesLeft <= 0) return { code: 36, stdout: '' }
+      writesLeft -= 1
       lines.push(stdin ?? '')
       const words = (stdin ?? '').trim().split(' ')
       items.set(`${flag('-s', words)}/${flag('-a', words)}`, flag('-w', words))
@@ -22,7 +26,7 @@ function fakeSecurity() {
     if (args[0] === 'delete-generic-password') return items.delete(key) ? { code: 0, stdout: '' } : { code: 44, stdout: '' }
     return { code: 1, stdout: '' }
   }
-  return { items, lines, run }
+  return { items, lines, run, failWritesAfter: (count: number) => { writesLeft = count } }
 }
 
 function bridge() {
@@ -48,6 +52,16 @@ it('keeps a large OAuth state in keychain chunks short enough for security, and 
   await ask({ _tag: 'clear', id: 'notion' })
   expect(await ask({ _tag: 'load', id: 'notion' })).toBeNull()
   expect(security.items.size).toBe(0)
+})
+
+it('a save that stops part way leaves no state rather than a mix of old and new chunks', async () => {
+  const { security, ask } = bridge()
+  const older = JSON.stringify({ tokens: { access_token: 'o'.repeat(7000) } })
+  await ask({ _tag: 'save', id: 'notion', state: older })
+  // The keychain fails after the first new chunk is in: the save ends there, as a kill mid-save would.
+  security.failWritesAfter(1)
+  await expect(ask({ _tag: 'save', id: 'notion', state: JSON.stringify({ tokens: { access_token: 'n'.repeat(7000) } }) })).rejects.toThrow()
+  expect(await ask({ _tag: 'load', id: 'notion' })).toBeNull()
 })
 
 it('runs one connection’s writes in order', async () => {

@@ -5,10 +5,12 @@
  * with that home, which opens the browser, as the Codex README asks the
  * owner to do in Terminal. The agent keeps its own check
  * (`packages/agent/src/providers/codex/local.ts`); main may not import the
- * agent (architecture 3). Under JUNO_E2E the executable is `JUNO_E2E_CODEX`,
- * or none, so a developer's own Codex never shows in a test.
+ * agent (architecture 3). One sign-in runs at a time: a second click joins
+ * it. Quitting kills the `codex login` child (`stop`). The executable comes
+ * from `index.ts`: under JUNO_E2E it is `JUNO_E2E_CODEX`, or none, so a
+ * developer's own Codex never shows in a test.
  */
-import { execFile, spawn } from 'node:child_process'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CodexSetup } from '@juno/contract'
@@ -18,11 +20,16 @@ const SIGN_IN_TIMEOUT_MS = 10 * 60_000
 
 export interface CodexHome {
   readonly status: () => Promise<CodexSetup>
+  /** Runs `codex login`, or joins the one running, and answers with the status after it. */
   readonly signIn: () => Promise<CodexSetup>
+  /** Kills a running `codex login`, on quit. */
+  readonly stop: () => void
 }
 
-export function codexHome(agentDir: string, e2e: boolean): CodexHome {
-  const executable = e2e ? (process.env.JUNO_E2E_CODEX ?? 'juno-e2e-no-codex') : 'codex'
+/** The Codex executable for this run: the owner's `codex`, or the test's stand-in under JUNO_E2E. */
+export const codexExecutable = (e2e: boolean): string => (e2e ? (process.env.JUNO_E2E_CODEX ?? 'juno-e2e-no-codex') : 'codex')
+
+export function codexHome(agentDir: string, executable: string): CodexHome {
   const home = join(agentDir, 'codex')
   // Juno's own Codex home, and nothing else from the environment: no inherited keys or configuration.
   const env: Record<string, string> = { CODEX_HOME: home }
@@ -40,21 +47,32 @@ export function codexHome(agentDir: string, e2e: boolean): CodexHome {
       })
     })
   }
+  let login: ChildProcess | undefined
+  let signingIn: Promise<CodexSetup> | undefined
+  const signIn = async (): Promise<CodexSetup> => {
+    if ((await status()) === 'missing') return 'missing'
+    await new Promise<void>((resolve) => {
+      const child = spawn(executable, ['login'], { env, stdio: 'ignore' })
+      login = child
+      const timer = setTimeout(() => child.kill(), SIGN_IN_TIMEOUT_MS)
+      const done = () => {
+        clearTimeout(timer)
+        if (login === child) login = undefined
+        resolve()
+      }
+      child.once('exit', done)
+      child.once('error', done)
+    })
+    return status()
+  }
   return {
     status,
-    signIn: async () => {
-      if ((await status()) === 'missing') return 'missing'
-      await new Promise<void>((resolve) => {
-        const child = spawn(executable, ['login'], { env, stdio: 'ignore' })
-        const timer = setTimeout(() => child.kill(), SIGN_IN_TIMEOUT_MS)
-        const done = () => {
-          clearTimeout(timer)
-          resolve()
-        }
-        child.once('exit', done)
-        child.once('error', done)
+    signIn: () => {
+      signingIn ??= signIn().finally(() => {
+        signingIn = undefined
       })
-      return status()
+      return signingIn
     },
+    stop: () => login?.kill(),
   }
 }

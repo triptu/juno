@@ -10,7 +10,7 @@ import { EventEmitter } from 'node:events'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
-import type { MessagePortMain, UtilityProcess } from 'electron'
+import type { MessagePortMain, UtilityProcess, WebContents } from 'electron'
 import type { MainToAgent } from '@juno/agent-contract'
 import type { MainToEngine } from '@juno/contract'
 import { AgentSupervisor } from '../src/main/agent'
@@ -34,15 +34,28 @@ class FakeProcess extends EventEmitter {
 
 function fakeDeps() {
   const forked: FakeProcess[] = []
+  const closed: MessagePortMain[] = []
+  const port = () => {
+    const made = { close: () => { closed.push(made) } } as unknown as MessagePortMain
+    return made
+  }
   const deps: ProcessDeps = {
     fork: () => {
       const child = new FakeProcess()
       forked.push(child)
       return child as unknown as UtilityProcess
     },
-    channel: () => ({ port1: { close: () => {} } as unknown as MessagePortMain, port2: { close: () => {} } as unknown as MessagePortMain }),
+    channel: () => ({ port1: port(), port2: port() }),
   }
-  return { forked, deps }
+  return { forked, closed, deps }
+}
+
+/** A renderer as the supervisors see it: a port handed over, and `destroyed` when its window closes. */
+class FakeRenderer extends EventEmitter {
+  readonly ports: Array<unknown> = []
+  postMessage(_channel: string, _message: unknown, transfer?: Array<unknown>): void {
+    this.ports.push(...(transfer ?? []))
+  }
 }
 
 const engineConfig = { userData: join(tmpdir(), 'juno-supervisor-test'), e2e: true, dev: true }
@@ -66,6 +79,21 @@ it('engine: a ready that arrives after the quit began leaves the supervisor stop
   await stopping
   expect(supervisor.currentState).toBe('stopped')
   expect(forked).toHaveLength(1)
+})
+
+it('engine: a renderer closed while it waited for a port gets none at ready, and its port is closed', () => {
+  const { forked, closed, deps } = fakeDeps()
+  const supervisor = new EngineSupervisor(engineConfig, () => {}, { ...deps, mark: () => {} })
+  supervisor.start()
+  const engine = forked[0]!
+  engine.emit('spawn')
+  // The window asks for its port while the engine is still starting, then closes.
+  const renderer = new FakeRenderer()
+  expect(supervisor.connect(renderer as unknown as WebContents)).toBe('sent')
+  renderer.emit('destroyed')
+  expect(closed).toHaveLength(1)
+  engine.emit('message', { _tag: 'ready' })
+  expect(tags(engine)).toEqual(['config', 'aiKey'])
 })
 
 it('engine: the old process exiting after give-up and restart leaves the new one running alone', () => {
