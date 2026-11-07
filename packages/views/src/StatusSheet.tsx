@@ -205,7 +205,7 @@ const styles = stylex.create({
   statusLine: {
     display: 'flex',
     alignItems: 'center',
-    gap: spacing['--space-1'],
+    gap: spacing['--space-1-5'],
     minWidth: 0,
   },
   statusText: {
