@@ -1,14 +1,15 @@
 // Files still being read when Enter is pressed (spec section 8; architecture 9, "Upload"): the post names
 // them at once and goes when they are ready, a restart keeps the bytes already on disk, and a file whose bytes
-// never all come leaves the post so Retry sends the rest. Every test starts warm on the synced default workspace.
+// never all come leaves the post so Retry sends the rest, or takes a post that was only that file with it. Every test
+// starts warm on the synced default workspace.
 import { randomUUID } from 'node:crypto'
 import { expect, it } from 'bun:test'
 import { filesStage } from '@juno/contract'
 import { samplePng } from '@juno/fake-slack'
 import { retryMessage, runCommand, sendMessage } from '@juno/state'
 import { waitFor, WAIT_MS } from '../harness'
-import { eng, MAIN, outboxScenario, rowWith, send, settled } from '../outboxScenario'
-import { valueOf } from '../scenario'
+import { eng, MAIN, outboxScenario, rowWith, send, settled, textOf } from '../outboxScenario'
+import { readDb, valueOf } from '../scenario'
 import { step } from '../step'
 
 const { booted, watch, opened, restarted } = outboxScenario()
@@ -50,4 +51,30 @@ it('after a restart, sends a post that named a file still being read whose bytes
     await after(settled('With the files'), 'sent after Retry')
     expect(engine.fake.messages('C0ENG').find((m) => m.text === 'With the files')?.files?.map((file) => ({ name: file.name, size: file.size }))).toEqual([{ name: 'chart.png', size: png.byteLength }])
   })
+})
+
+it('after a restart, a post that was only a file the restart lost is dropped, as nothing is left to send', async () => {
+  const first = await booted()
+  const rows = await opened(first)
+  first.fake.holdFrames({ types: ['message'] })
+  first.fake.holdNext({ method: 'chat.postMessage' })
+  await send(first, 'Before the file', rows)
+  await waitFor(() => (first.fake.heldCount({ method: 'chat.postMessage' }) === 1 ? true : undefined), WAIT_MS, 'the held answer')
+  // Enter with the file alone, before any of its bytes are read.
+  const notes = { id: randomUUID(), name: 'notes.txt', mimetype: 'text/plain' }
+  valueOf(await runCommand(first.registry, filesStage, { ...notes, offset: 0, size: 24, bytes: new Uint8Array(0), last: false }))
+  valueOf(await sendMessage(first.registry, eng, '', MAIN, [notes.id]))
+  const shown = await rows((list) => list.some((row) => row.pending !== undefined && textOf(row) === '' && row.files.length === 1), 'the post with the file')
+  const clientMsgId = shown.find((row) => row.pending !== undefined && row.files.length === 1)!.clientMsgId!
+  const engine = await restarted(first, (fake) => {
+    fake.releaseFrames({ drop: true })
+    fake.release()
+  })
+  const after = watch(engine, MAIN)
+  await after(settled('Before the file'), 'the earlier post stored after the restart')
+  // The worker looked at the post after the earlier one: it has nothing left to send, so it is gone, not failed.
+  await waitFor(() => (readDb(engine, 'user.db', (db) => db.prepare('SELECT state FROM pending_messages WHERE client_msg_id = ?').get(clientMsgId)) === undefined ? true : undefined), WAIT_MS, 'the row gone')
+  const final = await after((list) => !list.some((row) => row.clientMsgId === clientMsgId), 'the post gone from the topic')
+  expect(final.filter((row) => row.pending !== undefined)).toEqual([])
+  expect(engine.fake.messages('C0ENG').map((m) => m.text)).not.toContain('')
 })

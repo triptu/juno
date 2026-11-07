@@ -391,7 +391,7 @@ stateDiagram-v2
 | none | `sendMessage`, forward, agent send | queued | `pending:` thread resolved through `started_threads` at insert | `posts.ts:140 (queuePost)`, l.154 |
 | queued | a file is still staging | queued | | `worker.ts (staged)` |
 | queued | a file a restart forgot has every declared byte on disk | queued, the file complete (`fileStaged`) | | `staging.ts (recover)`, `worker.ts (staged)` |
-| queued | a file will never be staged (the composer could not read it, or a restart lost its bytes) | failed, without that file; its staged bytes released | | `posts.ts (failStaging)`, `worker.ts (staged)` |
+| queued | a file will never be staged (the composer could not read it, or a restart lost its bytes) | failed, without that file; its staged bytes released. Removed instead when the post was only that file, as Delete draft would | | `posts.ts (failStaging)`, `worker.ts (staged)` |
 | queued | upload refused | failed | | `posts.ts (failUpload)`, `worker.ts (upload)` |
 | queued | Slack has a file's bytes | queued, the file's `uploadId` kept until `files.completeUpload` answers; a try that finds one completes that upload instead of uploading again | | `posts.ts (fileUploading)`, `worker.ts (uploadFile, completeUpload)` |
 | queued | completion of a kept upload refused | `uploadId` forgotten; the file goes up again in the same try | | `worker.ts (completeUpload)` |
@@ -546,7 +546,7 @@ Where: in memory, `packages/engine/src/staging.ts`. `entries` (composer chips) a
 | claimed, unfinished | `unstage` | failed | `staging.ts:164-187` |
 | any | workspace change | both maps cleared | |
 
-After a restart `claimed` is empty, so every file with `staging: true` reads `unknown`: the worker asks `recover`, which answers the complete file when every declared byte is on disk, and otherwise drops the file from the post (OUT-6, fixed).
+After a restart `claimed` is empty, so every file with `staging: true` reads `unknown`: the worker asks `recover`, which answers the complete file when every declared byte is on disk, and otherwise drops the file from the post, or the post when the file was all of it (OUT-6, fixed).
 
 ## Renderer and state client
 
@@ -1040,7 +1040,7 @@ The user can delete Q by hand.
 - Severity: low. Confirmed. Impact: A Retry button that never works. Nothing special-cases `file_not_staged`. The same loop runs without a restart when the composer could not read the file (`files.unstage` marks the claimed entry failed, and `status` answers failed on every Retry).
 - Test: `packages/engine/test/flows/outbox-staging.flow.test.ts`. Name two files with their empty first chunk, send, stage one in full, restart, then Retry.
 - Fix direction: hide Retry for this code, or clear the flag when the staged file is complete on disk.
-- Status: Fixed in 413cf6d7a. A restart no longer loses a file whose declared bytes are all on disk: `Staging.recover` completes it as the last chunk would. A file whose bytes will never all come is dropped from the post (`failStaging`), its staged bytes released, and the row fails with `file_not_staged` as before, so Retry sends what the row shows (decision 2026-11-07 19:56). Test: `outbox-staging.flow.test.ts`, "after a restart, sends a post that named a file still being read whose bytes are all on disk, and drops a file the restart lost so Retry sends the rest".
+- Status: Fixed in 413cf6d7a. A restart no longer loses a file whose declared bytes are all on disk: `Staging.recover` completes it as the last chunk would. A file whose bytes will never all come is dropped from the post (`failStaging`), its staged bytes released, and the row fails with `file_not_staged` as before, so Retry sends what the row shows (decision 2026-11-07 19:56). Test: `outbox-staging.flow.test.ts`, "after a restart, sends a post that named a file still being read whose bytes are all on disk, and drops a file the restart lost so Retry sends the rest". A review of that fix found the loop it kept: a post that was only the lost file became an empty row whose Retry sent `chat.postMessage` with no text, which Slack refuses (`no_text`) every time. `failStaging` now removes such a post, as Delete draft would (decision 2026-11-07 20:20). Test: "after a restart, a post that was only a file the restart lost is dropped, as nothing is left to send".
 
 #### OUT-7. Uploads can leave orphan private files in Slack
 

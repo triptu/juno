@@ -226,7 +226,8 @@ export class PostWorker extends Context.Service<
               continue
             }
             // The composer could not read the rest, or a restart lost it: nothing was posted, and the post goes on
-            // without the file, failed, so Retry sends what the row shows and Delete draft drops it.
+            // without the file, failed, so Retry sends what the row shows and Delete draft drops it. A post that was
+            // only this file is dropped instead, as Retry on an empty post could never send.
             yield* Effect.logWarning('send: a file was not staged')
             yield* local(transaction(failStaging(row.clientMsgId, file.id, NOT_STAGED)))
             yield* staging.release(open, [file])

@@ -134,7 +134,8 @@ module outboxProtocol {
   // Retry uploads only what is missing. A lost connection leaves it queued.
   // A file the composer was still staging at the send is waited for before
   // the uploads, which is a queued row not yet claimed; one whose bytes will
-  // not come fails the row here too.
+  // not come fails the row here too, without that file. A post that was only
+  // that file is removed instead, which is this step and then `discard`.
   action uploadFail(k: int): bool = all {
     not(s.sealed), s.row.get(k) == "queued", s.due.contains(k), s.request.get(k) == "idle",
     s' = { ...s, row: s.row.set(k, "failed"), due: s.due.exclude(Set(k)), label: "uploadFail", target: k }
