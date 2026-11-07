@@ -1028,7 +1028,7 @@ The user can delete Q by hand.
 
 - Severity: medium. Confirmed. Impact: The thread's follow state freezes until the next sync start.
 - Test: `packages/engine/test/flows/follow.flow.test.ts`. Hold the add's answer, close the window that sent the command, release, and expect the row gone, a lookup, and a later `thread_unsubscribed` to apply.
-- Status: Fixed in SHA_OUT5. The command runs under `uninterruptibleMask` with only the Slack call restored, so a cut-off command still ends its row and asks Slack in the background, as after a failure. The protocol is unchanged (`reject`'s path), so `follow.qnt` needs no new action. Test: `follow.flow.test.ts`, "a Subscribe whose window closes while Slack has the call still ends its pending row, so later news about the thread applies".
+- Status: Fixed in ceaca1e6f. The command runs under `uninterruptibleMask` with only the Slack call restored, so a cut-off command still ends its row and asks Slack in the background, as after a failure. The protocol is unchanged (`reject`'s path), so `follow.qnt` needs no new action. Test: `follow.flow.test.ts`, "a Subscribe whose window closes while Slack has the call still ends its pending row, so later news about the thread applies".
 
 #### OUT-6. Retry on a post that failed with file_not_staged can never succeed
 
@@ -1038,9 +1038,9 @@ The user can delete Q by hand.
 4. The user clicks Retry. `retryPost` only changes the state (`posts.ts:274`). The file still has `staging: true`, so the next pass fails the same way.
 
 - Severity: low. Confirmed. Impact: A Retry button that never works. Nothing special-cases `file_not_staged`. The same loop runs without a restart when the composer could not read the file (`files.unstage` marks the claimed entry failed, and `status` answers failed on every Retry).
-- Test: `outbox.flow.test.ts`. Name two files with their empty first chunk, send, stage one in full, restart, then Retry.
+- Test: `packages/engine/test/flows/outbox-staging.flow.test.ts`. Name two files with their empty first chunk, send, stage one in full, restart, then Retry.
 - Fix direction: hide Retry for this code, or clear the flag when the staged file is complete on disk.
-- Status: Fixed in SHA_OUT6. A restart no longer loses a file whose declared bytes are all on disk: `Staging.recover` completes it as the last chunk would. A file whose bytes will never all come is dropped from the post (`failStaging`), its staged bytes released, and the row fails with `file_not_staged` as before, so Retry sends what the row shows (decision 2026-11-07 19:56). Test: `outbox.flow.test.ts`, "after a restart, sends a post that named a file still being read whose bytes are all on disk, and drops a file the restart lost so Retry sends the rest".
+- Status: Fixed in 413cf6d7a. A restart no longer loses a file whose declared bytes are all on disk: `Staging.recover` completes it as the last chunk would. A file whose bytes will never all come is dropped from the post (`failStaging`), its staged bytes released, and the row fails with `file_not_staged` as before, so Retry sends what the row shows (decision 2026-11-07 19:56). Test: `outbox-staging.flow.test.ts`, "after a restart, sends a post that named a file still being read whose bytes are all on disk, and drops a file the restart lost so Retry sends the rest".
 
 #### OUT-7. Uploads can leave orphan private files in Slack
 
@@ -1050,7 +1050,7 @@ The user can delete Q by hand.
 
 - Severity: low. Confirmed. Impact: Private files in the user's Slack that no message shows, counted against the workspace's storage.
 - Test: `packages/engine/test/flows/outbox-copies.flow.test.ts`. Attach a file, lose every answer to `files.completeUpload`, and expect one `files.getUploadURL`, one file in Slack and the message sharing it.
-- Status: Step 1 and 2 fixed in SHA_OUT7. The upload's id is written to the row once Slack has the bytes (`fileUploading`); a try that finds one completes that upload instead of uploading again, and a completion Slack refuses forgets the id and uploads afresh, which is the old path. Whether real Slack accepts a second `files.completeUpload` for a file it already completed is unknown (`docs/research/slack-data-access.md`); the client already sends one when the first answer is lost, and a refusal costs one extra call, no extra file. Test: `outbox-copies.flow.test.ts`, "completes an upload whose completion answers were all lost, instead of making a second file in Slack". Step 3 is open: removing the files needs `files.delete`, which Juno has never called and the research has not observed; check it live in the private test channel before adding it.
+- Status: Step 1 and 2 fixed in df01c17fb. The upload's id is written to the row once Slack has the bytes (`fileUploading`); a try that finds one completes that upload instead of uploading again, and a completion Slack refuses forgets the id and uploads afresh, which is the old path. Whether real Slack accepts a second `files.completeUpload` for a file it already completed is unknown (`docs/research/slack-data-access.md`); the client already sends one when the first answer is lost, and a refusal costs one extra call, no extra file. Test: `outbox-copies.flow.test.ts`, "completes an upload whose completion answers were all lost, instead of making a second file in Slack". Step 3 is open: removing the files needs `files.delete`, which Juno has never called and the research has not observed; check it live in the private test channel before adding it.
 
 #### OUT-8. A newer mark can be delayed by an older mark's backoff
 
@@ -1062,7 +1062,7 @@ The user can delete Q by hand.
 
 - Severity: low. Confirmed. Impact: The newer read state reaches Slack up to `retryCapMillis` later.
 - Test: `packages/engine/test/reads.test.ts`. Hold a mark at the fake's gate, mark differently while it is out, answer the held call with an error the client does not retry, and expect the next pass to send the newer intent.
-- Status: Fixed in bcaa8d15e. `deferMark` takes the sent `gen`, runs in the worker's transaction, and makes a replaced intent due now with its attempts reset, as `endMark` and `rejectMark` do. Test: `reads.test.ts`, "a newer mark goes at once when the older mark it replaced fails for a transient reason".
+- Status: Fixed in 7527934f7. `deferMark` takes the sent `gen`, runs in the worker's transaction, and makes a replaced intent due now with its attempts reset, as `endMark` and `rejectMark` do. Test: `reads.test.ts`, "a newer mark goes at once when the older mark it replaced fails for a transient reason".
 
 #### OUT-9. A reply that keeps a copy leaves the copy's delete row, which holds the channel's later changes
 
