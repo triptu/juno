@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 11-08 04:50 · ui · Escape on a popover opened with the mouse puts focus back on its anchor with the ring, as Escape from inside the panel already did: the anchor is blurred and focused again after the key · A mouse-opened menu keeps focus on its button with no ring, and Chrome does not give the ring to an element that is already focused when a key comes, so a menu closed from the keyboard showed no ring.
 - 11-08 04:30 · Updates · The Update ready pill's "Update ready" half shows `--surface-hover` under the pointer, in a 22px pill as tall as Restart · It opens Settings › About, but nothing showed it was a button until it was clicked.
 - 11-08 04:20 · composer · A grown composer's text fades out over its top 16px once scrolled, through a mask a scroll-driven animation slides in, not through more padding · Its 9px top padding scrolls with the text, so a cut line sat on the frame's border; the fade keeps every line clear of the edge, and a field at its top keeps its 40px single line and fades nothing.
 - 11-08 03:55 · all-topics · All topics' place filter is a `SelectButton` 28, outlined like the status and sort pop-ups, without the place's tint; on a compact page the four controls sit on a two-column grid so both lines share their edges · The filled pill at 600 was the one control in the row drawn differently, and the wrapped lines ended 35px apart on the right.
