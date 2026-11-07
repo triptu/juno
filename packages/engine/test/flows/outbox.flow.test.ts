@@ -4,10 +4,10 @@
 // replay (test/conformance) say so. Every test starts warm on the synced default workspace. The network's
 // copies of a post and files are in `outbox-copies.flow.test.ts`; edits and deletes in `outbox-actions`.
 import { expect, it } from 'bun:test'
-import { discardMessage, draftAtom, retryMessage, saveDraft, sendMessage } from '@juno/state'
+import { deleteMessage, discardMessage, draftAtom, retryMessage, saveDraft, sendMessage } from '@juno/state'
 import { controlledClock } from '../controlledClock'
 import { waitFor, WAIT_MS } from '../harness'
-import { copies, eng, fresh, MAIN, outboxScenario, rowWith, send, settled } from '../outboxScenario'
+import { copies, eng, fresh, MAIN, outboxScenario, refOf, rowWith, send, settled } from '../outboxScenario'
 import { apiCalls, errorOf, quiet, readDb, valueOf } from '../scenario'
 import { step } from '../step'
 
@@ -251,6 +251,54 @@ it('removes the replies and the thread of a started root the user deletes', asyn
   expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT thread_ts FROM thread_subs WHERE thread_ts = ?').get(root.ts))).toBeUndefined()
   await quiet(engine)
   expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(1)
+})
+
+// The root of a thread started from Home is at Slack when the user deletes it, with a reply waiting on it.
+// The delete waits on the root. Slack then does not take the root, so the delete applies to the row, and the
+// reply and the thread go with it, as when the root was queued. Before, only the root's row went: the reply
+// stayed queued as sending for good, with the thread's topic row and follow.
+it('removes the replies and the thread of a started root deleted while its send was out', async () => {
+  const engine = await booted()
+  const started = readDb(engine, 'user.db', (db) => db.prepare('SELECT topic_id FROM started_threads').all() as Array<{ topic_id: string }>)
+  const pendingRows = () => readDb(engine, 'user.db', (db) => db.prepare('SELECT client_msg_id FROM pending_messages').all() as Array<{ client_msg_id: string }>)
+  const deletedWhileOut = async (text: string) => {
+    engine.fake.gate((method) => method === 'chat.postMessage')
+    const topic = valueOf(await sendMessage(engine.registry, eng, text, undefined, undefined, true))
+    const thread = watch(engine, topic.topicId)
+    const root = (await thread((list) => list[0]?.pending === 'sending', 'the root at Slack'))[0]!
+    const call = await waitFor(() => engine.fake.gated().find((c) => c.stage === 'before'), WAIT_MS, 'the root held')
+    valueOf(await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, `Reply to ${text}`))
+    await thread((list) => list.length === 2, 'the reply waiting on the root')
+    valueOf(await deleteMessage(engine.registry, refOf(root)))
+    return { topicId: topic.topicId, root, call }
+  }
+  const gone = async (topicId: string, rootTs: string, label: string) => {
+    await waitFor(() => (pendingRows().length === 0 ? true : undefined), WAIT_MS, label)
+    expect(readDb(engine, 'user.db', (db) => db.prepare('SELECT topic_id FROM started_threads').all())).toEqual(started)
+    expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT topic_id FROM topic_index WHERE topic_id = ?').get(topicId))).toBeUndefined()
+    expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT thread_ts FROM thread_subs WHERE thread_ts = ?').get(rootTs))).toBeUndefined()
+  }
+
+  await step('a 429 puts the root back in the queue, where the delete applies', async () => {
+    const { topicId, root, call } = await deletedWhileOut('Root rate limited')
+    engine.fake.decide(call.id, { error: 'ratelimited', status: 429, retryAfter: 0.5 })
+    engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === call.id && c.stage === 'answer'), WAIT_MS, 'the 429')).id, 'answer')
+    engine.fake.gate(undefined)
+    await gone(topicId, root.ts, 'the reply gone with its rate-limited root')
+    await quiet(engine)
+    expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(1)
+  })
+
+  await step('a refusal fails the root, where the delete applies', async () => {
+    await fresh(engine)
+    const { topicId, root, call } = await deletedWhileOut('Root refused')
+    engine.fake.decide(call.id, { error: 'restricted_action' })
+    engine.fake.decide((await waitFor(() => engine.fake.gated().find((c) => c.id === call.id && c.stage === 'answer'), WAIT_MS, 'the refusal')).id, 'answer')
+    engine.fake.gate(undefined)
+    await gone(topicId, root.ts, 'the reply gone with its refused root')
+    await quiet(engine)
+    expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(1)
+  })
 })
 
 // A reply's answer is lost, and the thread's root is deleted before the lookup asks: Slack refuses

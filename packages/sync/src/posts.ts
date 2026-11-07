@@ -233,9 +233,8 @@ export const requeuePost = (clientMsgId: string, nextAt: number, error: string |
     const post = yield* readPost(clientMsgId)
     if (post === undefined || dependents.length === 0) return true
     if (dependents.some((row) => row.kind === 'delete')) {
-      yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${clientMsgId}`
+      yield* removePost(post)
       yield* sql`DELETE FROM outbox WHERE depends_on = ${clientMsgId}`
-      yield* touch(post)
       return true
     }
     for (const edit of dependents.filter((row) => row.kind === 'edit')) {

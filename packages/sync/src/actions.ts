@@ -322,7 +322,7 @@ export const settleOnFailedPost = (action: PendingAction, post: PendingPost): Ef
     if (action.kind === 'edit' && action.payload.text !== undefined) {
       yield* sql`UPDATE pending_messages SET text = ${action.payload.text}, blocks_json = ${action.payload.blocksJson ?? null} WHERE client_msg_id = ${post.clientMsgId}`
     } else if (action.kind === 'delete') {
-      yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${post.clientMsgId}`
+      yield* removePost(post)
     }
     yield* deleteActions([action])
     yield* touch([postTopic(post)])

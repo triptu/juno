@@ -401,7 +401,7 @@ stateDiagram-v2
 | sending | start of the next pass (restart, store failure) | unknown, due now | | `posts.ts:288 (recoverPosts)`, called at `worker.ts:290` |
 | unknown | lookup finds the cmid | gone | | `worker.ts:265` |
 | unknown | lookup complete, absent, not `shared` | queued, due now; a waiting edit is applied to the text | no waiting delete | `posts.ts (requeuePost)`, `worker.ts (lookUp)` |
-| unknown | lookup complete, absent, a delete waiting | gone, with the delete row | | `posts.ts (requeuePost)` |
+| unknown | lookup complete, absent, a delete waiting | gone, with the delete row; for a New chat root, its waiting replies and started thread go too | | `posts.ts (requeuePost, removePost)` |
 | unknown | lookup refused for good (a `Rejected` that is not transient, such as `thread_not_found`) | failed, `last_error` = the code | | `worker.ts (lookUp)` |
 | unknown | lookup fails for a transient reason, is incomplete, or is `shared` and absent | unknown; attempt + 1; backoff | the lookup reads from the last claim (`sent_posts.sent_at`) | `posts.ts (deferLookup)`, `worker.ts (lookUp)` |
 | failed | Retry | queued | | `posts.ts:274 (retryPost)` |
@@ -432,7 +432,7 @@ States: waiting (the post it depends on is not stored), ready, in flight, done (
 | none | edit, delete, react, broadcast on a stored message | ready | `actions.ts` |
 | none | the same on a post that is not stored yet | waiting (`depends_on` set) | `actions.ts` |
 | waiting | `placeOf`: post stored | ready | `actions.ts:305 (placeOf)` |
-| waiting | `placeOf`: post failed | `settleOnFailedPost` | `actions.ts:305` |
+| waiting | `placeOf`: post failed | `settleOnFailedPost`: an edit rewrites the post, a delete removes it as `removePost` does (a New chat root takes its waiting replies and started thread), a reaction is dropped | `actions.ts:305` |
 | waiting | `placeOf`: post gone | dropped | `actions.ts:305` |
 | ready | call succeeds and `rev` or `want` unchanged | done | `actions.ts:343 (actionDone)` |
 | ready | call succeeds and the intent changed | ready again | `actions.ts:343` |
@@ -466,7 +466,7 @@ Where: `started_threads.root_ts` (`packages/sync/src/startedThreads.ts`).
 |---|---|---|---|
 | none | New chat root queued | `root_ts` null; `p:<channel>:<cmid>` topic; `thread_subs(pending:...)` | `startedThreads.ts:9 (startThread)` |
 | `root_ts` null | the root's first store | `root_ts` set; dependent `pending_messages.thread_ts` rewritten; sub moved | `startedThreads.ts:25 (acknowledgeStartedThread)` |
-| `root_ts` null | root deleted while queued, or Delete draft on a failed root | started thread, its topic row, pending follow and waiting replies removed (OUT-4, fixed) | `posts.ts (discardStartedThread, removePost)` |
+| `root_ts` null | root deleted while queued, or Delete draft on a failed root, or a delete that waited on the root while it was out applies (the post came back to the queue or was refused) | started thread, its topic row, pending follow and waiting replies removed (OUT-4, fixed) | `posts.ts (discardStartedThread, removePost)`, `actions.ts (settleOnFailedPost)` |
 
 Invariant: every `pending:<cmid>` reply belongs to a root that will be stored, will fail, or is removed with it (OUT-4, fixed).
 
@@ -1012,7 +1012,7 @@ The user can delete Q by hand.
 - Spec: `outbox.qnt` allows `sendReply` onto a failed root and `discard(root)`. The child then has no enabled action. That run breaks `drainBound`, so the simulator has not reached it. It needs a directed schedule.
 - Test: `packages/engine/test/flows/outbox.flow.test.ts` (or `sidebar-order.flow.test.ts`, which already uses `pending:`). Fake Slack refuses the root; reply in the `p:` topic; discard the root; expect the reply to be failed or removed.
 - Fix direction: in `discardPost` and `queueDelete` of a root with dependents, fail or remove rows whose `thread_ts = 'pending:' || cmid`, and drop the started thread.
-- Status: Fixed in 104da4db8. `discardStartedThread` removes the waiting replies, the started thread, its topic row and pending follow when the root is deleted or discarded. Spec: `discardedWith`, invariant `repliesFollowRoot`, pair `discardedRoot`. Test: `outbox.flow.test.ts`, "removes the replies and the thread of a started root the user deletes".
+- Status: Fixed in 104da4db8. `discardStartedThread` removes the waiting replies, the started thread, its topic row and pending follow when the root is deleted or discarded. Spec: `discardedWith`, invariant `repliesFollowRoot`, pair `discardedRoot`. Test: `outbox.flow.test.ts`, "removes the replies and the thread of a started root the user deletes". A review of that fix found two delete paths it missed: a delete that waited on the root while its send was out, applied when the root came back to the queue (`requeuePost`) or was refused (`settleOnFailedPost`), removed the root's row alone with raw SQL and left its replies and thread. Both go through `removePost` now. Test: "removes the replies and the thread of a started root deleted while its send was out".
 
 #### OUT-6. Retry on a post that failed with file_not_staged can never succeed
 
