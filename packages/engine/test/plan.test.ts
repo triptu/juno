@@ -4,7 +4,7 @@ import { parseSearchQuery } from '@juno/domain'
 // Every live query statement reads through an index (performance 6): its plan may not scan messages,
 // topic_index, reactions or topic_overlay, which grow with the workspace. Which index each one picks is
 // the planner's business; only a full scan fails. The list names the statements of every live query:
-// the sidebar and its counts, the dock badge, All topics, the topic view, who reacted, a channel's
+// the sidebar and its counts, the dock badge, All topics, the topic view, who reacted, the Reactions view, a channel's
 // threads, the New chat pickers, the ignore list, Follow new threads, the @ and # suggestions, Home and ⌘K's local search.
 import { countsStatement } from '../src/sidebarUnread'
 import { badgeStatement, badgePolicy } from '../src/dockBadge'
@@ -21,6 +21,7 @@ import { missedHuddleStatement } from '../src/home/huddles'
 import { broadcastTitlesStatement } from '../src/messages/broadcastTitles'
 import { messageUsersStatement } from '../src/messages/query'
 import { whoReactedStatements } from '../src/messages/reactors'
+import { reactionFeedStatements } from '../src/messages/reactionFeed'
 import { homeStatements } from '../src/home/query'
 import { suggestedStatements } from '../src/home/suggested'
 import { staleStatement } from '../src/home/job'
@@ -106,6 +107,8 @@ function statements(): ReadonlyArray<readonly [string, Statement]> {
     ['messages by ts', messagesByTsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])],
     ['reactions.who message', who.message],
     ['reactions.who reactions', who.reactions],
+    ['reactions.feed', reactionFeedStatements(1_700_000_000_000).feed],
+    ['reactions.feed thread titles', reactionFeedStatements(1_700_000_000_000).threads('C0ENG', ['1700000000.000100'])],
     ...[recent.list, recent.count, all.list, all.count].map((statement, i) => [`channel.threads #${i}`, statement] as const),
     ['New chat frequent conversations', { sql: frequentConversationsStatement, params: [] }],
     ['New chat frequent sends', frequentSendsStatement('U0SELF', 1_800_000_000_000)],
