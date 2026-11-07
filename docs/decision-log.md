@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 11-08 04:30 · Updates · The Update ready pill's "Update ready" half shows `--surface-hover` under the pointer, in a 22px pill as tall as Restart · It opens Settings › About, but nothing showed it was a button until it was clicked.
 - 11-08 04:20 · composer · A grown composer's text fades out over its top 16px once scrolled, through a mask a scroll-driven animation slides in, not through more padding · Its 9px top padding scrolls with the text, so a cut line sat on the frame's border; the fade keeps every line clear of the edge, and a field at its top keeps its 40px single line and fades nothing.
 - 11-08 03:55 · all-topics · All topics' place filter is a `SelectButton` 28, outlined like the status and sort pop-ups, without the place's tint; on a compact page the four controls sit on a two-column grid so both lines share their edges · The filled pill at 600 was the one control in the row drawn differently, and the wrapped lines ended 35px apart on the right.
 - 11-08 03:35 · pause-notify · A colleague's avatar tooltip adds a quiet "Notifications paused" line while they have them paused, and its label reads as the title, one weight up (500) from the detail lines · Only the dot said they were paused, and the dot is not on message avatars; "Message Jonas" at the detail lines' weight read as one more line of detail.
