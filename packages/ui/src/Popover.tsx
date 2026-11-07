@@ -3,7 +3,11 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, type ReactNo
 import { layout, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Surface, type SurfacePadding, type SurfaceRadius } from './Surface'
 
-export type PopoverPlacement = 'bottom-start' | 'bottom-center' | 'bottom-end' | 'top-start' | 'top-end'
+/**
+ * `right-start` is a submenu's: beside the menu that holds the anchor, its first row level with the anchor, and
+ * on the left when there is no room on the right.
+ */
+export type PopoverPlacement = 'bottom-start' | 'bottom-center' | 'bottom-end' | 'top-start' | 'top-end' | 'right-start'
 export type PopoverLayer = 'mention' | 'picker' | 'menu' | 'context'
 export type PopoverWidth = 'menu' | 'account' | 'browse' | 'mention' | 'picker' | 'anchor'
 
@@ -20,8 +24,8 @@ export interface PopoverProps {
   readonly layer?: PopoverLayer
   readonly radius?: SurfaceRadius
   readonly padding?: SurfacePadding
-  /** ARIA role of the panel. Default `dialog`. */
-  readonly role?: 'dialog' | 'listbox' | 'menu'
+  /** ARIA role of the panel. Default `dialog`; `presentation` for a submenu, whose list is the menu. */
+  readonly role?: 'dialog' | 'listbox' | 'menu' | 'presentation'
   readonly label?: string
   /** Keep open while a pointer is down inside an input that owns it. */
   readonly closeOnBlur?: boolean
@@ -78,6 +82,32 @@ function clamp(panel: HTMLElement, placement: PopoverPlacement): void {
   if (shift !== 0) panel.style.translate = `${shift}px 0`
 }
 
+/**
+ * Places a `right-start` panel. Its root takes no position, so the panel hangs off the menu's own panel (the
+ * nearest positioned box) and is not cut off by the menu's scrolling surface. The first row lines up with the
+ * anchor; the panel goes on the left of the menu when the right has no room, and moves up when it would run past
+ * the bottom of the pane.
+ */
+function placeSide(panel: HTMLElement, anchor: Element): void {
+  const menu = panel.offsetParent
+  if (!(menu instanceof HTMLElement)) return
+  const clip = clipOf(menu)
+  const bounds = clip?.getBoundingClientRect() ?? { left: 0, right: document.documentElement.clientWidth, top: 0, bottom: document.documentElement.clientHeight }
+  const gap = Number.parseFloat(getComputedStyle(panel).getPropertyValue(EDGE_GAP)) || 0
+  const surface = panel.firstElementChild
+  const inset = surface instanceof HTMLElement ? (Number.parseFloat(getComputedStyle(surface).paddingTop) || 0) + (Number.parseFloat(getComputedStyle(surface).borderTopWidth) || 0) : 0
+  const menuBox = menu.getBoundingClientRect()
+  const top = anchor.getBoundingClientRect().top - menuBox.top - inset
+  const box = panel.getBoundingClientRect()
+  const room = bounds.bottom - gap - (menuBox.top + top + box.height)
+  panel.style.top = `${room < 0 ? Math.max(bounds.top + gap - menuBox.top, top + room) : top}px`
+  if (box.right > bounds.right - gap && menuBox.left - box.width >= bounds.left + gap) {
+    const offset = getComputedStyle(panel).left
+    panel.style.left = 'auto'
+    panel.style.right = offset
+  }
+}
+
 /** What can take focus in the anchor. */
 const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
@@ -118,6 +148,10 @@ export function Popover({
       if (panel === null) return
       // The panel's parent is the root: a panel open on first render gets its ref before the root does.
       const root = panel.parentElement
+      if (placement === 'right-start') {
+        if (root) placeSide(panel, root)
+        return
+      }
       const trigger = alignTo === undefined || !placement.endsWith('-start') ? null : root?.querySelector(alignTo)
       if (root && trigger) panel.style.left = `${trigger.getBoundingClientRect().left - root.getBoundingClientRect().left}px`
       clamp(panel, placement)
@@ -178,7 +212,7 @@ export function Popover({
   }, [open, onClose, closeOnBlur])
 
   return (
-    <div ref={rootRef} {...stylex.props(styles.root)}>
+    <div ref={rootRef} {...stylex.props(styles.root, placement === 'right-start' && styles.rootSide)}>
       {anchor}
       {open ? (
         <Suspense fallback={<span data-chunk-pending="" hidden />}>
@@ -206,6 +240,10 @@ const styles = stylex.create({
     display: 'inline-flex',
     minWidth: 0,
   },
+  // A submenu's panel hangs off the menu's panel, outside the menu's scrolling surface.
+  rootSide: {
+    position: 'static',
+  },
   // A panel that hangs off the title bar (the avatar menu) is not part of its drag region.
   panel: {
     position: 'absolute',
@@ -228,6 +266,8 @@ const placements = stylex.create({
   'bottom-end': { top: `calc(100% + ${spacing['--space-1']})`, right: 0 },
   'top-start': { bottom: `calc(100% + ${spacing['--space-1-5']})`, left: 0 },
   'top-end': { bottom: `calc(100% + ${spacing['--space-1-5']})`, right: 0 },
+  // `top` is set when it opens; the flip to the left reads this offset as `right`.
+  'right-start': { top: 0, left: `calc(100% + ${spacing['--space-1']})` },
 })
 
 const widths = stylex.create({
