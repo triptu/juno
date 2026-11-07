@@ -353,20 +353,39 @@ Invariants:
 
 ### Profile status expiry
 
-Where: `untilExpiry` and the `status.of` handler in `packages/engine/src/profileStatus/handlers.ts`, one per subscription (a person's status in the avatar menu or an avatar's tooltip).
-States: none (no status, or past its expiry), shown without expiry, shown until `expiresAt` (a sleep on the engine's clock is pending).
+Where: `untilExpiry`, `reach` and the `status.of` handler in `packages/engine/src/profileStatus/handlers.ts`, one per subscription (a person's status in the avatar menu or an avatar's tooltip).
+States: none (no status, or past its expiry), shown without expiry, shown until `expiresAt` (a wait on the engine's clock is pending).
 
 | From | Event | To | Guard | Code |
 |---|---|---|---|---|
 | any | the `users` row or a custom emoji changes (a run) | none | no text and no emoji, or the clock is at or past `expiresAt` | `readStatus`, `untilExpiry` |
 | any | a run | shown without expiry | `status_expiration` is 0 | `untilExpiry` |
-| any | a run | shown until `expiresAt` | `expiresAt` is later than the clock | `untilExpiry` (`Stream.concat` with `Effect.sleep`) |
-| shown until `expiresAt` | the sleep ends | none | | `untilExpiry` |
+| any | a run | shown until `expiresAt` | `expiresAt` is later than the clock | `untilExpiry` (`Stream.concat` with `reach`) |
+| shown until `expiresAt` | the sleep ends, or main says the Mac woke | none | the clock is at or past `expiresAt` | `reach` |
+| shown until `expiresAt` | the sleep ends, or main says the Mac woke | shown until `expiresAt` (a new sleep for what is left) | the clock is still before `expiresAt` | `reach` |
 
 Invariants:
-1. A new run cancels the pending sleep (`Stream.switchMap`), so a status changed or cleared before it expires never sends a stale "none" later.
-2. Nothing polls: the only timer is the one sleep to the current status's `expiresAt`.
-3. The stored row keeps Slack's expiry; hiding an expired status changes nothing in the store, and the next `user_change` replaces the row.
+1. A new run cancels the pending wait (`Stream.switchMap`), so a status changed or cleared before it expires never sends a stale "none" later.
+2. Nothing polls: the only timer is one sleep to the current status's `expiresAt`, rechecked against the clock each time it ends, and a wake ends it early to recheck. A sleep that ends early waits again; a Mac that slept past the expiry hides it at the wake, not when the slowed timer ends.
+3. The stored row keeps Slack's expiry; hiding an expired status changes nothing in the store, and the next user object replaces the row.
+
+### Stale user refresh
+
+Where: `refreshUsers` and `refreshStaleUsers` in `packages/sync/src/users.ts`, per user id, in the sync's context (`userRefresh`). The renderer starts it from the tooltip layer's `prepare` (`status.refresh`) when the pointer reaches an avatar.
+States: unread (no `userRefresh.readAt` this session), fresh (read or asked for under `USER_FRESH_MILLIS`, five minutes, ago), stale (older), queued (in `userRefresh.queued`), asked (a `users/info` call out).
+
+| From | Event | To | Guard | Code |
+|---|---|---|---|---|
+| unread or stale | a hover | queued, marked asked now | the id is a user id Slack knows | `refreshUsers` |
+| fresh, queued or asked | a hover | unchanged | | `refreshUsers` |
+| queued | the batch wait (`usersBatchMillis`) ends | asked | | `refreshStaleUsers` (`fetchUsers`, interactive lane, joins a call already out) |
+| asked | Slack answers | fresh (`readAt` = now), row written | | `chunks` |
+| asked | the call fails or Slack holds the lane back | unread (mark cleared) | not an expired session | `refreshStaleUsers` |
+| any | a `user_change` frame or any `users/info` answer for the user | fresh | | `events.ts`, `chunks` |
+
+Invariants:
+1. A person is asked about at most once per five minutes of hovering, and never while a call for them is out; a failed call is not retried until the next hover.
+2. Nothing polls and nothing runs without a hover; the marks live in memory, so the first hover on a person after Juno opens asks once.
 
 ### Smaller engine machines
 
