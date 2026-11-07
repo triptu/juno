@@ -1,0 +1,1 @@
+- 11-08 01:04 · Reactions view · Reaction rows share the topic row's anatomy: the reactor's photo in the tile, then the title, preview and place lines, from the topic row's styles and `PersonPhoto` · Tushar asked why the rows looked so different from the other sidebar rows. Built from the same parts, the two lists line up and cannot drift; a gallery test checks the geometry.

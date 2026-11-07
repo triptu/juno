@@ -605,7 +605,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `bun run test:gallery` |
 | No layout shift on hover, press or focus, and the cursor rule, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `bun run test:gallery` |
 | Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `bun run test:gallery` |
-| Sidebar rows as views: a DM's preview, the group DM tile, the row's description, the title tooltip, the list scrollbar | `apps/gallery/sidebar-rows.spec.ts` | `bun run test:gallery` |
+| Sidebar rows as views: a DM's preview, the group DM tile, a Reactions row lined up with a topic row, the row's description, the title tooltip, the list scrollbar | `apps/gallery/sidebar-rows.spec.ts` | `bun run test:gallery` |
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `bun run gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `bun run remote test:desktop --project=feel` (the six of every full run; `--env JUNO_ON_DEMAND=1` for all); `bun run test:feel` on the Mac for every scenario and the videos |
 

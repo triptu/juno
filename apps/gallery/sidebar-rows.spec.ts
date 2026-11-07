@@ -112,6 +112,19 @@ layoutTest('the place line sits at one height on every row: renaming, and a reso
   expect(await placeTop(notes)).toBe(read)
 })
 
+layoutTest('a Reactions row has a three-line topic row’s geometry: its tile, its text column and its height', async ({ page }) => {
+  const measure = (selector: string) =>
+    page.locator(selector).first().evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const left = (part: string) => node.querySelector(`[data-row-part="${part}"]`)!.getBoundingClientRect().left - box.left
+      return { x: box.left, width: box.width, height: box.height, title: left('title'), preview: left('preview'), place: left('place') }
+    })
+  await open(page, 'Sidebar', 'list/default')
+  const topic = await measure('[data-topic-row][data-row-lines="3"]')
+  await open(page, 'Sidebar', 'reactions/list')
+  expect(await measure('[data-reaction-row]')).toEqual(topic)
+})
+
 test('the list scrollbar shows only while the pointer is over the list, and nothing moves', async ({ page }) => {
   await open(page, 'Sidebar', 'list/default')
   const list = page.getByRole('group', { name: 'Topics' })
