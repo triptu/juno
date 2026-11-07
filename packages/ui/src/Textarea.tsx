@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useEffect, useLayoutEffect, useRef, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
 import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
 import { chunk } from './chunks'
 import { variants as typeVariants } from './internal/type'
@@ -92,6 +92,8 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
     void lineDrawing.load()
   }, [layered])
   const layer = useRef<HTMLDivElement>(null)
+  // Scrolled down at all: the top fade shows. Set only when it changes, so scrolling re-renders twice at most.
+  const [scrolled, setScrolled] = useState(false)
   const own = useRef<HTMLTextAreaElement | null>(null)
   // Text the field opens with (a saved draft, a message to edit) takes typing at its end, not before it.
   useLayoutEffect(() => {
@@ -111,21 +113,22 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
       aria-label={label}
       rows={rows ?? (variant === 'card' ? 2 : 1)}
       {...rest}
-      {...(!layered
+      {...(variant !== 'inline'
         ? { onScroll }
         : {
             onScroll: (event: UIEvent<HTMLTextAreaElement>) => {
               if (layer.current !== null) layer.current.scrollTop = event.currentTarget.scrollTop
+              setScrolled(event.currentTarget.scrollTop > 0)
               onScroll?.(event)
             },
           })}
-      {...stylex.props(styles.base, variants[variant], variant === 'field' && typeVariants.ui, variant === 'inline' && maxHeights[maxHeight], layered && styles.inkless)}
+      {...stylex.props(styles.base, variants[variant], variant === 'field' && typeVariants.ui, variant === 'inline' && maxHeights[maxHeight], variant === 'inline' && scrolled && styles.topFade, layered && styles.inkless)}
     />
   )
   if (!layered) return field
   return (
     <div {...stylex.props(styles.marked)}>
-      <div ref={layer} dir={rest.dir} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, styles.layer)}>
+      <div ref={layer} dir={rest.dir} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, scrolled && styles.topFade, styles.layer)}>
         {linesReady && lines !== undefined ? (formatted ? lines.drawnLines(rest.value ?? '', marks ?? [], format, anchorAt) : lines.drawn(rest.value ?? '', marks ?? [], anchorAt)) : (rest.value ?? '') + (rest.value?.endsWith('\n') ? '\u200b' : '')}
       </div>
       {field}
@@ -138,6 +141,8 @@ function setRef(ref: Ref<HTMLTextAreaElement> | undefined, node: HTMLTextAreaEle
   else if (ref !== undefined && ref !== null) (ref as RefObject<HTMLTextAreaElement | null>).current = node
 }
 
+/** How far a scrolled composer's text fades under its top edge. */
+const TOP_FADE = spacing['--space-4']
 
 const styles = stylex.create({
   base: {
@@ -171,6 +176,12 @@ const styles = stylex.create({
       color: colors['--foreground-default'],
     },
   },
+  // Scrolled, a line under the top edge fades out over 16px instead of being cut at the frame. A static mask, set
+  // while the field is scrolled at all: a field at its top fades nothing, and no animation runs on the field. The
+  // layer that draws marked text takes it too, and scrolls with the field.
+  topFade: {
+    maskImage: `linear-gradient(to bottom, transparent, black ${TOP_FADE})`, // tokens-allow: a mask's alpha, not a colour that shows.
+  },
   layer: {
     unicodeBidi: 'plaintext',
     position: 'absolute',
@@ -187,17 +198,10 @@ const styles = stylex.create({
   },
 })
 
-/** How far a scrolled composer's text fades under its top edge. */
-const TOP_FADE = spacing['--space-4']
-
-const topFade = stylex.keyframes({
-  from: { maskPosition: `0 calc(-1 * ${TOP_FADE})` },
-  to: { maskPosition: '0 0' },
-})
-
 const variants = stylex.create({
   inline: {
-    // 9 + 22 + 9 = the 40px single-line composer.
+    // 8 + 22 + 8 and the frame's 1px border = the 40px single-line composer. The frame keeps this box inside its
+    // border, so a scrolled line is cut below the border.
     paddingBlock: layout['--composer-padding-block'],
     paddingInline: spacing['--space-1'],
     borderWidth: 0,
@@ -210,18 +214,6 @@ const variants = stylex.create({
     fieldSizing: 'content',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
-    // Scrolled, a line under the top edge fades out over 16px instead of being cut against the frame. The mask sits
-    // above the box at rest and slides down over the first 16px of scroll (a scroll-driven animation), so a field at
-    // its top fades nothing. The layer that draws marked text uses this style too, and scrolls with the field.
-    maskImage: `linear-gradient(to bottom, transparent, black ${TOP_FADE})`, // tokens-allow: a mask's alpha, not a colour that shows.
-    maskSize: `100% calc(100% + ${TOP_FADE})`,
-    maskRepeat: 'no-repeat',
-    maskPosition: `0 calc(-1 * ${TOP_FADE})`,
-    animationName: topFade,
-    animationTimingFunction: 'linear',
-    animationFillMode: 'both',
-    animationTimeline: 'scroll(self)',
-    animationRange: `0 ${TOP_FADE}`,
   },
   card: {
     paddingBlock: spacing['--space-2'],

@@ -33,11 +33,11 @@ export function AttachButton({ onFiles, tabbable = true }: AttachButtonProps) {
 }
 
 const styles = stylex.create({
-  // The send button's slot, mirrored: 6px above and below at one line.
+  // The send button's slot, mirrored: 6px from the field's outer edge above and below at one line, its border included.
   slot: {
     display: 'inline-flex',
     flexShrink: 0,
-    paddingBlock: spacing['--space-1-5'],
+    paddingBlock: `calc(${spacing['--space-1-5']} - ${spacing['--space-pixel']})`,
   },
   input: {
     display: 'none',

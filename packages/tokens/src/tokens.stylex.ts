@@ -948,14 +948,14 @@ export const layout = stylex.defineVars({
   '--juno-panel-resize-hit': '8px',
   '--composer-width': '752px',
   // A topic's composer (and a message's edit field) grows to about half the
-  // window's height, as Slack's does, never under 8 lines (9 + 8×22 + 9);
+  // window's height, as Slack's does, never under 8 lines (8 + 8×22 + 8);
   // then it scrolls inside. 45, not 50: the composer's own padding and
   // attachments come on top of the field. A viewport unit, not a container
   // one: making the topic a size container tripled style work per keystroke
   // (the counted typing budget in `counted-layout.spec.ts`).
-  '--composer-max-height': 'max(194px, 45vh)',
+  '--composer-max-height': 'max(192px, 45vh)',
   '--composer-line-height': '22px',
-  '--composer-padding-block': '9px',
+  '--composer-padding-block': '8px',
   '--assistant-input-max-height': '160px',
   '--code-block-max-height': '150px',
   // The message hover toolbar's height: 24px buttons, a 1px inset and its
