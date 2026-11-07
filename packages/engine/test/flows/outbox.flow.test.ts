@@ -327,6 +327,31 @@ it('fails a post whose lookup Slack refuses for good, so later posts to the chan
   engine.fake.releaseFrames({ drop: true })
 })
 
+// A lookup Slack refuses for a reason that says nothing about the message (`invalid_cursor` here, or a code Slack
+// adds later) is asked again: the post may well be there, and Retry on a failed row would post it a second time.
+// Before, every refusal outside the transient ones failed the row.
+it('keeps asking after a lookup refused for a reason that does not decide the post', async () => {
+  const engine = await booted()
+  const rows = await opened(engine)
+  // Slack runs the post and the answer is lost; with the echo held, only a lookup can settle the row.
+  engine.fake.holdFrames({ types: ['message'] })
+  engine.fake.loseResponse({ method: 'chat.postMessage' })
+  engine.fake.forceError({ method: 'conversations.history', error: 'invalid_cursor' })
+  const id = await send(engine, 'Looked up twice', rows)
+  const row = () => readDb(engine, 'user.db', (db) => db.prepare('SELECT state, attempts, last_error FROM pending_messages WHERE client_msg_id = ?').get(id) as { state: string; attempts: number; last_error: string | null } | undefined)
+  // The row's next write after the refused lookup: a deferral counts an attempt, a failure changes the state.
+  const after = await waitFor(() => {
+    const current = row()
+    return current !== undefined && (current.state !== 'unknown' || current.attempts >= 2) ? current : undefined
+  }, WAIT_MS, 'the lookup settled')
+  expect(apiCalls(engine, 'conversations.history')[0]?.args['oldest']).toBeDefined()
+  expect(after).toMatchObject({ state: 'unknown' })
+  await rows(settled('Looked up twice'), 'the next lookup found it')
+  expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(1)
+  expect(copies(engine, id)).toBe(1)
+  engine.fake.releaseFrames({ drop: true })
+})
+
 it('flushes when a catch-up ends: a lookup waiting out its backoff runs at once', async () => {
   const time = await controlledClock()
   const engine = await booted({ clock: time.clock, timing: { socketPingMillis: 86_400_000, socketPongTimeoutMillis: 86_400_000 } })

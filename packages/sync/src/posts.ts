@@ -237,8 +237,9 @@ export const rewritePost = (post: PendingPost, text: string, blocksJson: string 
 export const deferLookup = (clientMsgId: string, nextAt: number) => move(clientMsgId, ['unknown'], 'unknown', { nextAt, attempt: true })
 
 /**
- * Slack refuses the lookup for good (`thread_not_found`, `channel_not_found`): no lookup can read the message,
- * so the row waits for Retry or Delete draft instead of asking forever and holding the channel's later posts.
+ * Slack refuses the lookup for good (`thread_not_found`, `channel_not_found`, `is_archived`, `not_in_channel`;
+ * the worker's `LOOKUP_REFUSED`): no lookup can read the message, so the row waits for Retry or Delete draft
+ * instead of asking forever and holding the channel's later posts.
  */
 export const failLookup = (clientMsgId: string, error: string) => move(clientMsgId, ['unknown'], 'failed', { lastError: error })
 

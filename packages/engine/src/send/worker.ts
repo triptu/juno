@@ -87,6 +87,12 @@ const LOOKUP_MARGIN_MILLIS = 5 * 60_000
 const LOOKUP_PAGES = 5
 /** Refusals Slack gives when it could not run the call, and may on a retry: a post may have been run (unknown, not refused); a lookup is asked again. */
 const MAYBE_POSTED = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable'])
+/**
+ * Refusals of a lookup that no later read can change: the thread or channel is gone for the user, and a post to
+ * it would be refused the same way, so Retry on the failed row cannot post a second copy. Any other code
+ * (`invalid_cursor`, one Slack adds later) says nothing about the message, so the row is asked about again.
+ */
+const LOOKUP_REFUSED = new Set(['thread_not_found', 'channel_not_found', 'is_archived', 'not_in_channel'])
 /** `last_error` of a post Slack accepted without sending the message back (`files.share`, `chat.shareMessage`). */
 const SHARED = 'shared'
 /** What `post` answers while a file the post took is still staging. */
@@ -275,7 +281,7 @@ export class PostWorker extends Context.Service<
             if (answer._tag === 'Failure') {
               const error = answer.failure
               // Slack will never answer this read (the root deleted, the channel left): the row is decided, for the user.
-              if (error._tag === 'Rejected' && !MAYBE_POSTED.has(error.code)) {
+              if (error._tag === 'Rejected' && LOOKUP_REFUSED.has(error.code)) {
                 yield* Effect.logWarning('send: Slack refused the lookup of a post', { id: row.clientMsgId, code: error.code })
                 return yield* local(transaction(failLookup(row.clientMsgId, error.code)))
               }

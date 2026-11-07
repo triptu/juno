@@ -402,8 +402,8 @@ stateDiagram-v2
 | unknown | lookup finds the cmid | gone | | `worker.ts:265` |
 | unknown | lookup complete, absent, not `shared` | queued, due now; a waiting edit is applied to the text | no waiting delete | `actions.ts (requeueUnsentPost, applyWaitingActions)`, `worker.ts (lookUp)` |
 | unknown | lookup complete, absent, a delete waiting | gone, with the delete row; for a New chat root, its waiting replies and started thread go too | | `actions.ts (requeueUnsentPost, applyWaitingActions)`, `posts.ts (removePost)` |
-| unknown | lookup refused for good (a `Rejected` that is not transient, such as `thread_not_found`) | failed, `last_error` = the code | | `worker.ts (lookUp)` |
-| unknown | lookup fails for a transient reason, is incomplete, or is `shared` and absent | unknown; attempt + 1; backoff | the lookup reads from the last claim (`sent_posts.sent_at`) | `posts.ts (deferLookup)`, `worker.ts (lookUp)` |
+| unknown | lookup refused for good (`thread_not_found`, `channel_not_found`, `is_archived`, `not_in_channel`; `LOOKUP_REFUSED`) | failed, `last_error` = the code | | `worker.ts (lookUp)` |
+| unknown | lookup fails for a transient reason, is refused with a code that does not decide the post (`invalid_cursor`, a code Slack adds later), is incomplete, or is `shared` and absent | unknown; attempt + 1; backoff | the lookup reads from the last claim (`sent_posts.sent_at`) | `posts.ts (deferLookup)`, `worker.ts (lookUp)` |
 | failed | Retry | queued | | `posts.ts:274 (retryPost)` |
 | failed | Delete draft | gone | | `posts.ts:277 (discardPost)` |
 | queued, failed | user edit | same state, text replaced | | `actions.ts:218 (queueEdit)` |
@@ -998,7 +998,7 @@ Two more paths reach the same state:
 - Spec: `outbox.qnt` enables `failLookup` only before `seal` and models no permanent refusal, so `drainBound` holds in the model but not in the code.
 - Test: `packages/engine/test/flows/outbox.flow.test.ts` ("flushes when a catch-up ends"). Lose a reply's answer, delete the thread root in fake Slack so `conversations.replies` answers `thread_not_found`, queue a second post in Main of the same channel, step a test clock past the backoff, and expect the second post to be sent.
 - Fix direction: treat a lookup refusal that will not change as decided (failed, or queued so the post gets a real refusal). Page replies from the newest end. Fail the row after N incomplete lookups.
-- Status: Fixed in d94bbedfd and 2913c1051. A lookup Slack refuses for good moves the row to `failed` with the code, so Retry and Delete draft apply, and the lookup reads from the last claim (`sent_posts.sent_at`). Spec: `refuseFetch`, pair `refusedLookup`. Test: `outbox.flow.test.ts`, "fails a post whose lookup Slack refuses for good, so later posts to the channel go".
+- Status: Fixed in d94bbedfd and 2913c1051. A lookup Slack refuses for good moves the row to `failed` with the code, so Retry and Delete draft apply, and the lookup reads from the last claim (`sent_posts.sent_at`). Spec: `refuseFetch`, pair `refusedLookup`. Test: `outbox.flow.test.ts`, "fails a post whose lookup Slack refuses for good, so later posts to the channel go". A review of that fix found it failed the row on every refusal outside the transient codes, so a code that says nothing about the message (`invalid_cursor`, one Slack adds later) offered Retry on a post that may be in Slack, and Retry would post a second copy. Only the codes in `LOOKUP_REFUSED` fail the row now; any other refusal defers the lookup (`failLookup` in the spec). Test: "keeps asking after a lookup refused for a reason that does not decide the post".
 
 #### OUT-4. Replies to a New chat root that is discarded stay queued forever
 
