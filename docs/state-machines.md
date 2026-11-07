@@ -872,7 +872,7 @@ Callers of `kick`: a click, Resume, presence and network changes (`start.ts:162`
 
 Invariants:
 1. Every pending approval that is still valid is eventually authorized or refused, whatever another card waits on (AGT-1, AGT-2, fixed).
-2. A kick is never lost: it starts chains synchronously (AGT-5), and a chain it reaches mid-flight reads its approvals again before it waits (AGT-7). A card that waits for good is read again only on a kick, so nothing spins.
+2. A kick is never lost: it starts chains synchronously (AGT-5), a chain it reaches mid-flight reads its approvals again before it waits (AGT-7), and a kick that lands after a chain's last look but before it ends starts the card again as the chain ends (daf858e67). A card that waits for good is read again only on a kick, so nothing spins.
 3. Expiry and redaction checks run on every pending approval, a waiting one included (AGT-1, fixed).
 
 Spec: `agent-actions.qnt` (`progress`, `approvedDrain`, l.538-560).
@@ -1384,7 +1384,7 @@ If the engine is restarting when main answers, `supervisor.send` drops `signedOu
 - Severity: medium; low likelihood. Confirmed. Impact: Stuck "signing out" with Sign out disabled until relaunch, with the session half cleared. This is a concrete candidate for the backlog item "Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled" (`docs/backlog.md`). It breaks sign-in handshake invariant 3.
 - Test: engine side in `packages/engine/test/session.test.ts` with a host fake that never answers `signedOut` (expect a timeout outcome); main side in `e2e/session.spec.ts`.
 - Fix direction: `try` and `finally` in `#signOut` so main always answers, with a failure tag if needed, and a bounded wait in the engine.
-- Status: Fixed in 53bbd4679. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent. Test: `apps/desktop/test/session.test.ts`. Still open: when deleting `secrets.bin` fails, the engine hears `signedOut` anyway and the next launch reads the stored session and signs the user back in (review finding, 2026-11-07).
+- Status: Partly fixed in 53bbd4679. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent. Test: `apps/desktop/test/session.test.ts`. Partly fixed: the engine can no longer hang. Still open: when deleting `secrets.bin` fails, the engine hears `signedOut` anyway and the next launch reads the stored session and signs the user back in (review finding, 2026-11-07; in `docs/backlog.md`).
 
 #### MAIN-3. A late ready takes the engine supervisor out of stopped during quit
 
