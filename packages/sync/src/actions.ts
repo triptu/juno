@@ -6,7 +6,8 @@
  * intent over the stored message until the row ends, so the user sees the
  * change at once and a socket event or page that lands meanwhile cannot
  * undo it. The engine's `ActionWorker` sends the rows; these functions are
- * the only writers.
+ * the only writers, apart from `fileDeletes.ts` (a `deleteFile` row, keyed
+ * by the file's id, so no list shows it).
  *
  * Rows are written for messages Slack has. One of Juno's own posts that is
  * still pending is handled by its state (`posts.ts`):
@@ -30,9 +31,9 @@ import { Effect } from 'effect'
 import { messageTopics } from './keys'
 import { postTopic, readPost, recordOwnDelete, removePost, requeuePost, rewritePost, type PendingPost } from './posts'
 
-export type ActionKind = 'edit' | 'delete' | 'react' | 'broadcast'
+export type ActionKind = 'edit' | 'delete' | 'react' | 'broadcast' | 'deleteFile'
 
-const KINDS: ReadonlyArray<ActionKind> = ['edit', 'delete', 'react', 'broadcast']
+const KINDS: ReadonlyArray<ActionKind> = ['edit', 'delete', 'react', 'broadcast', 'deleteFile']
 /** The kinds as an SQL list, for `kind IN (...)`. */
 export const ACTION_KINDS_SQL = KINDS.map((kind) => `'${kind}'`).join(', ')
 
@@ -54,11 +55,13 @@ export interface ActionPayload {
   readonly failed?: string
   /** `react`: it has waited past `STALL_MILLIS` without going out, and the view says so. */
   readonly stalled?: boolean
+  /** `deleteFile`: the file in Slack; `clientMsgId` is the removed post that uploaded it. */
+  readonly fileId?: string
 }
 
-export interface PendingAction {
+interface ActionFields {
   readonly id: number
-  readonly kind: ActionKind
+  /** The row's `target_key`: the channel, or for `deleteFile` the file's id. */
   readonly channel: string
   /** The `client_msg_id` of a post Slack may not have yet. */
   readonly dependsOn: string | null
@@ -70,6 +73,11 @@ export interface PendingAction {
   /** Epoch millis. */
   readonly createdAt: number
 }
+
+/** A change to a message (`channel` is the message's), or the delete of a file a removed post had uploaded (`fileDeletes.ts`; `channel` is the file's id). */
+export type MessageAction = ActionFields & { readonly kind: Exclude<ActionKind, 'deleteFile'> }
+export type FileDeleteAction = ActionFields & { readonly kind: 'deleteFile' }
+export type PendingAction = MessageAction | FileDeleteAction
 
 interface ActionRow {
   readonly id: number
@@ -83,17 +91,18 @@ interface ActionRow {
   readonly created_at: string
 }
 
-const toAction = (row: ActionRow): PendingAction => ({
-  id: row.id,
-  kind: row.kind,
-  channel: row.target_key,
-  dependsOn: row.depends_on,
-  payload: JSON.parse(row.payload_json) as ActionPayload,
-  attempts: row.attempts,
-  lastError: row.last_error,
-  nextAt: row.next_at === null ? 0 : Number(row.next_at),
-  createdAt: Number(row.created_at),
-})
+const toAction = (row: ActionRow): PendingAction =>
+  ({
+    id: row.id,
+    kind: row.kind,
+    channel: row.target_key,
+    dependsOn: row.depends_on,
+    payload: JSON.parse(row.payload_json) as ActionPayload,
+    attempts: row.attempts,
+    lastError: row.last_error,
+    nextAt: row.next_at === null ? 0 : Number(row.next_at),
+    createdAt: Number(row.created_at),
+  }) as PendingAction
 
 const COLUMNS = 'id, kind, target_key, depends_on, payload_json, attempts, last_error, next_at, created_at'
 
