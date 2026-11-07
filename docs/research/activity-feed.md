@@ -33,12 +33,12 @@ The entry does not say whether the message is a reply. `conversations.replies` w
 
 ## How Juno uses it
 
-- The engine reads one page of 50 while the Reactions view is subscribed: when it opens, and each time the socket connects again. It stores entries newest first and stops at the first one it already has. Nothing polls.
-- `reaction_added` on the socket, for a message of yours (`item_user`, or the stored message's author) by someone else, stores the same row while Juno runs.
-- The view reads people and emoji from the message's stored reactions. A row whose reaction the store may not have yet (`fetched_at` below `at`) has its message fetched once; until then the feed's own reactor shows.
+- The engine reads one page of 50 while the Reactions view is subscribed: when it opens, and each time the socket connects again. It checks every entry and stores each one newer than its row; it does not stop at the first stored entry, since a live reaction may have stored a newer row while older ones were missed. Nothing polls.
+- `reaction_added` on the socket, for a message of yours (`item_user`, or the stored message's author) by someone else, replaces the row's headline while Juno runs.
+- A row shows the entry's reactor and emoji as its headline, as Slack's Activity does, and "+N" for the other people with a reaction on the stored message. A message Juno lacks is read once per connection while the view is open; a message it stores is kept current by the sync, with no call here.
 
 ## Unknowns
 
 - Whether an entry goes away or keeps its `feed_ts` when the latest reaction is taken back. Juno keeps the row's time and lets the message's reactions decide who shows; a message with no one else's reaction left drops out.
-- Whether the feed lists reactions in channels you have left, or in Slack Connect channels. Ignored channels are left out by Juno.
+- Whether the feed lists reactions in channels you have left, or in Slack Connect channels. Juno leaves out channels you left, archived channels and ignored channels.
 - The rate limit tier. Juno reads at most one page per open or reconnect.
