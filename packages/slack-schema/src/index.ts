@@ -23,6 +23,7 @@ export * from './files.ts'
 export * from './rtm.ts'
 export * from './huddles.ts'
 export * from './drafts.ts'
+export * from './activity.ts'
 export * from './methods.ts'
 
 export * from './emoji.ts'

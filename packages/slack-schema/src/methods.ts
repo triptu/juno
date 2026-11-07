@@ -5,6 +5,7 @@
  * through it. Neither side can drift from the other without a type error.
  */
 import { Schema as S } from 'effect'
+import { ActivityFeedArgs, ActivityFeedFields } from './activity.ts'
 import {
   ClientCountsArgs,
   ClientCountsFields,
@@ -143,6 +144,7 @@ export const Methods = {
   'reactions.add': method(ReactionArgs, ReactionFields),
   'reactions.remove': method(ReactionArgs, ReactionFields),
   'reactions.get': method(ReactionsGetArgs, ReactionsGetFields),
+  'activity.feed': method(ActivityFeedArgs, ActivityFeedFields),
   'search.modules.messages': method(SearchMessagesArgs, SearchMessagesFields),
   'files.getUploadURL': method(FilesGetUploadUrlArgs, FilesGetUploadUrlFields),
   'files.completeUpload': method(FilesCompleteUploadArgs, FilesCompleteUploadFields),

@@ -1,0 +1,63 @@
+{
+  "ok": true,
+  "items": [
+    {
+      "is_unread": false,
+      "feed_ts": "1700000000.000001",
+      "item": {
+        "type": "message_reaction",
+        "message": {
+          "ts": "1700000000.000001",
+          "channel": "C0REDACTED"
+        },
+        "reaction": {
+          "user": "U0REDACTED",
+          "name": "redacted"
+        }
+      },
+      "key": "redacted",
+      "version": "redacted",
+      "is_archived": false
+    },
+    {
+      "is_unread": false,
+      "feed_ts": "1700000000.000001",
+      "item": {
+        "type": "message_reaction",
+        "message": {
+          "ts": "1700000000.000001",
+          "channel": "D0REDACTED"
+        },
+        "reaction": {
+          "user": "U0REDACTED",
+          "name": "redacted"
+        }
+      },
+      "key": "redacted",
+      "version": "redacted",
+      "is_archived": false
+    },
+    {
+      "is_unread": false,
+      "feed_ts": "1700000000.000001",
+      "item": {
+        "type": "message_reaction",
+        "message": {
+          "ts": "1700000000.000001",
+          "channel": "C0REDACTED"
+        },
+        "reaction": {
+          "user": "U0REDACTED",
+          "name": "redacted"
+        }
+      },
+      "key": "redacted",
+      "version": "redacted",
+      "is_archived": false
+    }
+  ],
+  "response_metadata": {
+    "next_cursor": "redacted"
+  },
+  "activity_views_date_updated": 1700000000
+}

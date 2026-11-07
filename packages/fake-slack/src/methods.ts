@@ -264,11 +264,13 @@ export const coreMethods = {
     const ws = ctx.workspace
     const conversation = requireConversation(ctx, args.channel)
     if (conversation instanceof ApiError) return conversation
-    const root = ws.find(args.channel, args.ts)
+    // A reply's ts names its thread, as in Slack (research `activity-feed.md`).
+    const named = ws.find(args.channel, args.ts)
+    const root = named !== undefined && isReply(named) && named.thread_ts !== undefined ? ws.find(args.channel, named.thread_ts) : named
     if (root === undefined || isReply(root)) return new ApiError('thread_not_found')
     const inclusive = args.inclusive ?? false
     const after = tsFromCursor(args.cursor)
-    const thread = [root, ...ws.replies(args.channel, args.ts)]
+    const thread = [root, ...ws.replies(args.channel, root.ts)]
       .filter((m) => m.ts === root.ts || inWindow(m.ts, args.oldest, args.latest, inclusive))
       .filter((m) => m.ts === root.ts || compareTs(m.ts, ws.retainedSince.get(args.channel) ?? NEVER_READ) >= 0)
       .filter((m) => m.ts === root.ts || after === undefined || compareTs(m.ts, after) > 0)
