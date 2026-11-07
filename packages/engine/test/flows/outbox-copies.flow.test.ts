@@ -7,9 +7,10 @@
 import { expect, it } from 'bun:test'
 import { STAGE_CHUNK_BYTES, type FileView, type MessageView } from '@juno/contract'
 import { samplePng } from '@juno/fake-slack'
-import { attachFiles, attachmentsAtom, clearAttachments, deleteMessage, openTopic, readyFiles, retryMessage, sendMessage, uploadProgressAtom } from '@juno/state'
+import { attachFiles, attachmentsAtom, clearAttachments, deleteMessage, editMessage, openTopic, readyFiles, retryMessage, sendMessage, uploadProgressAtom } from '@juno/state'
+import { controlledClock, noTicks } from '../controlledClock'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
-import { actionRows, copies, eng, fresh, MAIN, outboxScenario, post, rowWith, settled, textOf, type Watch } from '../outboxScenario'
+import { actionRows, actionsEnded, copies, eng, fresh, MAIN, outboxScenario, post, rowWith, settled, textOf, type Watch } from '../outboxScenario'
 import { apiCalls, quiet, valueOf } from '../scenario'
 import { step } from '../step'
 
@@ -149,6 +150,38 @@ it('checks a copy’s delete again before it goes out, and keeps the copy when t
     await waitFor(() => (copies(engine, id) === 1 ? true : undefined), WAIT_MS, 'the copy deleted')
     expect(apiCalls(engine, 'conversations.history').some((call) => call.args['_x_reason'] === 'recheck' && call.args['channel'] === 'C0ENG')).toBe(true)
   })
+})
+
+// Found by the conformance replay (docs/state-machines.md OUT-9): the reply kept the copy but its delete row
+// stayed, as the drop was given a made-up row, and the row held the channel's later changes until its next try.
+it('lets the user’s edit go at once when a reply keeps a copy whose delete waits out a backoff', async () => {
+  const time = await controlledClock()
+  const engine = await booted({ clock: time.clock, timing: noTicks })
+  try {
+    const rows = await opened(engine)
+    engine.main.network.resend = true
+    engine.fake.holdFrames({ types: ['message'] })
+    engine.fake.loseResponse({ method: 'chat.postMessage' })
+    const id = await post(engine, 'Copy kept by a reply')
+    const kept = (await shownAs(rows, 'Copy kept by a reply')).ts
+    const copy = engine.fake.messages('C0ENG').find((m) => m.client_msg_id === id && m.ts !== kept)!.ts
+    // Slack's own trouble puts the copy's delete on a backoff. With time frozen the backoff never ends,
+    // so only the reply can free the channel.
+    engine.fake.forceError({ method: 'chat.delete', error: 'internal_error', times: 1 })
+    await time.freeze()
+    engine.fake.releaseFrames()
+    await waitFor(() => (apiCalls(engine, 'chat.delete').length > 0 ? true : undefined), WAIT_MS, 'the first delete refused')
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Replying to the copy', threadTs: copy })
+    await engine.socketIdle()
+    valueOf(await editMessage(engine.registry, { channelId: 'C0ENG', ts: kept, clientMsgId: id }, 'Copy kept by a reply, edited'))
+    await waitFor(() => apiCalls(engine, 'chat.update')[0], WAIT_MS, 'the edit sent')
+    await actionsEnded(engine)
+    expect(apiCalls(engine, 'chat.delete')).toHaveLength(1)
+    expect(copies(engine, id)).toBe(2)
+    expect(engine.fake.messages('C0ENG').find((m) => m.ts === kept)?.text).toBe('Copy kept by a reply, edited')
+  } finally {
+    await time.close()
+  }
 })
 
 // A post sent before a gap may have had its kept message deleted during the gap, which no event reports.
