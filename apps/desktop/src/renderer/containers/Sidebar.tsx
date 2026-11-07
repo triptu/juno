@@ -6,6 +6,7 @@ import {
   engineStatusAtom,
   fullScreenAtom,
   notificationStatusAtom,
+  personStatusAtom,
   popupContextMenu,
   privacyAtom,
   privacySharingAtom,
@@ -16,6 +17,7 @@ import {
   sidebarListAtom,
   signedInAtom,
   sessionProfileAtom,
+  statusSheetOpenAtom,
   syncNoticeAtom,
   syncProgressAtom,
   tabsAtom,
@@ -25,7 +27,8 @@ import {
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
+import { statusUntil, type ProfileStatus } from '@juno/contract'
+import { hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type AccountStatus, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { chunk } from './chunks'
 import { SyncNotice, useSyncNoticeReady } from './SyncNotice'
 import { markFilterChange } from './filterMark'
@@ -80,6 +83,12 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
   }
 }
 
+/** Your status as the avatar menu shows it, with when it clears as of the menu's opening. */
+function accountStatus(status: ProfileStatus | null | undefined): AccountStatus | undefined {
+  if (status === undefined || status === null) return undefined
+  return { emoji: status.emoji, text: status.text, until: status.expiresAt === undefined ? undefined : statusUntil(status.expiresAt, new Date()) }
+}
+
 /**
  * Reading only: no page buttons, no account, no huddle bar, the views
  * without their menu or reordering, and a note that the conversations are
@@ -119,6 +128,7 @@ export function Sidebar() {
   const junoBusy = useAtomValue(junoNavAtom, (nav) => nav.busy)
   const [menuOpen, setMenuOpen] = useState(false)
   const status = useAtomValue(notificationStatusAtom)
+  const ownStatus = useAtomValue(personStatusAtom(user?.userId ?? ''))
   const privacy = useAtomValue(privacyAtom)
   const privacySharing = useAtomValue(privacySharingAtom)
   // Whether the list may still change: the engine is not live, or a sync cycle runs. Two booleans, so a status tick re-renders nothing.
@@ -142,6 +152,7 @@ export function Sidebar() {
     if (action === 'notifications') return openSettings('notifications')
     if (action === 'settings') return openSettings()
     if (action === 'privacy') return setPrivacy(!privacy)
+    if (action === 'status') return registry.set(statusSheetOpenAtom, true)
     void setPresence(registry, presence?.active === false ? 'active' : 'away')
   }
 
@@ -167,6 +178,7 @@ export function Sidebar() {
         workspace={user?.teamName ?? ''}
         {...(presence === undefined ? {} : { presence })}
         {...(paused === undefined ? {} : { paused })}
+        status={accountStatus(ownStatus)}
         privacy={privacy}
         onAction={accountAction}
       />
