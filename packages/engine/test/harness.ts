@@ -134,6 +134,10 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
     failNextSignIn: (kind: 'keychain', message: string) => {
       nextSignIn = () => ({ failed: { kind, message } })
     },
+    /** The next sign-in imports a session on `other`, as the Slack app signed in to another workspace. */
+    signInNextWith: (other: FakeSlack) => {
+      nextSignIn = () => other.signIn()
+    },
   }
 }
 
@@ -155,7 +159,7 @@ export interface RunningEngine {
    * `reached` once it waits there, `release()` to let it write, `written` once the write is done.
    */
   readonly holdDraftWrite: (step: DraftWriteStep, topicId: string) => DraftWriteHold
-  /** Holds the next run of a minute-ticked live list (`topics.list`) after it read the store: `reached` once it waits there, `release()` to let it send. */
+  /** Holds the next run of a live query that reports its reads (`topics.list`, `prefs.get`) after it read the store: `reached` once it waits there, `release()` to let it send. */
   readonly holdLiveRead: (route: string) => { readonly reached: Promise<void>; readonly release: () => void }
   /** Times the minute asked that live list for a run. */
   readonly liveTicks: (route: string) => number

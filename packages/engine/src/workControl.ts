@@ -18,12 +18,22 @@ export interface WorkControlOptions {
    */
   readonly onDraftWrite?: (step: 'claim' | 'absence', topicId: string, phase: 'before' | 'after') => Promise<void> | undefined
   /**
-   * A live list that also runs once a minute (`topics.list`, `allTopics.list`, `allTopics.summary`): `tick` when the
-   * minute asks for a run, `read` when a run has read the store. A test returns a promise at `read` to hold the run
-   * there while a write and a tick land; what it sends must never be older than what was sent before it.
+   * A live query that reports its runs: `read` when a run has read the store (`topics.list`, `allTopics.list`,
+   * `allTopics.summary`, `prefs.get`), `tick` when the minute asks a list for a run. A test returns a promise at
+   * `read` to hold the run there while something else lands: a write and a tick for a list, whose answer must never
+   * be older than the one before it; a sign-in for a pref, whose answer the page must not take for another workspace's.
    */
   readonly onLiveRun?: (route: string, event: 'tick' | 'read') => Promise<void> | undefined
 }
+
+/** The query, telling a test's `onLiveRun` when it has read and waiting while the test holds it there. */
+export const observeLiveRead = <A, E, R>(route: string, query: Effect.Effect<A, E, R>, control: WorkControlOptions): Effect.Effect<A, E, R> =>
+  control.onLiveRun === undefined
+    ? query
+    : Effect.tap(query, () => {
+        const hold = control.onLiveRun?.(route, 'read')
+        return hold === undefined ? Effect.void : Effect.promise(() => hold)
+      })
 
 export class WorkControl extends Context.Reference<WorkControlOptions>('juno/engine/WorkControl', {
   defaultValue: () => ({}),

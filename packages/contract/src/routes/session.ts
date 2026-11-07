@@ -47,6 +47,9 @@ export const ReadySession = Schema.TaggedStruct('ready', {
 })
 export type ReadySession = typeof ReadySession.Type
 
+/** The key the engine files a workspace under: the team id, with the enterprise id before it on Grid. */
+export const workspaceKey = (enterpriseId: string | undefined, teamId: string): string => (enterpriseId === undefined ? teamId : `${enterpriseId}-${teamId}`)
+
 export const SessionStatus = Schema.Union([
   /** The engine is reading the stored session and checking it with Slack. Every engine starts here. */
   Schema.TaggedStruct('starting', {}),

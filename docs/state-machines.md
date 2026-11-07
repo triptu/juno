@@ -579,7 +579,7 @@ Invariant: after a resubscribe, `applyListDelta` rebuilds rows from the `reset: 
 
 ### Tabs
 
-Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, per team, keepAlive), `savedTabsAtom` (l.586, `prefs.get('tabs')`, one atom for all teams), `tabsKnown` and `whenTabsKnown` (l.640-665), `updateTabs` (l.668), `saveTabsSoon` (l.612), `savedHomeDraftAtom` (l.594).
+Where: `tabsAtom` (`packages/state/src/tabs.ts`), `changedTabsAtom` (per team, keepAlive), `savedTabsAtom` (`prefs.get('tabs')` with the signed-in workspace's key, one subscription per workspace), `tabsKnown` and `whenTabsKnown`, `updateTabs`, `saveTabsSoon`, `savedHomeDraftAtom`.
 
 | Condition | `tabsAtom` value |
 |---|---|
@@ -591,7 +591,7 @@ Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, 
 
 Each tab holds a history (`entries`, `index`, at most 50). The strip keeps a `closed` list (at most 20). `updateTabs` writes `changedTabsAtom` and saves the whole set, Home drafts and Search sessions included, through `prefs.set`.
 
-Invariant: no change is applied before the saved tabs are known. The navigation queue waits for them (`whenTabsKnown`) before each step, so the step runs against the real tabs and its follow-up work (the selected topic, a fresh open's window and position, a background tab's window) sees the real result; `updateTabs` before that returns the tabs unchanged (REN-1, fixed). The variant across a workspace switch in the same run is still open, since the saved-tabs atom is shared across teams.
+Invariant: no change is applied before the saved tabs are known. The navigation queue waits for them (`whenTabsKnown`) before each step, so the step runs against the real tabs and its follow-up work (the selected topic, a fresh open's window and position, a background tab's window) sees the real result; `updateTabs` before that returns the tabs unchanged (REN-1, fixed). After a sign-in to another workspace in the same run its tabs are unknown again until its own pref answers, since each workspace's saved tabs are their own subscription (REN-1 variant, fixed).
 
 ### Navigation queue
 
@@ -1298,12 +1298,12 @@ Shared cause: renderer containers apply the result of an async step without chec
 5. From then on `tabsAtom` returns the changed set and never the saved one. The saved tabs, pins, history and closed list are out of reach for this run.
 6. `prefs.set` fails with `NotSignedIn` before the workspace opens (`prefs/handlers.ts:42-45`). The next `updateTabs` or `saveTabsSoon` (any Home keystroke, `tabs.ts:612`) after it opens overwrites `prefs.tabs` with the current tabs only. The old Home tabs' unsent drafts and destinations are deleted (`savedHomeDraftAtom` reads them from the same pref, `tabs.ts:594`).
 
-Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` is one atom for all teams and still holds A's value, so a change before B's pref answers saves A's tabs into B's pref.
+Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` was one query for all teams and still held A's value, so a change before B's pref answered saved A's tabs into B's pref. Fixed in REN1SHA: `prefs.get` takes a `workspace` key and the engine answers it only while that workspace is open, so the tabs read a subscription per workspace that can never carry another's answer. Test: `packages/engine/test/flows/tabs-workspaces.flow.test.ts`, "a tab change made just after signing in to another workspace neither shows the first workspace's tabs nor saves them there".
 
 - Severity: medium-high. Confirmed. Impact: Open tabs, pins and Home drafts (unsent text the user wrote) are lost after a relaunch where the user acts quickly. The window is longer after an update migration or on a slow disk. It breaks the tabs invariant.
 - Test: DOM lane, `apps/desktop/dom/tabs-relaunch.test.ts`. Save tabs including a Home tab with a draft, relaunch, hold the workspace open, send ⌘T before the first sidebar row, then expect the saved tabs and the Home draft after load and in `prefs.tabs`.
 - Fix direction: gate `updateTabs` on a "saved tabs known" flag, or merge into the saved set once it arrives.
-- Status: Fixed in 8a94b311b. A change asked for before the saved tabs load waits for them. Test: `tabs-relaunch.test.ts`, "⌘T before the saved tabs have loaded opens the new tab beside them, and keeps the Home draft saved with them". The variant across a workspace switch is still open.
+- Status: Fixed in 8a94b311b. A change asked for before the saved tabs load waits for them. Test: `tabs-relaunch.test.ts`, "⌘T before the saved tabs have loaded opens the new tab beside them, and keeps the Home draft saved with them". The variant across a workspace switch is fixed above.
 - Review found two faults in that fix. The tabs reducer held the change and returned the tabs unchanged, so the caller's follow-up ran against no tabs: `apply` cleared the selected topic, a fresh open skipped its landing window and position, and a background open found no tab for its window; and a failed saved-tabs read kept every change held for the run. Fixed: the hold moved out of the reducer into the navigation queue, which waits for `whenTabsKnown` before each step (a failed read counts as known, so the app goes on with no tabs, as before 8a94b311b), and `updateTabs` before that returns the tabs unchanged. Test: `tabs-relaunch.test.ts`, "a topic clicked before the saved tabs have loaded opens in them once they load, and is the selected row".
 
 #### REN-2. A Slack link, source link or person link opens its topic seconds after the user moved on, and takes the tab and focus

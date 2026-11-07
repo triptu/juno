@@ -6,6 +6,7 @@ import { decisionProviderAvailable } from '../ai'
 import { AiCredentials } from '../aiCredentials'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
+import { observeLiveRead, WorkControl } from '../workControl'
 import { Workspace } from '../workspace'
 import { queryRecentEmoji, queryFrequentEmoji, useEmoji } from './emoji'
 
@@ -15,6 +16,7 @@ export const PrefsHandlers = PrefsRoutes.toLayer(
     const credentials = yield* AiCredentials
     const workspace = yield* Workspace
     const worker = yield* MarkWorker
+    const control = yield* WorkControl
     return {
       'emoji.frequent': () => serveWorkspaceValue(workspace.changes, 'emoji.frequent', ['prefs', 'team', 'emoji'], queryFrequentEmoji),
       'emoji.recent': () => serveWorkspaceValue(workspace.changes, 'emoji.recent', keys.prefs, queryRecentEmoji),
@@ -27,12 +29,12 @@ export const PrefsHandlers = PrefsRoutes.toLayer(
       'ai.available': () => serveLiveValue(credentials.revisions.pipe(
         Stream.mapEffect(() => Effect.result(timed(decisionProviderAvailable.pipe(Effect.provideService(EngineConfig, config), Effect.provideService(AiCredentials, credentials))))),
       )),
-      'prefs.get': ({ key }) => {
+      'prefs.get': ({ key, workspace: asked }) => {
         const runs = workspace.changes.pipe(
           Stream.switchMap((open) => {
-            if (open === undefined) return Stream.empty
+            if (open === undefined || (asked !== undefined && open.id !== asked)) return Stream.empty
             const read = prefs.get(key).pipe(Effect.map((value) => Schema.decodeUnknownSync(Schema.Json)(value ?? null)))
-            return liveQuery(keys.prefs, timed(read)).pipe(Stream.provide(open.context))
+            return liveQuery(keys.prefs, timed(observeLiveRead('prefs.get', read, control))).pipe(Stream.provide(open.context))
           }),
         )
         return serveLiveValue(runs).pipe(retryFirstRun('prefs.get'), Stream.orDie)

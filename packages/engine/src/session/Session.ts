@@ -30,7 +30,7 @@
  */
 import { rm } from 'node:fs/promises'
 import { Context, Effect, Exit, Fiber, Layer, Ref, Scope, Stream, SubscriptionRef } from 'effect'
-import { NotSignedIn, SignInFailed, type MainToEngine, type SessionSecrets, type SessionStatus, type SignInMethod } from '@juno/contract'
+import { NotSignedIn, SignInFailed, type MainToEngine, type SessionSecrets, type SessionStatus, type SignInMethod, workspaceKey } from '@juno/contract'
 import {
   HttpTransport,
   RequestQueue,
@@ -333,7 +333,6 @@ function toSlackSession(secrets: SessionSecrets): SlackSessionShape {
 }
 
 /** One directory per team, also on Grid, where several teams share an `enterprise_id`. */
-const workspaceKey = (enterpriseId: string | undefined, teamId: string) => (enterpriseId === undefined ? teamId : `${enterpriseId}-${teamId}`)
 
 const workspaceIdOf = (secrets: SessionSecrets) => workspaceKey(secrets.enterprise?.id, secrets.teamId)
 
