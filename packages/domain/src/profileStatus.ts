@@ -7,6 +7,7 @@
  * Times are local, as Slack's client works them out (research section 3,
  * "Profile status"): Today ends at 23:59:59, This week at the end of Friday.
  */
+import { untilPhrase } from './time'
 
 /** Slack's limit on the text, in characters. */
 export const STATUS_TEXT_MAX = 100
@@ -76,29 +77,19 @@ export function statusExpiry(choice: StatusClearAfter, now: Date): number {
   return Math.floor(at / 1000)
 }
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
 
-function clock(at: Date): string {
-  const h24 = at.getHours()
-  const m = at.getMinutes()
-  const suffix = h24 < 12 ? 'am' : 'pm'
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
-  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`
-}
-
-/**
- * "until 5:30pm", "until tomorrow 9am", "until today", "until Friday",
- * "until Nov 20": when a status clears, seen from `now`. A status that ends
- * with its day names the day only.
- */
+/** When a status clears, seen from `now`, in local time (`untilPhrase`). */
 export function statusUntil(expiresAt: number, now: Date): string {
   const then = new Date(expiresAt)
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const day = new Date(then.getFullYear(), then.getMonth(), then.getDate()).getTime()
-  const daysAhead = Math.round((day - today) / (24 * 60 * MINUTE))
-  const wholeDay = then.getHours() === 23 && then.getMinutes() === 59
-  const name = daysAhead <= 0 ? 'today' : daysAhead === 1 ? 'tomorrow' : daysAhead < 7 ? DAY_NAMES[then.getDay()]! : `${MONTHS[then.getMonth()]!} ${then.getDate()}`
-  if (wholeDay) return `until ${name}`
-  return daysAhead <= 0 ? `until ${clock(then)}` : `until ${name} ${clock(then)}`
+  // The last moment it covers, so one that clears at midnight dates the day before.
+  const last = new Date(expiresAt - 1)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const day = new Date(then.getFullYear(), then.getMonth(), then.getDate())
+  return untilPhrase({
+    daysAhead: Math.round((day.getTime() - today.getTime()) / (24 * 60 * MINUTE)),
+    weekday: then.getDay(),
+    minutes: then.getHours() * 60 + then.getMinutes(),
+    date: `${MONTHS[last.getMonth()]!} ${last.getDate()}`,
+  })
 }

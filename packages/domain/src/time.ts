@@ -95,3 +95,32 @@ export function hourLabel(minutesOfDay: number): string {
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12
   return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`
 }
+
+const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/** When something ends, as `untilPhrase` reads it. */
+export interface UntilParts {
+  /** Whole local days from today to the day it ends on. */
+  readonly daysAhead: number
+  /** That day of the week, 0 for Sunday. */
+  readonly weekday: number
+  /** Minutes after that day's midnight. */
+  readonly minutes: number
+  /** "Nov 20": the last day it covers, for an end a week or more away. Without it the weekday is used. */
+  readonly date?: string
+}
+
+/**
+ * "until 5:30pm", "until tomorrow 9am", "until Fri 9am", "until Nov 20 3pm":
+ * the one "until" for a status, Away and Paused. An end at 23:59 or at
+ * midnight names its day only, and midnight belongs to the day before it:
+ * "until today", "until Fri", never "until tomorrow 12am".
+ */
+export function untilPhrase({ daysAhead, weekday, minutes, date }: UntilParts): string {
+  const midnight = minutes === 0 && daysAhead > 0
+  const days = midnight ? daysAhead - 1 : daysAhead
+  const day = SHORT_DAYS[((midnight ? weekday - 1 : weekday) + 7) % 7]!
+  const name = days <= 0 ? 'today' : days === 1 ? 'tomorrow' : days < 7 || date === undefined ? day : date
+  if (midnight || minutes >= 1439) return `until ${name}`
+  return days <= 0 ? `until ${hourLabel(minutes)}` : `until ${name} ${hourLabel(minutes)}`
+}

@@ -2,7 +2,7 @@
  * Notification settings, hours and presence (spec section 14, inventory
  * section 13). How one message is decided is in `notificationDecision.ts`.
  */
-import { hourLabel } from './time'
+import { untilPhrase } from './time'
 
 /** 0 is Sunday, as `Date.prototype.getDay`. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -237,14 +237,8 @@ export function nextSwitch(at: LocalTime, hours: Hours): Switch | undefined {
   return undefined
 }
 
-const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
-
 function until(at: LocalTime, inMinutes: number, then: LocalTime): string {
-  const time = hourLabel(then.minutes)
-  const daysAhead = Math.floor((at.minutes + inMinutes) / DAY)
-  if (daysAhead === 0) return `until ${time}`
-  if (daysAhead === 1) return `until tomorrow ${time}`
-  return `until ${dayNames[then.weekday]} ${time}`
+  return untilPhrase({ daysAhead: Math.floor((at.minutes + inMinutes) / DAY), weekday: then.weekday, minutes: then.minutes })
 }
 
 /** "until 9am", "until tomorrow 9am", "until Mon 9am": for "Away until 9am" and "Paused until 9am". */
