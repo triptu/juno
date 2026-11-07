@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useRef, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { EmptyState, pointerMoved, ScrollArea } from '@juno/ui'
 
 export interface ReactionListProps {
@@ -16,6 +16,8 @@ export interface ReactionListProps {
    * engaged.
    */
   readonly onEngagedChange?: (engaged: boolean) => void
+  /** The Update ready pill floats over the list's foot: room after the last row so it can scroll clear, as on the topic list. */
+  readonly pillRoom?: boolean
 }
 
 const ROW = '[data-reaction-row]'
@@ -25,7 +27,7 @@ const ROW = '[data-reaction-row]'
  * sidebar's scroller, or a calm empty state. Arrow keys, Home and End move
  * focus between rows; a row opens on Enter or a press.
  */
-export function ReactionList({ ids, renderRow, empty, onEngagedChange }: ReactionListProps) {
+export function ReactionList({ ids, renderRow, empty, onEngagedChange, pillRoom = false }: ReactionListProps) {
   const inside = useRef({ pointer: false, keyboard: false })
   const engage = (part: 'pointer' | 'keyboard', now: boolean) => {
     const was = inside.current.pointer || inside.current.keyboard
@@ -46,7 +48,7 @@ export function ReactionList({ ids, renderRow, empty, onEngagedChange }: Reactio
       onPointerEnter={(event: PointerEvent<HTMLElement>) => pointerMoved(event) && engage('pointer', true)}
       onPointerLeave={() => engage('pointer', false)}
       onPointerMove={() => engage('pointer', true)}
-      sx={styles.scroller}
+      sx={[styles.scroller, pillRoom && styles.pillRoom]}
     >
       {ids.length === 0 && empty === true ? (
         <EmptyState illustration="nothing-here" title="No reactions yet" body="When people react to your messages, they show up here." />
@@ -82,6 +84,7 @@ const styles = stylex.create({
     paddingInlineEnd: `calc(${layout['--sidebar-inset']} - ${layout['--scrollbar-size']})`,
     paddingBottom: spacing['--space-4'],
   },
+  pillRoom: { paddingBottom: `calc(${sizes['--control-30']} + 2 * ${layout['--sidebar-inset']})` },
   rows: {
     display: 'flex',
     flexDirection: 'column',

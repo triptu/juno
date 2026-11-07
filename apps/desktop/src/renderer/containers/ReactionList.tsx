@@ -22,7 +22,7 @@ const Row = memo(function Row({ row, tabbable }: { readonly row: ReactionRow; re
  * contents it had when the hold began, until 400 ms after both have left.
  * Rows still in the view show their current contents.
  */
-export const ReactionList = memo(function ReactionList() {
+export const ReactionList = memo(function ReactionList({ pillRoom }: { readonly pillRoom: boolean }) {
   const live = useAtomValue(reactionRowsAtom)
   const [held, setHeld] = useState<ReadonlyArray<ReactionRow> | undefined>(undefined)
   const release = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -40,6 +40,7 @@ export const ReactionList = memo(function ReactionList() {
 
   return (
     <ReactionListView
+      pillRoom={pillRoom}
       ids={[...shown.keys()]}
       renderRow={(id) => <Row key={id} row={shown.get(id)!} tabbable={id === rows[0]?.id} />}
       {...(live === undefined ? {} : { empty: live.length === 0 })}

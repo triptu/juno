@@ -241,7 +241,7 @@ export function Sidebar() {
       onPrivacyOff={() => setPrivacy(false)}
       syncing={!connected || !caughtUp}
     >
-      {reactions ? <ReactionList /> : <TopicList pillRoom={updateReady} />}
+      {reactions ? <ReactionList pillRoom={updateReady} /> : <TopicList pillRoom={updateReady} />}
     </SidebarView>
   )
 }
