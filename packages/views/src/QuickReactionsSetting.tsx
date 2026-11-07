@@ -1,11 +1,12 @@
 import * as stylex from '@stylexjs/stylex'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { DEFAULT_QUICK_REACTIONS, MAX_QUICK_REACTIONS, type QuickReaction } from '@juno/contract'
 import { accent, colors, motion, opacity, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Button, Emoji, IconButton, Text } from '@juno/ui'
+import { usePickerFocus, usePickerPlace } from './anchoredPicker'
 
 const HOVER = '@media (hover: hover)'
 
@@ -153,75 +154,6 @@ function useKeys(listRef: RefObject<HTMLDivElement | null>, addRef: RefObject<HT
   }
 
   return { remove, onKey }
-}
-
-/**
- * A picker that closes with focus in it (Esc, or a pick) gives focus back to
- * Add. A press outside, focus moving outside, or a scroll outside it (the
- * page moving under it) closes it.
- */
-function usePickerFocus(addRef: RefObject<HTMLDivElement | null>, pickerRef: RefObject<HTMLDivElement | null>, pickerOpen: boolean, onClosePicker: (() => void) | undefined) {
-  const wasOpen = useRef(false)
-  useLayoutEffect(() => {
-    const active = document.activeElement
-    if (wasOpen.current && !pickerOpen && (active === null || active === document.body)) addRef.current?.querySelector('button')?.focus()
-    wasOpen.current = pickerOpen
-  }, [addRef, pickerOpen])
-
-  useEffect(() => {
-    if (!pickerOpen || onClosePicker === undefined) return
-    const inside = (target: EventTarget | null) =>
-      target instanceof Node && ((addRef.current?.contains(target) ?? false) || (pickerRef.current?.contains(target) ?? false))
-    const outside = (event: Event) => {
-      if (!inside(event.target)) onClosePicker()
-    }
-    document.addEventListener('pointerdown', outside, true)
-    document.addEventListener('focusin', outside)
-    document.addEventListener('scroll', outside, true)
-    return () => {
-      document.removeEventListener('pointerdown', outside, true)
-      document.removeEventListener('focusin', outside)
-      document.removeEventListener('scroll', outside, true)
-    }
-  }, [addRef, pickerRef, pickerOpen, onClosePicker])
-}
-
-/** The picker's gap from Add, and from the window's edges (`--space-1`, `--space-2`). */
-const GAP = 4
-const EDGE = 8
-
-/**
- * Places the open picker under Add, its start on Add's start, moved in to
- * stay inside the window (or the gallery's frame); over Add when there is no
- * room below. Read once, then written, before the first paint, and again
- * when the window resizes.
- */
-function usePickerPlace(addRef: RefObject<HTMLDivElement | null>, pickerRef: RefObject<HTMLDivElement | null>, pickerOpen: boolean) {
-  useLayoutEffect(() => {
-    if (!pickerOpen) return
-    const place = () => {
-      const add = addRef.current
-      const picker = pickerRef.current
-      if (add === null || picker === null) return
-      const anchor = add.getBoundingClientRect()
-      const box = picker.getBoundingClientRect()
-      const bounds = add.closest('[data-tooltip-bounds]')?.getBoundingClientRect() ?? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
-      const x = Math.max(bounds.left + EDGE, Math.min(anchor.left, bounds.right - EDGE - box.width))
-      const below = anchor.bottom + GAP
-      const above = anchor.top - GAP - box.height
-      const y = below + box.height <= bounds.bottom - EDGE ? below : above >= bounds.top + EDGE ? above : Math.max(bounds.top + EDGE, bounds.bottom - EDGE - box.height)
-      picker.style.translate = `${Math.round(x)}px ${Math.round(y)}px`
-    }
-    place()
-    // The picker's chunk may arrive after the first layout; place it again when it has a size.
-    const observer = new ResizeObserver(place)
-    if (pickerRef.current !== null) observer.observe(pickerRef.current)
-    window.addEventListener('resize', place)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', place)
-    }
-  }, [addRef, pickerRef, pickerOpen])
 }
 
 /** Drag to reorder: while a pill is dragged over the row, the row shows the order it would drop in; a drop saves it. */

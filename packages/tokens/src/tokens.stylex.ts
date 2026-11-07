@@ -901,6 +901,8 @@ export const layout = stylex.defineVars({
   '--chat-empty-width': '520px',
   // A tooltip wraps past this; most are one short line.
   '--tooltip-max-width': '280px',
+  // A tooltip with a detail line (a person's status) starts at its control's left edge and wraps past this.
+  '--tooltip-detail-width': '240px',
   // The default; the live width is this variable set on the shell.
   '--sidebar-width': '384px',
   '--sidebar-min-width': '312px',
@@ -1030,6 +1032,8 @@ export const layout = stylex.defineVars({
   '--channel-sheet-width': '380px',
   // The status sheet (inventory 2.1b): the emoji and text field, five presets and Clear after.
   '--status-sheet-width': '400px',
+  // A top-anchored sheet (SheetLayer's `anchor="top"`), whose height changes while open: its top, from the window's top.
+  '--sheet-top-offset': '120px',
   // The peek popover: about 75 characters of message text in compact rows;
   // never wider than the room left in the window.
   '--peek-width': '640px',

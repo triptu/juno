@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { colors, spacing, z } from '@juno/tokens/tokens.stylex'
+import { colors, layout, spacing, z } from '@juno/tokens/tokens.stylex'
 
 /**
  * Told when a sheet opens and closes, so the app can hold what is behind it
@@ -17,8 +17,13 @@ const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), textarea:not(:di
  * sheet it holds the keyboard: Tab and Shift Tab go round its controls and
  * never reach the page under the dim, and on close focus goes back to what
  * opened it.
+ *
+ * `anchor="top"` is for a sheet whose height changes while it is open (the
+ * status sheet's presets come and go): its top stays at a fixed distance
+ * from the window's top and only its bottom edge moves, where a centred
+ * sheet would jump by half the change.
  */
-export function SheetLayer({ onClose, children }: { readonly onClose: () => void; readonly children: ReactNode }) {
+export function SheetLayer({ onClose, anchor = 'center', children }: { readonly onClose: () => void; readonly anchor?: 'center' | 'top'; readonly children: ReactNode }) {
   const close = useRef(onClose)
   const layer = useRef<HTMLDivElement>(null)
   // Read on the first render, before the sheet's own autofocused button takes focus.
@@ -57,7 +62,7 @@ export function SheetLayer({ onClose, children }: { readonly onClose: () => void
     }
   }, [opener])
   return (
-    <div ref={layer} {...stylex.props(styles.layer)}>
+    <div ref={layer} {...stylex.props(styles.layer, anchor === 'top' && styles.top)}>
       {children}
     </div>
   )
@@ -75,5 +80,9 @@ const styles = stylex.create({
     backgroundColor: colors['--overlay'],
     // Over the title bars' drag strips, which would otherwise take the press (as the palette's overlay).
     WebkitAppRegion: 'no-drag',
+  },
+  top: {
+    alignItems: 'flex-start',
+    paddingTop: layout['--sheet-top-offset'],
   },
 })
