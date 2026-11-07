@@ -26,6 +26,8 @@ import {
 import { alerts, eng, group, hiring, leoId, maya, mayaId } from './fixtures'
 
 const at = (weekday: LocalTime['weekday'], hour: number, minute = 0): LocalTime => ({ weekday, minutes: hour * 60 + minute })
+/** The same moment as epoch milliseconds, in the week of Sunday 2026-11-01, local time. */
+const dateAt = (weekday: LocalTime['weekday'], hour: number, minute = 0) => new Date(2026, 10, 1 + weekday, hour, minute).getTime()
 const MON = 1
 const SAT = 6
 
@@ -189,10 +191,15 @@ describe('hours', () => {
     expect(inHours(at(SAT, 23), week)).toBe(false)
     expect(inHours(at(SUN, 1), week)).toBe(false)
 
-    expect(pausedLabel(at(FRI, 12), week)).toBe('Paused until 10pm')
-    expect(pausedLabel(at(SAT, 3), week)).toBe('Paused until 11am')
-    expect(pausedLabel(at(SAT, 15), week)).toBe('Paused until Mon 9am')
-    expect(pausedLabel(at(4, 20), { ...week, days: [1, 2, 3, 4, 6] })).toBe('Paused until Sat 11am')
+    expect(pausedLabel(dateAt(FRI, 12), week)).toBe('Paused until 10pm')
+    expect(pausedLabel(dateAt(SAT, 3), week)).toBe('Paused until 11am')
+    expect(pausedLabel(dateAt(SAT, 15), week)).toBe('Paused until Mon 9am')
+    expect(pausedLabel(dateAt(4, 20), { ...week, days: [1, 2, 3, 4, 6] })).toBe('Paused until Sat 11am')
+    // A snooze inside the hours ends with the snooze; one that runs past their end lasts until they start again.
+    expect(pausedLabel(dateAt(MON, 12), week, dateAt(MON, 13, 30))).toBe('Paused until 1:30pm')
+    expect(pausedLabel(dateAt(MON, 18), week, dateAt(MON, 20))).toBe('Paused until tomorrow 9am')
+    // A snooze that ends before the hours start again changes nothing about when they do.
+    expect(pausedLabel(dateAt(SAT, 15), week, dateAt(SAT, 16))).toBe('Paused until Mon 9am')
 
     // The same hours on every day with hours are the shared hours again, and Slack's own modes.
     const sameEveryWeekday = normalHours({ days: [1, 2, 3, 4, 5], from: 8 * 60, to: 17 * 60, dayHours: [1, 2, 3, 4, 5].map((day) => ({ day: day as 1, from: 600, to: 1080 })) })
