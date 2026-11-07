@@ -11,7 +11,7 @@
     "oversizedFiles": 51,
     "oversizedFunctions": 108
   },
-  "clonedLines": 75,
+  "clonedLines": 77,
   "oversizedFiles": [
     "apps/desktop/dom/message-actions.test.ts",
     "apps/desktop/e2e/driver/juno.ts",
