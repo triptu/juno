@@ -15,7 +15,7 @@ import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveValueRoute } from '../live'
 
-export { STATUS_CLEAR_AFTER, STATUS_DEFAULT_EMOJI, STATUS_PRESETS, STATUS_TEXT_MAX, statusUntil, type StatusClearAfter, type StatusPreset } from '@juno/domain'
+export { STATUS_CLEAR_AFTER, STATUS_PRESETS, STATUS_TEXT_MAX, statusUntil, type StatusClearAfter } from '@juno/domain'
 
 /** The status's emoji: a standard emoji's text, or a custom emoji's image; neither when the workspace no longer has it. */
 export const StatusEmoji = Schema.Struct({
