@@ -122,7 +122,7 @@ export { type ReviewStatus } from './reviewModel'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export { ChannelSheet } from './ChannelSheet'
-export { StatusLine } from './StatusLine'
+export { PersonDetail, StatusLine } from './StatusLine'
 export { StatusSheet, type StatusSheetPreset } from './StatusSheet'
 export type { ViewIconName } from '@juno/ui'
 

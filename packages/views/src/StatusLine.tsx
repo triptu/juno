@@ -31,6 +31,20 @@ export function StatusLine({ emoji, text, until }: { readonly emoji?: StatusEmoj
   )
 }
 
+/**
+ * What a person's avatar tooltip says under "Message Jonas": their status, then "Notifications paused" while they have
+ * them paused (SPEC 14, "Paused colleagues"), as a quiet line. Nothing when neither holds.
+ */
+export function PersonDetail({ status, paused }: { readonly status?: { readonly emoji?: StatusEmoji | undefined; readonly text: string; readonly until?: string | undefined } | undefined; readonly paused: boolean }) {
+  if (status === undefined && !paused) return null
+  return (
+    <>
+      {status === undefined ? null : <StatusLine emoji={status.emoji} text={status.text} until={status.until} />}
+      {paused ? <span data-person-paused="" {...stylex.props(styles.until)}>Notifications paused</span> : null}
+    </>
+  )
+}
+
 const styles = stylex.create({
   missing: {
     display: 'inline-block',

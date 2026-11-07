@@ -1,0 +1,1 @@
+- 11-08 03:35 · pause-notify · A colleague's avatar tooltip adds a quiet "Notifications paused" line while they have them paused, and its label reads as the title, one weight up (500) from the detail lines · Only the dot said they were paused, and the dot is not on message avatars; "Message Jonas" at the detail lines' weight read as one more line of detail.
