@@ -336,8 +336,10 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       bodies.set(row.ts, parse(row))
       parsedNow.push(row)
     }
-    // Emoji names in reactions are looked up too, so the second pass has them.
+    // Emoji names in reactions are looked up too, so the second pass has them: the stored ones and the user's own the
+    // outbox still holds, so a custom emoji's chip shows its image before Slack echoes the reaction.
     for (const list of reactions.values()) for (const reaction of list) if (emojiUnicode(reaction.name) === undefined) lookups.emoji(splitEmojiName(reaction.name).name)
+    if (actions.size > 0) for (const row of rows) for (const name of intentOf(actions, row)?.reactions.keys() ?? []) if (emojiUnicode(name) === undefined) lookups.emoji(splitEmojiName(name).name)
     if (wantsAny(wanted)) {
       yield* readWanted(sql, cache, wanted, selfId)
       for (const row of parsedNow) bodies.set(row.ts, parse(row))
