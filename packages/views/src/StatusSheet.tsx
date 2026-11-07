@@ -1,40 +1,50 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import type { FormEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { StatusEmoji } from '@juno/contract'
-import { layout, radii, sizes, spacing, colors } from '@juno/tokens/tokens.stylex'
-import { Button, Emoji, focusRing, IconButton, OptionList, OptionRow, Select, SmileyPlus, Surface, Text, TextField } from '@juno/ui'
+import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
+import { Button, focusRing, IconButton, OptionList, OptionRow, Select, SmileyPlus, Surface, Text, TextField, useOptionListKeys } from '@juno/ui'
+import { usePickerFocus, usePickerPlace } from './anchoredPicker'
+import { EmojiFace } from './StatusLine'
 
-export interface StatusSheetPreset {
+export interface StatusSheetPreset<V extends string> {
   readonly emoji: StatusEmoji
   readonly text: string
-  /** "1 hour", "Today", "Don’t clear": what choosing it sets Clear after to. */
-  readonly clearAfter: string
+  /** What choosing it sets Clear after to. */
+  readonly clearAfter: V
+  /** "1 hour", "Today", "Don’t clear": that choice's label. */
+  readonly clearAfterLabel: string
 }
 
-export interface StatusSheetProps {
+export interface StatusSheetProps<V extends string> {
   /** The chosen emoji; none until one is picked or a preset fills it. */
   readonly emoji?: StatusEmoji | undefined
+  /** What the emoji button shows while there is text and no emoji: what Save sends (Slack's 💬). */
+  readonly textEmoji?: StatusEmoji | undefined
   readonly text: string
   /** Slack's limit, in characters. */
   readonly maxLength: number
   /** Slack's presets, shown while the field is empty. */
-  readonly presets: ReadonlyArray<StatusSheetPreset>
+  readonly presets: ReadonlyArray<StatusSheetPreset<V>>
   /** The Clear after choices; an existing status that clears later adds its own time first. */
-  readonly clearAfterOptions: ReadonlyArray<{ readonly value: string; readonly label: string }>
-  readonly clearAfter: string
+  readonly clearAfterOptions: ReadonlyArray<{ readonly value: V; readonly label: string }>
+  readonly clearAfter: V
   /** You have a status now: Clear status shows. */
   readonly hasStatus: boolean
   /** Save or Clear status is waiting for Slack. */
   readonly busy?: boolean
   /** Why the last try failed, in plain words. */
   readonly error?: string | undefined
+  /** The open emoji picker, floated under the emoji button. */
+  readonly picker?: ReactNode
   readonly onEmoji: () => void
+  /** A press or focus outside the open picker. */
+  readonly onClosePicker?: () => void
   readonly onTextChange: (text: string) => void
   /** The field's clear button: the text and the emoji go. */
   readonly onClearField: () => void
-  readonly onPreset: (preset: StatusSheetPreset) => void
-  readonly onClearAfterChange: (value: string) => void
+  readonly onPreset: (preset: StatusSheetPreset<V>) => void
+  readonly onClearAfterChange: (value: V) => void
   readonly onSave: () => void
   readonly onClearStatus: () => void
   readonly onCancel: () => void
@@ -44,74 +54,216 @@ export interface StatusSheetProps {
  * The status sheet (SPEC 14, "Your status"; inventory 2.1b), as Slack's
  * status dialog: the emoji button and the text, Slack's presets while the
  * text is empty, Clear after, then Clear status (when you have one),
- * Cancel and Save, which waits for an emoji or text. The emoji button opens the emoji picker, which the
- * container shows in the sheet's place. Enter in the text saves; Escape
- * closes (the container's `SheetLayer`).
+ * Cancel and Save, which waits for an emoji or text. The text field takes
+ * focus as the sheet opens. ↓ from the empty field moves through the
+ * presets and Enter picks one; a picked preset puts focus back in the
+ * field, the caret at the end. The emoji button opens the emoji picker as
+ * a popover under it; Escape there closes only the picker and focus goes
+ * back to the button. Enter in the text saves; Escape closes (the
+ * container's `SheetLayer`).
  */
-export function StatusSheet(props: StatusSheetProps) {
-  const { emoji, text, presets, clearAfterOptions, clearAfter, hasStatus, busy = false, onPreset, onClearAfterChange, onSave, onClearStatus, onCancel } = props
+export function StatusSheet<V extends string>(props: StatusSheetProps<V>) {
+  const { emoji, text, presets, clearAfterOptions, clearAfter, hasStatus, busy = false, picker, onClosePicker, onPreset, onClearAfterChange, onSave, onClearStatus, onCancel } = props
   const empty = text.trim() === '' && emoji === undefined
+  const showPresets = text === '' && emoji === undefined
+  const anchorRef = useRef<HTMLSpanElement>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  usePickerFocus(anchorRef, pickerRef, picker !== undefined, onClosePicker)
+  usePickerPlace(anchorRef, pickerRef, picker !== undefined)
+  const { fieldRef, listId, active, setActive, presetId, pick, onFieldKey } = usePresetKeys(presets, showPresets, onPreset)
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!busy && !empty) onSave()
   }
   return (
-    <Surface kind="popover" as="section" role="dialog" aria-label="Set a status" aria-modal data-status-sheet="" padding="none" sx={styles.sheet}>
-      <form onSubmit={submit} {...stylex.props(styles.inner)}>
-        <Text variant="heading" tone="default" as="h2">
-          Set a status
-        </Text>
-        <StatusField {...props} empty={empty} />
-        {text === '' && emoji === undefined ? <Presets presets={presets} onPreset={onPreset} /> : null}
-        <div {...stylex.props(styles.clearAfter)}>
-          <Text variant="meta" tone="muted" weight="medium" as="span" aria-hidden>
-            Clear after
+    <>
+      <Surface kind="popover" as="section" role="dialog" aria-label="Set a status" aria-modal data-status-sheet="" padding="none" sx={styles.sheet}>
+        <form onSubmit={submit} {...stylex.props(styles.inner)}>
+          <Text variant="heading" tone="default" as="h2">
+            Set a status
           </Text>
-          <Select label="Clear after" size={30} options={clearAfterOptions} value={clearAfter} disabled={empty} onChange={(event) => onClearAfterChange(event.currentTarget.value)} />
-        </div>
-        <div {...stylex.props(styles.buttons)}>
-          {hasStatus ? (
-            <Button type="button" variant="ghost" tone="subtle" size="md" disabled={busy} onClick={onClearStatus}>
-              Clear status
+          <StatusField
+            {...props}
+            empty={empty}
+            fieldRef={fieldRef}
+            anchorRef={anchorRef}
+            {...(showPresets ? { listId, activeId: active } : {})}
+            onKeyDown={onFieldKey}
+          />
+          {showPresets ? <Presets presets={presets} listId={listId} active={active} presetId={presetId} onActive={setActive} onPick={pick} /> : null}
+          <ClearAfter options={clearAfterOptions} value={clearAfter} disabled={empty} onChange={onClearAfterChange} />
+          <div {...stylex.props(styles.buttons)}>
+            {hasStatus ? (
+              <Button type="button" variant="ghost" tone="subtle" size="md" disabled={busy} onClick={onClearStatus}>
+                Clear status
+              </Button>
+            ) : null}
+            <span {...stylex.props(styles.spacer)} />
+            <Button type="button" variant="secondary" size="md" onClick={onCancel}>
+              Cancel
             </Button>
-          ) : null}
-          <span {...stylex.props(styles.spacer)} />
-          <Button type="button" variant="secondary" size="md" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" size="md" disabled={busy || empty}>
-            Save
-          </Button>
+            <Button type="submit" variant="primary" size="md" disabled={busy || empty}>
+              Save
+            </Button>
+          </div>
+        </form>
+      </Surface>
+      {picker === undefined ? null : (
+        <div ref={pickerRef} data-status-picker="" {...stylex.props(styles.picker)}>
+          {picker}
         </div>
-      </form>
-    </Surface>
+      )}
+    </>
   )
 }
 
+/**
+ * The field and the presets: the field takes focus once the sheet is in
+ * (the avatar menu hands focus back to its button as it closes), ↓ and ↑
+ * from the empty field move a highlight through the presets, Enter picks
+ * the highlighted one, and a pick puts focus back in the field with the
+ * caret at the end.
+ */
+function usePresetKeys<V extends string>(presets: ReadonlyArray<StatusSheetPreset<V>>, showPresets: boolean, onPreset: (preset: StatusSheetPreset<V>) => void) {
+  const fieldRef = useRef<HTMLInputElement>(null)
+  const caretToEnd = useRef(false)
+  const listId = useId()
+  const [active, setActive] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    fieldRef.current?.focus()
+  }, [])
+  useLayoutEffect(() => {
+    const field = fieldRef.current
+    if (!caretToEnd.current || field === null) return
+    caretToEnd.current = false
+    field.focus()
+    field.setSelectionRange(field.value.length, field.value.length)
+  })
+  const presetId = (preset: StatusSheetPreset<V>) => `${listId}-${preset.emoji.name}`
+  const pick = (preset: StatusSheetPreset<V>) => {
+    caretToEnd.current = true
+    setActive(undefined)
+    onPreset(preset)
+  }
+  const keys = useOptionListKeys({
+    ids: showPresets ? presets.map(presetId) : [],
+    activeId: active,
+    onActiveChange: setActive,
+    onSelect: (id) => {
+      const preset = presets.find((each) => presetId(each) === id)
+      if (preset !== undefined) pick(preset)
+    },
+  })
+  const onFieldKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    // Enter saves unless a preset is highlighted.
+    if (showPresets && !(event.key === 'Enter' && active === undefined)) keys(event)
+  }
+  return { fieldRef, listId, active, setActive, presetId, pick, onFieldKey }
+}
+
+/** Slack's presets: each row's emoji and text under the field's, with the Clear after it sets at the end. */
+function Presets<V extends string>({ presets, listId, active, presetId, onActive, onPick }: {
+  readonly presets: ReadonlyArray<StatusSheetPreset<V>>
+  readonly listId: string
+  readonly active: string | undefined
+  readonly presetId: (preset: StatusSheetPreset<V>) => string
+  readonly onActive: (id: string) => void
+  readonly onPick: (preset: StatusSheetPreset<V>) => void
+}) {
+  return (
+    <div {...stylex.props(styles.presets)}>
+      <OptionList id={listId} label="Presets" activeId={active}>
+        {presets.map((preset) => (
+          <OptionRow
+            key={preset.text}
+            id={presetId(preset)}
+            size={30}
+            active={active === presetId(preset)}
+            leading={
+              <span {...stylex.props(styles.presetEmoji)}>
+                <EmojiFace emoji={preset.emoji} size={16} />
+              </span>
+            }
+            label={preset.text}
+            sub={preset.clearAfterLabel}
+            onActivate={() => onActive(presetId(preset))}
+            onSelect={() => onPick(preset)}
+          />
+        ))}
+      </OptionList>
+    </div>
+  )
+}
+
+/** "Clear after" and its choices, as the field's height. */
+function ClearAfter<V extends string>({ options, value, disabled, onChange }: { readonly options: ReadonlyArray<{ readonly value: V; readonly label: string }>; readonly value: V; readonly disabled: boolean; readonly onChange: (value: V) => void }) {
+  return (
+    <div {...stylex.props(styles.clearAfter)}>
+      <Text variant="meta" tone="muted" weight="medium" as="span" aria-hidden>
+        Clear after
+      </Text>
+      <Select
+        label="Clear after"
+        size={32}
+        options={options}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => {
+          const chosen = options.find((option) => option.value === event.currentTarget.value)
+          if (chosen !== undefined) onChange(chosen.value)
+        }}
+      />
+    </div>
+  )
+}
+
+interface FieldProps<V extends string> extends StatusSheetProps<V> {
+  readonly empty: boolean
+  readonly fieldRef: RefObject<HTMLInputElement | null>
+  readonly anchorRef: RefObject<HTMLSpanElement | null>
+  /** The presets' list while it shows, and its highlighted row. */
+  readonly listId?: string
+  readonly activeId?: string | undefined
+  readonly onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void
+}
+
 /** The emoji button, the text with its clear button, and Slack's refusal under them. */
-function StatusField({ emoji, text, maxLength, error, empty, onEmoji, onTextChange, onClearField }: StatusSheetProps & { readonly empty: boolean }) {
+function StatusField<V extends string>({ emoji, textEmoji, text, maxLength, error, empty, picker, fieldRef, anchorRef, listId, activeId, onEmoji, onTextChange, onClearField, onKeyDown }: FieldProps<V>) {
+  const shown = emoji ?? (text.trim() === '' ? undefined : textEmoji)
   return (
     <div {...stylex.props(styles.field)}>
       <TextField
+        ref={fieldRef}
         size={32}
         label="Status"
         placeholder="What’s your status?"
         value={text}
         maxLength={maxLength}
-        autoFocus
         autoComplete="off"
+        {...(listId === undefined ? {} : { 'aria-controls': listId, 'aria-activedescendant': activeId })}
         leading={
-          emoji === undefined ? (
-            <IconButton icon={SmileyPlus} label="Choose an emoji" size={24} variant="ghost" tone="muted" onClick={onEmoji} />
-          ) : (
-            <button type="button" aria-label={`Emoji: ${emoji.name}. Choose another`} data-status-emoji={emoji.name} onClick={onEmoji} {...stylex.props(styles.emojiButton, focusRing.outside)}>
-              <EmojiFace emoji={emoji} size={16} />
-            </button>
-          )
+          <span ref={anchorRef} {...stylex.props(styles.anchor)}>
+            {shown === undefined ? (
+              <IconButton icon={SmileyPlus} label="Choose an emoji" size={24} variant="ghost" tone="muted" expanded={picker !== undefined} onClick={onEmoji} />
+            ) : (
+              <button
+                type="button"
+                aria-label={`Emoji: ${shown.name}. Choose another`}
+                aria-expanded={picker !== undefined}
+                data-status-emoji={shown.name}
+                onClick={onEmoji}
+                {...stylex.props(styles.emojiButton, focusRing.outside)}
+              >
+                <EmojiFace emoji={shown} size={16} />
+              </button>
+            )}
+          </span>
         }
         trailing={empty ? undefined : <IconButton icon={X} label="Clear" size={24} variant="ghost" tone="muted" onClick={onClearField} />}
         invalid={error !== undefined}
         onChange={(event) => onTextChange(event.currentTarget.value)}
+        onKeyDown={onKeyDown}
       />
       {error === undefined ? null : (
         <Text variant="meta" tone="danger" as="span" role="alert">
@@ -119,37 +271,6 @@ function StatusField({ emoji, text, maxLength, error, empty, onEmoji, onTextChan
         </Text>
       )}
     </div>
-  )
-}
-
-/** Slack's presets: each fills the emoji, the text and Clear after. */
-function Presets({ presets, onPreset }: Pick<StatusSheetProps, 'presets' | 'onPreset'>) {
-  return (
-    <OptionList label="Presets">
-      {presets.map((preset) => (
-        <OptionRow
-          key={preset.text}
-          id={`status-preset-${preset.emoji.name}`}
-          size={30}
-          leading={<EmojiFace emoji={preset.emoji} size={16} />}
-          label={preset.text}
-          sub={preset.clearAfter}
-          subPlacement="inline"
-          onSelect={() => onPreset(preset)}
-        />
-      ))}
-    </OptionList>
-  )
-}
-
-/** A status emoji: the standard emoji's text, a custom one's image, or its name when the workspace no longer has it. */
-export function EmojiFace({ emoji, size }: { readonly emoji: StatusEmoji; readonly size: 14 | 16 | 20 }) {
-  if (emoji.unicode !== undefined) return <Emoji glyph={emoji.unicode} size={size} />
-  if (emoji.url !== undefined) return <Emoji url={emoji.url} size={size} />
-  return (
-    <Text variant="meta" tone="muted" as="span">
-      :{emoji.name}:
-    </Text>
   )
 }
 
@@ -171,6 +292,10 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-1-5'],
   },
+  anchor: {
+    display: 'inline-flex',
+    flexShrink: 0,
+  },
   emojiButton: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -187,6 +312,16 @@ const styles = stylex.create({
       ':active': { default: colors['--secondary-active'], '@media (hover: hover)': colors['--secondary-active'] },
     },
   },
+  // The rows' emoji and text sit under the field's emoji button and text: the field's border and inset, less the row's own.
+  presets: {
+    paddingInline: spacing['--space-1'],
+  },
+  presetEmoji: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: sizes['--icon-20'],
+  },
   clearAfter: {
     display: 'flex',
     alignItems: 'center',
@@ -202,32 +337,15 @@ const styles = stylex.create({
   spacer: {
     flex: 1,
   },
-  statusLine: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-1-5'],
-    minWidth: 0,
+  picker: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    zIndex: z['--z-picker'],
   },
-  statusText: {
-    overflowWrap: 'anywhere',
-  },
-  until: {
-    color: colors['--foreground-muted'],
-  },
-})
 
-/**
- * A person's status in their avatar's tooltip (SPEC 7, "People"): the
- * emoji and the text, then when it clears.
- */
-export function StatusLine({ emoji, text, until }: { readonly emoji?: StatusEmoji | undefined; readonly text: string; readonly until?: string | undefined }) {
-  return (
-    <span data-person-status="" {...stylex.props(styles.statusLine)}>
-      {emoji === undefined ? null : <EmojiFace emoji={emoji} size={14} />}
-      <span {...stylex.props(styles.statusText)}>
-        {text}
-        {until === undefined ? null : <span {...stylex.props(styles.until)}>{` · ${until}`}</span>}
-      </span>
-    </span>
-  )
-}
+
+
+
+
+})

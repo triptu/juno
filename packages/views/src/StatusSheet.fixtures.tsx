@@ -3,12 +3,12 @@ import { StatusSheet, type StatusSheetProps } from './StatusSheet'
 
 const noop = () => {}
 
-const presets: StatusSheetProps['presets'] = [
-  { emoji: { name: 'spiral_calendar_pad', unicode: '🗓️' }, text: 'In a meeting', clearAfter: '1 hour' },
-  { emoji: { name: 'bus', unicode: '🚌' }, text: 'Commuting', clearAfter: '30 minutes' },
-  { emoji: { name: 'face_with_thermometer', unicode: '🤒' }, text: 'Out sick', clearAfter: 'Today' },
-  { emoji: { name: 'palm_tree', unicode: '🌴' }, text: 'Vacationing', clearAfter: 'Don’t clear' },
-  { emoji: { name: 'house_with_garden', unicode: '🏡' }, text: 'Working remotely', clearAfter: 'Today' },
+const presets: StatusSheetProps<string>['presets'] = [
+  { emoji: { name: 'spiral_calendar_pad', unicode: '🗓️' }, text: 'In a meeting', clearAfter: '1h', clearAfterLabel: '1 hour' },
+  { emoji: { name: 'bus', unicode: '🚌' }, text: 'Commuting', clearAfter: '30m', clearAfterLabel: '30 minutes' },
+  { emoji: { name: 'face_with_thermometer', unicode: '🤒' }, text: 'Out sick', clearAfter: 'today', clearAfterLabel: 'Today' },
+  { emoji: { name: 'palm_tree', unicode: '🌴' }, text: 'Vacationing', clearAfter: 'never', clearAfterLabel: 'Don’t clear' },
+  { emoji: { name: 'house_with_garden', unicode: '🏡' }, text: 'Working remotely', clearAfter: 'today', clearAfterLabel: 'Today' },
 ]
 
 const choices = [
@@ -20,8 +20,8 @@ const choices = [
   { value: 'week', label: 'This week' },
 ]
 
-const sheet = (props: Partial<StatusSheetProps>) =>
-  fixture<StatusSheetProps>({
+const sheet = (props: Partial<StatusSheetProps<string>>) =>
+  fixture<StatusSheetProps<string>>({
     text: '',
     maxLength: 100,
     presets,
@@ -47,6 +47,10 @@ export default defineFixtures(
       typed: sheet({ emoji: { name: 'books', unicode: '📚' }, text: 'Reading the Q4 plan', clearAfter: '4h' }),
       // A custom emoji from the workspace, drawn as its image.
       'custom-emoji': sheet({ emoji: { name: 'juno_wave', url: '/emoji/juno_wave.svg' }, text: 'Back at 2', clearAfter: '1h' }),
+      // Text with no emoji: the button shows the 💬 Save sends.
+      'text-only': sheet({ textEmoji: { name: 'speech_balloon', unicode: '💬' }, text: 'Heads down on the release', clearAfter: 'today' }),
+      // A custom emoji the workspace no longer has: a plain square, not its name.
+      'missing-emoji': sheet({ emoji: { name: 'party_parrot_wave_long_name' }, text: 'Back at 2', clearAfter: '1h' }),
     },
     Edit: {
       // The status clears later: its own time is the first choice, and Clear status shows.

@@ -9,7 +9,7 @@ import type { ReactNode } from 'react'
 import type { StatusEmoji } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, SmileyPlus, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
-import { EmojiFace } from './StatusSheet'
+import { EmojiFace } from './StatusLine'
 
 export interface AccountMenuSection {
   readonly title: string
@@ -59,8 +59,8 @@ interface Item {
 const icon = (glyph: PhosphorIcon) => <Icon icon={glyph} size={15} />
 
 /**
- * What the avatar button opens (inventory 2.1): who is signed in, with
- * their status's emoji, and whether Slack shows them active; your status,
+ * What the avatar button opens (inventory 2.1): who is signed in and
+ * whether Slack shows them active; your status,
  * or Set a status, which opens the status sheet; Set yourself away or active, Hide or
  * Show message text (privacy mode), Notifications and Settings (both
  * open Settings, at Notifications and at General), then the blocks the
@@ -97,18 +97,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
             </span>
           )
         }
-        title={
-          status?.emoji === undefined ? (
-            name
-          ) : (
-            <span {...stylex.props(styles.title)}>
-              {name}
-              <span data-account-status-emoji="" {...stylex.props(styles.titleEmoji)}>
-                <EmojiFace emoji={status.emoji} size={14} />
-              </span>
-            </span>
-          )
-        }
+        title={name}
         sub={presence?.label ?? workspace}
       />
       {items.length > 0 ? (
@@ -148,16 +137,6 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     minWidth: 0,
-  },
-  title: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: spacing['--space-1'],
-    maxWidth: '100%',
-  },
-  titleEmoji: {
-    display: 'inline-flex',
-    flexShrink: 0,
   },
   avatar: {
     position: 'relative',
