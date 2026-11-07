@@ -263,7 +263,7 @@ Invariants:
 
 ### Engine phase
 
-Where: `phaseOf` in `packages/engine/src/layer.ts:83`. Three fibers share a `Ref<PhaseInputs>` and push the result into `Status.phase` (`layer.ts:93-106`).
+Where: `phaseOf` in `packages/engine/src/layer.ts:83`. One fiber reads the merged stream of session, sync phase and `slowedUntil` changes and pushes each result into `Status.phase` (`layer.ts:91-106`).
 
 | Session status | Sync phase | Rate-limit pause | Engine phase |
 |---|---|---|---|
@@ -275,7 +275,7 @@ Where: `phaseOf` in `packages/engine/src/layer.ts:83`. Three fibers share a `Ref
 
 `syncing` passes straight through from `SyncRunner.syncing`.
 
-Invariant: the published phase is `phaseOf` of the latest inputs. Each fiber runs `Ref.updateAndGet` and then `status.setPhase` as two steps (`layer.ts:99-100`), so a slower fiber can publish an older result (**bug** ENG-7).
+Invariant: the published phase is `phaseOf` of the latest inputs. One fiber applies each change and publishes before it takes the next, so no older result can land after a newer one (ENG-7, fixed).
 
 ### Sync boot loop and phase
 
@@ -1142,7 +1142,7 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 
 - Severity: low. Plausible: it needs a fiber yield between the two steps. Impact: A wrong offline or live display until the next input change. It breaks the engine phase invariant.
 - Fix direction: compute and set under one lock (`SubscriptionRef.modifyEffect` or a semaphore), or derive from `Stream.zipLatestAll`.
-- Status: Open
+- Status: Fixed in SHA_ENG7 by construction: the three input streams are merged and one fiber applies each change and publishes its phase in order. No test: the race needs a fiber yield between two synchronous steps of one fiber, which no test can force.
 
 ### Issue 3: Juno Agent approvals and runs can stall for good
 
