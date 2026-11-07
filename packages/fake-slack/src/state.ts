@@ -29,6 +29,14 @@ import { DraftStore } from './drafts.ts'
 
 export type ConversationKind = 'public' | 'private' | 'im' | 'mpim'
 
+/** One user's Do Not Disturb as `dnd.teamInfo` answers it: the next scheduled pause and a snooze, in Unix seconds. */
+export interface UserDnd {
+  readonly next_dnd_start_ts: number
+  readonly next_dnd_end_ts: number
+  readonly dnd_enabled?: boolean
+  readonly snooze_endtime?: number
+}
+
 export interface ConversationRecord {
   readonly id: string
   name: string
@@ -133,6 +141,10 @@ export class Workspace {
   manualPresence: 'active' | 'away' = 'active'
   /** Other users' presence as colleagues see it, set with `setPresence`. A user who is not here is away. */
   readonly presence = new Map<string, 'active' | 'away'>()
+  /** Other users' Do Not Disturb as `dnd.teamInfo` answers it, set with `setUserDnd`. A user who is not here has none. */
+  readonly dnd = new Map<string, UserDnd>()
+  /** Self's snooze end in Unix seconds, from `dnd.setSnooze`; undefined when not snoozed. */
+  snoozeEnd: number | undefined
   readonly clock: Clock
   readonly selfId: string
   readonly team: Team
@@ -185,6 +197,18 @@ export class Workspace {
 
   emit(frame: RtmFrame): void {
     for (const listener of this.#listeners) listener(frame)
+  }
+
+  /** Sets another user's Do Not Disturb (undefined clears it) and sends `dnd_updated_user`, as Slack does when they change it. */
+  setUserDnd(userId: string, dnd: UserDnd | undefined): void {
+    if (dnd === undefined) this.dnd.delete(userId)
+    else this.dnd.set(userId, dnd)
+    this.emit({ type: 'dnd_updated_user', user: userId, event_ts: this.eventTs() })
+  }
+
+  /** Self's snooze while it runs: its end in Unix seconds. */
+  activeSnooze(): number | undefined {
+    return this.snoozeEnd !== undefined && this.snoozeEnd > this.clock.now() / 1000 ? this.snoozeEnd : undefined
   }
 
   // Timestamps

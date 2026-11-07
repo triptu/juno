@@ -15,6 +15,7 @@ import { Message, MessageFields, StructuralSubtypes } from './message.ts'
 import { ThreadSubscription } from './threads.ts'
 import { Subteam, User } from './users.ts'
 import { DraftChangedEvent, DraftRemovedEvent } from './drafts.ts'
+import { DndUpdatedEvent } from './dnd.ts'
 
 const opt = S.optionalKey
 
@@ -340,7 +341,6 @@ export const DesktopNotificationEvent = S.Struct({
 export type DesktopNotificationEvent = typeof DesktopNotificationEvent.Type
 
 // The union, with the fallback.
-
 export const KnownFrames = [
   HelloFrame,
   PongFrame,
@@ -357,7 +357,7 @@ export const KnownFrames = [
   ThreadStateEvent,
   ReactionEvent,
   UserTypingEvent,
-  PresenceChangeEvent,
+  PresenceChangeEvent, DndUpdatedEvent,
   ChannelEvent,
   ImEvent,
   MemberEvent,
