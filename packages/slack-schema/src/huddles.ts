@@ -10,7 +10,7 @@
  * Slack's other `date_*` fields are; the spike recorded names, not values.
  */
 import { Schema as S } from 'effect'
-import { FormBoolean, FormJson, FormList, RawObject } from './common.ts'
+import { FormBoolean, FormList, RawObject } from './common.ts'
 
 const opt = S.optionalKey
 
@@ -128,20 +128,14 @@ export const ShRoomFrame = S.Struct({
 })
 export type ShRoomFrame = typeof ShRoomFrame.Type
 
-// users.profile.set, for the "In a huddle" status only
+// users.profile.set: the "In a huddle" status
 
 /**
  * The one profile field the official client writes while a huddle runs
  * (`increment-huddle-state-expiration-ts`): epoch seconds, fractional, now
  * plus 300. `huddle_state` and `huddle_state_channel_id` are never written
- * by the client. Juno sends no other profile field.
+ * by the client. The user's own status is the other profile Juno writes
+ * (`StatusProfile` in `users.ts`).
  */
 export const HuddleStatusProfile = S.Struct({ huddle_state_expiration_ts: S.Number })
 export type HuddleStatusProfile = typeof HuddleStatusProfile.Type
-
-/** `profile` is one JSON-encoded form field, as the official client's `JSON.stringify(profile)`. */
-export const UsersProfileSetArgs = S.Struct({ profile: FormJson(HuddleStatusProfile) })
-export type UsersProfileSetArgs = typeof UsersProfileSetArgs.Type
-
-/** The answer's profile is never read. */
-export const UsersProfileSetFields = {} as const

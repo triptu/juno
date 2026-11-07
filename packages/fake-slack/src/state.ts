@@ -198,6 +198,25 @@ export class Workspace {
     for (const listener of this.#listeners) listener(frame)
   }
 
+  /**
+   * Sets a user's status (`users.profile.set` for self, `setStatus` for
+   * anyone) and sends `user_change` with the whole user, as Slack does for a
+   * profile change, unless `announce` is false. Empty text and emoji with
+   * expiry 0 clear it.
+   */
+  setStatus(userId: string, status: { readonly text: string; readonly emoji: string; readonly expiration: number }, announce = true): User | undefined {
+    const user = this.users.get(userId)
+    if (user === undefined) return undefined
+    const changed: User = {
+      ...user,
+      updated: Math.floor(this.clock.now() / 1000),
+      profile: { ...user.profile, status_text: status.text, status_emoji: status.emoji, status_expiration: status.expiration },
+    }
+    this.users.set(userId, changed)
+    if (announce) this.emit({ type: 'user_change', user: changed, event_ts: this.eventTs() })
+    return changed
+  }
+
   // Timestamps
 
   /** A ts for `at` (default now), always greater than the last one issued. */

@@ -1,0 +1,1 @@
+- 11-07 22:06 · profile-status · The sheet shows Slack's five default presets, not a workspace's customised ones · Tushar named the five; customised presets are in `team.prefs.custom_status_presets`, whose shape is redacted in the recorded boot, so they are a backlog item.

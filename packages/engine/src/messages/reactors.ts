@@ -13,6 +13,7 @@ import { Effect } from 'effect'
 import type { Person, WhoReacted } from '@juno/contract'
 import { emojiUnicode, splitEmojiName } from '@juno/richtext'
 import { StoreReader, type SqlError } from '@juno/store'
+import { reactionEmoji, readEmoji } from '../emojiLookup'
 import { personFrom } from '../topicRows'
 import {
   intentOf,
@@ -20,8 +21,6 @@ import {
   messageUsersStatement,
   orderedReactors,
   reach,
-  reactionEmoji,
-  readEmoji,
   unreachable,
   withReactionIntents,
   type ActionRow,

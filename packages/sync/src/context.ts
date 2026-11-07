@@ -63,6 +63,15 @@ export interface SyncContext {
   readonly fetchesInFlight: Set<{ readonly at: number }>
   /** User ids an edge `users/info` call is out for, with its lane and the moment its answer is stored: a page that names them waits for it instead of asking again. */
   readonly usersInFlight: Map<string, { readonly lane: 'interactive' | 'background'; readonly stored: Deferred.Deferred<void> }>
+  /** The hover refresh of user objects (`refreshUsers`, `refreshStaleUsers`). */
+  readonly userRefresh: {
+    /** When Slack last sent each user's object in this session (Juno's clock), or when a refresh was asked for; asked again after `USER_FRESH_MILLIS`. */
+    readonly readAt: Map<string, number>
+    /** Users a hover found stale, for one call. */
+    readonly queued: Set<string>
+    /** Wakes `refreshStaleUsers`. Sliding, capacity 1. */
+    readonly wanted: Queue.Queue<void>
+  }
   /**
    * The socket connection, for live tails (`threadRanges.ts`). `epoch` grows
    * at every drop, so a page requested before a drop never writes a live

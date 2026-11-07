@@ -6,15 +6,24 @@ import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import type { ReactNode } from 'react'
-import { spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
+import type { StatusEmoji } from '@juno/contract'
+import { sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, SmileyPlus, Text, useMenuActive, type HueName, type PhosphorIcon } from '@juno/ui'
+import { EmojiFace } from './StatusLine'
 
 export interface AccountMenuSection {
   readonly title: string
   readonly content: ReactNode
 }
 
-export type AccountMenuAction = 'presence' | 'privacy' | 'notifications' | 'settings'
+export type AccountMenuAction = 'status' | 'presence' | 'privacy' | 'notifications' | 'settings'
+
+/** Your status as the menu shows it: the emoji and text, and "until 5pm" when it clears. */
+export interface AccountStatus {
+  readonly emoji?: StatusEmoji | undefined
+  readonly text: string
+  readonly until?: string | undefined
+}
 
 export interface AccountMenuProps {
   readonly name: string
@@ -31,6 +40,8 @@ export interface AccountMenuProps {
   readonly presence?: { readonly active: boolean; readonly seen: boolean; readonly label: string }
   /** "Paused until 9am" outside notification hours, beside Notifications. */
   readonly paused?: string
+  /** Your status; none offers Set a status. */
+  readonly status?: AccountStatus | undefined
   /** Privacy mode is on: the item offers Show message text instead of Hide (SPEC section 5). */
   readonly privacy?: boolean
   readonly onAction?: (action: AccountMenuAction) => void
@@ -40,27 +51,33 @@ export interface AccountMenuProps {
 
 interface Item {
   readonly id: AccountMenuAction
-  readonly icon: PhosphorIcon
+  readonly leading: ReactNode
   readonly label: string
   readonly hint?: string
 }
 
+const icon = (glyph: PhosphorIcon) => <Icon icon={glyph} size={15} />
+
 /**
  * What the avatar button opens (inventory 2.1): who is signed in and
- * whether Slack shows them active, Set yourself away or active, Hide or
+ * whether Slack shows them active; your status,
+ * or Set a status, which opens the status sheet; Set yourself away or active, Hide or
  * Show message text (privacy mode), Notifications and Settings (both
  * open Settings, at Notifications and at General), then the blocks the
  * owner passes.
  */
-export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, privacy = false, onAction, sections }: AccountMenuProps) {
+export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presence, paused, status, privacy = false, onAction, sections }: AccountMenuProps) {
   const items: ReadonlyArray<Item> =
     onAction === undefined
       ? []
       : [
-          presence?.active === false ? { id: 'presence', icon: Sun, label: 'Set yourself active' } : { id: 'presence', icon: Moon, label: 'Set yourself away' },
-          privacy ? { id: 'privacy', icon: Eye, label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', icon: EyeSlash, label: 'Hide message text', hint: '⌃⌘H' },
-          { id: 'notifications', icon: Bell, label: 'Notifications', ...(paused === undefined ? {} : { hint: paused }) },
-          { id: 'settings', icon: Gear, label: 'Settings', hint: '⌘,' },
+          status === undefined
+            ? { id: 'status', leading: icon(SmileyPlus), label: 'Set a status' }
+            : { id: 'status', leading: status.emoji === undefined ? icon(SmileyPlus) : <span {...stylex.props(styles.statusFace)}><EmojiFace emoji={status.emoji} size={14} /></span>, label: status.text === '' ? 'Edit your status' : status.text, ...(status.until === undefined ? {} : { hint: status.until }) },
+          presence?.active === false ? { id: 'presence', leading: icon(Sun), label: 'Set yourself active' } : { id: 'presence', leading: icon(Moon), label: 'Set yourself away' },
+          privacy ? { id: 'privacy', leading: icon(Eye), label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', leading: icon(EyeSlash), label: 'Hide message text', hint: '⌃⌘H' },
+          { id: 'notifications', leading: icon(Bell), label: 'Notifications', ...(paused === undefined ? {} : { hint: paused }) },
+          { id: 'settings', leading: icon(Gear), label: 'Settings', hint: '⌘,' },
         ]
   const menu = useMenuActive(
     items.map((item) => `account-${item.id}`),
@@ -91,7 +108,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
               <OptionRow
                 key={item.id}
                 {...menu.row(`account-${item.id}`)}
-                leading={<Icon icon={item.icon} size={15} />}
+                leading={item.leading}
                 label={item.label}
                 {...(item.hint === undefined ? {} : { sub: item.hint })}
                 onSelect={() => onAction?.(item.id)}
@@ -116,6 +133,16 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
 }
 
 const styles = stylex.create({
+  // The status emoji in the icons' column: a 14px emoji centred in the 15px box the row icons use, so it reads as
+  // the same size as a line icon and lines up with them.
+  statusFace: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: sizes['--icon-15'],
+    height: sizes['--icon-15'],
+  },
   root: {
     display: 'flex',
     flexDirection: 'column',

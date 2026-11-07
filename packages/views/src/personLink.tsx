@@ -40,6 +40,8 @@ export function PersonLink({ id, label, part, tabIndex = -1, children }: PersonL
       // The name is the button for assistive tech and the keyboard; the avatar is the same target for the pointer only.
       {...(part === 'avatar' ? {} : { role: 'button', tabIndex })}
       data-tooltip={label && `Message ${label}`}
+      // The avatar's tooltip adds the person's status under the name (SPEC 7, "People").
+      {...(part === 'avatar' ? { 'data-tooltip-person': id } : {})}
       data-opens-person=""
       onClick={(event) => event.detail === 1 && !press.dragged && open(id, event.metaKey)}
       onKeyDown={(event) => {

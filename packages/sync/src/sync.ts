@@ -37,7 +37,7 @@ import { makeReconcile } from './run/reconcile'
 import { watchWindow } from './run/window'
 import { makeSyncRuntime } from './run/runtime'
 import { handleSocketEvent } from './run/socket'
-import { nameUsers } from './users'
+import { nameUsers, refreshStaleUsers } from './users'
 import { clearPendingFollows, endEventCoverage } from './write'
 import { reindexTopics } from './reindex'
 import { reindexOptions } from './context'
@@ -134,6 +134,8 @@ export interface TopicFetcher {
   readonly acted: (acted: Acted, alongside: Effect.Effect<unknown, SqlError, StoreWriter | Invalidation>) => Effect.Effect<void, SqlError>
   /** Asks `nameUsers` for users the store lacks, as a page that names them would (`wantUsers`). Returns at once; the names land in `users`. */
   readonly wantUsers: (ids: ReadonlyArray<string>) => Effect.Effect<void>
+  /** Asks Slack again for stored users whose object is more than a few minutes old, for their status (`refreshUsers`). Returns at once. */
+  readonly refreshUsers: (ids: ReadonlyArray<string>) => Effect.Effect<void>
   /** Fetches everyone who reacted to a stored message and stores them (`whoReacted.ts`). Concurrent callers share the read. An undefined snapshot means a concurrent write superseded it; the dialog retries. Not retried on the background lane. */
   readonly reactors: (channel: string, ts: string) => Effect.Effect<string | undefined, OpenError>
 }
@@ -162,6 +164,6 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
 
     // Stored index rows from an older Juno take the current meaning from local messages, alongside the boot.
     const upgrade = upgradeIndex(ctx).pipe(Effect.catchCause((cause) => Effect.logError('sync: index upgrade failed', { cause })))
-    yield* Effect.all([consumer, bootLoop, upgrade, watchWindow(runtime), fetchRoots(ctx), lookUpReads(ctx), lookUpConversations(ctx), refreshFiles(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    yield* Effect.all([consumer, bootLoop, upgrade, watchWindow(runtime), fetchRoots(ctx), lookUpReads(ctx), lookUpConversations(ctx), refreshFiles(ctx), nameUsers(ctx), refreshStaleUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

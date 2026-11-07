@@ -1,0 +1,1 @@
+- 11-07 22:52 · profile-status · `SheetLayer` takes `anchor="top"`, which holds the sheet's top 120 from the window's top, and the status sheet uses it · Centred, the status sheet jumped about 80px each time its presets hid or came back; other sheets keep their height and stay centred.

@@ -10,6 +10,7 @@ import { LeaveConfirmHost } from './LeaveConfirm'
 import { MessageMenuHost } from './messageMenu'
 import { Palette } from './Palette'
 import { readingOnly } from './readingOnly'
+import { Status } from './Status'
 import { Toasts } from './Toasts'
 
 /**
@@ -38,6 +39,7 @@ export function Frame({ sidebar, peek, children }: { readonly sidebar: ReactNode
             <MessageMenuHost />
             <Forward />
             <Channel />
+            <Status />
             <HuddleSharePicker />
             <LeaveConfirmHost />
           </>

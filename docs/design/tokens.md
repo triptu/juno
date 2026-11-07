@@ -500,6 +500,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--filter-pill-max-width` | 120px: a sidebar view's name pill; longer names end with an ellipsis (inventory 2.3) |
 | `--view-sheet-list-max-height` | 200px: the view sheet's conversation list, which scrolls past it; also the channel sheet's member and people lists |
 | `--channel-sheet-width` | 380px: the channel sheet (inventory 2.3a), at most this wide |
+| `--status-sheet-width` | 400px: the status sheet (inventory 2.1b), at most this wide |
 | `--toast-max-width` | 352px |
 | `--peek-width` | 640px peek popover (about 75 characters of compact message text), 8px right of the sidebar or at a Main message; as tall as its messages, up to the room in the window; never wider than the window has room for |
 | `--peek-header-height` | 44px peek header: art, title and where on one line |

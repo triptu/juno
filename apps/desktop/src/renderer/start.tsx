@@ -17,6 +17,7 @@ import { createRoot } from 'react-dom/client'
 import { TooltipLayer } from '@juno/views'
 import { App } from './App'
 import { clearCaretsLeftBehind } from './containers/caret'
+import { prepareTooltip, tooltipDetail } from './containers/PersonStatus'
 import { preloadHuddleHeader } from './containers/huddle/slots'
 import { setReadingOnly } from './containers/readingOnly'
 
@@ -65,7 +66,7 @@ export function startRenderer(options: RendererOptions = {}): void {
       <StrictMode>
         <RegistryContext.Provider value={registry}>
           <App />
-          <TooltipLayer />
+          <TooltipLayer detail={tooltipDetail} prepare={prepareTooltip} />
         </RegistryContext.Provider>
       </StrictMode>,
     )

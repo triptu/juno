@@ -1,0 +1,1 @@
+- 11-07 22:01 · profile-status · The tooltip layer takes an optional `detail(target)`, and the app fills it from `data-tooltip-person` with that person's live status · Messages stay as they are: no status in the message rows, so a status change re-renders only an open tooltip, and nothing is fetched until a hover.

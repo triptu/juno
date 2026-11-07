@@ -1,4 +1,4 @@
-export { AccountMenu, type AccountMenuAction } from './AccountMenu'
+export { AccountMenu, type AccountMenuAction, type AccountStatus } from './AccountMenu'
 export { AppearanceSettings } from './AppearanceSettings'
 export { AppInfoView } from './AppInfoView'
 export { CodeHighlighterContext, type CodeHighlighter } from './CodeHighlight'
@@ -121,6 +121,8 @@ export { type ReviewStatus } from './reviewModel'
 
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export { ChannelSheet } from './ChannelSheet'
+export { StatusLine } from './StatusLine'
+export { StatusSheet, type StatusSheetPreset } from './StatusSheet'
 export type { ViewIconName } from '@juno/ui'
 
 export { UpdateSettings, type UpdateStatus, type WhatsNew } from './UpdateSettings'

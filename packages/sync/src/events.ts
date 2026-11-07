@@ -195,6 +195,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         if (frame.user !== ctx.me.userId) return
         return yield* transaction(patchMetadata(ctx.metadata, frame.channel, { is_member: frame.type === 'member_joined_channel' ? 1 : 0 }))
       case 'user_change':
+        ctx.userRefresh.readAt.set(frame.user.id, yield* Clock.currentTimeMillis)
         return yield* transaction(upsertUsers([frame.user]))
       case 'subteam_created':
       case 'subteam_updated':

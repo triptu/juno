@@ -4,7 +4,8 @@
  * Source: docs/research/slack-data-access.md sections 1 (edge transport) and 3.
  */
 import { Schema as S } from 'effect'
-import { ErrorResponse, FormBoolean } from './common.ts'
+import { ErrorResponse, FormBoolean, FormJson } from './common.ts'
+import { HuddleStatusProfile } from './huddles.ts'
 
 const opt = S.optionalKey
 
@@ -105,6 +106,21 @@ export const Subteam = S.Struct({
   prefs: opt(S.Unknown),
 })
 export type Subteam = typeof Subteam.Type
+
+// users.profile.set: the user's own status, as the official client's
+// status dialog writes it (research section 3, "Profile status"). Clearing
+// writes all three empty, with the expiry 0. `status_emoji` is ":name:",
+// `status_expiration` epoch seconds, 0 for never.
+
+export const StatusProfile = S.Struct({ status_text: S.String, status_emoji: S.String, status_expiration: S.Number })
+export type StatusProfile = typeof StatusProfile.Type
+
+/** `profile` is one JSON-encoded form field, as the official client's `JSON.stringify(profile)`: the status, or the huddle's expiry (`huddles.ts`). */
+export const UsersProfileSetArgs = S.Struct({ profile: FormJson(S.Union([StatusProfile, HuddleStatusProfile])) })
+export type UsersProfileSetArgs = typeof UsersProfileSetArgs.Type
+
+/** The answer's profile is never read: the `user_change` Slack sends after it brings the stored copy. */
+export const UsersProfileSetFields = {} as const
 
 // usergroups.list: every group in the workspace. `include_disabled` adds
 // deleted groups (`date_delete` > 0); the live answer has no paging and no

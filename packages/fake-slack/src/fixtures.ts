@@ -25,6 +25,8 @@ export interface SeedUser {
   readonly color: string
   readonly tz: string
   readonly bot?: boolean
+  /** A Slack status the user has set, as ":name:" and text, with no expiry. */
+  readonly status?: { readonly emoji: string; readonly text: string }
 }
 
 export const SELF_ID = 'U0TUSHAR'
@@ -487,8 +489,8 @@ export function userObject(seed: SeedUser, avatarBase: string): User {
       image_72: `${image}?size=72`,
       image_192: `${image}?size=192`,
       image_512: image,
-      status_text: '',
-      status_emoji: '',
+      status_text: seed.status?.text ?? '',
+      status_emoji: seed.status?.emoji ?? '',
       ...(seed.bot === true ? { bot_id: `B${seed.id.slice(1)}`, always_active: true } : {}),
     },
   }

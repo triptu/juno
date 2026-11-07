@@ -10,7 +10,8 @@ import { tsToMillis, type Me, type Ts, type UserId } from '@juno/domain'
 import { emojiUnicode, messageBody, splitEmojiName, type MessageContent } from '@juno/richtext'
 import { StoreReader, syncState } from '@juno/store'
 import { Effect } from 'effect'
-import { bodyLookups, makeMessageCache, reach, reactionEmoji, readUsers, readWanted, storedFiles, unreachable, wantedNothing, wantsAny, type MessageCache, type StoredReaction } from './messages/query'
+import { reactionEmoji } from './emojiLookup'
+import { bodyLookups, makeMessageCache, reach, readUsers, readWanted, storedFiles, unreachable, wantedNothing, wantsAny, type MessageCache, type StoredReaction } from './messages/query'
 import { personFrom } from './topicRows'
 
 /** What a card is made from: a stored message's columns. */

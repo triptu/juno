@@ -35,6 +35,7 @@ import { HomeJob } from './home/job'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
 import { PresenceHandlers } from './presence/handlers'
+import { ProfileStatusHandlers } from './profileStatus/handlers'
 import { OthersPresence } from './presence/service'
 import { MessagesHandlers } from './messages/handlers'
 import { WhoReactedHandlers } from './messages/reactorsHandlers'
@@ -141,6 +142,7 @@ export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHa
   Layer.merge(WhoReactedHandlers),
   Layer.merge(ChannelsHandlers),
   Layer.merge(MembershipHandlers),
+  Layer.merge(ProfileStatusHandlers),
 )
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
