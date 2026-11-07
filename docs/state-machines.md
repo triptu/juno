@@ -1319,7 +1319,7 @@ The same race applies to a device re-apply in flight when the call ends (`listDe
 - Severity: medium; low likelihood. Confirmed by reading. Impact: Huddles unusable until reload. It breaks call lifecycle invariant 5.
 - Test: DOM lane, with fake Slack returning a `rooms.join` whose Chime payload the fake media session rejects. The fake needs the same constructor check.
 - Fix direction: end with the credentials' attendee id, or make `join` reject.
-- Status: Fixed in 2d83d7c17. `join` rejects on a join answer Chime cannot use, and the page's `.catch` lets go of the attendee and reports it ended `failed`; the fake session rejects the same answers. Test: `apps/desktop/dom/huddle.test.ts`, "a join answer whose meeting Chime cannot use ends the call, and the next Start joins".
+- Status: Fixed in 2d83d7c17. `join` rejects on a join answer Chime cannot use, and the page's `.catch` lets go of the attendee and reports it ended `joinFailed`, so the toast says "Couldn't join the huddle" with Try again (SPEC 20), not "Lost the connection"; the fake session rejects the same answers. Test: `apps/desktop/dom/huddle.test.ts`, "a join answer whose meeting Chime cannot use ends the call, and the next Start joins".
 
 ### Issue 5: Renderer applies stale results and loses tabs
 

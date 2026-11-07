@@ -257,7 +257,7 @@ domTest('a join answer whose meeting Chime cannot use ends the call, and the nex
   fake.control('breakJoinMeeting', { times: 1 })
   await startHuddleFromMenu(juno)
   // The page lets go of the attendee it was handed, so the call ends instead of joining forever.
-  await juno.expectToast('Lost the connection to the huddle')
+  await juno.expectToast("Couldn't join the huddle")
   await expect(bar).toBeHidden()
   await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.join').length).toBe(1)
 

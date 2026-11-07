@@ -221,7 +221,8 @@ function reconcile(call: HuddleCall | undefined): void {
       .catch(() => {
         if (hold.holding === attendeeId) {
           hold = { ...hold, holding: null }
-          ended = { attendeeId, reason: 'failed' }
+          // Chime could not use the join answer: the user never got into the call (SPEC 20, Join failed).
+          ended = { attendeeId, reason: 'joinFailed' }
           void report()
         }
       })

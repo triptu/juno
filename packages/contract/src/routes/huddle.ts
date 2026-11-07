@@ -48,13 +48,13 @@ export const HuddleWait = Schema.Literals(['store', 'lastCall', 'page'])
 export type HuddleWait = typeof HuddleWait.Type
 
 /** Why the media session stopped, as the renderer reports it. `left`: the engine asked it to. */
-export const HuddleMediaEnd = Schema.Literals(['left', 'anotherDevice', 'connectionLost', 'failed', 'ended'])
+export const HuddleMediaEnd = Schema.Literals(['left', 'anotherDevice', 'connectionLost', 'failed', 'ended', 'joinFailed'])
 export type HuddleMediaEnd = typeof HuddleMediaEnd.Type
 
 /** How the last call ended. `joinFailed` carries Slack's error code; `alone`: Juno left after 10 minutes with nobody else in it. */
 export const HuddleEnd = Schema.Struct({
   channelId: Schema.String,
-  reason: Schema.Union([HuddleMediaEnd, Schema.Literals(['joinFailed', 'alone'])]),
+  reason: Schema.Union([HuddleMediaEnd, Schema.Literals(['alone'])]),
   code: Schema.optionalKey(Schema.String),
 })
 export type HuddleEnd = typeof HuddleEnd.Type
