@@ -71,6 +71,36 @@ export function PersonChip({ inline, hue, tabIndex }: { readonly inline: Extract
   )
 }
 
+/**
+ * A #channel chip. With `onChannel`, a button that opens the channel's Main
+ * (⌘: behind the current tab), on one click and not at the end of a drag,
+ * as a person does; without it, the chip alone.
+ */
+export function ChannelChip({ inline, onChannel, tabIndex }: { readonly inline: Extract<BodyInline, { kind: 'channel' }>; readonly onChannel: ((id: string, behind: boolean) => void) | undefined; readonly tabIndex: 0 | -1 }) {
+  const chip = (
+    <Chip variant="filled" size="inline">
+      <bdi>#{inline.name}</bdi>
+    </Chip>
+  )
+  if (onChannel === undefined) return chip
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation()
+        if (event.detail <= 1 && !press.dragged) onChannel(inline.id, event.metaKey)
+      }}
+      title={`Open #${inline.name}`}
+      tabIndex={tabIndex}
+      data-channel={inline.id}
+      data-channel-name={inline.name}
+      {...stylex.props(styles.channelButton, focusRing.outside)}
+    >
+      {chip}
+    </button>
+  )
+}
+
 const HOVER = '@media (hover: hover)'
 
 const styles = stylex.create({
@@ -95,6 +125,18 @@ const styles = stylex.create({
     outlineColor: colors['--border-strongest'],
   },
   chip: {
+    borderRadius: radii['--radius-tag'],
+  },
+  channelButton: {
+    appearance: 'none',
+    display: 'inline',
+    margin: 0,
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    color: 'inherit',
+    font: 'inherit',
+    cursor: 'default',
     borderRadius: radii['--radius-tag'],
   },
 })
