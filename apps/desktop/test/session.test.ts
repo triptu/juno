@@ -7,7 +7,7 @@
 import { chmod, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, it } from 'bun:test'
+import { expect, it, vi } from 'bun:test'
 import type { MainToEngine } from '@juno/contract'
 import { eventually } from '@juno/testing/eventually'
 import { plainCipher, SecretsStore } from '../src/main/secrets'
@@ -46,7 +46,7 @@ it('serves no stored session after a sign-out whose unlink the folder refused, a
   const userData = await mkdtemp(join(tmpdir(), 'juno-session-'))
   const secrets = new SecretsStore(userData, plainCipher)
   await secrets.write(session)
-  // A userData folder the user cannot write (restored with the wrong owner): unlink fails, the file itself is still ours.
+  // A userData folder restored read-only: the unlink fails, the file itself is still writable.
   await chmod(userData, 0o500)
   try {
     const sent: MainToEngine[] = []
@@ -59,6 +59,23 @@ it('serves no stored session after a sign-out whose unlink the folder refused, a
     expect(sent.at(-1)).toEqual({ _tag: 'secrets', id: 'next-engine', secrets: null })
     expect(logged.filter((line) => line.level === 'ERROR')).toEqual([])
   } finally {
+    await chmod(userData, 0o700)
+    await rm(userData, { recursive: true, force: true })
+  }
+})
+
+it('a secrets.bin emptied by such a sign-out reads as no session at the next launch, with nothing to warn about', async () => {
+  const userData = await mkdtemp(join(tmpdir(), 'juno-session-'))
+  const secrets = new SecretsStore(userData, plainCipher)
+  await secrets.write(session)
+  await chmod(userData, 0o500)
+  const warned = vi.spyOn(console, 'warn')
+  try {
+    await secrets.delete()
+    expect(await secrets.read()).toBeNull()
+    expect(warned).not.toHaveBeenCalled()
+  } finally {
+    warned.mockRestore()
     await chmod(userData, 0o700)
     await rm(userData, { recursive: true, force: true })
   }

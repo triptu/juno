@@ -43,6 +43,8 @@ export class SecretsStore {
     } catch {
       return null
     }
+    // Emptied by a sign-out whose unlink the folder refused (`delete`): no session.
+    if (bytes.length === 0) return null
     try {
       const json = this.#cipher.decrypt(bytes)
       return decode(JSON.parse(json))
@@ -79,9 +81,11 @@ export class SecretsStore {
   }
 
   /**
-   * Removes the stored session. When the folder refuses the unlink (it is
-   * not writable, after a restore with the wrong owner), the file is emptied
-   * in place instead, so the next launch finds no session either way.
+   * Removes the stored session. When the folder refuses the unlink (a
+   * userData folder that is not writable) but the file still is, the file is
+   * emptied in place instead, so the next launch finds no session either way.
+   * A file that cannot be opened for writing either throws, and the caller
+   * logs it.
    */
   async delete(): Promise<void> {
     try {
