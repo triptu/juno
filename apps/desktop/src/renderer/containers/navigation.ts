@@ -41,6 +41,7 @@ import {
   closeTab,
   moveTab,
   closeTabsToRight,
+  connectionStateAtom,
   copyText,
   currentPlace,
   cycleTab,
@@ -218,7 +219,10 @@ function landFresh(before: Tabs, next: Tabs, topicId: string, snapshot: ScrollSn
  * would paint an empty pane and an empty tab title. A fresh open also
  * picks the window (`openWindow`); a topic coming back keeps the one it had.
  * A fresh open at `target`, a message older than that window, then takes
- * the window around the message instead.
+ * the window around the message instead. While the engine is unreachable
+ * (reconnecting, or failed until Restart) nothing can arrive, so after
+ * `READY_WAIT_MS` it resolves without the header: the queue behind it must
+ * not wait on the engine (REN-4).
  */
 function whenReady(view: string, fresh: boolean, target?: string): Promise<void> {
   const id = topicOfView(view)
@@ -247,7 +251,10 @@ function whenReady(view: string, fresh: boolean, target?: string): Promise<void>
       if (done) return
       const result = registry.get(topicAtom(id))
       if (result._tag === 'Failure') return finish()
-      if (result._tag !== 'Success') return
+      if (result._tag !== 'Success') {
+        if (waited && engineUnreachable()) finish()
+        return
+      }
       const detail = result.value
       if (detail === null) return finish()
       if (!specSet) {
@@ -267,8 +274,15 @@ function whenReady(view: string, fresh: boolean, target?: string): Promise<void>
       if (waited || (list.ready && (!anchored || list.spec.anchor === target))) finish()
     }
     releases.push(registry.subscribe(topicAtom(id), check, { immediate: false }))
+    releases.push(registry.subscribe(connectionStateAtom, check, { immediate: false }))
     check()
   })
+}
+
+/** Whether the engine is away (not the first connection on its way at launch): a query asked now gets no answer until it is back. */
+function engineUnreachable(): boolean {
+  const state = registry.get(connectionStateAtom)
+  return state === 'reconnecting' || state === 'failed'
 }
 
 /** Changes apply in the order they were asked for, and none before the saved tabs are known: one applied to no tabs would replace them (`whenTabsKnown`). */
