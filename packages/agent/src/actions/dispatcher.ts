@@ -227,19 +227,25 @@ export function createDispatcher(options: DispatcherOptions) {
     }
   }
 
-  /** Starts a chain for every card with approved children and none running. */
+  /** Starts a chain for every card with approved children and none running. A store error goes to `onReport`, never to the kick's caller. */
   const startChains = () => {
-    for (const { cardId } of pending()) {
-      if (chains.has(cardId)) continue
-      const chain = runCard(cardId)
-        .catch((error: unknown) => options.onReport?.(error))
-        .finally(() => {
-          chains.delete(cardId)
-          if (chains.size > 0) return
-          running = undefined
-          ended?.()
-        })
-      chains.set(cardId, chain)
+    try {
+      for (const { cardId } of pending()) {
+        if (chains.has(cardId)) continue
+        const chain = runCard(cardId)
+          .catch((error: unknown) => options.onReport?.(error))
+          .finally(() => {
+            chains.delete(cardId)
+            // A kick between the chain's last look and here marked the card but found it still running: look again now.
+            if (!closed && dirty.has(cardId)) startChains()
+            if (chains.size > 0) return
+            running = undefined
+            ended?.()
+          })
+        chains.set(cardId, chain)
+      }
+    } catch (error) {
+      options.onReport?.(error)
     }
     if (chains.size > 0 && running === undefined) running = new Promise<void>((resolve) => (ended = resolve))
   }
