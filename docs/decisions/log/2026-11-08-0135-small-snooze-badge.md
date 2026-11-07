@@ -1,0 +1,1 @@
+- 11-08 01:35 · pause-notify · The snooze badge is 12px with a lighter "z" on the small avatars (24px title bar, 32px account menu) and stays 14px on the 44px rows and the DM header's inline mark · The fixed 14px badge covered over half of the title bar's 24px avatar and hid its initials; a badge about 40% of the photo keeps them readable, and the row sizes already looked right.
