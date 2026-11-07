@@ -8,10 +8,11 @@
  *                                                      └▶ no answer: unknown
  *   startup: open authorizations ─▶ unknown ─reconcile─▶ done | unknown (kept)
  *
- * The drain runs each card's approved children in click order, one at a
- * time, so a batch reaches its destination in the card's order; cards run
- * beside each other, so a click that waits (a connection not ready, a
- * sign-in in progress) holds no other card. Before each child it checks the
+ * A kick runs each card's approved children in click order, one at a time,
+ * so a batch reaches its destination in the card's order; cards run beside
+ * each other, so a click that waits (a connection not ready, a sign-in in
+ * progress) holds no other card, and a kick that lands while a card's chain
+ * runs makes that chain look once more before it waits. Before each child it checks the
  * policy (`authorizeDecision`) on facts read in the same synchronous step as
  * `authorize` commits, so nothing can change in between. A refusal for a
  * reason that can pass (paused, off, not the owner) leaves the approval
@@ -67,13 +68,13 @@ export function createDispatcher(options: DispatcherOptions) {
   const { store } = options
   const executor = (tool: string) => options.executors().find((e) => e.tool === tool)
   let closed = false
+  /** Resolves when every card's chain ended. */
   let running: Promise<void> | undefined
-  /** A kick arrived: read the approvals again. */
-  let again = false
-  /** Wakes the drain when a card's chain ends or a kick arrives. */
-  let wake: (() => void) | undefined
+  let ended: (() => void) | undefined
   /** The chain running each card's children now. */
   const chains = new Map<string, Promise<void>>()
+  /** Cards a kick reached while their chain ran: the chain looks once more before it waits. */
+  const dirty = new Set<string>()
 
   const pending = (): ReadonlyArray<Pending> =>
     (store.db
@@ -201,67 +202,54 @@ export function createDispatcher(options: DispatcherOptions) {
     return 'done'
   }
 
-  /** One card's approved children in click order; the rest of the card waits with the first child that must. */
-  const runCard = async (items: ReadonlyArray<Pending>) => {
-    for (const item of items) {
-      let result: Awaited<ReturnType<typeof dispatch>>
-      do {
-        if (closed) return
-        result = await dispatch(item)
-      } while (result === 'rotated')
-      if (result !== 'done') return
+  /**
+   * One card's approved children in click order, read again after each; the
+   * card waits with the first child that must. A kick that landed while the
+   * chain ran (a connection became ready as its check was in flight) makes
+   * it read once more, so the change the kick announced is not lost, and a
+   * card that waits for good is not looked at again until the next kick.
+   */
+  const runCard = async (cardId: string) => {
+    for (;;) {
+      if (closed) return
+      dirty.delete(cardId)
+      const items = pending().filter((item) => item.cardId === cardId)
+      if (items.length === 0) return
+      let result: Awaited<ReturnType<typeof dispatch>> = 'done'
+      for (const item of items) {
+        do {
+          if (closed) return
+          result = await dispatch(item)
+        } while (result === 'rotated')
+        if (result === 'wait') break
+      }
+      if (result === 'wait' && !dirty.has(cardId)) return
     }
   }
 
   /** Starts a chain for every card with approved children and none running. */
   const startChains = () => {
-    const byCard = new Map<string, Pending[]>()
-    for (const item of pending()) {
-      if (chains.has(item.cardId)) continue
-      byCard.set(item.cardId, [...(byCard.get(item.cardId) ?? []), item])
-    }
-    for (const [cardId, items] of byCard) {
-      const chain = runCard(items)
+    for (const { cardId } of pending()) {
+      if (chains.has(cardId)) continue
+      const chain = runCard(cardId)
         .catch((error: unknown) => options.onReport?.(error))
         .finally(() => {
           chains.delete(cardId)
-          wake?.()
+          if (chains.size > 0) return
+          running = undefined
+          ended?.()
         })
       chains.set(cardId, chain)
     }
+    if (chains.size > 0 && running === undefined) running = new Promise<void>((resolve) => (ended = resolve))
   }
 
-  /** Runs the cards' chains until every one ended and no kick is waiting. A kick meanwhile reads the approvals again. */
-  const drain = async () => {
-    for (;;) {
-      if (closed) break
-      if (again) {
-        again = false
-        startChains()
-      }
-      if (chains.size === 0 && !again) return
-      if (!again) await new Promise<void>((resolve) => (wake = resolve))
-      wake = undefined
-    }
-    await Promise.all(chains.values())
-  }
-
-  /** Runs the drain, or asks the running one to look again. */
+  /** Starts chains for cards with none, and asks the running ones to look again. */
   const kick = (): Promise<void> => {
     if (closed) return Promise.resolve()
-    again = true
-    if (running !== undefined) {
-      wake?.()
-      return running
-    }
-    running = drain()
-      .catch((error: unknown) => options.onReport?.(error))
-      .finally(() => {
-        running = undefined
-        // A kick that landed as the drain ended starts the next one.
-        if (again && !closed) void kick()
-      })
-    return running
+    for (const cardId of chains.keys()) dirty.add(cardId)
+    startChains()
+    return running ?? Promise.resolve()
   }
 
   /**
@@ -308,7 +296,6 @@ export function createDispatcher(options: DispatcherOptions) {
     },
     close: async () => {
       closed = true
-      wake?.()
       await running
     },
   }

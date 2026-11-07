@@ -159,6 +159,45 @@ it('Waiting: a click whose destination cannot be checked yet holds no other card
   expect(statusOf(cards(h).find((view) => view.card._tag === 'change')!)).toEqual({ _tag: 'expired' })
 })
 
+it('Waiting: a kick that lands while the destination is checking a click is kept when that check then says wait', async () => {
+  // A connection whose check is in flight when it becomes ready: the answer in flight still says
+  // wait, and the kick that announced the readiness must bring the click back on its own.
+  let ready = false
+  let checking: (() => void) | undefined
+  let release: (() => void) | undefined
+  const checkStarted = new Promise<void>((resolve) => (checking = resolve))
+  const runs: unknown[] = []
+  const slow: Executor = {
+    tool: 'fake_write', tier: 3, deduped: false,
+    check: async () => {
+      if (ready) return 'valid'
+      await new Promise<void>((resolve) => { release = resolve; checking!() })
+      return 'wait'
+    },
+    run: async (c) => (runs.push(c.payload.args), { _tag: 'done', receipt: {} }),
+  }
+  const { h } = await open({ actions: { executors: [slow] } })
+  const payload = {
+    _tag: 'change', server: 'Notion', target: 'Roadmap',
+    action: {
+      id: ActionId.make('0199f0a0-0000-7000-8000-000000000004'), rev: Revision.make(1), tier: 3, deduped: false, source: SourceGeneration.make(0),
+      payload: {
+        connection_id: ConnectionId.make('notion'), account_id: AccountId.make('acct'), destination_ids: [], tool: 'fake_write',
+        schema_hash: Digest.make('0'.repeat(64)), args: { title: 'Q4' }, preconditions: {}, ops: [],
+      },
+    },
+  } as CardPayload
+  h.turns.actions.propose({ runId: 'run-c', callId: 'c-4', payload })
+  click(h, only(h))
+  await checkStarted
+  ready = true
+  h.turns.actions.kick()
+  release!()
+  await settle(h)
+  expect(runs).toEqual([{ title: 'Q4' }])
+  expect(statusOf(only(h))).toEqual({ _tag: 'done', line: 'Done' })
+})
+
 it('Unknown: a send whose answer was lost shows Failed, is never sent again, and turns Sent when reconcile finds it', async () => {
   const slack = fakeActionHost()
   const first = await open({ slack })
