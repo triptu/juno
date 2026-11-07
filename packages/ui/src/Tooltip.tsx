@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { colors, layout, motion, radii, shadows, spacing, z } from '@juno/tokens/tokens.stylex'
 import { variants as typeVariants } from './internal/type'
@@ -179,31 +179,38 @@ function place(tip: HTMLElement, target: HTMLElement): void {
  *   portal, so it moves nothing.
  * - `role="tooltip"`; the control points at it with `aria-describedby`
  *   while it shows.
+ * - `detail` may add a line under the label for some controls, from the
+ *   control itself (a person's status under "Message Maya Chen"). It can
+ *   arrive after the tip shows; the tip is placed again when its size
+ *   changes.
  */
-export function TooltipLayer() {
+export function TooltipLayer({ detail }: { readonly detail?: (target: HTMLElement) => ReactNode } = {}) {
   const id = useId()
   const [shown, setShown] = useState<Shown | undefined>(undefined)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => listen(tooltipTimer(setShown)), [])
 
-  // Placed before the first paint.
+  // Placed before the first paint, and again when a detail line changes its size.
   useLayoutEffect(() => {
     const tip = ref.current
     if (shown === undefined || tip === null) return
     const target = shown.target
     place(tip, target)
+    const observer = new ResizeObserver(() => place(tip, target))
+    observer.observe(tip)
     const before = target.getAttribute('aria-describedby')
     target.setAttribute('aria-describedby', before === null ? id : `${before} ${id}`)
     return () => {
+      observer.disconnect()
       if (before === null) target.removeAttribute('aria-describedby')
       else target.setAttribute('aria-describedby', before)
     }
   }, [shown, id])
 
   if (shown === undefined) return null
-  return createPortal(
-    <div ref={ref} id={id} role="tooltip" {...stylex.props(styles.tip, typeVariants.meta, !shown.warm && styles.fade)}>
+  const line = (
+    <>
       <span {...stylex.props(styles.label)}>{shown.label}</span>
       {shown.keys === undefined ? null : (
         <span {...stylex.props(styles.keys)}>
@@ -212,6 +219,19 @@ export function TooltipLayer() {
               {cap}
             </kbd>
           ))}
+        </span>
+      )}
+    </>
+  )
+  const more = detail?.(shown.target)
+  return createPortal(
+    <div ref={ref} id={id} role="tooltip" {...stylex.props(styles.tip, typeVariants.meta, !shown.warm && styles.fade)}>
+      {more === undefined || more === null ? (
+        line
+      ) : (
+        <span {...stylex.props(styles.stack)}>
+          <span {...stylex.props(styles.line)}>{line}</span>
+          {more}
         </span>
       )}
     </div>,
@@ -255,6 +275,17 @@ const styles = stylex.create({
   },
   label: {
     overflowWrap: 'anywhere',
+  },
+  stack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-0-5'],
+    minWidth: 0,
+  },
+  line: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2'],
   },
   keys: {
     display: 'inline-flex',

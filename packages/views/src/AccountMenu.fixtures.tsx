@@ -26,6 +26,11 @@ export default defineFixtures(
       'active-connecting': fixture({ ...base, presence: { active: true, seen: false, label: 'Active. Connecting to Slack' } }),
       unknown: fixture({ ...base }),
     },
+    Status: {
+      'with-status': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, status: { emoji: { name: 'spiral_calendar_pad', unicode: '🗓️' }, text: 'In a meeting', until: 'until 3:30pm' } }),
+      'no-expiry': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, status: { emoji: { name: 'palm_tree', unicode: '🌴' }, text: 'Vacationing' } }),
+      'long-text': fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, status: { emoji: { name: 'house_with_garden', unicode: '🏡' }, text: 'Working from the north office this week, back in the city on Monday', until: 'until Friday' } }),
+    },
     Privacy: {
       on: fixture({ ...base, presence: { active: true, seen: true, label: 'Active' }, privacy: true }),
     },

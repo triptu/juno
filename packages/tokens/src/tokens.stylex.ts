@@ -1028,6 +1028,8 @@ export const layout = stylex.defineVars({
   '--view-sheet-list-max-height': '200px',
   // The channel sheet (inventory 2.3a): a name, a switch and a people list, with room for a long name.
   '--channel-sheet-width': '380px',
+  // The status sheet (inventory 2.1b): the emoji and text field, five presets and Clear after.
+  '--status-sheet-width': '400px',
   // The peek popover: about 75 characters of message text in compact rows;
   // never wider than the room left in the window.
   '--peek-width': '640px',
