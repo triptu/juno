@@ -3,7 +3,7 @@ import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
-import type { TopicRow as TopicRowModel } from '@juno/contract'
+import type { Person, TopicRow as TopicRowModel } from '@juno/contract'
 import { colors, density, opacity, radii, sizes, spacing, text, tints, weights } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
@@ -296,10 +296,7 @@ export const TopicRow = memo(function TopicRow({
 function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' | 'rowSelected' | undefined }) {
   const { channel } = row
   if (row.kind === 'main' && channel.kind === 'im') {
-    const partner = channel.partner
-    const name = partner?.name ?? channel.name
-    const hue = hueFor(partner?.color ?? channel.color, partner?.id ?? channel.id)
-    const photo = <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
+    const photo = <PersonPhoto person={channel.partner ?? channel} />
     if (dot === undefined) return photo
     // The dot is placed against the photo's own box: the tile's box is cut to the two-line row.
     return (
@@ -319,6 +316,11 @@ function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' |
       <TopicArt topicId={row.id} recipe={row.art} size={40} />
     </span>
   )
+}
+
+/** A person's photo at the tile's size: a DM's Main, and a Reactions row's reactor. */
+export function PersonPhoto({ person }: { readonly person: Pick<Person, 'id' | 'name' | 'color' | 'avatarUrl' | 'avatarLargeUrl'> }) {
+  return <Avatar label={initials(person.name)} size={44} hue={hueFor(person.color, person.id)} {...(person.avatarUrl === undefined ? {} : { src: person.avatarLargeUrl || person.avatarUrl })} />
 }
 
 /**
