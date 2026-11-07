@@ -14,8 +14,7 @@ const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
 const STAGING = 'Unrelated: has anyone looked at the'
 
-// One launch. The hover goes first, while the topic has never been opened; the chip step leaves the sidebar
-// scoped to #platform, and Show everything takes that off. The late composer needs threads not opened yet. Rina's thread opens while it still has its 2 unread.
+// One launch. The hover goes first, while the topic has never been opened; the pill step takes its scope off, and the chip step closes the tabs it opens. The late composer needs threads not opened yet. Rina's thread opens while it still has its 2 unread.
 // The Follow step ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
 domTest('a topic warms on hover, opens at its "N new" divider, follows and unfollows from its menus, switches from Main, and a late composer takes focus', async ({ juno, slack, fake, app, step }) => {
   await step('hovering a row warms the topic without asking Slack', async () => {
@@ -41,6 +40,7 @@ domTest('a topic warms on hover, opens at its "N new" divider, follows and unfol
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.contextPill.click()
     await juno.sidebar.expectScope('eng')
+    await juno.sidebar.root.getByRole('button', { name: 'Show everything' }).click()
   })
 
   await step('Follow new threads in the channel menu turns on with a toast, and ⌘Z turns it off', async () => {
@@ -59,13 +59,34 @@ domTest('a topic warms on hover, opens at its "N new" divider, follows and unfol
     await expect.poll(followNew).toBe('Follow new threads')
   })
 
-  await step('a #channel chip scopes the sidebar to that channel', async () => {
+  await step('a #channel chip opens that channel’s Main in a new tab, the tab that shows it again, and a channel you are not in as its preview', async () => {
     await juno.sidebar.row(POSTGRES).open()
+    await juno.tabs.expectCount(1)
     await juno.topic.clickChannel('platform')
-    await juno.sidebar.expectScope('platform')
-    await juno.sidebar.row(POSTGRES).expectAbsent()
+    await juno.tabs.expectCount(2)
+    await juno.tabs.expectActive('platform')
+    await juno.topic.expectTitle('Main')
+    // The sidebar is not narrowed to the channel.
+    await expect(juno.sidebar.root.getByRole('button', { name: 'Show everything' })).toHaveCount(0)
+
+    await juno.tabs.select(POSTGRES)
+    await juno.topic.clickChannel('platform')
+    await juno.tabs.expectCount(2)
+    await juno.tabs.expectActive('platform')
+
+    // You are not in #social.
+    await juno.tabs.select(POSTGRES)
+    const root = fake.messages('C0ENG').find((message) => message.text?.includes(POSTGRES))!
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', threadTs: root.ts, text: 'Ask in <#C0SOCIAL|social> too.' })
+    await juno.topic.expectMessage('Ask in')
+    await juno.topic.clickChannel('social')
+    await juno.tabs.expectCount(3)
+    await juno.tabs.expectActive('social')
+    await expect(juno.topic.root.locator('[data-read-only-note]')).toContainText('You’re not in #social.')
+    await juno.tabs.close('social')
+    await juno.tabs.close('platform')
+    await juno.tabs.expectCount(1)
   })
-  await juno.sidebar.root.getByRole('button', { name: 'Show everything' }).click()
 
   // The engine's draft replies are held, so each thread's composer mounts only when the test lets it.
   await step('a composer that mounts late takes focus and the keys typed at once after a switcher pick, as does a topic opened again, and leaves focus on the title the user moved to', async () => {

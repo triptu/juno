@@ -46,7 +46,10 @@ export interface MessageSource {
 export type NotificationTarget = { readonly kind: 'message'; readonly source: MessageSource }
 export interface Notification {
   readonly id: string
+  /** Who sent the message. */
   readonly title: string
+  /** Where it was posted ("#eng", "Thread in #eng", a group DM's people); absent for a one-to-one DM, which the title names. */
+  readonly subtitle?: string
   readonly body: string
   readonly target: NotificationTarget
 }

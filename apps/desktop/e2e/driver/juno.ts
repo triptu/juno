@@ -1129,7 +1129,7 @@ export class Juno implements JunoVerbs {
   }
 
   /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. `silent` only on one posted without a sound. */
-  osNotifications(): Promise<Array<{ readonly title: string; readonly body: string; readonly silent?: true }>> {
+  osNotifications(): Promise<Array<{ readonly title: string; readonly subtitle?: string; readonly body: string; readonly silent?: true }>> {
     return this.surface.system('notifications')
   }
 
@@ -2167,7 +2167,7 @@ export class TopicPane implements TopicVerbs {
     return new ThreadLinkDriver(this.win, typeof text === 'string' ? this.list.locator(`[data-thread-link][aria-label*=${cssString(text)} i]`) : this.list.locator('[data-thread-link]', { hasText: text }))
   }
 
-  /** A #channel chip in a message: clicking it scopes the sidebar. */
+  /** A #channel chip in a message: clicking it opens the channel's Main. */
   async clickChannel(name: string): Promise<void> {
     await this.list.locator(`button[data-channel-name=${cssString(name)}]`).first().click()
   }

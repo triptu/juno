@@ -606,7 +606,7 @@ Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title
 
 ### Composer
 
-Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 184px (7.5 lines of 22px plus 18px padding). SPEC says "about 8 lines"; [proposed] `--composer-max-height: 194px` (9 + 8×22 + 9). Juno input max 160px.
+Single line 40px; grows to `max-height` then scrolls inside. `--composer-max-height: max(194px, 45vh)`: about half the window's height, as Slack grows its composer, and never under 8 lines (9 + 8×22 + 9). 45 rather than 50 leaves the composer's padding and attachments inside the half. A viewport unit, not a container unit: a size container on the topic tripled style work per keystroke. Juno input max 160px.
 
 A field Textarea (a note or pin under edit on What Juno remembers) grows the same way to 176px, a constant in `Textarea.tsx`: 8 lines of ui text (13.5 × 1.5) plus its 6px insets and 1px border.
 
@@ -725,7 +725,7 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | `--foreground-muted` 52% L in the CSS file | 42% L (the prototype's runtime override) |
 | Focus ring in `--selection-background` | `--focus-ring` = `--info` light, `hsla(200, 80%, 65%)` dark (decided) |
 | Cyan accent with off-white text (3.8:1) | Cyan takes near-black `--hl-fg` (`hsla(48, 10%, 2%)`) |
-| Composer max 184px | 194px (8 full lines) |
+| Composer max 184px | `max(194px, 45vh)`: about half the window, never under 8 full lines |
 | Söhne / Meraki | Figtree / Instrument Serif, bundled (Inter was the first replacement; swapped for Figtree in the friendly-layer options review) |
 | Global letter-spacing 0.02em in CSS file | 0 (Figtree; 0.01em was the Inter value) |
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |

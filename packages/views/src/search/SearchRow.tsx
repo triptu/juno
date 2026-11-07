@@ -43,6 +43,8 @@ export interface SearchRowProps {
   readonly onOpen: (id: string, options: { readonly newTab: boolean }) => void
   readonly onLink?: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo?: LinkInfo | undefined
+  /** A #channel chip in a card: open the channel, `behind` with ⌘. */
+  readonly onChannel?: ((id: string, behind: boolean) => void) | undefined
 }
 
 const tints: Record<SearchGroup['place']['kind'], ContextTint> = { public: 'public', private: 'private', im: 'dm', mpim: 'dm' }
@@ -57,7 +59,7 @@ export const SearchRow = memo(function SearchRow(props: SearchRowProps) {
   return <Stop {...props} row={row} />
 })
 
-function Stop({ row, now, time, selected, focused, tabbable, words, onSelect, onPress, onOpen, onLink, linkInfo }: SearchRowProps & { readonly row: Exclude<SearchRowItem, { readonly kind: 'older' }> }) {
+function Stop({ row, now, time, selected, focused, tabbable, words, onSelect, onPress, onOpen, onLink, linkInfo, onChannel }: SearchRowProps & { readonly row: Exclude<SearchRowItem, { readonly kind: 'older' }> }) {
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || event.ctrlKey) return
     if (event.target instanceof Element && event.target.closest(OWN_PRESS) !== null) return
@@ -87,7 +89,7 @@ function Stop({ row, now, time, selected, focused, tabbable, words, onSelect, on
       {placeLine}
       <div data-search-card={row.kind === 'card' ? '' : undefined} {...stylex.props(styles.card, selected && styles.selected, selected && focused && styles.selectedFocused)}>
         {row.kind === 'card' && row.hit.card !== undefined ? (
-          <CardContent card={row.hit.card} at={tsMillis(row.hit.ts)} now={now} time={time} words={words} onLink={onLink} linkInfo={linkInfo} />
+          <CardContent card={row.hit.card} at={tsMillis(row.hit.ts)} now={now} time={time} words={words} onLink={onLink} linkInfo={linkInfo} onChannel={onChannel} />
         ) : row.kind === 'card' ? (
           <PlainContent sender={row.hit.sender} text={row.hit.text} at={tsMillis(row.hit.ts)} now={now} time={time} />
         ) : (
@@ -114,7 +116,7 @@ function PlaceLine({ group }: { readonly group: SearchGroup }) {
   )
 }
 
-function CardContent({ card, at, now = 0, time: TimeLeaf, words, onLink, linkInfo }: { readonly card: SearchCard; readonly at: number; readonly now?: number | undefined; readonly time?: SearchTimeLeaf | undefined; readonly words: ReadonlyArray<string>; readonly onLink?: SearchRowProps['onLink']; readonly linkInfo?: LinkInfo | undefined }) {
+function CardContent({ card, at, now = 0, time: TimeLeaf, words, onLink, linkInfo, onChannel }: { readonly card: SearchCard; readonly at: number; readonly now?: number | undefined; readonly time?: SearchTimeLeaf | undefined; readonly words: ReadonlyArray<string>; readonly onLink?: SearchRowProps['onLink']; readonly linkInfo?: LinkInfo | undefined; readonly onChannel?: SearchRowProps['onChannel'] }) {
   const { sender } = card
   return (
     <>
@@ -131,7 +133,7 @@ function CardContent({ card, at, now = 0, time: TimeLeaf, words, onLink, linkInf
             {TimeLeaf === undefined ? messageHeaderTime(at, now) : <TimeLeaf at={at} />}
           </Text>
         </span>
-        <FoldedBody body={card.body} now={now} words={words} onLink={onLink} linkInfo={linkInfo} />
+        <FoldedBody body={card.body} now={now} words={words} onLink={onLink} linkInfo={linkInfo} onChannel={onChannel} />
         {card.files.length === 0 ? null : (
           <span {...stylex.props(styles.files)}>
             {card.files.map((file) => (

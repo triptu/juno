@@ -2,13 +2,13 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, FileView, MessageBody as MessageBodyModel } from '@juno/contract'
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
-import { Chip, Divider, Emoji, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Chip, Divider, Emoji, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { HighlightedCodeBlock } from './CodeHighlight'
 import { AttachmentButtons, type OnAttachmentButton } from './AttachmentButtons'
 import { AttachmentCard, AttachmentFields, AttachmentImage, ContextIcon, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { MessageTable } from './MessageTable'
-import { PersonChip } from './personLink'
+import { ChannelChip, PersonChip } from './personLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -17,8 +17,8 @@ export interface MessageBodyProps {
   readonly now: number
   /** The person hue for @mention chips, by user id. A missing entry falls back to the id's hash. */
   readonly hueOf: (id: string) => HueName
-  /** A `#channel` chip was clicked: scope the sidebar to it. */
-  readonly onChannel?: (id: string) => void
+  /** A `#channel` chip was clicked (with ⌘: `behind`): open the channel. Without it the chip is plain text. */
+  readonly onChannel?: (id: string, behind: boolean) => void
   /** A link was clicked: open it, inside Juno for a Slack link to this workspace, else in the browser. */
   readonly onLink?: (url: string, event: ActivateEvent) => void
   /** Which links open inside Juno, and where they go. Without it every link opens outside. */
@@ -80,7 +80,7 @@ interface BlockProps {
   readonly block: BodyBlock
   readonly now: number
   readonly hueOf: (id: string) => HueName
-  readonly onChannel: ((id: string) => void) | undefined
+  readonly onChannel: ((id: string, behind: boolean) => void) | undefined
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
@@ -173,7 +173,7 @@ interface InlinesProps {
   readonly inlines: ReadonlyArray<BodyInline>
   readonly now: number
   readonly hueOf: (id: string) => HueName
-  readonly onChannel: ((id: string) => void) | undefined
+  readonly onChannel: ((id: string, behind: boolean) => void) | undefined
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
@@ -189,7 +189,7 @@ interface InlineProps {
   readonly inline: BodyInline
   readonly now: number
   readonly hueOf: (id: string) => HueName
-  readonly onChannel: ((id: string) => void) | undefined
+  readonly onChannel: ((id: string, behind: boolean) => void) | undefined
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
@@ -205,24 +205,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
     case 'user':
       return <PersonChip inline={inline} hue={hueOf(inline.id)} tabIndex={tabIndex} />
     case 'channel':
-      return (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onChannel?.(inline.id)
-          }}
-          title={`Show only #${inline.name}`}
-          tabIndex={tabIndex}
-          data-channel={inline.id}
-          data-channel-name={inline.name}
-          {...stylex.props(styles.channelButton, focusRing.outside)}
-        >
-          <Chip variant="filled" size="inline">
-            <bdi>#{inline.name}</bdi>
-          </Chip>
-        </button>
-      )
+      return <ChannelChip inline={inline} onChannel={onChannel} tabIndex={tabIndex} />
     case 'usergroup':
       return (
         <Chip variant={inline.isMine ? 'mention' : 'person'} size="inline" hue={hueOf(inline.id)} title={inline.name ?? (inline.isMine ? 'Mentions you' : '')} data-usergroup={inline.id}>
@@ -375,18 +358,6 @@ const styles = stylex.create({
   },
   // A #channel chip is a control inside selectable text: it resets the
   // button and keeps the chip's own look.
-  channelButton: {
-    appearance: 'none',
-    display: 'inline',
-    margin: 0,
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    color: 'inherit',
-    font: 'inherit',
-    cursor: 'default',
-    borderRadius: radii['--radius-tag'],
-  },
 })
 
 const indents = stylex.create({

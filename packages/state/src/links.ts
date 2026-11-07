@@ -13,7 +13,7 @@ export function slackLink(workspaceUrl: string, topic: Pick<TopicDetail, 'channe
   return topic.rootTs === undefined ? channelLink(workspaceUrl, topic.channel.id) : messageLink(workspaceUrl, topic.channel.id, topic.rootTs)
 }
 
-const channelLink = (workspaceUrl: string, channel: string) => new URL(`archives/${channel}`, workspaceUrl.endsWith('/') ? workspaceUrl : `${workspaceUrl}/`).toString()
+export const channelLink = (workspaceUrl: string, channel: string) => new URL(`archives/${channel}`, workspaceUrl.endsWith('/') ? workspaceUrl : `${workspaceUrl}/`).toString()
 
 /** A message's link, as Slack's client builds it: a reply adds its thread's root and its channel. */
 export function messageLink(workspaceUrl: string, channel: string, ts: string, threadTs?: string): string {

@@ -14,7 +14,7 @@ Outcomes are `notify` and `stay`; the 2026-10-23 migration renamed older `now` a
 
 ## Host callbacks
 
-`Notifier.show` receives a stable notification id, title, body, and click target. `viewing(topicId)` returns true only when that topic is visible in a focused window. Showing no OS notification for such a topic consumes its notification. `suppressed_at` records this separately from `delivered_at`, and the stored reason explains the suppression.
+`Notifier.show` receives a stable notification id, a title (the sender), an optional subtitle (where it was posted; none for a one-to-one DM, `notificationText`), the body, and a click target. `viewing(topicId)` returns true only when that topic is visible in a focused window. Showing no OS notification for such a topic consumes its notification. `suppressed_at` records this separately from `delivered_at`, and the stored reason explains the suppression.
 
 Delivery is claimed in SQLite before the OS call, to prevent a duplicate interruption. A crash between the claim and the OS call can lose that interruption. Reasons and message content remain in the log.
 

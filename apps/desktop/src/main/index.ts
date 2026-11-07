@@ -115,7 +115,7 @@ const huddleQuit = createHuddleQuit(e2e, appWindow)
 supervisor.onFailed(() => { huddleQuit.engineFailed(); dockBadge.set('') })
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
-const notificationsForTests: Array<{ readonly title: string; readonly body: string; readonly silent?: boolean; click: () => void }> = []
+const notificationsForTests: Array<{ readonly title: string; readonly subtitle?: string; readonly body: string; readonly silent?: boolean; click: () => void }> = []
 let badgeForTests = ''
 const dockBounce = createDockBounce(e2e, () => BrowserWindow.getFocusedWindow() !== null, () => app.dock?.bounce('informational'))
 
@@ -140,7 +140,7 @@ const notifier = new Notifier({
       notificationsForTests.push(recorded)
       return { show: () => {}, close: () => {}, onClick: (f) => { recorded.click = f } }
     }
-    const shown = new Notification({ title: options.title, body: options.body, silent: options.silent === true })
+    const shown = new Notification({ title: options.title, ...(options.subtitle === undefined ? {} : { subtitle: options.subtitle }), body: options.body, silent: options.silent === true })
     return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
   },
   setBadge: (text) => dockBadge.set(text),
@@ -385,7 +385,7 @@ if (e2e) {
       agentPid: () => agent.pid,
       ...processes.testHooks,
       viewing: () => notifier.viewingTopic,
-      notifications: () => notificationsForTests.map(({ title, body, silent }) => ({ title, body, ...(silent === true ? { silent } : {}) })),
+      notifications: () => notificationsForTests.map(({ title, subtitle, body, silent }) => ({ title, ...(subtitle === undefined ? {} : { subtitle }), body, ...(silent === true ? { silent } : {}) })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       clearDockBadge: () => dockBadge.set(''),

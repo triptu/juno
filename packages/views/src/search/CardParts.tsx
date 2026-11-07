@@ -39,7 +39,7 @@ function fold(element: HTMLElement, words: ReadonlyArray<string>): Cut {
  * fade says there is more above or below. Show more unfolds it in place.
  * It folds again whenever its width or its content changes.
  */
-export function FoldedBody({ body, now, words, onLink, linkInfo }: { readonly body: MessageBodyModel; readonly now: number; readonly words: ReadonlyArray<string>; readonly onLink?: ((url: string, event: ActivateEvent) => void) | undefined; readonly linkInfo?: LinkInfo | undefined }) {
+export function FoldedBody({ body, now, words, onLink, linkInfo, onChannel }: { readonly body: MessageBodyModel; readonly now: number; readonly words: ReadonlyArray<string>; readonly onLink?: ((url: string, event: ActivateEvent) => void) | undefined; readonly linkInfo?: LinkInfo | undefined; readonly onChannel?: ((id: string, behind: boolean) => void) | undefined }) {
   const box = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [cut, setCut] = useState<Cut>(undefined)
@@ -61,7 +61,7 @@ export function FoldedBody({ body, now, words, onLink, linkInfo }: { readonly bo
   return (
     <>
       <div ref={box} data-search-body="" data-sensitive="" data-folded={cut !== undefined && !open ? '' : undefined} {...stylex.props(styles.body, !open && styles.folded, !open && cut?.top === true && styles.cutTop, !open && cut?.bottom === true && styles.cutBottom, !open && cut?.top === true && cut.bottom && styles.cutBoth)}>
-        <MessageBody body={body} now={now} hueOf={hueForId} onLink={onLink} linkInfo={linkInfo} />
+        <MessageBody body={body} now={now} hueOf={hueForId} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} />
       </div>
       {cut === undefined && !open ? null : (
         // Unfolding grows the card in place, which the press asked for. A press leaves focus where it was, so the card

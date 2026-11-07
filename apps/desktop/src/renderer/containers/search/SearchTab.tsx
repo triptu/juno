@@ -29,7 +29,7 @@ import { useAtomValue } from '@juno/state/react'
 import { searchTime, SearchField, SearchFilters, SearchPage, SearchResults, searchRowDomId, type SearchRowItem, type SearchToggle } from '@juno/views'
 import { wantComposerFocus } from '../pageFocus'
 import { openPalette } from '../paletteActions'
-import { messageLinkInfo, openMessageLink } from '../slackLinks'
+import { messageLinkInfo, openChannel, openMessageLink } from '../slackLinks'
 import { chipViewsOf, useSearchField } from './field'
 import { openResultHere, selectionOf, useListScroll, useResultRows, useWarmNeighbours, useWindowPaging } from './list'
 import { showFilterMenu } from './menus'
@@ -271,6 +271,7 @@ function ResultsColumn({ sessionId, session, snapshot, prefs, rows, empty, listR
       onHideTopic={actions.hide}
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}
+      onChannel={openChannel}
       onHoverRow={onHoverRow}
       onLeaveTop={() => inputRef.current?.focus()}
       onTab={() => {
