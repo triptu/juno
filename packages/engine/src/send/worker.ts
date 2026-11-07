@@ -64,7 +64,7 @@ import {
   pendingPosts,
   postUnknown,
   recoverPosts,
-  requeuePost,
+  requeueUnsentPost,
   sentAt,
   storedMe,
   type PendingPost,
@@ -244,9 +244,9 @@ export class PostWorker extends Context.Service<
               yield* Effect.logWarning('send: Slack refused a message', { id: row.clientMsgId, attempts: row.attempts, code: error.code })
               return yield* local(transaction(failPost(row.clientMsgId, error.code)))
             case 'RateLimited':
-              return yield* local(transaction(requeuePost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
+              return yield* local(transaction(requeueUnsentPost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
             case 'NotSignedIn':
-              return yield* local(transaction(requeuePost(row.clientMsgId, now + timing.noSessionMillis, error._tag)))
+              return yield* local(transaction(requeueUnsentPost(row.clientMsgId, now + timing.noSessionMillis, error._tag)))
             case 'Offline':
               return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, error._tag)))
           }
@@ -288,7 +288,7 @@ export class PostWorker extends Context.Service<
               // Slack said it took the post (files, a forward): the message is there even if the read does not show it yet.
               if (row.lastError === SHARED) return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
               // Slack has decided the lost request by now (specs/outbox.qnt): it is not there, so it may go again.
-              return yield* local(transaction(requeuePost(row.clientMsgId, now, 'lost')))
+              return yield* local(transaction(requeueUnsentPost(row.clientMsgId, now, 'lost')))
             }
           }
           const now = yield* Clock.currentTimeMillis

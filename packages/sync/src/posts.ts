@@ -122,7 +122,7 @@ const touch = (post: Pick<PendingPost, 'channel' | 'threadTs'>) =>
  * A thread Juno started and Slack has not answered is indexed on its own
  * (`startedThreads.ts`).
  */
-export const reindexPostTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+const reindexPostTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     if (post.threadTs?.startsWith('pending:') === true) return
     const me = yield* storedMe
@@ -219,31 +219,18 @@ export const postUnknown = (clientMsgId: string, nextAt: number, error: string) 
 
 /**
  * Slack did not post it and may later (rate limited, signed out), or a
- * lookup found no message: send again at `nextAt`. Slack has nothing, so an
- * edit or delete the user queued while the post was out (`actions.ts`,
- * `depends_on`) applies to the row now, as on a queued row: the edit's text
- * goes into the row, a delete removes it, and those rows end. The worker
- * never sends a post the user deleted.
+ * lookup found no message: send again at `nextAt`. Slack has nothing, so
+ * the worker calls this through `requeueUnsentPost` (`actions.ts`), which
+ * applies an edit or delete the user queued while the post was out.
  */
-export const requeuePost = (clientMsgId: string, nextAt: number, error: string | null): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+export const requeuePost = (clientMsgId: string, nextAt: number, error: string | null) => move(clientMsgId, ['sending', 'unknown'], 'queued', { nextAt, lastError: error })
+
+/** The user's edit of a post Slack has not got: the row takes the text, and shows it. */
+export const rewritePost = (post: PendingPost, text: string, blocksJson: string | null): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
-    if (!(yield* move(clientMsgId, ['sending', 'unknown'], 'queued', { nextAt, lastError: error }))) return false
     const sql = yield* StoreWriter
-    const dependents = yield* sql<{ id: number; kind: string; payload_json: string }>`SELECT id, kind, payload_json FROM outbox WHERE depends_on = ${clientMsgId} ORDER BY id`
-    const post = yield* readPost(clientMsgId)
-    if (post === undefined || dependents.length === 0) return true
-    if (dependents.some((row) => row.kind === 'delete')) {
-      yield* removePost(post)
-      yield* sql`DELETE FROM outbox WHERE depends_on = ${clientMsgId}`
-      return true
-    }
-    for (const edit of dependents.filter((row) => row.kind === 'edit')) {
-      const payload = JSON.parse(edit.payload_json) as { readonly text?: string; readonly blocksJson?: string | null }
-      if (payload.text !== undefined) yield* sql`UPDATE pending_messages SET text = ${payload.text}, blocks_json = ${payload.blocksJson ?? null} WHERE client_msg_id = ${clientMsgId}`
-      yield* sql`DELETE FROM outbox WHERE id = ${edit.id}`
-      yield* touch(post)
-    }
-    return true
+    yield* sql`UPDATE pending_messages SET text = ${text}, blocks_json = ${blocksJson} WHERE client_msg_id = ${post.clientMsgId}`
+    yield* touch(post)
   })
 
 /** A lookup could not answer: ask again at `nextAt`. Counts as an attempt, so the backoff grows. */

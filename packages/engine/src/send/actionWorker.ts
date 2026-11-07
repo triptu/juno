@@ -57,6 +57,7 @@ import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
 import {
   actionDone,
+  applyWaitingActions,
   checkCopyDelete,
   deferAction,
   dropAction,
@@ -67,7 +68,6 @@ import {
   pendingActions,
   placeOf,
   readAction,
-  settleOnFailedPost,
   storedMe,
   type Acted,
   type PendingAction,
@@ -189,7 +189,7 @@ export class ActionWorker extends Context.Service<
               yield* local(transaction(dropAction(action)))
               return false
             case 'failed':
-              yield* local(transaction(settleOnFailedPost(action, place.post)))
+              yield* local(transaction(applyWaitingActions(place.post, [action])))
               return false
             case 'ready':
               break
