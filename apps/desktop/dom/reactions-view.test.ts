@@ -2,7 +2,8 @@
 // Slack's Activity lists them: a reaction Juno only learns of from Slack's
 // activity feed shows when the view opens, even below a newer live one; a
 // live reaction makes its reactor the row's headline and moves it up; "+N"
-// counts the others who reacted now; another pill puts the topics back and
+// counts the others who reacted now; another pill puts the topics back, and
+// while the view is closed a reaction and a reconnect ask Slack for nothing;
 // the feed is read again when the view reopens; and pressing a row opens the
 // topic at the message. That the message flashes in view is the browser
 // lane's, as for Search.
@@ -54,17 +55,29 @@ domTest('the Reactions view lists reactions to your messages newest first, follo
     await expect.poll(ours(rows)).toEqual([`Leo | ${REPLY}`, `Maya | ${MAIN}`])
   })
 
-  await step('another pill puts the topics back, and the feed is read again when the view reopens', async () => {
+  await step('another pill puts the topics back', async () => {
     await juno.sidebar.filter('Channels')
     await expect(rows).toHaveCount(0)
-    // A while on the topics: a new message reaches the list, long after the view's subscription was let go.
+  })
+
+  await step('while the view is closed, a reaction on your message and a reconnect ask Slack for nothing', async () => {
+    const before = fake.calls.length
+    fake.addReaction({ channel: eng, ts: mainTs, name: 'eyes', user: 'U0SAM' })
+    fake.dropSocket()
+    await juno.expectEngineLive()
     slack.as('Maya').postIn('eng', 'Lunch order goes in at noon')
     await expect(juno.sidebar.root.getByText('Lunch order goes in at noon')).toBeVisible()
+    // Settled: the post reaching the list proves the socket is back, and a feed read would have come at the connect, before it.
+    expect(fake.calls.slice(before).filter((call) => call.method === 'activity.feed' || call.args['_x_reason'] === 'reactions')).toEqual([])
+  })
+
+  await step('the feed is read again when the view reopens, and the reaction heard while it was closed counts', async () => {
     fake.holdFrames({ types: ['reaction_added'] })
     fake.addReaction({ channel: eng, ts: mainTs, name: 'raised_hands', user: 'U0PRIYA' })
     fake.releaseFrames({ drop: true })
     await pill.click()
-    await expect.poll(ours(rows)).toEqual([`Priya | ${MAIN}`, `Leo | ${REPLY}`])
+    // "+2": Sam's reaction heard while the view was closed, and Maya's, which the reconnect's page brought.
+    await expect.poll(ours(rows)).toEqual([`Priya +2 | ${MAIN}`, `Leo | ${REPLY}`])
   })
 
   await step('pressing a reply’s row opens its thread at the message', async () => {
