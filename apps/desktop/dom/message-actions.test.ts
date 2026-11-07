@@ -54,6 +54,7 @@ domTest('edits, deletes, reacts, quotes and opens threads from Main', async ({ j
   const context = { juno, fake, step }
   await step('the keyboard: ↑ selects, E edits, Delete asks once, and E and Delete do nothing on others’ messages', () => keyboardActions(context))
   await step('reactions: a quick reaction, its chip toggled off, and one from the full picker', () => reactToMessage(context))
+  await step('a custom emoji reaction shows its image from the first frame, never its :name:', () => customEmojiReaction(context))
   await step('a reaction Slack keeps refusing stops after five tries with one toast, and Retry starts again', () => refusedReaction(context))
   await step('Quote puts the message in the composer as "> " lines; a selection quotes only itself', () => quoteMessage(context))
   await step('Edit and Delete from the menus, and Edit after the message changed elsewhere', () => menuActions(context))
@@ -232,6 +233,54 @@ async function reactToMessage({ juno, fake }: Context): Promise<void> {
   await expect(plain).not.toHaveAttribute('data-popover-active')
   await expect(plain.getByRole('button', { name: '1 🚀, including you' })).toBeVisible()
   await expect.poll(() => (fake.messages('C0ENG').find((m) => m.ts === plainTs)?.reactions ?? []).some((r) => r.name === 'rocket')).toBe(true)
+}
+
+/**
+ * Regression: a custom emoji picked from the full picker showed `:juno_party:` as text on the chip until Slack echoed the
+ * reaction, because the window query looked up images only for stored reactions, not for the outbox's own. The call is
+ * held so the chip's pending state can be read; a recorder started before the pick catches every state in between.
+ */
+async function customEmojiReaction({ juno, fake }: Context): Promise<void> {
+  const { topic } = juno
+  const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Release notes are out for the custom reaction' })
+  const row = topic.message('Release notes are out for the custom reaction')
+  await expect(row).toBeVisible()
+  const reactionsOf = () => fake.messages('C0ENG').find((m) => m.ts === message.ts)?.reactions ?? []
+  const chip = row.locator('[data-reaction="juno_party"]')
+  const chipStates: string[] = []
+  const record = () => {
+    const node = chip.el()
+    if (node === undefined) return
+    const state = node.querySelector('img') === null ? node.textContent ?? '' : `img:${node.querySelector('img')?.getAttribute('src') ?? ''}`
+    if (chipStates.at(-1) !== state) chipStates.push(state)
+  }
+  const Observer = (juno.win.window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver
+  const observer = new Observer(record)
+  observer.observe(row.el()!, { subtree: true, childList: true, characterData: true, attributes: true })
+  try {
+    fake.holdNext({ method: 'reactions.add', before: true })
+    const menu = await topic.messageMenu('Release notes are out for the custom reaction')
+    await menu.more.click()
+    await expect(menu.search).toBeFocused()
+    await menu.search.fill('juno_party')
+    await menu.search.press('Enter')
+    await expect(menu.root).toHaveCount(0)
+
+    // While Slack has not answered, the chip is the outbox's own: it already shows the image.
+    await expect(chip).toBeVisible()
+    await expect(chip.locator('img')).toHaveAttribute('src', `${fake.url}/emoji/juno_party.svg`)
+    await expect(chip).not.toContainText(':juno_party:')
+    expect(reactionsOf()).toEqual([])
+
+    fake.release()
+    await expect.poll(() => reactionsOf().some((r) => r.name === 'juno_party')).toBe(true)
+    await expect(chip.locator('img')).toHaveAttribute('src', `${fake.url}/emoji/juno_party.svg`)
+  } finally {
+    observer.disconnect()
+  }
+  record()
+  expect(chipStates.length).toBeGreaterThan(0)
+  expect(chipStates.filter((state) => state.includes(':juno_party:')), 'chip states that showed the code as text').toEqual([])
 }
 
 async function quoteMessage({ juno, fake }: Context): Promise<void> {
