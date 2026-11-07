@@ -1,7 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, useId } from 'react'
 import type { ReactionRow as ReactionRowModel } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, AvatarStack, Emoji, focusRing, Text, type ActivateEvent } from '@juno/ui'
 import { stackPerson } from './look'
 import { PlaceGlyph, topicRowStyles as look } from './TopicRow'
@@ -19,12 +18,12 @@ export interface ReactionRowProps {
 
 /**
  * One row of the sidebar's Reactions view (SPEC 5, "Reactions"), drawn
- * with the topic row's look and three lines: who reacted, at most two
- * faces and their names with "+N" for the rest, then their emoji; the
- * message's first words, muted, as message text that privacy mode blurs;
- * and where it is, with the thread's title for a reply. The time shows
- * over the end of line one while the row is hovered or focused, as on a
- * topic row. No counts and no dot.
+ * with the topic row's look and three lines, as Slack's Activity reads: the
+ * latest reactor's face and name, "+N" for the others who reacted, and that
+ * reactor's emoji; the message's first words, muted, as message text that
+ * privacy mode blurs; and where it is, with the thread's title for a reply.
+ * The time shows over the end of line one while the row is hovered or
+ * focused, as on a topic row. No counts and no dot.
  */
 export const ReactionRow = memo(function ReactionRow({ row, time, tabbable = true, onOpen }: ReactionRowProps) {
   const whoId = useId()
@@ -44,20 +43,18 @@ export const ReactionRow = memo(function ReactionRow({ row, time, tabbable = tru
       <span {...stylex.props(look.body)}>
         <span {...stylex.props(look.line1)}>
           <span {...stylex.props(styles.faces)}>
-            <AvatarStack people={row.reactors.map((person) => stackPerson(person))} max={2} label="" />
+            <AvatarStack people={[stackPerson(row.reactor)]} max={1} label="" />
           </span>
           <Text variant="rowTitle" truncate id={whoId} data-row-part="title" sx={styles.who}>
             {row.who}
           </Text>
           <span {...stylex.props(styles.emoji)} data-row-part="emoji">
-            {row.emoji.map((emoji) =>
-              emoji.url !== undefined ? (
-                <Emoji key={emoji.name} url={emoji.url} size={16} title={`:${emoji.name}:`} />
-              ) : emoji.unicode !== undefined ? (
-                <Emoji key={emoji.name} glyph={emoji.unicode} size={16} title={`:${emoji.name}:`} />
-              ) : (
-                <Text key={emoji.name} variant="meta" tone="muted">{`:${emoji.name}:`}</Text>
-              ),
+            {row.emoji.url !== undefined ? (
+              <Emoji url={row.emoji.url} size={16} title={`:${row.emoji.name}:`} />
+            ) : row.emoji.unicode !== undefined ? (
+              <Emoji glyph={row.emoji.unicode} size={16} title={`:${row.emoji.name}:`} />
+            ) : (
+              <Text variant="meta" tone="muted">{`:${row.emoji.name}:`}</Text>
             )}
           </span>
           <Text variant="meta" tone="muted" numeric data-row-part="time" sx={look.time}>
@@ -94,7 +91,7 @@ const styles = stylex.create({
     display: 'inline-flex',
     flexShrink: 0,
   },
-  // The names give way to the emoji, which always show whole.
+  // The name gives way to the emoji, which always shows whole.
   who: {
     flexShrink: 1,
     minWidth: 0,
@@ -102,7 +99,6 @@ const styles = stylex.create({
   emoji: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: spacing['--space-0-5'],
     flexShrink: 0,
   },
   thread: {

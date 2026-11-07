@@ -30,11 +30,9 @@ import { nativeMenu } from './notifyActions'
 /** A conversation as a menu knows it. */
 export type ViewChannel = Pick<ChannelRef, 'id' | 'kind' | 'name' | 'label'>
 
-/** Puts the topic list back in place of the Reactions view. Returns whether it already showed. */
-function showTopics(): boolean {
-  if (registry.get(sidebarPaneAtom) === 'topics') return true
-  registry.set(sidebarPaneAtom, 'topics')
-  return false
+/** Puts the topic list back in place of the Reactions view. */
+function showTopics(): void {
+  if (registry.get(sidebarPaneAtom) !== 'topics') registry.set(sidebarPaneAtom, 'topics')
 }
 
 /** Selects the Reactions pill (SPEC 5, "Reactions"): its list replaces the topics until another pill is picked. */
@@ -45,8 +43,9 @@ export function selectReactions(): void {
 
 /** Selects a view's pill: its list replaces the shown one, and a scope goes. */
 export function selectView(id: string): void {
+  showTopics()
   const filter = registry.get(sidebarFilterAtom)
-  if (filter.view === id && filter.scope === undefined && showTopics()) return
+  if (filter.view === id && filter.scope === undefined) return
   markFilterChange()
   const { scope: _scope, ...rest } = filter
   // The old rows stay until the new window arrives; never a blank list in between (performance.md 5.3).
@@ -55,8 +54,9 @@ export function selectView(id: string): void {
 
 /** Selects All, Channels or DMs, leaving any view. */
 export function selectKind(kind: KindFilter): void {
+  showTopics()
   const filter = registry.get(sidebarFilterAtom)
-  if (filter.kind === kind && filter.view === undefined && showTopics()) return
+  if (filter.kind === kind && filter.view === undefined) return
   markFilterChange()
   const { view: _view, ...rest } = filter
   startTransition(() => registry.set(sidebarFilterAtom, { ...rest, kind }))
