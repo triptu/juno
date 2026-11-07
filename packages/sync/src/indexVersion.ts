@@ -36,5 +36,7 @@
  * 16: Pause notifications and paused colleagues added Slack's Do Not
  * Disturb to the domain and the Slack schema, which the index imports; the
  * rows do not differ, as for 10.
+ * 17: the Reactions view added `activity.feed` to the Slack schema and a
+ * cache table, which the index imports; the rows do not differ, as for 10.
  */
-export const INDEX_VERSION = 16
+export const INDEX_VERSION = 17

@@ -21,7 +21,7 @@ import {
   type ViewMenuAction,
   type ViewPillAction,
 } from '@juno/contract'
-import { popupContextMenu, registry, runAction, runCommand, sidebarFilterAtom, viewSheetAtom, viewsAtom } from '@juno/state'
+import { popupContextMenu, registry, runAction, runCommand, sidebarFilterAtom, sidebarPaneAtom, viewSheetAtom, viewsAtom } from '@juno/state'
 import { Exit } from 'effect'
 import { startTransition } from 'react'
 import { markFilterChange } from './filterMark'
@@ -30,8 +30,20 @@ import { nativeMenu } from './notifyActions'
 /** A conversation as a menu knows it. */
 export type ViewChannel = Pick<ChannelRef, 'id' | 'kind' | 'name' | 'label'>
 
+/** Puts the topic list back in place of the Reactions view. */
+function showTopics(): void {
+  if (registry.get(sidebarPaneAtom) !== 'topics') registry.set(sidebarPaneAtom, 'topics')
+}
+
+/** Selects the Reactions pill (SPEC 5, "Reactions"): its list replaces the topics until another pill is picked. */
+export function selectReactions(): void {
+  if (registry.get(sidebarPaneAtom) === 'reactions') return
+  registry.set(sidebarPaneAtom, 'reactions')
+}
+
 /** Selects a view's pill: its list replaces the shown one, and a scope goes. */
 export function selectView(id: string): void {
+  showTopics()
   const filter = registry.get(sidebarFilterAtom)
   if (filter.view === id && filter.scope === undefined) return
   markFilterChange()
@@ -42,6 +54,7 @@ export function selectView(id: string): void {
 
 /** Selects All, Channels or DMs, leaving any view. */
 export function selectKind(kind: KindFilter): void {
+  showTopics()
   const filter = registry.get(sidebarFilterAtom)
   if (filter.kind === kind && filter.view === undefined) return
   markFilterChange()

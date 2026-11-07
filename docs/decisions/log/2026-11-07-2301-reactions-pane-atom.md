@@ -1,0 +1,1 @@
+- 11-07 23:01 · Reactions view · The Reactions view is its own sidebar pane (`sidebarPaneAtom`) and list (`reactions.feed`, `ReactionList`), not a topic filter · A row is a message, not a topic: keeping it out of the topic list's filter, keys and hold leaves the topic list as it was. Picking a kind or a view, or narrowing to a channel, puts the topics back.

@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { Heart } from '@phosphor-icons/react/dist/icons/Heart'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
@@ -53,6 +54,8 @@ export interface SidebarFilter {
   readonly unreadOnly: boolean
   /** The selected view's id; its pill is selected instead of the kind's. */
   readonly view?: string | undefined
+  /** The Reactions view is selected: its pill is, no other, and Unread only does not apply. */
+  readonly reactions?: boolean
 }
 
 /** A view's pill (spec section 5, "Views"). */
@@ -117,6 +120,8 @@ export interface SidebarProps {
   readonly views?: ReadonlyArray<SidebarViewPill>
   /** Fires on mouse down, like the other filters. */
   readonly onFilterView?: (id: string) => void
+  /** The Reactions pill, after the views. Without it there is no pill. Fires on mouse down, like the other filters. */
+  readonly onFilterReactions?: () => void
   /** The "+" pill. */
   readonly onNewView?: () => void
   /** The view sheet is open for a new view: the "+" pill holds its hover fill, as an open trigger. */
@@ -157,6 +162,9 @@ export interface SidebarProps {
 
 const ALL_PAGES: ReadonlyArray<SidebarNavTarget> = ['search', 'all-topics', 'home', 'juno']
 
+/** The Reactions pill's icon (SPEC 5, "Reactions"): calm, and not a face. */
+const REACTIONS_ICON = Heart
+
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
  * space, Search, All topics, Home and the account button, the `top` bars,
@@ -188,6 +196,7 @@ export function Sidebar({
   onFilterKind,
   views = [],
   onFilterView,
+  onFilterReactions,
   onNewView,
   newViewOpen = false,
   onViewMenu,
@@ -208,8 +217,9 @@ export function Sidebar({
   const shows = (target: SidebarNavTarget) => pages.includes(target)
   const junoShown = shows('juno')
   // The pill that is selected: a view, else the kind.
-  const selected = filter.view !== undefined && views.some((view) => view.id === filter.view) ? filter.view : undefined
-  const kind = selected === undefined ? filter.kind : undefined
+  const reactions = filter.reactions === true && onFilterReactions !== undefined
+  const selected = !reactions && filter.view !== undefined && views.some((view) => view.id === filter.view) ? filter.view : undefined
+  const kind = selected === undefined && !reactions ? filter.kind : undefined
   // A dot marks a group with unread topics that is not the one being viewed.
   const channelsDot = dots.channels && kind !== 'channels'
   const dmsDot = dots.dms && kind !== 'dms'
@@ -346,13 +356,27 @@ export function Sidebar({
                 />
               </FilterPill>
               <ViewPills views={views} selected={selected} onFilterView={onFilterView} onViewMenu={onViewMenu} onMoveView={onMoveView} />
+              {onFilterReactions === undefined ? null : (
+                <FilterPill>
+                  <Button
+                    variant="filter"
+                    iconStart={REACTIONS_ICON}
+                    {...tooltip('Reactions')}
+                    aria-label="Reactions"
+                    data-reactions-pill=""
+                    pressed={reactions}
+                    {...activateHandlers<HTMLButtonElement>(() => onFilterReactions())}
+                  />
+                </FilterPill>
+              )}
             </PillRow>
             {onNewView === undefined ? null : (
               <FilterPill>
                 <Button variant="filter" iconStart={Plus} {...tooltip('New view')} aria-label="New view" aria-haspopup="dialog" expanded={newViewOpen} onClick={onNewView} />
               </FilterPill>
             )}
-            <span {...stylex.props(styles.unread)}>
+            {/* Hidden, not removed, while Reactions shows: it does not apply there, and the pills keep their places. */}
+            <span {...stylex.props(reactions ? [styles.unread, styles.unreadHidden] : styles.unread)} aria-hidden={reactions || undefined}>
               {/* An icon pill like Channels and DMs: the dot on its corner is the unread mark the pills already use. */}
               <Button
                 variant="filter"
@@ -369,7 +393,7 @@ export function Sidebar({
         {viewSheet}
       </Popover>
 
-      {scope ? (
+      {scope && !reactions ? (
         <div {...stylex.props(styles.scope)}>
           <Chip size={26} variant="filled" icon={kindIcon(scope.kind)} onRemove={onClearScope} removeLabel="Show everything" title={`Showing ${scope.name} only`}>
             {scope.name}
@@ -559,6 +583,9 @@ const styles = stylex.create({
     display: 'inline-flex',
     flexShrink: 0,
     marginInlineStart: 'auto',
+  },
+  unreadHidden: {
+    visibility: 'hidden',
   },
   scope: {
     display: 'flex',

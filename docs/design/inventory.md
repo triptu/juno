@@ -152,6 +152,7 @@ Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller
   - **All**: text.
   - **Channels** (`hash` 14) and **DMs** (`user` 14): icon-only, 28×28. Tooltip and accessible name "Channels" and "DMs".
   - **A view**: its icon 14 in a 28×28 pill when it has one (tooltip and name are the view's name), otherwise its name as text, at most 120px (`--filter-pill-max-width`) with an ellipsis. The icon takes the view's colour (`--icon-tint-<accent>`, tokens 1.3a) when it has one, the same whether the pill is selected, hovered or not; without one it is the pill's muted grey.
+  - **Reactions**: `heart` 14, icon-only, 28×28, after the views and before New view, fixed (not a view: it has no menu and does not drag). Tooltip and accessible name "Reactions". No dot and no count. While it is selected no other pill is, the scope chip hides, and Unread only stays in its place, hidden (`visibility: hidden`), since it does not apply. §2.5a.
   - **New view**: `plus` 14, 28×28, fg muted, tooltip and name "New view". Always last. A popover button (`aria-haspopup="dialog"`, `aria-expanded`), not a toggle: while the sheet is open for a new view it keeps its hover fill (`--surface-hover`) [decided 10-17].
 - **Unread only** (outside the scroller, at the right): `notification` 14 (a box with a dot on its corner, the pills' own unread mark) in a 28×28 icon pill, the same `Button variant="filter"` as Channels and DMs, so its icon sits 7px in on every side as theirs does. Tooltip and accessible name "Unread only"; `aria-pressed` and the selected fill while it is on. No count and no dot. [10-15] Replaced the "Unread" text toggle.
 - **Dot**: 5px `--hl` at the pill's top right (4px in from the top and right edge), absolute so it moves nothing; only its opacity changes. Channels and DMs: the group has unread topics the sidebar would show. A view: one of its topics has an unread mention (plain unread does not count). Never on the selected pill. The name says it: "Channels, unread", "Bots, unread mention".
@@ -195,6 +196,17 @@ Scroll container, padding `0 8 16`, contained scroll.
 - Row gap 2px.
 - Visibility rules (SPEC §5): hide when quiet (no activity in 7 days and no unread), resolved, a thread set to Never (unless it mentions you), or in an ignored channel. Pinned rows are always shown. Mark-as-unread brings a quiet row back.
 - Prototype difference: a pinned row that is resolved stays visible with a green `circle-check` 14 before its title and no hover Resolve button. **[spec]** says resolving hides the row; decision needed (see summary).
+
+### 2.5a Reactions list
+
+SPEC §5 "Reactions". `ReactionList` and `ReactionRow` in `@juno/views`, `ReactionList` in the desktop containers, `sidebarPaneAtom` and `reactionRowsAtom` in `@juno/state`, route `reactions.feed`. The topic list's scroller insets and row gap; no sections.
+
+- **Row**: the topic row's look (`topicRowStyles`: padding, radius, hover fill, focus ring, line heights), three lines and no tile. Line one: the headline reactor as an 18px `AvatarStack` of one, then the first name and "+N" in the row title style, regular weight ("Maya +2": a last initial for two of the same name; no "+0"), then the headline's emoji at 16. No reaction chips. The time ("12m", `relativeTime` of the headline reaction) floats over the line's end on hover and keyboard focus, as on a topic row. Line two: the message's first words (`messagePreviewText`), preview style, muted, one line with an ellipsis, `data-sensitive` (blurred in privacy mode). Line three: the place glyph and name as on a topic row, then for a reply the thread's title, meta muted, ellipsis; a title that is the root's first words is `data-sensitive`.
+- No counts, no dot, no unread state, no selection, no menu.
+- Press (pointer down) or Enter opens the topic at the message and flashes it (`openTopicAt` with `flash`, as Search and ⌘K): a reply's thread, else the conversation's Main. ⌘ opens a new tab. ↑ ↓ Home End move focus.
+- Hold: while the pointer has moved over the list or keyboard focus is in it, the rows keep their order, none is added, and a row that leaves keeps its place and the contents it had when the hold began; it lets go 400 ms after both leave. No reorder motion.
+- Empty: "No reactions yet" / "When people react to your messages, they show up here." with the nothing-here drawing, no button.
+- Gallery: `Sidebar` › Reactions (list, empty, row-hover, privacy).
 
 ### 2.6 Sidebar empty state
 

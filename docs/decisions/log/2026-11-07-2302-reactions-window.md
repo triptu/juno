@@ -1,0 +1,1 @@
+- 11-07 23:02 · Reactions view · It shows at most 50 rows from the last 14 days, read from one activity.feed page when the view opens and when the socket reconnects, plus live reaction_added events · Tushar wants a glance, not a dashboard: no infinite history, no polling, no counts, no dot, no filters.

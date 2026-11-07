@@ -330,7 +330,7 @@ function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: { reado
  * photo; 13px fits no letter). Elsewhere the kind of place: # or a lock,
  * and the person glyph for a DM whose partner is not known yet.
  */
-function PlaceGlyph({ channel }: { readonly channel: TopicRowModel['channel'] }) {
+export function PlaceGlyph({ channel }: { readonly channel: TopicRowModel['channel'] }) {
   const partner = channel.kind === 'im' ? channel.partner : undefined
   if (partner !== undefined) {
     const src = partner.avatarSmallUrl || partner.avatarUrl
@@ -627,3 +627,6 @@ const styles = stylex.create({
     flexShrink: 0,
   },
 })
+
+/** The row's look, for lists that draw the same rows from other data (`ReactionRow`). */
+export { styles as topicRowStyles }

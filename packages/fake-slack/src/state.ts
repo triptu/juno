@@ -123,6 +123,8 @@ export class Workspace {
   /** Test retention visibility: older messages are omitted and pages declare is_limited. */
   readonly retainedSince = new Map<string, Ts>()
   readonly messageVersions = new Map<string, Ts>()
+  /** The latest reaction someone else added to a message, by `channel:ts`, for `activity.feed`. A seeded reaction has none: its message's ts stands in. */
+  readonly latestReaction = new Map<string, { readonly at: Ts; readonly user: string; readonly name: string }>()
   readonly mutationUpdated = new Map<string, Ts>()
   readonly historyInvalid = new Map<string, Ts>()
   readonly changedAt = new Map<string, number>()
@@ -706,6 +708,7 @@ export class Workspace {
     const reactions: Reaction[] =
       existing === undefined ? [...current, updated] : current.map((r) => (r.name === name ? updated : r)).filter((r) => (r.count ?? 0) > 0)
     const version = this.eventTs()
+    if (add && user !== message.user) this.latestReaction.set(`${channel}:${ts}`, { at: version, user, name })
     list[index] = reactions.length === 0 ? omitReactions(message) : { ...message, reactions }
     this.messageVersions.set(`${channel}:${ts}`, version)
     this.mutationUpdated.set(channel, version)

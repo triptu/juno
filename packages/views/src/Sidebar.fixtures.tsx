@@ -6,11 +6,14 @@ import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { artRows } from './fixtures/artRows'
 import { PrivacyOn } from './fixtures/privacy'
+import { reactionRows } from './fixtures/reactionRows'
 import { mixedPinnedIds, mixedRecentIds, mixedRows, mixedSelectedId } from './fixtures/mixedRows'
 import { art, hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
 import { relativeTime } from './time'
 import { TitlebarNav } from './TitlebarNav'
+import { ReactionList } from './ReactionList'
+import { ReactionRow } from './ReactionRow'
 import { TopicList, type TopicListProps } from './TopicList'
 import { TopicRow } from './TopicRow'
 import { UpdateReady } from './UpdateReady'
@@ -52,6 +55,20 @@ const colouredViews: ReadonlyArray<SidebarViewPill> = [
   { id: 'vdesign', name: 'Design crit', mention: false },
 ]
 const viewChrome = { views, onFilterView: noop, onNewView: noop, onViewMenu: noop, onMoveView: noop, onCloseViewSheet: noop } as const
+
+/** The Reactions view selected (SPEC 5, "Reactions"): its pill after the views, its rows in place of the topics. */
+const reactionsView = (rows: ReadonlyArray<(typeof reactionRows)[number]>) => (
+  <Sidebar {...chrome} {...viewChrome} views={views.slice(0, 1)} onFilterReactions={noop} filter={{ kind: 'all', unreadOnly: false, reactions: true }}>
+    <ReactionList
+      ids={rows.map((row) => row.id)}
+      renderRow={(id) => {
+        const row = rows.find((each) => each.id === id)!
+        return <ReactionRow key={id} row={row} time={relativeTime(row.at, NOW)} tabbable={id === rows[0]?.id} onOpen={noop} />
+      }}
+      empty={rows.length === 0}
+    />
+  </Sidebar>
+)
 
 const sheetProps: ViewSheetProps = {
   mode: 'new',
@@ -222,6 +239,12 @@ export default defineFixtures(
           ),
         }),
       ),
+    },
+    Reactions: {
+      list: scene(() => reactionsView(reactionRows)),
+      empty: scene(() => reactionsView([])),
+      'row-hover': scene(() => reactionsView(reactionRows), { hover: '[data-reaction-row]:nth-of-type(1)' }),
+      privacy: scene(() => <PrivacyOn>{reactionsView(reactionRows)}</PrivacyOn>),
     },
     Content: {
       // Right-to-left, emoji names, a long private channel, a lower-bound count, and the resolved and unsubscribed rows.

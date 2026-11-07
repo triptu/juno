@@ -39,6 +39,7 @@ import { ProfileStatusHandlers } from './profileStatus/handlers'
 import { OthersPresence } from './presence/service'
 import { MessagesHandlers } from './messages/handlers'
 import { WhoReactedHandlers } from './messages/reactorsHandlers'
+import { ReactionFeedHandlers } from './messages/reactionFeedHandlers'
 import { MembershipHandlers } from './topics/membershipHandlers'
 import { MentionsHandlers } from './mentions/handlers'
 import { NewChatHandlers } from './newchat/handlers'
@@ -142,6 +143,7 @@ export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHa
   Layer.merge(DevLogHandlers),
   Layer.merge(PicturesHandlers),
   Layer.merge(WhoReactedHandlers),
+  Layer.merge(ReactionFeedHandlers),
   Layer.merge(ChannelsHandlers),
   Layer.merge(MembershipHandlers),
   Layer.merge(ProfileStatusHandlers),

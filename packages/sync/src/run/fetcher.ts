@@ -6,6 +6,7 @@ import { applyRenamed } from '../metadata'
 import { fetchAt, fetchNewer, fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
 import { refreshUsers, wantUsers } from '../users'
 import { fetchFullReactions } from '../whoReacted'
+import { fetchFeedMessage, readReactionFeed } from '../reactionFeed'
 import { queueTopicFiles } from './files'
 
 import type { SyncServices, TopicFetcher } from '../sync'
@@ -85,6 +86,22 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
     wantUsers: (ids) => Effect.sync(() => wantUsers(ctx, ids)),
     refreshUsers: (ids) => refreshUsers(ctx, ids),
     reactors,
+    reactionFeed: shareRead(trackFetch(ctx, readReactionFeed(ctx)).pipe(Effect.provide(services))),
+    feedMessage: (channel, ts) => trackFetch(ctx, fetchFeedMessage(ctx, channel, ts)).pipe(Effect.provide(services)),
   }
   return fetcher
 })
+
+/** One run of `read` at a time: a caller that comes while it is out (the view in two windows, a reconnect while it opens) joins it. */
+function shareRead<A, E>(read: Effect.Effect<A, E>): Effect.Effect<A, E> {
+  let pending: Effect.Effect<A, E> | undefined
+  return Effect.suspend(() => {
+    if (pending !== undefined) return pending
+    return Effect.cached(read.pipe(Effect.ensuring(Effect.sync(() => { pending = undefined })))).pipe(
+      Effect.flatMap((shared) => {
+        pending = shared
+        return shared
+      }),
+    )
+  })
+}
