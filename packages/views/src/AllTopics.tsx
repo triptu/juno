@@ -453,8 +453,11 @@ const styles = stylex.create({
     borderBottomColor: colors['--border-subtle'],
   },
   // The status tabs, then the other controls at the end; on a narrow window the controls wrap under the tabs, then onto more lines.
+  // Compact, a grid of two columns: the status pop-up and Where take the rest, Kind and Sort share the second column, so
+  // both lines start and end on the same edges and the seam between them lines up.
   filters: {
-    display: 'flex',
+    display: { default: 'flex', [COMPACT]: 'grid' },
+    gridTemplateColumns: { default: null, [COMPACT]: 'minmax(0, 1fr) auto' },
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: { default: 'space-between', [COMPACT]: 'flex-start' },
@@ -466,7 +469,7 @@ const styles = stylex.create({
   statusMenu: {
     display: { default: 'none', [COMPACT]: 'contents' },
   },
-  // In a compact page the controls flow with the status pop-up, so the four take two lines, not three.
+  // In a compact page the controls flow with the status pop-up into the grid, so the four take two lines, not three.
   controls: {
     display: { default: 'flex', [COMPACT]: 'contents' },
     flexWrap: 'wrap',

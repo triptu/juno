@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import type { ConversationKind, PickConversation, PickConversations } from '@juno/contract'
-import { Popover } from '@juno/ui'
-import { ConversationList, kindIcons, loadLists, PickerButton } from './DestinationPickers'
+import { Icon, Popover, SelectButton } from '@juno/ui'
+import { ConversationList, kindIcons, loadLists } from './DestinationPickers'
 
 export interface PlacePick {
   readonly id: string
@@ -26,10 +26,10 @@ export interface PlacePickerProps {
 }
 
 /**
- * A place filter (All topics, spec section 11): Home's destination
- * button and searchable list, opening below the button, with Anywhere as
- * the list's first row. The button takes the place's tint once one is
- * picked.
+ * A place filter (All topics, spec section 11): a button drawn like the
+ * page's other pop-up buttons (`SelectButton`), with the place's kind icon,
+ * and Home's searchable list, opening below it, with Anywhere as the list's
+ * first row.
  */
 export function PlacePicker({ place, open, onOpen, query, onQuery, conversations, loading, onPick }: PlacePickerProps) {
   useEffect(() => {
@@ -37,6 +37,7 @@ export function PlacePicker({ place, open, onOpen, query, onQuery, conversations
     return () => cancelIdleCallback(idle)
   }, [])
   const button = useRef<HTMLButtonElement>(null)
+  const warm = () => void loadLists()
   const label = place?.name ?? 'Anywhere'
   // A pick puts focus back on the button, as Esc does.
   const pick = (conversation: PickConversation | undefined) => {
@@ -54,9 +55,9 @@ export function PlacePicker({ place, open, onOpen, query, onQuery, conversations
       padding="none"
       label="Pick a place"
       anchor={
-        <PickerButton ref={button} label={`Where: ${label}`} icon={place === undefined ? Globe : kindIcons[place.kind]} tint={place?.tint} muted={place === undefined} wide expanded={open} onOpen={() => onOpen(!open)}>
+        <SelectButton ref={button} size={28} fill aria-label={`Where: ${label}`} leading={<Icon icon={place === undefined ? Globe : kindIcons[place.kind]} size={13} />} expanded={open} onPointerEnter={warm} onFocus={warm} onClick={() => onOpen(!open)}>
           {label}
-        </PickerButton>
+        </SelectButton>
       }
     >
       {open ? (
