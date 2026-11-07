@@ -1039,17 +1039,17 @@ The user can delete Q by hand.
 - Test: a read-state flow in `packages/engine/test/flows` with a test clock.
 - Status: Open
 
-#### OUT-9. The action worker can run a channel's ready edit while the model holds it behind another channel's timed-out delete
+#### OUT-9. A reply that keeps a copy leaves the copy's delete row, which holds the channel's later changes
 
-Found by `bun run specs:conformance` on 2026-11-07, in the random trace `outbox-copy-11.itf.json` (seed of that run; the trace file is kept under `specs/traces/conformance/`, which git ignores).
+Found by `bun run specs:conformance` on 2026-11-07, in the random trace `outbox-copy-11.itf.json` (the trace file is kept under `specs/traces/conformance/`, which git ignores).
 
-1. Two posts in two channels, each with an action row: a delete for the first, an edit for the second that waits on its post.
-2. The first delete's `chat.delete` times out (`request_timeout`), so its row goes back to waiting with a backoff.
-3. The second post's answer arrives. The model keeps its edit waiting and puts the delete in transit again; the engine sends the edit (`chat.update`) and keeps the delete waiting.
+1. A post the network sent twice: the copy is stored and its delete queued, and Slack refuses the delete (`request_timeout`), so the row waits out a backoff.
+2. Another person replies to the copy. Sync keeps the copy (`reconcileSent`) and tries to drop its delete row, but the row it hands to `dropAction` is built with made-up fields (`createdAt: 0`), and the drop matches on them: the row stays.
+3. The user edits the kept message. The edit waits behind the stale delete row (same channel) until the row's next try, when the worker's check drops it. In the trace, the user's delete replaced the edit during that wait, so the engine sent one call where the model sent two.
 
-- Severity: low. Both rows reach Slack; only their order across channels differs from the model.
-- Evidence: the trace replays the same way every time. On the code before the outbox fixes it diverges one step later (`actAccept(1)`, step 21) instead of at `answer(2)`, step 20, so the difference predates them.
-- Status: Open. Decide whether the model or the worker is right about order across channels, then change the other.
+- Severity: low. The user's edit or delete in that channel waits for the copy delete's backoff, up to five minutes in production, after the copy was already kept.
+- Evidence: the trace replays the same way every time on a quiet machine. On a loaded machine the same trace diverges a step earlier for a different reason: the copy delete's retry fires while a post holds the send lane, and the action worker waits in the lane with it, so the user's edit is not run until the lane frees. The model does not see that wait.
+- Status: Fixed in a57f3b241 (engine) and 0f656c547 (conformance spec). `copyDeleteOf` reads the stored row, so the drop ends it. Test: `outbox-copies.flow.test.ts`, "lets the user’s edit go at once when a reply keeps a copy whose delete waits out a backoff", on a frozen clock so the backoff never ends. The wait in the lane is engine timing the harness cannot see or control, so `outbox-conformance.qnt` queues no user change while a copy delete's try may be in the lane (`copyTry`), as it already left out a delete elsewhere during that wait. The regenerated random traces also found three schedule gaps unrelated to this issue, now narrowed in the same spec: a rate-limited post's claim waits for its Retry-After (`limited`), no device deletes a message the user already deleted, and no crash comes while a post is sending (its restart lookup races the boot's catch-up). `specs/README.md`, "Conformance", lists each.
 
 ### Issue 2: Engine phase can stick and never recover
 
