@@ -57,8 +57,8 @@ export interface AccountMenuProps {
   readonly snoozed?: boolean
   /** While snoozed, "Paused until 11:11pm" beside Resume notifications: the snooze's own end. */
   readonly snoozeLabel?: string
-  /** When each Pause notifications choice would end if picked now, beside it: "3:47pm", "9am", "Mon 9am". */
-  readonly pauseEnds?: Readonly<Record<PauseChoice, string>>
+  /** When each Pause notifications choice would end if picked now, beside it: "3:47pm", "9am", "Mon 9am". A choice left out is not offered. */
+  readonly pauseEnds?: Readonly<Partial<Record<PauseChoice, string>>>
   /** One of Pause notifications' choices: Slack's snooze for that long. */
   readonly onPause?: (choice: PauseChoice) => void
   /** Privacy mode is on: the item offers Show message text instead of Hide (SPEC section 5). */
@@ -91,7 +91,6 @@ const pauseItems: ReadonlyArray<{ readonly id: PauseChoice; readonly label: stri
 
 const PAUSE_ROW = 'account-pause'
 const SIGN_OUT_ROW = 'account-signOut'
-const pauseIds = pauseItems.map((item) => `account-pause-${item.id}`)
 
 const icon = (glyph: PhosphorIcon) => <Icon icon={glyph} size={15} />
 
@@ -165,7 +164,7 @@ function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy,
  * (`useSubmenu`): on a rest of the pointer, a click, → or Enter. The list takes focus when the menu opens from the
  * keyboard, so ↓ works at once.
  */
-function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { readonly items: ReadonlyArray<Item>; readonly onAction: (action: AccountMenuAction) => void; readonly onSignOut?: () => void; readonly onPause?: (choice: PauseChoice) => void; readonly pauseEnds?: Readonly<Record<PauseChoice, string>> }) {
+function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { readonly items: ReadonlyArray<Item>; readonly onAction: (action: AccountMenuAction) => void; readonly onSignOut?: () => void; readonly onPause?: (choice: PauseChoice) => void; readonly pauseEnds?: Readonly<Partial<Record<PauseChoice, string>>> }) {
   const ids = items.filter((item) => item.disabled !== true).map((item) => `account-${item.id}`)
   const select = (id: string) => {
     if (id === PAUSE_ROW) return
@@ -177,7 +176,8 @@ function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { read
   }
   const menu = useMenuActive(ids, select)
   const choose = (id: string) => onPause?.(id.slice('account-pause-'.length) as PauseChoice)
-  const sub = useSubmenu({ triggerId: PAUSE_ROW, ids: pauseIds, onSelect: choose })
+  const offered = pauseEnds === undefined ? pauseItems : pauseItems.filter((choice) => pauseEnds[choice.id] !== undefined)
+  const sub = useSubmenu({ triggerId: PAUSE_ROW, ids: offered.map((choice) => `account-pause-${choice.id}`), onSelect: choose })
   useEffect(() => {
     // Opened from the keyboard, the list takes focus, so ↓ works at once. Opened with the pointer it does not, so no
     // focus ring appears.
@@ -219,7 +219,7 @@ function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { read
           />
         }
       >
-        {pauseItems.map((choice) => {
+        {offered.map((choice) => {
           const end = pauseEnds?.[choice.id]
           return <OptionRow key={choice.id} {...sub.row(`account-pause-${choice.id}`)} label={choice.label} {...(end === undefined ? {} : { sub: end })} onSelect={() => choose(`account-pause-${choice.id}`)} />
         })}

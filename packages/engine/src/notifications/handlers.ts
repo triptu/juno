@@ -38,7 +38,7 @@ import {
   awayHours,
   localTime,
   notifyChoice,
-  pauseChoices,
+  pauseChoicesAt,
   pauseEndHint,
   pauseMinutes,
   parseTopicId,
@@ -207,7 +207,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         ...(paused === undefined ? {} : { paused }),
         ...(settings.snoozedUntil === undefined ? {} : { snoozedUntil: settings.snoozedUntil }),
         ...(snoozeLabel === undefined ? {} : { snoozeLabel }),
-        pauseEnds: Object.fromEntries(pauseChoices.map((choice) => [choice, pauseEndHint(choice, millis, settings.notificationHours)])) as Record<PauseChoice, string>,
+        pauseEnds: Object.fromEntries(pauseChoicesAt(millis, settings.notificationHours).map((choice) => [choice, pauseEndHint(choice, millis, settings.notificationHours)])) as Partial<Record<PauseChoice, string>>,
       } satisfies NotificationStatus
     })
 

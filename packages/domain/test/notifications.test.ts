@@ -12,6 +12,8 @@ import {
   withGroupHours,
   localTime,
   pausedLabel,
+  pauseChoicesAt,
+  pauseEndHint,
   slackScheduleFor,
   scheduledPresence,
   untilLabel,
@@ -214,6 +216,26 @@ describe('hours', () => {
       dnd_enabled_saturday: 'partial', dnd_before_saturday: '11:00', dnd_after_saturday: '14:00',
       dnd_enabled_sunday: 'all_day',
     })
+  })
+})
+
+describe('pause choices', () => {
+  const SUN = 0
+  const choices = (now: number, hours: Hours | undefined) => pauseChoicesAt(now, hours).map((choice) => [choice, pauseEndHint(choice, now, hours)])
+
+  it('end at a fixed length or at a day\'s start of notifications', () => {
+    expect(choices(dateAt(3, 14, 47), notificationHours)).toEqual([['30m', '3:17pm'], ['1h', '3:47pm'], ['2h', '4:47pm'], ['tomorrow', 'Thu 9am'], ['nextWeek', 'Mon 9am']])
+    // From a Monday, next week is a week on.
+    expect(pauseEndHint('nextWeek', dateAt(MON, 10), notificationHours)).toBe('Mon 9am')
+    expect(pauseChoicesAt(dateAt(MON, 10), notificationHours)).toContain('nextWeek')
+  })
+
+  it('on a Sunday, Until next week ends with Until tomorrow and is left out', () => {
+    expect(choices(dateAt(SUN, 11), notificationHours)).toEqual([['30m', '11:30am'], ['1h', '12pm'], ['2h', '1pm'], ['tomorrow', 'Mon 9am']])
+    expect(pauseChoicesAt(dateAt(SUN, 11), undefined)).not.toContain('nextWeek')
+    // Monday's own hours move both ends alike.
+    expect(pauseChoicesAt(dateAt(SUN, 11), { ...notificationHours, dayHours: [{ day: 1, from: 10 * 60, to: 18 * 60 }] })).not.toContain('nextWeek')
+    expect(pauseChoicesAt(dateAt(SAT, 11), notificationHours)).toContain('nextWeek')
   })
 })
 
