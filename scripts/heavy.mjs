@@ -51,7 +51,10 @@ const start = startOf(process.pid)
 // A ticket or a slot names its process by PID and start: a PID the system gave to another process is not that job.
 const alive = (record) => {
   try { process.kill(record.pid, 0) } catch { return false }
-  return record.start === undefined || startOf(record.pid) === record.start
+  if (record.start === undefined) return true
+  // A `ps` that fails says nothing about the process: only a different start means the PID was reused.
+  const now = startOf(record.pid)
+  return now === undefined || now === record.start
 }
 const readJson = (path) => {
   try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return undefined }
