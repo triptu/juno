@@ -8,6 +8,7 @@ import { readUserDb, savedTabs, threadId } from '../e2e/driver/userDb'
 import { searchPage } from './driver/palette'
 import { expect } from './expect'
 import { domTest } from './test'
+import { meterOf } from './work'
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
@@ -218,4 +219,29 @@ domTest('⌘T before the saved tabs have loaded opens the new tab beside them, a
       return state.tabs.length === 4 && state.tabs.some((tab) => tab.homeDraft?.draft === 'Note kept across the relaunch')
     }).toBe(true)
   })
+})
+
+domTest('a topic clicked before the saved tabs have loaded opens in them once they load, and is the selected row', async ({ juno, relaunch, app, userData, fake }) => {
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+  await juno.sidebar.row(RINA).openInNewTab()
+  await juno.topic.expectTitle(RINA)
+  await expect.poll(() => saved(userData, fake.teamId).tabs.length).toBe(2)
+
+  const restarted = await relaunch()
+  // The engine's answer with the saved tabs is held while the click lands on the blank page.
+  const release = app.holdReplies('prefs.get')
+  await restarted.sidebar.row(ROADMAP).expectVisible()
+  await expect(restarted.tabs.root.getByRole('tab')).toHaveCount(0)
+  await restarted.sidebar.row(ROADMAP).open()
+  // The topic's header and first window reach the page before the saved tabs do, as on a slow disk, so the open is ready to apply with no tabs known.
+  const arrived = (route: string) => (meterOf(app.window).read().byRoute[route]?.messages ?? 0) > 0
+  await expect.poll(() => arrived('topics.get') && arrived('messages.list'), { timeout: 15_000 }).toBe(true)
+  release()
+  // The topic takes the active saved tab, as a click does, and the list marks it: the open ran against the saved tabs, not against none.
+  await expect(restarted.tabs.root.getByRole('tab')).toHaveCount(2, { timeout: 5_000 })
+  await restarted.topic.expectTitle(ROADMAP)
+  await restarted.tabs.expectActive('Proposal')
+  await restarted.sidebar.row(ROADMAP).expectSelected()
+  await restarted.sidebar.row(RINA).expectSelected(false)
 })

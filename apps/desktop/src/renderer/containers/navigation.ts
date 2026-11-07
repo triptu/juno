@@ -95,6 +95,7 @@ import {
   traceSend,
   untouched,
   updateTabs,
+  whenTabsKnown,
   type MessageWindowSpec,
   type OpenOptions,
   type Place,
@@ -270,8 +271,16 @@ function whenReady(view: string, fresh: boolean, target?: string): Promise<void>
   })
 }
 
-/** Changes apply in the order they were asked for. */
+/** Changes apply in the order they were asked for, and none before the saved tabs are known: one applied to no tabs would replace them (`whenTabsKnown`). */
 let queue: Promise<void> = Promise.resolve()
+
+/** Adds `step` to the queue, after the saved tabs are known and `wait` has settled. */
+function enqueue(wait: Promise<void> | undefined, step: () => void): void {
+  queue = queue
+    .then(() => whenTabsKnown(registry))
+    .then(() => wait)
+    .then(step)
+}
 /** Bumped by each change of what the window shows: a change that waited applies only if nothing replaced it since. */
 let currentTicket = 0
 
@@ -343,7 +352,7 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
   const ticket = replaceable ? ++currentTicket : currentTicket
   traceSend('tabs asked', () => ({ ticket, replaceable, ...(topic === undefined ? {} : { view: (topic.view ?? topic.id).replace('\u0000', '@'), fresh: topic.fresh }) }))
   if (topic === undefined) {
-    queue = queue.then(() => ready).then(() => {
+    enqueue(ready, () => {
       if (!replaceable || ticket === currentTicket) apply(change)
       else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
     })
@@ -359,12 +368,10 @@ function show(change: (tabs: Tabs) => Tabs, topic: Arriving | undefined, replace
         return next
       }
     : change
-  queue = queue
-    .then(() => topicReady)
-    .then(() => {
-      if (!replaceable || ticket === currentTicket) apply(landing)
-      else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
-    })
+  enqueue(topicReady, () => {
+    if (!replaceable || ticket === currentTicket) apply(landing)
+    else traceSend('tabs dropped', () => ({ ticket, current: currentTicket }))
+  })
 }
 
 /**
@@ -395,7 +402,7 @@ export function openTopicFromList(id: string, options: OpenOptions = {}): void {
  * the topic is enough (SPEC 12).
  */
 export function openTopicInBackground(id: string, { after, unlessShown = false }: { readonly after?: string; readonly unlessShown?: boolean } = {}): void {
-  queue = queue.then(() => {
+  enqueue(undefined, () => {
     const shownIn = unlessShown ? tabShowing(registry.get(tabsAtom), id) : undefined
     traceSend('background', () => ({ topic: id, ...(shownIn === undefined ? {} : { reused: shownIn.id }) }))
     if (shownIn !== undefined) return
@@ -642,7 +649,7 @@ export function openTopicAt(id: string, ts: string, options: OpenOptions & { rea
 export function openTopicAtInBackground(id: string, ts: string): void {
   flushSidebar(registry)
   flashMessage(registry, id, ts)
-  queue = queue.then(() => {
+  enqueue(undefined, () => {
     const before = new Set(registry.get(tabsAtom).tabs.map((tab) => tab.id))
     const next = updateTabs(registry, (tabs) => openPlace(tabs, topicPlace(id), { newTab: true, background: true }))
     const tab = next.tabs.find((each) => !before.has(each.id))
@@ -713,12 +720,9 @@ export function openAllTopics(options: OpenOptions = {}): void {
   }
   const ticket = ++currentTicket
   allTopicsOpenStart = performance.now()
-  const ready = whenAllTopicsReady()
-  queue = queue
-    .then(() => ready)
-    .then(() => {
-      if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
-    })
+  enqueue(whenAllTopicsReady(), () => {
+    if (ticket === currentTicket) apply((tabs) => openPlace(tabs, allTopicsPlace, options))
+  })
 }
 
 /** The topic a tab change brings on screen, if it has to wait for one. */

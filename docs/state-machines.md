@@ -578,7 +578,7 @@ Invariant: after a resubscribe, `applyListDelta` rebuilds rows from the `reset: 
 
 ### Tabs
 
-Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, per team, keepAlive), `savedTabsAtom` (l.586, `prefs.get('tabs')`, one atom for all teams), `updateTabs` (l.640), `saveTabsSoon` (l.612), `savedHomeDraftAtom` (l.594).
+Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, per team, keepAlive), `savedTabsAtom` (l.586, `prefs.get('tabs')`, one atom for all teams), `tabsKnown` and `whenTabsKnown` (l.640-665), `updateTabs` (l.668), `saveTabsSoon` (l.612), `savedHomeDraftAtom` (l.594).
 
 | Condition | `tabsAtom` value |
 |---|---|
@@ -586,14 +586,15 @@ Where: `tabsAtom` (`packages/state/src/tabs.ts:630`), `changedTabsAtom` (l.627, 
 | `changedTabsAtom(team)` set (anything changed this run) | the changed set |
 | saved pref has answered | the saved set |
 | saved pref has not answered | `noTabs` |
+| saved pref read failed | `noTabs`; the tabs count as known, so the app goes on with none |
 
 Each tab holds a history (`entries`, `index`, at most 50). The strip keeps a `closed` list (at most 20). `updateTabs` writes `changedTabsAtom` and saves the whole set, Home drafts and Search sessions included, through `prefs.set`.
 
-Invariant: no change is applied before the saved tabs are known. A change asked for earlier waits for them (REN-1, fixed). The variant across a workspace switch in the same run is still open, since the saved-tabs atom is shared across teams.
+Invariant: no change is applied before the saved tabs are known. The navigation queue waits for them (`whenTabsKnown`) before each step, so the step runs against the real tabs and its follow-up work (the selected topic, a fresh open's window and position, a background tab's window) sees the real result; `updateTabs` before that returns the tabs unchanged (REN-1, fixed). The variant across a workspace switch in the same run is still open, since the saved-tabs atom is shared across teams.
 
 ### Navigation queue
 
-Where: `containers/navigation.ts`. A global promise `queue`, `currentTicket` (l.275), `pending` (the open being measured), `waitingTabChange`. `whenReady` (l.221).
+Where: `containers/navigation.ts`. A global promise `queue` and `enqueue` (l.275-283, each step after `whenTabsKnown`), `currentTicket` (l.285), `latestRequest` (l.296), `pending` (the open being measured), `waitingTabChange`. `whenReady` (l.223).
 
 | Event | Effect | Code |
 |---|---|---|
@@ -1291,6 +1292,7 @@ Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` is
 - Test: DOM lane, `apps/desktop/dom/tabs-relaunch.test.ts`. Save tabs including a Home tab with a draft, relaunch, hold the workspace open, send ⌘T before the first sidebar row, then expect the saved tabs and the Home draft after load and in `prefs.tabs`.
 - Fix direction: gate `updateTabs` on a "saved tabs known" flag, or merge into the saved set once it arrives.
 - Status: Fixed in 8a94b311b. A change asked for before the saved tabs load waits for them. Test: `tabs-relaunch.test.ts`, "⌘T before the saved tabs have loaded opens the new tab beside them, and keeps the Home draft saved with them". The variant across a workspace switch is still open.
+- Review found two faults in that fix. The tabs reducer held the change and returned the tabs unchanged, so the caller's follow-up ran against no tabs: `apply` cleared the selected topic, a fresh open skipped its landing window and position, and a background open found no tab for its window; and a failed saved-tabs read kept every change held for the run. Fixed: the hold moved out of the reducer into the navigation queue, which waits for `whenTabsKnown` before each step (a failed read counts as known, so the app goes on with no tabs, as before 8a94b311b), and `updateTabs` before that returns the tabs unchanged. Test: `tabs-relaunch.test.ts`, "a topic clicked before the saved tabs have loaded opens in them once they load, and is the selected row".
 
 #### REN-2. A Slack link, source link or person link opens its topic seconds after the user moved on, and takes the tab and focus
 

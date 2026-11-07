@@ -108,6 +108,7 @@ export {
   searchPlace,
   replaceInTab,
   updateTabs,
+  whenTabsKnown,
   samePlace,
   setHomeDraft,
   type OpenOptions,
