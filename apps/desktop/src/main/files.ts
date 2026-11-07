@@ -33,9 +33,13 @@ import { readdir, readFile, rm } from 'node:fs/promises'
 import { join, parse } from 'node:path'
 import type { DownloadResult } from '@juno/contract'
 import { publicImage } from './publicImage'
+import { HostPauses } from './rateLimit'
 import { SLACK_PARTITION } from './slackSession'
 
 const SLACK_FILE_HOSTS = ['files.slack.com', 'slack-files.com', 'secure.gravatar.com']
+
+/** File hosts that answered 429, left alone until their `Retry-After` passes. */
+const pauses = new HostPauses()
 
 /** The thumbnail url of a `juno://files` request when it points at a host Juno may fetch from, else undefined. */
 export function thumbnailUrl(request: URL, extraOrigin: string | undefined): URL | undefined {
@@ -73,7 +77,9 @@ function isSignInPage(url: URL): boolean {
  * sign-in page answers 404 for every variant. A `video` or `audio` variant
  * answers only its kind, with `range` passed to Slack and its partial
  * answer passed back. A `content` variant answers what Slack serves, for
- * the app's page alone (`origin`).
+ * the app's page alone (`origin`). A host that answered 429 is not asked
+ * again until its `Retry-After` passes; until then every request for it
+ * answers 503 here, with the seconds left.
  */
 export async function serveThumbnail(request: URL, extraOrigin: string | undefined, range?: string | null, origin?: string | null): Promise<Response> {
   let url = thumbnailUrl(request, extraOrigin)
@@ -82,6 +88,8 @@ export async function serveThumbnail(request: URL, extraOrigin: string | undefin
   const variant = request.host === 'files' ? (request.pathname.split('/')[2] ?? '') : ''
   const streamed = STREAMED[variant]
   const content = variant === 'content'
+  const pausedFor = pauses.remainingSeconds(url.host, Date.now())
+  if (pausedFor !== undefined) return new Response('Rate limited', { status: 503, headers: { 'retry-after': String(pausedFor) } })
   try {
     const session = electronSession.fromPartition(SLACK_PARTITION)
     // A video plays for minutes and a long PDF takes a while; only their first answer has to come quickly.
@@ -95,6 +103,11 @@ export async function serveThumbnail(request: URL, extraOrigin: string | undefin
       url = location === null ? undefined : slackFileUrl(new URL(location, url).toString(), extraOrigin)
       if (url === undefined || isSignInPage(url)) return new Response('Not found', { status: 404 })
       response = await get(url)
+    }
+    if (response.status === 429) {
+      pauses.pause(url.host, response.headers.get('retry-after'), Date.now())
+      await response.body?.cancel()
+      return new Response('Rate limited', { status: 503, headers: { 'retry-after': String(pauses.remainingSeconds(url.host, Date.now()) ?? 0) } })
     }
     const type = response.headers.get('content-type') ?? ''
     if (streamed !== undefined) {
