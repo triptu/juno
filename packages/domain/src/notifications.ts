@@ -321,13 +321,18 @@ export function pausedLabel(now: number, notificationHours: Hours | undefined, s
   const end = pausedUntil(now, notificationHours, snoozedUntil)
   if (end === undefined) return undefined
   if (end === null) return 'Paused'
+  const { days, time, day } = endParts(now, end)
+  if (days === 0) return `Paused until ${time}`
+  if (days === 1) return `Paused until tomorrow ${time}`
+  return `Paused until ${day} ${time}`
+}
+
+/** A time `end` after `now` (epoch milliseconds) in local time: days ahead by the calendar, "9am", and "Mon". */
+export function endParts(now: number, end: number): { readonly days: number; readonly time: string; readonly day: string } {
   const from = new Date(now)
   const to = new Date(end)
   const days = Math.round((new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime() - new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()) / 86_400_000)
-  const time = hourLabel(to.getHours() * 60 + to.getMinutes())
-  if (days === 0) return `Paused until ${time}`
-  if (days === 1) return `Paused until tomorrow ${time}`
-  return `Paused until ${dayNames[to.getDay()]} ${time}`
+  return { days, time: hourLabel(to.getHours() * 60 + to.getMinutes()), day: dayNames[to.getDay()] as string }
 }
 
 export type Presence = 'active' | 'away'

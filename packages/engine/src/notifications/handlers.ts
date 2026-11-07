@@ -31,12 +31,15 @@ import {
   type NotificationsPage,
   type NotificationStatus,
   type NotifyTargetView,
+  type PauseChoice,
 } from '@juno/contract'
 import {
   alwaysNotifyOf,
   awayHours,
   localTime,
   notifyChoice,
+  pauseChoices,
+  pauseEndHint,
   pauseMinutes,
   parseTopicId,
   pausedLabel,
@@ -198,10 +201,13 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       const label = presenceLabel(now, shown, hours)
       const note = presence === null ? undefined : seenNote(presence, seen)
       const paused = pausedLabel(millis, settings.notificationHours, settings.snoozedUntil)
+      const snoozeLabel = settings.snoozedUntil === undefined ? undefined : pausedLabel(millis, undefined, settings.snoozedUntil)
       return {
         presence, seen: seen ?? null, presenceLabel: note === undefined ? label : `${label}. ${note}`,
         ...(paused === undefined ? {} : { paused }),
         ...(settings.snoozedUntil === undefined ? {} : { snoozedUntil: settings.snoozedUntil }),
+        ...(snoozeLabel === undefined ? {} : { snoozeLabel }),
+        pauseEnds: Object.fromEntries(pauseChoices.map((choice) => [choice, pauseEndHint(choice, millis, settings.notificationHours)])) as Record<PauseChoice, string>,
       } satisfies NotificationStatus
     })
 

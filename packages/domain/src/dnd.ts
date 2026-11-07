@@ -4,7 +4,7 @@
  * for a while, and the scheduled pause, which Slack's server works out from
  * each person's notification schedule.
  */
-import { hoursOn, type Hours, type Weekday } from './notifications'
+import { endParts, hoursOn, type Hours, type Weekday } from './notifications'
 
 /** One person's Do Not Disturb as `dnd.teamInfo` or `dnd.info` gives it. Times are Unix seconds. */
 export interface SlackDnd {
@@ -70,4 +70,13 @@ export function pauseMinutes(choice: PauseChoice, now: number, notificationHours
       return Math.max(1, Math.ceil((date.getTime() - now) / 60_000))
     }
   }
+}
+
+/**
+ * When a choice would end the pause if picked at `now`, as the menu shows it beside the choice: "3:47pm", "9am"
+ * (today or tomorrow), "Mon 9am" (later). The same end the snooze gets: `now` plus `pauseMinutes`.
+ */
+export function pauseEndHint(choice: PauseChoice, now: number, notificationHours: Hours | undefined): string {
+  const { days, time, day } = endParts(now, now + pauseMinutes(choice, now, notificationHours) * 60_000)
+  return days <= 1 ? time : `${day} ${time}`
 }

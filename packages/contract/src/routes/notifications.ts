@@ -32,7 +32,9 @@
  * - `notifications.pause` and `notifications.resume` are Pause notifications
  *   and Resume notifications: Slack's own snooze (`dnd.setSnooze`,
  *   `dnd.endSnooze`), so every Slack client goes quiet. While it runs the
- *   status has `snoozedUntil` and `paused` says until when.
+ *   status has `snoozedUntil`, and `snoozeLabel` says until when; `paused`
+ *   says when notifications come back, by the snooze and the hours.
+ *   `pauseEnds` is when each choice would end if picked now.
  * - `notifications.useJunoHours` writes the notification hours to Slack's
  *   schedule again after it was changed in Slack.
  * - Hours start not set: the notification hours are then Slack's schedule,
@@ -197,6 +199,10 @@ export const notificationsPage = liveValueRoute('notifications.page', { value: N
 export const PresenceValue = Schema.Literals(['active', 'away'])
 export type PresenceValue = typeof PresenceValue.Type
 
+/** Slack's Pause notifications choices: 30 minutes, 1 hour, 2 hours, Until tomorrow, Until next week. */
+export const PauseChoice = Schema.Literals(pauseChoices)
+export type PauseChoice = typeof PauseChoice.Type
+
 export const NotificationStatus = Schema.Struct({
   /** The presence setting (Slack's `manual_presence`), once known: what Set yourself away or active and the active hours change. */
   presence: Schema.NullOr(PresenceValue),
@@ -208,6 +214,10 @@ export const NotificationStatus = Schema.Struct({
   paused: Schema.optionalKey(Schema.String),
   /** While Slack's snooze runs (Pause notifications): when it ends, in epoch milliseconds. The menu then offers Resume notifications. */
   snoozedUntil: Schema.optionalKey(Schema.Number),
+  /** While Slack's snooze runs: "Paused until 11:11pm", the snooze's own end, for Resume notifications. */
+  snoozeLabel: Schema.optionalKey(Schema.String),
+  /** When each Pause notifications choice would end if picked now: "3:47pm", "9am", "Mon 9am". */
+  pauseEnds: Schema.Record(PauseChoice, Schema.String),
 })
 export type NotificationStatus = typeof NotificationStatus.Type
 
@@ -294,10 +304,6 @@ export const notificationsSetPresence = Rpc.make('notifications.setPresence', {
   success: Schema.Struct({ sent: Schema.Boolean }),
   error: NotSignedIn,
 })
-
-/** Slack's Pause notifications choices: 30 minutes, 1 hour, 2 hours, Until tomorrow, Until next week. */
-export const PauseChoice = Schema.Literals(pauseChoices)
-export type PauseChoice = typeof PauseChoice.Type
 
 /** Pauses notifications with Slack's snooze. `until` is when it ends, in epoch milliseconds; null when Slack did not take it. */
 export const notificationsPause = Rpc.make('notifications.pause', {
