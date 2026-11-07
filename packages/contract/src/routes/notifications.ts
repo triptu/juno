@@ -216,8 +216,8 @@ export const NotificationStatus = Schema.Struct({
   snoozedUntil: Schema.optionalKey(Schema.Number),
   /** While Slack's snooze runs: "Paused until 11:11pm", the snooze's own end, for Resume notifications. */
   snoozeLabel: Schema.optionalKey(Schema.String),
-  /** When each Pause notifications choice would end if picked now: "3:47pm", "9am", "Mon 9am". */
-  pauseEnds: Schema.Record(PauseChoice, Schema.String),
+  /** When each Pause notifications choice offered now would end if picked: "3:47pm", "9am", "Mon 9am". A choice left out is not offered (Until next week on a Sunday). */
+  pauseEnds: Schema.Record(PauseChoice, Schema.optionalKey(Schema.String)),
 })
 export type NotificationStatus = typeof NotificationStatus.Type
 

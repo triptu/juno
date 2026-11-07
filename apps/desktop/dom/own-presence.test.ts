@@ -17,6 +17,9 @@ domTest('a choice from the avatar menu wins over the active hours through a wake
     await accountMenu.open()
     await expect(accountMenu.root.getByText(/^Away/)).toBeVisible()
     await expect(accountMenu.root.locator('[data-paused][data-presence="away"]')).toHaveCount(1)
+    // The hours' pause is said once, on Pause notifications.
+    await expect(accountMenu.item(/^Pause notifications/)).toContainText('Paused until')
+    await expect(accountMenu.item(/^Notification settings/)).not.toContainText('Paused until')
     await expect(button.locator('[data-paused][data-presence="away"]')).toHaveCount(1)
     await expect.poll(() => sent().slice(before)).toEqual(['away'])
     await accountMenu.close()

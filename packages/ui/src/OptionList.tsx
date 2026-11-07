@@ -68,7 +68,7 @@ export interface OptionRowProps {
   readonly selected?: boolean
   readonly disabled?: boolean
   readonly size?: OptionRowSize
-  /** A 32px row with a second line under its label (the account menu's hints): the icon stays centred on the first line. */
+  /** A 32px row with a second line under its label (the account menu's hints): the icon and `trailing` stay centred on the first line. */
   readonly leadingOnFirstLine?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
@@ -133,7 +133,7 @@ export function OptionRow({
       </span>
       {sub !== undefined && subPlacement === 'end' ? <span {...stylex.props(styles.subEnd, typeVariants.tag)}>{sub}</span> : null}
       {trailing || selected ? (
-        <span {...stylex.props(styles.trailing)}>
+        <span {...stylex.props(styles.trailing, leadingOnFirstLine && styles.leadingFirstLine)}>
           {trailing}
           {selected ? <Icon icon={Check} size={14} weight="bold" /> : null}
         </span>

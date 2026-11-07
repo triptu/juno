@@ -159,14 +159,13 @@ const styles = stylex.create({
     paddingInline: spacing['--space-3-5'],
     boxSizing: 'border-box',
   },
-  // 40px at one line (the textarea's 9 + 22 + 9): the row reaches into the field's 1px border, as the topic composer's does.
+  // 40px at one line (the 1px border and the textarea's 8 + 22 + 8), as the topic composer is; the row stays inside the border.
   row: {
     display: 'flex',
     alignItems: 'flex-end',
     flexGrow: 1,
     minWidth: 0,
     gap: spacing['--space-1'],
-    marginBlock: '-1px', // tokens-allow: Overlap the composer border by one pixel.
   },
   // A 28px leading control sits 6px in, as the send button does at the end; the context chips keep their place.
   boxWithLeading: {
@@ -181,9 +180,10 @@ const styles = stylex.create({
     paddingTop: spacing['--space-1-5'],
     minWidth: 0,
   },
+  // 6px from the field's outer edge, its border included.
   send: {
     display: 'inline-flex',
     flexShrink: 0,
-    paddingBlock: spacing['--space-1-5'],
+    paddingBlock: `calc(${spacing['--space-1-5']} - ${spacing['--space-pixel']})`,
   },
 })

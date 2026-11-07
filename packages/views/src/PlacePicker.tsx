@@ -50,6 +50,8 @@ export function PlacePicker({ place, open, onOpen, query, onQuery, conversations
       onClose={() => onOpen(false)}
       placement="bottom-start"
       width="picker"
+      // Inside All topics' filter row, so a narrow page's panel ends on the controls' edge, not past it.
+      within="[data-all-topics-filters]"
       maxHeight="none"
       layer="picker"
       padding="none"

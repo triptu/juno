@@ -238,8 +238,8 @@ const styles = stylex.create({
     paddingInline: spacing['--space-1-5'],
     minWidth: 0,
   },
-  // The row is 40px at one line (the textarea's 9 + 22 + 9). It reaches into the field's 1px border,
-  // so the field is 40px tall too, like the ComposerSlot it replaces.
+  // The field is 40px at one line: its 1px border and the textarea's 8 + 22 + 8, like the ComposerSlot it replaces.
+  // The row stays inside the border, so scrolled text is cut below it, never drawn over it.
   row: {
     display: 'flex',
     alignItems: 'flex-end',
@@ -248,15 +248,15 @@ const styles = stylex.create({
     paddingInlineStart: spacing['--space-3-5'],
     paddingInlineEnd: spacing['--space-1-5'],
     gap: spacing['--space-1'],
-    marginBlock: '-1px', // tokens-allow: Overlap the composer border by one pixel.
   },
   // A 28px leading control sits 6px in, as the send button does at the end.
   rowWithLeading: {
     paddingInlineStart: spacing['--space-1-5'],
   },
+  // 6px from the field's outer edge, its border included.
   send: {
     display: 'inline-flex',
     flexShrink: 0,
-    paddingBlock: spacing['--space-1-5'],
+    paddingBlock: `calc(${spacing['--space-1-5']} - ${spacing['--space-pixel']})`,
   },
 })

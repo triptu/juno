@@ -107,10 +107,12 @@ const styles = stylex.create({
     maxWidth: layout['--composer-width'],
     marginBlock: spacing['--space-0-5'],
   },
+  // The textarea's 8px inset and this 1px start the text 10px in from the outer edge.
   box: {
     display: 'flex',
     width: '100%',
     anchorName: '--composer-box',
+    paddingBlock: spacing['--space-pixel'],
     paddingInline: spacing['--space-3'],
     boxSizing: 'border-box',
   },

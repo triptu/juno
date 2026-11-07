@@ -314,9 +314,9 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing['--space-2'],
   },
-  // Over detail lines the label is the title: one weight up from them.
+  // Over detail lines the label is the title: semibold, so it reads as one at the tooltip's small size.
   title: {
-    fontWeight: weights['--weight-medium'],
+    fontWeight: weights['--weight-semibold'],
   },
   keys: {
     display: 'inline-flex',

@@ -74,6 +74,15 @@ export function pauseMinutes(choice: PauseChoice, now: number, notificationHours
 }
 
 /**
+ * The choices the menu offers at `now`. On a Sunday, Until tomorrow and Until next week both end on Monday at the
+ * same moment, so Until next week is left out.
+ */
+export function pauseChoicesAt(now: number, notificationHours: Hours | undefined): ReadonlyArray<PauseChoice> {
+  const sameEnd = pauseMinutes('nextWeek', now, notificationHours) === pauseMinutes('tomorrow', now, notificationHours)
+  return sameEnd ? pauseChoices.filter((choice) => choice !== 'nextWeek') : pauseChoices
+}
+
+/**
  * When a choice would end the pause if picked at `now`, as the menu shows it beside the choice, in `endTime`'s form:
  * "3:47pm" today, "Sun 9am" or "Mon 9am" on another day. The same end the snooze gets: `now` plus `pauseMinutes`.
  */

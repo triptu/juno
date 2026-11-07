@@ -538,7 +538,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-lg` | 32px | Nav buttons, menu items, rule selects, Add |
 | `--control-xl-` | 34px | Filter search, suggestion chips, Open notification settings, To-picker rows |
 | `--control-xl` | 36px | topic-list items in Juno cards, reply options (min), title input |
-| `--field-min` | 40px | Composer textarea single line (`--composer-padding-block` 9 + `--composer-line-height` 22 + 9), To field 44 |
+| `--field-min` | 40px | Composer single line (1px border + `--composer-padding-block` 8 + `--composer-line-height` 22 + 8 + 1px border), To field 44 |
 | `--row-44` / `--row-48` / `--row-52` | 44, 48, 52px | Today log row, notification rule row, All topics table row (ListRow `minHeight`) |
 | `--row-topic-estimate` | 66px | A sidebar row's content box (title, one-line preview, meta), rounded up to a whole pixel. The row's fixed height is this plus its block padding (88px Comfortable), and it is the exact `contain-intrinsic-size` for rows off screen (performance.md 3.2) |
 | `--row-message-estimate` | 56px | The same estimate for message rows off screen (performance.md 3.3): a name line and one body line, without the row's block padding |
@@ -607,7 +607,7 @@ Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title
 
 ### Composer
 
-Single line 40px; grows to `max-height` then scrolls inside, the text fading out over the top 16px once scrolled (primitives, `Textarea`). `--composer-max-height: max(194px, 45vh)`: about half the window's height, as Slack grows its composer, and never under 8 lines (9 + 8×22 + 9). 45 rather than 50 leaves the composer's padding and attachments inside the half. A viewport unit, not a container unit: a size container on the topic tripled style work per keystroke. Juno input max 160px.
+Single line 40px; grows to `max-height` then scrolls inside, the text fading out over the top 16px once scrolled (primitives, `Textarea`). `--composer-max-height: max(192px, 45vh)`: about half the window's height, as Slack grows its composer, and never under 8 lines (8 + 8×22 + 8). 45 rather than 50 leaves the composer's padding and attachments inside the half. A viewport unit, not a container unit: a size container on the topic tripled style work per keystroke. Juno input max 160px.
 
 A field Textarea (a note or pin under edit on What Juno remembers) grows the same way to 176px, a constant in `Textarea.tsx`: 8 lines of ui text (13.5 × 1.5) plus its 6px insets and 1px border.
 
@@ -726,7 +726,7 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | `--foreground-muted` 52% L in the CSS file | 42% L (the prototype's runtime override) |
 | Focus ring in `--selection-background` | `--focus-ring` = `--info` light, `hsla(200, 80%, 65%)` dark (decided) |
 | Cyan accent with off-white text (3.8:1) | Cyan takes near-black `--hl-fg` (`hsla(48, 10%, 2%)`) |
-| Composer max 184px | `max(194px, 45vh)`: about half the window, never under 8 full lines |
+| Composer max 184px | `max(192px, 45vh)`: about half the window, never under 8 full lines |
 | Söhne / Meraki | Figtree / Instrument Serif, bundled (Inter was the first replacement; swapped for Figtree in the friendly-layer options review) |
 | Global letter-spacing 0.02em in CSS file | 0 (Figtree; 0.01em was the Inter value) |
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
