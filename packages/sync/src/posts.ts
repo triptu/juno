@@ -21,6 +21,7 @@ import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { storedMe } from './me'
 import { reindexTopics } from './reindex'
+import { queueFileDeletes } from './fileDeletes'
 import { discardStartedThread } from './startedThreads'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
@@ -239,6 +240,14 @@ export const rewritePost = (post: PendingPost, text: string, blocksJson: string 
 export const deferLookup = (clientMsgId: string, nextAt: number) => move(clientMsgId, ['unknown'], 'unknown', { nextAt, attempt: true })
 
 /**
+ * Refusals after which Slack may still show a failed post with its files. `failLookup` stores them when a post
+ * whose answer was lost cannot be looked up because its channel was archived, left or removed: the post may have
+ * gone in before. Removing such a row keeps its files in Slack, since deleting them would empty a message people
+ * can still read. The same codes from a refused post keep its files too, which only leaves a private file.
+ */
+const MAYBE_IN_SLACK = new Set(['channel_not_found', 'is_archived', 'not_in_channel'])
+
+/**
  * Slack refuses the lookup for good (`thread_not_found`, `channel_not_found`, `is_archived`, `not_in_channel`;
  * the worker's `LOOKUP_REFUSED`): no lookup can read the message, so the row waits for Retry or Delete draft
  * instead of asking forever and holding the channel's later posts.
@@ -311,11 +320,14 @@ export const discardPost = (clientMsgId: string): Effect.Effect<boolean, SqlErro
  * Removes a post Slack has not got: Delete draft on a failed row, or the
  * user's delete of a queued one (`actions.ts`). A root started from Home
  * takes its thread and the replies that waited on it (`startedThreads.ts`).
+ * The files it had uploaded are deleted in Slack (`fileDeletes.ts`), unless
+ * Slack may still show the post (`MAYBE_IN_SLACK`).
  */
 export const removePost = (post: PendingPost): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${post.clientMsgId}`
+    if (!(post.state === 'failed' && post.lastError !== null && MAYBE_IN_SLACK.has(post.lastError))) yield* queueFileDeletes(post, yield* Clock.currentTimeMillis)
     if (post.threadTs === undefined) yield* discardStartedThread(post.channel, post.clientMsgId)
     yield* touch(post)
   })

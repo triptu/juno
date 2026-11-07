@@ -15,6 +15,11 @@
  *
  * `files.info` answers the file as Slack holds it now, with its thumbnails
  * once Slack has made them.
+ *
+ * `files.delete` removes a file. Live (research section 10, "Files", the
+ * 2026-11-07 check): a completed, unshared file answers `ok`; after that,
+ * and for an upload never completed, `files.info` and `files.delete` answer
+ * `file_deleted`. So a repeated delete is safe.
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
@@ -70,3 +75,9 @@ export type FilesInfoArgs = typeof FilesInfoArgs.Type
 
 /** Also `comments` and `paging`, which Juno does not read. */
 export const FilesInfoFields = { file: File } as const
+
+export const FilesDeleteArgs = S.Struct({ file: S.String })
+export type FilesDeleteArgs = typeof FilesDeleteArgs.Type
+
+/** The answer is `{ ok }` alone. */
+export const FilesDeleteFields = {} as const
