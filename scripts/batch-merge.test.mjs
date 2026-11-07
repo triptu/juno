@@ -105,6 +105,20 @@ test('attribution in a commit body blocks publication', (t) => {
   assert.doesNotMatch(readFileSync(resolve(f.dir, '.juno-status/batches/batch-1.log'), 'utf8'), /\$ git push/)
 })
 
+test('a subject that names the Codex feature publishes, and a Codex trailer in the body does not', (t) => {
+  const f = fixture(t)
+  f.branch('one', { 'one.txt': 'one\n' }, 'Codex: a quit during sign-in starts no login')
+  // The fixture has no origin, so a batch that passes the check stops at the fetch before its push.
+  const published = f.batch(['--push', 'one'])
+  assert.doesNotMatch(published.stderr, /attribution line/)
+  assert.match(published.stderr, /git fetch origin/)
+  const g = fixture(t)
+  g.branch('two', { 'two.txt': 'two\n' }, 'Add file\n\nCodex: wrote this')
+  const result = g.batch(['--push', 'two'])
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /attribution line/)
+})
+
 test('decision check rejects stale output and a mismatched fragment without overwriting the log', (t) => {
   const f = fixture(t)
   f.write('docs/decisions/log/2026-10-17-0055-new.md', '- 10-17 ~00:55 · Test · New decision.\n')

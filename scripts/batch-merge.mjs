@@ -121,10 +121,16 @@ function regenerate() {
 }
 
 function checkMessages() {
-  const messages = git(state.worktree, 'log', `${state.base}..HEAD`, '--format=%H%n%B%x00')
+  const messages = git(state.worktree, 'log', `${state.base}..HEAD`, '--format=%B%x00').split('\0')
   // Reject attribution trailers and common generated/assisted-by signatures.
-  const attribution = /^\s*(?:co-authored-by\s*:|(?:.*\b)?(?:generated|written|authored|assisted|powered|created)\s+(?:with|by|using)\b.*\b(?:ai|claude|codex|chatgpt|openai|copilot|gemini|anthropic)\b|(?:ai[- ](?:attribution|generated|assisted)|(?:claude|codex|chatgpt|copilot))\s*:)/im
-  if (attribution.test(messages)) throw new Error('Batch contains a commit attribution line; remove it before publishing')
+  const signature = /^\s*(?:co-authored-by\s*:|(?:.*\b)?(?:generated|written|authored|assisted|powered|created)\s+(?:with|by|using)\b.*\b(?:ai|claude|codex|chatgpt|openai|copilot|gemini|anthropic)\b)/im
+  // A `Claude:` or `Codex:` trailer counts in the body only: a subject may name a feature, as in "Codex: sign-in ...".
+  const trailer = /^\s*(?:ai[- ](?:attribution|generated|assisted)|claude|codex|chatgpt|copilot)\s*:/im
+  const attributed = messages.some((message) => {
+    const body = message.trim().split('\n').slice(1).join('\n')
+    return signature.test(message) || trailer.test(body)
+  })
+  if (attributed) throw new Error('Batch contains a commit attribution line; remove it before publishing')
 }
 
 function publish(checkedHead) {
