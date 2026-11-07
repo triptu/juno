@@ -26,7 +26,8 @@ domTest('Pause notifications for 1 hour from the keyboard snoozes Slack and hold
     await expect(button.locator('[data-paused]')).toHaveCount(0)
     await button.press('Enter')
     await expect(account).toBeFocused()
-    for (let row = 0; row < 4; row++) await press('ArrowDown')
+    // Your status, away, hide message text, notification settings, then Pause notifications.
+    for (let row = 0; row < 5; row++) await press('ArrowDown')
     await expect(account).toHaveAttribute('aria-activedescendant', 'account-pause')
     await press('ArrowRight')
     await expect(choices).toBeFocused()
