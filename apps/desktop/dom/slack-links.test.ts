@@ -26,8 +26,8 @@ const find = (fake: FakeSlack, start: string) => fake.messages('C0ENG').find((me
 const permalink = (fake: FakeSlack, ts: string, threadTs?: string) =>
   `${fake.url}/archives/C0ENG/p${ts.replace('.', '')}${threadTs === undefined ? '' : `?thread_ts=${threadTs}&cid=C0ENG`}`
 
-/** Seeds a reply in the Postgres thread holding one link of each kind. */
-function seedLinks(fake: FakeSlack): void {
+/** Seeds a reply in the Postgres thread holding one link of each kind. Returns the old thread's root, which Juno has not stored. */
+function seedLinks(fake: FakeSlack): { readonly oldThreadTs: string } {
   const root = find(fake, POSTGRES)
   const main = find(fake, 'preview environments never shut down')
   const reply = find(fake, 'Please do.')
@@ -48,6 +48,7 @@ function seedLinks(fake: FakeSlack): void {
       `and <${OTHER}|elsewhere>.`,
     ].join(' '),
   })
+  return { oldThreadTs: oldRoot.ts }
 }
 
 /** Opens the Postgres thread and returns its links by their words. */
@@ -165,11 +166,12 @@ domTest('of two links clicked before either answers, the later one opens and the
 })
 
 domTest('a thread opened while Slack is slowing Juno down says so, and shows its replies once the pause ends, in the same tab', async ({ juno, fake }) => {
-  seedLinks(fake)
+  const { oldThreadTs } = seedLinks(fake)
   const link = await openLinks(juno)
   const { topic, tabs } = juno
-  // Slack's next answer to a thread fetch is a 429 whose Retry-After is longer than an interactive call waits out.
-  fake.force429({ method: 'conversations.replies', retryAfter: 2, times: 1 })
+  // Slack's next answer to this thread's fetch is a 429 whose Retry-After is longer than an interactive call waits out.
+  // Only this thread's: the sync's own reads of other threads must not take it.
+  fake.force429({ method: 'conversations.replies', retryAfter: 2, times: 1, where: { ts: oldThreadTs } })
 
   // The thread opens in a new tab with what the store has: nothing, since Juno never stored it, so not even its title.
   await link('the old thread').click()
