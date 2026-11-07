@@ -1,5 +1,5 @@
 import type { RowChannel } from '@juno/contract'
-import { registry, sidebarFilterAtom } from '@juno/state'
+import { registry, sidebarFilterAtom, sidebarPaneAtom } from '@juno/state'
 import { chunk } from './chunks'
 import { markFilterChange } from './filterMark'
 
@@ -15,6 +15,7 @@ export function scopeToChannel(channel: string): void {
   // The scope wins over a view, so the view's pill gives way to All.
   const { view: _view, ...filter } = registry.get(sidebarFilterAtom)
   registry.set(sidebarFilterAtom, { ...filter, scope: channel })
+  registry.set(sidebarPaneAtom, 'topics')
 }
 
 const menu = chunk(() => import('./ChannelMenu'))

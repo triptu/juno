@@ -14,6 +14,7 @@ import {
   sidebarDotAtom,
   sidebarFilterAtom,
   sidebarListAtom,
+  sidebarPaneAtom,
   signedInAtom,
   sessionProfileAtom,
   syncNoticeAtom,
@@ -37,7 +38,8 @@ import { readingOnly } from './readingOnly'
 import { sidebarTop } from './sidebarTop'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
-import { closeViewSheet, moveView, newView, selectKind, selectView, showViewPillMenu } from './viewActions'
+import { ReactionList } from './ReactionList'
+import { closeViewSheet, moveView, newView, selectKind, selectReactions, selectView, showViewPillMenu } from './viewActions'
 
 // Popover content warms on idle; the sidebar chrome stays in the initial bundle.
 const viewSheet = chunk(() => import('./ViewSheet'))
@@ -106,6 +108,7 @@ export function Sidebar() {
     return () => cancelIdleCallback(idle)
   }, [reading])
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
+  const reactions = useAtomValue(sidebarPaneAtom) === 'reactions'
   const views = useAtomValue(viewPillsAtom)
   const sheet = useAtomValue(viewSheetAtom)
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
@@ -175,6 +178,7 @@ export function Sidebar() {
     newViewOpen: sheet?.mode === 'new',
     onViewMenu: (id: string) => void showViewPillMenu(id),
     onMoveView: moveView,
+    onFilterReactions: selectReactions,
   }
 
   return (
@@ -182,7 +186,7 @@ export function Sidebar() {
       titlebarLeading={<TitlebarNav />}
       fullScreen={fullScreen}
       {...(reading ? READING : full)}
-      filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
+      filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view, reactions }}
       dots={dots}
       {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}
       {...(activeNav === undefined ? {} : { activeNav })}
@@ -206,7 +210,7 @@ export function Sidebar() {
       onPrivacyOff={() => setPrivacy(false)}
       syncing={!connected || !caughtUp}
     >
-      <TopicList />
+      {reactions ? <ReactionList /> : <TopicList />}
     </SidebarView>
   )
 }

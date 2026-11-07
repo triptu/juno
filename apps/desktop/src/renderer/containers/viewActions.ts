@@ -21,7 +21,7 @@ import {
   type ViewMenuAction,
   type ViewPillAction,
 } from '@juno/contract'
-import { popupContextMenu, registry, runAction, runCommand, sidebarFilterAtom, viewSheetAtom, viewsAtom } from '@juno/state'
+import { popupContextMenu, registry, runAction, runCommand, sidebarFilterAtom, sidebarPaneAtom, viewSheetAtom, viewsAtom } from '@juno/state'
 import { Exit } from 'effect'
 import { startTransition } from 'react'
 import { markFilterChange } from './filterMark'
@@ -30,10 +30,23 @@ import { nativeMenu } from './notifyActions'
 /** A conversation as a menu knows it. */
 export type ViewChannel = Pick<ChannelRef, 'id' | 'kind' | 'name' | 'label'>
 
+/** Puts the topic list back in place of the Reactions view. Returns whether it already showed. */
+function showTopics(): boolean {
+  if (registry.get(sidebarPaneAtom) === 'topics') return true
+  registry.set(sidebarPaneAtom, 'topics')
+  return false
+}
+
+/** Selects the Reactions pill (SPEC 5, "Reactions"): its list replaces the topics until another pill is picked. */
+export function selectReactions(): void {
+  if (registry.get(sidebarPaneAtom) === 'reactions') return
+  registry.set(sidebarPaneAtom, 'reactions')
+}
+
 /** Selects a view's pill: its list replaces the shown one, and a scope goes. */
 export function selectView(id: string): void {
   const filter = registry.get(sidebarFilterAtom)
-  if (filter.view === id && filter.scope === undefined) return
+  if (filter.view === id && filter.scope === undefined && showTopics()) return
   markFilterChange()
   const { scope: _scope, ...rest } = filter
   // The old rows stay until the new window arrives; never a blank list in between (performance.md 5.3).
@@ -43,7 +56,7 @@ export function selectView(id: string): void {
 /** Selects All, Channels or DMs, leaving any view. */
 export function selectKind(kind: KindFilter): void {
   const filter = registry.get(sidebarFilterAtom)
-  if (filter.kind === kind && filter.view === undefined) return
+  if (filter.kind === kind && filter.view === undefined && showTopics()) return
   markFilterChange()
   const { view: _view, ...rest } = filter
   startTransition(() => registry.set(sidebarFilterAtom, { ...rest, kind }))
