@@ -81,6 +81,8 @@ import {
   FilesGetUploadUrlFields,
   FilesShareArgs,
   FilesShareFields,
+  FilesDeleteArgs,
+  FilesDeleteFields,
   FilesInfoArgs,
   FilesInfoFields,
 } from './files.ts'
@@ -146,6 +148,7 @@ export const Methods = {
   'files.share': method(FilesShareArgs, FilesShareFields),
   'usergroups.list': method(UsergroupsListArgs, UsergroupsListFields),
   'files.info': method(FilesInfoArgs, FilesInfoFields),
+  'files.delete': method(FilesDeleteArgs, FilesDeleteFields),
   'rooms.join': method(RoomsJoinArgs, RoomsJoinFields),
   'rooms.leave': method(RoomsLeaveArgs, RoomsLeaveFields),
   'users.profile.set': method(UsersProfileSetArgs, UsersProfileSetFields),

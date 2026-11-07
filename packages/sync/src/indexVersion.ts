@@ -28,9 +28,11 @@
  * threads, which the index imports; the rows do not differ, as for 10.
  * 13: the outbox fixes for a cut-off follow, a lost file, a lost upload
  * answer and a replaced mark touched posts and the read writer, which the
- * index imports; the rows do not differ, as for 10.
- * 14: Pause notifications and paused colleagues added Slack's Do Not
+ * index imports; the rows do not differ, as for 10. 14: deleting the
+ * uploaded files of a removed post touched posts and started threads, which
+ * the index imports; the rows do not differ, as for 10.
+ * 15: Pause notifications and paused colleagues added Slack's Do Not
  * Disturb to the domain and the Slack schema, which the index imports; the
  * rows do not differ, as for 10.
  */
-export const INDEX_VERSION = 14
+export const INDEX_VERSION = 15

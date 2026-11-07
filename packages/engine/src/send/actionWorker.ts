@@ -47,6 +47,13 @@
  * rechecked since the reconnect, so a delete of the kept message made
  * meanwhile on another device is stored first. Otherwise the copy is kept.
  *
+ * A removed post that had uploaded files leaves them in Slack as private
+ * files no message shows, so its removal queues a `deleteFile` row per file
+ * (`@juno/sync` `fileDeletes.ts`), sent as `files.delete`. Seen live, a
+ * repeat gets `file_deleted`, which counts as done, as does `file_not_found`.
+ * The row holds only its file. Nothing shows it or offers Retry, so a
+ * refusal, a defect or spent retries drop it.
+ *
  * Nothing is sent while no sync runs or its socket is down. The end of
  * each boot or catch-up makes every row due (architecture 5.8).
  */
@@ -70,6 +77,7 @@ import {
   readAction,
   storedMe,
   type Acted,
+  type MessageAction,
   type PendingAction,
   type TopicFetcher,
 } from '@juno/sync'
@@ -93,6 +101,8 @@ const alreadyDone = (action: PendingAction, code: string): boolean => {
   switch (action.kind) {
     case 'delete':
       return code === 'message_not_found'
+    case 'deleteFile':
+      return code === 'file_deleted' || code === 'file_not_found'
     case 'react':
       return code === (action.payload.want === true ? 'already_reacted' : 'no_reaction')
     case 'edit':
@@ -100,6 +110,9 @@ const alreadyDone = (action: PendingAction, code: string): boolean => {
       return false
   }
 }
+
+/** A row whose attempts are spent or whose run broke: kept as failed for Retry, except a file delete, which nothing shows, so it ends. */
+const giveUp = (action: PendingAction, code: string) => (action.kind === 'deleteFile' ? dropAction(action) : failAction(action, code))
 
 export class ActionWorker extends Context.Service<
   ActionWorker,
@@ -129,7 +142,7 @@ export class ActionWorker extends Context.Service<
        * stores. A delete's `check` runs holding the send lane, just before the
        * request leaves; when it fails nothing is sent.
        */
-      const callFor = (action: PendingAction, ts: string, selfId: string, check: Effect.Effect<void, NotSent>): Effect.Effect<Acted, MirrorError | NotSent> => {
+      const callFor = (action: MessageAction, ts: string, selfId: string, check: Effect.Effect<void, NotSent>): Effect.Effect<Acted, MirrorError | NotSent> => {
         const { channel } = action
         switch (action.kind) {
           case 'edit': {
@@ -175,12 +188,31 @@ export class ActionWorker extends Context.Service<
       }
 
       const defer = (action: PendingAction, nextAt: number, code: string) =>
-        action.attempts + 1 >= MAX_ATTEMPTS ? failAction(action, code) : deferAction(action, nextAt, code)
+        action.attempts + 1 >= MAX_ATTEMPTS ? giveUp(action, code) : deferAction(action, nextAt, code)
+
+      /** A call that did not make its change (every failure but a refusal that means it was already made): the row's next step. */
+      const settle = (open: OpenWorkspace, action: PendingAction, error: MirrorError, now: number) =>
+        Effect.gen(function* () {
+          const local = inStore(open)
+          if (error._tag === 'Rejected' && !TRANSIENT.has(error.code)) {
+            yield* Effect.logWarning('send: Slack refused a message change', { rowId: action.id, attempts: action.attempts, kind: action.kind, code: error.code })
+            yield* Effect.logWarning('outbox row gave up', { rowId: action.id, attempts: action.attempts })
+            return yield* local(transaction(action.kind === 'react' ? failAction(action, error.code) : dropAction(action)))
+          }
+          const wait = error._tag === 'RateLimited' ? Math.max(error.retryAfterMillis, backoff(action.attempts)) : error._tag === 'NotSignedIn' ? timing.noSessionMillis : backoff(action.attempts)
+          yield* local(transaction(defer(action, now + wait, error._tag === 'Rejected' ? error.code : error._tag)))
+        })
 
       /** Settles one row. Answers whether it still waits for its post. */
       const run = (open: OpenWorkspace, fetcher: TopicFetcher, action: PendingAction) =>
         Effect.gen(function* () {
           const local = inStore(open)
+          if (action.kind === 'deleteFile') {
+            const result = yield* Effect.result(outbox.send((api) => api.call('files.delete', { file: action.payload.fileId ?? '' }, { singleAttempt: true })))
+            if (result._tag === 'Success' || (result.failure._tag === 'Rejected' && alreadyDone(action, result.failure.code))) yield* local(transaction(dropAction(action)))
+            else yield* settle(open, action, result.failure, yield* Clock.currentTimeMillis)
+            return false
+          }
           const place = yield* local(placeOf(action))
           switch (place.kind) {
             case 'waiting':
@@ -220,34 +252,14 @@ export class ActionWorker extends Context.Service<
             return false
           }
           const error = result.failure
-          switch (error._tag) {
-            // The check kept the copy and ended the row.
-            case 'NotSent':
-              return false
-            case 'Rejected': {
-              if (alreadyDone(action, error.code)) {
-                yield* fetcher.acted(actedAlready(action, place.ts), done()).pipe(Effect.orDie)
-                return false
-              }
-              if (TRANSIENT.has(error.code)) {
-                yield* local(transaction(defer(action, now + backoff(action.attempts), error.code)))
-                return false
-              }
-              yield* Effect.logWarning('send: Slack refused a message change', { rowId: action.id, attempts: action.attempts, kind: action.kind, code: error.code })
-              yield* Effect.logWarning('outbox row gave up', { rowId: action.id, attempts: action.attempts })
-              yield* local(transaction(action.kind === 'react' ? failAction(action, error.code) : dropAction(action)))
-              return false
-            }
-            case 'RateLimited':
-              yield* local(transaction(defer(action, now + Math.max(error.retryAfterMillis, backoff(action.attempts)), error._tag)))
-              return false
-            case 'NotSignedIn':
-              yield* local(transaction(defer(action, now + timing.noSessionMillis, error._tag)))
-              return false
-            case 'Offline':
-              yield* local(transaction(defer(action, now + backoff(action.attempts), error._tag)))
-              return false
+          // The check kept the copy and ended the row.
+          if (error._tag === 'NotSent') return false
+          if (error._tag === 'Rejected' && alreadyDone(action, error.code)) {
+            yield* fetcher.acted(actedAlready(action, place.ts), done()).pipe(Effect.orDie)
+            return false
           }
+          yield* settle(open, action, error, now)
+          return false
         })
 
       const nextWake = wakeSchedule<PendingAction>(actionTarget)
@@ -259,7 +271,7 @@ export class ActionWorker extends Context.Service<
           // Retire legacy exhausted rows before any network call, including rows behind a head.
           for (const action of yield* local(pendingActions)) {
             if (action.lastError === 'defect' || action.attempts >= MAX_ATTEMPTS) {
-              yield* local(transaction(failAction(action, action.lastError ?? 'retry_limit')))
+              yield* local(transaction(giveUp(action, action.lastError ?? 'retry_limit')))
             }
           }
           const now = yield* Clock.currentTimeMillis
@@ -312,7 +324,7 @@ export class ActionWorker extends Context.Service<
               Effect.catchCause((cause) =>
                 Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.gen(function* () {
                   yield* Effect.logError('send: action failed to run', { kind: action.kind, id: action.id })
-                  yield* local(transaction(failAction(action, 'defect')))
+                  yield* local(transaction(giveUp(action, 'defect')))
                   return false
                 }),
               ),
@@ -368,8 +380,9 @@ export class ActionWorker extends Context.Service<
   )
 }
 
-/** All changes to one message stay ordered; other messages can pass a backoff. */
+/** All changes to one message stay ordered; other messages can pass a backoff. A file delete holds only its file. */
 const actionTarget = (action: PendingAction): ReadonlyArray<string> => {
+  if (action.kind === 'deleteFile') return [JSON.stringify(['file', action.channel])]
   const message = JSON.stringify([action.channel, action.payload.clientMsgId ?? action.payload.ts])
   return action.kind === 'react' ? [message] : [action.channel, message]
 }
@@ -378,7 +391,7 @@ const actionTarget = (action: PendingAction): ReadonlyArray<string> => {
 const isCopyDelete = (action: PendingAction): boolean => action.kind === 'delete' && action.dependsOn === null && action.payload.clientMsgId === null
 
 /** What the call stores when Slack says the change was already made (`alreadyDone`). */
-const actedAlready = (action: PendingAction, ts: string): Acted =>
+const actedAlready = (action: MessageAction, ts: string): Acted =>
   action.kind === 'react'
     ? ({ kind: 'reacted', channel: action.channel, ts, name: action.payload.name ?? '', added: action.payload.want === true } as const)
     : ({ kind: 'deleted', channel: action.channel, ts } as const)

@@ -1,7 +1,9 @@
 /** Threads started from New chat retain their outbox identity after acknowledgement. */
-import { Effect } from 'effect'
+import { Clock, Effect } from 'effect'
 import { millisToTs } from '@juno/domain'
 import { Invalidation, StoreWriter, type MessageRow } from '@juno/store'
+import { queueFileDeletes } from './fileDeletes'
+import type { PendingFile } from './posts'
 import { ROOT_TEXT_CHARS } from './reindex'
 
 const startedTopicId = (channel: string, clientMsgId: string) => `p:${channel}:${clientMsgId}`
@@ -34,7 +36,13 @@ export const discardStartedThread = (channel: string, clientMsgId: string) => Ef
     WHERE client_msg_id = ${clientMsgId} AND channel = ${channel}`)[0]
   if (started === undefined || started.root_ts !== null) return false
   const root = `pending:${clientMsgId}`
+  // The waiting replies go with the root, and the files they had uploaded are deleted in Slack (`fileDeletes.ts`).
+  const replies = yield* sql<{ client_msg_id: string; file_ids_json: string | null }>`SELECT client_msg_id, file_ids_json FROM pending_messages WHERE channel = ${channel} AND thread_ts = ${root}`
   yield* sql`DELETE FROM pending_messages WHERE channel = ${channel} AND thread_ts = ${root}`
+  const now = yield* Clock.currentTimeMillis
+  for (const reply of replies) {
+    if (reply.file_ids_json !== null) yield* queueFileDeletes({ clientMsgId: reply.client_msg_id, files: JSON.parse(reply.file_ids_json) as ReadonlyArray<PendingFile> }, now)
+  }
   yield* sql`DELETE FROM started_threads WHERE client_msg_id = ${clientMsgId} AND channel = ${channel}`
   yield* sql`DELETE FROM topic_index WHERE topic_id = ${started.topic_id}`
   yield* sql`DELETE FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${root}`

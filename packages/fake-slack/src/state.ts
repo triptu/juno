@@ -67,6 +67,8 @@ export interface StoredFile {
   mimetype: string
   /** Set by `files.completeUpload`. The name stands in until then. */
   title?: string
+  /** Made by `files.getUploadURL` and not yet completed: no file in Slack's eyes, so `files.delete` answers `file_deleted`. */
+  uploading?: true
   /** Slack has not made the thumbnails yet: the file object has no thumbnails and no size (`holdThumbnails`). */
   thumbsHeld?: boolean
   /** A video's poster frame, a PNG, served at `?thumb=video`. */
@@ -128,6 +130,15 @@ export class Workspace {
   /** Unmeasured malformed-row scenarios, in-process tests only. Keyed by root timestamp. */
   readonly threadViewRowOverrides = new Map<string, unknown>()
   readonly files = new Map<string, StoredFile>()
+  /** Ids of files `files.delete` removed, and of uploads it was asked to remove before `files.completeUpload`: both answer `file_deleted` after. */
+  readonly deletedFiles = new Set<string>()
+  #fileSerial = 0
+
+  /** The next file id (`F…`). Counted, not sized, so a deleted file's id is never given out again. */
+  nextFileId(): string {
+    this.#fileSerial += 1
+    return `F0${String(this.#fileSerial).padStart(4, '0')}`
+  }
   /** Files uploaded while this is set start without thumbnails (`holdThumbnails`). */
   holdThumbnails = false
   /** Some live sessions reject files.info; default to the observed successful response. */
