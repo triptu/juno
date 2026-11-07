@@ -71,6 +71,11 @@ export interface OptionRowProps {
   readonly selected?: boolean
   readonly disabled?: boolean
   readonly size?: OptionRowSize
+  /**
+   * For a 32px row whose label wraps to a second line under its first (the account menu's hint under a label): the
+   * leading icon stays centred on the first line, in the 32px a one-line row gives it, instead of between the lines.
+   */
+  readonly leadingOnFirstLine?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
   /** Called when the pointer moves over the row, so the owner can move `active`. Rows without it show no pointer highlight. */
@@ -93,6 +98,7 @@ export function OptionRow({
   selected = false,
   disabled = false,
   size = 32,
+  leadingOnFirstLine = false,
   onSelect,
   onActivate,
   onContextMenu,
@@ -119,12 +125,13 @@ export function OptionRow({
         rowSizes[size],
         twoLine && styles.rowTwoLine,
         size === 44 && styles.rowTwoLineCompact,
+        leadingOnFirstLine && styles.rowStart,
         active && styles.rowActive,
         selected && styles.rowSelected,
         disabled && styles.rowDisabled,
       )}
     >
-      {leading ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
+      {leading ? <span {...stylex.props(styles.leading, leadingOnFirstLine && styles.leadingFirstLine)}>{leading}</span> : null}
       <span {...stylex.props(styles.body, twoLine && styles.bodyColumn, size === 44 && styles.bodyColumnCompact)}>
         <span data-option-label="" {...stylex.props(styles.label, twoLine ? typeVariants.body : typeVariants.ui, size === 44 && styles.labelCompact)}>{label}</span>
         {sub !== undefined && subPlacement !== 'end' ? (
@@ -314,6 +321,14 @@ const styles = stylex.create({
     display: 'inline-flex',
     flexShrink: 0,
     color: colors['--foreground-subtle'],
+  },
+  rowStart: {
+    alignItems: 'flex-start',
+  },
+  // The first line's 32px, the height a one-line row centres its icon in.
+  leadingFirstLine: {
+    alignItems: 'center',
+    height: sizes['--control-32'],
   },
   body: {
     display: 'flex',

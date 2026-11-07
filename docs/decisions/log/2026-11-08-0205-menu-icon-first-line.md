@@ -1,0 +1,1 @@
+- 11-08 02:05 · ui · A menu row with a hint under its label keeps its icon and its first line where a one-line row has them, centred in the first 32px (`OptionRow` `leadingOnFirstLine`) · Centred on the whole row, the icon sat between the two lines of Notification settings and Resume notifications and lined up with neither.

@@ -10,7 +10,7 @@ import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import { useEffect, type KeyboardEvent, type ReactNode } from 'react'
 import type { PauseChoice, StatusEmoji } from '@juno/contract'
-import { sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, SmileyPlus, Submenu, Text, lastInputWasKeyboard, useMenuActive, useSubmenu, type HueName, type PhosphorIcon } from '@juno/ui'
 import { EmojiFace } from './StatusLine'
 
@@ -204,6 +204,7 @@ function AccountItems({ items, onAction, onPause, pauseEnds }: { readonly items:
         item.label
       ),
       ...(below || item.hint === undefined ? {} : { sub: item.hint }),
+      leadingOnFirstLine: below,
     }
     if (item.id !== 'pause' || onPause === undefined) {
       return <OptionRow key={item.id} {...props} onActivate={() => sub.hoverOther(row.onActivate)} onSelect={() => select(id)} />
@@ -265,11 +266,13 @@ const styles = stylex.create({
     position: 'relative',
     display: 'inline-flex',
   },
-  // A row's label with its hint under it, in the menu's own type, so the row keeps its inset.
+  // A row's label with its hint under it, in the menu's own type. The label sits where a one-line row's does,
+  // centred in the first 32px, so the icon (`leadingOnFirstLine`) lines up with it.
   stack: {
     display: 'flex',
     flexDirection: 'column',
-    paddingBlock: spacing['--space-1'],
+    paddingBlockStart: `calc((${sizes['--control-32']} - ${text['--text-ui-size']} * ${text['--text-ui-leading']}) / 2)`,
+    paddingBlockEnd: spacing['--space-1'],
   },
   section: {
     display: 'flex',
