@@ -77,7 +77,13 @@ const styles = stylex.create({
     display: 'flex',
     width: '100%',
     height: '100%',
-    overflow: 'hidden',
+    // Clips sideways without being a scroll container: a hidden box still scrolls when something in it takes
+    // focus or asks to be shown, and the whole window would move sideways. The shell never scrolls. Only the x
+    // axis clips: a box that clips both axes at the window's edge cuts Chromium's lazy-image margin, so a photo
+    // just below the fold in the sidebar or a topic never loads until it is scrolled to. Nothing hangs below the
+    // shell, since a popover is capped at the room on its side of the anchor.
+    overflowX: 'clip',
+    overflowY: 'visible',
     backgroundColor: colors['--background'],
     color: colors['--foreground-default'],
   },

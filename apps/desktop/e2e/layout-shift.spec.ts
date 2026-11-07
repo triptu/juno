@@ -24,7 +24,7 @@ const QUIET = 'Lag alerts are firing on the'
 
 // Each path opens a topic or page this test has not opened before, from Home as at launch, so the first message row
 // the probe finds is the new topic's. The Home path opens the topic it leaves from first.
-syncedTest('topics and pages open without a layout shift, and a row on All topics opens its topic', async ({ juno, win, fake }) => {
+syncedTest('topics and pages open without a layout shift, a row on All topics opens its topic, and the place picker opens inside a narrow window', async ({ juno, win, fake }) => {
   for (const [index, path] of (['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const).entries()) {
     await test.step(`stable open: ${path}`, async () => {
       if (index > 0) await juno.home.open()
@@ -70,6 +70,26 @@ syncedTest('topics and pages open without a layout shift, and a row on All topic
     await juno.nav.back()
     await tabs.expectActive('All topics')
     await allTopics.row(QUIET).expectVisible()
+  })
+
+  // At 900px the place picker's list is wider than the room right of its button. It moves in to the pane's edge and
+  // nothing else moves: its search field taking focus once scrolled the workspace, tab strip included, sideways to
+  // show the part that ran past the edge.
+  await test.step('the place picker opens inside a narrow window and moves nothing', async () => {
+    await juno.setWindowSize(900)
+    const panel = win.locator('[role="dialog"][aria-label="Pick a place"]')
+    await expectStableAnchor(win, '[role="tab"]', async () => {
+      await juno.allTopics.placeButton.click()
+      await expect(juno.allTopics.placeSearch).toBeFocused()
+    })
+    const box = (await panel.boundingBox())!
+    expect(box.x + box.width).toBeLessThanOrEqual(await win.evaluate(() => document.documentElement.clientWidth))
+    const scrolled = await panel.evaluate((node) => {
+      const names: string[] = []
+      for (let el = node.parentElement; el !== null; el = el.parentElement) if (el.scrollLeft !== 0) names.push(`${el.tagName} ${el.getAttribute('aria-label') ?? ''} ${el.scrollLeft}`)
+      return names
+    })
+    expect(scrolled, 'no ancestor of the picker scrolled sideways').toEqual([])
   })
 })
 

@@ -151,8 +151,13 @@ const styles = stylex.create({
     height: '100%',
     // When the window is as narrow as the sidebar (at the minimum size under
     // zoom) the pane shrinks to nothing; its content must not paint over the
-    // sidebar.
-    overflow: 'hidden',
+    // sidebar. `clip`, not `hidden`: a hidden box is a scroll container, and a
+    // popover's field taking focus scrolled the whole pane, tab strip included,
+    // sideways to show it. Only the x axis clips, as on the shell: clipping the
+    // y axis at the window's edge cuts Chromium's lazy-image margin, and a
+    // photo just below the fold never loads until it is scrolled to.
+    overflowX: 'clip',
+    overflowY: 'visible',
     backgroundColor: colors['--background'],
   },
   // The page and the Juno panel side by side under the strip. A named
@@ -250,7 +255,7 @@ const styles = stylex.create({
     flexGrow: 1,
     minHeight: 0,
     borderRadius: radii['--radius-panel'],
-    overflow: 'hidden',
+    overflow: 'clip',
   },
   // The page fills the pane under the strip; a tall page scrolls inside
   // itself and never pushes the strip.
