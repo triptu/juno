@@ -73,7 +73,7 @@ stateDiagram-v2
 | From | Event | To | Guard | Code |
 |---|---|---|---|---|
 | stopped, failed (through `restart`) | `start()` | starting | `if (this.child) return` | `engine.ts:58 (start)` |
-| starting | child `spawn` | starting; `config` sent | | `engine.ts:68` |
+| starting | child `spawn` | starting; `config` sent | from the current child only | `engine.ts (start)` |
 | any | child message `ready` | ready; `attempt = 0`; held ports flushed; ready listeners run | from the current child only (MAIN-3, fixed) | `engine.ts (start)` |
 | starting, ready, restarting | child `exit` | restarting; timer `restartBackoff(attempt++)` | from the current child only (MAIN-4, fixed) | `engine.ts (start, onExit)` |
 | starting, ready, restarting | 5th exit in 120 s | failed (`giveUp`) | | `engine.ts:180-183` |
@@ -1370,7 +1370,7 @@ If the engine is restarting when main answers, `supervisor.send` drops `signedOu
 - Severity: medium; low likelihood. Confirmed. Impact: Stuck "signing out" with Sign out disabled until relaunch, with the session half cleared. This is a concrete candidate for the backlog item "Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled" (`docs/backlog.md`). It breaks sign-in handshake invariant 3.
 - Test: engine side in `packages/engine/test/session.test.ts` with a host fake that never answers `signedOut` (expect a timeout outcome); main side in `e2e/session.spec.ts`.
 - Fix direction: `try` and `finally` in `#signOut` so main always answers, with a failure tag if needed, and a bounded wait in the engine.
-- Status: Fixed in 53bbd4679. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent. Test: `apps/desktop/test/session.test.ts`.
+- Status: Fixed in 53bbd4679. Each sign-out stage runs on its own, a failed one is logged, and `signedOut` is always sent. Test: `apps/desktop/test/session.test.ts`. Still open: when deleting `secrets.bin` fails, the engine hears `signedOut` anyway and the next launch reads the stored session and signs the user back in (review finding, 2026-11-07).
 
 #### MAIN-3. A late ready takes the engine supervisor out of stopped during quit
 
@@ -1433,7 +1433,7 @@ Found while running the fixes, not by the audit. Both are in the scripts every a
 3. macOS gives the PID to another process (here `mdworker`). The ticket is "alive" again, it sorts first, and every later heavy job waits behind it.
 
 - Severity: medium (every heavy job on the machine waits until someone deletes the file).
-- Status: Fixed in 3adeeeda1. Tickets and slot owners record their process's start time (`ps -o lstart`), and a PID counts only while it has that start. Test: `scripts/heavy.test.mjs`, "a ticket left by a dead job whose PID another process now has does not hold the queue".
+- Status: Fixed in 3adeeeda1. Tickets and slot owners record their process's start time (`ps -o lstart`), and a PID counts only while it has that start; a `ps` that fails keeps the record alive (35325cad1). Test: `scripts/heavy.test.mjs`, "a ticket left by a dead job whose PID another process now has does not hold the queue".
 
 ### Not scheduled
 
