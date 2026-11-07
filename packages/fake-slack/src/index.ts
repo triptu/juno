@@ -437,6 +437,16 @@ export class FakeSlack {
   }
 
   /**
+   * The next `times` (default 1) file downloads answer `status` (default
+   * 503) with no bytes, as a file host that is down does; with a 429,
+   * `retryAfter` seconds in `Retry-After`. Thumbnails and the viewer's
+   * files come this way, so a client can show a failed picture and retry.
+   */
+  failFiles(input: { times?: number; status?: number; retryAfter?: number } = {}): void {
+    this.server.failFiles(input.times ?? 1, input.status ?? 503, input.retryAfter)
+  }
+
+  /**
    * The next `times` (default 1) upload POSTs answer HTTP 500 and store
    * nothing, so a client can show a failed upload and retry. With `after`,
    * that many POSTs succeed first.

@@ -36,6 +36,7 @@ export const coreFeature = {
     delayFiles: (fake, i) => fake.delayFiles(i),
     setLatency: (fake, i) => fake.setLatency(i),
     failUploads: (fake, i) => fake.failUploads(i),
+    failFiles: (fake, i) => fake.failFiles(i),
     setFilesInfoSupported: (fake, i) => fake.setFilesInfoSupported(i),
     holdThumbnails: (fake) => fake.holdThumbnails(),
     releaseThumbnails: (fake, i) => fake.releaseThumbnails(i),

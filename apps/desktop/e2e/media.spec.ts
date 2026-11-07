@@ -81,6 +81,7 @@ syncedTest('pictures keep their box: a sent image before and after Slack\'s thum
     await expect(row.locator('[data-file-card]')).toHaveCount(0)
   })
   await test.step('a picture in the viewer zooms with a double-click and a pinch, and pans with a drag', () => zoomAndPan({ juno, win, fake }))
+  await test.step('a picture whose first fetch fails is asked for again and shows in the same box, without a relaunch', () => failedOnce({ juno, win, fake }))
   // Last: the held bytes rule outlives the step.
   await test.step('delayed image bytes keep the reserved thumbnail box', async () => {
     fake.holdNext({ method: 'file:bytes', times: 100 })
@@ -124,6 +125,26 @@ async function beforeThumbnails({ juno, win, fake }: Pick<Fixtures, 'juno' | 'wi
     await expect.poll(() => image.locator(`img${schemeSrc('files')}`).evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
   }, { within: '[data-topic-view]' })
   expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
+}
+
+// A thumbnail's first fetch fails (the laptop asleep, Slack slow, the file host down). The picture must not
+// stay broken until the app restarts: it is asked for again by itself, and shows in the box it had.
+async function failedOnce({ juno, win, fake }: Pick<Fixtures, 'juno' | 'win' | 'fake'>): Promise<void> {
+  fake.failFiles({ times: 1 })
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0LEO', text: 'The venue after the storm', media: [{ name: 'storm.png', width: 640, height: 480 }] })
+  const image = juno.topic.message('The venue after the storm').locator('[data-thumbnail][title*="storm.png"]')
+  await expect(image.locator('[data-broken]')).toHaveCount(1)
+  expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
+  const loaded = () => image.locator(`img${schemeSrc('files')}`).evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)
+  await expectStableAnchor(win, '[data-message-row] [data-thumbnail][title*="storm.png"]', async () => {
+    await expect.poll(loaded, { timeout: 15_000 }).toBe(true)
+  }, { within: '[data-topic-view]' })
+  await expect(image.locator('[data-broken]')).toHaveCount(0)
+  await expect(image).toHaveAttribute('title', 'storm.png')
+  expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
+  // One refused fetch, one that served: nothing in between hammered the host.
+  const fileId = fake.calls.find((call) => call.kind === 'file' && call.status !== 200)?.method
+  await expect.poll(() => fake.calls.filter((call) => call.kind === 'file' && call.method === fileId).map((call) => call.status)).toEqual([503, 200])
 }
 
 // An image zooms inside its box (SPEC 8, "Zoom"): a double-click goes to 2.5x and back, a pinch zooms, and a drag pans
