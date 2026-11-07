@@ -23,11 +23,11 @@ export interface PresenceDotProps {
   /** Slack shows the person as active. A green dot when true, a hollow ring when false (nothing on a row). */
   readonly active: boolean
   readonly surface: PresenceDotSurface | RowSurface | InlineSurface
-  /** Notifications are paused: a snooze badge (a "z") takes the dot's place, as Slack shows it, green while active. */
+  /** Notifications are paused: a snooze badge (a "z" in an open circle) takes the dot's place, as Slack shows it, green while active. */
   readonly paused?: boolean
 }
 
-/** The paused badge: the 10px snooze mark inside the same 2px ring, so it reads at the avatar's corner. */
+/** The paused badge: a 10px snooze glyph inside the same 2px ring, so it reads at the avatar's corner. */
 const BADGE = '14px' // tokens-allow: the paused badge
 /** 10px with a 2px ring in the surface colour (inventory 2.1). */
 const DOT = '10px' // tokens-allow: the presence dot
@@ -78,14 +78,12 @@ export function PresenceDot({ active, surface, paused = false }: PresenceDotProp
   return <span aria-hidden data-presence={active ? 'active' : 'away'} {...stylex.props(styles.dot, rings[surface], active ? styles.active : holes[surface])} />
 }
 
-/**
- * The snooze mark: a "z", 8px across with its round caps, on whole pixels at 1x. Slack's mark also has an arc
- * around it, which at this size blurs the "z"; it is left out. Phosphor has no such glyph.
- */
+/** Slack's snooze mark: a "z" breaking out of an open circle. Phosphor has no such glyph. */
 function Snooze() {
   return (
-    <svg width={GLYPH} height={GLYPH} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
-      <path d="M2 2 H8 L2 8 H8" />
+    <svg width={GLYPH} height={GLYPH} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+      <path d="M3.6 2.2 A4.9 4.9 0 1 0 10.9 8" />
+      <path d="M5.6 1 H11 L5.6 6.2 H11" />
     </svg>
   )
 }
