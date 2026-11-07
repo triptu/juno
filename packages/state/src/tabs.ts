@@ -640,14 +640,14 @@ export const tabsAtom = Atom.make((get): Tabs => {
 const tabsKnown = (registry: Registry, teamId: string): boolean => registry.get(changedTabsAtom(teamId)) !== undefined || !AsyncResult.isInitial(registry.get(savedTabsAtom))
 
 /**
- * Resolves once the signed-in workspace's tabs are known. A change applied
- * before that would run on no tabs and replace the saved ones with its
- * result, so whoever changes the tabs on a user's action waits here first
- * (the navigation queue does).
+ * Undefined when the signed-in workspace's tabs are known, else a promise
+ * that resolves once they are. A change applied before that would run on no
+ * tabs and replace the saved ones with its result, so whoever changes the
+ * tabs on a user's action waits here first (the navigation queue does).
  */
-export function whenTabsKnown(registry: Registry): Promise<void> {
+export function whenTabsKnown(registry: Registry): Promise<void> | undefined {
   const teamId = registry.get(signedInAtom)?.teamId
-  if (teamId === undefined || tabsKnown(registry, teamId)) return Promise.resolve()
+  if (teamId === undefined || tabsKnown(registry, teamId)) return undefined
   return new Promise((resolve) => {
     const off = registry.subscribe(
       savedTabsAtom,

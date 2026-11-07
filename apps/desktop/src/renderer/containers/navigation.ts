@@ -274,12 +274,14 @@ function whenReady(view: string, fresh: boolean, target?: string): Promise<void>
 /** Changes apply in the order they were asked for, and none before the saved tabs are known: one applied to no tabs would replace them (`whenTabsKnown`). */
 let queue: Promise<void> = Promise.resolve()
 
-/** Adds `step` to the queue, after the saved tabs are known and `wait` has settled. */
+/**
+ * Adds `step` to the queue, after the saved tabs are known and `wait` has settled. With the tabs known it
+ * takes no more turns than a step that only waits for `wait`, so steps keep their timing against live updates.
+ */
 function enqueue(wait: Promise<void> | undefined, step: () => void): void {
-  queue = queue
-    .then(() => whenTabsKnown(registry))
-    .then(() => wait)
-    .then(step)
+  const known = whenTabsKnown(registry)
+  const before = known === undefined ? wait : known.then(() => wait)
+  queue = before === undefined ? queue.then(step) : queue.then(() => before).then(step)
 }
 /** Bumped by each change of what the window shows: a change that waited applies only if nothing replaced it since. */
 let currentTicket = 0
