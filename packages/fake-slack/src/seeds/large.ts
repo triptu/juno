@@ -12,6 +12,7 @@
  */
 import type { File, Ts, User } from '@juno/slack-schema'
 import { SELF_ID, TEAM } from '../fixtures.ts'
+import { samplePng } from '../samples.ts'
 import { NEVER_READ, type ConversationKind, type Workspace } from '../state.ts'
 
 export interface LargeSeedOptions {
@@ -130,21 +131,28 @@ export function largeSeed(options: LargeSeedOptions = {}): (workspace: Workspace
     const plainMain = Math.max(0, config.messages - repliesTotal - threadCount)
     const conversationOf = () => pick(conversations)
     const senderIn = (c: { members: Array<string> }) => pick(c.members)
-    const file = (index: number): File => {
+    // Every picture is the same small PNG, stored so the fake serves its thumbnail: a picture the fake cannot serve
+    // fails to load, and the renderer asks for a failed picture again for 40 s (`pictureLoad.ts`), which an idle
+    // window would see as Slack work. The declared dimensions stay the generated ones.
+    const pictureBytes = samplePng(64, 48)
+    const file = (index: number, user: string, at: number): File => {
       const w = 400 + Math.floor(rand() * 1200)
       const h = 300 + Math.floor(rand() * 900)
-      const url = `${avatarBase}/../files/F${index}/image.png`
-      return { id: `FL${index}`, name: 'image.png', title: 'image.png', mimetype: 'image/png', filetype: 'png', size: w * h, url_private: url, thumb_360: url, thumb_360_w: Math.min(360, w), thumb_360_h: Math.round((h * Math.min(360, w)) / w), original_w: w, original_h: h }
+      const id = `FL${index}`
+      const url = `${avatarBase}/../files/${id}/image.png`
+      workspace.files.set(id, { id, name: 'image.png', length: pictureBytes.length, user, created: at, bytes: pictureBytes, mimetype: 'image/png' })
+      return { id, name: 'image.png', title: 'image.png', mimetype: 'image/png', filetype: 'png', size: w * h, url_private: url, thumb_360: url, thumb_360_w: Math.min(360, w), thumb_360_h: Math.round((h * Math.min(360, w)) / w), original_w: w, original_h: h }
     }
     let fileIndex = 0
     const plan = (channel: { id: string; members: Array<string> }, root: Planned | undefined, at: number): Planned => {
       const withFile = rand() < 0.15
+      const user = senderIn(channel)
       const entry: Planned = {
         channel: channel.id,
-        user: senderIn(channel),
+        user,
         at,
         text: text(rand() < 0.04, rand() < 0.05),
-        ...(withFile ? { files: [file(fileIndex++)] } : {}),
+        ...(withFile ? { files: [file(fileIndex++, user, at)] } : {}),
         ...(root === undefined ? {} : { root }),
         reactions: rand() < 0.2 ? 1 + Math.floor(rand() * 3) : 0,
       }
