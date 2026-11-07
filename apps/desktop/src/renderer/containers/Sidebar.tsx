@@ -25,7 +25,7 @@ import {
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
+import { hueFor, initials, Sidebar as SidebarView, UpdateReady, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { chunk } from './chunks'
 import { SyncNotice, useSyncNoticeReady } from './SyncNotice'
 import { markFilterChange } from './filterMark'
@@ -37,6 +37,7 @@ import { readingOnly } from './readingOnly'
 import { sidebarTop } from './sidebarTop'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
+import { restartToUpdate, useReadyUpdate } from './updateState'
 import { closeViewSheet, moveView, newView, selectKind, selectView, showViewPillMenu } from './viewActions'
 
 // Popover content warms on idle; the sidebar chrome stays in the initial bundle.
@@ -87,6 +88,9 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
  */
 const READING = { pages: [], note: 'Demo · sample conversations' } as const
 
+/** The Update ready card's text: Settings › About, where the update's line has What's new. */
+const openAbout = () => openSettings('about')
+
 /**
  * Wires the sidebar chrome: the filters and scope (local UI state), the
  * filter dots (booleans from the counts live value, so a count that changes
@@ -128,6 +132,8 @@ export function Sidebar() {
   const noticeShown = useAtomValue(syncNoticeAtom, (kind) => kind !== undefined)
   const progressShown = useAtomValue(syncProgressAtom, (progress) => progress !== undefined)
   const syncStatus = useSyncNoticeReady(noticeShown || progressShown) && (noticeShown || progressShown)
+  // A downloaded update: its version only, so a download's progress re-renders nothing.
+  const readyUpdate = useReadyUpdate()
   // The scope chip names the channel the list is narrowed to; its rows' refs carry it.
   const scopeChannel = useAtomValue(sidebarListAtom, (list) => (filter.scope === undefined ? undefined : list.refs.channels.get(filter.scope)))
 
@@ -201,6 +207,7 @@ export function Sidebar() {
       onToggleUnread={toggleUnread}
       onClearScope={clearScope}
       {...(syncStatus ? { status: <SyncNotice /> } : {})}
+      {...(readyUpdate === undefined ? {} : { update: <UpdateReady version={readyUpdate} onRestart={restartToUpdate} onOpen={openAbout} /> })}
       privacy={privacy}
       privacySharing={privacySharing}
       onPrivacyOff={() => setPrivacy(false)}

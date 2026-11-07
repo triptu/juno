@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Schema } from 'effect'
 import { ReleaseNotes, UpdateState } from '@juno/contract'
 import { copyText } from '@juno/state'
 import { UpdateSettings, type UpdateStatus, type WhatsNew } from '@juno/views'
+import { restartToUpdate, useUpdateState } from './updateState'
 
 const decode = Schema.decodeUnknownSync(UpdateState)
 const decodeNotes = Schema.decodeUnknownSync(ReleaseNotes)
@@ -25,15 +26,8 @@ function statusOf(state: UpdateState): UpdateStatus | null {
 }
 
 export function Updates({ build }: { readonly build: ReactNode }) {
-  const [state, setState] = useState<UpdateState>({ kind: 'unavailable' })
+  const [state, setState] = useUpdateState()
   const [whatsNew, setWhatsNew] = useState<WhatsNew>(null)
-  useEffect(() => {
-    let active = true
-    const accept = (value: unknown) => { if (active) setState(decode(value)) }
-    const unsubscribe = window.juno.updates.onChange(accept)
-    void window.juno.updates.get().then(accept).catch(() => {})
-    return () => { active = false; unsubscribe() }
-  }, [])
   const status = statusOf(state)
   const offered = status?.kind === 'restart' || status?.kind === 'download'
   // The update's notes belong to the offered version; close them when it goes.
@@ -57,7 +51,7 @@ export function Updates({ build }: { readonly build: ReactNode }) {
     onChange={(enabled) => { void window.juno.updates.set(enabled).then((value) => setState(decode(value))).catch(() => {}) }}
     // `checking` and then the result arrive through onChange; the answer may be older than them.
     onCheck={() => { void window.juno.updates.check().catch(() => {}) }}
-    onRestart={() => { void window.juno.updates.restart().catch(() => {}) }}
+    onRestart={restartToUpdate}
     // The download's progress arrives through onChange; the answer may be older than it.
     onDownload={() => { void window.juno.updates.download().catch(() => {}) }}
     onCopyDetails={() => { if (state.kind === 'failed') copyText(state.details) }}

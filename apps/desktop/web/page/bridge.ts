@@ -14,7 +14,8 @@
  * - The test host answers engine/agent sockets, providers, notifications and
  *   folder selections through real services with memory OS boundaries.
  * - Native media/screen sharing, web panels, Quick Look, Codex sign-in and
- *   updates remain unavailable here.
+ *   updates remain unavailable here; under `e2e` a test can report an
+ *   update state through the seam.
  */
 import { Channels, menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
 import { DOWNLOAD_PATH } from '../paths'
@@ -85,14 +86,22 @@ async function copyImage(src: string): Promise<'copied' | 'failed'> {
 }
 
 const bridge: JunoBridge = {
+  // Unavailable, except that a test reports a state through the seam (`testSeam.ts`).
   updates: {
-    get: () => Promise.resolve(noUpdates),
-    set: () => Promise.resolve(noUpdates),
-    restart: nothing,
-    check: () => Promise.resolve(noUpdates),
-    download: () => Promise.resolve(noUpdates),
+    get: () => Promise.resolve(testing ? seam.updates.state : noUpdates),
+    set: () => Promise.resolve(testing ? seam.updates.state : noUpdates),
+    restart: () => {
+      if (testing) seam.updates.restarts += 1
+      return nothing()
+    },
+    check: () => Promise.resolve(testing ? seam.updates.state : noUpdates),
+    download: () => Promise.resolve(testing ? seam.updates.state : noUpdates),
     notes: () => Promise.resolve({ kind: 'failed' }),
-    onChange: never,
+    onChange: (listener) => {
+      if (!testing) return () => {}
+      seam.updates.listeners.add(listener)
+      return () => { seam.updates.listeners.delete(listener) }
+    },
   },
   app: {
     getInfo: () => Promise.resolve({ name: 'Juno', version: 'web', platform: 'darwin', electron: '' }),

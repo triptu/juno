@@ -2,7 +2,8 @@
 // client, the quick filters, and the Unread filter keeping a read topic while a tab shows it
 // (SPEC 5, "Holding the order"). That the opened row's box holds still is the browser lane's
 // layout-shift guard; here the order and the rows. The rows asserted on are threads the self
-// user follows and a channel's Main, so they stay under the followed-threads rule.
+// user follows and a channel's Main, so they stay under the followed-threads rule. Last, a
+// downloaded update's card at the foot, reported through the page's seam as main would.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Slack } from '../e2e/driver/slack'
 import type { Juno } from './driver/juno'
@@ -114,6 +115,19 @@ domTest('shows sidebar rows and unread people, filters and clears the list, keep
     for (let i = 0; i < steps; i++) await win.keyboard.press('ArrowDown')
     await postgres.expectFocused()
     await postgres.expectSelected(false)
+  })
+  await step('a downloaded update shows at the foot: Restart installs it, its text opens About, and it goes when the update does', async () => {
+    const updates = juno.app.seam.updates
+    const card = win.getByRole('region', { name: 'Update' })
+    updates.set({ kind: 'ready', enabled: true, version: '0.1.15' })
+    await expect(card).toContainText('Juno 0.1.15')
+    await card.getByRole('button', { name: 'Restart to update' }).click()
+    await expect.poll(() => updates.restarts).toBe(1)
+    await card.getByRole('button', { name: /^Update ready/ }).click()
+    await juno.tabs.expectActive('Settings')
+    await expect(juno.settings.section('About')).toHaveAttribute('aria-current', 'page')
+    updates.set({ kind: 'idle', enabled: true })
+    await expect(card).toHaveCount(0)
   })
 })
 
