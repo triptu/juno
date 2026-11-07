@@ -14,13 +14,16 @@
  * - A conversation Juno does not have, or one Slack refuses, opens in the
  *   browser (or in Slack, for a `slack://` link) with a toast saying why.
  * - A click on a person in a message opens them as a link to them does
- *   (`openPerson`).
+ *   (`openPerson`), and a click on a #channel chip opens the channel as a
+ *   link to it does (`openChannel`): its Main, a preview for a public
+ *   channel the user is not in.
  * - An answer that comes after the user went elsewhere (a slow fetch, a tab
  *   switch meanwhile), or after a later link was clicked, opens nothing
  *   (`movedOn`): the tab and the composer's focus stay where the user is.
  */
 import type { ActivateEvent, LinkInfo } from '@juno/views'
 import {
+  channelLink,
   locateMessage,
   locatePerson,
   loadMessageAt,
@@ -164,6 +167,15 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
       return openLinked(topic.topicId, target.ts, event.metaKey)
     }
   }
+}
+
+/** A #channel chip in a message: what a link to the channel opens (SPEC 7, "Mentions"). With ⌘, behind the current tab. */
+export function openChannel(channel: string, behind: boolean): void {
+  const session = registry.get(signedInAtom)
+  if (session === undefined) return
+  const url = channelLink(session.workspaceUrl, channel)
+  const match = read(url)
+  if (match !== undefined) void openSlackLink(url, match, { metaKey: behind, shiftKey: false, altKey: false, source: 'pointer' })
 }
 
 /** A web link: in the web panel, or in the browser with ⌘ (SPEC 8). Reading only, there is no web panel: always the browser. */

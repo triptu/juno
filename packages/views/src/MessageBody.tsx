@@ -8,7 +8,7 @@ import { AttachmentButtons, type OnAttachmentButton } from './AttachmentButtons'
 import { AttachmentCard, AttachmentFields, AttachmentImage, ContextIcon, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { MessageTable } from './MessageTable'
-import { PersonChip } from './personLink'
+import { PersonChip, press } from './personLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -17,8 +17,8 @@ export interface MessageBodyProps {
   readonly now: number
   /** The person hue for @mention chips, by user id. A missing entry falls back to the id's hash. */
   readonly hueOf: (id: string) => HueName
-  /** A `#channel` chip was clicked: scope the sidebar to it. */
-  readonly onChannel?: (id: string) => void
+  /** A `#channel` chip was clicked (with ⌘: `behind`): open the channel. Without it the chip is plain text. */
+  readonly onChannel?: (id: string, behind: boolean) => void
   /** A link was clicked: open it, inside Juno for a Slack link to this workspace, else in the browser. */
   readonly onLink?: (url: string, event: ActivateEvent) => void
   /** Which links open inside Juno, and where they go. Without it every link opens outside. */
@@ -80,7 +80,7 @@ interface BlockProps {
   readonly block: BodyBlock
   readonly now: number
   readonly hueOf: (id: string) => HueName
-  readonly onChannel: ((id: string) => void) | undefined
+  readonly onChannel: ((id: string, behind: boolean) => void) | undefined
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
@@ -173,7 +173,7 @@ interface InlinesProps {
   readonly inlines: ReadonlyArray<BodyInline>
   readonly now: number
   readonly hueOf: (id: string) => HueName
-  readonly onChannel: ((id: string) => void) | undefined
+  readonly onChannel: ((id: string, behind: boolean) => void) | undefined
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
@@ -189,7 +189,7 @@ interface InlineProps {
   readonly inline: BodyInline
   readonly now: number
   readonly hueOf: (id: string) => HueName
-  readonly onChannel: ((id: string) => void) | undefined
+  readonly onChannel: ((id: string, behind: boolean) => void) | undefined
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
@@ -204,25 +204,31 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
       return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet}>{styled(inline.text, inline.style)}</Link>
     case 'user':
       return <PersonChip inline={inline} hue={hueOf(inline.id)} tabIndex={tabIndex} />
-    case 'channel':
+    case 'channel': {
+      const chip = (
+        <Chip variant="filled" size="inline">
+          <bdi>#{inline.name}</bdi>
+        </Chip>
+      )
+      if (onChannel === undefined) return chip
+      // Opens the channel's Main (⌘: behind the current tab), on one click and not at the end of a drag, as a person does.
       return (
         <button
           type="button"
           onClick={(event) => {
             event.stopPropagation()
-            onChannel?.(inline.id)
+            if (event.detail <= 1 && !press.dragged) onChannel(inline.id, event.metaKey)
           }}
-          title={`Show only #${inline.name}`}
+          title={`Open #${inline.name}`}
           tabIndex={tabIndex}
           data-channel={inline.id}
           data-channel-name={inline.name}
           {...stylex.props(styles.channelButton, focusRing.outside)}
         >
-          <Chip variant="filled" size="inline">
-            <bdi>#{inline.name}</bdi>
-          </Chip>
+          {chip}
         </button>
       )
+    }
     case 'usergroup':
       return (
         <Chip variant={inline.isMine ? 'mention' : 'person'} size="inline" hue={hueOf(inline.id)} title={inline.name ?? (inline.isMine ? 'Mentions you' : '')} data-usergroup={inline.id}>

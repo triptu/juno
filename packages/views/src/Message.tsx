@@ -82,7 +82,7 @@ export interface MessageProps {
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   /** Main: a broadcast reply's "in <topic title>" opens the thread `id` at the reply `ts`. */
   readonly onOpenReply?: (id: string, ts: string, event: ActivateEvent) => void
-  readonly onChannel?: (id: string) => void
+  readonly onChannel?: (id: string, behind: boolean) => void
   readonly onLink?: (url: string, event: ActivateEvent) => void
   /** Which links open inside Juno, and where they go (`MessageBody`). Stable for the list's life. */
   readonly linkInfo?: LinkInfo

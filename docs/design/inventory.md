@@ -163,7 +163,7 @@ Buttons at the bottom right: Cancel (secondary) and **Create** or **Save** (prim
 
 ### 2.4 Scope chip
 
-Only when scoped to one channel. Row padding `0 16 8`. Chip 26px, radius 6, bg `--secondary-default`, padding `0 4 0 9`, gap 6, 12.5/500: channel icon 12 muted, name without "#", then a 20×20 close button (`x` 11, radius 4, hover `--secondary-hover`), accessible name "Show everything". Scoping sources: clicking a topic's context pill (§5), "Show its topics" in a channel menu, clicking a #channel chip in a message, ⌘K "show its topics" result.
+Only when scoped to one channel. Row padding `0 16 8`. Chip 26px, radius 6, bg `--secondary-default`, padding `0 4 0 9`, gap 6, 12.5/500: channel icon 12 muted, name without "#", then a 20×20 close button (`x` 11, radius 4, hover `--secondary-hover`), accessible name "Show everything". Scoping sources: clicking a topic's context pill (§5), "Show its topics" in a channel menu (also a #channel chip's right-click menu), ⌘K "show its topics" result.
 
 ### 2.5 Topic list
 
@@ -355,7 +355,7 @@ Scroll container `[data-scroll]` with contained scroll; inner column max-width 8
 ### 6.2 Inline chips
 
 - **@person**: weight 600, padding 0 3, radius 4, bg `--hl-soft`, fg default. **@you**: bg `--hl-mention`, fg `--hl-mention-fg` (the accent fill, deeper in light for coral, teal and cyan; 6:1 or better, tokens.md 1.3). In your own bubble: `color-mix(currentColor 16%, transparent)`.
-- **#channel**: same look as @person; clicking scopes the sidebar to that channel (stops propagation).
+- **#channel**: same look as @person; a click opens the channel's Main as a Slack link to the channel does (`openChannel` in `slackLinks.ts`): a new tab, or the tab that shows it; ⌘ opens it behind; a public channel you are not in opens as its preview. Stops propagation. Where nothing opens it (the Forward sheet), it is a plain chip.
 - [built 10-20] An @person or @you chip opens your DM with them on click, ⌘-click behind (SPEC 7, "People"; `PersonChip`): the chip sits in a span that underlines on hover, takes the focus ring and the "Message Maya" tooltip, and is a Tab stop with the row's links. A chip for an app or deactivated person with no DM is drawn as before (`unreachable` on the inline). @you keeps its "Mentions you" title.
 - Tokens are matched against known names ("@Maya Chen", "@Maya", "#eng"); longest first.
 

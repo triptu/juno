@@ -62,6 +62,8 @@ export interface SearchResultsProps extends SearchRecentProps {
   readonly onHideTopic: () => boolean
   readonly onLink?: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo?: LinkInfo | undefined
+  /** A #channel chip in a card: open the channel, `behind` with ⌘. */
+  readonly onChannel?: ((id: string, behind: boolean) => void) | undefined
   /** The pointer came onto a row: warm what the reader would show for it. */
   readonly onHoverRow?: (id: string) => void
   /** ↑ on the first row. */
@@ -127,7 +129,7 @@ function nothingLine(words: string, filtered: boolean): string {
 }
 
 function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<SearchRowItem> }) {
-  const { rows, state, note, selectedId, focused, marks, now, time, onSelect, onPress, onOpen, onLink, linkInfo, onHoverRow, onTryAgain, onNearEnd, onNearStart, windowKey } = props
+  const { rows, state, note, selectedId, focused, marks, now, time, onSelect, onPress, onOpen, onLink, linkInfo, onChannel, onHoverRow, onTryAgain, onNearEnd, onNearStart, windowKey } = props
   const stops = rows.filter(isStop).map((row) => row.id)
   // The selection, or the first row when the selection is not among these rows: Tab always has a row to land on.
   const tabStop = selectedId !== undefined && stops.includes(selectedId) ? selectedId : stops[0]
@@ -174,7 +176,7 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
           {...stylex.props(styles.list)}
         >
           {rows.map((row) => (
-            <SearchRow key={row.id} row={row} now={now} time={time} words={marks} selected={row.id === selectedId} focused={focused} tabbable={row.id === tabStop} onSelect={onSelect} onPress={onPress} onOpen={onOpen} onLink={onLink} linkInfo={linkInfo} />
+            <SearchRow key={row.id} row={row} now={now} time={time} words={marks} selected={row.id === selectedId} focused={focused} tabbable={row.id === tabStop} onSelect={onSelect} onPress={onPress} onOpen={onOpen} onLink={onLink} linkInfo={linkInfo} onChannel={onChannel} />
           ))}
         </div>
       )}

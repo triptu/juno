@@ -9,8 +9,8 @@ import { showPersonMenu } from './notifyActions'
 import { closeMessageMenu } from './messageMenu'
 import { takeComposerFocus } from './pageFocus'
 import { readingOnly } from './readingOnly'
-import { scopeToChannel, showChannelMenu } from './placeMenus'
-import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
+import { showChannelMenu } from './placeMenus'
+import { messageLinkInfo, openChannel, openMessageLink, openPerson } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
 import { downloadMessageFile, quickLookMessageFile, showMessageImageMenu, useTopicFiles } from './topic/files'
@@ -298,7 +298,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
       hueOf={hueOf}
       {...(readOnly ? PEEK_THREAD_LINKS : THREAD_LINKS)}
       onPrefetchThread={warmTopic}
-      onChannel={scopeToChannel}
+      onChannel={openChannel}
       onPerson={openPersonDm}
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}

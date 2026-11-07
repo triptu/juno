@@ -107,7 +107,8 @@ export interface MessageListProps {
   readonly onOpenThreadBehind?: (ts: string) => void
   /** The pointer came onto a Main message that has a thread: warm the thread, which a peek or an open may read next. */
   readonly onPrefetchThread?: (id: string) => void
-  readonly onChannel?: (id: string) => void
+  /** A click on a `#channel` chip: open the channel's Main, `behind` the current tab with ⌘. Without it chips open nothing. */
+  readonly onChannel?: (id: string, behind: boolean) => void
   /**
    * A click, or Enter, on a sender's name or avatar or an @person chip: your
    * DM with them (SPEC 7, "People"), `behind` the current tab with ⌘. Created

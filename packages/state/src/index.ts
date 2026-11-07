@@ -221,7 +221,7 @@ export type { PortLike } from './transport'
 export { canRedraw, redrawTopic, type RedrawProblem } from './art'
 export { aiActivityAtom } from './aiActivity'
 export { DEV_LOG_PAGE, devLogDetailAtom, devLogFilterAtom, devLogLimitAtom, devLogListAtom } from './devLog'
-export { parseSlackLink, messageLink, slackLink, threadRootTs, type SlackLinkMatch, type SlackLinkTarget } from './links'
+export { parseSlackLink, channelLink, messageLink, slackLink, threadRootTs, type SlackLinkMatch, type SlackLinkTarget } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {
   dismissToast,
