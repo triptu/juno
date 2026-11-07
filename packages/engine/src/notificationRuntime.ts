@@ -77,7 +77,7 @@ export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(fu
   yield* Effect.forkScoped(Stream.runForEach(messages, (message) => message._tag === 'viewing' ? Ref.set(viewing, message.topicId) : message._tag === 'wake' ? Effect.flatMap(Ref.get(lastBadge), (unread) => link.send({ _tag: 'badge', unread })) : Effect.void))
   const host: NotificationHost = {
     notifier: {
-      show: ({ id, title, body, target }) => link.send({ _tag: 'notify', notification: { id, title, body, target: { _tag: 'message', source: target.source } } }),
+      show: ({ id, title, subtitle, body, target }) => link.send({ _tag: 'notify', notification: { id, title, ...(subtitle === undefined ? {} : { subtitle }), body, target: { _tag: 'message', source: target.source } } }),
       viewing: (topicId) => Effect.map(Ref.get(viewing), (shown) => shown === topicId),
     },
     badge: (unread) => Ref.set(lastBadge, unread).pipe(Effect.andThen(link.send({ _tag: 'badge', unread }))),

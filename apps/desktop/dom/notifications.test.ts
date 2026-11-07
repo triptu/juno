@@ -1,7 +1,7 @@
 /**
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
- * thread or person, the OS notification and its title for a group DM, its
- * click, the dock badge, a notification's text hidden in privacy mode, and
+ * thread or person, the OS notification's sender, place and text (a channel,
+ * a thread, a group DM, a DM), its click, the dock badge, a notification's text hidden in privacy mode, and
  * an instruction added and removed in Settings › Notifications. The host's shell records OS notifications
  * instead of showing them. Landing on a message in a long thread and the
  * Settings forms are notifications.spec.ts's.
@@ -21,18 +21,18 @@ domTest('Notify me levels, which messages notify and how a click opens them, and
   // From a fresh start, before anything is read.
   await step('unread topics badge the dock', () => expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•'))
   await juno.notificationHoursNow()
-  await step('in privacy mode a notification says where it came from, not what was written', async () => {
+  await step('in privacy mode a notification says who sent it and where, not what was written', async () => {
     await juno.sidebar.row('#eng').chooseInMenu('notify-always')
     await juno.expectToast('#eng: Always')
     await juno.privacy.toggleWithMenu()
     slack.as('Leo').postIn('eng', 'Payroll export failed for 3 people')
-    await expect.poll(async () => (await juno.osNotifications()).map((shown) => shown.body), { timeout: 15_000 }).toContain('Message hidden')
+    await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Leo', subtitle: '#eng', body: 'Message hidden' })
     expect((await juno.osNotifications()).some((shown) => shown.body.includes('Payroll'))).toBe(false)
     await juno.privacy.toggleWithMenu()
   })
   await step('Notify me on a channel lists it on the page, and removing it there has Undo', () => levels(context))
   await step('a topic on screen in a focused window does not notify', () => focusedTopic(context))
-  await step('a group DM notifies under its people\'s names, not Slack\'s internal name', () => groupDm(context))
+  await step('a group DM notification names the sender, and the group by its people\'s names, not Slack\'s internal name', () => groupDm(context))
   await step('a DM set to Always notifies, and the click opens it at the message', () => clickOpens(context))
   await step('Your instructions: one added with its direction is kept across closing Settings, and removed', async () => {
     await juno.openNotifications()
@@ -63,7 +63,7 @@ domTest('Notify me levels, which messages notify and how a click opens them, and
   })
 })
 
-async function levels({ juno }: Context): Promise<void> {
+async function levels({ juno, slack, fake }: Context): Promise<void> {
   // A bot channel: the Automated view holds it.
   await juno.sidebar.selectView('Automated')
   const alerts = juno.sidebar.row(ALERTS_MAIN)
@@ -82,6 +82,11 @@ async function levels({ juno }: Context): Promise<void> {
   expect((await rina.chooseInMenu('mark-read')).labels).toContain('> Always ✓')
 
   await juno.openNotifications()
+  // A reply in it notifies under the sender, and says it is in a thread.
+  const root = fake.messages('C0HIRING').find((message) => message.text?.startsWith(RINA))!
+  fake.injectMessage({ channel: 'C0HIRING', user: slack.as('Sam').id, threadTs: root.ts, text: 'Scorecard is complete' })
+  await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Sam', subtitle: 'Thread in #hiring', body: 'Scorecard is complete' })
+
   const page = juno.notifications
   await expect(page.level('Never')).toContainText('alerts-prod')
   await page.removeTag('alerts-prod')
@@ -121,7 +126,7 @@ async function groupDm({ juno, slack }: Context): Promise<void> {
 
   await juno.openNotifications()
   slack.as('Leo').groupDm('Moved it to 1pm')
-  await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya, Leo', body: 'Moved it to 1pm' })
+  await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Leo', subtitle: 'Maya, Leo', body: 'Moved it to 1pm' })
 }
 
 async function clickOpens({ juno, slack }: Context): Promise<void> {
@@ -134,7 +139,7 @@ async function clickOpens({ juno, slack }: Context): Promise<void> {
   expect(person.labels).toEqual(expect.arrayContaining(['Notify me about Maya', '> Auto ✓']))
   await juno.expectToast('Maya: Always')
 
-  // Away from the DM, a new message from Maya notifies. Clicking it opens the DM at the message.
+  // Away from the DM, a new message from Maya notifies, under her name alone. Clicking it opens the DM at the message.
   await juno.openNotifications()
   slack.as('Maya').dm('The offer letter needs your signature')
   await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya', body: 'The offer letter needs your signature' })

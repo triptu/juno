@@ -26,13 +26,15 @@ export interface ShownNotification {
 
 export interface NotificationOptions {
   readonly title: string
+  /** macOS's line under the title; Electron shows it only on macOS. */
+  readonly subtitle?: string
   readonly body: string
   /** No sound from macOS: an incoming huddle rings in Juno. */
   readonly silent?: boolean
 }
 
 export interface NotifierDeps {
-  /** Electron's `new Notification({ title, body, silent })`, or a fake. */
+  /** Electron's `new Notification({ title, subtitle, body, silent })`, or a fake. */
   readonly create: (options: NotificationOptions) => ShownNotification
   /** `app.dock.setBadge`. */
   readonly setBadge: (text: string) => void
@@ -48,7 +50,7 @@ export interface NotifierDeps {
   readonly privacy: () => boolean
 }
 
-/** The body while privacy mode is on. The title still says where it came from. */
+/** The body while privacy mode is on. The title and subtitle still say who sent it and where. */
 export const HIDDEN_BODY = 'Message hidden'
 
 /** Notifications kept alive for their click handler. Electron drops the handler of one it no longer references. */
@@ -109,7 +111,8 @@ export class Notifier {
   private show(notification: OsNotification): void {
     if (this.shown.has(notification.id)) return
     const body = this.deps.privacy() && notification.target._tag === 'message' ? HIDDEN_BODY : notification.body
-    this.post(notification.id, { title: notification.title, body, ...(notification.silent === true ? { silent: true } : {}) }, () => this.deps.open(notification.target))
+    const options = { title: notification.title, ...(notification.subtitle === undefined ? {} : { subtitle: notification.subtitle }), body, ...(notification.silent === true ? { silent: true } : {}) }
+    this.post(notification.id, options, () => this.deps.open(notification.target))
     if (notification.target._tag === 'huddle') this.deps.bounce()
   }
 

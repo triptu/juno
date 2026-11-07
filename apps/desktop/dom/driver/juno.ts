@@ -251,7 +251,7 @@ export class Juno implements JunoVerbs {
   }
 
   /** The OS notifications the host's shell showed, oldest first. */
-  osNotifications(): Promise<Array<{ readonly title: string; readonly body: string; readonly silent?: true }>> {
+  osNotifications(): Promise<Array<{ readonly title: string; readonly subtitle?: string; readonly body: string; readonly silent?: true }>> {
     return this.surface.system('notifications')
   }
 

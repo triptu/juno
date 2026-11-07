@@ -59,6 +59,8 @@ export type NotificationTarget = typeof NotificationTarget.Type
 export const OsNotification = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
+  /** macOS's line under the title: where a message was posted. */
+  subtitle: Schema.optionalKey(Schema.String),
   body: Schema.String,
   target: NotificationTarget,
   /** No sound from macOS: an incoming huddle's ring is Juno's own. */

@@ -1129,7 +1129,7 @@ export class Juno implements JunoVerbs {
   }
 
   /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. `silent` only on one posted without a sound. */
-  osNotifications(): Promise<Array<{ readonly title: string; readonly body: string; readonly silent?: true }>> {
+  osNotifications(): Promise<Array<{ readonly title: string; readonly subtitle?: string; readonly body: string; readonly silent?: true }>> {
     return this.surface.system('notifications')
   }
 

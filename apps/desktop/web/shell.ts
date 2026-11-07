@@ -8,7 +8,7 @@ export interface SystemHooks {
   agentState: () => string
   /** The topic the shell last told the engine is on screen in a focused window, or null. */
   viewing: () => string | null
-  notifications: () => Array<{ readonly title: string; readonly body: string; readonly silent?: true }>
+  notifications: () => Array<{ readonly title: string; readonly subtitle?: string; readonly body: string; readonly silent?: true }>
   clickNotification: (index: number) => void
   notificationPermission: (permission: NotificationPermission) => void
   notificationRequests: () => number

@@ -16,6 +16,20 @@ const kindOf = (candidate: Candidate) =>
 const decide = (candidate: Candidate, at: number, settings: NotificationSettings, aiAssist: boolean, reading?: StoredReading) =>
   decideNotification({ ...candidate, at: localTime(at) }, settings, { aiAssist, userName: () => candidate.senderName }, reading as Reading | 'failed' | undefined)
 
+/**
+ * A message's OS notification text, as Slack's on macOS: the sender as the
+ * title and where it was posted as the subtitle, left out in a one-to-one
+ * DM, whose title already names the place. A reply says it is in a thread.
+ * A message with no known sender is titled by its place.
+ */
+export function notificationText(candidate: Pick<Candidate, 'channel' | 'senderName' | 'topicId'>): { readonly title: string; readonly subtitle?: string } {
+  const place = channelLabel(candidate.channel)
+  const thread = candidate.topicId.startsWith('t:')
+  const where = candidate.channel.kind === 'im' ? (thread ? 'Thread' : undefined) : thread ? `Thread in ${place}` : place
+  if (candidate.senderName === undefined) return { title: place, ...(thread ? { subtitle: 'Thread' } : {}) }
+  return { title: candidate.senderName, ...(where === undefined ? {} : { subtitle: where }) }
+}
+
 /** What Juno's reading is given about one message. The replay tool (`scripts/notif-replay`) builds it the same way. */
 export const readingInput = (candidate: Candidate, conversation: Conversation, instructions: ReadonlyArray<Instruction>, exchanges: number, now: number): NotificationReadingInput => ({
   messageTs: candidate.ts, where: channelLabel(candidate.channel), kind: kindOf(candidate),
@@ -67,7 +81,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
           reason = ${focused ? reason + FOCUSED : reason}
         WHERE id = ${id} AND delivered_at IS NULL AND suppressed_at IS NULL RETURNING id`
       if (claimed.length === 0 || focused) return
-      yield* notifier.show({ id: `message:${id}`, title: channelLabel(candidate.channel), body: candidate.text,
+      yield* notifier.show({ id: `message:${id}`, ...notificationText(candidate), body: candidate.text,
         target: { kind: 'message', source: { channelId: candidate.channel.id, ts: candidate.ts, topicId: candidate.topicId } } })
     })
 
