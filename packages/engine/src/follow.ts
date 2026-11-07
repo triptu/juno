@@ -30,10 +30,12 @@
  * state back. specs/follow.qnt models this: `localChange`, `accept`,
  * `acknowledge`, `reject`, `failLookup`.
  *
- * Only the mirror call can be cut off (the window closed, Follow new
- * threads restarted). A cut-off command still ends its row, and Slack is
- * asked in the background as after a failure, since it may have accepted
- * the call.
+ * Only the mirror call and the lookup after it can be cut off (the window
+ * closed, Follow new threads restarted). A command cut off during the call
+ * still ends its row, and Slack is asked in the background as after a
+ * failure, since it may have accepted the call. One cut off during the
+ * lookup leaves that lookup to the background too, so nothing waits for a
+ * read the command no longer needs.
  *
  * The undo is computed from the state before the change: a change returns
  * the opposite command, no change returns nothing.
@@ -133,13 +135,21 @@ export const setSubscribed = (id: string, subscribed: boolean, how: FollowedBy =
           const endedAt = yield* Clock.currentTimeMillis
           const ended = millisToTs(endedAt)
           const seen = yield* local(transaction(endPendingFollow(channel, threadTs, ended)))
-          if (Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)) {
-            yield* outbox.background(refreshOrRetry(before.previous, true, endedAt, ended))
-            return yield* Effect.failCause(exit.cause)
-          }
           // After a failure Slack is always asked: the answer may have been lost after Slack accepted the call.
           const failed = Exit.isFailure(exit)
-          if (seen || failed) yield* refreshOrRetry(before.previous, failed, endedAt, ended)
+          const lookup = refreshOrRetry(before.previous, failed, endedAt, ended)
+          if (failed && Cause.hasInterrupts(exit.cause)) {
+            yield* outbox.background(lookup)
+            return yield* Effect.failCause(exit.cause)
+          }
+          if (seen || failed) {
+            // A read nothing else waits for: a command cut off during it leaves it to the background.
+            const read = yield* Effect.exit(restore(lookup))
+            if (Exit.isFailure(read)) {
+              if (Cause.hasInterrupts(read.cause)) yield* outbox.background(lookup)
+              return yield* Effect.failCause(read.cause)
+            }
+          }
           return Exit.isSuccess(exit) ? undo : yield* Effect.failCause(exit.cause)
         }),
       ),

@@ -79,6 +79,30 @@ it('a Subscribe whose window closes while Slack has the call still ends its pend
   await engine.rowsUntil((rows) => !rows.some((r) => r.id === id), 'the thread gone after the phone unfollowed it')
 })
 
+// A command cut off while the lookup after its failed call is out
+it('a failed Subscribe whose window closes while Slack has the lookup ends at once and asks in the background', async () => {
+  const engine = await synced()
+  const id = unfollowed(engine)
+  const window = engine.openWindow()
+  engine.fake.resetCalls()
+  // Slack refuses the add, and then holds the lookup the refusal asks for.
+  engine.fake.forceError({ method: 'subscriptions.thread.add', error: 'not_allowed' })
+  engine.fake.holdNext({ method: 'conversations.replies' })
+  const pending = runCommand(window, topicsSubscribe, { id })
+  await waitFor(() => (engine.fake.heldCount({ method: 'conversations.replies' }) === 1 ? true : undefined), undefined, 'the held lookup')
+  window.dispose()
+  void pending.catch(() => undefined)
+  // The command ends while Slack still has the lookup: nothing waits on it, so the thread is free for the next command.
+  await waitFor(() => (engine.pendingCommands(id) === 0 ? true : undefined), undefined, 'the command cut off')
+  expect(engine.fake.heldCount({ method: 'conversations.replies' })).toBe(1)
+  const asked = apiCalls(engine, 'conversations.replies').filter((c) => c.args['ts'] === tsOf(id)).length
+  engine.fake.release()
+  // The lookup goes on in the background, so the thread still ends up as Slack has it.
+  await waitFor(() => (apiCalls(engine, 'conversations.replies').filter((c) => c.args['ts'] === tsOf(id)).length > asked ? true : undefined), undefined, 'the background lookup')
+  await quiet(engine)
+  expect(storedFollow(engine, 'C0PLATFORM', tsOf(id))).toBeUndefined()
+})
+
 // The user follows and unfollows
 it('Subscribe adds a thread live and mirrors it to Slack, Unsubscribe removes it, and undo brings it back', async () => {
   const engine = await synced()

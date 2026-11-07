@@ -503,9 +503,10 @@ Where: `outbox` rows of kind `follow`, one per thread, present only while a comm
 | pending | event or page about the thread | ignored; `seen` set | `subscriptions.ts:87`, l.171-179 |
 | pending | call ends | txn 2: row deleted; root lookup if `seen` | `follow.ts (setSubscribed)` |
 | pending | command fiber cut off during the call (window closed, `FollowNewJob` restarted) | txn 2: row deleted; root lookup in the background | `follow.ts (setSubscribed)`, `uninterruptibleMask` |
+| none (row ended) | command fiber cut off during the lookup after the call | the lookup goes on in the background; the command ends at once | `follow.ts (setSubscribed)`, `restore(lookup)` |
 | pending | `runSync` starts | row deleted | `packages/sync/src/sync.ts:149` |
 
-Invariant: the command that inserted the row also ends it, a cut-off one too: only the call is interruptible (OUT-5, fixed).
+Invariant: the command that inserted the row also ends it, a cut-off one too: only the call and the lookup after it are interruptible, and a cut-off lookup goes on in the background (OUT-5, fixed).
 
 Spec: `follow.qnt`, `follow-bounded.qnt`. A cut-off command takes `reject`'s path (the row ends, one lookup), so neither needs an interrupt action. Neither models a crash; sync start clears what one leaves.
 
@@ -1028,7 +1029,7 @@ The user can delete Q by hand.
 
 - Severity: medium. Confirmed. Impact: The thread's follow state freezes until the next sync start.
 - Test: `packages/engine/test/flows/follow.flow.test.ts`. Hold the add's answer, close the window that sent the command, release, and expect the row gone, a lookup, and a later `thread_unsubscribed` to apply.
-- Status: Fixed in ceaca1e6f. The command runs under `uninterruptibleMask` with only the Slack call restored, so a cut-off command still ends its row and asks Slack in the background, as after a failure. The protocol is unchanged (`reject`'s path), so `follow.qnt` needs no new action. Test: `follow.flow.test.ts`, "a Subscribe whose window closes while Slack has the call still ends its pending row, so later news about the thread applies".
+- Status: Fixed in ceaca1e6f. The command runs under `uninterruptibleMask` with only the Slack call restored, so a cut-off command still ends its row and asks Slack in the background, as after a failure. The protocol is unchanged (`reject`'s path), so `follow.qnt` needs no new action. Test: `follow.flow.test.ts`, "a Subscribe whose window closes while Slack has the call still ends its pending row, so later news about the thread applies". A review of that fix found that the lookup after a failed call, or after a noted observation, ran inside the mask too: a second Slack call, with the queue's waits and retries, that a window close, a Follow new threads restart or engine shutdown had to wait for while the thread's lock stayed held. That lookup is restored now, and a command cut off during it hands it to the background lane as the cut-off call does. Test: "a failed Subscribe whose window closes while Slack has the lookup ends at once and asks in the background".
 
 #### OUT-6. Retry on a post that failed with file_not_staged can never succeed
 
