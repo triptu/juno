@@ -39,6 +39,8 @@ export interface PendingFile {
   readonly width?: number | undefined
   readonly height?: number | undefined
   readonly fileId?: string | undefined
+  /** `files.getUploadURL`'s id once Slack has the bytes, until `files.completeUpload` answers: a lost answer completes this upload instead of making another file (`fileUploading`). */
+  readonly uploadId?: string | undefined
   /** Sent while the composer was still staging it: the bytes are not all here yet (`fileStaged`). */
   readonly staging?: true | undefined
 }
@@ -250,28 +252,6 @@ export const sentAt = (clientMsgId: string): Effect.Effect<number | undefined, S
     return (yield* sql<{ sent_at: number }>`SELECT sent_at FROM sent_posts WHERE client_msg_id = ${clientMsgId}`)[0]?.sent_at
   })
 
-/**
- * One of a queued post's files is in Slack: its id is kept, so the next
- * try uploads only the files still missing. False when the row is gone.
- */
-export const fileUploaded = (clientMsgId: string, stagedId: string, fileId: string): Effect.Effect<boolean, SqlError, StoreWriter> =>
-  Effect.gen(function* () {
-    const post = yield* readPost(clientMsgId)
-    if (post === undefined) return false
-    const files = post.files.map((file) => (file.id === stagedId ? { ...file, fileId } : file))
-    const sql = yield* StoreWriter
-    yield* sql`UPDATE pending_messages SET file_ids_json = ${JSON.stringify(files)} WHERE client_msg_id = ${clientMsgId}`
-    // An image keeps its staged copy as the message's preview until Slack's thumbnails are stored (`files.ts`).
-    const staged = files.find((file) => file.id === stagedId)
-    if (staged?.width !== undefined && staged.height !== undefined && staged.mimetype.startsWith('image/') && !staged.stagedName.endsWith('.bin')) {
-      const now = yield* Clock.currentTimeMillis
-      yield* sql`DELETE FROM uploaded_files WHERE uploaded_at < ${now - KEEP_MILLIS}`
-      yield* sql`INSERT INTO uploaded_files (file_id, staged_name, width, height, uploaded_at) VALUES (${fileId}, ${staged.stagedName}, ${staged.width}, ${staged.height}, ${now})
-        ON CONFLICT (file_id) DO NOTHING`
-    }
-    return true
-  })
-
 /** A file the post took while it was staging is complete now: it is kept as staged, with its size. False when the row is gone. */
 export const fileStaged = (clientMsgId: string, staged: PendingFile): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
@@ -284,17 +264,33 @@ export const fileStaged = (clientMsgId: string, staged: PendingFile): Effect.Eff
     return true
   })
 
-/** The staged copies `uploaded_files` still shows, which the staging sweep keeps. */
-export const uploadedNames: Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter> = Effect.gen(function* () {
-  const sql = yield* StoreWriter
-  return (yield* sql<{ staged_name: string }>`SELECT staged_name FROM uploaded_files`).map((row) => row.staged_name)
-})
-
 /** A queued post's uploads could not reach Slack (offline, rate limited, signed out): try again at `nextAt`. */
 export const deferPost = (clientMsgId: string, nextAt: number, error: string) => move(clientMsgId, ['queued'], 'queued', { nextAt, lastError: error, attempt: true })
 
 /** A file of a queued post could not be uploaded: nothing was posted, so it waits for Retry or Delete draft. */
 export const failUpload = (clientMsgId: string, error: string) => move(clientMsgId, ['queued'], 'failed', { lastError: error, attempt: true })
+
+/**
+ * A file a queued post took while it was staging will never be complete
+ * (the composer could not read it, or a restart lost its bytes): the post
+ * goes on without it and fails with `error`, so Retry sends what the row
+ * shows and Delete draft drops it. A post that was only that file has
+ * nothing left to send, so it is removed as Delete draft would remove it.
+ * False when the row is gone.
+ */
+export const failStaging = (clientMsgId: string, stagedId: string, error: string): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const post = yield* readPost(clientMsgId)
+    if (post === undefined) return false
+    const files = post.files.filter((file) => file.id !== stagedId)
+    if (files.length === 0 && post.text.trim() === '' && post.share === undefined) {
+      yield* removePost(post)
+      return false
+    }
+    const sql = yield* StoreWriter
+    yield* sql`UPDATE pending_messages SET file_ids_json = ${JSON.stringify(files)} WHERE client_msg_id = ${clientMsgId}`
+    return yield* failUpload(clientMsgId, error)
+  })
 
 /** Slack refused the post. It waits for Retry or Delete draft. */
 export const failPost = (clientMsgId: string, error: string) => move(clientMsgId, ['sending'], 'failed', { lastError: error })
@@ -349,7 +345,7 @@ export const reconcilePost = (clientMsgId: string): Effect.Effect<void, SqlError
   })
 
 /** How long a sent post's row is kept. A copy shows within seconds; a week covers a long time offline. */
-const KEEP_MILLIS = 7 * 24 * 60 * 60_000
+export const KEEP_MILLIS = 7 * 24 * 60 * 60_000
 
 /**
  * `userId` is about to send the post with `clientMsgId` to `channel` (`sent.ts`). A post sent again (after a

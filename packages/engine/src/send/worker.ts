@@ -57,8 +57,10 @@ import {
   deferPost,
   failLookup,
   failPost,
+  failStaging,
   failUpload,
   fileStaged,
+  fileUploading,
   fileUploaded,
   flushPosts,
   pendingPosts,
@@ -67,6 +69,7 @@ import {
   requeueUnsentPost,
   sentAt,
   storedMe,
+  type PendingFile,
   type PendingPost,
   type TopicFetcher,
 } from '@juno/sync'
@@ -121,11 +124,45 @@ export class PostWorker extends Context.Service<
       const wake = queue.wake
 
       /**
+       * One file up, as the official client does when a file is attached:
+       * `files.getUploadURL`, the bytes, `files.completeUpload`. The upload's
+       * id is written to the row once Slack has the bytes, so a completion
+       * whose answer is lost is completed next time, not uploaded again as a
+       * second file. Answers the file's id in Slack.
+       */
+      const uploadFile = (open: OpenWorkspace, row: PendingPost, file: PendingFile) =>
+        staging.read(open, file).pipe(
+          Effect.flatMap((bytes) =>
+            outbox.send((api) =>
+              Effect.gen(function* () {
+                const target = yield* api.call('files.getUploadURL', { filename: file.name, length: bytes.byteLength }, { reason: 'upload-queue' })
+                yield* api.upload(target.upload_url, { name: file.name, mimetype: file.mimetype, bytes }).pipe(
+                  // Slack's upload host answered but did not take the bytes: a failure the user retries, not a lost connection.
+                  Effect.catchIf(
+                    (error) => error.status !== undefined,
+                    (error) => Effect.fail(new SlackRejected({ method: 'upload', error: `upload_failed_${error.status}` })),
+                  ),
+                )
+                yield* inStore(open)(transaction(fileUploading(row.clientMsgId, file.id, target.file)))
+                yield* api.call('files.completeUpload', { files: [{ id: target.file, title: file.name }] }, { reason: 'upload-queue' })
+                return target.file
+              }),
+            ),
+          ),
+        )
+
+      /** Completes an upload Slack has the bytes of. A refusal (the upload expired, or Slack takes no second completion) uploads the file again. */
+      const completeUpload = (open: OpenWorkspace, row: PendingPost, file: PendingFile, uploadId: string) =>
+        outbox.send((api) => api.call('files.completeUpload', { files: [{ id: uploadId, title: file.name }] }, { reason: 'upload-queue' })).pipe(
+          Effect.as(uploadId),
+          Effect.catchTag('Rejected', () => inStore(open)(transaction(fileUploading(row.clientMsgId, file.id, undefined))).pipe(Effect.andThen(uploadFile(open, row, file)))),
+        )
+
+      /**
        * Uploads the files of a queued post that Slack does not have yet, one
-       * at a time, as the official client does when a file is attached:
-       * `files.getUploadURL`, the bytes, `files.completeUpload`. Each file's
-       * id is kept as soon as it is in Slack. Answers the post with every
-       * file id, or undefined when the post must wait or failed.
+       * at a time. Each file's id is kept as soon as it is in Slack. Answers
+       * the post with every file id, or undefined when the post must wait or
+       * failed.
        */
       const upload = (open: OpenWorkspace, row: PendingPost) =>
         Effect.gen(function* () {
@@ -136,25 +173,7 @@ export class PostWorker extends Context.Service<
           let files = row.files
           for (const file of row.files) {
             if (file.fileId !== undefined) continue
-            const result = yield* staging.read(open, file).pipe(
-              Effect.flatMap((bytes) =>
-                outbox.send((api) =>
-                  Effect.gen(function* () {
-                    const target = yield* api.call('files.getUploadURL', { filename: file.name, length: bytes.byteLength }, { reason: 'upload-queue' })
-                    yield* api.upload(target.upload_url, { name: file.name, mimetype: file.mimetype, bytes }).pipe(
-                      // Slack's upload host answered but did not take the bytes: a failure the user retries, not a lost connection.
-                      Effect.catchIf(
-                        (error) => error.status !== undefined,
-                        (error) => Effect.fail(new SlackRejected({ method: 'upload', error: `upload_failed_${error.status}` })),
-                      ),
-                    )
-                    yield* api.call('files.completeUpload', { files: [{ id: target.file, title: file.name }] }, { reason: 'upload-queue' })
-                    return target.file
-                  }),
-                ),
-              ),
-              Effect.result,
-            )
+            const result = yield* (file.uploadId === undefined ? uploadFile(open, row, file) : completeUpload(open, row, file, file.uploadId)).pipe(Effect.result)
             const now = yield* Clock.currentTimeMillis
             if (result._tag === 'Failure') {
               yield* progress.clear(row.clientMsgId)
@@ -199,14 +218,19 @@ export class PostWorker extends Context.Service<
             if (file.staging !== true) continue
             const status = yield* staging.status(file.id)
             if (status._tag === 'writing') return WAITING
-            if (status._tag === 'ready') {
-              if (!(yield* local(transaction(fileStaged(row.clientMsgId, status.file))))) return undefined
-              files = files.map((each) => (each.id === file.id ? status.file : each))
+            // A restart forgets the file, but keeps the bytes it had written.
+            const complete = status._tag === 'ready' ? status.file : status._tag === 'unknown' ? yield* staging.recover(open, file) : undefined
+            if (complete !== undefined) {
+              if (!(yield* local(transaction(fileStaged(row.clientMsgId, complete))))) return undefined
+              files = files.map((each) => (each.id === file.id ? complete : each))
               continue
             }
-            // The composer could not read the rest, or a restart lost it: nothing was posted, so it waits for Retry or Delete draft.
+            // The composer could not read the rest, or a restart lost it: nothing was posted, and the post goes on
+            // without the file, failed, so Retry sends what the row shows and Delete draft drops it. A post that was
+            // only this file is dropped instead, as Retry on an empty post could never send.
             yield* Effect.logWarning('send: a file was not staged')
-            yield* local(transaction(failUpload(row.clientMsgId, NOT_STAGED)))
+            yield* local(transaction(failStaging(row.clientMsgId, file.id, NOT_STAGED)))
+            yield* staging.release(open, [file])
             return undefined
           }
           return { ...row, files }

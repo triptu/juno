@@ -126,11 +126,11 @@ export class MarkWorker extends Context.Service<
                 if (yield* local(transaction(rejectMark(topicId, mark.gen, answeredAt)))) yield* outbox.background(lookUp(open, topic, topicId))
                 return yield* Effect.logWarning('reads: Slack refused a mark', { code: error.code })
               case 'NotSignedIn':
-                return yield* local(deferMark(topicId, answeredMillis + timing.noSessionMillis, error._tag))
+                return yield* local(transaction(deferMark(topicId, mark.gen, answeredMillis + timing.noSessionMillis, error._tag)))
               case 'RateLimited':
-                return yield* local(deferMark(topicId, answeredMillis + Math.max(error.retryAfterMillis, backoff(mark.attempts)), error._tag))
+                return yield* local(transaction(deferMark(topicId, mark.gen, answeredMillis + Math.max(error.retryAfterMillis, backoff(mark.attempts)), error._tag)))
               case 'Offline':
-                return yield* local(deferMark(topicId, answeredMillis + backoff(mark.attempts), error._tag))
+                return yield* local(transaction(deferMark(topicId, mark.gen, answeredMillis + backoff(mark.attempts), error._tag)))
             }
           }),
         )

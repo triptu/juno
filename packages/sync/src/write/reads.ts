@@ -227,10 +227,21 @@ export const rejectMark = (topicId: string, gen: number, at: Ts): Effect.Effect<
     return true
   })
 
-/** A transient failure: the row keeps its intent and is due again at `nextAt` (epoch milliseconds). */
-export const deferMark = (topicId: string, nextAt: number, error: string): Effect.Effect<void, SqlError, StoreWriter> =>
+/**
+ * A transient failure of the mark of generation `gen`: the row keeps its
+ * intent and is due again at `nextAt` (epoch milliseconds). A newer local
+ * mark that replaced it meanwhile is not the one that failed, so the row is
+ * due now with a fresh count, as after `endMark` and `rejectMark`.
+ */
+export const deferMark = (topicId: string, gen: number, nextAt: number, error: string): Effect.Effect<void, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
+    const mark = yield* pendingMark(topicId)
+    if (mark === undefined) return
+    if (mark.gen !== gen) {
+      yield* sql`UPDATE outbox SET attempts = 0, next_at = ${String(0)}, last_error = NULL WHERE kind = ${MARK} AND target_key = ${topicId}`
+      return
+    }
     yield* sql`UPDATE outbox SET attempts = attempts + 1, next_at = ${String(nextAt)}, last_error = ${error} WHERE kind = ${MARK} AND target_key = ${topicId}`
   })
 

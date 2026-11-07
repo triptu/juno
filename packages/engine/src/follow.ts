@@ -30,6 +30,13 @@
  * state back. specs/follow.qnt models this: `localChange`, `accept`,
  * `acknowledge`, `reject`, `failLookup`.
  *
+ * Only the mirror call and the lookup after it can be cut off (the window
+ * closed, Follow new threads restarted). A command cut off during the call
+ * still ends its row, and Slack is asked in the background as after a
+ * failure, since it may have accepted the call. One cut off during the
+ * lookup leaves that lookup to the background too, so nothing waits for a
+ * read the command no longer needs.
+ *
  * The undo is computed from the state before the change: a change returns
  * the opposite command, no change returns nothing.
  *
@@ -45,7 +52,7 @@
  * `@juno/domain` read it (`isFollowed`, `sidebarPlacement`).
  */
 import { EngineTiming } from './config'
-import { Clock, Effect, Schedule } from 'effect'
+import { Cause, Clock, Effect, Exit, Schedule } from 'effect'
 import { NotFound, NotSignedIn, type CommandResult, type SubscribeError } from '@juno/contract'
 import { compareTs, maxTs, millisToTs, parseTopicId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
@@ -108,26 +115,44 @@ export const setSubscribed = (id: string, subscribed: boolean, how: FollowedBy =
         if (!(yield* refresh(previous, forgetIfUnfollowed, endedAt))) return yield* Effect.fail('unanswered' as const)
       }).pipe(Effect.retry({ schedule: Schedule.exponential(timing.lookupRetryMillis), times: LOOKUP_RETRIES }), Effect.delay(timing.lookupRetryMillis))
 
-    return yield* outbox.exclusive(id)(
+    /** `refresh`, and when Slack could not say, `retryRefresh` in the background. */
+    const refreshOrRetry = (previous: ThreadSubRow | undefined, forgetIfUnfollowed: boolean, endedAt: number, ended: Ts) =>
       Effect.gen(function* () {
-        const now = yield* Clock.currentTimeMillis
-        const stamp = millisToTs(now)
-        const before = yield* local(transaction(setThreadSubscribed(channel, threadTs, id, subscribed, stamp, now, how)))
-        if (before === 'missing') return yield* new NotFound({ kind: 'topic', id })
-        if (before === 'unchanged') return {}
-        const args = { channel, thread_ts: threadTs, last_read: before.lastRead }
-        const send = how === 'auto' ? outbox.sendBackground : outbox.send
-        const result = yield* Effect.result(send((api) => api.call(subscribed ? 'subscriptions.thread.add' : 'subscriptions.thread.remove', args)))
-        const endedAt = yield* Clock.currentTimeMillis
-        const ended = millisToTs(endedAt)
-        const seen = yield* local(transaction(endPendingFollow(channel, threadTs, ended)))
-        // After a failure Slack is always asked: the answer may have been lost after Slack accepted the call.
-        const failed = result._tag === 'Failure'
-        if ((seen || failed) && !(yield* refresh(before.previous, failed, endedAt))) {
-          yield* outbox.background(retryRefresh(before.previous, failed, endedAt, ended))
-        }
-        return result._tag === 'Success' ? undo : yield* result.failure
-      }),
+        if (!(yield* refresh(previous, forgetIfUnfollowed, endedAt))) yield* outbox.background(retryRefresh(previous, forgetIfUnfollowed, endedAt, ended))
+      })
+
+    return yield* outbox.exclusive(id)(
+      Effect.uninterruptibleMask((restore) =>
+        Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis
+          const stamp = millisToTs(now)
+          const before = yield* local(transaction(setThreadSubscribed(channel, threadTs, id, subscribed, stamp, now, how)))
+          if (before === 'missing') return yield* new NotFound({ kind: 'topic', id })
+          if (before === 'unchanged') return {}
+          const args = { channel, thread_ts: threadTs, last_read: before.lastRead }
+          const send = how === 'auto' ? outbox.sendBackground : outbox.send
+          const exit = yield* Effect.exit(restore(send((api) => api.call(subscribed ? 'subscriptions.thread.add' : 'subscriptions.thread.remove', args))))
+          const endedAt = yield* Clock.currentTimeMillis
+          const ended = millisToTs(endedAt)
+          const seen = yield* local(transaction(endPendingFollow(channel, threadTs, ended)))
+          // After a failure Slack is always asked: the answer may have been lost after Slack accepted the call.
+          const failed = Exit.isFailure(exit)
+          const lookup = refreshOrRetry(before.previous, failed, endedAt, ended)
+          if (failed && Cause.hasInterrupts(exit.cause)) {
+            yield* outbox.background(lookup)
+            return yield* Effect.failCause(exit.cause)
+          }
+          if (seen || failed) {
+            // A read nothing else waits for: a command cut off during it leaves it to the background.
+            const read = yield* Effect.exit(restore(lookup))
+            if (Exit.isFailure(read)) {
+              if (Cause.hasInterrupts(read.cause)) yield* outbox.background(lookup)
+              return yield* Effect.failCause(read.cause)
+            }
+          }
+          return Exit.isSuccess(exit) ? undo : yield* Effect.failCause(exit.cause)
+        }),
+      ),
     )
   })
 

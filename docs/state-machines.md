@@ -390,8 +390,12 @@ stateDiagram-v2
 | From | Event | To | Guard | Code |
 |---|---|---|---|---|
 | none | `sendMessage`, forward, agent send | queued | `pending:` thread resolved through `started_threads` at insert | `posts.ts:140 (queuePost)`, l.154 |
-| queued | a file is still staging | queued | | `worker.ts:183 (staged)` |
-| queued | file not stageable or upload refused | failed | | `posts.ts:268 (failUpload)`, `worker.ts:154`, `worker.ts:198` |
+| queued | a file is still staging | queued | | `worker.ts (staged)` |
+| queued | a file a restart forgot has every declared byte on disk | queued, the file complete (`fileStaged`) | | `staging.ts (recover)`, `worker.ts (staged)` |
+| queued | a file will never be staged (the composer could not read it, or a restart lost its bytes) | failed, without that file; its staged bytes released. Removed instead when the post was only that file, as Delete draft would | | `posts.ts (failStaging)`, `worker.ts (staged)` |
+| queued | upload refused | failed | | `posts.ts (failUpload)`, `worker.ts (upload)` |
+| queued | Slack has a file's bytes | queued, the file's `uploadId` kept until `files.completeUpload` answers; a try that finds one completes that upload instead of uploading again | | `posts.ts (fileUploading)`, `worker.ts (uploadFile, completeUpload)` |
+| queued | completion of a kept upload refused | `uploadId` forgotten; the file goes up again in the same try | | `worker.ts (completeUpload)` |
 | queued | upload offline, 429 or no session | queued; attempt + 1; backoff | | `posts.ts:265 (deferPost)` |
 | queued | claim | sending; attempt + 1; `sent_posts` row; the request is built from the row the claim read | socket online (`worker.ts:212`) | `posts.ts (claimPost)`, `worker.ts (post)` |
 | sending | answer with a message | gone | | `fetcher.sent`, `posts.ts:305 (reconcilePost)` |
@@ -482,10 +486,11 @@ Where: `outbox` rows of kind `mark`, one per topic. `writeLocalMark` (`packages/
 | in flight | success, `gen` equal | deleted | `endMark` |
 | in flight | success, `gen` newer | due now | `endMark` |
 | in flight | refused | `rejectMark` and a lookup | `rejectMark` |
-| in flight | transient error | `deferMark`: attempts + 1, backoff | `reads.ts:231 (deferMark)`, `markWorker.ts:129-131` |
+| in flight | transient error, `gen` equal | `deferMark`: attempts + 1, backoff | `reads.ts (deferMark)`, `markWorker.ts (send)` |
+| in flight | transient error, `gen` newer | due now, attempts reset | `reads.ts (deferMark)` |
 | any | setting turned off | dropped | `dropMark` |
 
-Invariant: a stale answer never ends a newer mark (`gen` compare in `endMark` and `rejectMark`). `deferMark` does not make a replaced intent due now (**bug** OUT-8).
+Invariant: a stale answer never ends a newer mark, and never delays it: `endMark`, `rejectMark` and `deferMark` compare `gen`, and a replaced intent is due now (OUT-8, fixed).
 
 Spec: `readstate.qnt`, `readstate-bounded.qnt`.
 
@@ -497,13 +502,14 @@ Where: `outbox` rows of kind `follow`, one per thread, present only while a comm
 |---|---|---|---|
 | none | command | txn 1: `thread_subs` set to the intent; `follow` row inserted | `follow.ts:159` |
 | pending | event or page about the thread | ignored; `seen` set | `subscriptions.ts:87`, l.171-179 |
-| pending | call ends | txn 2: row deleted; root lookup if `seen` | `follow.ts:123` |
-| pending | command fiber interrupted | no transition; the row stays (OUT-5) | |
+| pending | call ends | txn 2: row deleted; root lookup if `seen` | `follow.ts (setSubscribed)` |
+| pending | command fiber cut off during the call (window closed, `FollowNewJob` restarted) | txn 2: row deleted; root lookup in the background | `follow.ts (setSubscribed)`, `uninterruptibleMask` |
+| none (row ended) | command fiber cut off during the lookup after the call | the lookup goes on in the background; the command ends at once | `follow.ts (setSubscribed)`, `restore(lookup)` |
 | pending | `runSync` starts | row deleted | `packages/sync/src/sync.ts:149` |
 
-Invariant: the command that inserted the row also ends it. An interrupt breaks it (OUT-5).
+Invariant: the command that inserted the row also ends it, a cut-off one too: only the call and the lookup after it are interruptible, and a cut-off lookup goes on in the background (OUT-5, fixed).
 
-Spec: `follow.qnt`, `follow-bounded.qnt`. Neither models an interrupt or a crash.
+Spec: `follow.qnt`, `follow-bounded.qnt`. A cut-off command takes `reject`'s path (the row ends, one lookup), so neither needs an interrupt action. Neither models a crash; sync start clears what one leaves.
 
 ### Follow new threads
 
@@ -542,7 +548,7 @@ Where: in memory, `packages/engine/src/staging.ts`. `entries` (composer chips) a
 | claimed, unfinished | `unstage` | failed | `staging.ts:164-187` |
 | any | workspace change | both maps cleared | |
 
-After a restart `claimed` is empty, so every file with `staging: true` reads `unknown` (see OUT-6).
+After a restart `claimed` is empty, so every file with `staging: true` reads `unknown`: the worker asks `recover`, which answers the complete file when every declared byte is on disk, and otherwise drops the file from the post, or the post when the file was all of it (OUT-6, fixed).
 
 ## Renderer and state client
 
@@ -1016,6 +1022,16 @@ The user can delete Q by hand.
 - Fix direction: in `discardPost` and `queueDelete` of a root with dependents, fail or remove rows whose `thread_ts = 'pending:' || cmid`, and drop the started thread.
 - Status: Fixed in 104da4db8. `discardStartedThread` removes the waiting replies, the started thread, its topic row and pending follow when the root is deleted or discarded. Spec: `discardedWith`, invariant `repliesFollowRoot`, pair `discardedRoot`. Test: `outbox.flow.test.ts`, "removes the replies and the thread of a started root the user deletes". A review of that fix found two delete paths it missed: a delete that waited on the root while its send was out, applied when the root came back to the queue or was refused, removed the root's row alone with raw SQL and left its replies and thread. The rule has one copy now, `applyWaitingActions` in `actions.ts`, which goes through `removePost`. Test: "removes the replies and the thread of a started root deleted while its send was out".
 
+#### OUT-5. A follow command cut off mid-call leaves its pending row
+
+1. The user clicks Subscribe. `setSubscribed` writes `thread_subs` and the `follow` outbox row, then calls `subscriptions.thread.add` (`packages/engine/src/follow.ts`).
+2. The window closes while the call is out. The RPC server interrupts every fiber of that port (`protocol/runner.ts`), and the command fiber ends between the call and `endPendingFollow`. `FollowNewJob`'s `switchMap` restarting its pass cuts an auto follow off the same way.
+3. The row stays. Every event and page about the thread is noted and ignored (`notePendingFollow`) until the next sync start clears it, so an unfollow from a phone does not show until then.
+
+- Severity: medium. Confirmed. Impact: The thread's follow state freezes until the next sync start.
+- Test: `packages/engine/test/flows/follow.flow.test.ts`. Hold the add's answer, close the window that sent the command, release, and expect the row gone, a lookup, and a later `thread_unsubscribed` to apply.
+- Status: Fixed in ceaca1e6f. The command runs under `uninterruptibleMask` with only the Slack call restored, so a cut-off command still ends its row and asks Slack in the background, as after a failure. The protocol is unchanged (`reject`'s path), so `follow.qnt` needs no new action. Test: `follow.flow.test.ts`, "a Subscribe whose window closes while Slack has the call still ends its pending row, so later news about the thread applies". A review of that fix found that the lookup after a failed call, or after a noted observation, ran inside the mask too: a second Slack call, with the queue's waits and retries, that a window close, a Follow new threads restart or engine shutdown had to wait for while the thread's lock stayed held. That lookup is restored now (9893ade70), and a command cut off during it hands it to the background lane as the cut-off call does. Test: "a failed Subscribe whose window closes while Slack has the lookup ends at once and asks in the background".
+
 #### OUT-6. Retry on a post that failed with file_not_staged can never succeed
 
 1. The user attaches a file and sends while it is still staging. The post's file JSON has `staging: true`.
@@ -1023,10 +1039,20 @@ The user can delete Q by hand.
 3. The worker asks `status` and gets `unknown`, so it calls `failUpload(NOT_STAGED)` (`worker.ts:189-199`).
 4. The user clicks Retry. `retryPost` only changes the state (`posts.ts:274`). The file still has `staging: true`, so the next pass fails the same way.
 
-- Severity: low. Confirmed. Impact: A Retry button that never works. Nothing special-cases `file_not_staged`.
-- Test: `outbox.flow.test.ts`. Restart the engine between `files.stage` chunks and a send, then Retry.
+- Severity: low. Confirmed. Impact: A Retry button that never works. Nothing special-cases `file_not_staged`. The same loop runs without a restart when the composer could not read the file (`files.unstage` marks the claimed entry failed, and `status` answers failed on every Retry).
+- Test: `packages/engine/test/flows/outbox-staging.flow.test.ts`. Name two files with their empty first chunk, send, stage one in full, restart, then Retry.
 - Fix direction: hide Retry for this code, or clear the flag when the staged file is complete on disk.
-- Status: Open
+- Status: Fixed in 413cf6d7a. A restart no longer loses a file whose declared bytes are all on disk: `Staging.recover` completes it as the last chunk would. A file whose bytes will never all come is dropped from the post (`failStaging`), its staged bytes released, and the row fails with `file_not_staged` as before, so Retry sends what the row shows (decision 2026-11-07 19:56). Test: `outbox-staging.flow.test.ts`, "after a restart, sends a post that named a file still being read whose bytes are all on disk, and drops a file the restart lost so Retry sends the rest". A review of that fix found the loop it kept: a post that was only the lost file became an empty row whose Retry sent `chat.postMessage` with no text, which Slack refuses (`no_text`) every time. `failStaging` now removes such a post, as Delete draft would (9203a9905; decision 2026-11-07 20:20). Test: "after a restart, a post that was only a file the restart lost is dropped, as nothing is left to send".
+
+#### OUT-7. Uploads can leave orphan private files in Slack
+
+1. A queued post's file goes up: `files.getUploadURL`, the bytes, `files.completeUpload`. Slack takes the completion, and every answer to it is lost (the client's three attempts). The worker defers the post (`Offline`).
+2. The next try starts over with `files.getUploadURL`: a second file in Slack. The message shares the second; the first stays as a private file no message shows. Measured with the fake: three lost completion answers gave two `files.getUploadURL` calls and two `notes.txt` files.
+3. Separately, a queued post deleted after some of its files got a `fileId` (`removePost`, `discardMessage`) makes no Slack call: those files stay private and unshared.
+
+- Severity: low. Confirmed. Impact: Private files in the user's Slack that no message shows, counted against the workspace's storage.
+- Test: `packages/engine/test/flows/outbox-copies.flow.test.ts`. Attach a file, lose every answer to `files.completeUpload`, and expect one `files.getUploadURL`, one file in Slack and the message sharing it.
+- Status: Step 1 and 2 fixed in df01c17fb. The upload's id is written to the row once Slack has the bytes (`fileUploading`); a try that finds one completes that upload instead of uploading again, and a completion Slack refuses forgets the id and uploads afresh, which is the old path. Whether real Slack accepts a second `files.completeUpload` for a file it already completed is unknown (`docs/research/slack-data-access.md`); the client already sends one when the first answer is lost, and a refusal costs one extra call, no extra file. Test: `outbox-copies.flow.test.ts`, "completes an upload whose completion answers were all lost, instead of making a second file in Slack". Step 3 is open: removing the files needs `files.delete`, which Juno has never called and the research has not observed; check it live in the private test channel before adding it.
 
 #### OUT-8. A newer mark can be delayed by an older mark's backoff
 
@@ -1037,8 +1063,8 @@ The user can delete Q by hand.
 `endMark` and `rejectMark` make a replaced intent due now; `deferMark` does not. `deferMark` also runs outside `transaction(...)`, unlike every other write here. It is one UPDATE, so that is not a correctness problem today.
 
 - Severity: low. Confirmed. Impact: The newer read state reaches Slack up to `retryCapMillis` later.
-- Test: a read-state flow in `packages/engine/test/flows` with a test clock.
-- Status: Open
+- Test: `packages/engine/test/reads.test.ts`. Hold a mark at the fake's gate, mark differently while it is out, answer the held call with an error the client does not retry, and expect the next pass to send the newer intent.
+- Status: Fixed in 7527934f7. `deferMark` takes the sent `gen`, runs in the worker's transaction, and makes a replaced intent due now with its attempts reset, as `endMark` and `rejectMark` do. Test: `reads.test.ts`, "a newer mark goes at once when the older mark it replaced fails for a transient reason".
 
 #### OUT-9. A reply that keeps a copy leaves the copy's delete row, which holds the channel's later changes
 
@@ -1465,8 +1491,6 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 
 | Id | Bug | Severity |
 |---|---|---|
-| OUT-5 | A follow command interrupted mid-call (window closed, or `FollowNewJob`'s `switchMap` restarting) leaves its `follow` row, so events and pages for the thread are ignored until the next sync start (`packages/engine/src/follow.ts:111-123`, `topics/handlers.ts:146` is not uninterruptible). `follow.qnt` has no interrupt action. | medium |
-| OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
 | REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
 | MAIN-6 | Sign-in answers carried no request id: after an engine crash during a keychain import, the import's `secrets` could be taken as the stored session, which was never written to `secrets.bin`. An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131), which stays as it is: the engine's check needs the cookie in the Slack session. Status: Fixed in da399658a. Every sign-in request carries an id the engine makes and main echoes; the engine waits for the answer with its id (`Session.ts`, `main/session.ts`, `contract/protocol.ts`). Test: `packages/engine/test/session.test.ts`, "ignores the answer to an import a crashed engine asked for, and starts signed out". | low |
