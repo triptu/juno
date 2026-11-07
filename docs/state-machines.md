@@ -263,7 +263,7 @@ Invariants:
 
 ### Engine phase
 
-Where: `phaseOf` in `packages/engine/src/layer.ts:83`. Three fibers share a `Ref<PhaseInputs>` and push the result into `Status.phase` (`layer.ts:93-106`).
+Where: `phaseOf` in `packages/engine/src/layer.ts:83`. One fiber reads the merged stream of session, sync phase and `slowedUntil` changes and pushes each result into `Status.phase` (`layer.ts:91-106`).
 
 | Session status | Sync phase | Rate-limit pause | Engine phase |
 |---|---|---|---|
@@ -275,7 +275,7 @@ Where: `phaseOf` in `packages/engine/src/layer.ts:83`. Three fibers share a `Ref
 
 `syncing` passes straight through from `SyncRunner.syncing`.
 
-Invariant: the published phase is `phaseOf` of the latest inputs. Each fiber runs `Ref.updateAndGet` and then `status.setPhase` as two steps (`layer.ts:99-100`), so a slower fiber can publish an older result (**bug** ENG-7).
+Invariant: the published phase is `phaseOf` of the latest inputs. One fiber applies each change and publishes before it takes the next, so no older result can land after a newer one (ENG-7, fixed).
 
 ### Sync boot loop and phase
 
@@ -305,7 +305,7 @@ stateDiagram-v2
 | start | initialize | `booting`, then `catching-up` progress | work permit | `run/boot.ts:10-24`, `sync/src/boot.ts:502-549` |
 | booting | boot fails, not auth | `offline` or `failed{reason}`; wait 30 s or a `force_reload` | | `run/boot.ts (bootUntilDone)` |
 | booting | boot ok | `booted = true`; `settle`; if a drop was recorded during the boot and the socket is up, fork `reconcile` | | `run/boot.ts (bootUntilDone)` |
-| any | socket Connected | `connected = true`; if booted, fork `reconcile` | | `run/socket.ts:16-23` |
+| any | socket Connected | `connected = true`; if booted, fork `reconcile`, unless one waits for the work permit (ENG-5, fixed) | `waiting` | `run/socket.ts:16-23`, `run/reconcile.ts (makeReconcile)` |
 | any | socket Disconnected after a real connection | `droppedAt ??= now`; event coverage ends; `offline` if booted, else the boot's phase holds (ENG-3, fixed) | `connected` was true | `run/socket.ts` |
 | any | socket Disconnected after an attempt that never connected | event coverage ends; no gap recorded | | `run/socket.ts` |
 | any | `force_reload` while `bootRetry` is set | wake the boot retry | | `run/socket.ts:46` |
@@ -319,6 +319,7 @@ Invariants:
 2. After boot, the phase is `offline` whenever `state.connected` is false (ENG-4, fixed).
 3. Every gap between a drop and a reconnect is rechecked by a catch-up with `recheck`, including a drop during a boot (ENG-3, fixed).
 4. A boot or catch-up that finishes after a disconnect does not set `live`: `settle` reads `state.connected` when it runs.
+5. At most one reconcile waits for the work permit; it reads `droppedAt`, the earliest drop, when it starts (ENG-5, fixed).
 
 Spec: `catchup.qnt` covers a drop while connected and live. Boot is outside the model; a drop during a boot uses the same recheck once the boot ends.
 
@@ -335,7 +336,7 @@ Where: `packages/slack/src/client/queue.ts`. `paused: Map<method, until>` (l.65)
 
 Invariants:
 1. The interval stays within base and 60 s.
-2. Only a real 429 from Slack counts as `limited`. A synthetic refusal does not (**bug** ENG-6).
+2. Only a real 429 from Slack counts as `limited`. A refusal by the queue does not (ENG-6, fixed).
 
 Spec: `requestqueue.qnt`.
 
@@ -1122,7 +1123,16 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 - Severity: low to medium. Plausible: each step is confirmed, the frequency depends on the network. Impact: On bad Wi-Fi, bursts of redundant interactive-lane calls, more 429s, and `syncing` held true for a long time.
 - Test: `gap-and-restart.flow.test.ts`. Hold `client.counts`, drop and reconnect three times, release, and expect 2 `client.counts` calls, not 4.
 - Fix direction: one "catch-up wanted" flag; do not queue a reconcile while one is queued and not started.
-- Status: Open
+- Status: Fixed in cb268fe76. `makeReconcile` queues no reconcile while one waits for the work permit; the waiting one reads the earliest `droppedAt` when it starts. Test: `gap-and-restart.flow.test.ts`, "a socket that flaps during a slow catch-up queues one more catch-up, not one per reconnect".
+
+#### ENG-6. A call refused during a pause counts as another rate limit
+
+1. A method is paused by a real 429 for longer than `interactiveMaxWaitMillis`. `pacing.limited` set its `decayAt` to five minutes from then (`pacing.ts:42`).
+2. An interactive call of the method is refused by the queue with a synthetic `SlackRateLimited` (`queue.ts:103-104`).
+3. `withRetries` cannot tell the refusal from a 429 and calls `queue.pause` again (`api.ts:254-255`), which sets `decayAt` five minutes from now. Every attempt does, up to `maxAttempts`.
+
+- Severity: low. Confirmed. Impact: the method's doubled background spacing lasts five minutes past the last refused call, not past the 429. Departs from `requestqueue.qnt`, where only a real 429 is `limited`.
+- Status: Fixed in c7cdb504a. `withRetries` runs the exchange's result inside the queue, so the queue's own failure is a refusal: final, with no pause. Test: `packages/slack/test/api.test.ts`, "a call refused during a pause is not another rate limit: the method recovers its spacing five minutes after the 429".
 
 #### ENG-7. EnginePhases can publish a phase computed from stale inputs
 
@@ -1132,7 +1142,7 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 
 - Severity: low. Plausible: it needs a fiber yield between the two steps. Impact: A wrong offline or live display until the next input change. It breaks the engine phase invariant.
 - Fix direction: compute and set under one lock (`SubscriptionRef.modifyEffect` or a semaphore), or derive from `Stream.zipLatestAll`.
-- Status: Open
+- Status: Fixed in 0742cf6c2 by construction: the three input streams are merged and one fiber applies each change and publishes its phase in order. No test: the race needs a fiber yield between two synchronous steps of one fiber, which no test can force.
 
 ### Issue 3: Juno Agent approvals and runs can stall for good
 
@@ -1455,7 +1465,6 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 
 | Id | Bug | Severity |
 |---|---|---|
-| ENG-6 | A refused interactive call during a pause calls `queue.pause` again through `withRetries`, which pushes `decayAt` out by 5 minutes each time (`packages/slack/src/client/queue.ts:103-104`, `api.ts:254-255`, `pacing.ts:42`). Departs from `requestqueue.qnt`, where only a real 429 is `limited`. | low |
 | OUT-5 | A follow command interrupted mid-call (window closed, or `FollowNewJob`'s `switchMap` restarting) leaves its `follow` row, so events and pages for the thread are ignored until the next sync start (`packages/engine/src/follow.ts:111-123`, `topics/handlers.ts:146` is not uninterruptible). `follow.qnt` has no interrupt action. | medium |
 | OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |

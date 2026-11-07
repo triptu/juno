@@ -122,6 +122,33 @@ describe('SlackApi.call', () => {
     }),
   )
 
+  itEffect('a call refused during a pause is not another rate limit: the method recovers its spacing five minutes after the 429', () =>
+    Effect.gen(function* () {
+      const fake = yield* fakeSlack
+      fake.force429({ method: 'conversations.history', retryAfter: 30, times: 1 })
+      const program = Effect.gen(function* () {
+        const api = yield* SlackApi
+        // The 429 doubles history's background spacing to 3 s until five quiet minutes have passed.
+        yield* api.call('conversations.history', { channel: CHANNEL }).pipe(Effect.ignore)
+        yield* TestClock.adjust(20_000)
+        const refused = yield* api.call('conversations.history', { channel: CHANNEL }).pipe(Effect.flip)
+        expect(refused._tag).toBe('SlackRateLimited')
+        expect(fake.callCount('conversations.history')).toBe(1)
+        yield* TestClock.adjust(281_000)
+        yield* api.call('conversations.history', { channel: CHANNEL, limit: 1 }, { lane: 'background' })
+        const sentAt: number[] = []
+        yield* Effect.forkScoped(api.call('conversations.history', { channel: CHANNEL, limit: 1 }, {
+          lane: 'background',
+          beforeSend: Effect.gen(function* () { sentAt.push(yield* Clock.currentTimeMillis) }),
+        }))
+        yield* TestClock.adjust(1_500)
+        yield* eventually(() => sentAt.length === 1)
+        expect(sentAt[0]).toBe(302_500)
+      })
+      yield* program.pipe(Effect.provide(clientLayer(fake)))
+    }),
+  )
+
   itEffect('a 429 on one method pauses only that method', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack

@@ -102,14 +102,18 @@ export const repairAfterLive = (runtime: SyncRuntime) => repairMutations(runtime
 
 export const makeReconcile = (runtime: SyncRuntime, name: 'catch-up' | 'sweep') => {
   const { cycle, work, settle, step } = runtime
+  /** A reconcile waits for the work permit; while one waits, another is not queued, since it reads the gap when it starts. */
+  let waiting = false
+  const started = Effect.sync(() => { waiting = false })
   /**
    * The catch-up after a reconnect or a sweep, under the work permit, then
    * the follow pass if it is due. Reconnects refresh the incremental thread
    * last sync; the hourly full pass covers the whole quiet window. After
    * a drop it rechecks the gap; a drop during it is rechecked by the next
-   * one, and a failure keeps the gap.
+   * one, and a failure keeps the gap. A flapping socket queues at most one.
    */
-  const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(step(name, catchUpAfterGap(runtime)).pipe(
+  const run: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(started.pipe(
+    Effect.andThen(step(name, catchUpAfterGap(runtime))),
     work.withPermit,
     Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { cause: error })),
     Effect.andThen(settle),
@@ -117,6 +121,11 @@ export const makeReconcile = (runtime: SyncRuntime, name: 'catch-up' | 'sweep') 
     Effect.andThen(repairAfterLive(runtime)),
     Effect.andThen(followPassIfDue(runtime)),
   ))
+  const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = Effect.suspend(() => {
+    if (waiting) return Effect.void
+    waiting = true
+    return run
+  })
   const retryCatchUp = makeCatchUpRetry(runtime, reconcile)
   return reconcile
 }

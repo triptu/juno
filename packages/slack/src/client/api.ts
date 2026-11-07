@@ -247,7 +247,8 @@ export const withRetries = <A>(
 ): Effect.Effect<A, SlackApiError> =>
   Effect.gen(function* () {
     for (let attempt = 0; ; attempt++) {
-      const result = yield* Effect.result(queue.run(lane, method, once(attempt)))
+      // The queue's own failure is a refusal (the method is paused for longer than the lane waits): final, and not a limit Slack set.
+      const result = yield* queue.run(lane, method, Effect.result(once(attempt)))
       if (Result.isSuccess(result)) return result.success
       const error = result.failure
       const last = attempt + 1 >= config.maxAttempts

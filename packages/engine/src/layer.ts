@@ -3,7 +3,7 @@
  * their services to `Services`; this file is otherwise edited only by the
  * milestone's integration task.
  */
-import { Effect, Layer, Ref, Stream } from 'effect'
+import { Effect, Layer, Stream } from 'effect'
 import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
 import { NotificationControl } from './notificationRuntime'
@@ -93,15 +93,17 @@ const EnginePhases = Layer.effectDiscard(
     const session = yield* Session
     const sync = yield* SyncRunner
     const status = yield* Status
-    const latest = yield* Ref.make<PhaseInputs>({ session: yield* session.status, sync: yield* sync.current, slowedUntil: undefined })
-    const update = (change: Partial<PhaseInputs>) =>
-      Effect.gen(function* () {
-        const next = yield* Ref.updateAndGet(latest, (current) => ({ ...current, ...change }))
-        yield* status.setPhase(phaseOf(next))
-      })
-    yield* Effect.forkScoped(Stream.runForEach(session.statuses, (value) => update({ session: value })))
-    yield* Effect.forkScoped(Stream.runForEach(sync.phases, (value) => update({ sync: value })))
-    yield* Effect.forkScoped(Stream.runForEach(sync.slowedUntil, (value) => update({ slowedUntil: value })))
+    let latest: PhaseInputs = { session: yield* session.status, sync: yield* sync.current, slowedUntil: undefined }
+    // One fiber takes every change, so each published phase is of the inputs as they were at its change.
+    const changes = Stream.mergeAll<Partial<PhaseInputs>, never, never>([
+      Stream.map(session.statuses, (session) => ({ session })),
+      Stream.map(sync.phases, (sync) => ({ sync })),
+      Stream.map(sync.slowedUntil, (slowedUntil) => ({ slowedUntil })),
+    ], { concurrency: 'unbounded' })
+    yield* Effect.forkScoped(Stream.runForEach(changes, (change) => {
+      latest = { ...latest, ...change }
+      return status.setPhase(phaseOf(latest))
+    }))
     yield* Effect.forkScoped(Stream.runForEach(sync.syncing, status.setSyncing))
   }),
 )
