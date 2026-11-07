@@ -125,7 +125,7 @@ function RowTile({ item }: { readonly item: HomeItem }) {
   if (tileIcon !== undefined || topic === undefined) {
     return (
       <span {...stylex.props(styles.iconTile)}>
-        <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={28} />
+        <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={20} />
       </span>
     )
   }

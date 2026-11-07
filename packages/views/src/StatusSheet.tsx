@@ -349,7 +349,7 @@ const styles = stylex.create({
     borderRadius: radii['--radius-menu'],
     outlineWidth: '1px',
     outlineStyle: 'solid',
-    outlineOffset: '-1px',
+    outlineOffset: '-1px', // tokens-allow: the hairline drawn on the picker's own edge
     outlineColor: colors['--border-strong'],
   },
 

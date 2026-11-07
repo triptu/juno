@@ -1,7 +1,6 @@
 import { defineFixtures, scene, TooltipLayer, type FixtureFrame } from '@juno/ui'
 import { useState } from 'react'
 import { AccountMenu } from './AccountMenu'
-import { GalleryAppearanceSettings } from './fixtures/appearance'
 import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { artRows } from './fixtures/artRows'

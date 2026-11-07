@@ -16,10 +16,7 @@ export interface OptionListProps extends Omit<HTMLAttributes<HTMLDivElement>, 's
   readonly label?: string
   /** The active (highlighted) row, as `OptionRow` ids. Sets aria-activedescendant. */
   readonly activeId?: string
-  /**
-   * Make the list itself focusable and handle arrow keys on it. Lists that
-   * sit over an input leave this off and use `useOptionListKeys` on the input.
-   */
+  /** Make the list itself focusable and handle arrow keys on it. Lists over an input use `useOptionListKeys` on it. */
   readonly focusable?: boolean
   readonly onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void
   readonly children?: ReactNode
@@ -71,10 +68,7 @@ export interface OptionRowProps {
   readonly selected?: boolean
   readonly disabled?: boolean
   readonly size?: OptionRowSize
-  /**
-   * For a 32px row whose label wraps to a second line under its first (the account menu's hint under a label): the
-   * leading icon stays centred on the first line, in the 32px a one-line row gives it, instead of between the lines.
-   */
+  /** A 32px row with a second line under its label (the account menu's hints): the icon stays centred on the first line. */
   readonly leadingOnFirstLine?: boolean
   /** Fires on mouse down (see internal/activate.ts); `metaKey` for ⌘-click. */
   readonly onSelect?: (event: ActivateEvent) => void
@@ -125,7 +119,6 @@ export function OptionRow({
         rowSizes[size],
         twoLine && styles.rowTwoLine,
         size === 44 && styles.rowTwoLineCompact,
-        leadingOnFirstLine && styles.rowStart,
         active && styles.rowActive,
         selected && styles.rowSelected,
         disabled && styles.rowDisabled,
@@ -183,14 +176,8 @@ export function OptionHeader({ leading, title, sub }: OptionHeaderProps) {
     <div {...stylex.props(styles.header)}>
       {leading}
       <span {...stylex.props(styles.headerText)}>
-        <Text variant="ui" weight="semibold" truncate>
-          {title}
-        </Text>
-        {sub !== undefined ? (
-          <Text variant="meta" tone="muted" truncate>
-            {sub}
-          </Text>
-        ) : null}
+        <Text variant="ui" weight="semibold" truncate>{title}</Text>
+        {sub !== undefined ? <Text variant="meta" tone="muted" truncate>{sub}</Text> : null}
       </span>
     </div>
   )
@@ -322,14 +309,8 @@ const styles = stylex.create({
     flexShrink: 0,
     color: colors['--foreground-subtle'],
   },
-  rowStart: {
-    alignItems: 'flex-start',
-  },
-  // The first line's 32px, the height a one-line row centres its icon in.
-  leadingFirstLine: {
-    alignItems: 'center',
-    height: sizes['--control-32'],
-  },
+  // The first line's 32px, where a one-line row centres its icon.
+  leadingFirstLine: { alignSelf: 'flex-start', alignItems: 'center', height: sizes['--control-32'] },
   body: {
     display: 'flex',
     alignItems: 'baseline',

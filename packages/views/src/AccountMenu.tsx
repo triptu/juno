@@ -194,32 +194,10 @@ function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { read
     const id = `account-${item.id}`
     const row = menu.row(id)
     const below = item.hintBelow === true && item.hint !== undefined
-    const props = {
-      ...row,
-      leading: item.leading,
-      label: below ? (
-        <span {...stylex.props(styles.stack)}>
-          {item.label}
-          <Text variant="meta" tone="muted" truncate {...(item.id === 'signOut' ? { role: 'status', 'aria-label': 'Session status' } : {})}>
-            {item.hint}
-          </Text>
-        </span>
-      ) : (
-        item.label
-      ),
-      ...(below || item.hint === undefined ? {} : { sub: item.hint }),
-      leadingOnFirstLine: below,
-    }
+    const props = { ...row, leading: item.leading, label: itemLabel(item, below), ...(below || item.hint === undefined ? {} : { sub: item.hint }), leadingOnFirstLine: below }
     if (item.id !== 'pause' || onPause === undefined) {
       const option = item.disabled === true ? <OptionRow key={item.id} {...props} active={false} disabled /> : <OptionRow key={item.id} {...props} onActivate={() => sub.hoverOther(row.onActivate)} onSelect={() => select(id)} />
-      return item.apart === true ? (
-        <Fragment key={item.id}>
-          <OptionSeparator />
-          {option}
-        </Fragment>
-      ) : (
-        option
-      )
+      return item.apart === true ? <Fragment key={item.id}><OptionSeparator />{option}</Fragment> : option
     }
     return (
       <Submenu
@@ -255,6 +233,19 @@ function AccountItems({ items, onAction, onSignOut, onPause, pauseEnds }: { read
         {items.map(rowOf)}
       </OptionList>
     </>
+  )
+}
+
+/** A row's label, with its hint on a second line when it is a sentence; Sign out's says who is signed in. */
+function itemLabel(item: Item, below: boolean): ReactNode {
+  if (!below) return item.label
+  return (
+    <span {...stylex.props(styles.stack)}>
+      {item.label}
+      <Text variant="meta" tone="muted" truncate {...(item.id === 'signOut' ? { role: 'status', 'aria-label': 'Session status' } : {})}>
+        {item.hint}
+      </Text>
+    </span>
   )
 }
 

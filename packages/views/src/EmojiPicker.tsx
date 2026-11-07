@@ -24,10 +24,7 @@ export interface EmojiPickerProps {
   readonly selected?: ReadonlyArray<{ readonly name: string; readonly url?: string }>
   /** The search to open with. For fixtures; the app opens the picker empty. */
   readonly initialQuery?: string
-  /**
-   * `popover`: its own floating surface. `menu`: no surface of its own, drawn
-   * on the message menu's material, which turns into it (More reactions).
-   */
+  /** `popover`: its own floating surface. `menu`: drawn on the message menu's material, which turns into it (More reactions). */
   readonly material?: 'popover' | 'menu'
   /** `fill`: as wide as its box (the status sheet's field), the nine columns spread evenly. Default the fixed width. */
   readonly width?: 'fixed' | 'fill'
@@ -343,9 +340,7 @@ const styles = stylex.create({
     maskImage: `linear-gradient(to bottom, transparent, black ${FADE})`, // tokens-allow: a mask's alpha, not a colour that shows.
   },
   // Opaque: the menu's text colour is translucent, and Chromium draws a colour emoji with its text colour's alpha.
-  cellInMenu: {
-    color: menu['--menu-emoji'],
-  },
+  cellInMenu: { color: menu['--menu-emoji'] },
   // The menu's corners, so a scrolled emoji never shows past them.
   inMenu: {
     borderRadius: menu['--menu-radius'],
@@ -358,13 +353,9 @@ const styles = stylex.create({
     gridTemplateColumns: `repeat(${COLUMNS}, ${sizes['--control-32']})`,
     gridAutoRows: sizes['--control-32'],
   },
-  panelFill: {
-    width: '100%',
-  },
+  panelFill: { width: '100%' },
   // Wider than nine cells: the room goes between the columns, so the first column stays under the heading's start.
-  gridFill: {
-    justifyContent: 'space-between',
-  },
+  gridFill: { justifyContent: 'space-between' },
   cell: {
     appearance: 'none',
     display: 'flex',
