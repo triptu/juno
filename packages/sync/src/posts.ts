@@ -21,6 +21,7 @@ import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { storedMe } from './me'
 import { reindexTopics } from './reindex'
+import { queueFileDeletes } from './fileDeletes'
 import { discardStartedThread } from './startedThreads'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
@@ -311,11 +312,13 @@ export const discardPost = (clientMsgId: string): Effect.Effect<boolean, SqlErro
  * Removes a post Slack has not got: Delete draft on a failed row, or the
  * user's delete of a queued one (`actions.ts`). A root started from Home
  * takes its thread and the replies that waited on it (`startedThreads.ts`).
+ * The files it had uploaded are deleted in Slack (`fileDeletes.ts`).
  */
 export const removePost = (post: PendingPost): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${post.clientMsgId}`
+    yield* queueFileDeletes(post, yield* Clock.currentTimeMillis)
     if (post.threadTs === undefined) yield* discardStartedThread(post.channel, post.clientMsgId)
     yield* touch(post)
   })
