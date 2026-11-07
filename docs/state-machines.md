@@ -859,19 +859,19 @@ Per item, `dispatch` runs the records check (`recordsValid`: expiry, redaction) 
 
 | From | Event | To | Code |
 |---|---|---|---|
-| idle | `kick` | draining (`running` set) | `dispatcher.ts:203 (kick)` |
-| draining | `kick` | `again = true` | `dispatcher.ts:205-207` |
-| draining | item `check` returns `wait`, or refused for paused, off or not owner | that card's chain waits; other cards go on (AGT-1, fixed) | `dispatcher.ts` |
+| idle | `kick` | a chain per card with approved children (`running` set) | `dispatcher.ts` (`kick`, `startChains`) |
+| chains running | `kick` | chains start for cards with none; each running card is marked, and its chain reads its approvals once more before it waits (AGT-7, fixed) | `dispatcher.ts` (`kick`, `runCard`) |
+| chain running | item `check` returns `wait`, or refused for paused, off or not owner | that card's chain waits; other cards go on (AGT-1, fixed) | `dispatcher.ts` (`runCard`) |
 | waiting | the approval expires or its source is redacted | refused (`expired` or `sourceChanged`), since the records check runs before `check` | `dispatcher.ts` |
-| draining | item `rotated` | `again = true`; continue | |
-| draining | other refusal | refusal written on the approval; continue | |
-| draining | queue empty and `again` false | idle (`running` cleared in `finally`) | `dispatcher.ts:198`, l.211-213 |
+| chain running | item `rotated` | the same item goes again | `dispatcher.ts` (`runCard`) |
+| chain running | other refusal | refusal written on the approval; next item | |
+| chains running | the last chain ends | idle (`running` cleared in `finally`) | `dispatcher.ts` (`startChains`) |
 
 Callers of `kick`: a click, Resume, presence and network changes (`start.ts:162`), MCP manager changes (`start.ts:172`), ownership activation, and `start()` after reconcile (`actions/index.ts:99`, l.135, l.142, l.152).
 
 Invariants:
 1. Every pending approval that is still valid is eventually authorized or refused, whatever another card waits on (AGT-1, AGT-2, fixed).
-2. A kick during a drain is never lost (AGT-5 is closed by the per-card chains).
+2. A kick is never lost: it starts chains synchronously (AGT-5), and a chain it reaches mid-flight reads its approvals again before it waits (AGT-7). A card that waits for good is read again only on a kick, so nothing spins.
 3. Expiry and redaction checks run on every pending approval, a waiting one included (AGT-1, fixed).
 
 Spec: `agent-actions.qnt` (`progress`, `approvedDrain`, l.538-560).
@@ -1200,6 +1200,17 @@ The block clears only when the owner signs in to that server again or removes it
 - Test: `packages/agent/test/connections.test.ts`. Start a sign-in, close the manager, reopen it, and expect `needsSignIn` or a reconnect attempt.
 - Status: Fixed in cd97515a3. A sign-in cut off by a relaunch leaves the connection Needs sign-in. Test: `connections.test.ts`.
 
+#### AGT-7. A kick that reaches a card's running chain is lost when the chain then waits
+
+1. The owner clicks a Change card. Its chain calls the connection's `check`, which waits on I/O.
+2. The connection becomes ready, and the manager kicks the dispatcher. The kick sets `again`, the drain clears it, and `startChains` skips the card because its chain is running.
+3. The check in flight answers `wait` from the state before the kick. The chain ends, its `finally` wakes the drain, which finds no `again` and no chains, and returns.
+4. The click stays working until an unrelated kick (a network change, another click, a relaunch).
+
+- Severity: medium. Confirmed by both reviewers of the AGT-1 fix. Impact: a click on a card whose connection comes ready during its check can wait for hours. It breaks dispatcher invariant 2.
+- Test: `packages/agent/test/actions.test.ts`, a kick that lands while the destination is checking a click is kept when that check then says wait.
+- Status: Fixed. `kick` marks every running card, and a chain whose item waits reads its approvals once more when its card is marked. The drain loop is gone: `kick` starts chains itself.
+
 ### Issue 4: Huddle ends or sticks on window and timing edges
 
 Shared cause: the huddle machines assume the page lives as long as the call and that events arrive in one order. A window close, a late answer, or a late device start falls outside those assumptions.
@@ -1444,7 +1455,7 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 | ENG-6 | A refused interactive call during a pause calls `queue.pause` again through `withRetries`, which pushes `decayAt` out by 5 minutes each time (`packages/slack/src/client/queue.ts:103-104`, `api.ts:254-255`, `pacing.ts:42`). Departs from `requestqueue.qnt`, where only a real 429 is `limited`. | low |
 | OUT-5 | A follow command interrupted mid-call (window closed, or `FollowNewJob`'s `switchMap` restarting) leaves its `follow` row, so events and pages for the thread are ignored until the next sync start (`packages/engine/src/follow.ts:111-123`, `topics/handlers.ts:146` is not uninterruptible). `follow.qnt` has no interrupt action. | medium |
 | OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
-| AGT-5 | A kick that lands after the drain's last `again` check and before `finally` clears `running` is lost (`actions/dispatcher.ts:198`, l.205-213), so a click waiting for a connection stays working until another kick. Plausible. | low |
+| AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
 | REN-6 | After Restart, a `requestPort` already queued in main can answer `failed` after `reconnecting`, so "Sync stopped" shows again for up to about 1 s (`packages/state/src/client.ts:57`, l.72-75). Plausible. | low |
 | MAIN-6 | Sign-in answers carry no request id: after an engine crash during a keychain import, the import's `secrets` can be taken as the stored session, which was never written to `secrets.bin` (`Session.ts:173-188`, `main/session.ts:47-52`, l.93). An import also writes the `d` cookie before the engine verifies it (`main/slackImport.ts:89`, l.117-131). | low |
 | MAIN-7 | `juno-provider.json` is written with a plain `writeFile` and `set()` calls are not serialized; a crash or two overlapping sets can leave invalid JSON, which loses the custom base URL (`main/providers.ts:172-174`, l.89-96). | low |
