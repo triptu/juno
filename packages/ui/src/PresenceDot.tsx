@@ -27,13 +27,8 @@ export interface PresenceDotProps {
   readonly paused?: boolean
 }
 
-/** The paused badge on a 44px row avatar: the 10px snooze mark inside the same 2px ring, so it reads at the avatar's corner. */
+/** The paused badge: the 10px snooze mark inside the same 2px ring, so it reads at the avatar's corner. */
 const BADGE = '14px' // tokens-allow: the paused badge
-/**
- * The paused badge on the small avatars (24px in the title bar, 32px in the account menu): 12px with an 8px mark,
- * about 40% of the photo, so the initials stay readable under it.
- */
-const SMALL_BADGE = '12px' // tokens-allow: the small paused badge
 /** 10px with a 2px ring in the surface colour (inventory 2.1). */
 const DOT = '10px' // tokens-allow: the presence dot
 /**
@@ -43,13 +38,10 @@ const DOT = '10px' // tokens-allow: the presence dot
  */
 const INSET = `calc(14.645% - ${DOT} / 2)`
 const BADGE_INSET = `calc(14.645% - ${BADGE} / 2)`
-const SMALL_BADGE_INSET = `calc(14.645% - ${SMALL_BADGE} / 2)`
 /** The inline dot, as wide as the 13px icon it stands in for, less its side bearings. */
 const INLINE_DOT = '8px' // tokens-allow: the inline presence dot
 /** The snooze mark's box: the badge's inside, and the inline mark, which stands in for the 8px dot. */
 const GLYPH = 10
-/** The small badge's inside. */
-const SMALL_GLYPH = 8
 
 /**
  * Whether Slack shows you, or the person on a DM row, as active, drawn on
@@ -74,10 +66,9 @@ export function PresenceDot({ active, surface, paused = false }: PresenceDotProp
     return <span aria-hidden data-presence={active ? 'active' : 'away'} {...stylex.props(styles.inline, active ? styles.active : styles.inlineAway)} />
   }
   if (paused) {
-    const small = surface === 'subtle' || surface === 'raised'
     return (
-      <span aria-hidden data-paused data-presence={active ? 'active' : 'away'} {...stylex.props(styles.dot, styles.badge, small && styles.smallBadge, rings[surface], fills[surface], active && styles.badgeActive)}>
-        <Snooze small={small} />
+      <span aria-hidden data-paused data-presence={active ? 'active' : 'away'} {...stylex.props(styles.dot, styles.badge, rings[surface], fills[surface], active && styles.badgeActive)}>
+        <Snooze />
       </span>
     )
   }
@@ -88,18 +79,10 @@ export function PresenceDot({ active, surface, paused = false }: PresenceDotProp
 }
 
 /**
- * The snooze mark: a "z", 8px across with its round caps, on whole pixels at 1x; small, about 6px across with a lighter
- * stroke. Slack's mark also has an arc around it, which at this size blurs the "z"; it is left out. Phosphor has no
- * such glyph.
+ * The snooze mark: a "z", 8px across with its round caps, on whole pixels at 1x. Slack's mark also has an arc
+ * around it, which at this size blurs the "z"; it is left out. Phosphor has no such glyph.
  */
-function Snooze({ small = false }: { readonly small?: boolean }) {
-  if (small) {
-    return (
-      <svg width={SMALL_GLYPH} height={SMALL_GLYPH} viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
-        <path d="M1.5 1.5 H6.5 L1.5 6.5 H6.5" />
-      </svg>
-    )
-  }
+function Snooze() {
   return (
     <svg width={GLYPH} height={GLYPH} viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
       <path d="M2 2 H8 L2 8 H8" />
@@ -144,12 +127,6 @@ const styles = stylex.create({
     width: BADGE,
     height: BADGE,
     color: colors['--foreground-default'],
-  },
-  smallBadge: {
-    right: SMALL_BADGE_INSET,
-    bottom: SMALL_BADGE_INSET,
-    width: SMALL_BADGE,
-    height: SMALL_BADGE,
   },
   badgeActive: {
     color: colors['--presence-active'],
