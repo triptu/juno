@@ -100,6 +100,7 @@ export {
   applyWaitingActions,
   requeueUnsentPost,
   type ActionRefusal,
+  type MessageAction,
   type MessageRef,
   type PendingAction,
 } from './actions'

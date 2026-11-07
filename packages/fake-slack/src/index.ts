@@ -503,7 +503,7 @@ export class FakeSlack {
     const user = input.user ?? 'U0MAYA'
     const isPublic = ws.conversations.get(input.channel)?.kind === 'public'
     const stored = input.media.map((each) => {
-      const id = `F0${String(ws.files.size + 1).padStart(4, '0')}`
+      const id = ws.nextFileId()
       const picture = samplePng(each.width, each.height)
       const video = each.kind === 'video'
       const bytes = video ? Buffer.from('not a playable video') : picture

@@ -28,8 +28,10 @@
  * threads, which the index imports; the rows do not differ, as for 10.
  * 13: the outbox fixes for a cut-off follow, a lost file, a lost upload
  * answer and a replaced mark touched posts and the read writer, which the
- * index imports; the rows do not differ, as for 10.
- * 14: the profile status touched the users table, its row type and the
+ * index imports; the rows do not differ, as for 10. 14: deleting the
+ * uploaded files of a removed post touched posts and started threads, which
+ * the index imports; the rows do not differ, as for 10.
+ * 15: the profile status touched the users table, its row type and the
  * Slack schema, which the index imports; the rows do not differ, as for 10.
  */
-export const INDEX_VERSION = 14
+export const INDEX_VERSION = 15
