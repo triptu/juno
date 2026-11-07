@@ -378,7 +378,7 @@ class ChimeMediaSession implements MediaSession {
       call.av.realtimeMuteLocalAudio()
     }
     if (call.ended) {
-      // The call ended while the microphone was starting (the macOS prompt was up): `#end` found nothing to stop, so release it here.
+      // The call ended before this start ran: `#end`'s stop went first through Chime's queue (a Voice Focus wrap in flight, or the fallback above), so release it here.
       for (const track of stream?.getTracks() ?? []) track.stop()
       void call.av.stopAudioInput().catch(() => {})
       return

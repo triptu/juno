@@ -800,7 +800,7 @@ States: `idle`, `connecting`, `connected`, `reconnecting`, `ended(reason)`.
 
 Invariants:
 1. `#end` is idempotent (`session.ts:324-336`).
-2. After `#end`, no device stays captured: a microphone start that resolves after the end stops what it got (HUD-3, fixed).
+2. After `#end`, no device stays captured: a microphone start in flight at the end is stopped by the `stopAudioInput` the end queued behind it, and one that starts after the end stops what it got (HUD-3, fixed).
 
 ### Smaller huddle machines
 
@@ -1271,7 +1271,7 @@ The same race applies to a device re-apply in flight when the call ends (`listDe
 - Severity: medium. Plausible: whether Chime's `stopAudioInput` cancels an in-flight start was not checked. Impact: The microphone stays captured, with the orange indicator, until reload. No audio is sent. It breaks Chime media session invariant 2.
 - Test: browser lane with a stubbed `getUserMedia` that resolves after `leave()`. `packages/huddle-media/test/` has no Chime harness.
 - Fix direction: when `call.ended` after the await, stop the returned stream's tracks and call `stopAudioInput()`.
-- Status: Fixed in 94a245c7a. `#applyMicrophone` stops the stream it got and calls `stopAudioInput()` again when the call ended while the microphone was starting; the same path covers a device re-apply, Voice Focus loading and `listDevices`. No test: the package has no Chime harness, and the race needs `getUserMedia` to answer after `leave()`; the fix is read against `session.ts` only.
+- Status: Fixed in 94a245c7a. `#applyMicrophone` stops the stream it got and calls `stopAudioInput()` again when the call ended before the microphone started. The trace above is not the case that leaks: Chime's device controller runs `startAudioInput` and `stopAudioInput` through one promise queue, so the `stopAudioInput()` `#end` makes while the prompt is up runs once the start resolves and stops its tracks. Test: `packages/huddle-media/test/microphone-after-leave.test.ts`, "a microphone granted after the user left is stopped, and the call stays ended", the real Chime session against a `getUserMedia` the test answers after `leave()`; it passes with and without the fix, which is the evidence for the queue. The case the fix covers is a start queued after that stop: the end lands while `#applyMicrophone` waits on Voice Focus's `wrap`, or the silent fallback after a failed start; the harness cannot reach it, since Voice Focus needs its model from Chime's CDN, so that path is read against `session.ts` only.
 
 #### HUD-4. A malformed join payload leaves the page holding an attendee forever
 
