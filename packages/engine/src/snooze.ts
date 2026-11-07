@@ -7,19 +7,23 @@
  * snooze ends, as Slack last said. `readSettings` puts it in the settings
  * while it runs, so the decision, the huddle ring and the avatar's paused
  * badge all read it. Pause and Resume call `dnd.setSnooze` and
- * `dnd.endSnooze` and store Slack's answer. Each session reads `dnd.info`
+ * `dnd.endSnooze` and store Slack's answer; Resume keeps the pref when
+ * Slack refuses for any reason but `snooze_not_active`. Each session reads `dnd.info`
  * when it connects, and again on every `dnd_updated` for the user, so a
  * snooze set, changed or ended in another Slack client shows here. At the
  * end a timer clears the pref, which runs every reader again; nothing polls.
+ * The timer is `sleepUntil`, which checks the wall clock again after it
+ * fires and when the Mac wakes, so the end is exact across sleep.
  * Calls answer in order, and the last `dnd_updated` always reads again, so
  * an older answer stored late is replaced. One write keyed by Slack's
  * answer, with no queue or merge: no Quint spec.
  */
-import { Clock, Context, Effect, Layer, Result, Stream } from 'effect'
+import { Context, Effect, Layer, Result, Stream } from 'effect'
 import { readSnooze, SNOOZE_PREF, writeSnooze } from '@juno/notifications'
 import { SlackApi, SlackSession } from '@juno/slack'
 import { liveQuery, prefs, transaction, type SqlError } from '@juno/store'
 import { Outbox, type MirrorError } from './outbox'
+import { sleepUntil, SystemWake } from './systemWake'
 import { SocketEvents, type SessionStart } from './socketEvents'
 import { Workspace, type StoreServices } from './workspace'
 
@@ -29,10 +33,11 @@ export class SlackSnooze extends Context.Service<SlackSnooze, {
   /** Ends the snooze. One that already ended in Slack counts as ended. */
   readonly resume: Effect.Effect<void, MirrorError | SqlError, StoreServices>
 }>()('juno/engine/SlackSnooze') {
-  static readonly layer: Layer.Layer<SlackSnooze, never, Workspace | Outbox | SocketEvents> = Layer.effect(SlackSnooze, Effect.gen(function* () {
+  static readonly layer: Layer.Layer<SlackSnooze, never, Workspace | Outbox | SocketEvents | SystemWake> = Layer.effect(SlackSnooze, Effect.gen(function* () {
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const events = yield* SocketEvents
+    const wake = yield* SystemWake
     yield* events.subscribe('snooze', sessionSnooze)
 
     // At the end of the snooze the pref is cleared, so every reader runs again. A new value interrupts the wait.
@@ -42,7 +47,7 @@ export class SlackSnooze extends Context.Service<SlackSnooze, {
         : liveQuery(['prefs'], readSnooze).pipe(
           Stream.filterMap((result) => (Result.isSuccess(result) ? Result.succeed(result.success) : Result.failVoid)),
           Stream.changes,
-          Stream.switchMap((until) => Stream.fromEffect(endAt(until))),
+          Stream.switchMap((until) => Stream.fromEffect(Effect.provideService(endAt(until), SystemWake, wake))),
           Stream.provide(open.context),
         )),
       Stream.runDrain,
@@ -57,8 +62,8 @@ export class SlackSnooze extends Context.Service<SlackSnooze, {
       }),
       resume: outbox.send((api) => api.call('dnd.endSnooze', {})).pipe(
         Effect.asVoid,
-        // `snooze_not_active`: it already ended, in Slack or by its time.
-        Effect.catchIf((error) => error._tag === 'Rejected', () => Effect.void),
+        // It already ended, in Slack or by its time. Any other refusal keeps the pref, and the caller says so.
+        Effect.catchIf((error) => error._tag === 'Rejected' && error.code === 'snooze_not_active', () => Effect.void),
         Effect.andThen(writeSnooze(undefined)),
       ),
     })
@@ -68,8 +73,7 @@ export class SlackSnooze extends Context.Service<SlackSnooze, {
 /** Waits until `until`, then clears the pref if it still holds that snooze. */
 const endAt = (until: number | undefined) => Effect.gen(function* () {
   if (until === undefined) return
-  const now = yield* Clock.currentTimeMillis
-  if (until > now) yield* Effect.sleep(until - now)
+  yield* sleepUntil(until)
   yield* transaction(Effect.gen(function* () {
     if ((yield* readSnooze) === until) yield* prefs.set(SNOOZE_PREF, null)
   }))
