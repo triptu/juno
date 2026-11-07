@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useRef, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, EmptyState, pointerMoved, ReorderMotion, ScrollArea, Text } from '@juno/ui'
 
 export type TopicListSectionId = 'pinned' | 'recent'
@@ -29,6 +29,8 @@ export interface TopicListProps {
   readonly enterEmpty?: boolean
   /** The window is full: say where the rest is instead of paging. */
   readonly truncated?: boolean
+  /** The sidebar's update pill floats over the list's foot: room at the end, so the last row scrolls clear of it. */
+  readonly pillRoom?: boolean
   /**
    * How this change of the order shows. `animate`: the rows slide to their
    * new places when the list is at its top (a change from elsewhere).
@@ -77,6 +79,7 @@ export function TopicList({
   quietDays = 3,
   enterEmpty = true,
   truncated = false,
+  pillRoom = false,
   moves = 'instant',
   onClearFilters,
   onViewAll,
@@ -121,7 +124,7 @@ export function TopicList({
         engage('pointer', true)
         onTouch?.()
       }}
-      sx={styles.scroller}
+      sx={[styles.scroller, pillRoom && styles.pillRoom]}
       ref={scroller}
     >
       {isEmpty && empty !== undefined ? (
@@ -257,6 +260,8 @@ const styles = stylex.create({
     paddingInlineEnd: `calc(${layout['--sidebar-inset']} - ${layout['--scrollbar-size']})`,
     paddingBottom: spacing['--space-4'],
   },
+  // The pill's 30px and the sidebar inset below and above it (Sidebar's float). Room added at the end moves no row in view.
+  pillRoom: { paddingBottom: `calc(${sizes['--control-30']} + 2 * ${layout['--sidebar-inset']})` },
   section: {
     display: 'flex',
     flexDirection: 'column',

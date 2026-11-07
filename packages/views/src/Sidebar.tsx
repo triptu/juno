@@ -11,7 +11,7 @@ import { User } from '@phosphor-icons/react/dist/icons/User'
 import { useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import type { ConversationKind, KindFilter } from '@juno/contract'
 import { menuKeys } from '@juno/contract/channels'
-import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   AvatarButton,
@@ -136,7 +136,11 @@ export interface SidebarProps {
    * set, or while privacy mode is on.
    */
   readonly status?: ReactNode
-  /** A downloaded update with Restart (`UpdateReady`), after the status card. The footer shows while it is set too. */
+  /**
+   * A downloaded update (`UpdateReady`): a pill floating over the foot of
+   * the list, centred, above the footer when there is one. The owner gives
+   * the list room at its end while it shows, so the last row scrolls clear.
+   */
   readonly update?: ReactNode
   /** Privacy mode is on (SPEC section 5): the footer says so and turns it off in one click. */
   readonly privacy?: boolean
@@ -159,9 +163,9 @@ const ALL_PAGES: ReadonlyArray<SidebarNavTarget> = ['search', 'all-topics', 'hom
  * the Juno nav item, a
  * hairline, the quick filters with their dots and the Unread toggle, the
  * scope chip when scoped, the list the owner renders into it, and a footer
- * while there is something to say: the sync status card, a downloaded
- * update, while privacy mode is on a card that says so with a Show button,
- * and the note.
+ * while there is something to say: the sync status card, while privacy
+ * mode is on a card that says so with a Show button, and the note. A
+ * downloaded update floats over the list's foot as a pill.
  */
 export function Sidebar({
   titlebarLeading,
@@ -375,10 +379,15 @@ export function Sidebar({
 
       {children}
 
-      {status !== undefined || update !== undefined || privacy || note !== undefined ? (
+      {update === undefined ? null : (
+        <div {...stylex.props(styles.float)}>
+          <div {...stylex.props(styles.floatPill)}>{update}</div>
+        </div>
+      )}
+
+      {status !== undefined || privacy || note !== undefined ? (
         <div {...stylex.props(styles.footer)}>
           {status}
-          {update}
           {privacy ? (
             <div role="status" data-privacy-footer="" {...stylex.props(styles.privacy)}>
               <Icon icon={EyeSlash} size={14} />
@@ -555,6 +564,19 @@ const styles = stylex.create({
     display: 'flex',
     paddingInline: spacing['--space-4'],
     paddingBottom: spacing['--space-2'],
+  },
+  // No height, so the list keeps its size. The pill sits the sidebar inset above the list's foot, centred, over the rows.
+  float: {
+    position: 'relative',
+    flexShrink: 0,
+    height: 0,
+    zIndex: z['--z-header'],
+  },
+  floatPill: {
+    position: 'absolute',
+    bottom: layout['--sidebar-inset'],
+    left: '50%',
+    transform: 'translateX(-50%)',
   },
   // The sidebar inset on every side, so the widget sits as far from the bottom as from the edges.
   footer: {

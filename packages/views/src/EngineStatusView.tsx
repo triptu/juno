@@ -3,9 +3,9 @@ import { CloudWarning } from '@phosphor-icons/react/dist/icons/CloudWarning'
 import { HourglassMedium } from '@phosphor-icons/react/dist/icons/HourglassMedium'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { WifiSlash } from '@phosphor-icons/react/dist/icons/WifiSlash'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import type { ReactNode } from 'react'
+import { colors, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Icon, ProgressRing, Text, type PhosphorIcon } from '@juno/ui'
-import { StatusCard } from './StatusCard'
 
 export interface EngineStatusViewProps {
   /** One short line, for example "Engine live". */
@@ -62,6 +62,38 @@ const notices: Record<EngineNoticeKind, { readonly icon: PhosphorIcon; readonly 
   stopped: { icon: WarningCircle, title: 'Sync stopped', line: 'The topics here are kept.', body: 'The topics here are kept. Restart to catch up.' },
 }
 
+interface StatusCardProps {
+  /** The ring, or the notice's icon, in a 20px slot. */
+  readonly leading: ReactNode
+  readonly title: string
+  readonly line: string
+  /** The full second line when it may be cut off. */
+  readonly tooltip?: string
+  readonly action?: ReactNode
+}
+
+/**
+ * The card at the foot of the sidebar: a 20px leading slot, a title and
+ * one line under it, and an optional button. Every state is the same
+ * height, so one state replacing another moves nothing.
+ */
+function StatusCard({ leading, title, line, tooltip, action }: StatusCardProps) {
+  return (
+    <section aria-label="Sync" title={tooltip} data-sync-status="" {...stylex.props(styles.card)}>
+      <span {...stylex.props(styles.leading)}>{leading}</span>
+      <span {...stylex.props(styles.lines)}>
+        <Text variant="ui" weight="medium" tone="default" truncate role="status" aria-label="Sync status" sx={styles.title}>
+          {title}
+        </Text>
+        <Text variant="meta" tone="subtle" numeric truncate sx={styles.line}>
+          {line}
+        </Text>
+      </span>
+      {action}
+    </section>
+  )
+}
+
 /**
  * Why the sidebar may be behind Slack (friendly-layer 7), in the status
  * card at the foot of the sidebar: what happened, what is kept, and
@@ -72,9 +104,6 @@ export function EngineNotice({ kind, onRestart, reason, onCopyLog }: EngineNotic
   const failedReason = kind === 'failed' ? reason : undefined
   return (
     <StatusCard
-      label="Sync"
-      statusLabel="Sync status"
-      marker="sync"
       leading={<Icon icon={notice.icon} size={18} />}
       title={notice.title}
       line={failedReason ?? notice.line}
@@ -110,9 +139,6 @@ export function SyncProgress({ done, total }: SyncProgressProps) {
   const line = counted ? `${done} of ${total} conversations` : 'Finding your conversations'
   return (
     <StatusCard
-      label="Sync"
-      statusLabel="Sync status"
-      marker="sync"
       leading={counted ? <ProgressRing label="Sync progress" value={done} max={total} valueText={line} /> : <ProgressRing label="Sync progress" valueText={line} />}
       title="Syncing with Slack"
       line={line}
@@ -120,7 +146,42 @@ export function SyncProgress({ done, total }: SyncProgressProps) {
   )
 }
 
+const appear = stylex.keyframes({
+  from: { opacity: 0 },
+  to: { opacity: 1 },
+})
+
 const styles = stylex.create({
+  // The privacy card's look, two lines tall: 10px around the 20px slot, the text and the button.
+  card: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing['--space-2-5'],
+    padding: spacing['--space-2-5'],
+    borderRadius: radii['--radius-lg'],
+    backgroundColor: colors['--secondary-default'],
+    color: colors['--foreground-subtle'],
+    animationName: appear,
+    animationDuration: motion['--duration-appear'],
+    animationTimingFunction: motion['--ease-out'],
+    animationFillMode: 'both',
+  },
+  leading: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: sizes['--icon-20'],
+    height: sizes['--icon-20'],
+  },
+  lines: {
+    display: 'flex',
+    flexDirection: 'column',
+    flexGrow: 1,
+    minWidth: 0,
+  },
+  title: { lineHeight: spacing['--space-5'] },
+  line: { lineHeight: spacing['--space-4'] },
   section: {
     display: 'flex',
     flexDirection: 'column',
