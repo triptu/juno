@@ -399,3 +399,23 @@ it('a drop during a catch-up keeps the phase offline until the catch-up settles'
     engine.fake.goOnline()
   }
 })
+
+it('a socket that flaps during a slow catch-up queues one more catch-up, not one per reconnect', async () => {
+  const engine = await synced()
+  engine.fake.resetCalls()
+  engine.fake.holdNext({ method: 'client.counts' })
+  engine.fake.dropSocket()
+  // The first catch-up holds the work permit at its counts call while the socket drops and comes back twice more.
+  await waitFor(() => (engine.fake.heldCount({ method: 'client.counts' }) === 1 ? true : undefined), 20_000, 'the held counts')
+  for (let flap = 0; flap < 2; flap++) {
+    await waitFor(() => (engine.online() ? true : undefined), 20_000, 'the socket back')
+    engine.fake.dropSocket()
+    await waitFor(() => (engine.online() ? undefined : true), 20_000, 'the socket dropped')
+  }
+  await waitFor(() => (engine.online() ? true : undefined), 20_000, 'the socket back')
+  engine.fake.release()
+  await engine.phase('live', 20_000)
+  await quiet(engine)
+  // One more catch-up covers both later gaps: it reads from the earliest drop.
+  expect(apiCalls(engine, 'client.counts').length).toBe(2)
+})

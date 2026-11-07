@@ -305,7 +305,7 @@ stateDiagram-v2
 | start | initialize | `booting`, then `catching-up` progress | work permit | `run/boot.ts:10-24`, `sync/src/boot.ts:502-549` |
 | booting | boot fails, not auth | `offline` or `failed{reason}`; wait 30 s or a `force_reload` | | `run/boot.ts (bootUntilDone)` |
 | booting | boot ok | `booted = true`; `settle`; if a drop was recorded during the boot and the socket is up, fork `reconcile` | | `run/boot.ts (bootUntilDone)` |
-| any | socket Connected | `connected = true`; if booted, fork `reconcile` | | `run/socket.ts:16-23` |
+| any | socket Connected | `connected = true`; if booted, fork `reconcile`, unless one waits for the work permit (ENG-5, fixed) | `waiting` | `run/socket.ts:16-23`, `run/reconcile.ts (makeReconcile)` |
 | any | socket Disconnected after a real connection | `droppedAt ??= now`; event coverage ends; `offline` if booted, else the boot's phase holds (ENG-3, fixed) | `connected` was true | `run/socket.ts` |
 | any | socket Disconnected after an attempt that never connected | event coverage ends; no gap recorded | | `run/socket.ts` |
 | any | `force_reload` while `bootRetry` is set | wake the boot retry | | `run/socket.ts:46` |
@@ -319,6 +319,7 @@ Invariants:
 2. After boot, the phase is `offline` whenever `state.connected` is false (ENG-4, fixed).
 3. Every gap between a drop and a reconnect is rechecked by a catch-up with `recheck`, including a drop during a boot (ENG-3, fixed).
 4. A boot or catch-up that finishes after a disconnect does not set `live`: `settle` reads `state.connected` when it runs.
+5. At most one reconcile waits for the work permit; it reads `droppedAt`, the earliest drop, when it starts (ENG-5, fixed).
 
 Spec: `catchup.qnt` covers a drop while connected and live. Boot is outside the model; a drop during a boot uses the same recheck once the boot ends.
 
@@ -1122,7 +1123,7 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 - Severity: low to medium. Plausible: each step is confirmed, the frequency depends on the network. Impact: On bad Wi-Fi, bursts of redundant interactive-lane calls, more 429s, and `syncing` held true for a long time.
 - Test: `gap-and-restart.flow.test.ts`. Hold `client.counts`, drop and reconnect three times, release, and expect 2 `client.counts` calls, not 4.
 - Fix direction: one "catch-up wanted" flag; do not queue a reconcile while one is queued and not started.
-- Status: Open
+- Status: Fixed in SHA_ENG5. `makeReconcile` queues no reconcile while one waits for the work permit; the waiting one reads the earliest `droppedAt` when it starts. Test: `gap-and-restart.flow.test.ts`, "a socket that flaps during a slow catch-up queues one more catch-up, not one per reconnect".
 
 #### ENG-7. EnginePhases can publish a phase computed from stale inputs
 
