@@ -377,7 +377,12 @@ class ChimeMediaSession implements MediaSession {
       stream = await call.av.startAudioInput(null).catch(() => undefined)
       call.av.realtimeMuteLocalAudio()
     }
-    if (call.ended) return
+    if (call.ended) {
+      // The call ended while the microphone was starting (the macOS prompt was up): `#end` found nothing to stop, so release it here.
+      for (const track of stream?.getTracks() ?? []) track.stop()
+      void call.av.stopAudioInput().catch(() => {})
+      return
+    }
     this.#watchTrack(call, stream?.getAudioTracks()[0])
     call.av.realtimeSetCanUnmuteLocalAudio(access === 'granted')
     this.#store.update((s) => ({ ...s, microphoneAccess: access, devices: { ...s.devices, microphoneInUse: id } }))
