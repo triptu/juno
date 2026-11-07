@@ -1,0 +1,1 @@
+- 11-07 22:07 · profile-status · Juno does not yet send `user_change_subscribe_request` for the people it shows; others' status comes from every user object Juno already reads plus the `user_change` frames Slack sends · Which frames reach an unsubscribed client is unknown and needs a live check; subscribing is a socket protocol change of its own (backlog).

@@ -1,0 +1,1 @@
+- 11-07 22:03 · profile-status · Setting or clearing your status calls `users.profile.set` once on the send lane (`Outbox.send`), as `presence.set` is sent, and the sheet waits for the answer · A status is safe to repeat and nothing is worth keeping across a restart; on success the users row is written at once so the menu updates before Slack's `user_change`.

@@ -1,0 +1,1 @@
+- 11-07 22:05 · profile-status · The status sheet's emoji button shows the emoji picker in the sheet's place, and a pick or Escape brings the sheet back · A popover over a sheet would need its own placement and focus trap inside `SheetLayer`; the message menu already swaps itself for the picker the same way.

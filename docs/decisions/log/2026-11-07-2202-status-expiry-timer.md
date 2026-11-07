@@ -1,0 +1,1 @@
+- 11-07 22:02 · profile-status · `status.of` serves a status until its `status_expiration` and then none, with one sleep on the engine's clock per subscription that a new run cancels · Tushar: hide an expired status without polling. The engine's clock follows the DOM lane's test clock, so the expiry is testable; the stored row keeps Slack's values.
