@@ -24,7 +24,7 @@ async function failedAfterUpload(engine: RunningEngine, rows: Watch, text: strin
   clearAttachments(engine.registry, MAIN)
   await attachFiles(engine.registry, MAIN, [notes()])
   const ids = readyFiles(engine.registry, MAIN)!
-  engine.fake.forceError({ method: 'files.share', error: 'is_archived' })
+  engine.fake.forceError({ method: 'files.share', error: 'restricted_action' })
   valueOf(await sendMessage(engine.registry, eng, text, MAIN, ids))
   const failed = rowWith(await rows((list) => rowWith(list, text)?.pending === 'failed', `"${text}" failed`), text)!
   const fileId = [...engine.fake.workspace.files.values()].find((file) => file.name === 'notes.txt')!.id
@@ -64,6 +64,36 @@ it('ends the delete when its first answer is lost and the retry hears file_delet
     await quiet(engine)
     expect(apiCalls(engine, 'files.delete').map((call) => [call.args['file'], call.error])).toEqual([[fileId, 'lost'], [fileId, 'file_deleted']])
     expect(engine.fake.workspace.files.has(fileId)).toBe(false)
+  } finally {
+    unmount()
+  }
+})
+
+// The other side: Slack shares the file and posts the message, the answer is lost, and the channel is archived
+// before the lookup asks, so the row fails with Slack's refusal of the lookup. Slack may show the message, so
+// Delete draft must not delete the file people can still open in it.
+it('keeps the file of a post Slack may show when its lookup is refused because the channel was archived', async () => {
+  const engine = await booted()
+  const rows = await opened(engine)
+  const unmount = engine.registry.mount(attachmentsAtom(MAIN))
+  try {
+    clearAttachments(engine.registry, MAIN)
+    await attachFiles(engine.registry, MAIN, [notes()])
+    const ids = readyFiles(engine.registry, MAIN)!
+    engine.fake.holdFrames({ types: ['message'] })
+    engine.fake.loseResponse({ method: 'files.share' })
+    engine.fake.forceError({ method: 'conversations.history', error: 'is_archived', times: 50 })
+    valueOf(await sendMessage(engine.registry, eng, 'Shared, then archived', MAIN, ids))
+    const failed = rowWith(await rows((list) => rowWith(list, 'Shared, then archived')?.pending === 'failed', 'the post failed'), 'Shared, then archived')!
+    const fileId = [...engine.fake.workspace.files.values()].find((file) => file.name === 'notes.txt')!.id
+    valueOf(await discardMessage(engine.registry, failed.clientMsgId!))
+    await rows((list) => rowWith(list, 'Shared, then archived') === undefined, 'the post gone from the list')
+    await quiet(engine)
+    expect(apiCalls(engine, 'files.share').map((call) => call.error)).toEqual(['lost'])
+    expect(apiCalls(engine, 'files.delete')).toEqual([])
+    expect(fileDeleteRows(engine)).toEqual([])
+    expect(engine.fake.workspace.files.has(fileId)).toBe(true)
+    engine.fake.releaseFrames({ drop: true })
   } finally {
     unmount()
   }
