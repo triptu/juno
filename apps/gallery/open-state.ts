@@ -74,7 +74,9 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
   // callback with a 5 s deadline (the destination lists), so on a busy machine the load begins only then.
   await expect(page.locator('[data-chunk-pending]')).toHaveCount(0, { timeout: 15_000 })
   // Let the frame's images load or fail: a failed unfurl image removes its box (AttachmentCard), and on a busy machine
-  // the error can land after the state looks drawn. The held Avatar photo and lazy images out of view are not waited for.
+  // the error can land after the state looks drawn. The held Avatar photo and lazy images out of view are not waited for,
+  // nor is a message picture whose box already shows the broken glyph: that is its final state, and the fresh `<img>` a
+  // retry mounts under the glyph (packages/views/src/pictureLoad.ts) changes nothing the eye sees until it loads.
   await page.evaluate(async ({ frameName, finish }) => {
     document.body.getBoundingClientRect()
     await document.fonts.ready
@@ -83,8 +85,9 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
       const box = img.getBoundingClientRect()
       return box.bottom > 0 && box.top < innerHeight && box.right > 0 && box.left < innerWidth
     }
+    const failedPicture = (img: HTMLImageElement) => img.closest('[data-thumbnail]')?.querySelector('[data-broken]') != null
     const loading = Array.from(frame?.querySelectorAll('img') ?? []).filter(
-      (img) => !img.complete && !img.src.endsWith('/__fixture/pending.png') && (img.loading !== 'lazy' || inView(img)),
+      (img) => !img.complete && !img.src.endsWith('/__fixture/pending.png') && !failedPicture(img) && (img.loading !== 'lazy' || inView(img)),
     )
     const settled = loading.map((img) => new Promise((resolve) => {
       img.addEventListener('load', resolve, { once: true })
