@@ -29,6 +29,8 @@ export interface EmojiPickerProps {
    * on the message menu's material, which turns into it (More reactions).
    */
   readonly material?: 'popover' | 'menu'
+  /** `fill`: as wide as its box (the status sheet's field), the nine columns spread evenly. Default the fixed width. */
+  readonly width?: 'fixed' | 'fill'
 }
 
 const COLUMNS = 9
@@ -40,7 +42,7 @@ const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
 /** A windowed grid: only nearby rows mount, including in a large workspace or search. */
-export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', material = 'popover', searchReady = true, customReady = true }: EmojiPickerProps) {
+export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', material = 'popover', width = 'fixed', searchReady = true, customReady = true }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
   const [focused, setFocused] = useState<number | undefined>(undefined)
@@ -240,7 +242,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
                 const row = grid.rows[virtual.index]!
                 if (!('items' in row) || row.section !== section.key) return null
                 return (
-                  <div key={virtual.key} {...stylex.props(styles.virtualRow(virtual.start - top, virtual.size), styles.grid)}>
+                  <div key={virtual.key} {...stylex.props(styles.virtualRow(virtual.start - top, virtual.size), styles.grid, width === 'fill' && styles.gridFill)}>
                     {row.items.slice(row.start, row.start + COLUMNS).map((item, index) => {
                       const chosen = isChosen(item)
                       return (
@@ -277,7 +279,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
       {body}
     </div>
   ) : (
-    <Surface kind="popover" padding="none" role="dialog" aria-label="Emoji" data-emoji-picker="" onKeyDown={onPanelKeyDown} sx={styles.panel}>
+    <Surface kind="popover" padding="none" role="dialog" aria-label="Emoji" data-emoji-picker="" onKeyDown={onPanelKeyDown} sx={[styles.panel, width === 'fill' && styles.panelFill]}>
       {body}
     </Surface>
   )
@@ -355,6 +357,13 @@ const styles = stylex.create({
     display: 'grid',
     gridTemplateColumns: `repeat(${COLUMNS}, ${sizes['--control-32']})`,
     gridAutoRows: sizes['--control-32'],
+  },
+  panelFill: {
+    width: '100%',
+  },
+  // Wider than nine cells: the room goes between the columns, so the first column stays under the heading's start.
+  gridFill: {
+    justifyContent: 'space-between',
   },
   cell: {
     appearance: 'none',

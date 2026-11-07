@@ -203,6 +203,7 @@ function StatusEmojiPicker({ data, customReady, onPick, onClose }: { readonly da
       searchReady={searchReady}
       customReady={customReady}
       recent={recent}
+      width="fill"
       onPick={(name, unicode, url) => onPick({ name, ...(unicode === undefined ? {} : { unicode }), ...(url === undefined ? {} : { url }) })}
       onClose={onClose}
     />

@@ -1,0 +1,1 @@
+- 11-08 02:40 · profile-status · The status sheet's emoji picker opens under the field with the field's edges, its nine columns spread, and a `--border-strong` hairline over the popover shadow · Under the emoji button it started 11px in from the field, covered half the sheet with "Cl" and "ave" showing at its sides, and in dark it had the sheet's fill with no edge.

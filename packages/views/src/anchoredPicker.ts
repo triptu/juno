@@ -44,16 +44,18 @@ const EDGE = 8
  * Places the open picker under its anchor, its start on the anchor's start,
  * moved in to stay inside the window (or the gallery's frame); over the
  * anchor when there is no room below. Read once, then written, before the first paint, and again
- * when the window resizes.
+ * when the window resizes. With `under`, the picker goes under that box instead (the field the
+ * anchor sits in) and takes its width, so its edges line up with the field's.
  */
-export function usePickerPlace(anchorRef: RefObject<HTMLElement | null>, pickerRef: RefObject<HTMLElement | null>, pickerOpen: boolean) {
+export function usePickerPlace(anchorRef: RefObject<HTMLElement | null>, pickerRef: RefObject<HTMLElement | null>, pickerOpen: boolean, under?: () => HTMLElement | null) {
   useLayoutEffect(() => {
     if (!pickerOpen) return
     const place = () => {
-      const anchorElement = anchorRef.current
+      const anchorElement = under?.() ?? anchorRef.current
       const picker = pickerRef.current
       if (anchorElement === null || picker === null) return
       const anchor = anchorElement.getBoundingClientRect()
+      if (under !== undefined) picker.style.width = `${anchor.width}px`
       const box = picker.getBoundingClientRect()
       const bounds = anchorElement.closest('[data-tooltip-bounds]')?.getBoundingClientRect() ?? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
       const x = Math.max(bounds.left + EDGE, Math.min(anchor.left, bounds.right - EDGE - box.width))
@@ -71,5 +73,5 @@ export function usePickerPlace(anchorRef: RefObject<HTMLElement | null>, pickerR
       observer.disconnect()
       window.removeEventListener('resize', place)
     }
-  }, [anchorRef, pickerRef, pickerOpen])
+  }, [anchorRef, pickerRef, pickerOpen, under])
 }
