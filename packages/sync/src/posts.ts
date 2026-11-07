@@ -21,6 +21,7 @@ import { Invalidation, StoreWriter, type SqlError } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { storedMe } from './me'
 import { reindexTopics } from './reindex'
+import { discardStartedThread } from './startedThreads'
 
 export type PostState = 'queued' | 'sending' | 'unknown' | 'failed'
 
@@ -121,7 +122,7 @@ const touch = (post: Pick<PendingPost, 'channel' | 'threadTs'>) =>
  * A thread Juno started and Slack has not answered is indexed on its own
  * (`startedThreads.ts`).
  */
-export const reindexPostTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+const reindexPostTopic = (post: Pick<PendingPost, 'channel' | 'threadTs'>): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     if (post.threadTs?.startsWith('pending:') === true) return
     const me = yield* storedMe
@@ -200,26 +201,54 @@ const move = (
 
 /**
  * `queued` to `sending`, before the one request leaves, and the post is
- * recorded as sent by `userId` (`sent.ts`). False when the row is gone or
- * not queued.
+ * recorded as sent by `userId` (`sent.ts`). Answers the row as it is at the
+ * claim, which the request is built from: the user may have edited it
+ * since the worker read the queue. Undefined when the row is gone or not
+ * queued.
  */
-export const claimPost = (clientMsgId: string, userId: string): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+export const claimPost = (clientMsgId: string, userId: string): Effect.Effect<PendingPost | undefined, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const post = yield* readPost(clientMsgId)
-    if (!(yield* move(clientMsgId, ['queued'], 'sending', { attempt: true })) || post === undefined) return false
+    if (post === undefined || !(yield* move(clientMsgId, ['queued'], 'sending', { attempt: true }))) return undefined
     yield* recordSend(clientMsgId, post.channel, userId)
-    return true
+    return { ...post, state: 'sending', attempts: post.attempts + 1 }
   })
 
 /** The answer was lost: Slack may hold the message. Look it up at `nextAt`. */
 export const postUnknown = (clientMsgId: string, nextAt: number, error: string) => move(clientMsgId, ['sending'], 'unknown', { nextAt, lastError: error })
 
-/** Slack did not post it and may later (rate limited, signed out), or a lookup found no message: send again at `nextAt`. */
-export const requeuePost = (clientMsgId: string, nextAt: number, error: string | null) =>
-  move(clientMsgId, ['sending', 'unknown'], 'queued', { nextAt, lastError: error })
+/**
+ * Slack did not post it and may later (rate limited, signed out), or a
+ * lookup found no message: send again at `nextAt`. Slack has nothing, so
+ * the worker calls this through `requeueUnsentPost` (`actions.ts`), which
+ * applies an edit or delete the user queued while the post was out.
+ */
+export const requeuePost = (clientMsgId: string, nextAt: number, error: string | null) => move(clientMsgId, ['sending', 'unknown'], 'queued', { nextAt, lastError: error })
+
+/** The user's edit of a post Slack has not got: the row takes the text, and shows it. */
+export const rewritePost = (post: PendingPost, text: string, blocksJson: string | null): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`UPDATE pending_messages SET text = ${text}, blocks_json = ${blocksJson} WHERE client_msg_id = ${post.clientMsgId}`
+    yield* touch(post)
+  })
 
 /** A lookup could not answer: ask again at `nextAt`. Counts as an attempt, so the backoff grows. */
 export const deferLookup = (clientMsgId: string, nextAt: number) => move(clientMsgId, ['unknown'], 'unknown', { nextAt, attempt: true })
+
+/**
+ * Slack refuses the lookup for good (`thread_not_found`, `channel_not_found`, `is_archived`, `not_in_channel`;
+ * the worker's `LOOKUP_REFUSED`): no lookup can read the message, so the row waits for Retry or Delete draft
+ * instead of asking forever and holding the channel's later posts.
+ */
+export const failLookup = (clientMsgId: string, error: string) => move(clientMsgId, ['unknown'], 'failed', { lastError: error })
+
+/** When the post's request last left (`recordSend`), in epoch millis; undefined when it never did. */
+export const sentAt = (clientMsgId: string): Effect.Effect<number | undefined, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    return (yield* sql<{ sent_at: number }>`SELECT sent_at FROM sent_posts WHERE client_msg_id = ${clientMsgId}`)[0]?.sent_at
+  })
 
 /**
  * One of a queued post's files is in Slack: its id is kept, so the next
@@ -278,10 +307,21 @@ export const discardPost = (clientMsgId: string): Effect.Effect<boolean, SqlErro
   Effect.gen(function* () {
     const post = yield* readPost(clientMsgId)
     if (post === undefined || post.state !== 'failed') return false
-    const sql = yield* StoreWriter
-    yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${clientMsgId}`
-    yield* touch(post)
+    yield* removePost(post)
     return true
+  })
+
+/**
+ * Removes a post Slack has not got: Delete draft on a failed row, or the
+ * user's delete of a queued one (`actions.ts`). A root started from Home
+ * takes its thread and the replies that waited on it (`startedThreads.ts`).
+ */
+export const removePost = (post: PendingPost): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${post.clientMsgId}`
+    if (post.threadTs === undefined) yield* discardStartedThread(post.channel, post.clientMsgId)
+    yield* touch(post)
   })
 
 /** After a restart: a row left `sending` may have reached Slack, so it is `unknown`, due at `now`. */
@@ -311,7 +351,11 @@ export const reconcilePost = (clientMsgId: string): Effect.Effect<void, SqlError
 /** How long a sent post's row is kept. A copy shows within seconds; a week covers a long time offline. */
 const KEEP_MILLIS = 7 * 24 * 60 * 60_000
 
-/** `userId` is about to send the post with `clientMsgId` to `channel` (`sent.ts`). Drops rows older than a week. */
+/**
+ * `userId` is about to send the post with `clientMsgId` to `channel` (`sent.ts`). A post sent again (after a
+ * 429, or a lookup that found it absent) keeps its row and takes the new time, which bounds its next lookup.
+ * Drops rows older than a week.
+ */
 export const recordSend = (clientMsgId: string, channel: string, userId: string): Effect.Effect<void, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
@@ -319,7 +363,7 @@ export const recordSend = (clientMsgId: string, channel: string, userId: string)
     yield* sql`DELETE FROM sent_posts WHERE sent_at < ${now - KEEP_MILLIS}`
     yield* sql`DELETE FROM kept_copies WHERE kept_at < ${now - KEEP_MILLIS}`
     yield* sql`INSERT INTO sent_posts (client_msg_id, channel, user_id, ts, sent_at) VALUES (${clientMsgId}, ${channel}, ${userId}, NULL, ${now})
-      ON CONFLICT (client_msg_id) DO NOTHING`
+      ON CONFLICT (client_msg_id) DO UPDATE SET sent_at = excluded.sent_at`
   })
 
 /**

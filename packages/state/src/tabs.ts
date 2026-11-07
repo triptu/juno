@@ -138,7 +138,7 @@ export function tabTopic(tab: Tab): string | undefined {
   return place.kind === 'topic' ? place.topicId : undefined
 }
 /** Settings is one place whatever its section, so it shows in one tab. */
-const samePlace = (a: Place, b: Place) =>
+export const samePlace = (a: Place, b: Place) =>
   a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId
   : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page
   : a.kind === 'huddle' ? b.kind === 'huddle' && a.channelId === b.channelId
@@ -636,11 +636,39 @@ export const tabsAtom = Atom.make((get): Tabs => {
   return AsyncResult.isSuccess(saved) ? ensureTab(parseTabs(saved.value), homePlace) : noTabs
 }).pipe(Atom.withEquality((a: Tabs, b: Tabs) => a === b))
 
-/** Applies a rule to the tabs and saves the result. A change that leaves no tab leaves one with Home. */
+/** Whether the workspace's tabs are known: changed in this run, or the saved pref has answered (a failed read counts: the app goes on with no tabs). */
+const tabsKnown = (registry: Registry, teamId: string): boolean => registry.get(changedTabsAtom(teamId)) !== undefined || !AsyncResult.isInitial(registry.get(savedTabsAtom))
+
+/**
+ * Undefined when the signed-in workspace's tabs are known, else a promise
+ * that resolves once they are. A change applied before that would run on no
+ * tabs and replace the saved ones with its result, so whoever changes the
+ * tabs on a user's action waits here first (the navigation queue does).
+ */
+export function whenTabsKnown(registry: Registry): Promise<void> | undefined {
+  const teamId = registry.get(signedInAtom)?.teamId
+  if (teamId === undefined || tabsKnown(registry, teamId)) return undefined
+  return new Promise((resolve) => {
+    const off = registry.subscribe(
+      savedTabsAtom,
+      () => {
+        if (!tabsKnown(registry, teamId)) return
+        off()
+        resolve()
+      },
+      { immediate: false },
+    )
+  })
+}
+
+/**
+ * Applies a rule to the tabs and saves the result. A change that leaves no tab leaves one with Home. Before
+ * the saved tabs are known there is nothing to change (`whenTabsKnown`).
+ */
 export function updateTabs(registry: Registry, change: (tabs: Tabs) => Tabs): Tabs {
   const teamId = registry.get(signedInAtom)?.teamId
   const current = registry.get(tabsAtom)
-  if (teamId === undefined) return current
+  if (teamId === undefined || !tabsKnown(registry, teamId)) return current
   const changed = change(current)
   const ensured = changed === current ? current : ensureTab(changed, homePlace)
   // The tab that became active and the one left are both viewed now; expiry counts from there.

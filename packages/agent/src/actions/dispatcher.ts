@@ -8,13 +8,17 @@
  *                                                      └▶ no answer: unknown
  *   startup: open authorizations ─▶ unknown ─reconcile─▶ done | unknown (kept)
  *
- * One worker drains approved children in click order, one at a time, so a
- * batch reaches its destination in the card's order. Before each it checks
- * the policy (`authorizeDecision`) on facts read in the same synchronous
- * step as `authorize` commits, so nothing can change in between. A refusal
- * for a reason that can pass (paused, off, not the owner) leaves the
- * approval waiting; any other refusal is written on the approval, and the
- * click never runs.
+ * A kick runs each card's approved children in click order, one at a time,
+ * so a batch reaches its destination in the card's order; cards run beside
+ * each other, so a click that waits (a connection not ready, a sign-in in
+ * progress) holds no other card, and a kick that lands while a card's chain
+ * runs makes that chain look once more before it waits. Before each child it checks the
+ * policy (`authorizeDecision`) on facts read in the same synchronous step as
+ * `authorize` commits, so nothing can change in between. A refusal for a
+ * reason that can pass (paused, off, not the owner) leaves the approval
+ * waiting; any other refusal is written on the approval, and the click never
+ * runs. Juno's own records (expiry, a redaction, an edit) are checked before
+ * the destination is asked, so a waiting click still expires.
  *
  * Nothing here retries. One authorization is one attempt, and an attempt
  * Juno cannot confirm stays `unknown` (the card shows "Failed"). A child
@@ -64,8 +68,13 @@ export function createDispatcher(options: DispatcherOptions) {
   const { store } = options
   const executor = (tool: string) => options.executors().find((e) => e.tool === tool)
   let closed = false
+  /** Resolves when every card's chain ended. */
   let running: Promise<void> | undefined
-  let again = false
+  let ended: (() => void) | undefined
+  /** The chain running each card's children now. */
+  const chains = new Map<string, Promise<void>>()
+  /** Cards a kick reached while their chain ran: the chain looks once more before it waits. */
+  const dirty = new Set<string>()
 
   const pending = (): ReadonlyArray<Pending> =>
     (store.db
@@ -109,17 +118,27 @@ export function createDispatcher(options: DispatcherOptions) {
 
   const settleCard = (cardId: string) => settleCardOutcome(store, cardId)
 
-  /** One approved child: check, authorize, attempt, run, record. Returns false when the drain must wait (paused, off, not the owner, no account yet). */
-  const dispatch = async (item: Pending): Promise<boolean> => {
+  /**
+   * One approved child: check, authorize, attempt, run, record. `wait` when the
+   * card must wait (no account or connection yet, paused, off, not the owner),
+   * `rotated` when the journal moved under the position and the child goes again.
+   */
+  const dispatch = async (item: Pending): Promise<'done' | 'wait' | 'rotated'> => {
     const payload = JSON.parse(item.intent.payload) as ExecutableIdentity
     const found = executor(payload.tool)
     if (found === undefined) {
       refuse(item, 'unavailable')
-      return true
+      return 'done'
     }
-    // The destination's side of `valid` (account, schema, preconditions) needs I/O, so it is read first.
+    // Juno's own records first, so a click that waits on its destination still expires.
+    const early = recordsValid(item)
+    if (early !== 'valid') {
+      refuse(item, early)
+      return 'done'
+    }
+    // The destination's side of `valid` (account, schema, preconditions) needs I/O, so it is read before the step below.
     const identity = found.check === undefined ? 'valid' : await found.check(payload)
-    if (identity === 'wait') return false
+    if (identity === 'wait') return 'wait'
     const position = await options.position()
     // From here to `authorize` nothing awaits, so Juno's records cannot change under the decision.
     const records = recordsValid(item)
@@ -143,21 +162,17 @@ export function createDispatcher(options: DispatcherOptions) {
       done,
     })
     if (decision._tag === 'refused') {
-      if (decision.reason === 'paused' || decision.reason === 'off' || decision.reason === 'notOwner') return false
+      if (decision.reason === 'paused' || decision.reason === 'off' || decision.reason === 'notOwner') return 'wait'
       refuse(item, decision.reason === 'invalid' ? decision.invalid : decision.reason)
-      return true
+      return 'done'
     }
     const authorized = authorize(store, { intentId: item.intent.id, approvalId: item.approvalId, originOp: item.opId, position })
-    if (authorized._tag === 'refused') {
-      // The journal rotated under the position: read it again on the next pass.
-      if (authorized.reason !== 'rotated') return false
-      again = true
-      return true
-    }
+    // The journal rotated under the position: read it again and go once more.
+    if (authorized._tag === 'refused') return authorized.reason === 'rotated' ? 'rotated' : 'wait'
     options.onChange()
     const attemptId = recordAttempt(store, authorized.id)
     // Pause cancelled it before the handoff: nothing was sent.
-    if (attemptId === undefined) return true
+    if (attemptId === undefined) return 'done'
     const call: ExecutorCall = {
       actionId: item.intent.action_id, authorizationId: authorized.id, attemptId, digest: item.intent.digest,
       payload, cardId: item.cardId, opId: item.opId,
@@ -184,62 +199,97 @@ export function createDispatcher(options: DispatcherOptions) {
     settleCard(item.cardId)
     options.onChange()
     options.onSettled?.(item.cardId)
-    return true
+    return 'done'
   }
 
-  /** Dispatches in click order until nothing is pending, or the first child must wait. A kick meanwhile looks again. */
-  const drain = async () => {
+  /**
+   * One card's approved children in click order, read again after each; the
+   * card waits with the first child that must. A kick that landed while the
+   * chain ran (a connection became ready as its check was in flight) makes
+   * it read once more, so the change the kick announced is not lost, and a
+   * card that waits for good is not looked at again until the next kick.
+   */
+  const runCard = async (cardId: string) => {
     for (;;) {
-      again = false
-      for (const item of pending()) {
-        if (closed) return
-        if (!(await dispatch(item))) break
+      if (closed) return
+      dirty.delete(cardId)
+      const items = pending().filter((item) => item.cardId === cardId)
+      if (items.length === 0) return
+      let result: Awaited<ReturnType<typeof dispatch>> = 'done'
+      for (const item of items) {
+        do {
+          if (closed) return
+          result = await dispatch(item)
+        } while (result === 'rotated')
+        if (result === 'wait') break
       }
-      if (!again || closed) return
+      if (result === 'wait' && !dirty.has(cardId)) return
     }
   }
 
-  /** Runs the drain, or asks the running one to look again. */
+  /** Starts a chain for every card with approved children and none running. A store error goes to `onReport`, never to the kick's caller. */
+  const startChains = () => {
+    try {
+      for (const { cardId } of pending()) {
+        if (chains.has(cardId)) continue
+        const chain = runCard(cardId)
+          .catch((error: unknown) => options.onReport?.(error))
+          .finally(() => {
+            chains.delete(cardId)
+            // A kick between the chain's last look and here marked the card but found it still running: look again now.
+            if (!closed && dirty.has(cardId)) startChains()
+            if (chains.size > 0) return
+            running = undefined
+            ended?.()
+          })
+        chains.set(cardId, chain)
+      }
+    } catch (error) {
+      options.onReport?.(error)
+    }
+    if (chains.size > 0 && running === undefined) running = new Promise<void>((resolve) => (ended = resolve))
+  }
+
+  /** Starts chains for cards with none, and asks the running ones to look again. */
   const kick = (): Promise<void> => {
     if (closed) return Promise.resolve()
-    if (running !== undefined) {
-      again = true
-      return running
-    }
-    running = drain()
-      .catch((error: unknown) => options.onReport?.(error))
-      .finally(() => {
-        running = undefined
-      })
-    return running
+    for (const cardId of chains.keys()) dirty.add(cardId)
+    startChains()
+    return running ?? Promise.resolve()
   }
 
   /**
    * Startup (§6.5): authorizations recovery classified `unknown` look for
    * positive evidence, once, in the background. A miss keeps them unknown.
+   * Either way the card's outcome is recorded, so the model learns it (done,
+   * or Failed), and a connection call's run goes on with it as it does after
+   * a click that ran.
    */
   const reconcile = async () => {
     const unknown = store.db
       .prepare(
         `SELECT authorizations.id AS authorizationId, attempts.id AS attemptId, intents.action_id AS actionId, intents.digest, intents.payload, intents.card_id AS cardId, authorizations.origin_op AS opId
-         FROM authorizations JOIN attempts ON attempts.authorization_id = authorizations.id JOIN intents ON intents.id = authorizations.intent_id
+         FROM authorizations JOIN intents ON intents.id = authorizations.intent_id LEFT JOIN attempts ON attempts.authorization_id = authorizations.id
          WHERE authorizations.outcome = 'unknown'`,
       )
-      .all() as Array<{ authorizationId: string; attemptId: string; actionId: string; digest: string; payload: string; cardId: string; opId: string | null }>
+      .all() as Array<{ authorizationId: string; attemptId: string | null; actionId: string; digest: string; payload: string; cardId: string; opId: string | null }>
     for (const row of unknown) {
       if (closed) return
       const payload = JSON.parse(row.payload) as ExecutableIdentity
       const found = executor(payload.tool)
-      if (found?.reconcile === undefined) continue
-      try {
-        const result = await found.reconcile({ ...row, payload, opId: row.opId ?? '' })
-        if (result._tag !== 'found') continue
-        recordReceipt(store, row.attemptId, result.receipt)
-        settleCard(row.cardId)
-        options.onChange()
-      } catch (error) {
-        options.onReport?.(error)
+      // No attempt: the crash came before the handoff, so there is nothing to look for.
+      if (row.attemptId !== null && found?.reconcile !== undefined) {
+        const attemptId = row.attemptId
+        try {
+          const result = await found.reconcile({ ...row, attemptId, payload, opId: row.opId ?? '' })
+          if (result._tag === 'found') recordReceipt(store, attemptId, result.receipt)
+        } catch (error) {
+          options.onReport?.(error)
+        }
       }
+      settleCard(row.cardId)
+      options.onChange()
+      options.onSettled?.(row.cardId)
     }
   }
 

@@ -62,6 +62,8 @@ const RECONNECT_URL_INTERVAL_MILLIS = 30_000
 interface RateLimitRule {
   retryAfter: number
   remaining: number
+  /** Only calls whose fields hold these values count; the others pass. */
+  where?: Readonly<Record<string, string>>
 }
 
 interface FailureRule {
@@ -228,8 +230,8 @@ export class FakeServer {
 
   // Rate limits
 
-  force429(method: string, retryAfter: number, times: number): void {
-    this.#rateLimits.set(method, { retryAfter, remaining: times })
+  force429(method: string, retryAfter: number, times: number, where?: Readonly<Record<string, string>>): void {
+    this.#rateLimits.set(method, { retryAfter, remaining: times, ...(where === undefined ? {} : { where }) })
   }
 
   clear429(method?: string): void {
@@ -237,9 +239,10 @@ export class FakeServer {
     else this.#rateLimits.delete(method)
   }
 
-  #takeRateLimit(method: string): RateLimitRule | undefined {
+  #takeRateLimit(method: string, fields: Readonly<Record<string, unknown>> = {}): RateLimitRule | undefined {
     const rule = this.#rateLimits.get(method) ?? this.#rateLimits.get('*')
     if (rule === undefined || rule.remaining <= 0) return undefined
+    if (rule.where !== undefined && Object.entries(rule.where).some(([key, value]) => fields[key] !== value)) return undefined
     rule.remaining -= 1
     return rule
   }
@@ -658,7 +661,7 @@ export class FakeServer {
     }
     const auth = this.#authenticate(parseCookies(request.headers.cookie)['d'], fields['token'])
     if (typeof auth === 'string') return record(200, { ok: false, error: auth })
-    const limit = this.#takeRateLimit(method)
+    const limit = this.#takeRateLimit(method, fields)
     if (limit !== undefined) {
       response.setHeader('Retry-After', String(limit.retryAfter))
       return record(429, { ok: false, error: 'ratelimited' })

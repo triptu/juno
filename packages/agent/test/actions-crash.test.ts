@@ -25,6 +25,9 @@ interface Summary {
   /** Send RPCs this process made. */
   readonly sends: number
   readonly slack: ReadonlyArray<string>
+  readonly inbox: ReadonlyArray<{ readonly opId: string; readonly state: string }>
+  /** The `<card-outcome …>` tags the model read in this process. */
+  readonly told: ReadonlyArray<string>
 }
 
 async function run(...commands: string[]): Promise<Summary> {
@@ -69,4 +72,21 @@ it('a kill after the host sent, before the receipt: unknown at startup, then rec
   expect(after.authorizations).toEqual([{ outcome: 'done' }])
   expect(after.attempts).toBe(1)
   expect(after.cards).toEqual([{ _tag: 'done', line: 'Sent' }])
+})
+
+it('a kill before the handoff: the restarted agent tells the model the click failed, with its next message', async () => {
+  await crashAt('authorization.consumed', { args: args(...propose, 'click:click-1', 'idle'), timeoutMs: 60_000 })
+  const after = await run('idle', 'send:op-2:thanks', 'idle')
+  expect(after.cards[0]).toEqual({ _tag: 'failed', line: 'Failed' })
+  expect(after.told).toEqual([expect.stringMatching(/^<card-outcome card="[^"]+" kind="sendMessage" outcome="failed">$/)])
+})
+
+it('a kill after a connection write landed, before the receipt: reconcile finds it, and the run goes on with the outcome', async () => {
+  await crashAt('attempt.beforeReceipt', { args: args('change:call-1', 'click:click-1', 'idle'), timeoutMs: 60_000 })
+  const after = await run('idle')
+  expect(after.authorizations).toEqual([{ outcome: 'done' }])
+  expect(after.cards[0]).toMatchObject({ _tag: 'done' })
+  // The click's run continued: the outcome op ran, and the model read the outcome in it.
+  expect(after.inbox).toEqual([expect.objectContaining({ opId: expect.stringMatching(/^outcome:/), state: 'done' })])
+  expect(after.told).toEqual([expect.stringMatching(/^<card-outcome card="[^"]+" kind="change" outcome="done">$/)])
 })

@@ -6,6 +6,7 @@ import type { AppUpdater } from 'electron-updater'
 import { openedForTests, freePath } from './files'
 import { createReleaseFeed, type LatestRelease, type UpdateConfig } from './releaseFeed'
 import { compareVersions, parseChangelog } from './releaseNotes'
+import { createLooker, type UpdaterEvents } from './updateLooker'
 
 const CHECK_EVERY = 6 * 60 * 60 * 1000
 /** How long a fetched changelog is reused before "What's new" asks again. */
@@ -14,7 +15,7 @@ const NOTES_FOR = 60 * 60 * 1000
 type Feed = ReturnType<typeof createReleaseFeed>
 
 /** electron-updater with the releases repository as a private GitHub feed. */
-async function loadSignedUpdater(settings: UpdateConfig, events: { readonly progress: (share: number) => void; readonly downloaded: (version: string) => void }): Promise<AppUpdater> {
+async function loadSignedUpdater(settings: UpdateConfig, events: UpdaterEvents): Promise<AppUpdater> {
   const module = await import('electron-updater')
   const { PrivateGitHubProvider } = await import('electron-updater/out/providers/PrivateGitHubProvider')
   const [owner, repo] = settings.repository.split('/')
@@ -75,74 +76,6 @@ function detailsOf(error: unknown, token: string): string {
   return `Juno ${app.getVersion()} could not check for updates: ${message.replaceAll(token, '[token]')}`.slice(0, 500)
 }
 
-/** What a look for a newer version reports, and only while its generation is current. */
-interface LookEvents {
-  readonly offer: (release: LatestRelease, download: 'none' | 'downloading') => void
-  readonly progress: (share: number) => void
-  readonly ready: (version: string) => void
-  readonly idle: () => void
-}
-
-/**
- * Looks for a newer version, one look at a time: an unsigned build offers its
- * DMG, a signed build downloads it in place. `reset` drops a look in progress,
- * so it reports nothing more.
- */
-function createLooker(config: UpdateConfig, feed: Feed, events: LookEvents) {
-  let generation = 0
-  let looking: Promise<'none' | 'found'> | undefined
-  let updater: AppUpdater | undefined
-  let cancel: (() => void) | undefined
-  const look = async (at: number): Promise<'none' | 'found'> => {
-    const latest = await feed.latest()
-    if (at !== generation || compareVersions(latest.version, app.getVersion()) <= 0) return 'none'
-    if (!config.signed) {
-      if (latest.dmg === null) throw new Error(`Release ${latest.version} has no DMG`)
-      events.offer(latest, 'none')
-      return 'found'
-    }
-    try {
-      updater ??= await loadSignedUpdater(config, {
-        progress: (share) => { if (at === generation) events.progress(share) },
-        downloaded: (version) => { if (at === generation) events.ready(version) },
-      })
-      const result = at === generation ? await updater.checkForUpdates() : null
-      if (at !== generation || result === null || !result.isUpdateAvailable) return 'none'
-      cancel = () => result.cancellationToken?.cancel()
-      events.offer(latest, 'downloading')
-      await updater.downloadUpdate(result.cancellationToken)
-      return 'found'
-    } catch (error) {
-      // Squirrel.Mac refused the update or the download failed: offer the DMG instead.
-      if (at !== generation) return 'none'
-      if (latest.dmg === null) {
-        events.idle()
-        throw error
-      }
-      events.offer(latest, 'none')
-      return 'found'
-    } finally {
-      cancel = undefined
-    }
-  }
-  return {
-    generation: () => generation,
-    /** The look in progress, or a new one. */
-    find: (): Promise<'none' | 'found'> => {
-      if (looking !== undefined) return looking
-      const run = look(generation).finally(() => { if (looking === run) looking = undefined })
-      looking = run
-      return run
-    },
-    reset: () => {
-      generation += 1
-      looking = undefined
-      cancel?.()
-    },
-    install: () => updater?.quitAndInstall(),
-  }
-}
-
 /**
  * Shell-only updater. Nothing loads or contacts GitHub until the owner opts in
  * or presses Check for updates, except "What's new", which fetches the
@@ -174,7 +107,7 @@ export function createUpdates(initial: boolean, save: (enabled: boolean) => void
     if (release === null || found !== release || state.kind !== 'available' || state.download !== 'downloading' || state.progress === rounded) return
     offer(release, 'downloading', rounded)
   }
-  const looker = config === null || feed === null ? null : createLooker(config, feed, {
+  const looker = config === null || feed === null ? null : createLooker({ signed: config.signed, version: app.getVersion(), latest: () => feed.latest(), load: (events) => loadSignedUpdater(config, events) }, {
     offer,
     progress: (share) => progress(found, share),
     ready: (version) => publish({ kind: 'ready', enabled, version }),
@@ -221,7 +154,8 @@ export function createUpdates(initial: boolean, save: (enabled: boolean) => void
     },
     start: () => { if (enabled) timer = setTimeout(background, 30_000) },
     stop: () => { enabled = false; clearTimeout(timer); looker?.reset() },
-    restart: () => { if (state.kind === 'ready') looker?.install() },
+    /** Restart to update: quits into the downloaded update, and says whether it did. */
+    install: () => state.kind === 'ready' && (looker?.install() ?? false),
     /** "Download the new version". Answers at once; the state moves on through `updates.changed`. */
     download: () => {
       const release = found

@@ -28,7 +28,7 @@
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
-import { postTopic, readPost, recordOwnDelete, reindexPostTopic, type PendingPost } from './posts'
+import { postTopic, readPost, recordOwnDelete, removePost, requeuePost, rewritePost, type PendingPost } from './posts'
 
 export type ActionKind = 'edit' | 'delete' | 'react' | 'broadcast'
 
@@ -223,13 +223,10 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
     const actions = yield* actionsOn(target)
     if (actions.some((action) => action.kind === 'delete')) return 'missing'
     if (target.kind === 'pending' && (target.post.state === 'queued' || target.post.state === 'failed')) {
-      const sql = yield* StoreWriter
-      yield* sql`UPDATE pending_messages SET text = ${input.text}, blocks_json = ${input.blocksJson} WHERE client_msg_id = ${target.post.clientMsgId}`
+      yield* rewritePost(target.post, input.text, input.blocksJson)
       // An edit queued while the post was out (it came back: a 429, or a lookup that did not find it) holds older
       // text, and Slack does not have the post: the post now carries the newest text, so the row goes.
       yield* deleteActions(actions.filter((action) => action.kind === 'edit'))
-      yield* touch([postTopic(target.post)])
-      yield* reindexPostTopic(target.post)
       return undefined
     }
     const pending = actions.find((action) => action.kind === 'edit')
@@ -264,10 +261,7 @@ export const queueDelete = (input: DeleteInput): Effect.Effect<ActionRefusal | u
     if (actions.some((action) => action.kind === 'delete')) return undefined
     yield* deleteActions(actions)
     if (target.kind === 'pending' && (target.post.state === 'queued' || target.post.state === 'failed')) {
-      const sql = yield* StoreWriter
-      yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${target.post.clientMsgId}`
-      yield* touch([postTopic(target.post)])
-      yield* reindexPostTopic(target.post)
+      yield* removePost(target.post)
       return undefined
     }
     const { channel, dependsOn, ...fields } = targetFields(target)
@@ -315,21 +309,39 @@ export const placeOf = (action: PendingAction): Effect.Effect<ActionPlace, SqlEr
   })
 
 /**
- * The post a row depended on was refused, so Slack never had it: an edit
- * rewrites the failed row, a delete removes it, a reaction is dropped.
- * The action row ends in the same transaction.
+ * Slack has not got `post` (it was refused, or came back to the queue), so
+ * the rows that waited on it apply to the row, as on a queued post: an
+ * edit's text goes into the row, a delete removes it (a New chat root takes
+ * its waiting replies and started thread, `removePost`), and any other row
+ * given, such as a reaction on a refused post, is dropped. The rows end in
+ * the same transaction.
  */
-export const settleOnFailedPost = (action: PendingAction, post: PendingPost): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+export const applyWaitingActions = (post: PendingPost, actions: ReadonlyArray<PendingAction>): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
-    const sql = yield* StoreWriter
-    if (action.kind === 'edit' && action.payload.text !== undefined) {
-      yield* sql`UPDATE pending_messages SET text = ${action.payload.text}, blocks_json = ${action.payload.blocksJson ?? null} WHERE client_msg_id = ${post.clientMsgId}`
-    } else if (action.kind === 'delete') {
-      yield* sql`DELETE FROM pending_messages WHERE client_msg_id = ${post.clientMsgId}`
+    if (actions.some((action) => action.kind === 'delete')) {
+      yield* removePost(post)
+    } else {
+      for (const action of actions) {
+        if (action.kind === 'edit' && action.payload.text !== undefined) yield* rewritePost(post, action.payload.text, action.payload.blocksJson ?? null)
+      }
     }
-    yield* deleteActions([action])
-    yield* touch([postTopic(post)])
-    yield* reindexPostTopic(post)
+    yield* deleteActions(actions)
+  })
+
+/**
+ * `requeuePost`, and then the edit or delete the user queued while the post
+ * was out applies to it (`applyWaitingActions`), so the worker never sends
+ * a post the user deleted and an edit's text goes with the post. A reaction
+ * keeps waiting for the stored message. Answers whether the row was out.
+ */
+export const requeueUnsentPost = (clientMsgId: string, nextAt: number, error: string | null): Effect.Effect<boolean, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    if (!(yield* requeuePost(clientMsgId, nextAt, error))) return false
+    const post = yield* readPost(clientMsgId)
+    if (post === undefined) return true
+    const waiting = (yield* actionsOn({ kind: 'pending', post })).filter((action) => action.kind === 'edit' || action.kind === 'delete')
+    if (waiting.length > 0) yield* applyWaitingActions(post, waiting)
+    return true
   })
 
 /**

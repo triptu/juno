@@ -10,6 +10,7 @@ Juno is a calm, topic-first desktop client for Slack. It reads and writes real S
 - `docs/research/` holds what we learned by reverse engineering Slack. Treat it as evidence, with its stated unknowns.
 - `docs/development.md` covers setup, commands and known toolchain pitfalls.
 - `docs/future-ideas.md` holds product ideas not yet planned; `docs/backlog.md` holds small known items.
+- `docs/state-machines.md` lists every state machine with its states, transitions and invariants, and the known invalid states with their status. A change that adds a state or a transition, or fixes a listed bug, updates it.
 - `specs/` holds Quint specs of the concurrent sync protocols, readable on their own (start with `specs/README.md`).
 
 Read the parts relevant to your task, and the package's README, before changing code. If the code and a doc disagree, fix whichever is wrong in the same change.

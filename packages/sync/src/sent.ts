@@ -46,7 +46,7 @@ import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domai
 import { Clock, Effect } from 'effect'
 import { CommandWrite, Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { messageTopics } from './keys'
-import { dropAction, queueCopyDelete, type PendingAction } from './actions'
+import { dropAction, queueCopyDelete, readAction, type PendingAction } from './actions'
 
 /** `sync_state` key: when the last recheck began (`recheck.ts`). */
 export const RECHECK_KEY = 'recheck'
@@ -140,14 +140,16 @@ const keepCopy = (copy: MessageRow, sent: SentRow, reason: KeepReason): Effect.E
     yield* Effect.logInfo('send: kept a network copy of a post', { reason })
   })
 
-/** The delete row waiting for `row`, if it is a copy's (it names the copy by ts alone). */
+/**
+ * The delete row waiting for `row`, if it is a copy's (it names the copy by
+ * ts alone), as stored: `dropAction` ends only the row it was given.
+ */
 const copyDeleteOf = (row: MessageRow): Effect.Effect<PendingAction | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const rows = yield* sql<{ id: number }>`SELECT id FROM outbox WHERE kind = 'delete' AND target_key = ${row.channel} AND depends_on IS NULL
       AND json_extract(payload_json, '$.ts') = ${row.ts} AND json_extract(payload_json, '$.clientMsgId') IS NULL`
-    if (rows[0] === undefined) return undefined
-    return { id: rows[0].id, kind: 'delete', channel: row.channel, dependsOn: null, payload: { ts: row.ts, clientMsgId: null, topics: messageTopics(row) }, attempts: 0, lastError: null, nextAt: 0, createdAt: 0 }
+    return rows[0] === undefined ? undefined : yield* readAction(rows[0].id)
   })
 
 /** The kept message of a sent post was deleted: a file copy hidden for it is shown and becomes the message. */

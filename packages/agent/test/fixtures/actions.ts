@@ -6,10 +6,14 @@ import { testDurability } from '@juno/agent-testing'
 //
 //   bun actions.ts <dir> [command...]
 //
-// Commands: send:<op>:<text>  click:<op>  idle
+// Commands: send:<op>:<text>  change:<call>  click:<op>  idle
+//
+// `change` proposes a Change card on a fake connection whose write always lands and is always found
+// by reconcile, as a Notion page update is.
 import { join } from 'node:path'
 import { fakeActionHost, fakeProvider, reply, TEST_CHANNEL } from '@juno/agent-testing'
-import { createProviderGuard, openTurns } from '../../src/index'
+import type { CardPayload } from '@juno/agent-cards'
+import { createProviderGuard, openTurns, type Executor } from '../../src/index'
 
 const [dir, ...commands] = process.argv.slice(2)
 if (dir === undefined) throw new Error('usage: actions.ts <dir> [command...]')
@@ -29,12 +33,24 @@ fake.script(Array.from({ length: 8 }, () => reply((context) => {
 })))
 
 const slack = fakeActionHost({ file: join(dir, 'slack.json') })
+const fakeWrite: Executor = {
+  tool: 'fake_write', tier: 3, deduped: false,
+  run: async () => ({ _tag: 'done', receipt: { confirmed: true } }),
+  reconcile: async () => ({ _tag: 'found', receipt: { confirmed: true } }),
+}
+const change = {
+  _tag: 'change', server: 'Notion', target: 'Roadmap',
+  action: {
+    id: '0199f0a0-0000-7000-8000-000000000003', rev: 1, tier: 3, deduped: false, source: 0,
+    payload: { connection_id: 'notion', account_id: 'acct', destination_ids: [], tool: 'fake_write', schema_hash: '0'.repeat(64), args: { title: 'Q4' }, preconditions: {}, ops: [] },
+  },
+} as unknown as CardPayload
 const turns = await openTurns({
   durability: testDurability,
   agentDir: dir,
   provider: (store) => createProviderGuard({ store, transport: fake.models }),
   model: { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' },
-  actions: { host: slack.host },
+  actions: { host: slack.host, executors: [fakeWrite] },
 })
 if (turns._tag === 'updateNeeded') throw new Error('update needed')
 
@@ -46,6 +62,9 @@ for (const command of commands) {
       turns.accept({ opId: opId!, kind: 'send', text: text.join(':') })
       break
     }
+    case 'change':
+      turns.actions.propose({ runId: 'run-fixture', callId: rest[0]!, payload: change })
+      break
     case 'click': {
       const open = turns.actions.views().find((view) => view.binding !== undefined)
       if (open?.binding === undefined) throw new Error('no open card')
@@ -53,6 +72,8 @@ for (const command of commands) {
       break
     }
     case 'idle':
+      // Reconcile and a click's dispatch may start a run; a run may propose a card.
+      await turns.actions.idle()
       await turns.idle()
       await turns.actions.idle()
       break
@@ -68,6 +89,13 @@ const summary = {
   attempts: (turns.store.db.prepare('SELECT count(*) AS n FROM attempts').get() as { n: number }).n,
   sends: slack.calls.length,
   slack: slack.messages().map((m) => m.text),
+  inbox: turns.store.db.prepare('SELECT op_id AS opId, state FROM inbox ORDER BY seq').all(),
+  /** The card outcomes the model was told in this process, each once (a run's later requests repeat its inputs). */
+  told: [...new Set(fake.requests.flatMap((request) => request.context.messages).flatMap((message) => {
+    const content = (message as { content?: unknown }).content
+    const text = typeof content === 'string' ? content : Array.isArray(content) ? content.map((part: { text?: string }) => part.text ?? '').join('') : ''
+    return text.match(/<card-outcome [^>]*>/g) ?? []
+  }))],
 }
 await turns.close()
 console.log(JSON.stringify(summary))

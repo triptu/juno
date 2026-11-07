@@ -325,6 +325,14 @@ it('an interrupted cold boot does not fetch again the history it already has', a
   expect(apiCalls(engine, 'conversations.history')).toHaveLength(activeMains - 1)
 })
 
+it('a force_reload whose boot fails shows the failure and boots again after the retry wait', async () => {
+  const engine = await booted({ timing: { bootRetryMillis: 100 } })
+  engine.fake.forceError({ method: 'client.userBoot', error: 'not_allowed', times: 1 })
+  engine.fake.emitFrame({ type: 'force_reload', event_ts: `${Math.floor(Date.now() / 1000)}.000001` })
+  expect(await engine.phase('failed')).toEqual({ _tag: 'failed', reason: { error: 'SlackRejected', method: 'client.userBoot', detail: 'not_allowed' } })
+  await engine.phase('live')
+})
+
 it('reads history over the quiet window the user chose, finishes when discovery fails, and the next sweep searches the same gap', async () => {
   // The preview search after the quick start, then the discovery sweep, are refused.
   const engine = await booted({ quietDays: 3, initial: (fake) => (fake.forceError({ method: 'search.modules.messages', error: 'not_allowed', times: 2 }), fake.signIn()) })
@@ -397,4 +405,44 @@ it('a boot that never reaches Slack is offline, not failed, through the 30 s ret
   } finally {
     await Promise.all([time.close(), grace.close()])
   }
+})
+
+// A launch whose session check cannot reach Slack (SPEC 5, item 5): the stored session is used as it is, and the sync's boot decides.
+it('a launch whose session check never reaches Slack still syncs once Slack answers', async () => {
+  // The client's three attempts at `auth.test` get no answer; the sync's own boot does.
+  const engine = await started({ initial: (fake) => (fake.loseResponse({ method: 'auth.test', times: 3 }), fake.signIn()) })
+  await engine.phase('live', 30_000)
+  await engine.rowsUntil((rows) => rows.length > 0, 'rows after a launch that could not check the session')
+})
+
+it('a launch whose session check never reaches Slack still ends in session-expired when Slack rejects the session', async () => {
+  const engine = await started({ initial: (fake) => (fake.loseResponse({ method: 'auth.test', times: 3 }), fake.signIn()) })
+  // Slack rejects the session from now on: the sync finds out, since the launch's check could not.
+  engine.fake.expireSession()
+  await engine.status('authRequired')
+  await engine.phase('session-expired')
+})
+
+// A socket drop during the first sync
+const storedText = (engine: RunningEngine, channel: string, ts: string) =>
+  readDb(engine, 'cache.db', (db) => (db.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get(channel, ts) as { text: string } | undefined)?.text)
+
+it('a socket drop and reconnect during the first sync is caught up when the boot ends: an edit and a message from the gap land', async () => {
+  const engine = await started({ initial: (fake) => (fake.holdNext({ method: 'conversations.history' }), fake.signIn()) })
+  await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
+  // The first conversation's page is on its way with its messages as they were; the socket drops and comes back before the boot goes on.
+  const channel = String(engine.fake.heldCalls({ method: 'conversations.history' })[0]!['channel'])
+  const target = engine.fake.workspace.main(channel).at(-1)!
+  engine.fake.dropSocket()
+  await waitFor(() => (engine.online() ? undefined : true), undefined, 'the socket down')
+  engine.fake.editMessage({ channel, ts: target.ts, text: 'Edited while the socket was down.' })
+  const posted = engine.fake.injectMessage({ channel, user: target.user, text: 'Posted while the socket was down.' })
+  await waitFor(() => (engine.online() ? true : undefined), undefined, 'the socket back')
+  engine.fake.release()
+  await engine.phase('live', 30_000)
+  await waitFor(
+    () => (storedText(engine, channel, target.ts) === 'Edited while the socket was down.' && storedText(engine, channel, posted.ts) !== undefined ? true : undefined),
+    undefined,
+    'the changes made during the drop',
+  )
 })

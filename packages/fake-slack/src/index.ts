@@ -353,9 +353,9 @@ export class FakeSlack {
     return this.server.sockets.size
   }
 
-  /** The next `times` calls of `method` (or `*`) get HTTP 429 with Retry-After. */
-  force429(input: { method: string; retryAfter?: number; times?: number }): void {
-    this.server.force429(input.method, input.retryAfter ?? 30, input.times ?? 1)
+  /** The next `times` calls of `method` (or `*`) get HTTP 429 with Retry-After; with `where`, only calls whose fields hold those values. */
+  force429(input: { method: string; retryAfter?: number; times?: number; where?: Readonly<Record<string, string>> }): void {
+    this.server.force429(input.method, input.retryAfter ?? 30, input.times ?? 1, input.where)
   }
 
   clear429(input: { method?: string } = {}): void {

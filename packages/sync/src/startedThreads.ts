@@ -21,6 +21,28 @@ export const startThread = (input: { readonly channel: string; readonly clientMs
     return id
   })
 
+/**
+ * The root of a thread started from Home goes before Slack has it (Delete
+ * draft on a refused root, or a delete of a queued one): the thread never
+ * existed. The replies that waited on it (`thread_ts` `pending:<id>`) go
+ * with it, as do its topic and its local follow. Answers whether there was
+ * such a thread. Their staged files are left to the staging sweep.
+ */
+export const discardStartedThread = (channel: string, clientMsgId: string) => Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  const started = (yield* sql<{ topic_id: string; root_ts: string | null }>`SELECT topic_id, root_ts FROM started_threads
+    WHERE client_msg_id = ${clientMsgId} AND channel = ${channel}`)[0]
+  if (started === undefined || started.root_ts !== null) return false
+  const root = `pending:${clientMsgId}`
+  yield* sql`DELETE FROM pending_messages WHERE channel = ${channel} AND thread_ts = ${root}`
+  yield* sql`DELETE FROM started_threads WHERE client_msg_id = ${clientMsgId} AND channel = ${channel}`
+  yield* sql`DELETE FROM topic_index WHERE topic_id = ${started.topic_id}`
+  yield* sql`DELETE FROM thread_subs WHERE channel = ${channel} AND thread_ts = ${root}`
+  yield* Invalidation.use(i => i.invalidate(['topics', 'thread_subs']))
+  yield* Invalidation.use(i => i.invalidate({ messages: [started.topic_id] }))
+  return true
+})
+
 /** Called before storing an echo or post response, in the same transaction. */
 export const acknowledgeStartedThread = (message: MessageRow) => Effect.gen(function* () {
   if (message.client_msg_id === null) return message

@@ -342,6 +342,7 @@ export default defineFixtures(
       'empty-main': state({ items: [], main: true }),
       loading: state({ items: [], main: false, status: 'loading' }),
       offline: state({ items: [], main: false, status: 'offline' }),
+      'rate-limited': state({ items: [], main: false, status: 'rate-limited' }),
     },
     Interaction: {
       hover: state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(4)` }),

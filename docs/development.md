@@ -343,7 +343,7 @@ The `stylex` skill (`.claude/skills/stylex/SKILL.md`) has the full rules and the
 Three processes talk to each other, four with Juno Agent on (`docs/architecture.md` section 2):
 
 - **main** forks the **engine** as an Electron utility process (`src/main/engine.ts`,
-  built from `src/engine/index.ts` to `out/main/engine.js`) with the `persist:slack`
+  forked through `src/main/supervisors.ts`, built from `src/engine/index.ts` to `out/main/engine.js`) with the `persist:slack`
   partition and `serviceName: 'juno-engine'`, restarts it with backoff when it exits,
   and serves the renderer from `juno://app/` (`src/main/scheme.ts`).
 - The **renderer** talks to the engine over one `MessagePort`. It asks main for a port
@@ -362,7 +362,7 @@ place of main and Node `fetch` in place of `net.fetch`. Under `JUNO_E2E=1` main
 exposes `globalThis.junoTest` (engine pid and supervisor state) for Playwright.
 
 Whenever a model provider is set up in Settings › Juno, main also forks the Juno
-Agent utility process (`src/main/agent.ts`, built from `src/agent/index.ts` to
+Agent utility process (`src/main/agent.ts`, forked through `supervisors.ts`, built from `src/agent/index.ts` to
 `out/main/agent.js`) without the Slack partition, and on every engine `ready` brokers
 a port between the agent and the engine's AgentHost server (ADR 0012). With no
 provider it does not run. The providers are OpenRouter, with its key in the login

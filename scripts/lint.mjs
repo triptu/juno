@@ -5,6 +5,12 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+// A Bun without `bun lint` (any build but the pinned canary) runs this script again for
+// `bun lint --no-script`, and each copy starts thirteen more. Refuse the nested copy.
+if (process.env.JUNO_LINT_RUNNING === '1') {
+  console.error(`This Bun (${Bun.version}) has no built-in \`bun lint\`. Install the canary build in package.json's packageManager; see "Prerequisites" in docs/development.md.`)
+  process.exit(1)
+}
 const bun = (script, ...args) => [process.execPath, [`scripts/${script}`, ...args]]
 const checks = [
   // Reads .oxlintrc.json. --no-script, or it would run this package's lint script.
@@ -26,7 +32,7 @@ const checks = [
 ]
 
 const started = performance.now()
-const env = { ...process.env, ...(process.stdout.isTTY ? { FORCE_COLOR: '1' } : {}) }
+const env = { ...process.env, JUNO_LINT_RUNNING: '1', ...(process.stdout.isTTY ? { FORCE_COLOR: '1' } : {}) }
 const results = await Promise.all(checks.map(([name, [command, args]]) => new Promise((done) => {
   const at = performance.now()
   const output = []

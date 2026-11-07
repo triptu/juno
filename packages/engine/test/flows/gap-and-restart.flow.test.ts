@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { type TopicRow } from '@juno/contract'
 import { SELF_ID } from '@juno/fake-slack'
+import { engineStatusAtom } from '@juno/state'
 import { controlledSweeps } from '../controlledClock'
 import { waitFor, type RunningEngine } from '../harness'
 import { apiCalls, DAY, notRecheck, quiet, readDb, restart, seedThread, storedFollow, threadId, tsOf, type SeededThread } from '../scenario'
@@ -367,4 +368,34 @@ it('the thread view sweep keeps the repairs from pages it fetched when a later p
   await swept
   const row = (await engine.rowsUntil((rows) => rows.some((r) => r.id === id && r.unreadCount === 1), 'the thread unread from its last reply')).find((r) => r.id === id)
   expect(row).toMatchObject({ unreadCount: 1 } satisfies Partial<TopicRow>)
+})
+
+it('a drop during a catch-up keeps the phase offline until the catch-up settles', async () => {
+  const engine = await synced()
+  const phases: Array<string> = []
+  const unmount = engine.registry.subscribe(engineStatusAtom, (status) => { if (status._tag === 'Success') phases.push(status.value.phase._tag) }, { immediate: true })
+  try {
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    // Two conversations move while offline, so the catch-up reads two pages and reports its progress between them.
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Deploy is out.' })
+    engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0PRIYA', text: 'Pricing page is live.' })
+    engine.fake.holdNext({ method: 'conversations.history' })
+    engine.fake.goOnline()
+    await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), undefined, 'the first page held')
+    await engine.phase('catching-up')
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    // The recorded phases lag the atom by a tick: anchor on the record itself.
+    await waitFor(() => (phases.at(-1) === 'offline' ? true : undefined), undefined, 'the drop recorded')
+    const dropped = phases.length
+    engine.fake.release()
+    await engine.syncIdle()
+    // The rest of the catch-up ran while the socket was down: its progress never replaced the offline phase.
+    expect(phases.slice(dropped)).not.toContain('catching-up')
+    await engine.phase('offline')
+  } finally {
+    unmount()
+    engine.fake.goOnline()
+  }
 })

@@ -1,16 +1,15 @@
 // Must run before any module captures a test switch.
 import './environment'
-import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, session as electronSession, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
 import { createDockBadge, createDockBounce } from './dockBadge'
 import { testNotificationPermission } from './notificationTestHooks'
 import { createActivityWatch } from './activity'
-import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
 import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
-import { createSupervisor } from './engine'
+import { createAgentSupervisor, createSupervisor } from './supervisors'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
 import { clearTemporaryFiles, copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
@@ -22,7 +21,8 @@ import { registerMediaPermissions } from './media'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
-import { slackKeychainReads } from './slackImport'
+import { forgetSlackKeychain, importFromSlackApp, slackKeychainReads } from './slackImport'
+import { SLACK_PARTITION } from './slackSession'
 import { Notifier, type ShownNotification } from './notifier'
 import { createNotificationPermission, loadPermissionBridge, openSettings } from './notificationPermission'
 import { mainLog as processLog } from './logging'
@@ -218,8 +218,11 @@ const providers = new ProviderStore(
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
   send: (message) => supervisor.send(message),
-  importOptions: { ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) },
+  importSession: () => importFromSlackApp({ ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) }),
+  forgetKeychain: forgetSlackKeychain,
+  slackSession: () => electronSession.fromPartition(SLACK_PARTITION),
   saveSession: (session) => void (launch = withSession(launch, session, launchFile)),
+  log: (level, message, data) => processLog.log(level, message, data),
 })
 
 app.whenReady().then(() => {
@@ -244,7 +247,7 @@ app.whenReady().then(() => {
   })
   const fakeSlackOrigin = fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin
   registerIpc({
-    updates: { ...updates, restart: () => void huddleQuit.confirm('restart').then((ok) => ok && updates.restart()) },
+    updates: { ...updates, restart: () => void huddleQuit.confirm('restart', updates.install) },
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
@@ -289,13 +292,17 @@ app.whenReady().then(() => {
   setMenuCheckForUpdates(() => void updates.check())
   updates.start()
 
-  // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open.
+  // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open,
+  // and shows again after a close hid it for a huddle.
   app.on('activate', () => {
-    if (appWindow() === undefined) openWindow()
+    const window = appWindow()
+    if (window === undefined) openWindow()
+    else if (!window.isVisible()) window.show()
   })
   app.on('second-instance', () => {
     const window = appWindow()
     if (window === undefined) return void openWindow()
+    if (!window.isVisible()) window.show()
     if (window.isMinimized()) window.restore()
     window.focus()
   })
@@ -310,7 +317,15 @@ function openWindow(): BrowserWindow {
     notificationPermission.preload()
   })
   processes.watch(window)
-  window.on('close', () => updateLaunch({ bounds: window.getNormalBounds() }))
+  window.on('close', (event) => {
+    updateLaunch({ bounds: window.getNormalBounds() })
+    // Closing the window while in a huddle hides it; the huddle goes on, and the Dock icon brings it back
+    // (SPEC 20, "Quitting"). A quit closes it for good, after its own question.
+    if (huddleQuit.hidesOnClose()) {
+      event.preventDefault()
+      window.hide()
+    }
+  })
   window.on('closed', () => screenWatch.stop())
   return window
 }

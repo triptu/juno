@@ -11,7 +11,11 @@ import type { MessageListStatus } from '@juno/views'
 /** No "Loading messages" line before this (performance 4.4). */
 const LOADING_DELAY_MS = 300
 
-export type FetchState = 'pending' | 'done' | 'offline'
+/** `offline` and `rate-limited`: Slack could not be asked, and the engine fetches the topic by itself once it can (`useTopicFetch`). */
+export type FetchState = 'pending' | 'done' | 'offline' | 'rate-limited'
+
+/** Slack could not be asked, and the topic shows what the store has. */
+export const unreached = (state: FetchState): boolean => state === 'offline' || state === 'rate-limited'
 
 export const markRead = (id: string) => runCommand(registry, readsMarkRead, { id })
 
@@ -58,6 +62,10 @@ export function useDivider(id: string, lastReadTs: string | undefined, markedUnr
  * ask again. `slow`: still asking after 300 ms. The fetch's rows reach the window in a later update than the
  * fetch's own answer, so a window not yet `shown` settles on `done` only with the window's next answer: on the
  * answer alone it painted what it held before and then the rows the fetch brought (one reply, then 31).
+ * A fetch Slack could not answer (`offline`, `rate-limited`) is the engine's to finish, not the view's: after a
+ * reconnect the sync fetches every topic on screen again (`sync/run/reconcile.ts`), and a rate-limited fetch runs
+ * again on the background lane once the pause ends (`sync/run/fetcher.ts`), so the rows reach the window without
+ * another open. The state stays as it was, which the list shows only while it has no rows.
  */
 export function useTopicFetch(id: string, view: string, enabled = true, shown = false) {
   'use no memo'
@@ -83,7 +91,7 @@ export function useTopicFetch(id: string, view: string, enabled = true, shown = 
       // A view gone meanwhile asks for nothing more.
       if (!mounted.current) return
       const done = exit._tag === 'Success' && (exit.value.outcome === 'fetched' || exit.value.outcome === 'cached')
-      if (!done) return setFetchState('offline')
+      if (!done) return setFetchState(exit._tag === 'Success' && exit.value.outcome === 'rate-limited' ? 'rate-limited' : 'offline')
       if (shownRef.current) return setFetchState('done')
       // Asked again: the window can also have started while the fetch was writing the history it covers (a first
       // send to someone never messaged) and missed that change. The list keeps its last value while the
@@ -122,7 +130,7 @@ export function windowShown(positioned: boolean, list: MessageWindow, readAtOpen
   // A thread's root has nothing before it, so a window from the root reaches any pointer, a thread never read too.
   const contextLoaded = readAtOpen === undefined || (first !== undefined && (first <= readAtOpen || list.rows.get(first)?.root === true))
   const held = list.meta.windowCovered === true || list.meta.standIn === true
-  return positioned || (held && (contextLoaded || fetchState === 'done')) || fetchState === 'offline' || (fetchState === 'done' && list.order.length >= list.spec.limit)
+  return positioned || (held && (contextLoaded || fetchState === 'done')) || unreached(fetchState) || (fetchState === 'done' && list.order.length >= list.spec.limit)
 }
 
 /**
@@ -143,7 +151,7 @@ export const standingIn = (list: MessageWindow, fetchState: FetchState): boolean
 
 /** An empty list says nothing until Slack has answered or 300 ms have passed. */
 export function listStatus(showWindow: boolean, list: MessageWindow, { fetchState, slow }: { readonly fetchState: FetchState; readonly slow: boolean }): MessageListStatus {
-  return showWindow && list.order.length > 0 ? 'ready' : fetchState === 'offline' ? 'offline' : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
+  return showWindow && list.order.length > 0 ? 'ready' : fetchState === 'offline' || fetchState === 'rate-limited' ? fetchState : list.ready && fetchState === 'done' ? 'ready' : slow ? 'loading' : 'pending'
 }
 
 /**

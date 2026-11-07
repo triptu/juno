@@ -5,10 +5,12 @@
  * (`HostLink`). At start the engine asks main for the stored secrets, opens
  * the workspace store (so the first live query is answered from the cache)
  * and verifies the secrets with `auth.test`; the status is `starting` until
- * that settles, so the renderer can tell a check in progress from no session. A sign-in or import asks main
- * to capture a session, verifies it the same way, and only then tells main
- * to store it, so `secrets.bin` never holds a session Slack has not
- * accepted.
+ * that settles, so the renderer can tell a check in progress from no session.
+ * A check that cannot reach Slack does not end the session: the stored one
+ * becomes active unchecked and the sync's boot checks it (`start`). A sign-in
+ * or import asks main to capture a session, verifies it the same way, and
+ * only then tells main to store it, so `secrets.bin` never holds a session
+ * Slack has not accepted.
  *
  * While `ready`, the Slack client for that session lives in its own scope:
  * `SlackApi`, `SlackEdge`, `SlackSocket` and `RequestQueue` built on the
@@ -135,38 +137,52 @@ export class Session extends Context.Service<
           yield* host.send({ _tag: 'authRequired', reason })
         })
 
-      /**
-       * Builds the client for `secrets`, calls `auth.test` and, on success,
-       * makes it the active session. Fails with the error `auth.test` gave;
-       * the client scope is closed on any failure.
-       */
-      const activate = (secrets: SessionSecrets, beforeReady: Effect.Effect<void, SignInFailed> = Effect.void) =>
+      /** Opens the workspace of `secrets` and builds the Slack client for them in a scope of its own. */
+      const build = (secrets: SessionSecrets) =>
         Effect.gen(function* () {
           yield* workspace.open(workspaceIdOf(secrets)).pipe(Effect.orDie)
           const scope = yield* Scope.make()
           const context = yield* Layer.buildWithScope(slackLayer(secrets), scope).pipe(Effect.onError(() => Scope.close(scope, Exit.void)))
-          const api = Context.get(context, SlackApi)
-          const result = yield* Effect.result(api.call('auth.test', {}, { lane: 'interactive', reason: 'session' }))
-          if (result._tag === 'Failure') {
-            yield* Scope.close(scope, Exit.void)
-            return yield* result.failure
-          }
-          const auth = result.success
-          const enterpriseId = auth.enterprise_id ?? secrets.enterprise?.id
-          const workspaceId = workspaceKey(enterpriseId, auth.team_id)
+          return { scope, context }
+        })
+
+      type Client = Effect.Success<ReturnType<typeof build>>
+
+      /** `auth.test` with the built client. Fails with the error `auth.test` gave; the caller decides what becomes of the client. */
+      const check = (client: Client) => Context.get(client.context, SlackApi).call('auth.test', {}, { lane: 'interactive', reason: 'session' })
+
+      type AuthTest = Effect.Success<ReturnType<typeof check>>
+
+      /** The ready status: from Slack's answer when the check passed, else from the stored secrets. */
+      const readyStatus = (secrets: SessionSecrets, auth: AuthTest | undefined): SessionStatus => {
+        const enterpriseId = auth?.enterprise_id ?? secrets.enterprise?.id
+        const enterprise = enterpriseId === undefined ? {} : { enterprise: { id: enterpriseId, ...(secrets.enterprise?.name === undefined ? {} : { name: secrets.enterprise.name }) } }
+        return auth === undefined
+          ? {
+              _tag: 'ready',
+              teamId: secrets.teamId,
+              teamName: secrets.teamName ?? secrets.teamDomain ?? secrets.teamId,
+              userId: secrets.userId,
+              userName: secrets.userId,
+              workspaceUrl: secrets.workspaceUrl,
+              ...enterprise,
+            }
+          : { _tag: 'ready', teamId: auth.team_id, teamName: auth.team, userId: auth.user_id, userName: auth.user, workspaceUrl: auth.url, ...enterprise }
+      }
+
+      /**
+       * Makes the client the active session and the status ready. `auth` is
+       * `auth.test`'s answer, or undefined when the check could not be made:
+       * the workspace then stays the one the secrets name.
+       */
+      const makeActive = (secrets: SessionSecrets, client: Client, auth: AuthTest | undefined, beforeReady: Effect.Effect<void, SignInFailed> = Effect.void) =>
+        Effect.gen(function* () {
+          const workspaceId = auth === undefined ? workspaceIdOf(secrets) : workspaceKey(auth.enterprise_id ?? secrets.enterprise?.id, auth.team_id)
           yield* closeActive
           if (workspaceId !== workspaceIdOf(secrets)) yield* workspace.open(workspaceId).pipe(Effect.orDie)
-          yield* Ref.set(active, { secrets, scope, context, workspaceId })
+          yield* Ref.set(active, { secrets, scope: client.scope, context: client.context, workspaceId })
           yield* beforeReady.pipe(Effect.onError(() => closeActive))
-          yield* setStatus({
-            _tag: 'ready',
-            teamId: auth.team_id,
-            teamName: auth.team,
-            userId: auth.user_id,
-            userName: auth.user,
-            workspaceUrl: auth.url,
-            ...(enterpriseId === undefined ? {} : { enterprise: { id: enterpriseId, ...(secrets.enterprise?.name === undefined ? {} : { name: secrets.enterprise.name }) } }),
-          })
+          yield* setStatus(readyStatus(secrets, auth))
         })
 
       /** Sends `request` and waits for main's `secrets` or `sessionFailed` answer. */
@@ -183,24 +199,26 @@ export class Session extends Context.Service<
           }),
         )
 
+      /**
+       * The stored session at launch. A session Slack rejects is expired. One
+       * the check cannot reach Slack for (or that answers oddly) becomes
+       * active unchecked, with the status from the stored secrets: the sync's
+       * boot backs off while Slack is unreachable, and ends the session when
+       * Slack rejects it. Otherwise the client would be gone and nothing would
+       * try again until the next launch.
+       */
       const start = Effect.gen(function* () {
         const answer = yield* askHost('requestSecrets')
         if (answer === undefined || answer._tag !== 'secrets' || answer.secrets === null) return yield* setStatus({ _tag: 'signedOut' })
-        const result = yield* Effect.result(activate(answer.secrets))
-        if (result._tag === 'Success') return
-        const error = result.failure
-        if (error._tag === 'SlackAuthRequired') return yield* expire(error.error)
-        // Slack could not be reached or answered oddly: keep the session on file and show what we know.
-        yield* Effect.logWarning('session: auth.test failed at start', { cause: error })
-        yield* setStatus({
-          _tag: 'ready',
-          teamId: answer.secrets.teamId,
-          teamName: answer.secrets.teamName ?? answer.secrets.teamDomain ?? answer.secrets.teamId,
-          userId: answer.secrets.userId,
-          userName: answer.secrets.userId,
-          workspaceUrl: answer.secrets.workspaceUrl,
-          ...(answer.secrets.enterprise === undefined ? {} : { enterprise: { id: answer.secrets.enterprise.id } }),
-        })
+        const secrets = answer.secrets
+        const client = yield* build(secrets)
+        const checked = yield* Effect.result(check(client))
+        if (checked._tag === 'Failure' && checked.failure._tag === 'SlackAuthRequired') {
+          yield* Scope.close(client.scope, Exit.void)
+          return yield* expire(checked.failure.error)
+        }
+        if (checked._tag === 'Failure') yield* Effect.logWarning('session: auth.test failed at start; the sync checks the session', { cause: checked.failure })
+        yield* makeActive(secrets, client, checked._tag === 'Success' ? checked.success : undefined)
       })
 
       const signIn = (method: SignInMethod) =>
@@ -223,7 +241,7 @@ export class Session extends Context.Service<
             return yield* new SignInFailed({ kind: 'no-token', message: 'No session was found.' })
           }
           const secrets = answer.secrets
-          const result = yield* Effect.result(activate(secrets, Effect.scoped(Effect.gen(function* () {
+          const stored = Effect.scoped(Effect.gen(function* () {
             const messages = yield* host.messages
             const storedAnswer = yield* Effect.forkScoped(
               Stream.runHead(Stream.filter(messages, (m): m is Extract<MainToEngine, { _tag: 'secretsStored' | 'sessionFailed' }> => m._tag === 'secretsStored' || m._tag === 'sessionFailed')),
@@ -233,7 +251,12 @@ export class Session extends Context.Service<
             if (stored._tag === 'None') return yield* new SignInFailed({ kind: 'other', message: 'Juno could not save the Slack session. Try signing in again.' })
             if (stored.value._tag === 'sessionFailed') return yield* new SignInFailed({ kind: stored.value.kind, message: stored.value.message })
             return yield* Effect.void
-          }))))
+          }))
+          const result = yield* Effect.result(Effect.gen(function* () {
+            const client = yield* build(secrets)
+            const auth = yield* check(client).pipe(Effect.onError(() => Scope.close(client.scope, Exit.void)))
+            yield* makeActive(secrets, client, auth, stored)
+          }))
           if (result._tag === 'Failure') {
             yield* restore
             const error = result.failure

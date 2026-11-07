@@ -41,6 +41,7 @@ const unmapped = {
   reconnectPage: 'depends on timing: the catch-up stores the post before the lookup\'s 2 s are up',
   reactionOnGone: 'reactions: the harness replays every change as an edit',
   actionRetry: 'a difference: after a lost answer the client sends the old text again before the worker sends the new one',
+  refusedLookup: 'loseThread: the harness posts to a channel\'s Main, which it cannot make unreachable',
 }
 // Broken schedules whose bug the projection cannot see.
 const unseen = {
