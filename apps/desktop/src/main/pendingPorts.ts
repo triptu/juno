@@ -20,14 +20,15 @@ export class PendingPorts {
 
   /** Hands every held port to `send` and holds none. */
   flush(send: (port: MessagePortMain) => void): void {
-    for (const target of [...this.#held.keys()]) send(this.#forget(target)!)
+    for (const target of this.#held.keys()) send(this.#forget(target)!)
   }
 
   /** Closes every held port, so each renderer asks again. */
   close(): void {
-    for (const target of [...this.#held.keys()]) this.#forget(target)!.close()
+    for (const target of this.#held.keys()) this.#forget(target)!.close()
   }
 
+  /** Forgets `target`'s port, listener included, and answers it. Deleting the current key is safe while a Map is iterated. */
   #forget(target: WebContents): MessagePortMain | undefined {
     const held = this.#held.get(target)
     if (held === undefined) return undefined
