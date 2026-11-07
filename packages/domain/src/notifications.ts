@@ -2,7 +2,7 @@
  * Notification settings, hours and presence (spec section 14, inventory
  * section 13). How one message is decided is in `notificationDecision.ts`.
  */
-import { hourLabel, SHORT_DAYS, untilPhrase } from './time'
+import { untilPhrase, type UntilParts } from './time'
 
 /** 0 is Sunday, as `Date.prototype.getDay`. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -247,7 +247,7 @@ function until(at: LocalTime, inMinutes: number, then: LocalTime): string {
   return untilPhrase({ daysAhead: Math.floor((at.minutes + inMinutes) / DAY), weekday: then.weekday, minutes: then.minutes })
 }
 
-/** "until 9am", "until tomorrow 9am", "until Mon 9am": for "Away until 9am" and "Paused until 9am". */
+/** "until 9am", "until Sat 9am", "until Mon 9am": for "Away until 9am" and "Paused until 9am". */
 export function untilLabel(at: LocalTime, hours: Hours): string | undefined {
   const next = nextSwitch(at, hours)
   return next === undefined ? undefined : until(at, next.inMinutes, next.at)
@@ -309,24 +309,21 @@ export function pausedUntil(now: number, notificationHours: Hours | undefined, s
 
 /**
  * The avatar menu's hint on Notifications while they are paused, by the notification hours or Slack's snooze:
- * "Paused until 9am", "Paused until tomorrow 9am", "Paused until Mon 9am". Nothing while they are not.
+ * "Paused until 9am", "Paused until Sat 9am", "Paused until Mon 9am". Nothing while they are not.
  */
 export function pausedLabel(now: number, notificationHours: Hours | undefined, snoozedUntil?: number): string | undefined {
   const end = pausedUntil(now, notificationHours, snoozedUntil)
   if (end === undefined) return undefined
   if (end === null) return 'Paused'
-  const { days, time, day } = endParts(now, end)
-  if (days === 0) return `Paused until ${time}`
-  if (days === 1) return `Paused until tomorrow ${time}`
-  return `Paused until ${day} ${time}`
+  return `Paused ${untilPhrase(endParts(now, end))}`
 }
 
-/** A time `end` after `now` (epoch milliseconds) in local time: days ahead by the calendar, "9am", and "Mon". */
-export function endParts(now: number, end: number): { readonly days: number; readonly time: string; readonly day: string } {
+/** A time `end` after `now` (epoch milliseconds) in local time, as `endTime` and `untilPhrase` read it. */
+export function endParts(now: number, end: number): UntilParts {
   const from = new Date(now)
   const to = new Date(end)
-  const days = Math.round((new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime() - new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()) / 86_400_000)
-  return { days, time: hourLabel(to.getHours() * 60 + to.getMinutes()), day: SHORT_DAYS[to.getDay()] as string }
+  const daysAhead = Math.round((new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime() - new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()) / 86_400_000)
+  return { daysAhead, weekday: to.getDay(), minutes: to.getHours() * 60 + to.getMinutes() }
 }
 
 export type Presence = 'active' | 'away'

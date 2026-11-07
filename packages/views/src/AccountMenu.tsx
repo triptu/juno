@@ -68,7 +68,7 @@ interface Item {
   readonly leading: ReactNode
   readonly label: string
   readonly hint?: string
-  /** The hint is a sentence ("Paused until tomorrow 9am"): on a second line, so the label is not cut. */
+  /** The hint is a sentence ("Paused until Sun 9am"): on a second line, so the label is not cut. */
   readonly hintBelow?: boolean
 }
 
