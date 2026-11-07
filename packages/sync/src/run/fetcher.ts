@@ -6,7 +6,7 @@ import { applyRenamed } from '../metadata'
 import { fetchAt, fetchNewer, fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
 import { wantUsers } from '../users'
 import { fetchFullReactions } from '../whoReacted'
-import { fetchFeedMessages, readReactionFeed } from '../reactionFeed'
+import { fetchFeedMessage, readReactionFeed } from '../reactionFeed'
 import { queueTopicFiles } from './files'
 
 import type { SyncServices, TopicFetcher } from '../sync'
@@ -86,7 +86,7 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
     wantUsers: (ids) => Effect.sync(() => wantUsers(ctx, ids)),
     reactors,
     reactionFeed: shareRead(trackFetch(ctx, readReactionFeed(ctx)).pipe(Effect.provide(services))),
-    feedMessages: (refs) => trackFetch(ctx, fetchFeedMessages(ctx, refs)).pipe(Effect.provide(services)),
+    feedMessage: (channel, ts) => trackFetch(ctx, fetchFeedMessage(ctx, channel, ts)).pipe(Effect.provide(services)),
   }
   return fetcher
 })

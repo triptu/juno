@@ -1,22 +1,21 @@
 /**
- * The Reactions view's rows (SPEC 5, "Reactions"): which of the user's
- * messages someone else reacted to, and when the latest of those reactions
- * came, in `reaction_feed`.
+ * The Reactions view's rows (SPEC 5, "Reactions"): one per message of the
+ * user's that someone else reacted to, with the headline Slack's Activity
+ * shows (who, which emoji, when), in `reaction_feed`.
  *
  * - `readReactionFeed`: one `activity.feed` page (research
- *   `activity-feed.md`), newest first, stored until the first entry the
- *   table already has. The engine reads it when the view opens and when
- *   the socket connects again while it is open; nothing polls.
+ *   `activity-feed.md`), each entry stored unless its row is as new. The
+ *   engine reads it when the view opens and when the socket connects again
+ *   while it is open; nothing polls.
  * - `noteFeedReaction`: a `reaction_added` on the user's message by someone
- *   else, while Juno runs.
- * - `fetchFeedMessages`: the messages of rows the store lacks, or whose
- *   stored reactions may be older than the row (`fetched_at`), one
- *   `conversations.replies` each, which answers for a reply and a top-level
- *   message alike. A message Slack no longer has takes its row with it.
+ *   else, while Juno runs, replaces the row's headline.
+ * - `fetchFeedMessage`: a row's message the store lacks, one
+ *   `conversations.replies`, which answers for a reply (with its thread's
+ *   root) and a top-level message alike. A message Slack no longer has
+ *   takes its row with it.
  *
- * The reactions themselves stay on the message (`reactions`), so a removal
- * changes the row through the message, and the row's time stays the latest
- * add the feed or the socket reported.
+ * The reactions themselves stay on the message (`reactions`): a removal
+ * changes "+N" through the message and never the headline.
  */
 import { tsToMillis, type Ts } from '@juno/domain'
 import { SlackApi } from '@juno/slack'
@@ -43,9 +42,9 @@ interface FeedEntry {
 }
 
 /**
- * Stores an entry unless the table has the same message at the same time or
- * later. `known`: the stored reactions already include it. Returns whether
- * it was new.
+ * Stores an entry as its message's headline unless the row is as new.
+ * `known`: the stored reactions already include it. Returns whether it was
+ * new.
  */
 const storeEntry = (entry: FeedEntry, known: boolean): Effect.Effect<boolean, SqlError, StoreWriter> =>
   Effect.gen(function* () {
@@ -53,9 +52,8 @@ const storeEntry = (entry: FeedEntry, known: boolean): Effect.Effect<boolean, Sq
     const rows = yield* sql<{ at: number }>`SELECT at FROM reaction_feed WHERE channel = ${entry.channel} AND ts = ${entry.ts}`
     const stored = rows[0]?.at
     if (stored !== undefined && stored >= entry.at) return false
-    const fetched = known ? entry.at : null
-    yield* sql`INSERT INTO reaction_feed (channel, ts, at, user_id, name, fetched_at) VALUES (${entry.channel}, ${entry.ts}, ${entry.at}, ${entry.user}, ${entry.name}, ${fetched})
-      ON CONFLICT (channel, ts) DO UPDATE SET at = excluded.at, user_id = excluded.user_id, name = excluded.name, fetched_at = COALESCE(excluded.fetched_at, reaction_feed.fetched_at)`
+    yield* sql`INSERT INTO reaction_feed (channel, ts, at, user_id, name, known) VALUES (${entry.channel}, ${entry.ts}, ${entry.at}, ${entry.user}, ${entry.name}, ${known ? 1 : 0})
+      ON CONFLICT (channel, ts) DO UPDATE SET at = excluded.at, user_id = excluded.user_id, name = excluded.name, known = excluded.known`
     return true
   })
 
@@ -87,7 +85,12 @@ export const noteFeedReaction = (ctx: SyncContext, frame: ReactionEvent): Writer
     if (yield* storeEntry({ channel, ts, at: tsToMillis(frame.event_ts), user: frame.user, name: frame.reaction }, true)) yield* invalidate(FEED_KEYS)
   })
 
-/** Reads the newest page of the feed and stores it up to the first entry already stored. Returns how many were new. */
+/**
+ * Reads the newest page of the feed and stores each entry newer than its
+ * row. Every entry is checked, not only those above the first stored one: a
+ * live reaction may have stored a newer row while older ones were missed.
+ * Returns how many were new.
+ */
 export const readReactionFeed = (_ctx: SyncContext): Effect.Effect<number, OpenError, OpenServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
@@ -106,45 +109,39 @@ export const readReactionFeed = (_ctx: SyncContext): Effect.Effect<number, OpenE
     return yield* transaction(
       Effect.gen(function* () {
         let added = 0
-        for (const entry of entries) {
-          if (!(yield* storeEntry(entry, yield* storedReaction(entry)))) break
-          added += 1
-        }
+        for (const entry of entries) if (yield* storeEntry(entry, yield* storedReaction(entry))) added += 1
         if (added > 0) yield* invalidate(FEED_KEYS)
         return added
       }),
     )
   })
 
+/** Errors that say Slack no longer has the message for the user. Anything else may pass, so the row stays. */
+const GONE = new Set(['thread_not_found', 'message_not_found', 'channel_not_found', 'not_in_channel'])
+
 /**
- * Stores the messages of feed rows the store lacks. Each is one
- * `conversations.replies` with the message's ts as both bounds: Slack
- * answers with the thread's root first for a reply, and with the message
- * alone otherwise. One Slack refuses for good, or no longer has, drops its row.
+ * Stores a feed row's message, one `conversations.replies` with the
+ * message's ts as both bounds: Slack answers with the thread's root first
+ * for a reply, and with the message alone otherwise. Both are stored, so a
+ * reply needs no second lookup for its root. A message Slack no longer has
+ * drops its row; another failure fails this call and leaves the row.
  */
-export const fetchFeedMessages = (ctx: SyncContext, refs: ReadonlyArray<{ readonly channel: string; readonly ts: string }>): Effect.Effect<void, OpenError, OpenServices> =>
-  Effect.forEach(
-    refs,
-    ({ channel, ts }) =>
+export const fetchFeedMessage = (ctx: SyncContext, channel: string, ts: string): Effect.Effect<void, OpenError, OpenServices> =>
+  Effect.gen(function* () {
+    const api = yield* SlackApi
+    const requestedAt = yield* nowTs
+    const page = yield* api
+      .call('conversations.replies', { channel, ts: ts as Ts, oldest: ts, latest: ts, inclusive: true, limit: 2 }, { lane: 'background', reason: 'reactions' })
+      .pipe(Effect.catchTag('SlackRejected', (error) => (GONE.has(error.error) ? Effect.succeed(undefined) : Effect.fail(error))))
+    const messages = page?.messages ?? []
+    yield* transaction(
       Effect.gen(function* () {
-        const api = yield* SlackApi
-        const requestedAt = yield* nowTs
-        const page = yield* api
-          .call('conversations.replies', { channel, ts: ts as Ts, oldest: ts, latest: ts, inclusive: true, limit: 2 }, { lane: 'background', reason: 'reactions' })
-          .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
-        const message = page?.messages.find((each) => each.ts === ts)
-        yield* transaction(
-          Effect.gen(function* () {
-            const sql = yield* StoreWriter
-            if (message === undefined) yield* sql`DELETE FROM reaction_feed WHERE channel = ${channel} AND ts = ${ts}`
-            else {
-              yield* applyPage(ctx, channel, [message], { kind: 'page', requestedAt })
-              // The answer holds every reaction made before the request; a later one keeps the row stale.
-              yield* sql`UPDATE reaction_feed SET fetched_at = MIN(at, ${tsToMillis(requestedAt)}) WHERE channel = ${channel} AND ts = ${ts}`
-            }
-            yield* invalidate(FEED_KEYS)
-          }),
-        )
+        const sql = yield* StoreWriter
+        if (messages.length > 0) yield* applyPage(ctx, channel, messages, { kind: 'page', requestedAt })
+        if (!messages.some((each) => each.ts === ts)) yield* sql`DELETE FROM reaction_feed WHERE channel = ${channel} AND ts = ${ts}`
+        // The answer holds every reaction made before the request.
+        else yield* sql`UPDATE reaction_feed SET known = 1 WHERE channel = ${channel} AND ts = ${ts} AND at <= ${tsToMillis(requestedAt)}`
+        yield* invalidate(FEED_KEYS)
       }),
-    { discard: true },
-  )
+    )
+  })

@@ -138,8 +138,8 @@ export interface TopicFetcher {
   readonly reactors: (channel: string, ts: string) => Effect.Effect<string | undefined, OpenError>
   /** Reads the newest `activity.feed` page into `reaction_feed` (`reactionFeed.ts`). Concurrent callers share the read. Returns how many entries were new. */
   readonly reactionFeed: Effect.Effect<number, OpenError>
-  /** Stores the messages of Reactions rows the store lacks (`fetchFeedMessages`), on the background lane. */
-  readonly feedMessages: (refs: ReadonlyArray<{ readonly channel: string; readonly ts: string }>) => Effect.Effect<void, OpenError>
+  /** Stores a Reactions row's message, and a reply's thread root, on the background lane (`fetchFeedMessage`). Fails when Slack's answer is unusable for now; a message Slack no longer has drops its row instead. */
+  readonly feedMessage: (channel: string, ts: string) => Effect.Effect<void, OpenError>
 }
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation
