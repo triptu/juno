@@ -21,14 +21,13 @@ export function useUpdateState(): [UpdateState, (state: UpdateState) => void] {
 }
 
 /**
- * The version a downloaded update installs on restart, or undefined: the
- * sidebar's Update ready card. A string, so a download's progress or a
- * check re-renders nothing.
+ * Whether a downloaded update installs on restart: the sidebar's Update
+ * ready pill. A boolean, so a download's progress or a check re-renders nothing.
  */
-export function useReadyUpdate(): string | undefined {
-  const [version, setVersion] = useState<string | undefined>(undefined)
-  useEffect(() => watchUpdates((state) => setVersion(state.kind === 'ready' ? state.version : undefined)), [])
-  return version
+export function useUpdateReady(): boolean {
+  const [ready, setReady] = useState(false)
+  useEffect(() => watchUpdates((state) => setReady(state.kind === 'ready')), [])
+  return ready
 }
 
 /** Restart to update, as Settings › About's button runs it; main asks first while a huddle runs. */

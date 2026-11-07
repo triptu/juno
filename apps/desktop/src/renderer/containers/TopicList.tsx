@@ -236,7 +236,7 @@ function useSnapshotMark(): void {
  * painted. Rows stay in flow, so nothing on screen moves when the rest
  * arrive below.
  */
-export const TopicList = memo(function TopicList() {
+export const TopicList = memo(function TopicList({ pillRoom }: { readonly pillRoom: boolean }) {
   const quietDays = useAtomValue(quietDaysAtom)
   const sections = useAtomValue(sidebarSectionsAtom)
   const { filter, ready } = sections
@@ -301,6 +301,7 @@ export const TopicList = memo(function TopicList() {
       {...(empty === undefined ? {} : { empty })}
       enterEmpty={enterEmpty}
       truncated={full && count >= SIDEBAR_WINDOW}
+      pillRoom={pillRoom}
       moves={sections.moves}
       onClearFilters={clearFilters}
       {...(readingOnly() ? {} : { onViewAll: viewAllTopics, onEditView: editSelectedView })}
