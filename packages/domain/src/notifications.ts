@@ -2,7 +2,7 @@
  * Notification settings, hours and presence (spec section 14, inventory
  * section 13). How one message is decided is in `notificationDecision.ts`.
  */
-import { untilPhrase } from './time'
+import { hourLabel, SHORT_DAYS, untilPhrase } from './time'
 
 /** 0 is Sunday, as `Date.prototype.getDay`. */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -326,7 +326,7 @@ export function endParts(now: number, end: number): { readonly days: number; rea
   const from = new Date(now)
   const to = new Date(end)
   const days = Math.round((new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime() - new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime()) / 86_400_000)
-  return { days, time: hourLabel(to.getHours() * 60 + to.getMinutes()), day: dayNames[to.getDay()] as string }
+  return { days, time: hourLabel(to.getHours() * 60 + to.getMinutes()), day: SHORT_DAYS[to.getDay()] as string }
 }
 
 export type Presence = 'active' | 'away'

@@ -18,7 +18,8 @@ import { firstWords, mainTopicId, mentionedUserIds, messagePreviewText, shortNam
 import { emojiUnicode, splitEmojiName } from '@juno/richtext'
 import { StoreReader, type SqlError } from '@juno/store'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName } from '../topicRows'
-import { messageUsersStatement, reactionEmoji, readEmoji, type MessageUser } from './query'
+import { reactionEmoji, readEmoji } from '../emojiLookup'
+import { messageUsersStatement, type MessageUser } from './query'
 import { reactionsStatement } from './window'
 
 const DAY = 24 * 60 * 60 * 1000
