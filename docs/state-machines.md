@@ -481,10 +481,11 @@ Where: `outbox` rows of kind `mark`, one per topic. `writeLocalMark` (`packages/
 | in flight | success, `gen` equal | deleted | `endMark` |
 | in flight | success, `gen` newer | due now | `endMark` |
 | in flight | refused | `rejectMark` and a lookup | `rejectMark` |
-| in flight | transient error | `deferMark`: attempts + 1, backoff | `reads.ts:231 (deferMark)`, `markWorker.ts:129-131` |
+| in flight | transient error, `gen` equal | `deferMark`: attempts + 1, backoff | `reads.ts (deferMark)`, `markWorker.ts (send)` |
+| in flight | transient error, `gen` newer | due now, attempts reset | `reads.ts (deferMark)` |
 | any | setting turned off | dropped | `dropMark` |
 
-Invariant: a stale answer never ends a newer mark (`gen` compare in `endMark` and `rejectMark`). `deferMark` does not make a replaced intent due now (**bug** OUT-8).
+Invariant: a stale answer never ends a newer mark, and never delays it: `endMark`, `rejectMark` and `deferMark` compare `gen`, and a replaced intent is due now (OUT-8, fixed).
 
 Spec: `readstate.qnt`, `readstate-bounded.qnt`.
 
@@ -1036,8 +1037,8 @@ The user can delete Q by hand.
 `endMark` and `rejectMark` make a replaced intent due now; `deferMark` does not. `deferMark` also runs outside `transaction(...)`, unlike every other write here. It is one UPDATE, so that is not a correctness problem today.
 
 - Severity: low. Confirmed. Impact: The newer read state reaches Slack up to `retryCapMillis` later.
-- Test: a read-state flow in `packages/engine/test/flows` with a test clock.
-- Status: Open
+- Test: `packages/engine/test/reads.test.ts`. Hold a mark at the fake's gate, mark differently while it is out, answer the held call with an error the client does not retry, and expect the next pass to send the newer intent.
+- Status: Fixed in bcaa8d15e. `deferMark` takes the sent `gen`, runs in the worker's transaction, and makes a replaced intent due now with its attempts reset, as `endMark` and `rejectMark` do. Test: `reads.test.ts`, "a newer mark goes at once when the older mark it replaced fails for a transient reason".
 
 #### OUT-9. A reply that keeps a copy leaves the copy's delete row, which holds the channel's later changes
 

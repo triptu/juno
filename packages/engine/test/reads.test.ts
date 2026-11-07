@@ -169,6 +169,31 @@ describe('the outbox', () => {
     expect(readDb(engine, 'user.db', (db) => db.prepare("SELECT count(*) AS n FROM outbox WHERE kind = 'mark'").get())).toEqual({ n: 0 })
   })
 
+  it('a newer mark goes at once when the older mark it replaced fails for a transient reason', async () => {
+    // A minute of backoff: the old intent's wait would hold the newer one for the whole test.
+    const engine = await syncedEngine(engines, { timing: { retryBaseMillis: 60_000 } })
+    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 9, 'nine unread')
+    engine.fake.resetCalls()
+    engine.fake.gate((method) => method === 'conversations.mark')
+    valueOf(await markRead(engine, ALERTS_MAIN))
+    const first = await waitFor(() => engine.fake.gated().find((call) => call.stage === 'before'), 10_000, 'the mark in flight')
+    // The user reads differently while the call is out: the row takes the newer intent.
+    valueOf(await markUnread(engine, ALERTS_MAIN))
+    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount > 0, 'unread again')
+    // The connection answers with an error the client does not retry: the worker's own backoff decides.
+    engine.fake.decide(first.id, { error: 'internal_error', status: 400 })
+    await waitFor(() => engine.fake.gated().find((call) => call.id === first.id && call.stage === 'answer'), 10_000, 'the answer at the gate')
+    engine.fake.gate()
+    await waitFor(() => (marks(engine)[0]?.ok === false ? true : undefined), 10_000, 'the refused mark')
+    // The next pass finds the newer intent due now, not behind the old one's backoff.
+    await engine.workPass('mark')
+    await quiet(engine)
+    expect(marks(engine).map((c) => c.ok)).toEqual([false, true])
+    expect(marks(engine)[1]!.args['ts']).not.toBe(marks(engine)[0]!.args['ts'])
+    expect(String(engine.fake.workspace.reads.get(ALERTS))).toBe(String(marks(engine)[1]!.args['ts']))
+    expect(readDb(engine, 'user.db', (db) => db.prepare("SELECT count(*) AS n FROM outbox WHERE kind = 'mark'").get())).toEqual({ n: 0 })
+  })
+
   it('a mark Slack has not acknowledged survives a restart and is sent after it', async () => {
     const first = await bootedEngine()
     first.fake.force429({ method: 'conversations.mark', retryAfter: 60, times: 10 })
