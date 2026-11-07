@@ -43,12 +43,15 @@ export const ReadySession = Schema.TaggedStruct('ready', {
   userName: Schema.String,
   /** `https://<workspace>.slack.com/`, the base of Slack links (the fake's URL in tests). */
   workspaceUrl: Schema.String,
+  /**
+   * The id the engine opened the workspace under, which keys what is read
+   * per workspace (`prefs.get`). Only the engine computes it; the renderer
+   * passes it back.
+   */
+  workspaceId: Schema.String,
   enterprise: Schema.optionalKey(Schema.Struct({ id: Schema.String, name: Schema.optionalKey(Schema.String) })),
 })
 export type ReadySession = typeof ReadySession.Type
-
-/** The key the engine files a workspace under: the team id, with the enterprise id before it on Grid. */
-export const workspaceKey = (enterpriseId: string | undefined, teamId: string): string => (enterpriseId === undefined ? teamId : `${enterpriseId}-${teamId}`)
 
 export const SessionStatus = Schema.Union([
   /** The engine is reading the stored session and checking it with Slack. Every engine starts here. */

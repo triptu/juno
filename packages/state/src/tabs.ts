@@ -35,7 +35,7 @@ import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { JunoPage } from '@juno/agent-contract'
-import { mainTopicOf, PickConversation, prefsGet, prefsSet, SettingsSectionSchema, workspaceKey, type ReadySession, type SettingsSection, type TopicDetail } from '@juno/contract'
+import { mainTopicOf, PickConversation, prefsGet, prefsSet, SettingsSectionSchema, type ReadySession, type SettingsSection, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
@@ -583,7 +583,7 @@ const savedHomeDraft = (draft: HomeDraft) => ({
   ...(draft.thread === undefined ? {} : { thread: draft.thread }),
 })
 
-const savedTabsOf = (session: ReadySession) => liveQuery(prefsGet)({ key: TABS_PREF, workspace: workspaceKey(session.enterprise?.id, session.teamId) })
+const savedTabsOf = (session: ReadySession) => liveQuery(prefsGet)({ key: TABS_PREF, workspace: session.workspaceId })
 
 const unknownTabs = AsyncResult.initial<never, never>()
 

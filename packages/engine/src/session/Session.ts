@@ -30,7 +30,7 @@
  */
 import { rm } from 'node:fs/promises'
 import { Context, Effect, Exit, Fiber, Layer, Ref, Scope, Stream, SubscriptionRef } from 'effect'
-import { NotSignedIn, SignInFailed, type MainToEngine, type SessionSecrets, type SessionStatus, type SignInMethod, workspaceKey } from '@juno/contract'
+import { NotSignedIn, SignInFailed, type MainToEngine, type SessionSecrets, type SessionStatus, type SignInMethod } from '@juno/contract'
 import {
   HttpTransport,
   RequestQueue,
@@ -154,7 +154,7 @@ export class Session extends Context.Service<
       type AuthTest = Effect.Success<ReturnType<typeof check>>
 
       /** The ready status: from Slack's answer when the check passed, else from the stored secrets. */
-      const readyStatus = (secrets: SessionSecrets, auth: AuthTest | undefined): SessionStatus => {
+      const readyStatus = (secrets: SessionSecrets, auth: AuthTest | undefined, workspaceId: string): SessionStatus => {
         const enterpriseId = auth?.enterprise_id ?? secrets.enterprise?.id
         const enterprise = enterpriseId === undefined ? {} : { enterprise: { id: enterpriseId, ...(secrets.enterprise?.name === undefined ? {} : { name: secrets.enterprise.name }) } }
         return auth === undefined
@@ -165,9 +165,10 @@ export class Session extends Context.Service<
               userId: secrets.userId,
               userName: secrets.userId,
               workspaceUrl: secrets.workspaceUrl,
+              workspaceId,
               ...enterprise,
             }
-          : { _tag: 'ready', teamId: auth.team_id, teamName: auth.team, userId: auth.user_id, userName: auth.user, workspaceUrl: auth.url, ...enterprise }
+          : { _tag: 'ready', teamId: auth.team_id, teamName: auth.team, userId: auth.user_id, userName: auth.user, workspaceUrl: auth.url, workspaceId, ...enterprise }
       }
 
       /**
@@ -182,7 +183,7 @@ export class Session extends Context.Service<
           if (workspaceId !== workspaceIdOf(secrets)) yield* workspace.open(workspaceId).pipe(Effect.orDie)
           yield* Ref.set(active, { secrets, scope: client.scope, context: client.context, workspaceId })
           yield* beforeReady.pipe(Effect.onError(() => closeActive))
-          yield* setStatus(readyStatus(secrets, auth))
+          yield* setStatus(readyStatus(secrets, auth, workspaceId))
         })
 
       /** Sends `request` and waits for main's `secrets` or `sessionFailed` answer. */
@@ -333,6 +334,7 @@ function toSlackSession(secrets: SessionSecrets): SlackSessionShape {
 }
 
 /** One directory per team, also on Grid, where several teams share an `enterprise_id`. */
+const workspaceKey = (enterpriseId: string | undefined, teamId: string) => (enterpriseId === undefined ? teamId : `${enterpriseId}-${teamId}`)
 
 const workspaceIdOf = (secrets: SessionSecrets) => workspaceKey(secrets.enterprise?.id, secrets.teamId)
 
