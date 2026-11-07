@@ -4,9 +4,9 @@
 // worker retries, and a repeat that finds the file gone (`file_deleted`) is done. Every test starts warm on the
 // synced default workspace.
 import { expect, it } from 'bun:test'
-import { attachFiles, attachmentsAtom, clearAttachments, discardMessage, readyFiles, sendMessage } from '@juno/state'
+import { attachFiles, attachmentsAtom, clearAttachments, deleteMessage, discardMessage, readyFiles, sendMessage } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
-import { eng, MAIN, outboxScenario, rowWith, type Watch } from '../outboxScenario'
+import { eng, MAIN, outboxScenario, refOf, rowWith, type Watch } from '../outboxScenario'
 import { apiCalls, quiet, readDb, valueOf } from '../scenario'
 
 const { booted, opened } = outboxScenario()
@@ -94,6 +94,33 @@ it('keeps the file of a post Slack may show when its lookup is refused because t
     expect(fileDeleteRows(engine)).toEqual([])
     expect(engine.fake.workspace.files.has(fileId)).toBe(true)
     engine.fake.releaseFrames({ drop: true })
+  } finally {
+    unmount()
+  }
+})
+
+// Slack completes the upload and every answer is lost, so the row knows only the upload's id while it waits to
+// try the completion again. The user deletes the queued post: the file Slack made from it is deleted too.
+it('deletes the file of a queued post whose completion answers were lost', async () => {
+  const engine = await booted()
+  const rows = await opened(engine)
+  const unmount = engine.registry.mount(attachmentsAtom(MAIN))
+  try {
+    clearAttachments(engine.registry, MAIN)
+    await attachFiles(engine.registry, MAIN, [notes()])
+    const ids = readyFiles(engine.registry, MAIN)!
+    engine.fake.loseResponse({ method: 'files.completeUpload', times: 100 })
+    valueOf(await sendMessage(engine.registry, eng, 'Completion never heard', MAIN, ids))
+    await waitFor(() => (apiCalls(engine, 'files.completeUpload').length >= 1 ? true : undefined), WAIT_MS, 'a completion lost')
+    const fileId = [...engine.fake.workspace.files.values()].find((file) => file.name === 'notes.txt')!.id
+    const pending = rowWith(await rows((list) => rowWith(list, 'Completion never heard') !== undefined, 'the post shown'), 'Completion never heard')!
+    valueOf(await deleteMessage(engine.registry, refOf(pending)))
+    await rows((list) => rowWith(list, 'Completion never heard') === undefined, 'the post gone from the list')
+    await waitFor(() => (engine.fake.workspace.files.has(fileId) ? undefined : true), WAIT_MS, 'the file deleted in Slack')
+    await quiet(engine)
+    expect(apiCalls(engine, 'files.delete').map((call) => [call.args['file'], call.ok])).toEqual([[fileId, true]])
+    expect(apiCalls(engine, 'files.share')).toEqual([])
+    expect(fileDeleteRows(engine)).toEqual([])
   } finally {
     unmount()
   }
