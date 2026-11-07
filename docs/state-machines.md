@@ -603,7 +603,7 @@ Where: `containers/navigation.ts`. A global promise `queue`, `currentTicket` (l.
 | `whenReady` | resolves when the header and window are local, on a Failure, or on a null header; the `READY_WAIT_MS` (150 ms) timer only runs `check` again | `navigation.ts:221-270` |
 
 Invariants:
-1. A change asked for before a newer one never applies after it. A link open records the active tab, place and ticket before its fetch and opens nothing if any changed (REN-2, fixed).
+1. A change asked for before a newer one never applies after it. A link open records the active tab, place and ticket before its fetch and opens nothing if any changed; a foreground link open also takes a request number (`latestRequest`), so of two link opens waiting together only the one clicked last opens, whichever answers first (REN-2, fixed).
 2. Every `whenReady` settles. REN-4 breaks it while the engine is down.
 
 ### Topic composer send check
@@ -1305,6 +1305,7 @@ Variant: sign out of team A and sign in to team B in one run. `savedTabsAtom` is
 - Test: DOM lane, `apps/desktop/dom/slack-links.test.ts`. Hold fake Slack's answer for the linked message, click the link, open a different topic and type, release, and expect the second topic to stay active with the text in its composer.
 - Fix direction: take the ticket before the await and drop the open if `currentTicket` moved.
 - Status: Fixed in 771395859 and b61e461e7. A Slack, source or person link records the active tab, place and ticket before its fetch and opens nothing if any changed. Test: `slack-links.test.ts`, "a message link whose fetch answers after the user moved on opens nothing".
+- Review found that two link opens waiting together both recorded the same tab, place and ticket, so the one that answered first opened, and the other, clicked last, was dropped as late. Fixed: a foreground link open takes a request number as it starts waiting (`shown(true)`), and `movedOn` drops an open that is no longer the newest. An open behind the current tab (⌘-click) takes none, since it changes nothing on screen. Test: `slack-links.test.ts`, "of two links clicked before either answers, the later one opens and the earlier answer opens nothing, whichever answers first".
 
 #### REN-3. A topic opened while rate-limited said Slack could not be reached
 

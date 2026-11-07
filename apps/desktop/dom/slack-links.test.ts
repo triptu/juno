@@ -5,7 +5,7 @@
 // conversation Juno cannot reach opens in the browser, and another
 // workspace's link is handled as any web link. That the message is in view
 // and flashes is the browser lane's (the long thread journey in topic.spec.ts); here, the tab
-// and the message it opens at. A link whose answer comes after the user moved on opens nothing, and a thread
+// and the message it opens at. A link whose answer comes after the user moved on, or after a later link, opens nothing, and a thread
 // opened while Slack is slowing Juno down says so until its replies come.
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
@@ -139,6 +139,28 @@ domTest('a message link whose fetch answers after the user moved on opens nothin
   expect(tabCount()).toBe(2)
   await tabs.expectActive(RINA)
   await expect(topic.composer).toHaveValue('Typed after moving on')
+  await expect(topic.composer).toBeFocused()
+})
+
+domTest('of two links clicked before either answers, the later one opens and the earlier answer opens nothing, whichever answers first', async ({ juno, fake, app }) => {
+  seedLinks(fake)
+  const link = await openLinks(juno)
+  const { topic, tabs } = juno
+  const trace = { events: [] as Array<{ readonly what: string }> }
+  ;(app.window as unknown as { __junoSendTrace: unknown }).__junoSendTrace = trace
+  // Slack holds the old note's fetch, and the engine's answer to the reaper reply's lookup is held after it, so the note's answer comes first.
+  fake.holdNext({ method: 'conversations.history' })
+  await link('the old note').click()
+  await expect.poll(() => fake.heldCalls({ method: 'conversations.history' })[0]?.['channel'], { timeout: 15_000 }).toBe('C0ENG')
+  const release = app.holdReplies('messages.locate')
+  await link('the reaper reply').click()
+  fake.release({ method: 'conversations.history' })
+  // The note's answer is the older ask, so it opens nothing (the bug: it opens #eng, and the reply is then dropped as late).
+  await expect.poll(() => trace.events.some((event) => event.what === 'link dropped') || tabs.root.getByRole('tab').count() !== 1, { timeout: 5_000 }).toBe(true)
+  release()
+  await tabs.expectCount(2)
+  await expect(tabs.tab(ENG)).toHaveCount(0)
+  await expect(topic.message('Please do.')).toBeVisible({ timeout: 15_000 })
   await expect(topic.composer).toBeFocused()
 })
 
