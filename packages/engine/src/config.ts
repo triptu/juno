@@ -121,6 +121,10 @@ export interface EngineTimingConfig {
   readonly huddleAloneMillis: number
   /** How long a channel must be quiet before Juno reads its running huddle from Slack's edge, which lags the socket. */
   readonly huddleInfoSettleMillis: number
+  /** First wait before asking Slack again about colleagues whose Do Not Disturb lookup failed; each failure doubles it. */
+  readonly dndRetryBaseMillis: number
+  /** Age past which a colleague's Do Not Disturb is asked again when their DM is shown. */
+  readonly dndStaleMillis: number
 }
 
 export const productionTiming: EngineTimingConfig = {
@@ -171,6 +175,8 @@ export const productionTiming: EngineTimingConfig = {
   huddleStatusRenewMillis: 240_000,
   huddleAloneMillis: 600_000,
   huddleInfoSettleMillis: 3_000,
+  dndRetryBaseMillis: 5_000,
+  dndStaleMillis: 300_000,
 }
 
 export class EngineTiming extends Context.Reference<EngineTimingConfig>('juno/engine/EngineTiming', {
