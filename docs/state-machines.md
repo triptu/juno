@@ -336,7 +336,7 @@ Where: `packages/slack/src/client/queue.ts`. `paused: Map<method, until>` (l.65)
 
 Invariants:
 1. The interval stays within base and 60 s.
-2. Only a real 429 from Slack counts as `limited`. A synthetic refusal does not (**bug** ENG-6).
+2. Only a real 429 from Slack counts as `limited`. A refusal by the queue does not (ENG-6, fixed).
 
 Spec: `requestqueue.qnt`.
 
@@ -1125,6 +1125,15 @@ On a warm boot the same applies to a drop after the boot's own recheck step (`sy
 - Fix direction: one "catch-up wanted" flag; do not queue a reconcile while one is queued and not started.
 - Status: Fixed in SHA_ENG5. `makeReconcile` queues no reconcile while one waits for the work permit; the waiting one reads the earliest `droppedAt` when it starts. Test: `gap-and-restart.flow.test.ts`, "a socket that flaps during a slow catch-up queues one more catch-up, not one per reconnect".
 
+#### ENG-6. A call refused during a pause counts as another rate limit
+
+1. A method is paused by a real 429 for longer than `interactiveMaxWaitMillis`. `pacing.limited` set its `decayAt` to five minutes from then (`pacing.ts:42`).
+2. An interactive call of the method is refused by the queue with a synthetic `SlackRateLimited` (`queue.ts:103-104`).
+3. `withRetries` cannot tell the refusal from a 429 and calls `queue.pause` again (`api.ts:254-255`), which sets `decayAt` five minutes from now. Every attempt does, up to `maxAttempts`.
+
+- Severity: low. Confirmed. Impact: the method's doubled background spacing lasts five minutes past the last refused call, not past the 429. Departs from `requestqueue.qnt`, where only a real 429 is `limited`.
+- Status: Fixed in SHA_ENG6. `withRetries` runs the exchange's result inside the queue, so the queue's own failure is a refusal: final, with no pause. Test: `packages/slack/test/api.test.ts`, "a call refused during a pause is not another rate limit: the method recovers its spacing five minutes after the 429".
+
 #### ENG-7. EnginePhases can publish a phase computed from stale inputs
 
 1. Three fibers run `update` (`layer.ts:97-104`). Each runs `Ref.updateAndGet` and then `status.setPhase(phaseOf(next))` as two steps (`layer.ts:99-100`).
@@ -1456,7 +1465,6 @@ These are low-impact or need rare timing. Each keeps its id so a later change ca
 
 | Id | Bug | Severity |
 |---|---|---|
-| ENG-6 | A refused interactive call during a pause calls `queue.pause` again through `withRetries`, which pushes `decayAt` out by 5 minutes each time (`packages/slack/src/client/queue.ts:103-104`, `api.ts:254-255`, `pacing.ts:42`). Departs from `requestqueue.qnt`, where only a real 429 is `limited`. | low |
 | OUT-5 | A follow command interrupted mid-call (window closed, or `FollowNewJob`'s `switchMap` restarting) leaves its `follow` row, so events and pages for the thread are ignored until the next sync start (`packages/engine/src/follow.ts:111-123`, `topics/handlers.ts:146` is not uninterruptible). `follow.qnt` has no interrupt action. | medium |
 | OUT-7 | Uploads can leave orphan private files in Slack: a lost `files.completeUpload` answer uploads a second file on retry, and a queued post deleted after some files got a `fileId` never shares or deletes them (`worker.ts:130-143`, l.169). | low |
 | AGT-5 | A kick that landed after the drain's last `again` check and before `finally` cleared `running` was lost, so a click waiting for a connection stayed working until another kick. Closed with AGT-7: `kick` starts chains synchronously and there is no drain loop. | low |
