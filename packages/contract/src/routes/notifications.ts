@@ -11,7 +11,7 @@
  *   the Details dialog and the why popover.
  * - `notifications.status` is the avatar menu's line and hint: presence
  *   with until when, what Slack shows colleagues when it differs, and
- *   "Paused until 9am" outside notification hours. `seen` drives the
+ *   "Paused until 9am" outside notification hours or while snoozed. `seen` drives the
  *   avatar's dot.
  * - The setters write the settings. `notifications.setGroupHours` sets one
  *   row of either set of hours: weekdays, Saturday or Sunday (SPEC 14).
@@ -29,6 +29,10 @@
  *   once and holds until the next switch in the active hours (without them,
  *   Slack holds it until the next choice); `sent` is
  *   false when Slack refused it and the presence before came back.
+ * - `notifications.pause` and `notifications.resume` are Pause notifications
+ *   and Resume notifications: Slack's own snooze (`dnd.setSnooze`,
+ *   `dnd.endSnooze`), so every Slack client goes quiet. While it runs the
+ *   status has `snoozedUntil` and `paused` says until when.
  * - `notifications.useJunoHours` writes the notification hours to Slack's
  *   schedule again after it was changed in Slack.
  * - Hours start not set: the notification hours are then Slack's schedule,
@@ -38,7 +42,7 @@
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
-import { ConversationKind } from '@juno/domain'
+import { ConversationKind, pauseChoices } from '@juno/domain'
 import { NotSignedIn } from '../errors'
 import { liveValueRoute } from '../live'
 import { CommandResult, NotifyChoiceSchema, NotifyTargetSchema, SubscribeError } from './topics'
@@ -121,7 +125,7 @@ export type NotifyTag = typeof NotifyTag.Type
 
 /** What decided a message, first in the order that applied (SPEC 14). */
 export const DecidedBy = Schema.Literals([
-  'hours', 'always', 'never', 'ignored', 'directMention', 'alwaysNotify', 'aiOff', 'closer', 'addressedElsewhere', 'live', 'instruction', 'reading', 'timeout', 'burst',
+  'snooze', 'hours', 'always', 'never', 'ignored', 'directMention', 'alwaysNotify', 'aiOff', 'closer', 'addressedElsewhere', 'live', 'instruction', 'reading', 'timeout', 'burst',
 ])
 export type DecidedBy = typeof DecidedBy.Type
 
@@ -200,8 +204,10 @@ export const NotificationStatus = Schema.Struct({
   seen: Schema.NullOr(PresenceValue),
   /** "Active", "Away until 9am", "Active until 8pm", then "Slack shows you away" or "Connecting to Slack" when `seen` differs. */
   presenceLabel: Schema.String,
-  /** "Paused until 9am" outside notification hours. */
+  /** "Paused until 9am" while notifications are paused: outside notification hours, or by Slack's snooze. */
   paused: Schema.optionalKey(Schema.String),
+  /** While Slack's snooze runs (Pause notifications): when it ends, in epoch milliseconds. The menu then offers Resume notifications. */
+  snoozedUntil: Schema.optionalKey(Schema.Number),
 })
 export type NotificationStatus = typeof NotificationStatus.Type
 
@@ -289,6 +295,24 @@ export const notificationsSetPresence = Rpc.make('notifications.setPresence', {
   error: NotSignedIn,
 })
 
+/** Slack's Pause notifications choices: 30 minutes, 1 hour, 2 hours, Until tomorrow, Until next week. */
+export const PauseChoice = Schema.Literals(pauseChoices)
+export type PauseChoice = typeof PauseChoice.Type
+
+/** Pauses notifications with Slack's snooze. `until` is when it ends, in epoch milliseconds; null when Slack did not take it. */
+export const notificationsPause = Rpc.make('notifications.pause', {
+  payload: { choice: PauseChoice },
+  success: Schema.Struct({ until: Schema.NullOr(Schema.Number) }),
+  error: NotSignedIn,
+})
+
+/** Ends Slack's snooze. `resumed` is false when Slack could not be reached. */
+export const notificationsResume = Rpc.make('notifications.resume', {
+  payload: {},
+  success: Schema.Struct({ resumed: Schema.Boolean }),
+  error: NotSignedIn,
+})
+
 /** Writes the notification hours to Slack's schedule again, after it was changed in Slack. */
 export const notificationsUseJunoHours = Rpc.make('notifications.useJunoHours', {
   payload: {},
@@ -310,5 +334,7 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsSetAwayOutsideHours,
   notificationsSetLevel,
   notificationsSetPresence,
+  notificationsPause,
+  notificationsResume,
   notificationsUseJunoHours,
 )

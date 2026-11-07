@@ -61,6 +61,7 @@ import { StatusHandlers } from './status/handlers'
 import { Status } from './status/Status'
 import { SyncRunner } from './session/SyncRunner'
 import { SocketEvents } from './socketEvents'
+import { SlackSnooze } from './snooze'
 import { SyncLink } from './syncLink'
 import { AllTopicsHandlers, TopicsHandlers } from './topics/handlers'
 import { ViewsHandlers } from './sidebarViews/handlers'
@@ -118,7 +119,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(Layer.merge(OwnerActivity.layer, OthersPresence.layer)),
-  Layer.provideMerge(Layer.mergeAll(NotificationControl.layer, HuddleLive, SelfPresence.layer).pipe(Layer.provideMerge(SocketEvents.layer))),
+  Layer.provideMerge(Layer.mergeAll(NotificationControl.layer, HuddleLive, SelfPresence.layer, SlackSnooze.layer).pipe(Layer.provideMerge(SocketEvents.layer))),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(AiCredentials.layer),
   Layer.provideMerge(AiSpend.layer),

@@ -11,6 +11,8 @@ import {
   privacySharingAtom,
   registry,
   setPresence,
+  pauseNotifications,
+  resumeNotifications,
   sidebarDotAtom,
   sidebarFilterAtom,
   sidebarListAtom,
@@ -25,6 +27,7 @@ import {
 } from '@juno/state'
 import { junoNavAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
+import type { PauseChoice } from '@juno/contract'
 import { hueFor, initials, Sidebar as SidebarView, type AccountMenuAction, type ActivateEvent, type SidebarNavTarget } from '@juno/views'
 import { chunk } from './chunks'
 import { SyncNotice, useSyncNoticeReady } from './SyncNotice'
@@ -137,9 +140,15 @@ export function Sidebar() {
   // The setting drives the menu's toggle; the dot shows what Slack shows colleagues, away until Slack says.
   const presence = status._tag === 'Success' && status.value.presence !== null ? { active: status.value.presence === 'active', seen: status.value.seen === 'active', label: status.value.presenceLabel } : undefined
   const paused = status._tag === 'Success' ? status.value.paused : undefined
+  const snoozed = status._tag === 'Success' && status.value.snoozedUntil !== undefined
+  const pause = (choice: PauseChoice) => {
+    setMenuOpen(false)
+    void pauseNotifications(registry, choice)
+  }
   const accountAction = (action: AccountMenuAction) => {
     setMenuOpen(false)
     if (action === 'notifications') return openSettings('notifications')
+    if (action === 'resume') return void resumeNotifications(registry)
     if (action === 'settings') return openSettings()
     if (action === 'privacy') return setPrivacy(!privacy)
     void setPresence(registry, presence?.active === false ? 'active' : 'away')
@@ -167,6 +176,8 @@ export function Sidebar() {
         workspace={user?.teamName ?? ''}
         {...(presence === undefined ? {} : { presence })}
         {...(paused === undefined ? {} : { paused })}
+        snoozed={snoozed}
+        onPause={pause}
         privacy={privacy}
         onAction={accountAction}
       />
