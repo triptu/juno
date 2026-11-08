@@ -3,8 +3,8 @@ export { configureConnection, connectionStateAtom, makeRegistry, registry, resta
 export { engineStatusAtom, noticeClockAtom, OFFLINE_GRACE_MILLIS, pingCommand, syncFailureAtom, syncNoticeAtom, syncProgressAtom } from './engine'
 export { appStateAtom, copyDiagnostics, copySyncLog, describeTabs, showLogs, diagnosticsReport, formatCpu, readDiagnostics, reportAppStateAtom } from './diagnostics'
 export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signOutCommand } from './session'
-export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
-export { reactionRowsAtom, reactionsPillBeforeAtom, setReactionsPillBefore, sidebarPaneAtom } from './reactionFeed'
+export { pillLooksAtom, pillOrderAtom, savePillLook, savePillOrder, viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
+export { reactionRowsAtom, sidebarPaneAtom } from './reactionFeed'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
   allTopicsFilterAtom,

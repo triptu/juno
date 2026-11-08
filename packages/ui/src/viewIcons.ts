@@ -10,6 +10,7 @@ import { Flag } from '@phosphor-icons/react/dist/icons/Flag'
 import { Flask } from '@phosphor-icons/react/dist/icons/Flask'
 import { Gift } from '@phosphor-icons/react/dist/icons/Gift'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
+import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Heart } from '@phosphor-icons/react/dist/icons/Heart'
 import { Leaf } from '@phosphor-icons/react/dist/icons/Leaf'
 import { Lightning } from '@phosphor-icons/react/dist/icons/Lightning'
@@ -17,8 +18,10 @@ import { Megaphone } from '@phosphor-icons/react/dist/icons/Megaphone'
 import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
 import { Rocket } from '@phosphor-icons/react/dist/icons/Rocket'
 import { Shield } from '@phosphor-icons/react/dist/icons/Shield'
+import { Smiley } from '@phosphor-icons/react/dist/icons/Smiley'
 import { Star } from '@phosphor-icons/react/dist/icons/Star'
 import { Trophy } from '@phosphor-icons/react/dist/icons/Trophy'
+import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { Wrench } from '@phosphor-icons/react/dist/icons/Wrench'
 import type { PhosphorIcon } from './Icon'
@@ -37,10 +40,13 @@ export const viewIcons = {
   code: Code,
   megaphone: Megaphone,
   users: Users,
+  user: User,
+  hash: Hash,
   briefcase: Briefcase,
   star: Star,
   flag: Flag,
   heart: Heart,
+  smiley: Smiley,
   eye: Eye,
   coffee: Coffee,
   calendar: Calendar,

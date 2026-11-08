@@ -7,7 +7,7 @@
 import {
   dropViewOrder,
   moveViewOrder,
-  splitReactionsPill,
+  isBuiltinPill,
   viewMenuChoice,
   viewPillMenuItems,
   viewsAddChannel,
@@ -15,7 +15,6 @@ import {
   viewsRemoveChannel,
   viewsReorder,
   viewsSave,
-  withReactionsPill,
   type ChannelRef,
   type KindFilter,
   type ViewChoice,
@@ -23,7 +22,7 @@ import {
   type ViewMenuAction,
   type ViewPillAction,
 } from '@juno/contract'
-import { popupContextMenu, reactionsPillBeforeAtom, registry, runAction, runCommand, setReactionsPillBefore, sidebarFilterAtom, sidebarPaneAtom, viewSheetAtom, viewsAtom } from '@juno/state'
+import { pillOrderAtom, popupContextMenu, registry, runAction, runCommand, savePillOrder, sidebarFilterAtom, sidebarPaneAtom, viewSheetAtom, viewsAtom } from '@juno/state'
 import { Exit } from 'effect'
 import { startTransition } from 'react'
 import { markFilterChange } from './filterMark'
@@ -66,20 +65,17 @@ export function selectKind(kind: KindFilter): void {
 
 const viewOrder = () => registry.get(viewsAtom).map((view) => view.id)
 
-/** The pill row's order: the views, with the Reactions pill in its place. */
-const pillOrder = () => withReactionsPill(viewOrder(), registry.get(reactionsPillBeforeAtom))
-
-/** Saves a new pill order: the views' order, and where the Reactions pill sits, each only when it changed. */
+/** Saves a new order of the pills after All, and the views' own order when that changed. */
 function reorder(order: ReadonlyArray<string>): void {
-  const { views, before } = splitReactionsPill(order)
+  const views = order.filter((id) => !isBuiltinPill(id))
   const was = viewOrder()
+  void savePillOrder(registry, order)
   if (views.length !== was.length || views.some((id, i) => id !== was[i])) void runCommand(registry, viewsReorder, { ids: views })
-  if (before !== registry.get(reactionsPillBeforeAtom)) void setReactionsPillBefore(registry, before)
 }
 
-/** A pill (a view's or Reactions) dropped before another, or at the end. */
+/** A pill after All (a view's, Channels, DMs or Reactions) dropped before another, or at the end. */
 export function moveView(id: string, before: string | undefined): void {
-  const order = pillOrder()
+  const order = registry.get(pillOrderAtom)
   const next = dropViewOrder(order, id, before)
   if (next !== order) reorder(next)
 }
@@ -92,16 +88,17 @@ function deleteView(id: string): void {
   void runAction(registry, viewsDelete, { id }, { text: `Deleted view · ${view.name}` })
 }
 
-/** The menu on a view's pill (inventory 15.7). */
+/** The menu on a pill after All (inventory 15.7): a view's, or Channels', DMs' or Reactions', which have no Delete and whose Edit changes only the icon and colour. */
 export async function showViewPillMenu(id: string): Promise<void> {
-  const order = pillOrder()
+  const order = registry.get(pillOrderAtom)
   const at = order.indexOf(id)
   if (at < 0) return
+  const builtin = isBuiltinPill(id)
   const enabled = (item: ViewPillAction) => (item === 'view-left' ? at > 0 : item === 'view-right' ? at < order.length - 1 : true)
-  const chosen = (await popupContextMenu(nativeMenu(viewPillMenuItems(), enabled))) as ViewPillAction | undefined
+  const chosen = (await popupContextMenu(nativeMenu(viewPillMenuItems(builtin), enabled))) as ViewPillAction | undefined
   switch (chosen) {
     case 'view-edit':
-      return registry.set(viewSheetAtom, { mode: 'edit', id })
+      return registry.set(viewSheetAtom, builtin ? { mode: 'pill', id } : { mode: 'edit', id })
     case 'view-left':
       return reorder(moveViewOrder(order, id, -1))
     case 'view-right':

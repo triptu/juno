@@ -69,10 +69,13 @@ const iconLabels: Record<ViewIconName, string> = {
   code: 'Code',
   megaphone: 'Megaphone',
   users: 'People',
+  user: 'Person',
+  hash: 'Hash',
   briefcase: 'Briefcase',
   star: 'Star',
   flag: 'Flag',
   heart: 'Heart',
+  smiley: 'Smiley',
   eye: 'Eye',
   coffee: 'Coffee',
   calendar: 'Calendar',
@@ -137,53 +140,7 @@ export function ViewSheet({
     <form aria-label={mode === 'new' ? 'New view' : 'Edit view'} onSubmit={submit} data-view-sheet="" {...stylex.props(styles.sheet)}>
       <TextField size={30} label="Name" placeholder="Name" value={name} maxLength={32} autoFocus onChange={(event) => onNameChange(event.currentTarget.value)} />
 
-      <div {...stylex.props(styles.field)}>
-        <Text variant="meta" tone="muted" weight="medium" as="span">
-          Icon
-        </Text>
-        {/* One Tab stop: the arrows move and choose. */}
-        <div role="radiogroup" aria-label="Icon" onKeyDown={radioKeys} {...stylex.props(styles.icons)}>
-          <IconButton
-            type="button"
-            {...radioItem(icon === undefined, icon === undefined)}
-            icon={Prohibit}
-            label="No icon"
-            size={26}
-            iconSize={14}
-            variant={icon === undefined ? 'secondary' : 'ghost'}
-            tone={icon === undefined ? 'default' : 'subtle'}
-            onClick={() => onIconChange(undefined)}
-          />
-          {viewIconNames.map((each) => (
-            <IconButton
-              key={each}
-              type="button"
-              {...radioItem(icon === each, icon === each)}
-              icon={viewIcons[each]}
-              label={iconLabels[each]}
-              size={26}
-              iconSize={14}
-              variant={icon === each ? 'secondary' : 'ghost'}
-              tone={icon === each ? 'default' : 'subtle'}
-              {...(icon === each && color !== undefined ? { iconTint: color } : {})}
-              onClick={() => onIconChange(each)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* The colour is the icon's; the chosen icon above shows it. */}
-      <div {...stylex.props(styles.field)}>
-        <Text variant="meta" tone="muted" weight="medium" as="span">
-          Colour
-        </Text>
-        <div role="radiogroup" aria-label="Colour" data-view-colors="" onKeyDown={radioKeys} {...stylex.props(styles.colors)}>
-          <Swatch tint="neutral" label="Neutral" selected={color === undefined} {...radioItem(color === undefined, color === undefined)} onClick={() => onColorChange(undefined)} />
-          {accentNames.map((each) => (
-            <Swatch key={each} tint={each} label={accentLabels[each]} selected={color === each} {...radioItem(color === each, color === each)} onClick={() => onColorChange(each)} />
-          ))}
-        </div>
-      </div>
+      <LookFields icon={icon} color={color} onIconChange={onIconChange} onColorChange={onColorChange} />
 
       <div {...stylex.props(styles.field)}>
         <TextField
@@ -236,14 +193,107 @@ export function ViewSheet({
         onChange={(event) => onKeepOutOfAllChange(event.currentTarget.checked)}
       />
 
-      <div {...stylex.props(styles.buttons)}>
-        <Button type="button" variant="ghost" tone="subtle" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary" size="sm" disabled={!canSave}>
-          Save
-        </Button>
+      <SheetButtons canSave={canSave} onCancel={onCancel} />
+    </form>
+  )
+}
+
+interface LookFieldsProps {
+  readonly icon: ViewIconName | undefined
+  readonly color: AccentName | undefined
+  readonly onIconChange: (icon: ViewIconName | undefined) => void
+  readonly onColorChange: (color: AccentName | undefined) => void
+}
+
+/** The icon and its colour: the part of the sheet every pill has, a built-in one included. */
+function LookFields({ icon, color, onIconChange, onColorChange }: LookFieldsProps) {
+  return (
+    <>
+      <div {...stylex.props(styles.field)}>
+        <Text variant="meta" tone="muted" weight="medium" as="span">
+          Icon
+        </Text>
+        {/* One Tab stop: the arrows move and choose. */}
+        <div role="radiogroup" aria-label="Icon" onKeyDown={radioKeys} {...stylex.props(styles.icons)}>
+          <IconButton
+            type="button"
+            {...radioItem(icon === undefined, icon === undefined)}
+            icon={Prohibit}
+            label="No icon"
+            size={26}
+            iconSize={14}
+            variant={icon === undefined ? 'secondary' : 'ghost'}
+            tone={icon === undefined ? 'default' : 'subtle'}
+            onClick={() => onIconChange(undefined)}
+          />
+          {viewIconNames.map((each) => (
+            <IconButton
+              key={each}
+              type="button"
+              {...radioItem(icon === each, icon === each)}
+              icon={viewIcons[each]}
+              label={iconLabels[each]}
+              size={26}
+              iconSize={14}
+              variant={icon === each ? 'secondary' : 'ghost'}
+              tone={icon === each ? 'default' : 'subtle'}
+              {...(icon === each && color !== undefined ? { iconTint: color } : {})}
+              onClick={() => onIconChange(each)}
+            />
+          ))}
+        </div>
       </div>
+
+      {/* The colour is the icon's; the chosen icon above shows it. */}
+      <div {...stylex.props(styles.field)}>
+        <Text variant="meta" tone="muted" weight="medium" as="span">
+          Colour
+        </Text>
+        <div role="radiogroup" aria-label="Colour" data-view-colors="" onKeyDown={radioKeys} {...stylex.props(styles.colors)}>
+          <Swatch tint="neutral" label="Neutral" selected={color === undefined} {...radioItem(color === undefined, color === undefined)} onClick={() => onColorChange(undefined)} />
+          {accentNames.map((each) => (
+            <Swatch key={each} tint={each} label={accentLabels[each]} selected={color === each} {...radioItem(color === each, color === each)} onClick={() => onColorChange(each)} />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function SheetButtons({ canSave, onCancel }: { readonly canSave: boolean; readonly onCancel: () => void }) {
+  return (
+    <div {...stylex.props(styles.buttons)}>
+      <Button type="button" variant="ghost" tone="subtle" size="sm" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="submit" variant="primary" size="sm" disabled={!canSave}>
+        Save
+      </Button>
+    </div>
+  )
+}
+
+export interface PillSheetProps extends LookFieldsProps {
+  /** "Channels", "DMs", "Reactions": the sheet's accessible name is Edit and it. */
+  readonly name: string
+  readonly onSave: () => void
+  readonly onCancel: () => void
+}
+
+/**
+ * Edit view on a built-in pill (Channels, DMs, Reactions; SPEC 5, "Quick
+ * filters"): only the icon and its colour, then Cancel and Save. No icon
+ * shows the pill's name. Escape cancels, as the view sheet does.
+ */
+export function PillSheet({ name, onSave, onCancel, ...look }: PillSheetProps) {
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    onSave()
+  }
+  return (
+    <form aria-label={`Edit ${name}`} onSubmit={submit} data-pill-sheet="" {...stylex.props(styles.sheet)}>
+      <LookFields {...look} />
+      <SheetButtons canSave onCancel={onCancel} />
     </form>
   )
 }

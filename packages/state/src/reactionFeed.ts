@@ -14,36 +14,15 @@
  * of the one before wherever a row is unchanged, so unchanged rows skip
  * their render.
  */
-import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { prefsGet, prefsSet, REACTIONS_PILL_PREF, reactionsFeed, type ReactionRow } from '@juno/contract'
-import { liveQuery, runCommand } from './atoms'
-import type { Registry } from './client'
+import { reactionsFeed, type ReactionRow } from '@juno/contract'
+import { liveQuery } from './atoms'
 
 type SidebarPane = 'topics' | 'reactions'
 
 /** Which list the sidebar shows: the topics (its quick filters and views), or the Reactions view. */
 export const sidebarPaneAtom = Atom.make<SidebarPane>('topics').pipe(Atom.keepAlive)
-
-const savedPillPlaceAtom = liveQuery(prefsGet)({ key: REACTIONS_PILL_PREF })
-
-/**
- * Where the Reactions pill sits in the pill row: the id of the view it comes
- * before, or undefined after the last view. A workspace preference, so a
- * dragged pill keeps its place across a relaunch as the views do. The last
- * value holds while a new one is on its way.
- */
-export const reactionsPillBeforeAtom = Atom.make((get): string | undefined => {
-  const saved = get(savedPillPlaceAtom)
-  if (AsyncResult.isSuccess(saved)) return typeof saved.value === 'string' ? saved.value : undefined
-  return Option.getOrUndefined(get.self<string | undefined>())
-})
-
-/** Saves where the Reactions pill sits; last is saved as no preference. */
-export function setReactionsPillBefore(registry: Registry, before: string | undefined) {
-  return runCommand(registry, prefsSet, { key: REACTIONS_PILL_PREF, value: before ?? null })
-}
 
 /** Keeps the previous object of each unchanged row. */
 function keepRows(previous: ReadonlyArray<ReactionRow> | undefined, next: ReadonlyArray<ReactionRow>): ReadonlyArray<ReactionRow> {

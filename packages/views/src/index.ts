@@ -120,7 +120,7 @@ export { DoneFollowUpsReview, OldDraftsReview } from './ReviewCards'
 export { IgnoreReview, UnfollowReview } from './SuggestionReviews'
 export { type ReviewStatus } from './reviewModel'
 
-export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
+export { PillSheet, ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export { ChannelSheet } from './ChannelSheet'
 export { PersonDetail } from './StatusLine'
 export { StatusSheet, type StatusSheetPreset } from './StatusSheet'

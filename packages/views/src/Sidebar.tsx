@@ -1,6 +1,4 @@
 import * as stylex from '@stylexjs/stylex'
-import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Heart } from '@phosphor-icons/react/dist/icons/Heart'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
@@ -8,9 +6,8 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlas
 import { Notification } from '@phosphor-icons/react/dist/icons/Notification'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
-import { User } from '@phosphor-icons/react/dist/icons/User'
 import { useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
-import { REACTIONS_PILL, withReactionsPill, type ConversationKind, type KindFilter } from '@juno/contract'
+import { BUILTIN_PILL_NAMES, builtinPillLooks, isBuiltinPill, pillOrder as defaultPillOrder, type BuiltinPill, type ConversationKind, type KindFilter, type PillLook } from '@juno/contract'
 import { menuKeys } from '@juno/contract/channels'
 import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import {
@@ -122,15 +119,17 @@ export interface SidebarProps {
   readonly onFilterView?: (id: string) => void
   /** The Reactions pill, among the views. Without it there is no pill. Fires on mouse down, like the other filters. */
   readonly onFilterReactions?: () => void
-  /** The view the Reactions pill comes before; after the last view when undefined or not among them. */
-  readonly reactionsBefore?: string
+  /** Every pill after All in order, by id: `channels`, `dms`, `reactions` and the views'. Default as Juno first lays them out. */
+  readonly pillOrder?: ReadonlyArray<string>
+  /** How Channels, DMs and Reactions are drawn. Default as Juno first draws them. */
+  readonly pillLooks?: Readonly<Record<BuiltinPill, PillLook>>
   /** The "+" pill. */
   readonly onNewView?: () => void
   /** The view sheet is open for a new view: the "+" pill holds its hover fill, as an open trigger. */
   readonly newViewOpen?: boolean
-  /** Right-click (or the context-menu key) on a view's pill. */
+  /** Right-click (or the context-menu key) on a view's pill, or on Channels, DMs or Reactions (by those ids). */
   readonly onViewMenu?: (id: string) => void
-  /** A view's pill or the Reactions pill (`REACTIONS_PILL`) dropped before another, or at the end (`before` undefined). */
+  /** A pill after All dropped before another, or at the end (`before` undefined), by the ids of `pillOrder`. */
   readonly onMoveView?: (id: string, before: string | undefined) => void
   /** The view sheet, open under the filter row while present. */
   readonly viewSheet?: ReactNode
@@ -198,7 +197,8 @@ export function Sidebar({
   views = [],
   onFilterView,
   onFilterReactions,
-  reactionsBefore,
+  pillOrder,
+  pillLooks,
   onNewView,
   newViewOpen = false,
   onViewMenu,
@@ -337,33 +337,19 @@ export function Sidebar({
                   All
                 </Button>
               </FilterPill>
-              <FilterPill dot={channelsDot}>
-                <Button
-                  variant="filter"
-                  iconStart={Hash}
-                  {...tooltip('Channels')}
-                  aria-label={channelsDot ? 'Channels, unread' : 'Channels'}
-                  pressed={kind === 'channels'}
-                  {...activateHandlers<HTMLButtonElement>(() => onFilterKind('channels'))}
-                />
-              </FilterPill>
-              <FilterPill dot={dmsDot}>
-                <Button
-                  variant="filter"
-                  iconStart={User}
-                  {...tooltip('DMs')}
-                  aria-label={dmsDot ? 'DMs, unread' : 'DMs'}
-                  pressed={kind === 'dms'}
-                  {...activateHandlers<HTMLButtonElement>(() => onFilterKind('dms'))}
-                />
-              </FilterPill>
-              <ViewPills
+              <OrderedPills
+                order={(pillOrder ?? defaultPillOrder(views.map((view) => view.id), undefined)).filter((id) => id !== 'reactions' || onFilterReactions !== undefined)}
+                looks={pillLooks ?? builtinPillLooks(undefined)}
                 views={views}
+                kind={kind}
+                dots={{ channels: channelsDot, dms: dmsDot }}
+                reactions={reactions}
                 selected={selected}
+                onFilterKind={onFilterKind}
                 onFilterView={onFilterView}
+                onFilterReactions={onFilterReactions}
                 onViewMenu={onViewMenu}
                 onMoveView={onMoveView}
-                {...(onFilterReactions === undefined ? {} : { reactions: { before: reactionsBefore, pressed: reactions, onSelect: onFilterReactions } })}
               />
             </PillRow>
             {onNewView === undefined ? null : (
@@ -430,73 +416,107 @@ export function Sidebar({
   )
 }
 
-interface ViewPillsProps {
+interface OrderedPillsProps {
+  readonly order: ReadonlyArray<string>
+  readonly looks: Readonly<Record<BuiltinPill, PillLook>>
   readonly views: ReadonlyArray<SidebarViewPill>
+  /** The selected kind, when no view and not Reactions is. */
+  readonly kind: KindFilter | undefined
+  readonly dots: SidebarDots
+  readonly reactions: boolean
   readonly selected: string | undefined
+  readonly onFilterKind: SidebarProps['onFilterKind']
   readonly onFilterView: SidebarProps['onFilterView']
+  readonly onFilterReactions: SidebarProps['onFilterReactions']
   readonly onViewMenu: SidebarProps['onViewMenu']
   readonly onMoveView: SidebarProps['onMoveView']
-  /** The Reactions pill, in its place among the views. */
-  readonly reactions?: { readonly before: string | undefined; readonly pressed: boolean; readonly onSelect: () => void }
 }
 
 /**
- * The views' pills and the Reactions pill (SPEC 5, "Reactions"), a heart in
- * coral. Dragging one along the row reorders it: a caret shows where it
- * lands, and only these pills take part. The drag is local state; the order
+ * The pills after All, in the owner's order: Channels, DMs and Reactions
+ * among the views (SPEC 5, "Quick filters"). Each drags along the row to a
+ * new place, with a caret where it lands, and each has the view menu.
+ * Channels, DMs and Reactions draw the icon and colour their look gives
+ * them, or their name with no icon. The drag is local state; the order
  * changes when the owner saves it.
  */
-function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView, reactions }: ViewPillsProps) {
-  const viewIds = views.map((view) => view.id)
-  const order = reactions === undefined ? viewIds : withReactionsPill(viewIds, reactions.before)
+function OrderedPills({ order, looks, views, kind, dots, reactions, selected, onFilterKind, onFilterView, onFilterReactions, onViewMenu, onMoveView }: OrderedPillsProps) {
   const { dragHandlers, markOf } = usePillDrag(order, onMoveView)
   const byId = new Map(views.map((view) => [view.id, view]))
+  const menu = (id: string) => (event: MouseEvent<HTMLButtonElement>) => {
+    if (onViewMenu === undefined) return
+    event.preventDefault()
+    onViewMenu(id)
+  }
   return order.map((id) => {
     const mark = markOf(id)
-    if (id === REACTIONS_PILL && reactions !== undefined) {
-      return (
-        <FilterPill key={REACTIONS_PILL} {...(mark === undefined ? {} : { mark })}>
-          <Button
-            variant="filter"
-            iconStart={Heart}
-            iconTint="coral"
-            {...tooltip('Reactions')}
-            aria-label="Reactions"
-            data-reactions-pill=""
-            pressed={reactions.pressed}
-            {...dragHandlers(REACTIONS_PILL, 'Reactions')}
-            {...activateHandlers<HTMLButtonElement>(() => reactions.onSelect())}
-          />
-        </FilterPill>
-      )
-    }
-    const view = byId.get(id)!
-    const on = view.id === selected
-    const dot = view.mention && !on
-    const name = dot ? `${view.name}, unread mention` : view.name
-    const icon = view.icon === undefined ? undefined : viewIcons[view.icon]
+    const pill = isBuiltinPill(id) ? builtinPill(id, looks[id], { kind, dots, reactions, onFilterKind, onFilterReactions }) : viewPill(byId.get(id), selected, onFilterView)
+    if (pill === undefined) return null
+    const icon = pill.icon === undefined ? undefined : viewIcons[pill.icon]
     return (
-      <FilterPill key={view.id} dot={dot} {...(mark === undefined ? {} : { mark })}>
+      <FilterPill key={id} dot={pill.dot} {...(mark === undefined ? {} : { mark })}>
         <Button
           variant="filter"
-          data-view-pill={view.id}
-          aria-label={name}
-          {...(icon === undefined ? {} : { iconStart: icon, ...tooltip(view.name) })}
-          {...(icon === undefined || view.color === undefined ? {} : { iconTint: view.color })}
-          pressed={on}
-          onContextMenu={(event: MouseEvent<HTMLButtonElement>) => {
-            if (onViewMenu === undefined) return
-            event.preventDefault()
-            onViewMenu(view.id)
-          }}
-          {...dragHandlers(view.id, view.name)}
-          {...activateHandlers<HTMLButtonElement>(() => onFilterView?.(view.id))}
+          {...pill.data}
+          aria-label={pill.label}
+          {...(icon === undefined ? {} : { iconStart: icon, ...tooltip(pill.name) })}
+          {...(icon === undefined || pill.color === undefined ? {} : { iconTint: pill.color })}
+          pressed={pill.pressed}
+          onContextMenu={menu(id)}
+          {...dragHandlers(id, pill.name)}
+          {...activateHandlers<HTMLButtonElement>(pill.onSelect)}
         >
-          {icon === undefined ? view.name : undefined}
+          {icon === undefined ? pill.name : undefined}
         </Button>
       </FilterPill>
     )
   })
+}
+
+/** What one pill after All shows and does. */
+interface PillParts {
+  readonly name: string
+  /** The accessible name: the name, and "unread" or "unread mention" with a dot. */
+  readonly label: string
+  readonly icon: ViewIconName | undefined
+  readonly color: AccentName | undefined
+  readonly dot: boolean
+  readonly pressed: boolean
+  readonly data: Readonly<Record<string, string>>
+  readonly onSelect: () => void
+}
+
+function builtinPill(
+  id: BuiltinPill,
+  look: PillLook,
+  state: Pick<OrderedPillsProps, 'kind' | 'dots' | 'reactions' | 'onFilterKind' | 'onFilterReactions'>,
+): PillParts | undefined {
+  const name = BUILTIN_PILL_NAMES[id]
+  const base = { name, icon: look.icon, color: look.color }
+  if (id === 'reactions') {
+    const select = state.onFilterReactions
+    if (select === undefined) return undefined
+    return { ...base, label: name, dot: false, pressed: state.reactions, data: { 'data-reactions-pill': '' }, onSelect: () => select() }
+  }
+  // A dot is in the name ("Channels, unread"), so a screen reader hears it.
+  const dot = state.dots[id]
+  return { ...base, label: dot ? `${name}, unread` : name, dot, pressed: state.kind === id, data: { 'data-kind-pill': id }, onSelect: () => state.onFilterKind(id) }
+}
+
+function viewPill(view: SidebarViewPill | undefined, selected: string | undefined, onFilterView: SidebarProps['onFilterView']): PillParts | undefined {
+  if (view === undefined) return undefined
+  const on = view.id === selected
+  const dot = view.mention && !on
+  return {
+    name: view.name,
+    label: dot ? `${view.name}, unread mention` : view.name,
+    icon: view.icon,
+    color: view.icon === undefined ? undefined : view.color,
+    dot,
+    pressed: on,
+    data: { 'data-view-pill': view.id },
+    onSelect: () => onFilterView?.(view.id),
+  }
 }
 
 /** Dragging a pill along the row: where it would land, for the caret, and the drop, which asks the owner to move it. */

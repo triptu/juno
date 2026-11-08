@@ -158,9 +158,10 @@ export function isViewMenuAction(id: string): id is ViewMenuAction {
 
 export type ViewPillAction = 'view-edit' | 'view-left' | 'view-right' | 'view-delete'
 
-/** The menu on a view's pill (inventory 15.7). The owner disables Move left and Move right at the ends. */
-export function viewPillMenuItems(): ReadonlyArray<MenuItem<ViewPillAction>> {
-  return [item('view-edit', 'Edit view…'), item('view-left', 'Move left'), item('view-right', 'Move right'), separator, item('view-delete', 'Delete view')]
+/** The menu on a view's pill (inventory 15.7); a built-in pill (Channels, DMs, Reactions) has no Delete. The owner disables Move left and Move right at the ends. */
+export function viewPillMenuItems(builtin = false): ReadonlyArray<MenuItem<ViewPillAction>> {
+  const moves = [item('view-edit', 'Edit view…'), item('view-left', 'Move left'), item('view-right', 'Move right')] as const
+  return builtin ? moves : [...moves, separator, item('view-delete', 'Delete view')]
 }
 
 const separator = { type: 'separator' } as const

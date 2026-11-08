@@ -18,10 +18,13 @@ export const VIEW_ICONS = [
   'code',
   'megaphone',
   'users',
+  'user',
+  'hash',
   'briefcase',
   'star',
   'flag',
   'heart',
+  'smiley',
   'eye',
   'coffee',
   'calendar',
@@ -74,23 +77,77 @@ export function dropViewOrder(order: ReadonlyArray<string>, id: string, before: 
 }
 
 /**
- * The Reactions pill's id in the pill order (SPEC 5, "Reactions"). It is not
- * a view, so no view has this id: views have random ids, and Automated's is
- * `automated`.
+ * The pills after All that are not views (SPEC 5, "Quick filters"): Channels,
+ * DMs and Reactions. They move and take a colour as a view's pill does, but
+ * cannot be edited or deleted. No view has these ids: views have random ids,
+ * and Automated's is `automated`.
  */
-export const REACTIONS_PILL = 'reactions'
+export const BUILTIN_PILLS = ['channels', 'dms', 'reactions'] as const
+export type BuiltinPill = typeof BUILTIN_PILLS[number]
+export const isBuiltinPill = (id: string): id is BuiltinPill => (BUILTIN_PILLS as ReadonlyArray<string>).includes(id)
 
-/** The workspace preference that holds where the Reactions pill sits: the id of the view it comes before, or none after the last view. */
-export const REACTIONS_PILL_PREF = 'reactionsPillBefore'
+/** The workspace preference holding the order of every pill after All, built-in and view. */
+export const PILL_ORDER_PREF = 'pillOrder'
 
-/** The pill order with the Reactions pill in it: before the view `before` while that view is there, else last. */
-export function withReactionsPill(views: ReadonlyArray<string>, before: string | undefined): ReadonlyArray<string> {
-  const at = before === undefined ? -1 : views.indexOf(before)
-  return at < 0 ? [...views, REACTIONS_PILL] : [...views.slice(0, at), REACTIONS_PILL, ...views.slice(at)]
+/** The workspace preference holding the built-in pills' looks: per pill, an icon or `none`, and a colour or `neutral`. */
+export const PILL_LOOKS_PREF = 'pillLooks'
+
+/** How a built-in pill is drawn: its icon (none shows its name) and the icon's colour (none is neutral). */
+export interface PillLook {
+  readonly icon?: ViewIcon
+  readonly color?: ViewColor
 }
 
-/** A pill order split back into the views' order and the view the Reactions pill comes before (undefined when last). */
-export function splitReactionsPill(order: ReadonlyArray<string>): { readonly views: ReadonlyArray<string>; readonly before: string | undefined } {
-  const at = order.indexOf(REACTIONS_PILL)
-  return { views: order.filter((id) => id !== REACTIONS_PILL), before: at < 0 ? undefined : order[at + 1] }
+/** As Juno first draws them: Channels a hash, DMs a person, Reactions a coral heart. */
+const BUILTIN_PILL_LOOKS: Readonly<Record<BuiltinPill, PillLook>> = {
+  channels: { icon: 'hash' },
+  dms: { icon: 'user' },
+  reactions: { icon: 'heart', color: 'coral' },
 }
+
+/** The built-in pills' names: the tooltip, the accessible name, and the label when a pill has no icon. */
+export const BUILTIN_PILL_NAMES: Readonly<Record<BuiltinPill, string>> = { channels: 'Channels', dms: 'DMs', reactions: 'Reactions' }
+
+/**
+ * The pill order after All: the saved order with what changed since put
+ * right. Views take the order the views table gives them, in the places
+ * views held. A view the saved order lacks goes after the last view, or
+ * after Channels and DMs when no view had a place. A built-in pill it lacks
+ * goes where it first stood: Channels and DMs first, Reactions last.
+ */
+export function pillOrder(views: ReadonlyArray<string>, saved: unknown): ReadonlyArray<string> {
+  const known = new Set(views)
+  const listed = Array.isArray(saved) ? (saved as ReadonlyArray<unknown>).filter((id): id is string => typeof id === 'string' && (isBuiltinPill(id) || known.has(id))) : []
+  const order = [...new Set(listed)]
+  for (const id of ['dms', 'channels'] as const) if (!order.includes(id)) order.unshift(id)
+  if (!order.includes('reactions')) order.push('reactions')
+  const placed = new Set(order)
+  const inOrder = views.filter((id) => placed.has(id))
+  let next = 0
+  for (const [at, id] of order.entries()) if (known.has(id)) order[at] = inOrder[next++]!
+  const after = order.findLastIndex((id) => known.has(id))
+  const at = after >= 0 ? after + 1 : Math.max(order.indexOf('channels'), order.indexOf('dms')) + 1
+  order.splice(at, 0, ...views.filter((id) => !placed.has(id)))
+  return order
+}
+
+/** The built-in pills' looks from the saved preference: what each saved, `none` and `neutral` for nothing, else the default. */
+export function builtinPillLooks(saved: unknown): Readonly<Record<BuiltinPill, PillLook>> {
+  const looks: Record<BuiltinPill, PillLook> = { ...BUILTIN_PILL_LOOKS }
+  if (typeof saved !== 'object' || saved === null) return looks
+  for (const id of BUILTIN_PILLS) {
+    const entry = (saved as Record<string, unknown>)[id]
+    if (typeof entry !== 'object' || entry === null) continue
+    const { icon, color } = entry as Record<string, unknown>
+    const look: { icon?: ViewIcon; color?: ViewColor } = { ...looks[id] }
+    if (icon === 'none') delete look.icon
+    else if ((VIEW_ICONS as ReadonlyArray<unknown>).includes(icon)) look.icon = icon as ViewIcon
+    if (color === 'neutral') delete look.color
+    else if ((VIEW_COLORS as ReadonlyArray<unknown>).includes(color)) look.color = color as ViewColor
+    looks[id] = look
+  }
+  return looks
+}
+
+/** A built-in pill's look as the preference stores it. */
+export const savedPillLook = (look: PillLook) => ({ icon: look.icon ?? 'none', color: look.color ?? 'neutral' })
