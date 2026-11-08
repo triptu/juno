@@ -1,8 +1,8 @@
 import { useDeferredValue, useState } from 'react'
-import type { PickConversation, ViewColor } from '@juno/contract'
-import { pickConversationsAtom, viewsAtom, type ViewSheetState } from '@juno/state'
+import { BUILTIN_PILL_NAMES, type BuiltinPill, type PickConversation, type ViewColor } from '@juno/contract'
+import { pickConversationsAtom, pillLooksAtom, registry, savePillLook, viewsAtom, type ViewSheetState } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { ViewSheet as ViewSheetView, type ViewIconName, type ViewSheetConversation } from '@juno/views'
+import { PillSheet as PillSheetView, ViewSheet as ViewSheetView, type ViewIconName, type ViewSheetConversation } from '@juno/views'
 import { closeViewSheet, saveView } from './viewActions'
 
 const NONE: ReadonlyArray<PickConversation> = []
@@ -20,6 +20,22 @@ function conversationsOf(list: ReadonlyArray<PickConversation>): ReadonlyArray<V
  * conversations while the field is empty.
  */
 export function ViewSheet({ sheet }: { readonly sheet: ViewSheetState }) {
+  return sheet.mode === 'pill' ? <PillSheet id={sheet.id} /> : <ViewDraftSheet sheet={sheet} />
+}
+
+/** Edit view on Channels, DMs or Reactions: a draft of the icon and colour, saved to the workspace preference on Save. */
+function PillSheet({ id }: { readonly id: BuiltinPill }) {
+  const look = useAtomValue(pillLooksAtom)[id]
+  const [icon, setIcon] = useState<ViewIconName | undefined>(look.icon)
+  const [color, setColor] = useState<ViewColor | undefined>(look.color)
+  const save = () => {
+    void savePillLook(registry, id, { ...(icon === undefined ? {} : { icon }), ...(color === undefined ? {} : { color }) })
+    closeViewSheet()
+  }
+  return <PillSheetView name={BUILTIN_PILL_NAMES[id]} icon={icon} color={color} onIconChange={setIcon} onColorChange={setColor} onSave={save} onCancel={closeViewSheet} />
+}
+
+function ViewDraftSheet({ sheet }: { readonly sheet: Exclude<ViewSheetState, { readonly mode: 'pill' }> }) {
   const editing = useAtomValue(viewsAtom, (views) => (sheet.mode === 'edit' ? views.find((view) => view.id === sheet.id) : undefined))
   const [name, setName] = useState(editing?.name ?? '')
   const [icon, setIcon] = useState<ViewIconName | undefined>(editing?.icon)

@@ -16,7 +16,7 @@ import { ReactionRow } from './ReactionRow'
 import { TopicList, type TopicListProps } from './TopicList'
 import { TopicRow } from './TopicRow'
 import { UpdateReady } from './UpdateReady'
-import { ViewSheet, type ViewSheetProps } from './ViewSheet'
+import { PillSheet, ViewSheet, type ViewSheetProps } from './ViewSheet'
 
 const noop = () => {}
 
@@ -37,7 +37,7 @@ const chrome: Omit<SidebarProps, 'children'> = {
 
 // Views (spec section 5): the built-in Automated first, then icon pills and name pills, enough to overflow a 384px sidebar.
 const views: ReadonlyArray<SidebarViewPill> = [
-  { id: 'automated', name: 'Automated', icon: 'robot', mention: true },
+  { id: 'automated', name: 'Automated', icon: 'robot', color: 'midnight', mention: true },
   { id: 'vdesign', name: 'Design crit', mention: false },
   { id: 'vlead', name: 'Leadership', mention: false },
   { id: 'vwork', name: 'Work', icon: 'briefcase', mention: false },
@@ -237,6 +237,21 @@ export default defineFixtures(
             />
           ),
         }),
+      ),
+    },
+    // Channels, DMs and Reactions moved among the views and given their own looks; Edit view on one is only the icon and colour.
+    'Built-in pills': {
+      moved: scene(() =>
+        full({
+          ...viewChrome,
+          views: views.slice(0, 2),
+          onFilterReactions: noop,
+          pillOrder: ['dms', 'automated', 'channels', 'reactions', views[1]!.id],
+          pillLooks: { channels: { icon: 'hash', color: 'teal' }, dms: {}, reactions: { icon: 'smiley', color: 'claret' } },
+        }),
+      ),
+      sheet: scene(() =>
+        full({ ...viewChrome, views: views.slice(0, 2), onFilterReactions: noop, viewSheet: <PillSheet name="Reactions" icon="heart" color="coral" onIconChange={noop} onColorChange={noop} onSave={noop} onCancel={noop} /> }),
       ),
     },
     Reactions: {

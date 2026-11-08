@@ -489,10 +489,25 @@ export class Sidebar implements SidebarVerbs {
   }
 
   /** Right-click a view's pill, then `item` in its menu (inventory 15.7). Returns the menu's labels. */
-  async viewMenu(name: string, item: 'view-edit' | 'view-left' | 'view-right' | 'view-delete'): Promise<string[]> {
+  viewMenu(name: string, item: 'view-edit' | 'view-left' | 'view-right' | 'view-delete'): Promise<string[]> {
+    return this.pillMenu(this.viewPill(name), item)
+  }
+
+  /** Right-click any pill after All (a view's, Channels, DMs or Reactions), then `item` in its menu. Returns the menu's labels. */
+  async pillMenu(pill: Locator, item: 'view-edit' | 'view-left' | 'view-right' | 'view-delete'): Promise<string[]> {
     await chooseNextMenuItem(this.win, item)
-    await this.viewPill(name).click({ button: 'right' })
+    await pill.click({ button: 'right' })
     return (await lastMenu(this.win)).labels
+  }
+
+  /** Every pill after All in order, by accessible name, less any dot's words. */
+  pillNames(): Promise<string[]> {
+    return this.root.locator('[data-kind-pill], [data-view-pill], [data-reactions-pill]').evaluateAll((nodes) => nodes.map((node) => (node.getAttribute('aria-label') ?? '').replace(/, unread( mention)?$/, '')))
+  }
+
+  /** Edit view on Channels, DMs or Reactions: the icon and colour only. */
+  get pillSheet() {
+    return this.win.locator('[data-pill-sheet]')
   }
 
   /** The status card's title at the foot of the sidebar: the first sync, or why the list may be behind Slack. */

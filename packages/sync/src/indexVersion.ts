@@ -38,5 +38,7 @@
  * rows do not differ, as for 10.
  * 17: the Reactions view added `activity.feed` to the Slack schema and a
  * cache table, which the index imports; the rows do not differ, as for 10.
+ * 18: a user migration gives Automated its midnight colour, which the index
+ * imports; the rows do not differ, as for 10.
  */
-export const INDEX_VERSION = 17
+export const INDEX_VERSION = 18

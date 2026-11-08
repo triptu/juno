@@ -13,6 +13,8 @@ import {
   registry,
   setPresence,
   pauseNotifications,
+  pillLooksAtom,
+  pillOrderAtom,
   resumeNotifications,
   sidebarDotAtom,
   sidebarFilterAtom,
@@ -125,6 +127,8 @@ export function Sidebar() {
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
   const reactions = useAtomValue(sidebarPaneAtom) === 'reactions'
   const views = useAtomValue(viewPillsAtom)
+  const pillOrder = useAtomValue(pillOrderAtom)
+  const pillLooks = useAtomValue(pillLooksAtom)
   const sheet = useAtomValue(viewSheetAtom)
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
@@ -229,6 +233,8 @@ export function Sidebar() {
       }}
       onFilterKind={selectKind}
       views={views}
+      pillOrder={pillOrder}
+      pillLooks={pillLooks}
       onFilterView={selectView}
       {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
       onCloseViewSheet={closeViewSheet}

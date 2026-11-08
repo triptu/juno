@@ -1,0 +1,1 @@
+- 11-08 12:14 · ui · Automated's robot is midnight, the only purple among the view colours, when Juno makes the view; a migration gives it to an existing Automated view with no colour, and a colour the user picked stays · Tushar: "have sth close to purple color for the robot too", beside the coral Reactions heart.

@@ -114,8 +114,8 @@ export const moveToAutomated = (channel: string, by: SortedBy, now: number, why?
     const already = (yield* sql<{ n: number }>`SELECT count(*) AS n FROM sidebar_view_channels WHERE view_id = ${AUTOMATED_VIEW_ID} AND channel = ${channel}`)[0]?.n === 1
     if (state !== 'live') {
       const last = (yield* sql<{ position: number | null }>`SELECT max(position) AS position FROM sidebar_views`)[0]?.position ?? -1
-      yield* sql`INSERT INTO sidebar_views (id, name, icon, position, keep_out_of_all, created_at)
-        VALUES (${AUTOMATED_VIEW_ID}, ${AUTOMATED_VIEW.name}, ${AUTOMATED_VIEW.icon}, ${last + 1}, ${AUTOMATED_VIEW.keepOutOfAll ? 1 : 0}, ${String(now)})`
+      yield* sql`INSERT INTO sidebar_views (id, name, icon, color, position, keep_out_of_all, created_at)
+        VALUES (${AUTOMATED_VIEW_ID}, ${AUTOMATED_VIEW.name}, ${AUTOMATED_VIEW.icon}, ${AUTOMATED_VIEW.color}, ${last + 1}, ${AUTOMATED_VIEW.keepOutOfAll ? 1 : 0}, ${String(now)})`
       yield* sql`INSERT OR IGNORE INTO builtin_views (id, made_at) VALUES (${AUTOMATED_VIEW_ID}, ${String(now)})`
     }
     yield* sql`INSERT OR IGNORE INTO sidebar_view_channels (view_id, channel, added_at) VALUES (${AUTOMATED_VIEW_ID}, ${channel}, ${String(now)})`

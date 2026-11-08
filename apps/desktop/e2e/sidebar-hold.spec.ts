@@ -2,7 +2,7 @@
 // height alone. The list holds its order while the pointer
 // or keyboard focus is in it (SPEC 5, "Holding the order"): new activity updates a row in place but does not move
 // it, so a press lands on the row it was aimed at, and leaving the list applies the new order in one step. A view's
-// pill drags to a new place, and many views scroll the pill row sideways (SPEC 5, "Views"). What it shows after
+// pill (a view's or Reactions) drags to a new place, and many views scroll the pill row sideways (SPEC 5, "Views"). What it shows after
 // sign-in, live updates, the filters, the keyboard, the Unread hold and the rest of views are in the DOM lane
 // (`dom/sidebar.test.ts`, `dom/views.test.ts`); zooming, which keeps the sidebar in the window, is main's
 // (`break-pass.spec.ts`). The new-thread count itself is engine data (`packages/engine/test/reads.test.ts`).
@@ -145,6 +145,11 @@ async function viewPills(juno: Juno): Promise<void> {
   await sidebar.createView({ name: 'Hiring', conversations: ['hiring'] })
   await sidebar.viewPill('Hiring').dragTo(sidebar.viewPill('Team'), { targetPosition: { x: 4, y: 14 } })
   await expect.poll(() => sidebar.viewNames()).toEqual(['Hiring', 'Team'])
+  // The Reactions pill starts after the views and drags among them the same way.
+  const pills = () => sidebar.root.locator('[data-view-pill], [data-reactions-pill]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+  await expect.poll(pills).toEqual(['Hiring', 'Team', 'Reactions'])
+  await sidebar.root.locator('[data-reactions-pill]').dragTo(sidebar.viewPill('Hiring'), { targetPosition: { x: 4, y: 14 } })
+  await expect.poll(pills).toEqual(['Reactions', 'Hiring', 'Team'])
 
   // Show All again, as at launch, so the next part measures the row and list as they were.
   await sidebar.filter('All')

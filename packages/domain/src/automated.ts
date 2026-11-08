@@ -4,13 +4,13 @@
  * moved into the view; ambiguous ones go to Juno when AI assist is on, and
  * what stays ambiguous is asked about on Home.
  */
-import type { ViewIcon } from './views'
+import type { ViewColor, ViewIcon } from './views'
 
 /** The view's fixed id, so a rename, an icon change or a delete with Undo keeps it the built-in one. */
 export const AUTOMATED_VIEW_ID = 'automated'
 
 /** The view as Juno first makes it. */
-export const AUTOMATED_VIEW = { name: 'Automated', icon: 'robot' satisfies ViewIcon, keepOutOfAll: true } as const
+export const AUTOMATED_VIEW = { name: 'Automated', icon: 'robot' satisfies ViewIcon, color: 'midnight' satisfies ViewColor, keepOutOfAll: true } as const
 
 /** Who sent a message: an app or bot, the user, or another person. A person's message that tags or asks a bot is the person's. */
 export type Sender = 'app' | 'you' | 'person'
