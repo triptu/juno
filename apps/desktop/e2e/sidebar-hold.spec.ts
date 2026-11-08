@@ -1,8 +1,10 @@
 // The sidebar in the browser, as one journey from a synced start. A Main row's new-thread count leaves the row's
 // height alone. The list holds its order while the pointer
 // or keyboard focus is in it (SPEC 5, "Holding the order"): new activity updates a row in place but does not move
-// it, so a press lands on the row it was aimed at, and leaving the list applies the new order in one step. A view's
-// pill (a view's or Reactions) drags to a new place, and many views scroll the pill row sideways (SPEC 5, "Views"). What it shows after
+// it, so a press lands on the row it was aimed at, and leaving the list applies the new order in one step. Every pill
+// after All (a view's, Channels, DMs or Reactions) drags to a new place and has it from the first frame after a
+// relaunch, Edit view on a built-in one sets its icon and colour, and many views scroll the pill row sideways (SPEC 5,
+// "Quick filters" and "Views"). What it shows after
 // sign-in, live updates, the filters, the keyboard, the Unread hold and the rest of views are in the DOM lane
 // (`dom/sidebar.test.ts`, `dom/views.test.ts`); zooming, which keeps the sidebar in the window, is main's
 // (`break-pass.spec.ts`). The new-thread count itself is engine data (`packages/engine/test/reads.test.ts`).
@@ -179,3 +181,26 @@ async function viewPills(juno: Juno): Promise<void> {
   // Unread stays where it was, at the right.
   await expect(sidebar.unreadToggle).toBeInViewport()
 }
+
+test('dragged pills are in their places from the first frame after a relaunch', async ({ juno, relaunch }) => {
+  const { sidebar } = juno
+  await sidebar.root.locator('[data-reactions-pill]').dragTo(sidebar.root.locator('[data-kind-pill="channels"]'), { targetPosition: { x: 4, y: 14 } })
+  const moved = ['Reactions', 'Channels', 'DMs', 'Automated']
+  await expect.poll(() => sidebar.pillNames()).toEqual(moved)
+  // Every frame of the next launch's pill row, recorded from the page's first script on.
+  await juno.win.addInitScript(() => {
+    const frames: string[][] = []
+    ;(globalThis as unknown as { pillFrames: string[][] }).pillFrames = frames
+    const sample = () => {
+      const names = [...document.querySelectorAll('[data-kind-pill], [data-view-pill], [data-reactions-pill]')].map((node) => (node.getAttribute('aria-label') ?? '').replace(/, unread( mention)?$/, ''))
+      if (names.join() !== frames.at(-1)?.join()) frames.push(names)
+      requestAnimationFrame(sample)
+    }
+    requestAnimationFrame(sample)
+  })
+  const second = await relaunch()
+  await expect.poll(() => second.sidebar.pillNames()).toEqual(moved)
+  // The pills wait for the saved order and the views, then appear once, in place: no frame shows another order.
+  const frames = await second.win.evaluate(() => (globalThis as unknown as { pillFrames: string[][] }).pillFrames)
+  expect(frames.filter((names) => names.length > 0)).toEqual([moved])
+})
