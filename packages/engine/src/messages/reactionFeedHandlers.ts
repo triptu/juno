@@ -1,20 +1,22 @@
 /**
- * The handler of `reactions.feed` (`contract/src/routes/reactionFeed.ts`).
+ * The handlers of `reactions.feed` and `reactions.watch`
+ * (`contract/src/routes/reactionFeed.ts`).
  *
- * The query (`reactionFeed.ts`) re-runs on `reaction_feed` and on the
- * tables a row is shaped from. While it is subscribed, a fiber in the
- * subscription's scope reads Slack's feed each time the sync's socket is
- * connected, the first time included, so the view catches up when it opens
- * and after a reconnect and never polls.
+ * `reactions.feed` is a store query like any list: it re-runs on
+ * `reaction_feed` and on the tables a row is shaped from, and asks Slack for
+ * nothing, so the page can keep it subscribed as it keeps the topic lists.
  *
- * A run that finds rows whose message the store lacks asks the sync to read
- * them, each once per connection: a read that fails is logged, the others
- * go on, and it is asked again after the socket reconnects. Messages the
- * store has are kept current by the sync (the socket, and its repair after
- * a gap), so they cost no call here. A failed feed read is logged; the
- * stored rows stay.
+ * `reactions.watch` is the view being open. While it is subscribed, a fiber
+ * in its scope reads Slack's feed each time the sync's socket is connected,
+ * the first time included, so the view catches up when it opens and after a
+ * reconnect and never polls. A second watches the same query for rows whose
+ * message the store lacks and asks the sync to read them, each once per
+ * connection: a read that fails is logged, the others go on, and it is asked
+ * again after the socket reconnects. Messages the store has are kept current
+ * by the sync (the socket, and its repair after a gap), so they cost no call
+ * here. A failed feed read is logged; the stored rows stay.
  */
-import { Clock, Effect, Scope, Stream } from 'effect'
+import { Clock, Effect, Result, Scope, Stream } from 'effect'
 import { ReactionFeedRoutes } from '@juno/contract'
 import { Invalidation, liveQuery, StoreReader, type InvalidationKeys } from '@juno/store'
 import { EngineConfig } from '../config'
@@ -38,15 +40,34 @@ export const ReactionFeedHandlers = ReactionFeedRoutes.toLayer(
     const link = yield* SyncLink
     const config = yield* EngineConfig
     const measure = config.e2e || config.dev
+    const selfIdOf = Effect.gen(function* () {
+      const sql = yield* StoreReader
+      return (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`.pipe(Effect.orElseSucceed(() => [])))[0]?.self_user_id ?? undefined
+    })
     return {
       'reactions.feed': () => {
         const runs = workspace.changes.pipe(
           Stream.switchMap((open) => {
             if (open === undefined) return Stream.empty
             const opened = Effect.gen(function* () {
+              const selfId = yield* selfIdOf
+              const query = Effect.gen(function* () {
+                return (yield* readReactionFeed(selfId, yield* Clock.currentTimeMillis)).rows
+              })
+              return liveQuery(KEYS, timed(query), { debounce: DEBOUNCE })
+            })
+            return Stream.unwrap(opened).pipe(Stream.provide(open.context))
+          }),
+        )
+        return serveLiveValue(runs, { measure }).pipe(retryFirstRun('reactions.feed'), Stream.orDie)
+      },
+      'reactions.watch': () => {
+        const runs = workspace.changes.pipe(
+          Stream.switchMap((open) => {
+            if (open === undefined) return Stream.empty
+            const opened = Effect.gen(function* () {
               const scope = yield* Scope.Scope
-              const sql = yield* StoreReader
-              const selfId = (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`.pipe(Effect.orElseSucceed(() => [])))[0]?.self_user_id ?? undefined
+              const selfId = yield* selfIdOf
               // Rows asked for since the socket last connected. Nothing is asked before the first connection's feed read.
               let connected = false
               const asked = new Set<string>()
@@ -66,23 +87,23 @@ export const ReactionFeedHandlers = ReactionFeedRoutes.toLayer(
                 ),
                 scope,
               )
-              const query = Effect.gen(function* () {
+              const missing = Effect.gen(function* () {
                 const run = yield* readReactionFeed(selfId, yield* Clock.currentTimeMillis)
                 const wanted = connected ? run.missing.filter((ref) => !asked.has(`${ref.channel}:${ref.ts}`)) : []
                 const fetcher = wanted.length === 0 ? undefined : yield* link.fetcher
-                if (fetcher !== undefined) {
-                  for (const ref of wanted) asked.add(`${ref.channel}:${ref.ts}`)
-                  const readAll = Effect.forEach(wanted, (ref) => fetcher.feedMessage(ref.channel, ref.ts).pipe(Effect.catch(logFailure('a message was not read'))), { discard: true })
-                  yield* Effect.forkIn(readAll, scope)
-                }
-                return run.rows
+                if (fetcher === undefined) return
+                for (const ref of wanted) asked.add(`${ref.channel}:${ref.ts}`)
+                const readAll = Effect.forEach(wanted, (ref) => fetcher.feedMessage(ref.channel, ref.ts).pipe(Effect.catch(logFailure('a message was not read'))), { discard: true })
+                yield* Effect.forkIn(readAll, scope)
               })
-              return liveQuery(KEYS, timed(query), { debounce: DEBOUNCE })
+              yield* Effect.forkIn(Stream.runDrain(liveQuery(KEYS, timed(missing), { debounce: DEBOUNCE })), scope)
+              // One value says the watch is on; the subscription then stays open until the page lets it go.
+              return Stream.make(Result.succeed({ value: true, queryMs: 0 })).pipe(Stream.concat(Stream.never))
             })
             return Stream.scoped(Stream.unwrap(opened).pipe(Stream.provide(open.context)))
           }),
         )
-        return serveLiveValue(runs, { measure }).pipe(retryFirstRun('reactions.feed'), Stream.orDie)
+        return serveLiveValue(runs, { measure }).pipe(Stream.orDie)
       },
     }
   }),

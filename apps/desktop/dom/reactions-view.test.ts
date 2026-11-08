@@ -4,12 +4,14 @@
 // live reaction makes its reactor the row's headline and moves it up; "+N"
 // counts the others who reacted now; another pill puts the topics back, and
 // while the view is closed a reaction and a reconnect ask Slack for nothing;
-// the feed is read again when the view reopens; and pressing a row opens the
+// the feed is read again when the view reopens, and opened again soon after it
+// shows its rows at once; and pressing a row opens the
 // topic at the message. That the message flashes in view is the browser
 // lane's, as for Search.
 import type { Query } from './query'
 import { expect } from './expect'
 import { domTest } from './test'
+import { settledPage } from './work'
 
 const POSTGRES = 'Draft plan is in the doc'
 const MAIN = 'Shipped the fix for the stuck upload queue'
@@ -27,7 +29,7 @@ const ours = (rows: Query, texts: ReadonlyArray<string> = [MAIN, REPLY]) => () =
     .map((row) => `${part(row, 'title')} | ${part(row, 'preview')}`)
     .filter((line) => texts.some((text) => line.endsWith(text)))
 
-domTest('the Reactions view lists reactions to your messages newest first, follows the socket, and opens the message', async ({ juno, fake, slack, step }) => {
+domTest('the Reactions view lists reactions to your messages newest first, follows the socket, and opens the message', async ({ juno, fake, slack, app, clock, step }) => {
   const eng = slack.channel('eng')
   const mainTs = slack.as('Tushar').postIn('eng', MAIN)
   slack.as('Tushar').replyIn(POSTGRES, REPLY)
@@ -80,12 +82,38 @@ domTest('the Reactions view lists reactions to your messages newest first, follo
     await expect.poll(ours(rows)).toEqual([`Priya +2 | ${MAIN}`, `Leo | ${REPLY}`])
   })
 
+  await step('opened again soon after, the view shows its rows at once, as the topic lists do', async () => {
+    await juno.sidebar.filter('All')
+    await expect(rows).toHaveCount(0)
+    // At rest, whatever the closed view let go is gone, so the view comes back from what was kept, not by chance.
+    await settledPage(app.window)
+    // Answers to a new rows subscription would wait here, so rows on screen come from the one kept open.
+    const release = app.holdReplies('reactions.feed')
+    await pill.click()
+    await expect.poll(ours(rows)).toEqual([`Priya +2 | ${MAIN}`, `Leo | ${REPLY}`])
+    release()
+  })
+
+  await step('opened again after the rows subscription lapsed, it shows the rows it had until the new one answers', async () => {
+    await juno.sidebar.filter('Channels')
+    await expect(rows).toHaveCount(0)
+    await settledPage(app.window)
+    // Past the 30 seconds a closed list's subscription is kept, so the reopen starts a new one, whose answers wait.
+    await clock.fastForward(31_000)
+    await settledPage(app.window)
+    const release = app.holdReplies('reactions.feed')
+    await pill.click()
+    await expect.poll(ours(rows)).toEqual([`Priya +2 | ${MAIN}`, `Leo | ${REPLY}`])
+    release()
+    await expect.poll(ours(rows)).toEqual([`Priya +2 | ${MAIN}`, `Leo | ${REPLY}`])
+  })
+
   await step('pressing a reply’s row opens its thread at the message', async () => {
     await rows.filter({ hasText: REPLY }).click()
     await juno.topic.expectTitle(POSTGRES)
     await expect(juno.topic.message(REPLY)).toBeVisible()
   })
-})
+}, { clock: true })
 
 domTest('the Reactions view reads messages Juno never stored, one at a time, and leaves out channels you left', async ({ juno, fake, slack, step }) => {
   const eng = slack.channel('eng')

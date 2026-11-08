@@ -4,7 +4,7 @@ export { engineStatusAtom, noticeClockAtom, OFFLINE_GRACE_MILLIS, pingCommand, s
 export { appStateAtom, copyDiagnostics, copySyncLog, describeTabs, showLogs, diagnosticsReport, formatCpu, readDiagnostics, reportAppStateAtom } from './diagnostics'
 export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signOutCommand } from './session'
 export { pillLooksAtom, pillOrderAtom, savePillLook, savePillOrder, viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
-export { reactionRowsAtom, sidebarPaneAtom } from './reactionFeed'
+export { reactionRowsAtom, reactionWatchAtom, sidebarPaneAtom } from './reactionFeed'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
   allTopicsFilterAtom,
