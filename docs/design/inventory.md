@@ -159,7 +159,7 @@ Row padding `0 10 10`, height 28, never taller. Two parts: a horizontal scroller
 - **Picking**: on pointer down, like the rows. Picking a view clears the scope chip. A view's list follows the same rules as All, limited to its conversations; Unread narrows it as it does All.
 - **Right-click a view pill** (native menu, §15.7): Edit view… · Move left · Move right · — · Delete view. Dragging a pill along the row reorders it (a 2px `--hl` caret shows where it lands); All, Channels, DMs and New view do not move.
 
-**Automated** (SPEC §5 "Automated"): Juno's own view, id `automated`, name "Automated", icon `robot`, Keep these out of All on. Made the first time a conversation goes in, last in the row; after a delete it is not made again. Its pill and sheet are those of any view. In its sheet, a conversation Juno put there shows "Added by Juno" 12 muted at the end of its row, before the check.
+**Automated** (SPEC §5 "Automated"): Juno's own view, id `automated`, name "Automated", icon `robot` in `midnight` (the purple view colour; a migration gives it to an Automated view with no colour), Keep these out of All on. Made the first time a conversation goes in, last in the row; after a delete it is not made again. Its pill and sheet are those of any view. In its sheet, a conversation Juno put there shows "Added by Juno" 12 muted at the end of its row, before the check.
 
 **View sheet** (`ViewSheet` in `@juno/views`): a popover dialog anchored under the filter row, start-aligned, 300px (`--menu-width-browse`), padding 14, radius 13, `--pop-shadow`, gap 12. Opens from New view, Edit view… and New view… in Add to view. Four fields, nothing else (the icon's colour belongs to the icon):
 

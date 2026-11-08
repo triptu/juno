@@ -37,7 +37,7 @@ const chrome: Omit<SidebarProps, 'children'> = {
 
 // Views (spec section 5): the built-in Automated first, then icon pills and name pills, enough to overflow a 384px sidebar.
 const views: ReadonlyArray<SidebarViewPill> = [
-  { id: 'automated', name: 'Automated', icon: 'robot', mention: true },
+  { id: 'automated', name: 'Automated', icon: 'robot', color: 'midnight', mention: true },
   { id: 'vdesign', name: 'Design crit', mention: false },
   { id: 'vlead', name: 'Leadership', mention: false },
   { id: 'vwork', name: 'Work', icon: 'briefcase', mention: false },
