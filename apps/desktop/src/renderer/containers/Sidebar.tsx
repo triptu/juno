@@ -13,6 +13,7 @@ import {
   registry,
   setPresence,
   pauseNotifications,
+  reactionsPillBeforeAtom,
   resumeNotifications,
   sidebarDotAtom,
   sidebarFilterAtom,
@@ -125,6 +126,7 @@ export function Sidebar() {
   const [filter, setFilter] = useAtom(sidebarFilterAtom)
   const reactions = useAtomValue(sidebarPaneAtom) === 'reactions'
   const views = useAtomValue(viewPillsAtom)
+  const reactionsBefore = useAtomValue(reactionsPillBeforeAtom)
   const sheet = useAtomValue(viewSheetAtom)
   const channelsDot = useAtomValue(sidebarDotAtom('channels'))
   const dmsDot = useAtomValue(sidebarDotAtom('dms'))
@@ -229,6 +231,7 @@ export function Sidebar() {
       }}
       onFilterKind={selectKind}
       views={views}
+      {...(reactionsBefore === undefined ? {} : { reactionsBefore })}
       onFilterView={selectView}
       {...(sheet === undefined ? {} : { viewSheet: <ViewSheet key={JSON.stringify(sheet)} sheet={sheet} /> })}
       onCloseViewSheet={closeViewSheet}

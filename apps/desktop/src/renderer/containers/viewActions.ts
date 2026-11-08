@@ -7,6 +7,7 @@
 import {
   dropViewOrder,
   moveViewOrder,
+  splitReactionsPill,
   viewMenuChoice,
   viewPillMenuItems,
   viewsAddChannel,
@@ -14,6 +15,7 @@ import {
   viewsRemoveChannel,
   viewsReorder,
   viewsSave,
+  withReactionsPill,
   type ChannelRef,
   type KindFilter,
   type ViewChoice,
@@ -21,7 +23,7 @@ import {
   type ViewMenuAction,
   type ViewPillAction,
 } from '@juno/contract'
-import { popupContextMenu, registry, runAction, runCommand, sidebarFilterAtom, sidebarPaneAtom, viewSheetAtom, viewsAtom } from '@juno/state'
+import { popupContextMenu, reactionsPillBeforeAtom, registry, runAction, runCommand, setReactionsPillBefore, sidebarFilterAtom, sidebarPaneAtom, viewSheetAtom, viewsAtom } from '@juno/state'
 import { Exit } from 'effect'
 import { startTransition } from 'react'
 import { markFilterChange } from './filterMark'
@@ -64,14 +66,20 @@ export function selectKind(kind: KindFilter): void {
 
 const viewOrder = () => registry.get(viewsAtom).map((view) => view.id)
 
-/** Saves the pill order. */
-function reorder(ids: ReadonlyArray<string>): void {
-  void runCommand(registry, viewsReorder, { ids })
+/** The pill row's order: the views, with the Reactions pill in its place. */
+const pillOrder = () => withReactionsPill(viewOrder(), registry.get(reactionsPillBeforeAtom))
+
+/** Saves a new pill order: the views' order, and where the Reactions pill sits, each only when it changed. */
+function reorder(order: ReadonlyArray<string>): void {
+  const { views, before } = splitReactionsPill(order)
+  const was = viewOrder()
+  if (views.length !== was.length || views.some((id, i) => id !== was[i])) void runCommand(registry, viewsReorder, { ids: views })
+  if (before !== registry.get(reactionsPillBeforeAtom)) void setReactionsPillBefore(registry, before)
 }
 
-/** A pill dropped before another view's, or at the end. */
+/** A pill (a view's or Reactions) dropped before another, or at the end. */
 export function moveView(id: string, before: string | undefined): void {
-  const order = viewOrder()
+  const order = pillOrder()
   const next = dropViewOrder(order, id, before)
   if (next !== order) reorder(next)
 }
@@ -86,7 +94,7 @@ function deleteView(id: string): void {
 
 /** The menu on a view's pill (inventory 15.7). */
 export async function showViewPillMenu(id: string): Promise<void> {
-  const order = viewOrder()
+  const order = pillOrder()
   const at = order.indexOf(id)
   if (at < 0) return
   const enabled = (item: ViewPillAction) => (item === 'view-left' ? at > 0 : item === 'view-right' ? at < order.length - 1 : true)

@@ -72,3 +72,25 @@ export function dropViewOrder(order: ReadonlyArray<string>, id: string, before: 
   const at = before === undefined ? rest.length : rest.indexOf(before)
   return at < 0 ? order : [...rest.slice(0, at), id, ...rest.slice(at)]
 }
+
+/**
+ * The Reactions pill's id in the pill order (SPEC 5, "Reactions"). It is not
+ * a view, so no view has this id: views have random ids, and Automated's is
+ * `automated`.
+ */
+export const REACTIONS_PILL = 'reactions'
+
+/** The workspace preference that holds where the Reactions pill sits: the id of the view it comes before, or none after the last view. */
+export const REACTIONS_PILL_PREF = 'reactionsPillBefore'
+
+/** The pill order with the Reactions pill in it: before the view `before` while that view is there, else last. */
+export function withReactionsPill(views: ReadonlyArray<string>, before: string | undefined): ReadonlyArray<string> {
+  const at = before === undefined ? -1 : views.indexOf(before)
+  return at < 0 ? [...views, REACTIONS_PILL] : [...views.slice(0, at), REACTIONS_PILL, ...views.slice(at)]
+}
+
+/** A pill order split back into the views' order and the view the Reactions pill comes before (undefined when last). */
+export function splitReactionsPill(order: ReadonlyArray<string>): { readonly views: ReadonlyArray<string>; readonly before: string | undefined } {
+  const at = order.indexOf(REACTIONS_PILL)
+  return { views: order.filter((id) => id !== REACTIONS_PILL), before: at < 0 ? undefined : order[at + 1] }
+}

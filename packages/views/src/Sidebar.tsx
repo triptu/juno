@@ -10,7 +10,7 @@ import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
-import type { ConversationKind, KindFilter } from '@juno/contract'
+import { REACTIONS_PILL, withReactionsPill, type ConversationKind, type KindFilter } from '@juno/contract'
 import { menuKeys } from '@juno/contract/channels'
 import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import {
@@ -120,15 +120,17 @@ export interface SidebarProps {
   readonly views?: ReadonlyArray<SidebarViewPill>
   /** Fires on mouse down, like the other filters. */
   readonly onFilterView?: (id: string) => void
-  /** The Reactions pill, after the views. Without it there is no pill. Fires on mouse down, like the other filters. */
+  /** The Reactions pill, among the views. Without it there is no pill. Fires on mouse down, like the other filters. */
   readonly onFilterReactions?: () => void
+  /** The view the Reactions pill comes before; after the last view when undefined or not among them. */
+  readonly reactionsBefore?: string
   /** The "+" pill. */
   readonly onNewView?: () => void
   /** The view sheet is open for a new view: the "+" pill holds its hover fill, as an open trigger. */
   readonly newViewOpen?: boolean
   /** Right-click (or the context-menu key) on a view's pill. */
   readonly onViewMenu?: (id: string) => void
-  /** A view's pill dropped before another view's, or at the end (`before` undefined). */
+  /** A view's pill or the Reactions pill (`REACTIONS_PILL`) dropped before another, or at the end (`before` undefined). */
   readonly onMoveView?: (id: string, before: string | undefined) => void
   /** The view sheet, open under the filter row while present. */
   readonly viewSheet?: ReactNode
@@ -163,7 +165,6 @@ export interface SidebarProps {
 const ALL_PAGES: ReadonlyArray<SidebarNavTarget> = ['search', 'all-topics', 'home', 'juno']
 
 /** The Reactions pill's icon (SPEC 5, "Reactions"): calm, and not a face. */
-const REACTIONS_ICON = Heart
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
@@ -197,6 +198,7 @@ export function Sidebar({
   views = [],
   onFilterView,
   onFilterReactions,
+  reactionsBefore,
   onNewView,
   newViewOpen = false,
   onViewMenu,
@@ -355,20 +357,14 @@ export function Sidebar({
                   {...activateHandlers<HTMLButtonElement>(() => onFilterKind('dms'))}
                 />
               </FilterPill>
-              <ViewPills views={views} selected={selected} onFilterView={onFilterView} onViewMenu={onViewMenu} onMoveView={onMoveView} />
-              {onFilterReactions === undefined ? null : (
-                <FilterPill>
-                  <Button
-                    variant="filter"
-                    iconStart={REACTIONS_ICON}
-                    {...tooltip('Reactions')}
-                    aria-label="Reactions"
-                    data-reactions-pill=""
-                    pressed={reactions}
-                    {...activateHandlers<HTMLButtonElement>(() => onFilterReactions())}
-                  />
-                </FilterPill>
-              )}
+              <ViewPills
+                views={views}
+                selected={selected}
+                onFilterView={onFilterView}
+                onViewMenu={onViewMenu}
+                onMoveView={onMoveView}
+                {...(onFilterReactions === undefined ? {} : { reactions: { before: reactionsBefore, pressed: reactions, onSelect: onFilterReactions } })}
+              />
             </PillRow>
             {onNewView === undefined ? null : (
               <FilterPill>
@@ -440,27 +436,41 @@ interface ViewPillsProps {
   readonly onFilterView: SidebarProps['onFilterView']
   readonly onViewMenu: SidebarProps['onViewMenu']
   readonly onMoveView: SidebarProps['onMoveView']
+  /** The Reactions pill, in its place among the views. */
+  readonly reactions?: { readonly before: string | undefined; readonly pressed: boolean; readonly onSelect: () => void }
 }
 
 /**
- * The views' pills. Dragging one along the row reorders it: a caret shows
- * where it lands, and only the views take part. The drag is local state;
- * the order changes when the owner saves it.
+ * The views' pills and the Reactions pill (SPEC 5, "Reactions"), a heart in
+ * coral. Dragging one along the row reorders it: a caret shows where it
+ * lands, and only these pills take part. The drag is local state; the order
+ * changes when the owner saves it.
  */
-function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView }: ViewPillsProps) {
-  const [drag, setDrag] = useState<{ readonly id: string; readonly over?: string; readonly side?: 'before' | 'after' } | undefined>(undefined)
-  const sideOf = (event: DragEvent<HTMLElement>): 'before' | 'after' => {
-    const box = event.currentTarget.getBoundingClientRect()
-    return event.clientX < box.left + box.width / 2 ? 'before' : 'after'
-  }
-  const drop = () => {
-    if (drag?.over === undefined || drag.side === undefined) return
-    const at = views.findIndex((view) => view.id === drag.over)
-    const before = drag.side === 'before' ? drag.over : views[at + 1]?.id
-    if (before !== drag.id) onMoveView?.(drag.id, before)
-  }
-  return views.map((view) => {
-    const mark = drag !== undefined && drag.over === view.id && drag.id !== view.id ? drag.side : undefined
+function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView, reactions }: ViewPillsProps) {
+  const viewIds = views.map((view) => view.id)
+  const order = reactions === undefined ? viewIds : withReactionsPill(viewIds, reactions.before)
+  const { dragHandlers, markOf } = usePillDrag(order, onMoveView)
+  const byId = new Map(views.map((view) => [view.id, view]))
+  return order.map((id) => {
+    const mark = markOf(id)
+    if (id === REACTIONS_PILL && reactions !== undefined) {
+      return (
+        <FilterPill key={REACTIONS_PILL} {...(mark === undefined ? {} : { mark })}>
+          <Button
+            variant="filter"
+            iconStart={Heart}
+            iconTint="coral"
+            {...tooltip('Reactions')}
+            aria-label="Reactions"
+            data-reactions-pill=""
+            pressed={reactions.pressed}
+            {...dragHandlers(REACTIONS_PILL, 'Reactions')}
+            {...activateHandlers<HTMLButtonElement>(() => reactions.onSelect())}
+          />
+        </FilterPill>
+      )
+    }
+    const view = byId.get(id)!
     const on = view.id === selected
     const dot = view.mention && !on
     const name = dot ? `${view.name}, unread mention` : view.name
@@ -474,30 +484,12 @@ function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView }: Vi
           {...(icon === undefined ? {} : { iconStart: icon, ...tooltip(view.name) })}
           {...(icon === undefined || view.color === undefined ? {} : { iconTint: view.color })}
           pressed={on}
-          draggable={onMoveView !== undefined}
           onContextMenu={(event: MouseEvent<HTMLButtonElement>) => {
             if (onViewMenu === undefined) return
             event.preventDefault()
             onViewMenu(view.id)
           }}
-          onDragStart={(event) => {
-            event.dataTransfer.effectAllowed = 'move'
-            event.dataTransfer.setData('text/plain', view.name)
-            setDrag({ id: view.id })
-          }}
-          onDragOver={(event) => {
-            if (drag === undefined) return
-            event.preventDefault()
-            event.dataTransfer.dropEffect = 'move'
-            const side = sideOf(event)
-            if (drag.over !== view.id || drag.side !== side) setDrag({ id: drag.id, over: view.id, side })
-          }}
-          onDrop={(event) => {
-            event.preventDefault()
-            drop()
-            setDrag(undefined)
-          }}
-          onDragEnd={() => setDrag(undefined)}
+          {...dragHandlers(view.id, view.name)}
           {...activateHandlers<HTMLButtonElement>(() => onFilterView?.(view.id))}
         >
           {icon === undefined ? view.name : undefined}
@@ -505,6 +497,44 @@ function ViewPills({ views, selected, onFilterView, onViewMenu, onMoveView }: Vi
       </FilterPill>
     )
   })
+}
+
+/** Dragging a pill along the row: where it would land, for the caret, and the drop, which asks the owner to move it. */
+function usePillDrag(order: ReadonlyArray<string>, onMoveView: SidebarProps['onMoveView']) {
+  const [drag, setDrag] = useState<{ readonly id: string; readonly over?: string; readonly side?: 'before' | 'after' } | undefined>(undefined)
+  const sideOf = (event: DragEvent<HTMLElement>): 'before' | 'after' => {
+    const box = event.currentTarget.getBoundingClientRect()
+    return event.clientX < box.left + box.width / 2 ? 'before' : 'after'
+  }
+  const drop = () => {
+    if (drag?.over === undefined || drag.side === undefined) return
+    const at = order.indexOf(drag.over)
+    const before = drag.side === 'before' ? drag.over : order[at + 1]
+    if (before !== drag.id) onMoveView?.(drag.id, before)
+  }
+  const dragHandlers = (id: string, name: string) => ({
+    draggable: onMoveView !== undefined,
+    onDragStart: (event: DragEvent<HTMLButtonElement>) => {
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', name)
+      setDrag({ id })
+    },
+    onDragOver: (event: DragEvent<HTMLButtonElement>) => {
+      if (drag === undefined) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+      const side = sideOf(event)
+      if (drag.over !== id || drag.side !== side) setDrag({ id: drag.id, over: id, side })
+    },
+    onDrop: (event: DragEvent<HTMLButtonElement>) => {
+      event.preventDefault()
+      drop()
+      setDrag(undefined)
+    },
+    onDragEnd: () => setDrag(undefined),
+  })
+  const markOf = (id: string) => (drag !== undefined && drag.over === id && drag.id !== id ? drag.side : undefined)
+  return { dragHandlers, markOf }
 }
 
 const styles = stylex.create({
