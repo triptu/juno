@@ -81,8 +81,8 @@ async function main() {
     })
     if (!release) recordReleaseTiming('notarize', Date.now(), { status: 'skipped' })
     recordReleaseTiming('electron-builder', builderStarted)
-  } catch {
-    console.error('Packaging failed; see electron-builder output above.')
+  } catch (error) {
+    console.error('Packaging failed:', error)
     process.exitCode = 1
   } finally {
     rmSync(staging, { recursive: true, force: true })
