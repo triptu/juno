@@ -3,10 +3,12 @@
  * that someone else reacted to lately, one row each as Slack's Activity
  * lists them, newest first by the headline reaction's time.
  *
- * `reactions.feed` reads the store. While it is subscribed the engine reads
- * Slack's `activity.feed` once, again each time the socket connects, and
- * reads the messages of rows the store lacks; the rows update as those land
- * and as reactions come and go on the socket. Nothing polls.
+ * `reactions.feed` reads the store, as every list does, so a view opened
+ * again shows its rows at once. `reactions.watch` is the view being open:
+ * while it is subscribed the engine reads Slack's `activity.feed` once,
+ * again each time the socket connects, and reads the messages of rows the
+ * store lacks; the rows update as those land and as reactions come and go
+ * on the socket. Nothing polls.
  */
 import { Schema } from 'effect'
 import { RpcGroup } from 'effect/rpc'
@@ -55,6 +57,14 @@ export const ReactionRow = Schema.Struct({
 })
 export type ReactionRow = typeof ReactionRow.Type
 
+/** The view's rows, from the store alone, like any list: subscribing asks Slack for nothing (`reactions.watch` does). */
 export const reactionsFeed = liveValueRoute('reactions.feed', { value: Schema.Array(ReactionRow) })
 
-export const ReactionFeedRoutes = RpcGroup.make(reactionsFeed)
+/**
+ * The view is open. While subscribed, the engine reads Slack's feed, now and each time the socket connects,
+ * and reads the messages of rows the store lacks. Its one value says the subscription started; it carries
+ * nothing else.
+ */
+export const reactionsWatch = liveValueRoute('reactions.watch', { value: Schema.Boolean })
+
+export const ReactionFeedRoutes = RpcGroup.make(reactionsFeed, reactionsWatch)

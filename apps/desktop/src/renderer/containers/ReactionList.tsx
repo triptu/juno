@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import type { ReactionRow } from '@juno/contract'
-import { nowAtom, reactionRowsAtom } from '@juno/state'
+import { nowAtom, reactionRowsAtom, reactionWatchAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { ReactionList as ReactionListView, ReactionRow as ReactionRowView, relativeTime } from '@juno/views'
 import { openTopicAt } from './navigation'
@@ -24,6 +24,8 @@ const Row = memo(function Row({ row, tabbable }: { readonly row: ReactionRow; re
  */
 export const ReactionList = memo(function ReactionList({ pillRoom }: { readonly pillRoom: boolean }) {
   const live = useAtomValue(reactionRowsAtom)
+  // The view being open: Slack is read while it is mounted, and not after.
+  useAtomValue(reactionWatchAtom)
   const [held, setHeld] = useState<ReadonlyArray<ReactionRow> | undefined>(undefined)
   const release = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const current = new Map((live ?? []).map((row) => [row.id, row]))
