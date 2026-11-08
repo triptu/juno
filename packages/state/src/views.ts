@@ -28,16 +28,23 @@ const savedPillLooksAtom = liveQuery(prefsGet)({ key: PILL_LOOKS_PREF })
 
 const sameIds = (a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean => a.length === b.length && a.every((id, i) => id === b[i])
 
+const NO_PILLS: ReadonlyArray<string> = []
+
 /**
  * Every pill after All in order, by id: Channels, DMs and Reactions
  * (`BUILTIN_PILLS`) among the views (SPEC 5, "Quick filters"). A workspace
  * preference holds it, so a dragged pill keeps its place across a relaunch.
+ * Empty until both the preference and the views have answered, so at launch
+ * the pills appear once, in their places, and never reorder; after that the
+ * order shown holds while a new value is on its way.
  */
 export const pillOrderAtom = Atom.make((get): ReadonlyArray<string> => {
-  const result = get(savedPillOrderAtom)
-  // While a new value is on its way the order shown holds.
-  const saved: unknown = AsyncResult.isSuccess(result) ? result.value : Option.getOrUndefined(get.self<ReadonlyArray<string>>())
-  return pillOrder(get(viewsAtom).map((view) => view.id), saved)
+  const saved = get(savedPillOrderAtom)
+  const held = Option.getOrUndefined(get.self<ReadonlyArray<string>>())
+  const shown = held !== undefined && held.length > 0
+  if (!shown && (AsyncResult.isInitial(saved) || AsyncResult.isInitial(get(viewsResultAtom)))) return NO_PILLS
+  const value: unknown = AsyncResult.isSuccess(saved) ? saved.value : AsyncResult.isInitial(saved) ? held : undefined
+  return pillOrder(get(viewsAtom).map((view) => view.id), value)
 }).pipe(Atom.withEquality(sameIds))
 
 /** How Channels, DMs and Reactions are drawn: an icon and a colour each, which Edit view on their pill changes. */
@@ -52,11 +59,10 @@ export function savePillOrder(registry: Registry, order: ReadonlyArray<string>) 
   return runCommand(registry, prefsSet, { key: PILL_ORDER_PREF, value: [...order] })
 }
 
-/** Saves a built-in pill's icon and colour. */
+/** Saves a built-in pill's icon and colour, with the other two as they are drawn now. */
 export function savePillLook(registry: Registry, id: BuiltinPill, look: PillLook) {
-  const saved = registry.get(savedPillLooksAtom)
-  const before = AsyncResult.isSuccess(saved) && typeof saved.value === 'object' && saved.value !== null && !Array.isArray(saved.value) ? saved.value : {}
-  return runCommand(registry, prefsSet, { key: PILL_LOOKS_PREF, value: { ...before, [id]: savedPillLook(look) } })
+  const looks = { ...registry.get(pillLooksAtom), [id]: look }
+  return runCommand(registry, prefsSet, { key: PILL_LOOKS_PREF, value: Object.fromEntries(Object.entries(looks).map(([pill, each]) => [pill, savedPillLook(each)])) })
 }
 
 /** A view's pill: what the filter row draws. */
