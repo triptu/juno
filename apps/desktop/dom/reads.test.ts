@@ -100,12 +100,14 @@ domTest('Mark unread on a message makes it and the rest unread, holds while you 
   const firstNew = topic.root.locator('[data-new-divider] + [data-message-row]')
   await postgres.open()
   await topic.expectMessage('Cutover is Tuesday at 9.')
+  // An open fixes its divider at the stored read pointer, so the read this open sends is stored, and in Slack, before
+  // the topic opens again; a busy engine can otherwise answer after the second open.
+  await postgres.expectRead()
+  await expect.poll(() => slackPointer()).toBe(tenth)
   await juno.sidebar.row(RINA).open()
   await topic.expectTitle(RINA)
   await postgres.open()
   await topic.expectMessage('Cutover is Tuesday at 9.')
-  await postgres.expectRead()
-  await expect.poll(() => slackPointer()).toBe(tenth)
   await expect(topic.root.locator('[data-new-divider]')).toHaveCount(0)
 
   await step('Mark unread on the seventh: the divider is before it, four unread with the mention, and Slack reads to the sixth', async () => {
