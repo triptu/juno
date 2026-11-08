@@ -34,16 +34,25 @@ export function JunoChatFrame({ header, children, pill, composer, column = 'page
   )
 }
 
-/** The `--duration-appear` value in milliseconds, read once. */
-let appearMs: number | undefined
-function appearDuration(): number {
-  appearMs ??= rootDuration('--duration-appear')
-  return appearMs
+/** The flash's hold and fade in milliseconds, read once. */
+let flashMs: { readonly hold: number; readonly fade: number } | undefined
+function flashTiming(): { readonly hold: number; readonly fade: number } {
+  flashMs ??= { hold: rootDuration('--flash-hold'), fade: rootDuration('--duration-flash-fade') }
+  return flashMs
 }
 
-/** Flashes a row the chat scrolled to (a citation, a reply's quote) with the soft accent, once. */
+/** Flashes a row Juno jumped to (a topic message, a citation, a reply's quote) with the soft accent: it holds, then fades. */
 export function flashChatRow(row: Element): void {
-  row.animate([{ backgroundColor: accent['--hl-soft'] }, { backgroundColor: 'transparent' }], { duration: appearDuration(), easing: 'ease-out' })
+  const { hold, fade } = flashTiming()
+  const total = hold + fade
+  row.animate(
+    [
+      { backgroundColor: accent['--hl-soft'], offset: 0 },
+      { backgroundColor: accent['--hl-soft'], offset: total === 0 ? 0 : hold / total, easing: 'ease-out' },
+      { backgroundColor: 'transparent', offset: 1 },
+    ],
+    { duration: total },
+  )
 }
 
 const styles = stylex.create({

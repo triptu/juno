@@ -854,6 +854,12 @@ export const motion = stylex.defineVars({
     default: '220ms',
     [REDUCED_MOTION]: '0.01ms',
   },
+  // A message Juno jumps to (a search result, a reaction, a notification, a
+  // citation) keeps the soft highlight for --flash-hold, then fades over
+  // --duration-flash-fade. A colour fade with no movement, so reduced
+  // motion keeps it.
+  '--flash-hold': '1000ms',
+  '--duration-flash-fade': '1000ms',
   // One breath of the incoming huddle's pulse. Reduced motion stops the pulse instead.
   '--duration-pulse': '2400ms',
   // Entrances: the toast rises 8px, each part of an empty state rises 6px.

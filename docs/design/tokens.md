@@ -682,6 +682,7 @@ Buttons, toggles, menus and popovers answer at once. Buttons have no press motio
 | `--duration-appear` | 240ms | Toast, palette, card and empty-state entrance |
 | `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
+| `--flash-hold`, `--duration-flash-fade` | 1000ms, 1000ms | A message Juno jumps to (a search result, a reaction, a notification, a Slack link, a citation) keeps `--hl-soft` for the hold, then fades out over the fade, ease-out. Read from the root by its Web Animation. Kept under reduced motion: a colour fade with no movement |
 | `--duration-pulse` | 2400ms | One breath of an incoming huddle's glow (huddles 10-20), read from the root by its Web Animation. Not shortened for reduced motion: the card does not start the pulse there |
 | `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Non-button entrances and exits, and sidebar rows sliding to new places |
 | `--duration-reorder` | 220ms | Sidebar rows sliding to their new places when a change from elsewhere reorders the list at its top (SPEC 5, "Letting go"); 0 under reduced motion |
