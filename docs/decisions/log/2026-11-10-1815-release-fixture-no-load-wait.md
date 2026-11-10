@@ -1,0 +1,1 @@
+- 11-10 18:15 · Release fixture skips the load wait · The release tests' worktree install no longer waits while this machine's load is above 8. A local batch merge under load timed out in "a green run that skipped tests is not a full run" at "load 9.4 is above 8"; the fixture now sets the flag remote runs set, since the test does not control the machine's load.

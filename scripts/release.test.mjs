@@ -108,6 +108,8 @@ function fixture(t) {
   const file = (name) => join(folder, name)
   for (const path of [repo, bin, file('home'), file('tmp')]) mkdirSync(path)
   const env = { ...process.env, HOME: file('home'), TMPDIR: file('tmp'), TMP: file('tmp'), TEMP: file('tmp'), JUNO_RELEASE: '', PATH: `${bin}:${process.env.PATH}`, JUNO_WORKTREE_DIR: file('worktrees'), JUNO_UPDATE_TOKEN: 'fake',
+    // The release worktree's install must not wait on this machine's load (scripts/worktree.mjs); the test does not control it.
+    JUNO_REMOTE_CONTAINER: '1',
     GIT_CONFIG_GLOBAL: '/dev/null', GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
   const git = (...args) => execFileSync('git', args, { cwd: repo, env, encoding: 'utf8' }).trim()
   const commit = (subject, files) => {

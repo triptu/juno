@@ -94,7 +94,7 @@ export interface WorkerFixtures {
 
 type SyncOptions = Pick<LaunchOptions, 'timing' | 'fakeAiDelayMillis'>
 
-export interface RelaunchOptions extends Pick<LaunchOptions, 'aiJobs' | 'cacheMigration' | 'tour'> {
+export interface RelaunchOptions extends Pick<LaunchOptions, 'aiJobs' | 'cacheMigration' | 'tour' | 'foreground'> {
   /** Runs while the app is closed: edit `user.db` or a launch preference here. */
   readonly whileClosed?: () => unknown
 }
@@ -335,6 +335,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     let latest: RunningApp = running
     await use(async ({ whileClosed, ...options } = {}) => {
       if (lane === 'web') {
+        if (options.foreground) throw new Error('foreground is an Electron launch option; tag the test @electron.')
         const page = webPage!
         const host = running.host!
         await page.goto('about:blank')

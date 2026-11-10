@@ -2,6 +2,7 @@ import type { ElectronApplication, Locator, Page } from '@playwright/test'
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
+import { foregroundRuns } from './launch'
 import { expectStableAnchor } from './shiftProbe'
 import { longerThanView } from './stickBottomLists'
 
@@ -107,7 +108,7 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
 }
 
 // Signed in. The drag regions are counted first, before any surface has opened.
-syncedTest('the window: its image policy, drag regions, surfaces over the title bars, the build line with updates off, the test notification and permission line, swipes, minimize, the bottom at 2x, full screen and zoom', { tag: '@electron' }, async ({ juno, fake, app, win }) => {
+syncedTest('the window: its image policy, drag regions, surfaces over the title bars, the build line with updates off, the test notification and permission line, swipes, minimize, the bottom at 2x, zoom and full screen', { tag: '@electron' }, async ({ juno, fake, app, win, relaunch }) => {
   await test.step('images load only from the app and Slack; unfurls go through main (src/main/publicImage.ts)', async () => {
     const policy = await juno.win.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
     expect(policy).toContain("img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:")
@@ -122,10 +123,13 @@ syncedTest('the window: its image policy, drag regions, surfaces over the title 
   await test.step('window swipe events move back and forward', () => swipes(juno))
   await test.step('repeated window minimize and restore keeps the draft', () => minimizeKeepsDraft(juno, app))
   await test.step('the bottom survives shrinking content and fractional offsets at 2x', () => bottomAt2x(juno, fake, app, win))
-  // Zoom leaves the window at its minimum size, and full screen hides the sidebar: both go last.
+  // Zoom leaves the window at its minimum size, and full screen needs a relaunch: both go last.
   await test.step('zooming in from the View menu keeps the whole sidebar inside the window', () => zoom(juno, app, win))
-  // Settings is a tab: the title bars stay as they are.
-  await test.step('in full screen the title bars drop the traffic lights’ room, and keep it again after', () => fullScreenInsets(juno))
+  // Full screen activates the app on the Mac, so this relaunch runs in the foreground, and there only on request.
+  await test.step('in full screen the title bars drop the traffic lights’ room, and keep it again after', async (step) => {
+    step.skip(!foregroundRuns, 'takes the keyboard on the Mac; JUNO_E2E_FOREGROUND=1 runs it')
+    await fullScreenInsets(await relaunch({ foreground: true }))
+  })
 })
 
 // Main posts the test notification and reads macOS's permission (`junoTest.notificationPermission` fakes it).

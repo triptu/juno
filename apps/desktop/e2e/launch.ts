@@ -2,6 +2,7 @@ import { _electron as electron, test as base, type ElectronApplication, type Pag
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { quietArgs } from 'quiet-electron'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import type { TestHost } from './browser/host'
@@ -82,7 +83,16 @@ export interface LaunchOptions {
   readonly sidebarTrace?: boolean
   /** Record a send's path through the main window (`sendTrace.ts` in `@juno/state`; README, "Send trace"). */
   readonly sendTrace?: boolean
+  /**
+   * The test needs the app in the foreground: active, with key focus, and able to enter full screen.
+   * On the Mac this launches without the quiet-electron shim (`QUIET_ELECTRON=off`), so the app takes
+   * the keyboard while the test runs (README, "Electron lane").
+   */
+  readonly foreground?: boolean
 }
+
+/** Whether a check that needs the app in the foreground runs: always off the Mac, and on the Mac only with `JUNO_E2E_FOREGROUND=1`, since there it takes the keyboard. */
+export const foregroundRuns = process.platform !== 'darwin' || process.env.JUNO_E2E_FOREGROUND === '1'
 
 export function launchTiming(options: LaunchOptions): 'fast' | 'production' {
   const info = base.info()
@@ -125,6 +135,7 @@ function launchEnv(userData: string, options: LaunchOptions): Record<string, str
   if (options.aiJobs === true) env.JUNO_E2E_AI_JOBS = '1'
   else delete env.JUNO_E2E_AI_JOBS
   if (options.backupIntervalMs !== undefined) env.JUNO_E2E_BACKUP_INTERVAL_MS = String(options.backupIntervalMs)
+  if (options.foreground === true) env.QUIET_ELECTRON = 'off'
   return env
 }
 
@@ -146,11 +157,14 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
   const app = await electron.launch({
+    // On the Mac, quietArgs keeps the app from activating or taking key focus, and by default
+    // makes its windows invisible and click-through, so tests never take the keyboard (README, "Electron lane").
     // Under xvfb (bun run remote) Chromium may find no pointing device and match
     // `(hover: none)`, which turns off every hover style. Say there is a mouse.
     // A window behind another test's, or without focus, keeps its frames and timers running, as Playwright's own
     // Chromium does: on the Mac, several workers' windows overlap, and an occluded one stopped drawing frames.
     args: [
+      ...quietArgs(env),
       ...(process.platform === 'linux' ? ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4'] : []),
       '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--disable-background-timer-throttling', '--lang=en-US',
       resolve(__dirname, '..'),
