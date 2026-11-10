@@ -1,4 +1,5 @@
 import { Schema } from 'effect'
+import { Ts } from './ts.ts'
 
 /**
  * One edge `emojis/list` result, as observed live on 2026-10-16 (research
@@ -17,6 +18,24 @@ export type CustomEmoji = typeof CustomEmoji.Type
 export const EdgeEmojisListOk = Schema.Struct({
   ok: Schema.Literal(true), results: Schema.Array(CustomEmoji), next_marker: Schema.optionalKey(Schema.String),
 })
+
+/**
+ * The socket's word that a custom emoji was added (`name`, `value`), removed
+ * (`names`) or renamed (`old_name`, `new_name`, `value`). `value` is as in an
+ * `emojis/list` result. Shape from Slack's Events API reference; not yet
+ * observed on the client socket.
+ */
+export const EmojiChangedEvent = Schema.Struct({
+  type: Schema.Literal('emoji_changed'),
+  subtype: Schema.String,
+  name: Schema.optionalKey(Schema.String),
+  names: Schema.optionalKey(Schema.Array(Schema.String)),
+  old_name: Schema.optionalKey(Schema.String),
+  new_name: Schema.optionalKey(Schema.String),
+  value: CustomEmoji.fields.value,
+  event_ts: Schema.optionalKey(Ts),
+})
+export type EmojiChangedEvent = typeof EmojiChangedEvent.Type
 
 const ALIAS_PREFIX = 'alias:'
 

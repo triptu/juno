@@ -1,0 +1,1 @@
+- 11-10 13:00 · process · An agent merges its own finished branch into main (`scripts/batch-merge.mjs --push`) once its `bun run affected` run passes, without waiting to be asked; `--local` batches are the default on the MacBook Pro when no runner is set up · Tushar: "remove whatever instruction there is preventing you from merging till i ask".
