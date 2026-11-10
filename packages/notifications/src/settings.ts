@@ -114,11 +114,11 @@ export const slackPrefs = Effect.gen(function* () {
   return json == null ? undefined : (JSON.parse(json) as Record<string, unknown>)
 })
 
+const ownSettingsOf = (notifications: unknown, aiAssist: unknown) => ({ settings: settingsOf(notifications), aiAssist: aiAssist !== false })
+
 /** The settings as the owner set them, with no hours where they set none. Change and save these. */
 export const readOwnSettings = Effect.gen(function* () {
-  const settings = settingsOf(yield* prefs.get('notifications'))
-  const aiAssist = (yield* prefs.get('aiAssist')) !== false
-  return { settings, aiAssist }
+  return ownSettingsOf(yield* prefs.get('notifications'), yield* prefs.get('aiAssist'))
 })
 
 /** The hours Slack's own schedule lets notifications through, as the sync last stored it. Undefined pauses nothing. */
@@ -127,11 +127,13 @@ export const slackHours = Effect.map(slackPrefs, (cached) => (cached === undefin
 /** The pref that holds Slack's snooze as the engine last heard it: `{ until }` in epoch milliseconds, or null. */
 export const SNOOZE_PREF = 'slackSnooze'
 
-/** When Slack's snooze ends, as last heard; undefined when there is none. It may have ended already. */
-export const readSnooze = Effect.map(prefs.get(SNOOZE_PREF), (raw) => {
+const snoozeOf = (raw: unknown): number | undefined => {
   const until = typeof raw === 'object' && raw !== null ? (raw as { until?: unknown }).until : undefined
   return typeof until === 'number' ? until : undefined
-})
+}
+
+/** When Slack's snooze ends, as last heard; undefined when there is none. It may have ended already. */
+export const readSnooze = Effect.map(prefs.get(SNOOZE_PREF), snoozeOf)
 
 /** Saves Slack's snooze end (undefined: none), only when it changed, so an unchanged answer invalidates nothing. */
 export const writeSnooze = (until: number | undefined) => transaction(Effect.gen(function* () {
@@ -142,10 +144,14 @@ export const writeSnooze = (until: number | undefined) => transaction(Effect.gen
 /**
  * The settings as they decide: the notification hours are the ones in effect, and `snoozedUntil` is there while
  * Slack's snooze runs now. Reads Slack's prefs (the `team` row) while the owner has not set the hours.
+ * Its prefs come in one statement: every incoming message reads them, several times.
  */
 export const readSettings = Effect.gen(function* () {
-  const own = yield* readOwnSettings
-  const until = yield* readSnooze
+  const sql = yield* StoreReader
+  const rows = yield* sql<{ key: string; value_json: string }>`SELECT key, value_json FROM prefs WHERE key IN ('notifications', 'aiAssist', ${SNOOZE_PREF})`
+  const stored = new Map(rows.map((row) => [row.key, JSON.parse(row.value_json) as unknown]))
+  const own = ownSettingsOf(stored.get('notifications'), stored.get('aiAssist'))
+  const until = snoozeOf(stored.get(SNOOZE_PREF))
   const now = yield* Clock.currentTimeMillis
   const snoozed = until !== undefined && until > now ? { ...own, settings: { ...own.settings, snoozedUntil: until } } : own
   if (own.settings.notificationHours !== undefined) return snoozed

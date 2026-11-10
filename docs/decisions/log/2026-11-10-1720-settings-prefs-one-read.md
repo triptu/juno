@@ -1,0 +1,1 @@
+- 11-10 17:20 · performance · `readSettings` reads its three prefs (`notifications`, `aiAssist`, `slackSnooze`) in one statement, not one each: Pause notifications added the third read, three times per live reply, which took that counted budget from 112 statements to 115 against 114; it is 109 now · the failed `live reply` budget on main.
