@@ -69,12 +69,14 @@ const makeCatchUpRetry = (runtime: SyncRuntime, reconcile: Effect.Effect<void, S
 
 /** Rechecks a captured socket gap; a failure restores it without losing a later drop. */
 const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
-  const { state, ctx, options, reportBoot } = runtime
+  const { state, ctx, options, reportBoot, background, refreshEmoji } = runtime
   const openNow = options.openTopics ?? Effect.succeed([])
   const previous = state.lastBoot ?? (yield* bootState())
   if (previous === undefined) return
   const droppedAt = state.droppedAt
   state.droppedAt = undefined
+  // An `emoji_changed` sent while the socket was down is lost, so the custom emoji are read again beside the catch-up.
+  if (droppedAt !== undefined) yield* FiberSet.run(background, refreshEmoji.pipe(Effect.asVoid))
   const recheck = droppedAt === undefined ? undefined : { since: droppedAt, first: yield* openNow }
   const next = yield* catchUp(ctx, previous, reportBoot, {
     refreshWorkspace: false,

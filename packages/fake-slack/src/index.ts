@@ -237,9 +237,10 @@ export class FakeSlack {
     this.workspace.putUsergroup(input)
   }
 
-  /** A custom emoji in the workspace, listed by edge `emojis/list` and taken as a reaction name. */
+  /** A custom emoji in the workspace, listed by edge `emojis/list` and taken as a reaction name. Emits `emoji_changed`. */
   addEmoji(input: { name: string; url: string }): void {
     this.workspace.emoji.set(input.name, { name: input.name, value: input.url })
+    this.workspace.emit({ type: 'emoji_changed', subtype: 'add', name: input.name, value: input.url, event_ts: this.workspace.eventTs() })
   }
 
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {

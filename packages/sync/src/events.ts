@@ -4,16 +4,7 @@
  * and `reindexTopics` runs for the topics the event touched.
  */
 import { compareTs, millisToTs, type Ts } from '@juno/domain'
-import {
-  isReply,
-  isMessageChanged,
-  isMessageDeleted,
-  isMessagePosted,
-  isMessageReplied,
-  type Channel,
-  type Message,
-  type RtmFrame,
-} from '@juno/slack-schema'
+import { isReply, isMessageChanged, isMessageDeleted, isMessagePosted, isMessageReplied, type Channel, type Message, type RtmFrame } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
 import { huddleFrameWrite } from './write/huddles'
@@ -26,6 +17,7 @@ import { reindexTopics, topicsOfMessages } from './reindex'
 import { liveRootRange, noteLiveRoot } from './liveRoots'
 import { provenToEnd } from './threadRanges'
 import { applyUsergroups, changeOwnUsergroup } from './usergroups'
+import { applyEmojiChange } from './emoji'
 import {
   changeReaction,
   hearReply,
@@ -210,6 +202,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'subteam_self_added':
       case 'subteam_self_removed':
         return yield* transaction(changeOwnUsergroup(ctx, frame.subteam_id, frame.type === 'subteam_self_added'))
+      case 'emoji_changed': return yield* transaction(applyEmojiChange(frame))
       case 'pref_change':
         return yield* transaction(setPref(frame.name, frame.value))
       case 'file_created':

@@ -55,6 +55,7 @@ domTest('edits, deletes, reacts, quotes and opens threads from Main', async ({ j
   await step('the keyboard: ↑ selects, E edits, Delete asks once, and E and Delete do nothing on others’ messages', () => keyboardActions(context))
   await step('reactions: a quick reaction, its chip toggled off, and one from the full picker', () => reactToMessage(context))
   await step('a custom emoji reaction shows its image from the first frame, never its :name:', () => customEmojiReaction(context))
+  await step('a custom emoji added while Juno runs shows its image on a reaction', () => newCustomEmoji(context))
   await step('a reaction Slack keeps refusing stops after five tries with one toast, and Retry starts again', () => refusedReaction(context))
   await step('Quote puts the message in the composer as "> " lines; a selection quotes only itself', () => quoteMessage(context))
   await step('Edit and Delete from the menus, and Edit after the message changed elsewhere', () => menuActions(context))
@@ -281,6 +282,18 @@ async function customEmojiReaction({ juno, fake }: Context): Promise<void> {
   record()
   expect(chipStates.length).toBeGreaterThan(0)
   expect(chipStates.filter((state) => state.includes(':juno_party:')), 'chip states that showed the code as text').toEqual([])
+}
+
+/** Regression: an emoji added to the workspace after the boot showed as `:name:` until the next launch. */
+async function newCustomEmoji({ juno, fake }: Context): Promise<void> {
+  const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'The drum fill landed' })
+  const row = juno.topic.message('The drum fill landed')
+  await expect(row).toBeVisible()
+  fake.addEmoji({ name: 'ba-dum-tsss', url: `${fake.url}/emoji/juno_party.svg` })
+  fake.addReaction({ channel: 'C0ENG', ts: message.ts, name: 'ba-dum-tsss', user: 'U0PRIYA' })
+  const chip = row.locator('[data-reaction="ba-dum-tsss"]')
+  await expect(chip.locator('img')).toHaveAttribute('src', `${fake.url}/emoji/juno_party.svg`)
+  await expect(chip).not.toContainText(':ba-dum-tsss:')
 }
 
 async function quoteMessage({ juno, fake }: Context): Promise<void> {

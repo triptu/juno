@@ -16,6 +16,7 @@ import { ThreadSubscription } from './threads.ts'
 import { Subteam, User } from './users.ts'
 import { DraftChangedEvent, DraftRemovedEvent } from './drafts.ts'
 import { DndUpdatedEvent } from './dnd.ts'
+import { EmojiChangedEvent } from './emoji.ts'
 
 const opt = S.optionalKey
 
@@ -54,9 +55,7 @@ export const ErrorFrame = S.Struct({
 export const GoodbyeFrame = S.Struct({ type: S.Literal('goodbye') })
 export const ReconnectUrlFrame = S.Struct({ type: S.Literal('reconnect_url'), url: S.String })
 /** Frames with no payload that change the session's state. */
-export const SignalFrame = S.Struct({
-  type: S.Literals(['force_reload', 'user_session_expiration', 'access_paused', 'clear_cache']),
-})
+export const SignalFrame = S.Struct({ type: S.Literals(['force_reload', 'user_session_expiration', 'access_paused', 'clear_cache']) })
 
 // message and its structural subtypes.
 
@@ -364,7 +363,7 @@ export const KnownFrames = [
   UserChangeEvent,
   SubteamEvent,
   SubteamMembersChangedEvent,
-  SubteamSelfEvent,
+  SubteamSelfEvent, EmojiChangedEvent,
   PrefChangeEvent,
   FileEvent,
   DesktopNotificationEvent,

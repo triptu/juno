@@ -6,7 +6,7 @@ import { ME_KEY, type BootState, type Phase } from '../boot'
 import { makeMarkerCandidates } from '../markerCandidates'
 import { SyncConfig } from '../config'
 import type { FileFetch, RootFetch, SyncContext } from '../context'
-import { syncEmoji } from '../emoji'
+import { oneAtATime, syncEmoji } from '../emoji'
 import { syncUsergroups } from '../usergroups'
 import { getSyncState } from '../write/state'
 
@@ -89,10 +89,10 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
   }
   const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
   // Each says whether it finished; a failure other than an expired session is logged.
-  const refreshEmoji = syncEmoji().pipe(
+  const refreshEmoji = oneAtATime(syncEmoji().pipe(
     Effect.as(true),
     Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: emoji refresh failed', { cause: error }), false)),
-  )
+  ))
   const refreshUsergroups = syncUsergroups(ctx).pipe(
     Effect.as(true),
     Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: user groups refresh failed', { cause: error }), false)),

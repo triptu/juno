@@ -40,5 +40,7 @@
  * cache table, which the index imports; the rows do not differ, as for 10.
  * 18: a user migration gives Automated its midnight colour, which the index
  * imports; the rows do not differ, as for 10.
+ * 19: the socket's `emoji_changed` frame added to the Slack schema, which
+ * the index imports; the rows do not differ, as for 10.
  */
-export const INDEX_VERSION = 18
+export const INDEX_VERSION = 19
