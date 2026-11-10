@@ -61,6 +61,7 @@
     "electron-vite": "6.0.0",
     "happy-dom": "20.0.10",
     "oxc-transform-react": "0.155.0",
+    "quiet-electron": "github:triptu/quiet-electron#v0.1.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "typescript": "7.0.2",

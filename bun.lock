@@ -65,6 +65,7 @@
         "electron-vite": "6.0.0",
         "happy-dom": "20.0.10",
         "oxc-transform-react": "0.155.0",
+        "quiet-electron": "github:triptu/quiet-electron#v0.1.0",
         "react": "19.3.0",
         "react-dom": "19.3.0",
         "typescript": "7.0.2",
@@ -1701,6 +1702,8 @@
     "quick-lru": ["quick-lru@5.1.1", "", {}, "sha512-WuyALRjWPDGtt/wzJiadO5AXY+8hZ80hVpe6MyivgraREW751X3SbhRvG3eLKOYN+8VEvqLcf3wdnt44Z4S4SA=="],
 
     "quickjs-wasi": ["quickjs-wasi@3.6.2", "", {}, "sha512-FCqGtGOrMgzUiIrMNMA2YnsOxCNwo31dzqXvclXUC6xeT35NJLKXQJsvbeCTjvoFAwZgEAPg8U6+KAPDGXn8Mg=="],
+
+    "quiet-electron": ["quiet-electron@github:triptu/quiet-electron#8bbcc06", {}, "triptu-quiet-electron-8bbcc06", "sha512-iQSTaBE/KDpxpwuKGg4Jf1BG5rHwc+cNtMdr/54iWGxznKfkdc5eaiaIT8bP9MS1rAthjV5vsN+1dglij4d7Ug=="],
 
     "react": ["react@19.3.0", "", {}, "sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog=="],
 
