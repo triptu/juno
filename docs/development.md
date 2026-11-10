@@ -172,7 +172,7 @@ specs model changed ("Affected tests"), on one machine. Files that passed with
 the same inputs, in an agent's run or an earlier batch, are skipped through the
 shared results cache. The full suites are not part of a batch (see "Testing").
 When the SSH runner is unavailable, the batch waits for it; `--local` runs those steps on this Mac
-through the machine lock, and is only for when Tushar asks, since heavy runs make the Mac hang. A failed command retains the worktree;
+through the machine lock. Use it on the MacBook Pro when no runner is set up; on the MacBook Air only when Tushar asks, since heavy runs make it hang. A failed command retains the worktree;
 fix the cause, commit source fixes, and continue to rerun checks.
 
 Nothing pushes without `--push`. Publishing checks commit messages for attribution
