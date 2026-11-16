@@ -12,16 +12,24 @@ export type Unprotect = (blob: Buffer) => Buffer | undefined
 
 const CRYPTPROTECT_UI_FORBIDDEN = 0x1
 
-/** Loads `crypt32!CryptUnprotectData`. Undefined off Windows or when koffi does not load. */
-export async function loadUnprotect(): Promise<Unprotect | undefined> {
-  if (process.platform !== 'win32') return undefined
-  let koffi: typeof import('koffi')
-  try {
-    koffi = await import('koffi')
-  } catch (cause) {
-    console.warn('main: DPAPI off, koffi did not load', cause)
+let loaded: Promise<Unprotect | undefined> | undefined
+
+/**
+ * `crypt32!CryptUnprotectData`, loaded once: koffi refuses to declare the
+ * `DATA_BLOB` struct a second time, so a retried import must reuse it.
+ * Undefined off Windows or when koffi or crypt32 does not load.
+ */
+export function loadUnprotect(): Promise<Unprotect | undefined> {
+  if (process.platform !== 'win32') return Promise.resolve(undefined)
+  loaded ??= bind().catch((cause: unknown) => {
+    console.warn('main: DPAPI off, koffi or crypt32 did not load', cause)
     return undefined
-  }
+  })
+  return loaded
+}
+
+async function bind(): Promise<Unprotect> {
+  const koffi = await import('koffi')
   const blob = koffi.struct('DATA_BLOB', { cbData: 'uint32_t', pbData: 'uint8_t *' })
   const crypt32 = koffi.load('crypt32.dll')
   const kernel32 = koffi.load('kernel32.dll')
