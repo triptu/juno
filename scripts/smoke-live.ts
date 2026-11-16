@@ -44,7 +44,7 @@ import {
   type HttpResponse,
   type SlackSessionShape,
 } from '@juno/slack'
-import { copySlackAppData, locateSlackAppData, readSlackAppSession, slackAppCandidates } from '@juno/slack/import'
+import { copySlackAppData, KEYCHAIN_SERVICE, locateSlackAppData, readSlackAppSession, slackAppCandidates } from '@juno/slack/import'
 import { decodeIssues, forgetCachedSession, redact, readCachedSession, SESSION_SERVICE, security, storeCachedSession, type CachedSession } from './live-common.ts'
 
 const READ_ONLY_METHODS = [
@@ -126,8 +126,9 @@ async function importFromSlackApp(): Promise<CachedSession> {
   const copy = await mkdtemp(join(tmpdir(), 'juno-smoke-'))
   try {
     await copySlackAppData(data, copy)
-    console.log(`smoke-live: reading the "${data.keychainService}" keychain item (macOS will ask)`)
-    const answer = await security(['find-generic-password', '-w', '-s', data.keychainService])
+    const service = data.keychainService ?? KEYCHAIN_SERVICE
+    console.log(`smoke-live: reading the "${service}" keychain item (macOS will ask)`)
+    const answer = await security(['find-generic-password', '-w', '-s', service])
     if (answer.code !== 0) throw new Error('keychain access was declined or the item is missing')
     const keychainPassword = answer.stdout.replace(/\n$/, '')
     const { team, cookie } = await readSlackAppSession({ dir: copy, keychainPassword, ...(teamId === undefined ? {} : { teamId }) })

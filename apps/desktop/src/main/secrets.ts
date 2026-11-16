@@ -68,6 +68,9 @@ export class SecretsStore {
         await file.close()
       }
       await rename(temporary, this.#file)
+      // The rename is durable once its folder is synced. Windows cannot open a folder as a file (EISDIR), and
+      // NTFS logs the rename itself, so there it is done; throwing here failed every sign-in on Windows.
+      if (process.platform === 'win32') return
       const directory = await open(dirname(this.#file), 'r')
       try {
         await directory.sync()

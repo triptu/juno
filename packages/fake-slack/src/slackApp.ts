@@ -10,13 +10,14 @@
  *   has to handle both formats and pick by sequence number.
  * - `Cookies` (or `Network/Cookies`, as newer Chromium writes it): a Chromium
  *   cookie store with the `d` cookie encrypted the way Chromium encrypts it on
- *   macOS under the given "keychain" password.
+ *   macOS under the given "keychain" password, or on Windows under a raw
+ *   key, with `Local State` holding that key's DPAPI blob (`windows`).
  *
  * The leveldb writer here is for fixtures only: one data block, no
  * compression, no filter block, no manifest. The reader in `@juno/slack`
  * does not open the database through leveldb, so no manifest is needed.
  */
-import { createCipheriv, createHash, pbkdf2Sync } from 'node:crypto'
+import { createCipheriv, createHash, pbkdf2Sync, randomBytes } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -36,8 +37,14 @@ export interface SlackAppFixtureOptions {
   readonly team: SlackAppFixtureTeam
   /** The `d` cookie value. */
   readonly cookie: string
-  /** Stands in for the "Slack Safe Storage" keychain password. */
+  /** Stands in for the "Slack Safe Storage" keychain password. Ignored with `windows`. */
   readonly keychainPassword: string
+  /**
+   * Encrypt as Chromium does on Windows: `version` (default `v10`) + AES-256-GCM
+   * under `key`, and write `Local State` with `protectedKey` as the DPAPI blob
+   * (the caller's stand-in for `CryptProtectData(key)`).
+   */
+  readonly windows?: { readonly key: Buffer; readonly protectedKey: Buffer; readonly version?: 'v10' | 'v20' }
   /** A stale team record written before `team`, to prove the newest wins. Default: a copy of `team` with an old token. */
   readonly staleTeam?: SlackAppFixtureTeam
   /** Where the cookie store goes. Default: `Cookies`. */
@@ -64,6 +71,10 @@ export async function writeSlackAppFixture(dir: string, options: SlackAppFixture
   const cookies = join(dir, ...(options.cookiesFile ?? 'Cookies').split('/'))
   await mkdir(dirname(cookies), { recursive: true })
   writeCookies(cookies, options)
+  if (options.windows !== undefined) {
+    const encryptedKey = Buffer.concat([Buffer.from('DPAPI', 'latin1'), options.windows.protectedKey]).toString('base64')
+    await writeFile(join(dir, 'Local State'), JSON.stringify({ os_crypt: { audit_enabled: true, encrypted_key: encryptedKey } }))
+  }
 }
 
 export function localConfigJson(team: SlackAppFixtureTeam): string {
@@ -208,11 +219,19 @@ const WINDOWS_EPOCH_OFFSET_SECONDS = 11_644_473_600
 function writeCookies(file: string, options: SlackAppFixtureOptions): void {
   const url = new URL(options.team.url)
   const hostKey = url.hostname.endsWith('.slack.com') || url.hostname === 'slack.com' ? '.slack.com' : url.hostname
-  const key = pbkdf2Sync(options.keychainPassword, 'saltysalt', 1003, 16, 'sha1')
+  const hostHash = createHash('sha256').update(hostKey).digest()
+  const windows = options.windows
   const encrypt = (value: string) => {
+    const plain = Buffer.concat([hostHash, Buffer.from(value, 'utf8')])
+    if (windows !== undefined) {
+      const nonce = randomBytes(12)
+      const cipher = createCipheriv('aes-256-gcm', windows.key, nonce)
+      const body = Buffer.concat([cipher.update(plain), cipher.final()])
+      return Buffer.concat([Buffer.from(windows.version ?? 'v10', 'latin1'), nonce, body, cipher.getAuthTag()])
+    }
+    const key = pbkdf2Sync(options.keychainPassword, 'saltysalt', 1003, 16, 'sha1')
     const cipher = createCipheriv('aes-128-cbc', key, Buffer.alloc(16, ' '))
-    const hostHash = createHash('sha256').update(hostKey).digest()
-    return Buffer.concat([Buffer.from('v10', 'latin1'), cipher.update(Buffer.concat([hostHash, Buffer.from(value, 'utf8')])), cipher.final()])
+    return Buffer.concat([Buffer.from('v10', 'latin1'), cipher.update(plain), cipher.final()])
   }
   const expires = BigInt(Math.floor(Date.now() / 1000) + 365 * 86_400 + WINDOWS_EPOCH_OFFSET_SECONDS) * 1_000_000n
   const db = new DatabaseSync(file)

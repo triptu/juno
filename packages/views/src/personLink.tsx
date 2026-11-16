@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { createContext, useContext, type ReactNode } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
 import type { BodyInline } from '@juno/contract'
-import { Chip, focusRing, type HueName } from '@juno/ui'
+import { Chip, commandKey, focusRing, type HueName } from '@juno/ui'
 
 /**
  * What a person in a message opens: `MessageList`'s `onPerson`. Elsewhere,
@@ -43,11 +43,11 @@ export function PersonLink({ id, label, part, tabIndex = -1, children }: PersonL
       // The avatar's tooltip adds the person's status under the name (SPEC 7, "People").
       {...(part === 'avatar' ? { 'data-tooltip-person': id } : {})}
       data-opens-person=""
-      onClick={(event) => event.detail === 1 && !press.dragged && open(id, event.metaKey)}
+      onClick={(event) => event.detail === 1 && !press.dragged && open(id, commandKey(event))}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
         event.preventDefault()
-        if (!event.repeat) open(id, event.metaKey)
+        if (!event.repeat) open(id, commandKey(event))
       }}
       {...stylex.props(styles[part], part !== 'avatar' && styles.underline, part !== 'avatar' && focusRing.outside)}
     >
@@ -90,7 +90,7 @@ export function ChannelChip({ inline, onChannel, tabIndex }: { readonly inline: 
       type="button"
       onClick={(event) => {
         event.stopPropagation()
-        if (event.detail <= 1 && !press.dragged) onChannel(inline.id, event.metaKey)
+        if (event.detail <= 1 && !press.dragged) onChannel(inline.id, commandKey(event))
       }}
       title={`Open #${inline.name}`}
       tabIndex={tabIndex}

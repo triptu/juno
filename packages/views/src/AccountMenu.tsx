@@ -14,6 +14,7 @@ import type { PauseChoice, StatusEmoji } from '@juno/contract'
 import { sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Avatar, Icon, OptionHeader, OptionList, OptionRow, OptionSeparator, PresenceDot, SmileyPlus, Submenu, Text, lastInputWasKeyboard, useMenuActive, useSubmenu, type HueName, type PhosphorIcon } from '@juno/ui'
 import { EmojiFace } from './StatusLine'
+import { menuKeys } from './keys'
 
 /** Who is signed in, under Sign out, and the way out. */
 export interface AccountSession {
@@ -148,14 +149,14 @@ function accountItems({ status, presence, paused, snoozed, snoozeLabel, privacy,
           ...(status.until === undefined ? {} : { hint: status.until }),
         },
     presence?.active === false ? { id: 'presence', leading: icon(Sun), label: 'Set yourself active' } : { id: 'presence', leading: icon(Moon), label: 'Set yourself away' },
-    privacy ? { id: 'privacy', leading: icon(Eye), label: 'Show message text', hint: '⌃⌘H' } : { id: 'privacy', leading: icon(EyeSlash), label: 'Hide message text', hint: '⌃⌘H' },
+    privacy ? { id: 'privacy', leading: icon(Eye), label: 'Show message text', hint: menuKeys('privacy.toggle') } : { id: 'privacy', leading: icon(EyeSlash), label: 'Hide message text', hint: menuKeys('privacy.toggle') },
     { id: 'notifications', leading: icon(Bell), label: 'Notification settings', ...(canPause ? {} : pausedHint) },
     ...(snoozed
       ? [{ id: 'resume', leading: icon(BellRinging), label: 'Resume notifications', ...(snoozeLabel === undefined ? {} : { hint: snoozeLabel, hintBelow: true }) } as const]
       : canPause
         ? [{ id: 'pause', leading: icon(BellSlash), label: 'Pause notifications', ...pausedHint } as const]
         : []),
-    { id: 'settings', leading: icon(Gear), label: 'Settings', hint: '⌘,' },
+    { id: 'settings', leading: icon(Gear), label: 'Settings', hint: menuKeys('settings.open') },
     ...(session === undefined ? [] : [{ id: 'signOut', leading: icon(SignOut), label: 'Sign out', hint: session.line, hintBelow: true, apart: true, disabled: session.signingOut === true } as const]),
   ]
 }

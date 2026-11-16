@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { buildInputs, sourceFiles } from './build-inputs.mjs'
 
 // `--key` prints the build key and builds nothing.
@@ -29,7 +29,7 @@ const files = sourceFiles(root)
 const envFiles = [root, app].flatMap((dir) => readdirSync(dir).filter((name) => /^\.env(?:\.|$)/.test(name)).map((name) => relative(root, join(dir, name))))
 // A known output keys on what its entry points and configs reach (scripts/build-inputs.mjs).
 // Anything else, or a graph it cannot follow, keys on every source file but tests.
-const inputs = buildInputs(root, files, relative(root, app), outDir)
+const inputs = buildInputs(root, files, relative(root, app).replaceAll(sep, '/'), outDir)
 if (inputs.widened) console.log(`build-cached: keying ${outDir}/ on all source: ${inputs.widened.slice(0, 3).join('; ')}`)
 const buildFiles = [...new Set([...(inputs.files ?? [...files].filter((file) => {
   const path = relative(app, join(root, file))
@@ -49,7 +49,7 @@ const valid = (dir) => {
   try { return readFileSync(join(dir, marker), 'utf8') === `${key} ${fingerprint(dir)}` } catch { return false }
 }
 const cacheRoot = process.env.JUNO_BUILD_CACHE_DIR
-const cached = cacheRoot && join(cacheRoot, relative(root, app).replaceAll('/', '-'), key)
+const cached = cacheRoot && join(cacheRoot, relative(root, app).replaceAll(sep, '-'), key)
 const started = performance.now()
 if (process.env.JUNO_REBUILD !== '1') {
   if (valid(output)) {

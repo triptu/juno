@@ -6,9 +6,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { writeSlackAppFixture } from '@juno/fake-slack'
-import { slackAppCandidates } from '@juno/slack/import'
+import { slackAppCandidates, windowsSlackAppCandidates } from '@juno/slack/import'
 import { NEXT_KEYCHAIN, NO_KEYCHAIN, NOT_INSTALLED, readSlackApp, securityKeychain, SIGNED_OUT, UNREADABLE, WRONG_KEYCHAIN, type SlackKeychain } from '../src/main/slackAppData'
 import type { SecurityRunner } from '../src/main/keychain'
+import { NO_COOKIE_KEY, NOT_INSTALLED_WINDOWS, readWindowsSlackApp } from '../src/main/slackAppDataWindows'
 
 const homes: Array<string> = []
 afterEach(async () => {
@@ -298,5 +299,66 @@ describe('securityKeychain', () => {
     // Only `read` passes -w, the flag that prints the password.
     expect(calls.filter((args) => args.includes('-w'))).toEqual([])
     expect(await keychain.read('Slack Safe Storage')).toBe('synthetic')
+  })
+})
+
+describe('readSlackApp on Windows', () => {
+  const KEY = Buffer.alloc(32, 7)
+  // Stands in for DPAPI: the blob is the key with every byte flipped.
+  const flip = (bytes: Buffer) => Buffer.from(bytes.map((byte) => byte ^ 0xff))
+
+  async function windowsHome() {
+    const root = await mkdtemp(join(tmpdir(), 'juno-pc-'))
+    homes.push(root)
+    const localAppData = join(root, 'AppData', 'Local')
+    return { root, localAppData, candidates: windowsSlackAppCandidates({ appData: join(root, 'AppData', 'Roaming'), localAppData }) }
+  }
+
+  async function readOnWindows(root: string, localAppData: string, candidates: ReturnType<typeof windowsSlackAppCandidates>, unprotect = (blob: Buffer) => flip(blob) as Buffer | undefined) {
+    const logs: Array<string> = []
+    const result = await readWindowsSlackApp({
+      candidates,
+      unprotect,
+      installDir: join(localAppData, 'slack'),
+      junoVersion: '0.1.0',
+      windowsVersion: '10.0.26100',
+      home: root,
+      log: (line) => logs.push(line),
+    })
+    return { result, logs }
+  }
+
+  it('imports the MSIX install with the key from Local State, and the report names Windows and the key, not a keychain', async () => {
+    const { root, localAppData, candidates } = await windowsHome()
+    await writeSlackAppFixture(candidates[1]!.dir, { team, cookie: COOKIE, keychainPassword: '', cookiesFile: 'Network/Cookies', windows: { key: KEY, protectedKey: flip(KEY) } })
+    for (const version of ['4.9.1', '4.53.287', '4.41.0']) await mkdir(join(localAppData, 'slack', `app-${version}`), { recursive: true })
+    const outcome = await readOnWindows(root, localAppData, candidates)
+    expect(outcome.result).toMatchObject({ ok: true, team: { id: team.id }, cookie: { name: 'd', value: COOKIE } })
+    const text = reportOf(outcome)
+    expect(text).toContain('Juno 0.1.0, Windows 10.0.26100')
+    expect(text).toContain('Slack app: 4.53.287, installer build, ~/AppData/Local/slack')
+    expect(text).toContain('Chosen: MSIX, Network/Cookies')
+    expect(text).toContain('Cookie key: found in Local State, unlocked the cookie')
+    expect(text).not.toMatch(/macOS|Keychain|Applications/)
+  })
+
+  it('says this PC when no install has data, after looking in the installer, MSIX and Store folders in that order', async () => {
+    const { root, localAppData, candidates } = await windowsHome()
+    const outcome = await readOnWindows(root, localAppData, candidates)
+    expect(outcome.result).toMatchObject({ ok: false, kind: 'no-slack-app', message: NOT_INSTALLED_WINDOWS })
+    const checked = reportOf(outcome).split('\n').filter((line) => line.startsWith('  '))
+    expect(checked).toEqual([
+      '  direct download: ~/AppData/Roaming/Slack: not found',
+      '  MSIX: ~/AppData/Local/Packages/com.tinyspeck.slackdesktop_8yrtsj140pw4g/LocalCache/Roaming/Slack: not found',
+      '  Microsoft Store: ~/AppData/Local/Packages/91750D7E.Slack_8she8kybcnzg4/LocalCache/Roaming/Slack: not found',
+    ])
+  })
+
+  it('a key Windows will not unprotect stops with this PC’s line', async () => {
+    const { root, localAppData, candidates } = await windowsHome()
+    await writeSlackAppFixture(candidates[0]!.dir, { team, cookie: COOKIE, keychainPassword: '', windows: { key: KEY, protectedKey: flip(KEY) } })
+    const outcome = await readOnWindows(root, localAppData, candidates, () => undefined)
+    expect(outcome.result).toMatchObject({ ok: false, kind: 'keychain', message: NO_COOKIE_KEY })
+    expect(reportOf(outcome)).toContain('Cookie key: found in Local State, Windows did not unprotect it')
   })
 })

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, modelChoiceKey, NO_LIMIT_USD, type JunoSettingsPage as JunoSettingsPageModel, type ModelChoice } from '@juno/agent-contract'
-import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, Text, TextField } from '@juno/ui'
+import { Button, Checkbox, Chip, ListRow, Page, PageHeader, Section, Select, Surface, systemWords, Text, TextField } from '@juno/ui'
 import type { ReactNode } from 'react'
 import { BackupSection, ThisMacSection, type BackupSectionProps, type ThisMacSectionProps } from './BackupSections'
 import { cell } from './cell'
@@ -196,7 +196,7 @@ export function JunoSettingsPage({
                 </span>
               }
             >
-              <Text variant="body">{CODEX_ENABLED ? 'Uses your ChatGPT plan on this Mac.' : 'Use your ChatGPT plan instead of an API key.'}</Text>
+              <Text variant="body">{CODEX_ENABLED ? `Uses your ChatGPT plan on ${systemWords.thisComputer}.` : 'Use your ChatGPT plan instead of an API key.'}</Text>
             </ListRow>
           </Surface>
         </Section>
@@ -230,7 +230,7 @@ export type JunoBackupPageProps = Omit<BackupSectionProps, 'page'> &
 export function JunoBackupPage({ page, onAddProvider, ...props }: JunoBackupPageProps) {
   return (
     <Page width="settings">
-      <PageHeader title="Backup & This Mac" subtitle="Where Juno's state is kept, and which Mac runs Juno." />
+      <PageHeader title={`Backup & ${systemWords.ThisComputer}`} subtitle={`Where Juno's state is kept, and which ${systemWords.computer} runs Juno.`} />
       {page === undefined ? (
         <Section heading="Backup" sub="Juno's backup settings show once Juno has a model.">
           <div>

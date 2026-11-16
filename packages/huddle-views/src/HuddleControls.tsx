@@ -6,13 +6,14 @@ import { PhoneX } from '@phosphor-icons/react/dist/icons/PhoneX'
 import { SlidersHorizontal } from '@phosphor-icons/react/dist/icons/SlidersHorizontal'
 import type { ReactNode } from 'react'
 import { colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { focusRing, Icon, IconButton, Popover, type PhosphorIcon } from '@juno/ui'
+import { focusRing, handWrittenKeys, Icon, IconButton, type PhosphorIcon, Popover } from '@juno/ui'
 import { islandText } from './islandText'
 import { microphoneCopy } from './look'
 import type { HuddleControlsActions, HuddleControlsState } from './model'
 
 /** Mute and unmute while Juno is the active app (SPEC 20). The app menu owns the accelerator. */
-export const muteShortcut = '⌘⇧Space'
+// The page takes the key itself (SPEC 20). Windows uses Ctrl+Shift+Space: Win+Shift+Space switches the keyboard language there.
+export const muteShortcut = handWrittenKeys('⌘⇧Space', 'CommandOrControl+Shift+Space')
 
 /**
  * `bar`: the sidebar bar's row, 28px rounded rectangles that nest in its

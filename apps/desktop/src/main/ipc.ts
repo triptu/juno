@@ -19,7 +19,7 @@ import { diagnosticsLogText, syncLogText } from './syncLog'
 import { mainLog } from './logging'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
-import { setMenuHuddle } from './window'
+import { setMenuHuddle } from './menu'
 
 /**
  * Registers a request/response handler for one contract route. The input is

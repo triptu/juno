@@ -14,10 +14,15 @@ const FIELDS = new Set(['id', 'rowId', 'pid', 'count', 'attempts', 'retryInMilli
 const ERROR_NAMES = new Set(['Error', 'TypeError', 'RangeError', 'SyntaxError', 'AggregateError', 'ReferenceError'])
 const SLACK_ERRORS = new Set(['SlackTransportError', 'SlackDecodeError', 'SlackRejected', 'SlackAuthRequired', 'SlackRateLimited'])
 
+/**
+ * Where every process writes its log. Utility processes have no `app.getPath`, so the folder comes from the
+ * environment: ~/Library/Logs/Juno on the Mac, and on Windows Juno's folder in the local (not roaming)
+ * app data, where Windows apps keep logs.
+ */
 export function logFolder(): string {
-  return process.env.JUNO_E2E === '1' && process.env.JUNO_USER_DATA
-    ? join(process.env.JUNO_USER_DATA, 'logs')
-    : join(homedir(), 'Library', 'Logs', 'Juno')
+  if (process.env.JUNO_E2E === '1' && process.env.JUNO_USER_DATA) return join(process.env.JUNO_USER_DATA, 'logs')
+  if (process.platform === 'win32') return join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Juno', 'logs')
+  return join(homedir(), 'Library', 'Logs', 'Juno')
 }
 
 /** Deliberately drops error messages, paths, arbitrary tags, unchecked strings and object payloads. */

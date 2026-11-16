@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { useEffect, useEffectEvent, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { colors, layout, radii, sizes, spacing, text, weights, z } from '@juno/tokens/tokens.stylex'
-import { Icon, Kbd, OptionGroupLabel, OptionList, Surface, Text } from '@juno/ui'
+import { commandKey, Icon, Kbd, OptionGroupLabel, OptionList, Surface, Text } from '@juno/ui'
 import { PaletteRow, rowDomId, type PaletteItem } from './PaletteRow'
 
 export type { PaletteIconName, PaletteItem } from './PaletteRow'
@@ -125,7 +125,7 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
       case '2':
       case '3':
       case '4': {
-        if (!event.metaKey) return
+        if (!commandKey(event)) return
         event.preventDefault()
         const option = tabOptions[Number(event.key) - 1]
         return option === undefined ? undefined : onTab(option.value)
@@ -133,7 +133,7 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
       case 'Enter':
         if (event.nativeEvent.isComposing || activeId === undefined) return
         event.preventDefault()
-        return onSelect(activeId, { newTab: event.metaKey })
+        return onSelect(activeId, { newTab: commandKey(event) })
       case 'ContextMenu':
       case 'F10': {
         if (event.key === 'F10' && !event.shiftKey) return

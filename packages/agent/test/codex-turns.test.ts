@@ -23,7 +23,7 @@ it('runs a picked Codex turn through durable tools, shows waiting, and never rep
   let actions = 0
   const options = {
     agentDir: dir,
-    provider: (store: Parameters<typeof createProviderGuard>[0]['store']) => createProviderGuard({ store, transport: transport.models, codex: { agentDir: dir, executable: fake.path } }),
+    provider: (store: Parameters<typeof createProviderGuard>[0]['store']) => createProviderGuard({ store, transport: transport.models, codex: { agentDir: dir, executable: () => fake.path } }),
     model: { provider: 'openai-codex', modelId: 'gpt-6.1-sol' },
     tools: () => [defineTool({ name: 'test_action', description: 'Test action', parameters: { type: 'object', properties: {} }, replay: 'unsafe', status: () => 'Running test action', run: async () => { actions++; return { text: 'done' } } })],
   }
@@ -32,7 +32,7 @@ it('runs a picked Codex turn through durable tools, shows waiting, and never rep
   cleanup.push(() => turns.close())
   const connection = providerConnection()
   connection.set(null)
-  const picker = modelPicker(connection, { codex: { agentDir: dir, executable: fake.path }, fetch: async () => new Response('{}', { status: 503 }) })
+  const picker = modelPicker(connection, { codex: { agentDir: dir, executable: () => fake.path }, fetch: async () => new Response('{}', { status: 503 }) })
   const settings = createJunoSettings({ turns, picker, connection, agentDir: dir })
   cleanup.push(() => settings.close())
   await settings.ready

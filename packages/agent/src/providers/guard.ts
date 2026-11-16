@@ -189,7 +189,7 @@ export interface GuardOptions {
   readonly store: Store
   readonly transport: Models
   readonly spend?: SpendLedger
-  readonly codex?: { readonly agentDir: string; readonly executable: string }
+  readonly codex?: { readonly agentDir: string; readonly executable: () => string }
   readonly onFailure?: (failure: ProviderFailure) => void
   /** The model asked once when a request is refused under the model's policy or the model is unavailable (Settings › Juno). */
   readonly fallback?: () => Model<Api> | undefined

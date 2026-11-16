@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { colors, layout, radii, shadows, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
-import { Avatar, Emoji, Surface, Text, focusRing, moveFocus } from '@juno/ui'
+import { Avatar, contextClick, Emoji, focusRing, moveFocus, Surface, Text } from '@juno/ui'
 import { initials } from './look'
 import type { Reactor } from './ReactorsCard'
 import { placeNear } from './reactorsPlace'
@@ -81,7 +81,7 @@ function Strip({ id, reactions, chosen, onSelect }: { readonly id: string; reado
     if (name !== chosen) onSelect(name)
   }
   const press = (name: string) => (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0 || event.ctrlKey) return
+    if (event.button !== 0 || contextClick(event)) return
     event.preventDefault()
     event.currentTarget.focus({ preventScroll: true })
     choose(name)

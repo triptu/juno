@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Segmented, Text } from '@juno/ui'
+import { Segmented, systemWords, Text } from '@juno/ui'
 
 /** ⌥ Option, the default, or Space. Fn is not offered: macOS does not report it to apps reliably. */
 export type PeekKeyName = 'option' | 'space'
@@ -11,7 +11,7 @@ export interface PeekKeySettingProps {
 }
 
 const options: ReadonlyArray<{ readonly value: PeekKeyName; readonly label: string }> = [
-  { value: 'option', label: '⌥ Option' },
+  { value: 'option', label: systemWords.optionKey },
   { value: 'space', label: 'Space' },
 ]
 

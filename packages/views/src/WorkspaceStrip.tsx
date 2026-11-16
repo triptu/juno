@@ -12,7 +12,7 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
-import { menuKeys } from '@juno/contract/channels'
+import { menuKeys } from './keys'
 import { Avatar, IconButton, Tab, TabStrip, TopicArt, type ActivateEvent, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 

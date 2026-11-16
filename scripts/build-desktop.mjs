@@ -7,10 +7,13 @@ import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 
-const bin = join(process.cwd(), 'node_modules/.bin/electron-vite')
+const windows = process.platform === 'win32'
+// On Windows the .bin entry is a .cmd shim, which only a shell finds; the
+// shell splits the command line on spaces, so a checkout path with one needs quotes.
+const bin = windows ? `"${join(process.cwd(), 'node_modules/.bin/electron-vite')}"` : join(process.cwd(), 'node_modules/.bin/electron-vite')
 const groups = [['main', 'preload'], ['renderer']]
 const codes = await Promise.all(groups.map((targets) => new Promise((done) => {
-  const child = spawn(bin, ['build', '--ignoreConfigWarning'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, JUNO_ELECTRON_TARGETS: targets.join(',') } })
+  const child = spawn(bin, ['build', '--ignoreConfigWarning'], { stdio: ['ignore', 'pipe', 'pipe'], shell: windows, env: { ...process.env, JUNO_ELECTRON_TARGETS: targets.join(',') } })
   // Each line keeps its group's name, since the two outputs interleave.
   for (const [stream, out] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
     createInterface({ input: stream }).on('line', (line) => out.write(`[${targets[0]}] ${line}\n`))

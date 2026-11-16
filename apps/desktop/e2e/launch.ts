@@ -1,4 +1,5 @@
 import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { createHash } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -208,6 +209,7 @@ export interface SlackAppFixture {
 }
 
 export const KEYCHAIN_PASSWORD = 'fixture-keychain-password'
+const WINDOWS_KEY = createHash('sha256').update(KEYCHAIN_PASSWORD).digest()
 
 export async function writeSlackApp(
   fake: FakeSlack,
@@ -219,6 +221,8 @@ export async function writeSlackApp(
     team: { id: fake.teamId, name: 'Juno Fake', domain: 'juno-fake', url: `${fake.url}/`, token: credentials.token, userId: credentials.userId },
     cookie: credentials.cookie,
     keychainPassword: KEYCHAIN_PASSWORD,
+    // On Windows main's seam reads the key from Local State as it is (slackImport.ts).
+    ...(process.platform === 'win32' ? { windows: { key: WINDOWS_KEY, protectedKey: WINDOWS_KEY } } : {}),
     ...options,
   })
   return { dir, keychainPassword: KEYCHAIN_PASSWORD, credentials }

@@ -7,6 +7,13 @@
  * plaintext with the SHA-256 of `host_key`; the prefix is detected and
  * stripped.
  *
+ * On Windows the values are `v10` + a 12-byte nonce + AES-256-GCM ciphertext
+ * + the 16-byte tag, with a raw 32-byte key that `Local State` keeps
+ * DPAPI-protected (`localState.ts`); the same host prefix applies. Chromium
+ * on Windows writes no `v11`. `v20` is Chrome's app-bound encryption, which
+ * only Chrome's elevation service undoes; such a value is not decrypted
+ * (`cookieVersions` lets the caller say so).
+ *
  * Only the `d` cookie is read. The caller passes a copy of the file; this
  * module never touches the live store.
  */
@@ -30,6 +37,21 @@ const ROUNDS = 1003
 const KEY_BYTES = 16
 const IV = Buffer.alloc(16, ' ')
 const VERSION = 'v10'
+const GCM_NONCE_BYTES = 12
+const GCM_TAG_BYTES = 16
+
+/** What decrypts cookie values: the Mac's key derived from the keychain password, or Windows' raw key. */
+export type CookieKey = { readonly scheme: 'cbc'; readonly key: Buffer } | { readonly scheme: 'gcm'; readonly key: Buffer }
+
+/** The Mac's key, from the "Slack Safe Storage" password. */
+export function macCookieKey(password: string): CookieKey {
+  return { scheme: 'cbc', key: deriveCookieKey(password) }
+}
+
+/** Windows' key: the 32 bytes DPAPI gives back from `Local State`. */
+export function windowsCookieKey(key: Buffer): CookieKey {
+  return { scheme: 'gcm', key }
+}
 /** Chromium's time origin is 1601-01-01; values are microseconds. */
 const WINDOWS_EPOCH_OFFSET_SECONDS = 11_644_473_600
 
@@ -37,14 +59,25 @@ export function deriveCookieKey(password: string): Buffer {
   return pbkdf2Sync(password, SALT, ROUNDS, KEY_BYTES, 'sha1')
 }
 
-export function decryptCookieValue(encrypted: Uint8Array, hostKey: string, key: Buffer): string {
+export function decryptCookieValue(encrypted: Uint8Array, hostKey: string, cookieKey: CookieKey): string {
   const buffer = Buffer.from(encrypted)
   if (buffer.subarray(0, 3).toString('latin1') !== VERSION) throw new Error('cookie: unsupported encryption version')
-  const decipher = createDecipheriv('aes-128-cbc', key, IV)
-  const plain = Buffer.concat([decipher.update(buffer.subarray(3)), decipher.final()])
+  const plain = cookieKey.scheme === 'cbc' ? decryptCbc(buffer.subarray(3), cookieKey.key) : decryptGcm(buffer.subarray(3), cookieKey.key)
   const hostHash = createHash('sha256').update(hostKey).digest()
   const body = plain.length >= 32 && plain.subarray(0, 32).equals(hostHash) ? plain.subarray(32) : plain
   return body.toString('utf8')
+}
+
+function decryptCbc(body: Buffer, key: Buffer): Buffer {
+  const decipher = createDecipheriv('aes-128-cbc', key, IV)
+  return Buffer.concat([decipher.update(body), decipher.final()])
+}
+
+function decryptGcm(body: Buffer, key: Buffer): Buffer {
+  if (body.length < GCM_NONCE_BYTES + GCM_TAG_BYTES) throw new Error('cookie: value too short')
+  const decipher = createDecipheriv('aes-256-gcm', key, body.subarray(0, GCM_NONCE_BYTES))
+  decipher.setAuthTag(body.subarray(body.length - GCM_TAG_BYTES))
+  return Buffer.concat([decipher.update(body.subarray(GCM_NONCE_BYTES, body.length - GCM_TAG_BYTES)), decipher.final()])
 }
 
 interface CookieRow {
@@ -58,12 +91,12 @@ interface CookieRow {
   is_httponly: number | bigint
 }
 
-/** How many cookies named `name` the file holds. Needs no password: names are stored in the clear. */
-export function cookieRowCount(file: string, name: string): number {
+/** The encryption version (`v10`, `v20`, ...) of each cookie named `name`, `''` for a value stored in the clear. */
+export function cookieVersions(file: string, name: string): ReadonlyArray<string> {
   const db = new DatabaseSync(file, { readOnly: true })
   try {
-    const row = db.prepare('SELECT COUNT(*) AS count FROM cookies WHERE name = ?').get(name) as { count: number } | undefined
-    return Number(row?.count ?? 0)
+    const rows = db.prepare('SELECT encrypted_value FROM cookies WHERE name = ?').all(name) as unknown as Array<Pick<CookieRow, 'encrypted_value'>>
+    return rows.map((row) => (row.encrypted_value === null ? '' : Buffer.from(row.encrypted_value.subarray(0, 3)).toString('latin1')))
   } finally {
     db.close()
   }
@@ -73,8 +106,7 @@ export function cookieRowCount(file: string, name: string): number {
  * Every cookie named `name` in the file, decrypted. Rows that fail to
  * decrypt are skipped: a wrong password yields no cookies, not garbage.
  */
-export function readCookies(file: string, name: string, password: string): ReadonlyArray<SlackCookie> {
-  const key = deriveCookieKey(password)
+export function readCookies(file: string, name: string, key: CookieKey): ReadonlyArray<SlackCookie> {
   const db = new DatabaseSync(file, { readOnly: true })
   try {
     const statement = db.prepare(

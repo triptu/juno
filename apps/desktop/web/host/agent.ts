@@ -9,7 +9,7 @@ import { memoryTransport } from '@juno/engine'
 import type { WebSocket } from 'ws'
 import type { FromClientEncoded, FromServerEncoded } from 'effect/rpc/RpcMessage'
 import { ProviderStore } from '../../src/main/providers'
-import { memoryKeychain } from '../../src/main/keychain'
+import { memoryKeychain, memoryKeychains } from '../../src/main/keychain'
 import { appMcpCredentials } from '../../src/main/mcpCredentials'
 import { appBackupSecrets } from '../../src/main/backupSecrets'
 import { codexExecutable, codexHome } from '../../src/main/codex'
@@ -26,8 +26,9 @@ export interface AgentOptions {
 /** Main's provider store and agent configuration, with memory secrets and an in-process host port. */
 export class BrowserAgent {
   readonly transport = memoryTransport()
-  readonly secrets = appBackupSecrets(true)
-  readonly #credentials = appMcpCredentials(true, async () => {})
+  readonly #keychain = memoryKeychains()
+  readonly secrets = appBackupSecrets(this.#keychain)
+  readonly #credentials = appMcpCredentials(true, this.#keychain, async () => {})
   readonly #log: ReturnType<typeof createLog>
   readonly providers: ProviderStore
   /** Juno's own Codex home, as main checks it under JUNO_E2E. */
@@ -92,7 +93,7 @@ export class BrowserAgent {
     this.#renderers = runtime.rendererPorts()
     const origin = this.options.fakeOpenRouterUrl
     const agentDir = join(this.userData, 'agent')
-    const picker = runtime.modelPicker(connection, { ...(origin === undefined ? {} : { origin }), codex: { agentDir, executable: 'codex' } })
+    const picker = runtime.modelPicker(connection, { ...(origin === undefined ? {} : { origin }), codex: { agentDir, executable: () => 'codex' } })
     const mcp = runtime.credentialBridge((requestId, request) => {
       void this.#credentials(request).then((value) => mcp.answer({ requestId, ok: true, ...(value === undefined ? {} : { value }) }), () => mcp.answer({ requestId, ok: false }))
     })

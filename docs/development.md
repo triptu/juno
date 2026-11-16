@@ -6,7 +6,7 @@ How to build and run Juno, and how the repo is put together.
 
 - Node 24 or newer (Node 26 is what this was built with), for the few tools that stay on Node (see "Runtimes").
 - The Bun canary build that `packageManager` in `package.json` names: `1.4.4-canary.20261023.1`, commit `5c6d4e24c`. Canary builds have `bun lint`. Every canary of a release prints the same `bun --version`, so check the build with `bun --revision`, which prints `1.4.4-canary.1+5c6d4e24c`. `bun upgrade --canary` installs the newest canary, which may be another build, so install this one from npm: `npm pack @oven/bun-darwin-aarch64@1.4.4-canary.20261023.1`, `tar -xzf oven-bun-darwin-aarch64-1.4.4-canary.20261023.1.tgz package/bin/bun`, then move `package/bin/bun` to `~/.bun/bin/bun`. The root `preinstall` script (`scripts/check-bun.mjs`) stops an install with any other build. The remote image and CI install the same build with `npm install -g bun@<version>`.
-- macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
+- macOS for the window chrome and e2e tests. Windows builds an unsigned installer to try ("Windows build" under "Releasing").
 - Playwright's Chromium headless shell (`bunx playwright install chromium --only-shell`), for gallery tests and screenshots.
 - Git LFS (`brew install git-lfs`, then `git lfs install` once), for the images and videos under `docs/`.
 - On macOS, Homebrew's SQLite (`brew install sqlite`), for the store's unit tests on Bun (see "Pitfalls", `node:sqlite`). `JUNO_SQLITE=<libsqlite3.dylib>` names another full build.
@@ -2009,6 +2009,41 @@ strip `ELECTRON_RUN_AS_NODE` remain useful with the unmodified development
 Electron. Playwright's Electron launcher needs Node inspection and cannot drive
 the hardened package; the packaged smoke instead uses Chromium CDP. The
 `JUNO_E2E` fake-server seams remain available independently of the Node fuses.
+
+### Windows build
+
+`bun run package` run on Windows writes an unsigned x64 NSIS installer, `apps/desktop/release/Juno-Setup-<version>-x64.exe`, from the `win` and `nsis` sections of `electron-builder.yml`. It installs per user, without prompts, into `%LOCALAPPDATA%\Programs\juno`. There is no Windows release yet: no code signing, no update feed (`build/package.cjs` writes no `update.json` and names no publish target on Windows, even with `JUNO_UPDATE_TOKEN` set), and `appId` stays `app.juno.desktop`, which main also uses as the AppUserModelID. Build it on a Namespace Windows machine (`nsc`, logged in on the Mac); every `nsc` call needs `</dev/null` or a file on stdin. `nsc instance upload` fails on Windows, so files go through `nsc ssh` stdin as tar, and commands run in cmd.exe, so put them in `.cmd` files sent the same way.
+
+```sh
+nsc create --machine_type windows/amd64:4x8 --duration 90m --label remote-run=1 --cidfile id </dev/null
+# The files Git sees, without docs media or .env files.
+git ls-files | grep -v -E '^docs/.*\.(png|jpe?g|webp|gif|mp4|webm|mov)$' | grep -v -E '(^|/)\.env' > files.txt
+COPYFILE_DISABLE=1 tar --no-xattrs -czf src.tgz -T files.txt
+nsc ssh -T "$(cat id)" 'mkdir C:\juno && C:\Windows\System32\tar.exe -xzf - -C C:\juno' < src.tgz
+```
+
+`setup.ps1`, run with `pwsh -NoProfile -File`, installs Node 24 and the pinned Bun (npm's `bun` package ships the binary, so its blocked install script does not matter):
+
+```powershell
+$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip -OutFile C:\node.zip
+Expand-Archive C:\node.zip C:\ -Force; Rename-Item C:\node-v24.22.3-win-x64 C:\node24
+& C:\node24\npm.cmd install -g --prefix C:\bunpkg bun@1.4.4-canary.20261023.1
+```
+
+`build.cmd` builds and installs it. `git init` gives the release timings a status folder; the tarball has no `.git`.
+
+```bat
+set PATH=C:\node24;C:\bunpkg\node_modules\bun\bin;%PATH%
+cd /d C:\juno
+if not exist .git git init -q
+bun install --frozen-lockfile || exit /b 1
+bun run package || exit /b 1
+start /wait "" apps\desktop\release\Juno-Setup-0.1.32-x64.exe /S
+cd apps\desktop && bun run test:package
+```
+
+Send each file with `COPYFILE_DISABLE=1 tar --no-xattrs -cf - build.cmd | nsc ssh -T "$(cat id)" 'C:\Windows\System32\tar.exe -xf - -C C:\tools && C:\tools\build.cmd'`. Fetch the installer the same way in reverse (`tar.exe -cf - -C C:\juno\apps\desktop\release <name>` piped into `tar -xf -`), then `nsc destroy "$(cat id)" --force`. On 11-16 a 4x8 machine took 9 s to install, 6 s for the JS build and 26 s for electron-builder; sending the 47 MB source took 100 s and fetching the 106 MB installer 160 s. The packaged smoke test (`packaging/smoke.spec.ts`) finds the per-user install on Windows and skips codesign and the macOS screen-watch probe there; it stops at sign-in until the app's Windows session storage lands. On Windows `build-cached.mjs` keys the build on all source, because the import graph in `build-inputs.mjs` follows `/` paths only.
 
 ### Engine and sync benchmarks
 

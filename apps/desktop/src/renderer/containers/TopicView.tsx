@@ -2,7 +2,7 @@ import { memo, Suspense, useEffect, useRef, useState, type KeyboardEvent, type M
 import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing, type TopicHeaderReader } from '@juno/views'
+import { type ActivateEvent, chunk, commandKey, hueFor, type MediaViewing, MessageList, NewMessagesPill, type TopicHeaderReader, TopicView as TopicViewFrame } from '@juno/views'
 import { closeTabById, openTopic, openTopicAt, openTopicAtInBackground, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
@@ -162,7 +162,7 @@ interface TopicProps {
 }
 
 /** Keys that only move focus, step the reader's matches or leave it do not count as using the topic. */
-const usesTopic = (event: KeyboardEvent) => !(event.key === 'Escape' || event.key === 'Tab' || event.key === 'Shift' || event.key === 'Meta' || event.key === 'Alt' || event.key === 'Control' || (event.metaKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')))
+const usesTopic = (event: KeyboardEvent) => !(event.key === 'Escape' || event.key === 'Tab' || event.key === 'Shift' || event.key === 'Meta' || event.key === 'Alt' || event.key === 'Control' || (commandKey(event) && (event.key === 'ArrowUp' || event.key === 'ArrowDown')))
 
 /**
  * The reader's "not yet used" state, the topic view's own, starting again with each topic: a press or a key
@@ -227,7 +227,7 @@ function drawnRows(list: MessageWindow, at: number, snapshot: Parameters<typeof 
 }
 
 /** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
-const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
+const FILE_ACTIONS = { onDownload: downloadMessageFile, ...(quickLookMessageFile === undefined ? {} : { onQuickLook: quickLookMessageFile }) } as const
 
 /** What a row's links, files and images offer beyond opening a link: their menus, the file actions and the media viewer. */
 function fileActions(list: MessageWindow, openMedia: (viewing: MediaViewing) => void) {

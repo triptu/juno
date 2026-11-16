@@ -15,7 +15,7 @@ export interface CodexOptions {
   /** A removal invalidates every reusable thread before its files are purged. */
   readonly threadExists?: (id: string) => boolean
   /** The installed local CLI; startFakeCodex().path in tests. */
-  readonly executable: string
+  readonly executable: () => string
 }
 export type CodexResult = { readonly kind: 'done'; readonly text: string; readonly threadId: string | null }
   | { readonly kind: 'failed'; readonly failure: ProviderFailure; readonly threadId: string | null }
@@ -53,7 +53,7 @@ export function createCodexAdapter(options: CodexOptions) {
           throw new Error('Codex tools require a loopback endpoint')
         }
         cwd = await mkdtemp(join(tmpdir(), 'juno-codex-turn-'))
-        const codex = new Codex({ codexPathOverride: options.executable, env: { ...env, JUNO_MCP_TOKEN: input.mcp.token }, config: {
+        const codex = new Codex({ codexPathOverride: options.executable(), env: { ...env, JUNO_MCP_TOKEN: input.mcp.token }, config: {
           mcp_servers: { juno: { url: input.mcp.url, bearer_token_env_var: 'JUNO_MCP_TOKEN', default_tools_approval_mode: 'approve' } },
           features: { shell_tool: false, apps: false, plugins: false, image_generation: false, browser_use: false,
             computer_use: false, in_app_browser: false, memories: false },

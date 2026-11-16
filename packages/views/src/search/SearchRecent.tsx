@@ -10,6 +10,7 @@ import * as stylex from '@stylexjs/stylex'
 import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, IconButton, Kbd } from '@juno/ui'
 import { chipOperator, type SearchChipView } from './model'
+import { menuKeys } from '../keys'
 
 export interface RecentSearchView {
   readonly chips: ReadonlyArray<SearchChipView>
@@ -57,8 +58,8 @@ export function SearchRecent({ recent, onRecent, onForgetRecent, onPalette }: Se
       <p {...stylex.props(styles.hint)}>Narrow with from:, in:, has: or a date.</p>
       <p data-palette-hint="" {...stylex.props(styles.hint, styles.palette)}>
         To jump to a conversation, topic or command, press{' '}
-        <button type="button" aria-label="Open ⌘K" onClick={onPalette} {...stylex.props(styles.key, focusRing.outside)}>
-          <Kbd look="key">⌘K</Kbd>
+        <button type="button" aria-label={`Open ${menuKeys('palette.toggle')}`} onClick={onPalette} {...stylex.props(styles.key, focusRing.outside)}>
+          <Kbd look="key">{menuKeys('palette.toggle')}</Kbd>
         </button>
         .
       </p>

@@ -15,7 +15,7 @@ import type { ProviderConnection } from './connection'
 import { customRow, listCustomModels } from './custom'
 
 export interface ModelPicker {
-  readonly codex?: { readonly agentDir: string; readonly executable: string }
+  readonly codex?: { readonly agentDir: string; readonly executable: () => string }
   readonly codexStatus?: () => JunoSettingsPage['codex']
   readonly provider: () => 'openrouter' | 'custom'
   readonly rows: () => readonly PickerModel[]
@@ -32,7 +32,7 @@ export interface ModelPicker {
 }
 
 export interface PickerOptions {
-  readonly codex?: { readonly agentDir: string; readonly executable: string }
+  readonly codex?: { readonly agentDir: string; readonly executable: () => string }
   readonly fetch?: typeof fetch
   /**
    * Another origin for OpenRouter, for the catalogue and every model's base

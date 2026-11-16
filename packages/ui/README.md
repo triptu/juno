@@ -44,7 +44,7 @@ clamps to its pane when it mounts, including after a deferred load.
 
 ## Menu and popover triggers
 
-Every menu or popover button declares `aria-haspopup`. `Button`, `IconButton`, `AvatarButton` and `SelectButton` share `menuTriggerHandlers`; custom view buttons use it too. `expanded` on Button and IconButton implies a dialog trigger unless `aria-haspopup` says otherwise. Primary mouse-down invokes the trigger; its later click is ignored. Preventing the mouse-down default preserves focus in the panel. Keyboard and touch still activate on click; ↓ also opens. Ctrl-click and right-click keep their context-menu behaviour. Custom popovers require a separate press to select an item; native menus keep system drag selection.
+Every menu or popover button declares `aria-haspopup`. `Button`, `IconButton`, `AvatarButton` and `SelectButton` share `menuTriggerHandlers`; custom view buttons use it too. `expanded` on Button and IconButton implies a dialog trigger unless `aria-haspopup` says otherwise. Primary mouse-down invokes the trigger; its later click is ignored. Preventing the mouse-down default preserves focus in the panel. Keyboard and touch still activate on click; ↓ also opens. Right-click, and Ctrl-click on the Mac, keep their context-menu behaviour. Custom popovers require a separate press to select an item; native menus keep system drag selection.
 
 ## Context menu
 
@@ -54,8 +54,8 @@ Every menu or popover button declares `aria-haspopup`. `Button`, `IconButton`, `
 
 Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`, `NavItem`) activate on `pointerdown`, not `click`, so the app answers the moment the button goes down. The shared handlers live in `src/internal/activate.ts`:
 
-- Primary button of the primary pointer only. The secondary button goes to `onContextMenu`; ctrl-click is left alone because on macOS it is the context menu.
-- ⌘, shift and alt are passed through in the `ActivateEvent` so the owner can open in a new tab.
+- Primary button of the primary pointer only. The secondary button goes to `onContextMenu`; on the Mac a ctrl-click is left alone because it is the context menu (`contextClick`).
+- The command key, shift and alt are passed through in the `ActivateEvent` so the owner can open in a new tab. Its `metaKey` is the command key: ⌘ on the Mac, Ctrl on Windows (`commandKey`).
 - Enter and Space activate from the keyboard, once per press: holding the key does not repeat. A click with `detail === 0` (assistive technology) activates too. Real clicks are ignored because the press already fired.
 - A press that starts inside a nested control (a close button, a link, or anything marked `data-no-activate`) is ignored; the control handles itself.
 - Pressing and dragging away is harmless: the activation already happened on the press and nothing waits for the release.
@@ -98,3 +98,11 @@ export default defineFixtures(Component, {
 - A pending or loading state holds still. Never resolve a fixture with a timeout. For a thing that never arrives, point at a request the gallery server holds open (Avatar `photo/pending` uses `/__fixture/pending.png`); tests answer it when they need the arrival.
 - A state's frame can ask the screenshot runner to put the component into a look first: `hover`, `press` (holds the primary button, with motion on so unwanted press motion is caught) and `focus` (keyboard focus, so the ring shows) each take a CSS selector inside the frame. Every primitive with such looks has states for them, so hover, pressed, focused and disabled are reviewed in light and dark like everything else. Do not add a `press` state for a disabled control: it cannot be pressed.
 - The layout-shift test (`apps/gallery/shift.spec.ts`) hovers, presses and focuses every interactive element of every state and fails on any movement. Hover and focus may change colour, shadow and outline, never size, position or border width.
+
+## Mac and Windows
+
+`platform.ts` holds every key and word that differs between the Mac and Windows, read once from `?platform=` in the page's address (Linux, which runs only in tests, is the Mac). Views and containers ask it and never test the platform themselves:
+
+- `commandKey(event)`: ⌘ on the Mac, Ctrl on Windows. It asks for a new tab on a click and leads the page's own shortcuts (⌘↵, ⌘2). `otherCommandKey` is the one that is not: Ctrl on the Mac, the Windows key on Windows. `contextClick` is a Ctrl-press on the Mac, which is a right click there.
+- `shortcutKeys(accelerator)`: a label from an Electron accelerator, "⌘K" on the Mac and "Ctrl+K" on Windows. Menu commands' labels come from `menuKeys` in `@juno/views`, which reads the same table main registers.
+- `systemWords`: "this Mac" or "this PC", Finder or File Explorer, System Settings or Windows Settings, and the rest.

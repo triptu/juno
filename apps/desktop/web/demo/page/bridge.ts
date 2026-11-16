@@ -9,7 +9,8 @@
  * tab, and the app-menu keys a reader needs (tabs, Back and Forward, the
  * sidebar). The keys for surfaces the demo leaves out do nothing.
  */
-import { menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
+import { menuAccelerator, type menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
+import { commandKey, isWindows, keyPlatform, otherCommandKey } from '@juno/views'
 import { popupMenu, trackPointer } from '../../page/menu'
 
 const nothing = (): Promise<undefined> => Promise.resolve(undefined)
@@ -28,14 +29,17 @@ function matches(accelerator: string, event: KeyboardEvent): boolean {
   const parts = accelerator.split('+')
   const key = parts.at(-1) ?? ''
   const wants = new Set(parts.slice(0, -1))
+  // On Windows `CommandOrControl` is Ctrl, as Electron reads it there.
   const command = wants.has('CommandOrControl') || wants.has('Command')
-  if (event.metaKey !== command || event.ctrlKey !== wants.has('Control') || event.altKey !== (wants.has('Alt') || wants.has('Option')) || event.shiftKey !== wants.has('Shift')) return false
+  const meta = !isWindows && command
+  const ctrl = wants.has('Control') || (isWindows && command)
+  if (event.metaKey !== meta || event.ctrlKey !== ctrl || event.altKey !== (wants.has('Alt') || wants.has('Option')) || event.shiftKey !== wants.has('Shift')) return false
   return event.key.toLowerCase() === key.toLowerCase() || event.code === `Key${key.toUpperCase()}`
 }
 
 function menuCommandFor(event: KeyboardEvent): MenuCommand | undefined {
-  for (const command of DEMO_COMMANDS) if (matches(menuShortcuts[command], event)) return command
-  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) return `tab.select.${Number(event.key) as 1}`
+  for (const command of DEMO_COMMANDS) if (matches(menuAccelerator(command, keyPlatform), event)) return command
+  if (commandKey(event) && !otherCommandKey(event) && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) return `tab.select.${Number(event.key) as 1}`
   return undefined
 }
 

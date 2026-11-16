@@ -1,9 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { colors } from '@juno/tokens/tokens.stylex'
-import { defineFixtures, scene } from '@juno/ui'
+import { defineFixtures, handWrittenKeys, scene, shortcutKeys } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { CommandPalette, type PaletteItem, type PaletteSection, type PaletteTab } from './CommandPalette'
+import { menuKeys } from './keys'
 
 const NOW = Date.UTC(2026, 9, 15, 15, 0)
 const minutes = (n: number) => NOW - n * 60_000
@@ -25,7 +26,7 @@ const results: ReadonlyArray<PaletteItem> = [
   { id: 'm2', icon: 'public', label: '#eng · Main', sub: '#eng', snippet: { sender: 'Maya Chen', text: 'Engineering all-hands notes are in the doc', highlight: [[0, 3]] }, opensTab: true },
 ]
 
-const searchRow = (text: string): PaletteItem => ({ id: 'search-all', icon: 'search', label: `All results for “${text}”`, shortcut: '⌘⇧F' })
+const searchRow = (text: string): PaletteItem => ({ id: 'search-all', icon: 'search', label: `All results for “${text}”`, shortcut: handWrittenKeys('⌘⇧F', 'CommandOrControl+Shift+F') })
 
 const command: PaletteItem = { id: 'cmd', icon: 'send', label: 'Send to Maya Chen', sub: '"the wednesday slot works"', badge: '95%', hint: '↵ Send' }
 
@@ -48,10 +49,10 @@ const globalCommands: ReadonlyArray<PaletteItem> = [
   { id: 'g3', icon: 'theme-system', label: 'Theme: Match system', sub: 'Current', compact: true },
   { id: 'g4', icon: 'theme-system', accent: 'coral', label: 'Accent: Coral', sub: 'Current', compact: true },
   { id: 'g5', icon: 'theme-system', accent: 'teal', label: 'Accent: Teal', compact: true },
-  { id: 'g6', icon: 'new-tab', label: 'New tab', hint: '⌘T', compact: true },
-  { id: 'g7', icon: 'new-message', label: 'New message', hint: '⌘N', compact: true },
+  { id: 'g6', icon: 'new-tab', label: 'New tab', hint: menuKeys('tab.new'), compact: true },
+  { id: 'g7', icon: 'new-message', label: 'New message', hint: menuKeys('chat.new'), compact: true },
   { id: 'g8', icon: 'settings', label: 'Settings: Appearance', compact: true },
-  { id: 'g9', icon: 'hide-text', label: 'Hide message text', hint: '⌃⌘H', compact: true },
+  { id: 'g9', icon: 'hide-text', label: 'Hide message text', hint: menuKeys('privacy.toggle'), compact: true },
   { id: 'g10', icon: 'presence', label: 'Set yourself away', compact: true },
 ]
 
@@ -59,7 +60,7 @@ const topicCommands: ReadonlyArray<PaletteItem> = [
   { id: 'k1', icon: 'resolve', label: 'Resolve', compact: true },
   { id: 'k2', icon: 'pin', label: 'Pin', compact: true },
   { id: 'k3', icon: 'unread', label: 'Mark as unread', compact: true },
-  { id: 'k4', icon: 'juno', label: 'Open Juno panel', hint: '⌘J', compact: true },
+  { id: 'k4', icon: 'juno', label: 'Open Juno panel', hint: menuKeys('juno.toggle'), compact: true },
   { id: 'k5', icon: 'link', label: 'Copy Slack link', compact: true },
   { id: 'k6', icon: 'open-in-slack', label: 'Open in Slack', compact: true },
   { id: 'k7', icon: 'rename', label: 'Rename thread', compact: true },
@@ -128,8 +129,8 @@ export default defineFixtures(
           tab="all"
           initial=""
           sections={[
-            { heading: 'Frequent', hint: '⌘2', items: frequent.slice(0, 4) },
-            { heading: 'Recent', hint: '⌘3', items: recent.slice(0, 5) },
+            { heading: 'Frequent', hint: shortcutKeys('CommandOrControl+2'), items: frequent.slice(0, 4) },
+            { heading: 'Recent', hint: shortcutKeys('CommandOrControl+3'), items: recent.slice(0, 5) },
           ]}
         />
       )),
@@ -138,9 +139,9 @@ export default defineFixtures(
           tab="all"
           initial="eng"
           sections={[
-            { heading: 'Conversations', hint: '⌘2', items: engConversations },
-            { heading: 'Topics and messages', hint: '⌘3', items: results },
-            { key: 'commands', heading: 'Pages, settings and commands', hint: '⌘4', items: engCommands },
+            { heading: 'Conversations', hint: shortcutKeys('CommandOrControl+2'), items: engConversations },
+            { heading: 'Topics and messages', hint: shortcutKeys('CommandOrControl+3'), items: results },
+            { key: 'commands', heading: 'Pages, settings and commands', hint: shortcutKeys('CommandOrControl+4'), items: engCommands },
           ]}
           footer={searchRow('eng')}
         />
@@ -151,7 +152,7 @@ export default defineFixtures(
           tab="all"
           initial="tell maya the wednesday slot works"
           sections={[
-            { heading: 'Conversations', hint: '⌘2', items: [frequent[0]!] },
+            { heading: 'Conversations', hint: shortcutKeys('CommandOrControl+2'), items: [frequent[0]!] },
             { heading: 'Juno', items: [command] },
           ]}
           footer={searchRow('tell maya the wednesday slot works')}

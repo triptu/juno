@@ -14,10 +14,11 @@
  * appears. On a new Mac, `typePhrase` stores the phrase the owner typed in
  * the restore sheet, so the agent can open the old Mac's backup.
  *
- * Under `JUNO_E2E` the keychain is in memory.
+ * The keychain is the app's (`appKeychains`): the login keychain on the Mac,
+ * encrypted files on Windows, memory under `JUNO_E2E`.
  */
 import type { BackupSecretName, SecretRequest } from '@juno/agent-contract'
-import { macKeychain, memoryKeychain, type Keychain } from './keychain'
+import type { Keychain, KeychainItem } from './keychain'
 
 export const BACKUP_SERVICE = 'juno-backup'
 const NAMES: ReadonlyArray<BackupSecretName> = ['backupKey', 'deletionRecord', 'recoveryPhrase']
@@ -68,12 +69,7 @@ export function backupSecrets(item: (name: BackupSecretName) => Keychain): Backu
   }
 }
 
-/** The app's backup keychain: the login keychain, or memory under tests. */
-export function appBackupSecrets(e2e: boolean): BackupSecrets {
-  const items = new Map<BackupSecretName, Keychain>()
-  return backupSecrets((name) => {
-    let found = items.get(name)
-    if (!found) items.set(name, (found = e2e ? memoryKeychain() : macKeychain({ service: BACKUP_SERVICE, account: name })))
-    return found
-  })
+/** The app's backup secrets, in the app's keychain (`appKeychains`). */
+export function appBackupSecrets(keychain: (item: KeychainItem) => Keychain): BackupSecrets {
+  return backupSecrets((name) => keychain({ service: BACKUP_SERVICE, account: name }))
 }

@@ -26,7 +26,7 @@ import {
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { preloadAgentClient } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { holdKeys, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab } from '@juno/views'
+import { type ActivateEvent, commandKey, holdKeys, otherCommandKey, Workspace as WorkspaceView, type WorkspaceTab } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPanel, loadJuno } from './juno/lazy'
@@ -128,12 +128,12 @@ function onMouseUp(event: MouseEvent): void {
 }
 
 /**
- * ⌘N and ⌘T reach the page before main's menu runs them and sends the
+ * ⌘N and ⌘T (Ctrl+N and Ctrl+T on Windows) reach the page before main's menu runs them and sends the
  * command back. Keys typed in that time are held from the shortcut's own
  * key, so they reach Home's field or search, not the field that had focus.
  */
 function holdKeysAfterNewShortcut(event: KeyboardEvent): void {
-  if (!event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.repeat) return
+  if (!commandKey(event) || otherCommandKey(event) || event.altKey || event.shiftKey || event.repeat) return
   const key = event.key.toLowerCase()
   if (key === 'n' || key === 't') holdKeys()
 }

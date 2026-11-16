@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react'
-import { Textarea } from '@juno/ui'
+import { commandKey, Textarea } from '@juno/ui'
 
 export interface NoteFieldProps {
   readonly label: string
@@ -22,7 +22,7 @@ export function NoteField({ label, draft, onDraftChange, onSave, onCancel }: Not
       event.preventDefault()
       event.stopPropagation()
       onCancel()
-    } else if (event.key === 'Enter' && (event.metaKey || !event.shiftKey)) {
+    } else if (event.key === 'Enter' && (commandKey(event) || !event.shiftKey)) {
       event.preventDefault()
       event.stopPropagation()
       if (draft.trim().length > 0) onSave()

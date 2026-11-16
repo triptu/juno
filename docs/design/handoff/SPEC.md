@@ -924,6 +924,7 @@ Use the Littlebird design system's tokens.
 - **Undo over confirm.** Prefer undo to confirmation for reversible actions. Toasts read "Resolved · Postgres 16 migration plan · Undo".
 - **Main thread labels** always say whose Main it is: "#eng · Main".
 - **The "#" prefix.** Don't repeat the channel # in text when a hash icon is already beside it.
+- **Mac and Windows.** Copy names the computer as its platform does. The Mac says this Mac, macOS, Finder, System Settings, the Dock and the keychain; Windows says this PC, Windows, File Explorer, Windows Settings and the taskbar. Shortcuts are written as each platform writes them: ⌃⌘H on the Mac, Ctrl+Shift+H on Windows.
 
 ## 18. Keyboard shortcuts
 
@@ -953,6 +954,8 @@ Use the Littlebird design system's tokens.
 | ⌘B / ⌘I / ⌘⇧X / ⌘⇧C / ⌘⇧9 | In a composer or the edit field: bold, italic, strikethrough, code and quote on the selection (section 8) |
 | Enter / Shift Enter | Send / new line. During a send check, Enter takes the first option. |
 | Esc | Close a menu or palette, or dismiss a send check. In a topic's composer with nothing to close, select the message under the pointer, else the newest. In the Juno panel with an empty composer, close the panel |
+
+On Windows, Ctrl takes ⌘'s place in every shortcut above: Ctrl+K, Ctrl+click and Ctrl+Enter for a new tab, Ctrl+Shift+Space to mute (Win+Shift+Space switches the keyboard language there). Two keys differ, since Ctrl+S is Save and Ctrl+H is Replace in most Windows apps: Hide or show the sidebar is Ctrl+Shift+S, and hide or show message text is Ctrl+Shift+H. Hold Alt to peek. Ctrl-click opens in a new tab; on the Mac it is a right click.
 
 ## 19. Not in v1, and open questions
 

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type Banner, type JunoPage } from '@juno/agent-contract'
-import { menuKeys } from '@juno/contract/channels'
+import { menuKeys } from '../keys'
 import { colors } from '@juno/tokens/tokens.stylex'
 import { Fragment, type ReactNode } from 'react'
 import { ArrowsOutSimple } from '@phosphor-icons/react/dist/icons/ArrowsOutSimple'

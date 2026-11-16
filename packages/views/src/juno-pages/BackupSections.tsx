@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { chatCopy, type JobId, type JunoSettingsPage as JunoSettingsPageModel, type Ownership } from '@juno/agent-contract'
-import { Button, Chip, ListRow, Section, Surface, Text } from '@juno/ui'
+import { Button, Chip, ListRow, Section, Surface, systemWords, Text } from '@juno/ui'
 import { cell } from './cell'
 import { BackupPath } from './BackupPath'
 import { fullTime, messageTime } from '../time'
@@ -63,7 +63,7 @@ export function BackupSection({ page, now, onBackupFolder, onExportPhrase, backu
             <Text variant="body">Recovery phrase</Text>
             <Text variant="meta" tone="muted" data-phrase-exported={page.recoveryPhraseExportedAt === undefined ? 'no' : 'yes'}>
               {page.recoveryPhraseExportedAt === undefined ? (
-                'Not exported yet. Without it a backup cannot be read on another Mac.'
+                `Not exported yet. Without it a backup cannot be read on another ${systemWords.computer}.`
               ) : (
                 <>
                   Exported <time title={fullTime(page.recoveryPhraseExportedAt)}>{messageTime(page.recoveryPhraseExportedAt, now)}</time>
@@ -89,7 +89,7 @@ export interface ThisMacSectionProps {
 export function ThisMacSection({ page, onMove, onRestore, onStopJob }: ThisMacSectionProps) {
   const copy = chatCopy.pages.settings
   return (
-    <Section heading="This Mac" sub="Juno runs on one Mac at a time.">
+    <Section heading={systemWords.ThisComputer} sub={`Juno runs on one ${systemWords.computer} at a time.`}>
       <Surface kind="group" data-ownership={ownerState(page.ownership)}>
         <OwnerRow ownership={page.ownership} />
         {page.removalPending !== undefined && onStopJob !== undefined ? (
@@ -129,7 +129,7 @@ export function ThisMacSection({ page, onMove, onRestore, onStopJob }: ThisMacSe
           <span {...stylex.props(cell.lines)}>
             <Text variant="body">{copy.restore}</Text>
             <Text variant="meta" tone="muted">
-              Takes over from a backup, after you confirm the old Mac is off.
+              Takes over from a backup, after you confirm the old {systemWords.computer} is off.
             </Text>
           </span>
         </ListRow>

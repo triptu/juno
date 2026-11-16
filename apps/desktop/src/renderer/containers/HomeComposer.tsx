@@ -20,7 +20,7 @@ import {
 } from '@juno/state'
 import { junoNavAtom, junoReadsImagesAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, sendToRowId, type ComposerMention } from '@juno/views'
+import { AttachmentNote, commandKey, Composer, type ComposerMention, destinationLabel, holdKeys, notSentText, releaseKeys, sendToRowId } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useComposerMarkup } from './composerMarkup'
 import { useComposerLinks } from './composerLinks'
@@ -278,7 +278,7 @@ function homeFieldKey(
   if (event.nativeEvent.isComposing) return false
   if (sendTo.onKey(event)) return true
   // A held Backspace that just cleared the text keeps the destination; only a new press goes back to Juno.
-  if (event.key === 'Backspace' && toSlack && event.currentTarget.value === '' && !event.metaKey && !event.repeat) {
+  if (event.key === 'Backspace' && toSlack && event.currentTarget.value === '' && !commandKey(event) && !event.repeat) {
     event.preventDefault()
     destination.choose(undefined)
     return true

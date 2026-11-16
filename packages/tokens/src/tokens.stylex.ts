@@ -919,8 +919,10 @@ export const layout = stylex.defineVars({
   '--sidebar-inset': '10px',
   '--titlebar-height': '44px',
   // Kept free for the traffic lights at the start of the sidebar bar, or of
-  // the tab strip while the sidebar is hidden.
+  // the tab strip while the sidebar is hidden. The sidebar's inset on Windows (`windowsTitlebar`).
   '--titlebar-lights-inset': '78px',
+  // Kept free for Windows' minimise, maximise and close at the end of the tab strip. None on the Mac.
+  '--titlebar-controls-inset': '0px',
   '--tab-height': '35px',
   '--tab-width': '230px',
   '--tab-min-width': '120px',

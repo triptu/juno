@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useState, type KeyboardEvent } from 'react'
 import type { ThreadSummary } from '@juno/contract'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Chip, OptionGroupLabel, OptionList, OptionRow, Text, TopicArt, useOptionListKeys, type ActivateEvent } from '@juno/ui'
+import { type ActivateEvent, Chip, commandKey, OptionGroupLabel, OptionList, OptionRow, Text, TopicArt, useOptionListKeys } from '@juno/ui'
 import { countLabel, titleMatches as matches } from './look'
 import { PickerNoMatch, PickerSearch } from './PickerSearch'
 import { relativeTime } from './time'
@@ -67,7 +67,7 @@ export function TopicSwitcher({ mainId, mainUnread, mainArt, currentId, threads,
   }, [start])
   const keys = useOptionListKeys({ ids, activeId, onActiveChange: moveTo, onSelect: (id) => pick(id) })
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Enter' && event.metaKey && activeId !== undefined) {
+    if (event.key === 'Enter' && commandKey(event) && activeId !== undefined) {
       event.preventDefault()
       pick(activeId, true)
       return

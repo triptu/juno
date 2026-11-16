@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, MouseEvent } from 'react'
+import { contextClick } from './platform'
 
 type TriggerProps = Pick<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-haspopup' | 'onClick' | 'onPointerDown' | 'onKeyDown'>
 
@@ -10,7 +11,7 @@ export function menuTriggerHandlers({ 'aria-haspopup': popup, onClick, onPointer
   return {
     onPointerDown: (event) => {
       onPointerDown?.(event)
-      if (event.defaultPrevented || event.pointerType !== 'mouse' || event.button !== 0 || event.ctrlKey) return
+      if (event.defaultPrevented || event.pointerType !== 'mouse' || event.button !== 0 || contextClick(event)) return
       // Keep the browser's later mouse-down focus from taking focus back out of the panel.
       event.preventDefault()
       focusWithoutRing(event.currentTarget)
@@ -18,7 +19,7 @@ export function menuTriggerHandlers({ 'aria-haspopup': popup, onClick, onPointer
     },
     onClick: (event) => {
       // Keyboard/AT clicks and touch still activate here. A mouse press already activated.
-      if (!isMouseClick(event) && !event.ctrlKey) onClick(event)
+      if (!isMouseClick(event) && !contextClick(event)) onClick(event)
     },
     onKeyDown: (event) => {
       onKeyDown?.(event)

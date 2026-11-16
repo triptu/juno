@@ -3,7 +3,7 @@ import { CaretLeft } from '@phosphor-icons/react/dist/icons/CaretLeft'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { SidebarSimple } from '@phosphor-icons/react/dist/icons/SidebarSimple'
 import { useRef, type PointerEvent } from 'react'
-import { menuKeys } from '@juno/contract/channels'
+import { menuKeys } from './keys'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, type PhosphorIcon } from '@juno/ui'
 

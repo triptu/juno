@@ -30,14 +30,14 @@
  * option that makes the recovery phrase a trusted record is off by default
  * (O4) and not built in v1.
  */
-import { closeSync, existsSync, fsyncSync, openSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { AGENT_DATABASE_FILE } from '../runtime/core'
 import { crashPoint } from '../runtime/crash'
 import { applySegment } from './capture'
 import type { BackupKeychain } from './backup'
-import { generations, manifestHash, manifestPath, parseManifest, readBytes, readText, segmentPath, writeDurable, type Manifest } from './folder'
+import { generations, manifestHash, manifestPath, parseManifest, readBytes, readText, segmentPath, syncDir, writeDurable, type Manifest } from './folder'
 import { BackupUnreadable, moveCode, sha256, unseal, unwrapKey, unwrapWithPhrase, type PhraseWrap } from './keys'
 
 export const RESTORE_DATABASE = 'restore.sqlite'
@@ -100,15 +100,6 @@ async function newest(folder: string, keychain: BackupKeychain): Promise<{ reado
     }
   }
   return 'noKey'
-}
-
-function syncDir(dir: string): void {
-  const fd = openSync(dir, 'r')
-  try {
-    fsyncSync(fd)
-  } finally {
-    closeSync(fd)
-  }
 }
 
 /** Stage 1. `device` is this Mac's `ownership.device_id`. */

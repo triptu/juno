@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type JobPhase, type ProposedTaskCard as ProposedTaskCardModel, type TaskCard as TaskCardModel } from '@juno/agent-contract'
 import { motion, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Text } from '@juno/ui'
+import { Button, commandKey, Text } from '@juno/ui'
 import type { ChatActions } from '../commands'
 import { TextButton } from '../TextButton'
 import { ChatCard, DangerGhost, OpenButton } from './ChatCard'
@@ -58,7 +58,7 @@ export function TaskCard({ card, actions, enter }: TaskCardProps) {
         active.has(card.phase) ? (
           <>
             {card.phase !== 'lostSight' && open !== undefined ? (
-              <Button variant="ghost" size="md" tone="subtle" onClick={(event) => actions.onOpen(open, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>
+              <Button variant="ghost" size="md" tone="subtle" onClick={(event) => actions.onOpen(open, { metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>
                 {copy.open}
               </Button>
             ) : null}
@@ -118,7 +118,7 @@ function Settled({ card, actions }: TaskCardProps) {
     case 'failed':
       return (
         <>
-          {copy.failed} · <TextButton onClick={(event) => actions.onOpen({ _tag: 'page', page: 'activity' }, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>{copy.showInActivity}</TextButton>
+          {copy.failed} · <TextButton onClick={(event) => actions.onOpen({ _tag: 'page', page: 'activity' }, { metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>{copy.showInActivity}</TextButton>
         </>
       )
     case 'stopped':

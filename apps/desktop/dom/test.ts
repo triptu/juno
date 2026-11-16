@@ -53,6 +53,8 @@ export interface DomTestOptions<M extends Model | undefined = undefined> {
   readonly model?: () => Promise<M & Model>
   /** The engine's frames reach the page one at a time and the page's time stands still, so counted renders do not depend on timing (`work.ts`). */
   readonly counted?: boolean
+  /** The page runs as on Windows (`?platform=win32`): Ctrl takes ⌘'s place in shortcuts and their labels. */
+  readonly windows?: boolean
   /** The test's own timeout, over the lane's limit (`@juno/testing/limits`); it needs a `// Slow:` reason. */
   readonly timeout?: number
   /** Tags, as a Playwright test has them: a test with a tag JUNO_SKIP_TAGS names is skipped (`@heavy-huddle`, scripts/test-areas.mjs). */
@@ -116,7 +118,7 @@ async function run<M extends Model | undefined>(title: string, body: (context: D
     await warmWorker()
     const snapshot = options.synced === false ? undefined : await domSnapshot(signIn, options.seed)
     const ready = meter.lap()
-    const started = await startDomApp({ snapshot, engine, counted: options.counted === true, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
+    const started = await startDomApp({ snapshot, engine, counted: options.counted === true, windows: options.windows === true, ...(options.fake === undefined ? {} : { fake: options.fake }), ...(clock === undefined ? {} : { clock }), warm: (app) => new Juno(app).waitForSync() })
     const warm = meter.lap()
     const others: Array<{ app: DomApp | undefined; readonly userData: string }> = []
     const steps: Array<{ readonly name: string; readonly ms: number }> = []

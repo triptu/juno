@@ -1,6 +1,6 @@
 // Must run before any module captures a test switch.
 import './environment'
-import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, safeStorage, session as electronSession, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, safeStorage, session as electronSession, shell, type Tray } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
 import { createDockBadge, createDockBounce } from './dockBadge'
@@ -14,7 +14,7 @@ import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
 import { clearTemporaryFiles, copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, huddleSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
-import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
+import { appKeychains, CUSTOM_ITEM, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, withSession, type Launch } from './launch'
 import { registerMediaPermissions } from './media'
@@ -30,9 +30,17 @@ import { createProcessWatch } from './processWatch'
 import { createScreenWatch, loadScreenProbe, writeProbeForTests, type ScreenProbe } from './screenWatch'
 import { loadUpdateConfig } from './releaseFeed'
 import { createUpdates } from './updates'
-import { appWindow, createMainWindow, setMenuCheckForUpdates, setMenuPrivacy, setSidebarHidden } from './window'
+import { setAppMenu, setMenuCheckForUpdates, setMenuPrivacy, setSidebarHidden } from './menu'
+import { APP_USER_MODEL_ID, createTray, showUnreadOverlay } from './taskbar'
+import { appWindow, createMainWindow, refreshTitleBar } from './window'
 
 app.enableSandbox()
+
+const windows = process.platform === 'win32'
+/** The Windows tray icon, once made; closing the window hides to it. */
+let tray: Tray | undefined
+// Before any notification: Windows shows toasts only for an app it knows by this id (taskbar.ts).
+if (windows) app.setAppUserModelId(APP_USER_MODEL_ID)
 
 const e2e = process.env.JUNO_E2E === '1'
 
@@ -117,7 +125,11 @@ supervisor.onFailed(() => { huddleQuit.engineFailed(); dockBadge.set('') })
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
 const notificationsForTests: Array<{ readonly title: string; readonly subtitle?: string; readonly body: string; readonly silent?: boolean; click: () => void }> = []
 let badgeForTests = ''
-const dockBounce = createDockBounce(e2e, () => BrowserWindow.getFocusedWindow() !== null, () => app.dock?.bounce('informational'))
+const dockBounce = createDockBounce(e2e, () => BrowserWindow.getFocusedWindow() !== null, () => {
+  // Windows flashes the taskbar button until the window is focused.
+  if (windows) appWindow()?.flashFrame(true)
+  else app.dock?.bounce('informational')
+})
 
 /** A clicked notification: the app window comes forward, or opens. */
 function focusWindow(): BrowserWindow {
@@ -140,7 +152,10 @@ const notifier = new Notifier({
       notificationsForTests.push(recorded)
       return { show: () => {}, close: () => {}, onClick: (f) => { recorded.click = f } }
     }
-    const shown = new Notification({ title: options.title, ...(options.subtitle === undefined ? {} : { subtitle: options.subtitle }), body: options.body, silent: options.silent === true })
+    // Windows has no subtitle line, so where the message was posted leads the body there.
+    const placed = windows && options.subtitle !== undefined
+    const body = placed ? `${options.subtitle}\n${options.body}` : options.body
+    const shown = new Notification({ title: options.title, ...(options.subtitle === undefined || placed ? {} : { subtitle: options.subtitle }), body, silent: options.silent === true })
     return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
   },
   setBadge: (text) => dockBadge.set(text),
@@ -171,7 +186,9 @@ let notificationSettingsOpenedForTests = 0
 const notificationPermission = e2e ? permissionForTests : createNotificationPermission(loadPermissionBridge)
 const dockBadge = createDockBadge(notificationPermission, (text) => {
   badgeForTests = text
-  if (!e2e) app.dock?.setBadge(text)
+  if (e2e) return
+  if (windows) showUnreadOverlay(appWindow(), text)
+  else app.dock?.setBadge(text)
 }, {
   enabled: app.isPackaged || (e2e && process.env.JUNO_E2E_DEV_NOTIFICATIONS !== '1'),
   asked: () => launch.notificationPermissionAsked === true,
@@ -182,15 +199,24 @@ const refreshDockBadge = () => void dockBadge.refresh()
 /** System Settings at Juno's notifications; the Notifications pane if macOS refuses the entry's link. */
 const openNotificationSettings = async () => (e2e ? void (notificationSettingsOpenedForTests += 1) : openSettings(app.isPackaged))
 
-// The backup's secrets in the keychain (memory under tests), WP21.
-const backupSecrets = appBackupSecrets(e2e)
+// Provider keys, MCP sign-ins and the backup's secrets: the login keychain on the Mac,
+// safeStorage files on Windows, memory under tests (keychain.ts).
+const keychain = appKeychains({
+  e2e,
+  platform: process.platform,
+  userData: app.getPath('userData'),
+  cipher: { encrypt: (value) => safeStorage.encryptString(value), decrypt: (bytes) => safeStorage.decryptString(bytes) },
+})
+
+// The backup's secrets, WP21.
+const backupSecrets = appBackupSecrets(keychain)
 
 // The agent runs whenever a model provider is set up (ADR 0012, SPEC 13.10).
 const agent = createAgentSupervisor(
   (port) => supervisor.send({ _tag: 'agentPort' }, [port]),
   () => supervisor.currentState === 'ready',
-  // MCP sign-in: OAuth state in the keychain (memory under tests), sign-in pages in the system browser.
-  appMcpCredentials(e2e, (url) => shell.openExternal(url)),
+  // MCP sign-in: OAuth state in the keychain, sign-in pages in the system browser.
+  appMcpCredentials(e2e, keychain, (url) => shell.openExternal(url)),
   backupSecrets.answer,
 )
 // Each process's CPU and memory for Settings › About, and the idle CPU self-check (processWatch.ts).
@@ -200,10 +226,10 @@ supervisor.onReady(() => {
   if (appWindow()?.isVisible()) supervisor.send({ _tag: 'painted' })
 })
 
-// The providers: keys in the keychain (in memory under tests), OPENROUTER_API_KEY as a development override.
+// The providers: keys in the keychain, OPENROUTER_API_KEY as a development override.
 const providers = new ProviderStore(
   app.getPath('userData'),
-  e2e ? { openRouter: memoryKeychain(), custom: memoryKeychain() } : { openRouter: macKeychain(OPENROUTER_ITEM), custom: macKeychain(CUSTOM_ITEM) },
+  { openRouter: keychain(OPENROUTER_ITEM), custom: keychain(CUSTOM_ITEM) },
   // Under JUNO_E2E only the test seam: a test launches with a key, never the developer's.
   e2e ? process.env.JUNO_E2E_OPENROUTER_KEY : app.isPackaged ? undefined : process.env.OPENROUTER_API_KEY,
   (state, provider, engineKey) => {
@@ -235,6 +261,7 @@ app.whenReady().then(() => {
   // tests: decoding the 1,024 px icon holds main for about 80 ms before the window opens, a cost the
   // packaged app does not have, so the start-up scenarios would measure something that never ships.
   if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
+  nativeTheme.on('updated', refreshTitleBar)
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   void clearTemporaryFiles(e2e)
   registerMediaPermissions()
@@ -268,7 +295,10 @@ app.whenReady().then(() => {
     providers,
     codex,
     backupSecrets,
-    setTheme: (theme) => updateLaunch({ theme }),
+    setTheme: (theme) => {
+      updateLaunch({ theme })
+      refreshTitleBar()
+    },
     setAccent: (accent) => updateLaunch({ accent }),
     setTopicTitleLines: (topicTitleLines) => updateLaunch({ topicTitleLines }),
     setDensity: (density) => updateLaunch({ density }),
@@ -293,6 +323,14 @@ app.whenReady().then(() => {
   openWindow()
   setMenuCheckForUpdates(() => void updates.check())
   updates.start()
+  // On Windows Juno keeps running in the notification area after its window closes, as the Dock keeps it on the Mac.
+  // Held here: Electron removes a tray it can garbage-collect. Without a tray, closing the window quits.
+  if (windows) {
+    createTray(() => void focusWindow()).then(
+      (created) => (tray = created),
+      (cause: unknown) => console.warn('main: no tray icon, closing the window will quit', cause),
+    )
+  }
 
   // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open,
   // and shows again after a close hid it for a huddle.
@@ -310,9 +348,15 @@ app.whenReady().then(() => {
   })
 })
 
+/** A quit is under way: the window closes for good instead of hiding. */
+let quitting = false
+
 function openWindow(): BrowserWindow {
   const window = createMainWindow(() => ({ ...launch, privacy: privacyOn(), privacySharing: privacyBySharing }))
+  setAppMenu({ sidebarHidden: launch.sidebar?.collapsed ?? false, privacy: launch.privacy === true, huddle: null })
   window.once('ready-to-show', () => {
+    // A new window has no taskbar overlay yet.
+    if (windows) refreshDockBadge()
     supervisor.send({ _tag: 'painted' })
     // After the first paint, so loading koffi never delays it. Only while the window is open.
     screenWatch.start()
@@ -322,8 +366,9 @@ function openWindow(): BrowserWindow {
   window.on('close', (event) => {
     updateLaunch({ bounds: window.getNormalBounds() })
     // Closing the window while in a huddle hides it; the huddle goes on, and the Dock icon brings it back
-    // (SPEC 20, "Quitting"). A quit closes it for good, after its own question.
-    if (huddleQuit.hidesOnClose()) {
+    // (SPEC 20, "Quitting"). On Windows it always hides, and the tray icon brings it back. A quit closes it
+    // for good, after its own question.
+    if (huddleQuit.hidesOnClose() || (tray !== undefined && !quitting)) {
       event.preventDefault()
       window.hide()
     }
@@ -332,8 +377,9 @@ function openWindow(): BrowserWindow {
   return window
 }
 
+// The Mac keeps running in the Dock and Windows in the tray; elsewhere (Linux, tests only), or on Windows without a tray, the last window quits.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform !== 'darwin' && tray === undefined) app.quit()
 })
 
 /** The engine finishing its last requests as the app quits; undefined once it has exited. */
@@ -341,6 +387,7 @@ let engineStopping: Promise<void> | undefined
 
 app.on('before-quit', (event) => {
   if (event.defaultPrevented) return // held for the huddle question (huddleQuit.ts)
+  quitting = true
   activity.stop()
   screenWatch.stop()
   updates.stop()

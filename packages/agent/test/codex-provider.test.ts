@@ -22,7 +22,7 @@ afterEach(async () => { await server.close(); fake.close(); await h.close() })
 
 it('requires sign-in in its own home, uses approval mode and runs a fresh isolated thread', async () => {
   const guard = h.guard()
-  const codex = createCodexAdapter({ agentDir: h.dir, guard, executable: fake.path })
+  const codex = createCodexAdapter({ agentDir: h.dir, guard, executable: () => fake.path })
   const model = { ...h.model, id: 'gpt-6.1-sol', provider: 'openai-codex', contextWindow: 272_000 }
   const { revision, context } = request()
   const input = { revision, prompt: String(context.messages.at(-1)!.content), model, mcp: { url: server.url, token: 'test-turn-token' } }
@@ -59,7 +59,7 @@ it('requires sign-in in its own home, uses approval mode and runs a fresh isolat
 
 it('reuses a session thread, rotates at the bound, and never resumes after removal', async () => {
   const guard = h.guard()
-  const codex = createCodexAdapter({ agentDir: h.dir, guard, executable: fake.path,
+  const codex = createCodexAdapter({ agentDir: h.dir, guard, executable: () => fake.path,
     threadExists: id => h.core.store.db.prepare('SELECT 1 FROM codex_turns WHERE thread_id = ?').get(id) !== undefined })
   fake.signIn(codex.home)
   const input = { revision: request().revision, prompt: 'hello', model: { ...h.model, id: 'gpt-6.1-sol', contextWindow: 272_000 }, sessionId: 'chat', mcp: { url: server.url, token: 'test-turn-token' } }
@@ -76,7 +76,7 @@ it('reuses a session thread, rotates at the bound, and never resumes after remov
 })
 
 it('refuses built-ins while allowing only the bearer-authenticated Juno MCP tools', async () => {
-  const codex = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: fake.path })
+  const codex = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: () => fake.path })
   fake.signIn(codex.home)
   fake.script([{ builtIns: ['shell', 'edit', 'web'], reply: 'done' }])
   const result = await codex.turn({ revision: request().revision, prompt: 'try built-ins', model: h.model, mcp: { url: server.url, token: 'test-turn-token' } })
@@ -85,11 +85,11 @@ it('refuses built-ins while allowing only the bearer-authenticated Juno MCP tool
 })
 
 it('reports missing, quota and process crash distinctly without retrying a tool', async () => {
-  const missing = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: `${fake.path}-missing` })
+  const missing = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: () => `${fake.path}-missing` })
   const input = { revision: request().revision, prompt: 'hello', model: h.model, mcp: { url: server.url, token: 'test-turn-token' } }
   expect(await missing.status()).toBe('missing')
   expect(await missing.turn(input)).toMatchObject({ kind: 'failed', failure: { ending: { reason: 'codexMissing' } } })
-  const codex = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: fake.path })
+  const codex = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: () => fake.path })
   fake.signIn(codex.home)
   fake.script([{ fail: 'You have hit your usage limit' }, { toolCalls: [{ server: 'juno', tool: 'echo', arguments: { text: 'once' } }], crash: true }])
   expect(await codex.turn(input)).toMatchObject({ kind: 'failed', failure: { ending: { reason: 'codexQuota' } } })
@@ -99,7 +99,7 @@ it('reports missing, quota and process crash distinctly without retrying a tool'
 })
 
 it('removal drains an active writer and purges even a session without a recorded id', async () => {
-  const codex = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: fake.path })
+  const codex = createCodexAdapter({ agentDir: h.dir, guard: h.guard(), executable: () => fake.path })
   fake.signIn(codex.home)
   fake.script([{ toolCalls: [{ server: 'juno', tool: 'echo', arguments: { text: 'started' } }], delayMs: 10_000 }])
   const running = codex.turn({ revision: request().revision, prompt: 'hello', model: h.model, mcp: { url: server.url, token: 'test-turn-token' } })
