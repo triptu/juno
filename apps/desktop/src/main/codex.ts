@@ -15,6 +15,7 @@ import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { CodexSetup } from '@juno/contract'
+import { findCodex } from '../codexExecutable'
 
 /** Codex's browser sign-in gets this long before Juno stops waiting for it. */
 const SIGN_IN_TIMEOUT_MS = 10 * 60_000
@@ -27,14 +28,21 @@ export interface CodexHome {
   readonly stop: () => void
 }
 
-/** The Codex executable for this run: the owner's `codex`, or the test's stand-in under JUNO_E2E. */
-export const codexExecutable = (e2e: boolean): string => (e2e ? (process.env.JUNO_E2E_CODEX ?? 'juno-e2e-no-codex') : 'codex')
+/**
+ * The Codex executable for this run, found again for each spawn so an install made while Juno runs
+ * counts: the owner's (`codexExecutable.ts`), or the test's stand-in under JUNO_E2E.
+ */
+export const codexExecutable = (e2e: boolean): (() => string) =>
+  e2e ? () => process.env.JUNO_E2E_CODEX ?? 'juno-e2e-no-codex' : () => findCodex()
 
-export function codexHome(agentDir: string, executable: string): CodexHome {
+/** On Windows Codex also needs the profile folders, temp, `PATHEXT` and the shell to sign in and reach the network. */
+const WINDOWS_ENV = ['SystemRoot', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP', 'PATHEXT', 'ComSpec']
+
+export function codexHome(agentDir: string, executable: () => string): CodexHome {
   const home = join(agentDir, 'codex')
   // Juno's own Codex home, and nothing else from the environment: no inherited keys or configuration.
   const env: Record<string, string> = { CODEX_HOME: home }
-  for (const name of ['PATH', 'HOME', 'TMPDIR']) {
+  for (const name of ['PATH', 'HOME', 'TMPDIR', ...(process.platform === 'win32' ? WINDOWS_ENV : [])]) {
     const value = process.env[name]
     if (value !== undefined) env[name] = value
   }
@@ -43,7 +51,7 @@ export function codexHome(agentDir: string, executable: string): CodexHome {
   const status = async (): Promise<CodexSetup> => {
     await mkdir(home, { recursive: true, mode: 0o700 })
     return new Promise((resolve) => {
-      const child = execFile(executable, ['login', 'status'], { env, timeout: 10_000, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
+      const child = execFile(executable(), ['login', 'status'], { env, timeout: 10_000, maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
         children.delete(child)
         if (error !== null && 'code' in error && error.code === 'ENOENT') return resolve('missing')
         // Signed in prints the ChatGPT account; anything else, a failure included, reads as signed out.
@@ -58,7 +66,7 @@ export function codexHome(agentDir: string, executable: string): CodexHome {
     const before = await status()
     if (before === 'missing' || stopped) return before
     await new Promise<void>((resolve) => {
-      const child = spawn(executable, ['login'], { env, stdio: 'ignore' })
+      const child = spawn(executable(), ['login'], { env, stdio: 'ignore' })
       children.add(child)
       const timer = setTimeout(() => child.kill(), SIGN_IN_TIMEOUT_MS)
       const done = () => {

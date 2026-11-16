@@ -21,6 +21,7 @@
  * the next open installs the restore. This Mac's name for the
  * other Mac's banner is the computer name from System Settings.
  */
+import { findCodex } from '../codexExecutable'
 import { installProcessLog } from '../processLog'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -133,7 +134,7 @@ parent.on('message', (event) => {
       started = true
       const config = message.config
       if (config.e2e && config.codemode === true) probeCodemode(config.agentDir)
-      const picker = modelPicker(connection, { ...(config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }), codex: { agentDir: config.agentDir, executable: 'codex' } })
+      const picker = modelPicker(connection, { ...(config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }), codex: { agentDir: config.agentDir, executable: findCodex() } })
       // The engine opens on the saved model of the active provider, so it waits for main to name one.
       void connection
         .get()

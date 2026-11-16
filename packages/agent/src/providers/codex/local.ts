@@ -13,8 +13,10 @@ export type CodexStatus = 'signedIn' | 'signedOut' | 'missing'
 export function createCodexLocal(options: { readonly agentDir: string; readonly executable: string }) {
   const home = resolve(options.agentDir, 'codex')
   const env: Record<string, string> = { CODEX_HOME: home }
-  // No inherited keys, Codex configuration or MCP credentials.
-  for (const name of ['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT']) {
+  // No inherited keys, Codex configuration or MCP credentials. On Windows Codex also needs the
+  // profile folders, temp, PATHEXT and the shell to sign in and reach the network.
+  const windows = process.platform === 'win32' ? ['USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP', 'PATHEXT', 'ComSpec'] : []
+  for (const name of ['PATH', 'HOME', 'TMPDIR', 'SYSTEMROOT', ...windows]) {
     const value = process.env[name]
     if (value !== undefined) env[name] = value
   }
