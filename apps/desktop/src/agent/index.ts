@@ -134,7 +134,7 @@ parent.on('message', (event) => {
       started = true
       const config = message.config
       if (config.e2e && config.codemode === true) probeCodemode(config.agentDir)
-      const picker = modelPicker(connection, { ...(config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }), codex: { agentDir: config.agentDir, executable: findCodex() } })
+      const picker = modelPicker(connection, { ...(config.openRouterOrigin === undefined ? {} : { origin: config.openRouterOrigin }), codex: { agentDir: config.agentDir, executable: findCodex } })
       // The engine opens on the saved model of the active provider, so it waits for main to name one.
       void connection
         .get()

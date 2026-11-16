@@ -93,7 +93,7 @@ export class BrowserAgent {
     this.#renderers = runtime.rendererPorts()
     const origin = this.options.fakeOpenRouterUrl
     const agentDir = join(this.userData, 'agent')
-    const picker = runtime.modelPicker(connection, { ...(origin === undefined ? {} : { origin }), codex: { agentDir, executable: 'codex' } })
+    const picker = runtime.modelPicker(connection, { ...(origin === undefined ? {} : { origin }), codex: { agentDir, executable: () => 'codex' } })
     const mcp = runtime.credentialBridge((requestId, request) => {
       void this.#credentials(request).then((value) => mcp.answer({ requestId, ok: true, ...(value === undefined ? {} : { value }) }), () => mcp.answer({ requestId, ok: false }))
     })
