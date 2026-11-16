@@ -31,8 +31,13 @@ export const settingsUrls = (bundleId: string) => [
   'x-apple.systempreferences:com.apple.Notifications-Settings.extension',
 ] as const
 
-/** Opens System Settings at Juno's notifications. Packaged, macOS knows Juno by its bundle id; in development the app is Electron. */
+/**
+ * Opens System Settings at Juno's notifications. Packaged, macOS knows Juno by its bundle id; in development the app is Electron.
+ * Windows has no link to one app's entry, so its Notifications page. Windows does not tell apps whether their
+ * notifications are on, so the permission stays `unknown` there and Settings keeps this link beside the test.
+ */
 export async function openSettings(packaged: boolean): Promise<void> {
+  if (process.platform === 'win32') return shell.openExternal('ms-settings:notifications')
   const [entry, pane] = settingsUrls(packaged ? 'app.juno.desktop' : 'com.github.Electron')
   await shell.openExternal(entry).catch(() => shell.openExternal(pane))
 }

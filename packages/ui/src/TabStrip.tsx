@@ -16,8 +16,9 @@ export interface TabStripProps {
    */
   readonly leading?: ReactNode
   /**
-   * The window is in full screen, where macOS hides the traffic lights:
-   * `leading` starts at the strip's own padding instead of after their space.
+   * The window is in full screen, which hides the window buttons: `leading`
+   * starts at the strip's own padding instead of after the traffic lights,
+   * and the end keeps no room for Windows' buttons.
    */
   readonly fullScreen?: boolean
   /**
@@ -100,7 +101,7 @@ export function TabStrip({ label = 'Tabs', leading, fullScreen = false, trailing
     })
   }
   return (
-    <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && !fullScreen && styles.stripLeading)}>
+    <div data-tab-strip="" {...stylex.props(styles.strip, leading !== undefined && !fullScreen && styles.stripLeading, fullScreen && styles.stripFullScreen)}>
       {leading !== undefined ? <span {...stylex.props(styles.leading)}>{leading}</span> : null}
       <div ref={scroller} role="tablist" aria-label={label} onKeyDown={onKeyDown} onFocus={revealFocus} onPointerDown={movable ? onPointerDown : undefined} {...stylex.props(styles.scroller)}>
         {children}
@@ -124,7 +125,9 @@ const styles = stylex.create({
     flexShrink: 0,
     boxSizing: 'border-box',
     height: layout['--titlebar-height'],
-    paddingInline: spacing['--space-2-5'],
+    paddingInlineStart: spacing['--space-2-5'],
+    // Windows draws its window buttons over the strip's end (`--titlebar-controls-inset`, none on the Mac).
+    paddingInlineEnd: `calc(${spacing['--space-2-5']} + ${layout['--titlebar-controls-inset']})`,
     backgroundColor: colors['--tab-strip'],
     // The strip's own buttons ("+", and Back and Forward with the sidebar
     // hidden) hover with the tabs' fill; the usual one is the strip's.
@@ -138,6 +141,10 @@ const styles = stylex.create({
   // With the sidebar hidden the strip starts after the traffic lights, except in full screen, which has none.
   stripLeading: {
     paddingInlineStart: layout['--titlebar-lights-inset'],
+  },
+  // Full screen hides Windows' window buttons too.
+  stripFullScreen: {
+    paddingInlineEnd: spacing['--space-2-5'],
   },
   leading: {
     display: 'inline-flex',

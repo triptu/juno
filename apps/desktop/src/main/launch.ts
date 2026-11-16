@@ -43,6 +43,15 @@ const DEFAULTS: Launch = { theme: DEFAULT_THEME }
  */
 export const BACKGROUND = { light: '#fdfcf8', dark: '#1b1916' } as const
 
+/**
+ * Windows' window buttons per theme: the `--tab-strip` fill they sit on and
+ * the `--foreground-default` they are drawn in, from the same two files.
+ */
+export const TAB_STRIP = {
+  light: { color: '#f4f2ec', symbolColor: '#23211a' },
+  dark: { color: '#0d0c0a', symbolColor: '#eeebe2' },
+} as const
+
 const decode = Schema.decodeUnknownSync(Launch)
 const encode = Schema.encodeSync(Launch)
 
