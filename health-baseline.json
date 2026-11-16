@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedOn": "2026-11-10",
+  "recordedOn": "2026-11-16",
   "counts": {
     "unusedFiles": 0,
     "unusedExports": 0,
@@ -9,7 +9,7 @@
     "unlistedDependencies": 0,
     "clonePairs": 4,
     "oversizedFiles": 51,
-    "oversizedFunctions": 108
+    "oversizedFunctions": 107
   },
   "clonedLines": 77,
   "oversizedFiles": [
@@ -78,7 +78,6 @@
     "apps/desktop/src/main/index.ts:app.whenReady().then#1",
     "apps/desktop/src/main/ipc.ts:registerIpc#1",
     "apps/desktop/src/main/updates.ts:createUpdates#1",
-    "apps/desktop/src/main/window.ts:setAppMenu#1",
     "apps/desktop/src/renderer/containers/PaletteContent.tsx:OpenPalette#1",
     "apps/desktop/src/renderer/containers/Peek.tsx:Peek/memo/Peek#1",
     "apps/desktop/src/renderer/containers/Sidebar.tsx:Sidebar#1",
