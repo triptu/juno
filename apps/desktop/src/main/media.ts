@@ -32,8 +32,12 @@ const fromApp = (url: string | undefined) => {
 /** The main frame of a page Juno serves itself. */
 const ownPage = (contents: WebContents | null, origin?: string) => contents !== null && fromApp(contents.getURL()) && (origin === undefined || fromApp(origin))
 
-/** Asks macOS once, so the prompt names Juno; afterwards the answer stands until the user changes it in System Settings. */
+/**
+ * Asks macOS once, so the prompt names Juno; afterwards the answer stands until the user changes it in System Settings.
+ * Windows never asks: its privacy settings say whether desktop apps may use the microphone.
+ */
 async function microphoneAllowed(): Promise<boolean> {
+  if (process.platform === 'win32') return systemPreferences.getMediaAccessStatus('microphone') !== 'denied'
   if (process.platform !== 'darwin') return true
   const status = systemPreferences.getMediaAccessStatus('microphone')
   if (status === 'granted') return true
@@ -41,8 +45,8 @@ async function microphoneAllowed(): Promise<boolean> {
   return systemPreferences.askForMediaAccess('microphone')
 }
 
-/** System Settings at Privacy & Security, Microphone, where the user lets Juno use it again (SPEC 20, "Microphone blocked"). */
-export const MICROPHONE_SETTINGS_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+/** System Settings at Privacy & Security, Microphone, where the user lets Juno use it again (SPEC 20, "Microphone blocked"); Windows Settings' Microphone page on Windows. */
+export const MICROPHONE_SETTINGS_URL = process.platform === 'win32' ? 'ms-settings:privacy-microphone' : 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
 
 export async function openMicrophoneSettings(): Promise<void> {
   await shell.openExternal(MICROPHONE_SETTINGS_URL)

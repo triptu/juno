@@ -227,7 +227,7 @@ function drawnRows(list: MessageWindow, at: number, snapshot: Parameters<typeof 
 }
 
 /** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
-const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
+const FILE_ACTIONS = { onDownload: downloadMessageFile, ...(quickLookMessageFile === undefined ? {} : { onQuickLook: quickLookMessageFile }) } as const
 
 /** What a row's links, files and images offer beyond opening a link: their menus, the file actions and the media viewer. */
 function fileActions(list: MessageWindow, openMedia: (viewing: MediaViewing) => void) {
