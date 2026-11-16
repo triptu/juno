@@ -36,6 +36,21 @@ mac:
   # The macOS microphone prompt's line, for huddles (SPEC 20).
   extendInfo:
     NSMicrophoneUsageDescription: Juno uses the microphone when you join a Slack huddle.
+# An unsigned x64 installer for trying Juno on Windows, built on Windows (docs/development.md, "Windows build").
+win:
+  target:
+    - target: nsis
+      arch: x64
+  # electron-builder makes the .ico from this 1024 px PNG.
+  icon: build/icon.png
+  # Windows names its locale packs en-US.pak and en-GB.pak; the macOS list above would delete both.
+  electronLanguages:
+    - en-US
+    - en-GB
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
 npmRebuild: true
 asarUnpack:
   - "**/*.node"

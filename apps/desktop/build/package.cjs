@@ -1,13 +1,15 @@
 const { build } = require('electron-builder')
 const { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } = require('node:fs')
-const { dirname, join, resolve } = require('node:path')
+const { dirname, join, resolve, sep } = require('node:path')
 
 // Updates come from GitHub Releases of a private repository, read with a
 // fine-grained token that can only read it (docs/development.md, "Releasing").
 // The token is written into the app's update.json at package time and never
 // printed or committed. Without it the app is built with updates unavailable.
 const repository = process.env.JUNO_UPDATE_REPOSITORY || 'triptu/juno-releases'
-const updateToken = process.env.JUNO_UPDATE_TOKEN
+// Updates are macOS only; a Windows package never carries the token.
+const windows = process.platform === 'win32'
+const updateToken = windows ? undefined : process.env.JUNO_UPDATE_TOKEN
 if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('JUNO_UPDATE_REPOSITORY must be owner/repo')
 if (updateToken && !/^github_pat_\w+$/.test(updateToken)) {
   // A classic token cannot be limited to one repository, so it must never ship.
@@ -65,15 +67,18 @@ async function main() {
         extends: './electron-builder.yml',
         directories: { app, output: 'release', buildResources: 'build' },
         forceCodeSigning: release,
+        // NSIS names the per-user install folder after the package name; @juno/desktop would make it @junodesktop.
+        ...(windows ? { extraMetadata: { name: 'juno' } } : {}),
         // Writes latest-mac.yml for `bun run release:publish`. Nothing is uploaded here.
-        publish: { provider: 'github', owner, repo, private: true },
+        // Windows has no update feed yet, so its package names none.
+        publish: windows ? null : { provider: 'github', owner, repo, private: true },
         mac: { notarize: release, target: release ? ['dmg', 'zip'] : ['dmg'], ...(!release ? { identity: null } : {}) },
         afterPack: async () => { artifactStarted = Date.now() },
         afterSign: async () => {
           if (release) recordReleaseTiming('notarize', artifactStarted, { status: 'completed with signing' })
           artifactStarted = Date.now()
         },
-        afterAllArtifactBuild: async () => { recordReleaseTiming('DMG', artifactStarted) },
+        afterAllArtifactBuild: async () => { recordReleaseTiming(windows ? 'installer' : 'DMG', artifactStarted) },
         // ARM64 macOS requires a valid local signature after the fuse bytes change.
         electronFuses: { resetAdHocDarwinSignature: !release },
       },
@@ -122,7 +127,7 @@ function deploy(source, target) {
       const dest = top.has(name) ? join(into, 'node_modules', name) : join(target, 'node_modules', name)
       if (!top.has(name)) top.set(name, real)
       if (existsSync(dest)) continue
-      cpSync(real, dest, { recursive: true, dereference: true, filter: (path) => !path.slice(real.length).split('/').includes('node_modules') })
+      cpSync(real, dest, { recursive: true, dereference: true, filter: (path) => !path.slice(real.length).split(sep).includes('node_modules') })
       visit(real, JSON.parse(readFileSync(join(real, 'package.json'), 'utf8')), dest)
     }
   }
