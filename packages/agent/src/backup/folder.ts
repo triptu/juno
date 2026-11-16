@@ -123,7 +123,12 @@ export function readBytes(path: string): Buffer | undefined {
   }
 }
 
-function syncDir(dir: string): void {
+/**
+ * Makes a rename in `dir` durable. Windows will not open a folder this way
+ * (EISDIR), and NTFS journals the rename itself, so there it does nothing.
+ */
+export function syncDir(dir: string): void {
+  if (process.platform === 'win32') return
   const fd = openSync(dir, 'r')
   try {
     fsyncSync(fd)
