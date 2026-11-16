@@ -28,6 +28,7 @@ import joinSound from './sounds/huddle-join.wav?url'
 import leaveSound from './sounds/huddle-leave.wav?url'
 import { openSharePicker } from './shareSheet'
 import { watchHuddleEnds } from './toasts'
+import { commandKey, otherCommandKey } from '@juno/views'
 
 /** Chime's nearest media region, which only the page may look up (research section 1). */
 const REGION_URL = 'https://nearest-media-region.l.chime.aws'
@@ -249,9 +250,9 @@ export function startHuddleMedia(): void {
     else if (command === 'huddle.leave' && currentCall() !== undefined) leaveCurrentHuddle()
   })
   watchHuddleEnds((channelId) => void joinHuddle(channelId))
-  // ⌘⇧Space mutes and unmutes while Juno is the active app (SPEC 20).
+  // ⌘⇧Space (Ctrl+Shift+Space on Windows, where Win+Shift+Space switches the keyboard language) mutes and unmutes while Juno is the active app (SPEC 20).
   window.addEventListener('keydown', (event) => {
-    if (event.code !== 'Space' || !event.metaKey || !event.shiftKey || event.altKey || event.ctrlKey || hold.holding === null) return
+    if (event.code !== 'Space' || !commandKey(event) || !event.shiftKey || event.altKey || otherCommandKey(event) || hold.holding === null) return
     event.preventDefault()
     toggleHuddleMuted()
   })

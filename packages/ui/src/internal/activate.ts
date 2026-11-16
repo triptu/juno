@@ -3,8 +3,10 @@
  * Native apps react when the button goes down, not when it comes back up, so
  * these elements activate on `pointerdown` for the primary button.
  *
- * - Modifier keys (⌘, shift, alt) are passed through so the owner can open
- *   in a new tab. Ctrl is not: on macOS ctrl-click is the context menu.
+ * - Modifier keys are passed through so the owner can open in a new tab:
+ *   `metaKey` is the command key, ⌘ on the Mac and Ctrl on Windows
+ *   (`commandKey`). On the Mac a Ctrl-press does nothing: it is the context
+ *   menu.
  * - The secondary button and non-primary pointers are ignored;
  *   `onContextMenu` handles the secondary button.
  * - Enter and Space activate from the keyboard, once per press: a held key's
@@ -16,8 +18,10 @@
  * - Clicks with `detail === 0` (assistive technology) still activate.
  */
 import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react'
+import { commandKey, contextClick } from '../platform'
 
 export interface ActivateEvent {
+  /** The command key: ⌘ on the Mac, Ctrl on Windows. It asks for a new tab. */
   readonly metaKey: boolean
   readonly shiftKey: boolean
   readonly altKey: boolean
@@ -55,14 +59,14 @@ export function activateHandlers<E extends HTMLElement>(
   return {
     onPointerDown(event) {
       if (!onActivate || disabled) return
-      if (!event.isPrimary || event.button !== 0 || event.ctrlKey) return
+      if (!event.isPrimary || event.button !== 0 || contextClick(event)) return
       if (insideNestedControl(event.target, event.currentTarget)) return
       if (keepFocus) event.preventDefault()
       if (event.pointerType === 'touch') {
         touchPending = true
         return
       }
-      onActivate({ metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })
+      onActivate({ metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })
     },
     onKeyDown(event) {
       if (!onActivate || disabled) return
@@ -70,7 +74,7 @@ export function activateHandlers<E extends HTMLElement>(
       if (event.target !== event.currentTarget) return
       event.preventDefault()
       if (event.repeat) return
-      onActivate({ metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'keyboard' })
+      onActivate({ metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: 'keyboard' })
     },
     onClick(event) {
       if (!onActivate || disabled) return
@@ -78,7 +82,7 @@ export function activateHandlers<E extends HTMLElement>(
       const synthetic = event.detail === 0
       if (!synthetic && !touchPending) return
       touchPending = false
-      onActivate({ metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: synthetic ? 'keyboard' : 'pointer' })
+      onActivate({ metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: synthetic ? 'keyboard' : 'pointer' })
     },
   }
 }

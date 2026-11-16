@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { createPortal } from 'react-dom'
 import { colors, layout, motion, radii, shadows, spacing, weights, z } from '@juno/tokens/tokens.stylex'
 import { variants as typeVariants } from './internal/type'
+import { keycaps } from './platform'
 
 /** How long the pointer or keyboard focus rests on a control before its tooltip shows, as on macOS. */
 const DELAY_MS = 700
@@ -11,7 +12,7 @@ const WARM_MS = 600
 
 /**
  * The attributes that give any element a tooltip: the label, and a
- * shortcut drawn as keycaps ("⌘["). `TooltipLayer` shows it; nothing is
+ * shortcut drawn as keycaps ("⌘[", or "Ctrl+[" on Windows). `TooltipLayer` shows it; nothing is
  * mounted per element.
  */
 export function tooltip(label: string, keys?: string): { readonly 'data-tooltip': string; readonly 'data-tooltip-keys'?: string } {
@@ -21,20 +22,6 @@ export function tooltip(label: string, keys?: string): { readonly 'data-tooltip'
 const SELECTOR = '[data-tooltip]'
 /** An ancestor with this attribute bounds the tooltip instead of the window (the gallery's frame). */
 const BOUNDS = '[data-tooltip-bounds]'
-const MODIFIERS = new Set(['⌘', '⌃', '⌥', '⇧'])
-
-/** "⌃⌘S" as keycaps: each modifier on its own, then the key. */
-function keycaps(keys: string): ReadonlyArray<string> {
-  const caps: string[] = []
-  let rest = keys
-  while (rest.length > 0 && MODIFIERS.has(rest[0]!)) {
-    caps.push(rest[0]!)
-    rest = rest.slice(1)
-  }
-  if (rest.length > 0) caps.push(rest)
-  return caps
-}
-
 interface Shown {
   readonly target: HTMLElement
   readonly label: string

@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import type { ActivateEvent } from '@juno/ui'
 import { accent, colors, motion, sizes, radii } from '@juno/tokens/tokens.stylex'
+import { commandKey } from '@juno/ui'
 
 export interface InlineLinkProps {
   readonly onOpen: (event: ActivateEvent) => void
@@ -14,7 +15,7 @@ export interface InlineLinkProps {
 
 const HOVER = '@media (hover: hover)'
 
-const modifiers = (event: MouseEvent | KeyboardEvent) => ({ metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey })
+const modifiers = (event: MouseEvent | KeyboardEvent) => ({ metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey })
 
 /**
  * Words in a Juno bubble that open something: a recall citation or a Slack

@@ -1,3 +1,4 @@
+import { contextClick } from '../platform'
 import { rootDuration } from '../motion'
 
 /**
@@ -87,9 +88,9 @@ export class TabDrag {
     return this.drag !== undefined || this.waiting !== undefined || this.settling !== undefined
   }
 
-  /** A press on the strip. Only the primary button on a tab, not on its close button and not with ⌃ (the context menu). */
+  /** A press on the strip. Only the primary button on a tab, not on its close button and not with ⌃ on the Mac (the context menu). */
   pointerDown(event: PointerEvent): void {
-    if (event.button !== 0 || event.ctrlKey || this.press !== undefined || this.active) return
+    if (event.button !== 0 || contextClick(event) || this.press !== undefined || this.active) return
     const target = event.target
     if (!(target instanceof Element) || target.closest('button') !== null) return
     const box = target.closest('[data-tab]')

@@ -3,7 +3,7 @@ import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
-import { menuKeys } from '@juno/contract/channels'
+import { menuKeys } from '../keys'
 import { colors, layout, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { focusRing, menuTriggerHandlers, Icon, IconButton, Text } from '@juno/ui'
 

@@ -19,7 +19,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import type { SearchSnapshot } from '@juno/contract'
 import { colors, layout, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Button, type ActivateEvent } from '@juno/ui'
+import { type ActivateEvent, Button, commandKey } from '@juno/ui'
 import type { LinkInfo } from '../MessageLink'
 import { useCardMarks } from './marks'
 import { isStop, type SearchRowItem } from './rows'
@@ -211,7 +211,7 @@ function useListKeys({ onSelect, onOpen, onToggleTopic, onShowTopic, onHideTopic
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      return onOpen(id, { newTab: event.metaKey })
+      return onOpen(id, { newTab: commandKey(event) })
     }
     if (event.key === ' ' && plain && !event.shiftKey) {
       event.preventDefault()

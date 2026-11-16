@@ -2,7 +2,7 @@ import { memo, Suspense, useEffect, useRef, useState, type KeyboardEvent, type M
 import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing, type TopicHeaderReader } from '@juno/views'
+import { type ActivateEvent, chunk, commandKey, hueFor, type MediaViewing, MessageList, NewMessagesPill, type TopicHeaderReader, TopicView as TopicViewFrame } from '@juno/views'
 import { closeTabById, openTopic, openTopicAt, openTopicAtInBackground, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
@@ -162,7 +162,7 @@ interface TopicProps {
 }
 
 /** Keys that only move focus, step the reader's matches or leave it do not count as using the topic. */
-const usesTopic = (event: KeyboardEvent) => !(event.key === 'Escape' || event.key === 'Tab' || event.key === 'Shift' || event.key === 'Meta' || event.key === 'Alt' || event.key === 'Control' || (event.metaKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')))
+const usesTopic = (event: KeyboardEvent) => !(event.key === 'Escape' || event.key === 'Tab' || event.key === 'Shift' || event.key === 'Meta' || event.key === 'Alt' || event.key === 'Control' || (commandKey(event) && (event.key === 'ArrowUp' || event.key === 'ArrowDown')))
 
 /**
  * The reader's "not yet used" state, the topic view's own, starting again with each topic: a press or a key

@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from 'react'
 import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
-import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { type ActivateEvent, commandKey, EmptyState, hueForId, type HueName, ScrollArea, Text } from '@juno/ui'
 import type { MediaViewing } from './MediaViewer'
 import { Message, type MessageActions, type MessageProps } from './Message'
 import type { LinkInfo } from './MessageLink'
@@ -159,7 +159,7 @@ const CONTROL = 'a, button, input, textarea, select, audio, video, [role="button
 /** The row a ⌘-press opens: one pressed on itself, not on a control in it, and not being edited. */
 function plainRow(event: MouseEvent<HTMLElement>): string | undefined {
   const target = event.target
-  if (!event.metaKey || event.button !== 0 || !(target instanceof Element)) return undefined
+  if (!commandKey(event) || event.button !== 0 || !(target instanceof Element)) return undefined
   const row = target.closest<HTMLElement>(ROW)
   if (row === null || !event.currentTarget.contains(row) || row.dataset['editing'] !== undefined) return undefined
   const control = target.closest(CONTROL)

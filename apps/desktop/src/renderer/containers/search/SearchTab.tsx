@@ -26,7 +26,7 @@ import {
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { searchTime, SearchField, SearchFilters, SearchPage, SearchResults, searchRowDomId, type SearchRowItem, type SearchToggle } from '@juno/views'
+import { commandKey, SearchField, SearchFilters, SearchPage, SearchResults, searchRowDomId, type SearchRowItem, searchTime, type SearchToggle } from '@juno/views'
 import { wantComposerFocus } from '../pageFocus'
 import { openPalette } from '../paletteActions'
 import { messageLinkInfo, openChannel, openMessageLink } from '../slackLinks'
@@ -142,7 +142,7 @@ function fieldKey(sessionId: string, event: KeyboardEvent<HTMLInputElement>, pic
     event.preventDefault()
     rememberSearch(registry, sessionId)
     update(sessionId, (now) => ({ ...now, commit: now.commit + 1 }))
-  } else if (event.key === 'ArrowDown' && !event.metaKey) {
+  } else if (event.key === 'ArrowDown' && !commandKey(event)) {
     event.preventDefault()
     toList()
   } else if (event.key === 'Escape' && picker.open) {
@@ -157,7 +157,7 @@ function fieldKey(sessionId: string, event: KeyboardEvent<HTMLInputElement>, pic
 function usePageKeys(readerRef: RefObject<HTMLDivElement | null>, step: (direction: 1 | -1) => void, hide: () => void) {
   const onKey = useEffectEvent((event: globalThis.KeyboardEvent) => {
     const inText = event.target instanceof HTMLTextAreaElement
-    if (event.metaKey && !event.shiftKey && !event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !inText) {
+    if (commandKey(event) && !event.shiftKey && !event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !inText) {
       event.preventDefault()
       step(event.key === 'ArrowUp' ? -1 : 1)
     } else if (event.key === 'Escape' && !event.defaultPrevented && !inText && readerRef.current?.contains(event.target as Node) === true) {

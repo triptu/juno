@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { accent, colors, radii, sizes } from '@juno/tokens/tokens.stylex'
-import { focusRing, type ActivateEvent } from '@juno/ui'
+import { type ActivateEvent, commandKey, focusRing } from '@juno/ui'
 
 /** What a message's links do, for those that open inside Juno (SPEC 8, "Links"). */
 export interface LinkInfo {
@@ -32,7 +32,7 @@ export function MessageLink({ url, onLink, linkInfo, tabIndex, quiet = false, ch
   const title = described?.url === url ? described.place : url
   const open = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
-    onLink?.(url, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: event.detail === 0 ? 'keyboard' : 'pointer' })
+    onLink?.(url, { metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: event.detail === 0 ? 'keyboard' : 'pointer' })
   }
   const describe = () => {
     if (inApp && described?.url !== url) void linkInfo?.describe(url).then((place) => place === undefined || setDescribed({ url, place }))

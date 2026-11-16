@@ -4,6 +4,7 @@ import { openExternal } from '@juno/state'
 import type { ComposerPaste, ComposerPopover } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { editField } from './suggestionKeys'
+import { commandKey } from '@juno/views'
 
 // The link editor shows only after ⌘K, so it loads when idle once a composer has mounted.
 const linkEditor = chunk(() => import('./LinkEditorPanel'))
@@ -91,7 +92,7 @@ export function useComposerLinks({ field, initialText, initial, onChange }: Comp
   const shown = (value: string, picks: ReadonlyArray<MentionPick>) => shownLinks(value, drawn.filter((link) => link.end <= value.length), picks)
 
   const onFieldClick = (event: MouseEvent<HTMLTextAreaElement>) => {
-    if (!event.metaKey) return
+    if (!commandKey(event)) return
     const element = event.currentTarget
     const link = linkAt(shownLinks(element.value, links.current), element.selectionStart)
     if (link === undefined) return

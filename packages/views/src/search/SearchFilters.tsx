@@ -12,7 +12,7 @@ import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import * as stylex from '@stylexjs/stylex'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { focusRing, Icon, type PhosphorIcon } from '@juno/ui'
+import { contextClick, focusRing, Icon, type PhosphorIcon } from '@juno/ui'
 
 export type SearchFilterMenu = 'from' | 'in' | 'date' | 'has' | 'sort'
 export type SearchToggle = 'apps' | 'automated'
@@ -60,7 +60,7 @@ const anchorOf = (element: HTMLElement) => {
 
 function MenuButton({ label, accessibleName, set, onOpen }: { readonly label: string; readonly accessibleName?: string; readonly set: boolean; readonly onOpen: (at: { readonly x: number; readonly y: number }) => void }) {
   const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0 || event.ctrlKey) return
+    if (event.button !== 0 || contextClick(event)) return
     event.preventDefault()
     onOpen(anchorOf(event.currentTarget))
   }

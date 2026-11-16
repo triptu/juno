@@ -3,7 +3,7 @@ import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import type { MouseEvent } from 'react'
 import { junoPanelCopy } from '@juno/agent-contract'
-import { menuKeys } from '@juno/contract/channels'
+import { menuKeys } from './keys'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface } from '@juno/ui'
 
