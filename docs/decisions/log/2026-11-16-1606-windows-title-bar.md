@@ -1,0 +1,1 @@
+- 11-16 16:06 · Windows window chrome · Windows gets Juno's own title bar with its buttons drawn over the tab strip's end (titleBarOverlay in the tab strip's colours, following the theme); the page keeps --titlebar-controls-inset free from env(titlebar-area-*), and the start of the bar uses the sidebar inset as in full screen.

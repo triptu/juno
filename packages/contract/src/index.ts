@@ -13,6 +13,7 @@ export {
   SIDEBAR_WIDTH,
   JUNO_PANEL_WIDTH,
   SEARCH_PANEL_WIDTH,
+  menuShortcut,
   menuShortcuts,
   type ContextMenuAt,
   type ContextMenuItem,

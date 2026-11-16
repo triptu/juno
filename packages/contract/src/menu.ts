@@ -74,6 +74,21 @@ export const menuShortcuts = {
   'huddle.mute': 'Shift+CommandOrControl+Space',
 } as const satisfies Partial<Record<MenuCommand, string>>
 
+/**
+ * The shortcuts that differ on Windows. Electron drops `Command` off the
+ * Mac, so ⌃⌘S would be Ctrl+S, which Windows apps use for Save, and ⌃⌘H
+ * Ctrl+H, which they use for Find and replace.
+ */
+const windowsMenuShortcuts: Readonly<Partial<Record<keyof typeof menuShortcuts, string>>> = {
+  'sidebar.toggle': 'Control+Shift+S',
+  'privacy.toggle': 'Control+Shift+H',
+}
+
+/** A menu command's accelerator on Windows or on the Mac. */
+export function menuShortcut(command: keyof typeof menuShortcuts, windows: boolean): string {
+  return (windows ? windowsMenuShortcuts[command] : undefined) ?? menuShortcuts[command]
+}
+
 const keyGlyphs: Record<string, string> = {
   CommandOrControl: '⌘',
   Command: '⌘',

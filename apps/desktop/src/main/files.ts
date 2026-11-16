@@ -35,6 +35,7 @@ import type { DownloadResult } from '@juno/contract'
 import { publicImage } from './publicImage'
 import { HostPauses } from './rateLimit'
 import { SLACK_PARTITION } from './slackSession'
+import { safeFileName } from './fileNames'
 
 const SLACK_FILE_HOSTS = ['files.slack.com', 'slack-files.com', 'secure.gravatar.com']
 
@@ -212,7 +213,7 @@ const downloadsForTests: string[] = []
 
 /** A free path for `name` in `folder`: "plan.pdf", then "plan (1).pdf", as Finder names copies. */
 export function freePath(folder: string, name: string, exists: (path: string) => boolean = existsSync): string {
-  const safe = parse(name.replace(/[/\\:]/g, '-')).base.replace(/^\.+/, '') || 'download'
+  const safe = safeFileName(name)
   const { name: stem, ext } = parse(safe)
   let candidate = join(folder, safe)
   for (let n = 1; exists(candidate); n++) candidate = join(folder, `${stem} (${n})${ext}`)

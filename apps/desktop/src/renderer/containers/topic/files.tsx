@@ -2,7 +2,7 @@ import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react'
 import type { ContextMenuItem, FileView } from '@juno/contract'
 import { copyImage, downloadFile, openFile, openViewerAtom, popupContextMenu, quickLookFile, registry, uploadProgressAtom, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { viewingOf, type MediaViewing } from '@juno/views'
+import { isWindows, viewingOf, type MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
 import { readingOnly } from '../readingOnly'
 
@@ -25,10 +25,11 @@ export function downloadMessageFile(file: FileView): void {
   useDownloadedFile(file, downloadFile)
 }
 
-/** Quick Look on a card or in the viewer: main saves the file into a temporary folder and shows it in the macOS preview window. */
-export function quickLookMessageFile(file: FileView): void {
-  useDownloadedFile(file, quickLookFile)
-}
+/**
+ * Quick Look on a card or in the viewer: main saves the file into a temporary folder and shows it in the macOS preview window.
+ * Undefined on Windows, which has no Quick Look, so the views leave the button out; Open covers it there.
+ */
+export const quickLookMessageFile: ((file: FileView) => void) | undefined = isWindows ? undefined : (file) => useDownloadedFile(file, quickLookFile)
 
 /** Open a temporary copy in the system's default app. */
 export function openMessageFile(file: FileView): void {

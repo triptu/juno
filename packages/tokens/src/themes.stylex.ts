@@ -11,7 +11,7 @@
  * and the app can switch back to it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, accentSwatches, art, colors, density, hues, iconTints, menu, shadows, syntax, tints } from './tokens.stylex'
+import { accent, accentSwatches, art, colors, density, hues, iconTints, layout, menu, shadows, syntax, tints } from './tokens.stylex'
 
 export const darkColors = stylex.createTheme(colors, {
   // A warm-neutral near-black (OKLCH hue 85, chroma 0.006), so dark is the
@@ -617,4 +617,16 @@ export const compact = stylex.createTheme(density, {
   '--density-row-two-line-estimate': '42px',
   '--density-message-padding-block': '2px',
   '--density-message-group-gap': '6px',
+})
+
+/**
+ * The title bar on Windows: no traffic lights at the start, so the sidebar's
+ * inset as in full screen, and room at the end for the window buttons
+ * Windows draws over the page. Electron reports where they are as the
+ * window-controls-overlay variables (`env(titlebar-area-*)`), which follow
+ * the zoom; the gallery has none, so it keeps their 138px at 100%.
+ */
+export const windowsTitlebar = stylex.createTheme(layout, {
+  '--titlebar-lights-inset': 'var(--sidebar-inset)',
+  '--titlebar-controls-inset': 'calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)))',
 })

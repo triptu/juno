@@ -30,6 +30,8 @@ export const E2E_UPDATE_TOKEN = 'e2e-update-token'
  * token, or in tests unless a test names a fake server (`JUNO_E2E_UPDATE_SERVER`).
  */
 export function loadUpdateConfig(e2e: boolean): UpdateConfig | null {
+  // Releases ship only a DMG, so updates are unavailable on Windows.
+  if (process.platform === 'win32') return null
   if (e2e) {
     const server = process.env.JUNO_E2E_UPDATE_SERVER
     return server ? { repository: 'triptu/juno-releases', token: E2E_UPDATE_TOKEN, signed: false, api: `${server}/api/v3` } : null
