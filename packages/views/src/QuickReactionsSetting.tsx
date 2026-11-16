@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, 
 import { createPortal } from 'react-dom'
 import { DEFAULT_QUICK_REACTIONS, MAX_QUICK_REACTIONS, type QuickReaction } from '@juno/contract'
 import { accent, colors, motion, opacity, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
-import { Button, Emoji, IconButton, Text } from '@juno/ui'
+import { Button, Emoji, IconButton, shortcutKeys, Text } from '@juno/ui'
 import { usePickerFocus, usePickerPlace } from './anchoredPicker'
 
 const HOVER = '@media (hover: hover)'
@@ -92,7 +92,7 @@ export function QuickReactionsSetting({ reactions, onChange, onAdd, picker, onCl
       </div>
       <div {...stylex.props(styles.footer)}>
         <Text variant="meta" tone="muted" as="p">
-          {reactions.length} of {MAX_QUICK_REACTIONS}. Drag to reorder, or use ⌥← and ⌥→.
+          {reactions.length} of {MAX_QUICK_REACTIONS}. Drag to reorder, or use {shortcutKeys('Alt+Left')} and {shortcutKeys('Alt+Right')}.
         </Text>
         <Button variant="ghost" size="sm" tone="muted" disabled={isDefault(reactions)} onClick={() => onChange(DEFAULT_QUICK_REACTIONS)}>
           Reset to default

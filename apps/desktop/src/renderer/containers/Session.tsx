@@ -3,7 +3,7 @@ import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, reg
 import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { useEffect, type ReactNode } from 'react'
-import { SignInView } from '@juno/views'
+import { SignInView, systemWords } from '@juno/views'
 
 /** UI copy for a failed attempt (SPEC section 17: plain, one sentence, says what to do next). */
 function failureLine(error: SignInFailed): string {
@@ -11,7 +11,7 @@ function failureLine(error: SignInFailed): string {
     case 'no-token':
       return 'Juno could not read the Slack app’s session. Open Slack, sign in there, then try again.'
     case 'no-slack-app':
-      return 'Slack isn’t installed on this Mac. Install Slack, sign in to it, then try again.'
+      return `Slack isn’t installed on ${systemWords.thisComputer}. Install Slack, sign in to it, then try again.`
     case 'slack-signed-out':
       return 'Slack is installed but not signed in. Open Slack, sign in there, then try again.'
     case 'keychain':

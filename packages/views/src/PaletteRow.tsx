@@ -50,7 +50,7 @@ import { UserCircle } from '@phosphor-icons/react/dist/icons/UserCircle'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { Person } from '@juno/contract'
 import { accentSwatches, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Chip, Icon, Kbd, OptionRow, Text, type AccentName, type PhosphorIcon } from '@juno/ui'
+import { type AccentName, Avatar, Chip, Icon, Kbd, OptionRow, type PhosphorIcon, shortcutKeys, Text } from '@juno/ui'
 import { Highlighted, type TextRanges } from './Highlighted'
 import { hueFor, initials } from './look'
 import { relativeTime } from './time'
@@ -279,7 +279,7 @@ function subLine(item: PaletteItem, now: number): ReactNode {
 
 /** One look for every hint: the keys as a keycap, then what they do. "↵ Send" is the key and its word. */
 function KeyHint({ item }: { readonly item: PaletteItem }) {
-  const [keys, ...words] = (item.hint ?? (item.opensTab === true ? '⌘↵ New tab' : '↵')).split(' ')
+  const [keys, ...words] = (item.hint ?? (item.opensTab === true ? `${shortcutKeys('CommandOrControl+Enter')} New tab` : '↵')).split(' ')
   return (
     <span {...stylex.props(styles.hintLine)}>
       <Kbd look="key">{keys}</Kbd>

@@ -5,6 +5,7 @@ import { Checkbox, Page, PageHeader, Section, Segmented, Surface, Text } from '@
 import { settledCopy } from './settled'
 import { QuietWindowSetting } from './QuietWindowSetting'
 import { TabExpirySetting, type TabExpiryName } from './TabExpirySetting'
+import { menuKeys } from './keys'
 
 const quietOptions: ReadonlyArray<{ readonly value: TidyUpQuiet; readonly label: string }> = [
   { value: '1h', label: '1 hour' },
@@ -112,7 +113,7 @@ function TopicsSetting({ value, onChange }: { readonly value: number; readonly o
 }
 
 function TabsSetting({ value, onChange }: { readonly value: TabExpiryName; readonly onChange: (expiry: TabExpiryName) => void }) {
-  return <Section heading="Tabs" sub="Tabs you have not looked at close by themselves. Tabs with a draft stay; ⌘⇧T reopens one."><Surface kind="group" padding="md" sx={[styles.card, styles.rows]}><TabExpirySetting value={value} onChange={onChange} /></Surface></Section>
+  return <Section heading="Tabs" sub={`Tabs you have not looked at close by themselves. Tabs with a draft stay; ${menuKeys('tab.reopen')} reopens one.`}><Surface kind="group" padding="md" sx={[styles.card, styles.rows]}><TabExpirySetting value={value} onChange={onChange} /></Surface></Section>
 }
 
 const styles = stylex.create({

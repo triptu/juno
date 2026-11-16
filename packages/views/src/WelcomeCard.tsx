@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { useId } from 'react'
 import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Icon, Surface, Text } from '@juno/ui'
+import { Button, Icon, Surface, systemWords, Text } from '@juno/ui'
 import type { PeekKeyName } from './PeekKeySetting'
 
 /** The three things to try, in the card's order. */
@@ -18,9 +18,9 @@ export const welcomeCopy = {
   done: 'Done',
   hint: (hint: WelcomeHintName, peekKey: PeekKeyName): string =>
     hint === 'peek'
-      ? `Hold ${peekKey === 'space' ? 'Space' : '⌥'} over a topic to read it without opening it`
+      ? `Hold ${peekKey === 'space' ? 'Space' : systemWords.optionGlyph} over a topic to read it without opening it`
       : hint === 'tab'
-        ? '⌘-click a topic to open it in a new tab'
+        ? `${systemWords.commandClick} a topic to open it in a new tab`
         : 'Ask Juno below. It sends nothing without your OK.',
   progress: (count: number) => `${count} of 3 done`,
 } as const

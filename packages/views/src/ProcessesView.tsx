@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Text } from '@juno/ui'
+import { Button, systemWords, Text } from '@juno/ui'
 
 export interface ProcessRow {
   /** Juno's name: "Engine", "Juno agent", "Window", "Graphics", "Network", "Main". */
@@ -63,7 +63,7 @@ export function ProcessesView({ rows, copied, onCopy, onShowLogs }: ProcessesVie
       </table>
       <div {...stylex.props(styles.row)}>
         <Button onClick={onCopy}>Copy diagnostics</Button>
-        <Button onClick={onShowLogs}>Show logs in Finder</Button>
+        <Button onClick={onShowLogs}>Show logs in {systemWords.fileManager}</Button>
         {copied === undefined ? null : (
           <Text variant="meta" tone="muted" role="status">
             {copied}

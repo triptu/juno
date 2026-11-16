@@ -103,25 +103,42 @@ const macModifiers = new Set(macOrder)
 export const systemWords =
   keyPlatform === 'windows'
     ? {
-        /** "Slack isn't installed on this PC." */
+        /** "Juno runs on one PC at a time." */
+        computer: 'PC',
         thisComputer: 'this PC',
         ThisComputer: 'This PC',
         system: 'Windows',
         systemSettings: 'Windows Settings',
         fileManager: 'File Explorer',
-        dock: 'taskbar',
+        Dock: 'Taskbar',
+        /** Where Juno keeps keys: "Keys stay encrypted on this PC". */
+        keyStore: 'encrypted on this PC',
+        /** "Juno could not reach the keychain." */
+        keyStoreName: 'Windows’ secure storage',
         /** The Option key as a setting names it. */
         optionKey: 'Alt',
-        /** "⌘-click", "⌘ click": a click with the command key. */
+        /** The Option key in a sentence: "Hold ⌥ over a topic". */
+        optionGlyph: 'Alt',
+        /** A click with the command key, in a sentence: "⌘-click a topic". */
         commandClick: 'Ctrl+click',
       }
     : {
+        computer: 'Mac',
         thisComputer: 'this Mac',
         ThisComputer: 'This Mac',
         system: 'macOS',
         systemSettings: 'System Settings',
         fileManager: 'Finder',
-        dock: 'Dock',
+        Dock: 'Dock',
+        keyStore: 'in your keychain',
+        keyStoreName: 'the keychain',
         optionKey: '⌥ Option',
-        commandClick: '⌘ click',
+        optionGlyph: '⌥',
+        commandClick: '⌘-click',
       }
+
+/** A context menu's key as this platform writes it: the Mac's ⌫ is Del on Windows, where the menu takes Delete and Backspace alike. */
+export const menuKeyLabel = (key: string): string => (keyPlatform === 'windows' && key === '⌫' ? 'Del' : key)
+
+/** The command key's name in `aria-keyshortcuts` and Playwright: Meta on the Mac, Control on Windows. */
+export const commandKeyName = keyPlatform === 'windows' ? 'Control' : 'Meta'

@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { accent, menu, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
-import { commandKey } from './platform'
+import { commandKey, menuKeyLabel } from './platform'
 import { tooltip } from './Tooltip'
 import { MorphLayers } from './internal/MorphLayers'
 import { useMenuState } from './internal/menuMorph'
@@ -234,7 +234,7 @@ function RowItem({ item, onSelect, lead = false }: { readonly item: ContextMenuI
       <span {...stylex.props(styles.label)}>{item.label}</span>
       {item.shortcut === undefined ? null : (
         <span aria-hidden {...stylex.props(styles.shortcut)}>
-          {item.shortcut}
+          {menuKeyLabel(item.shortcut)}
         </span>
       )}
     </div>

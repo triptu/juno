@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { Ref } from 'react'
 import { groupHours, type Hours, type HoursGroup, type NotificationPermission } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Checkbox, ListRow, Section, Select, Surface, Text } from '@juno/ui'
+import { Button, Checkbox, ListRow, Section, Select, Surface, systemWords, Text } from '@juno/ui'
 import { hourLabel } from './time'
 
 /**
@@ -63,7 +63,7 @@ const rows: ReadonlyArray<{ readonly group: HoursGroup; readonly name: string }>
 export function HoursSections({ notificationHours, presenceHours, awayOutsideHours, onAwayOutsideHoursChange, onHoursChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
   return (
     <>
-      <Section headingRef={hoursRef} heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
+      <Section headingRef={hoursRef} heading="Notification hours" sub={`Outside these hours your ${systemWords.computer} doesn't notify. Slack pauses at the same times, so your phone stays quiet too.`}>
         <Surface kind="group">
           <HoursRows which="notifications" title="Notification hours" hours={notificationHours ?? slackSchedule?.slackHours ?? null} onChange={onHoursChange} />
           <SlackLine following={notificationHours === null} schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
@@ -87,7 +87,7 @@ export function HoursSections({ notificationHours, presenceHours, awayOutsideHou
               <div {...stylex.props(styles.note)}>
                 <Text variant="meta" tone="muted" as="p">
                   {presenceHours === null
-                    ? 'Until you set hours, Juno shows you active whenever you use your Mac, as Slack does.'
+                    ? `Until you set hours, Juno shows you active whenever you use your ${systemWords.computer}, as Slack does.`
                     : "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."}
                 </Text>
               </div>

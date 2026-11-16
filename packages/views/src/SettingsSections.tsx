@@ -2,11 +2,12 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { IgnoredChannel, SendCheckPref } from '@juno/contract'
 import { sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
+import { Button, Checkbox, isWindows, Page, PageHeader, Section, Surface, systemWords, Text } from '@juno/ui'
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
 import { PresenceSection, type PresenceProps } from './PresenceSection'
+import { menuKeys } from './keys'
 
 // The sections of Settings that are the app's own (SPEC 14). Notifications,
 // Juno, Connections and Backup & This Mac are their own pages. Each section
@@ -15,9 +16,10 @@ import { PresenceSection, type PresenceProps } from './PresenceSection'
 export type SharingDetection = 'available' | 'missing' | 'alwaysOn'
 
 const SHARING_LINE: Record<SharingDetection, string> = {
-  available: 'When another app starts recording or sharing the screen, Juno hides message text as ⌃⌘H does, and shows it again when that stops.',
-  missing: 'This Mac does not tell Juno when the screen is shared. Use ⌃⌘H to hide message text.',
-  alwaysOn: "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text.",
+  available: `When another app starts recording or sharing the screen, Juno hides message text as ${menuKeys('privacy.toggle')} does, and shows it again when that stops.`,
+  // Windows never tells Juno, so there it is always this line and hiding is by hand (decision D7).
+  missing: `${isWindows ? 'Windows' : 'This Mac'} does not tell Juno when the screen is shared. Use ${menuKeys('privacy.toggle')} to hide message text.`,
+  alwaysOn: `Another app is recording the screen all the time, so Juno can't tell when you share. Use ${menuKeys('privacy.toggle')} to hide message text.`,
 }
 
 const checkLabels: Record<SendCheckPref, string> = {
@@ -131,7 +133,7 @@ export interface SettingsAppearanceProps extends AppearanceSettingsProps {
 export function SettingsAppearance({ sidebarPresence, quickReactions, ...props }: SettingsAppearanceProps) {
   return (
     <Page width="settings">
-      <PageHeader title="Appearance" subtitle="System follows macOS. Density changes the sidebar and the messages." />
+      <PageHeader title="Appearance" subtitle={`System follows ${systemWords.system}. Density changes the sidebar and the messages.`} />
       <Surface kind="group" padding="md" sx={styles.card}>
         <AppearanceSettings {...props} />
       </Surface>

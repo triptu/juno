@@ -5,7 +5,7 @@ import type { MouseEvent } from 'react'
 import { junoPanelCopy } from '@juno/agent-contract'
 import { menuKeys } from './keys'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { IconButton, Surface } from '@juno/ui'
+import { commandKeyName, IconButton, Surface } from '@juno/ui'
 
 export interface SelectionToolbarProps {
   /** Quotes the selected text in the topic's composer. Runs on mouse down, so the selection is still there. */
@@ -36,7 +36,7 @@ export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) 
     <Surface kind="toolbar" padding="none" radius="pill" role="toolbar" aria-label="Selection" data-selection-toolbar="" sx={styles.toolbar}>
       <IconButton icon={Quotes} label="Quote" size={24} {...pressProps(onQuote)} />
       {onAskJuno === undefined ? null : (
-        <IconButton icon={Sparkle} label={junoPanelCopy.askJuno} shortcut={menuKeys('juno.toggle')} size={24} aria-keyshortcuts="Meta+J" {...pressProps(onAskJuno)} />
+        <IconButton icon={Sparkle} label={junoPanelCopy.askJuno} shortcut={menuKeys('juno.toggle')} size={24} aria-keyshortcuts={`${commandKeyName}+J`} {...pressProps(onAskJuno)} />
       )}
     </Surface>
   )

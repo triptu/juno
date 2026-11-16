@@ -4,6 +4,7 @@
  * failed row does, "Not sent", and says why in plain words.
  */
 import type { SendError } from '@juno/contract'
+import { systemWords } from '@juno/ui'
 
 /** Slack's refusals a send can meet, in plain words. Any other code is shown as Slack gave it. */
 const REFUSALS: Record<string, string> = {
@@ -18,7 +19,7 @@ const REFUSALS: Record<string, string> = {
   msg_too_long: 'The message is too long',
   too_many_files: 'Too many files for one message',
   file_not_found: 'A file is not ready',
-  file_not_found_on_device: 'A file is no longer on this Mac',
+  file_not_found_on_device: `A file is no longer on ${systemWords.thisComputer}`,
 }
 
 /** Why a send was refused, as a toast says it. */
