@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { AccentSchema, DEFAULT_THEME, DensitySchema, TopicTitleLinesSchema, ReadySession, SidebarLayout, ThemeSchema } from '@juno/contract'
+import { AccentSchema, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, TopicTitleLinesSchema, ReadySession, SidebarLayout, ThemeSchema } from '@juno/contract'
 
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
@@ -109,4 +109,33 @@ export function launchWriter(userData: string): LaunchWriter {
     },
     pending: () => last,
   }
+}
+
+/**
+ * What the page starts with: the saved launch values, with privacy mode as it is now. The screen
+ * watch may have turned it on (`privacySharing`), which is not saved, so only a reload sees it.
+ */
+export type PageLaunch = Launch & { readonly privacySharing?: boolean }
+
+/**
+ * The page reads `?platform=` (the keys and words it shows, `@juno/ui` `platform.ts`), `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
+ * accent, density and privacy mode, and the saved sidebar. `?session=` is the last verified session, so a relaunch renders the shell first. `?fullscreen=1` is a reload in full screen, so the title bars start without the
+ * traffic lights' room. `?tour=manual` (tests only) keeps the welcome card from showing by itself.
+ */
+export function pageUrl(base: string, launch: PageLaunch, fullScreen: boolean): string {
+  const url = new URL(base)
+  url.searchParams.set('platform', process.platform)
+  url.searchParams.set('theme', launch.theme)
+  url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
+  url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
+  if (launch.topicTitleLines !== undefined) url.searchParams.set('topicTitleLines', launch.topicTitleLines)
+  // `sharing` when it is on because the screen is shared, so the footer says why from the first frame.
+  if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
+  const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
+  url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
+  if (launch.session !== undefined) url.searchParams.set('session', JSON.stringify(launch.session))
+  if (fullScreen) url.searchParams.set('fullscreen', '1')
+  // Under JUNO_E2E the welcome card shows only when asked, unless the test wants it to show by itself (JUNO_E2E_TOUR).
+  if (process.env.JUNO_E2E === '1' && process.env.JUNO_E2E_TOUR !== '1') url.searchParams.set('tour', 'manual')
+  return url.toString()
 }

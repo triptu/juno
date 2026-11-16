@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Menu, nativeTheme, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions, type Rectangle } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts, type HuddleMenu, type MenuCommand, type Theme } from '@juno/contract'
-import { BACKGROUND, type Launch } from './launch'
+import { Events, menuShortcuts, type HuddleMenu, type MenuCommand, type Theme } from '@juno/contract'
+import { BACKGROUND, pageUrl, type Launch, type PageLaunch } from './launch'
 import { APP_URL } from './scheme'
 import { startupMark } from './startupMarks'
 import { wireTextMenu } from './textMenu'
@@ -74,12 +74,6 @@ const mainWindows = new WeakSet<BaseWindow>()
 export function appWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows().find((window) => mainWindows.has(window) && !window.isDestroyed())
 }
-
-/**
- * What the page starts with: the saved launch values, with privacy mode as it is now. The screen
- * watch may have turned it on (`privacySharing`), which is not saved, so only a reload sees it.
- */
-export type PageLaunch = Launch & { readonly privacySharing?: boolean }
 
 /** Each app window's way to read the current launch values, for a reload. */
 const launchOf = new WeakMap<BaseWindow, () => PageLaunch>()
@@ -375,26 +369,4 @@ function setAppMenu(state: MenuState, rebuild = false): void {
       { role: 'help', submenu: [{ id: 'tour', label: 'Show the Tour', click: (_item, window) => tabCommand(window, 'tour.show') }] },
     ]),
   )
-}
-
-/**
- * The page reads `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
- * accent, density and privacy mode, and the saved sidebar. `?session=` is the last verified session, so a relaunch renders the shell first. `?fullscreen=1` is a reload in full screen, so the title bars start without the
- * traffic lights' room. `?tour=manual` (tests only) keeps the welcome card from showing by itself.
- */
-function pageUrl(base: string, launch: PageLaunch, fullScreen: boolean): string {
-  const url = new URL(base)
-  url.searchParams.set('theme', launch.theme)
-  url.searchParams.set('accent', launch.accent ?? DEFAULT_ACCENT)
-  url.searchParams.set('density', launch.density ?? DEFAULT_DENSITY)
-  if (launch.topicTitleLines !== undefined) url.searchParams.set('topicTitleLines', launch.topicTitleLines)
-  // `sharing` when it is on because the screen is shared, so the footer says why from the first frame.
-  if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
-  const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
-  url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
-  if (launch.session !== undefined) url.searchParams.set('session', JSON.stringify(launch.session))
-  if (fullScreen) url.searchParams.set('fullscreen', '1')
-  // Under JUNO_E2E the welcome card shows only when asked, unless the test wants it to show by itself (JUNO_E2E_TOUR).
-  if (process.env.JUNO_E2E === '1' && process.env.JUNO_E2E_TOUR !== '1') url.searchParams.set('tour', 'manual')
-  return url.toString()
 }

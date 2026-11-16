@@ -1,6 +1,7 @@
 // Slack's markup rules and keys, in a chunk of their own (`composerMarkup.ts`).
 import { toggleMarkup, type MarkupStyle } from '@juno/contract'
 import { editField } from './suggestionKeys'
+import { isWindows } from '@juno/views'
 
 export { markupLayout } from '@juno/contract'
 
@@ -20,11 +21,10 @@ export interface Press {
 }
 
 /** The app's shortcuts take ⌘ on the Mac and Ctrl elsewhere, as the menu's `CommandOrControl` does (the test machines run Linux). */
-const MAC = navigator.platform.startsWith('Mac')
 
 /** The formatting key `press` is, as in Slack (spec section 8): ⌘B, ⌘I, ⌘⇧X, ⌘⇧C and ⌘⇧9. */
 function styleOf(press: Press): MarkupStyle | 'quote' | undefined {
-  if ((MAC ? !press.metaKey || press.ctrlKey : !press.ctrlKey || press.metaKey) || press.altKey) return undefined
+  if ((isWindows ? !press.ctrlKey || press.metaKey : !press.metaKey || press.ctrlKey) || press.altKey) return undefined
   const key = press.key.toLowerCase()
   if (!press.shiftKey) return key === 'b' ? 'bold' : key === 'i' ? 'italic' : undefined
   if (key === 'x') return 'strike'

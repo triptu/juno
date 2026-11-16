@@ -165,7 +165,7 @@ async function boldSelection({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
     element.focus()
     element.setSelectionRange(at, at + 2)
   })
-  await topic.composer.press('ControlOrMeta+b')
+  await topic.composer.press('Meta+b')
   await expect(topic.composer).toHaveValue('ship *it* today')
   // The words stay selected inside the markers, so ⌘B again takes them off.
   expect(await topic.composer.evaluate((element: HTMLTextAreaElement) => element.value.slice(element.selectionStart, element.selectionEnd))).toBe('it')
