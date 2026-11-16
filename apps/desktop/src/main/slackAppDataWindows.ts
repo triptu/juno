@@ -122,7 +122,7 @@ async function readWindowsInstall(dir: string): Promise<SlackWindowsInstall> {
     return { dir }
   }
   const versions = names.flatMap((name) => /^app-(\d+(?:\.\d+)*)$/.exec(name)?.[1] ?? [])
-  const newest = versions.sort((a, b) => compareVersions(b, a))[0]
+  const newest = versions.toSorted((a, b) => compareVersions(b, a))[0]
   return newest === undefined ? { dir } : { dir, version: newest }
 }
 

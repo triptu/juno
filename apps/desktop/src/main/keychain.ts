@@ -116,9 +116,9 @@ export function fileKeychain(dir: string, { service, account }: KeychainItem, ci
       try {
         await writeFile(temp, cipher.encrypt(value), { flush: true })
         await rename(temp, file)
-      } catch {
+      } catch (cause) {
         await rm(temp, { force: true })
-        throw new Error('the keychain refused the write')
+        throw new Error('the keychain refused the write', { cause })
       }
     },
     remove: async () => {
@@ -127,7 +127,7 @@ export function fileKeychain(dir: string, { service, account }: KeychainItem, ci
         return true
       } catch (cause) {
         if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return false
-        throw new Error('the keychain refused the delete')
+        throw new Error('the keychain refused the delete', { cause })
       }
     },
   }
