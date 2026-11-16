@@ -16,7 +16,7 @@ import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import { useLayoutEffect, useState } from 'react'
 import type { PreparedEmojiPicker } from '@juno/contract'
 import { layout, menu } from '@juno/tokens/tokens.stylex'
-import { ContextMenu, Emoji, Icon, SmileyPlus, tooltip, type ContextMenuEntry, type MenuPoint, type PhosphorIcon } from '@juno/ui'
+import { contextClick, ContextMenu, type ContextMenuEntry, Emoji, Icon, type MenuPoint, type PhosphorIcon, SmileyPlus, tooltip } from '@juno/ui'
 import { EmojiPicker } from './EmojiPicker'
 import { GRID_REACTIONS, type GridReaction, type MessageMenuEntry, type MessageMenuIcon } from './messageMenuModel'
 
@@ -155,7 +155,7 @@ function ReactionGrid({ reactions, onReact, onMore, spaced }: ReactionGridProps)
         aria-haspopup="dialog"
         // A popover trigger: it opens as the primary button goes down, as every menu and popover does; Enter opens it from the keys.
         onPointerDown={(event) => {
-          if (event.pointerType !== 'mouse' || event.button !== 0 || event.ctrlKey) return
+          if (event.pointerType !== 'mouse' || event.button !== 0 || contextClick(event)) return
           event.preventDefault()
           onMore()
         }}

@@ -12,7 +12,7 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { useRef, type ReactNode } from 'react'
 import type { SettingsSection } from '@juno/contract'
 import { colors, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { NavItem, useNarrowerThan, type PhosphorIcon } from '@juno/ui'
+import { NavItem, type PhosphorIcon, systemWords, useNarrowerThan } from '@juno/ui'
 
 /** Each section's name in the list, in the list's order (SPEC 14). */
 export const settingsSections: ReadonlyArray<{ readonly section: SettingsSection; readonly label: string; readonly icon: PhosphorIcon }> = [
@@ -24,7 +24,7 @@ export const settingsSections: ReadonlyArray<{ readonly section: SettingsSection
   { section: 'juno', label: 'Juno', icon: Sparkle },
   { section: 'ai-activity', label: 'AI activity', icon: Pulse },
   { section: 'connections', label: 'Connections', icon: Plugs },
-  { section: 'backup', label: 'Backup & This Mac', icon: HardDrives },
+  { section: 'backup', label: `Backup & ${systemWords.ThisComputer}`, icon: HardDrives },
   { section: 'about', label: 'About', icon: Info },
 ]
 

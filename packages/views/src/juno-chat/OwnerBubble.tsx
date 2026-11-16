@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo, type MouseEvent } from 'react'
 import { aboutLabel, chatCopy, type About, type Delivery, type OwnerMessageItem } from '@juno/agent-contract'
 import { accent, chat, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { focusRing, Text } from '@juno/ui'
+import { commandKey, focusRing, Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { OwnerFiles } from './OwnerFiles'
 import { QuoteStub } from './QuoteStub'
@@ -88,7 +88,7 @@ function AboutLine({ about, actions }: { readonly about: About; readonly actions
     )
   }
   const open = (event: MouseEvent<HTMLButtonElement>) =>
-    actions.onOpen({ _tag: 'topic', topicId: about.topicId }, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })
+    actions.onOpen({ _tag: 'topic', topicId: about.topicId }, { metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })
   return (
     <button type="button" data-about="topic" onClick={open} {...stylex.props(styles.about, styles.aboutButton)}>
       <Text variant="tag" tone="muted" truncate dir="auto">

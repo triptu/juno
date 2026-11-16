@@ -10,7 +10,7 @@ import type { AttachmentFailure } from './routes/files'
 import type { MenuCommand } from './menu'
 
 export type { Accent, Density, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
-export { menuKeys, menuShortcut, menuShortcuts, type MenuCommand } from './menu'
+export { menuAccelerator, menuShortcuts, type MenuCommand } from './menu'
 
 export const Channels = {
   updatesGet: 'updates.get',

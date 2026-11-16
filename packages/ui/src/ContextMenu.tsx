@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { accent, menu, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from './Icon'
+import { commandKey, menuKeyLabel } from './platform'
 import { tooltip } from './Tooltip'
 import { MorphLayers } from './internal/MorphLayers'
 import { useMenuState } from './internal/menuMorph'
@@ -49,7 +50,7 @@ export interface ContextMenuProps {
   readonly header?: ReactNode
   /** The menu's accessible name. */
   readonly label: string
-  /** A row was chosen; `metaKey` with ⌘ held, which some rows read as "in a new tab". */
+  /** A row was chosen; `metaKey` with the command key held (⌘, or Ctrl on Windows), which some rows read as "in a new tab". */
   readonly onSelect: (id: string, how: { readonly metaKey: boolean }) => void
   readonly onClose: () => void
   /**
@@ -206,7 +207,7 @@ function Row({ item, onSelect }: { readonly item: ContextMenuItem; readonly onSe
         data-menu-trailing={trailing.id}
         aria-label={trailing.label}
         {...tooltip(trailing.label)}
-        onClick={(event) => onSelect(trailing.id, { metaKey: event.metaKey })}
+        onClick={(event) => onSelect(trailing.id, { metaKey: commandKey(event) })}
         {...stylex.props(styles.trailing)}
       >
         <Icon icon={trailing.icon} size={14} />
@@ -225,7 +226,7 @@ function RowItem({ item, onSelect, lead = false }: { readonly item: ContextMenuI
       data-menu-shortcut={item.shortcut}
       aria-keyshortcuts={item.shortcut === undefined ? undefined : (SHORTCUT_KEYS[item.shortcut] ?? [item.shortcut]).join(' ')}
       onClick={(event) => {
-        if (item.disabled !== true) onSelect(item.id, { metaKey: event.metaKey })
+        if (item.disabled !== true) onSelect(item.id, { metaKey: commandKey(event) })
       }}
       {...stylex.props(lead ? styles.lead : styles.row, item.disabled === true && styles.disabled)}
     >
@@ -233,7 +234,7 @@ function RowItem({ item, onSelect, lead = false }: { readonly item: ContextMenuI
       <span {...stylex.props(styles.label)}>{item.label}</span>
       {item.shortcut === undefined ? null : (
         <span aria-hidden {...stylex.props(styles.shortcut)}>
-          {item.shortcut}
+          {menuKeyLabel(item.shortcut)}
         </span>
       )}
     </div>

@@ -4,7 +4,7 @@ import type { FileView, MessageView, Person, ReactionIssue } from '@juno/contrac
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
 import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, focusRing, Icon, IconButton, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { type ActivateEvent, Avatar, focusRing, type HueName, Icon, IconButton, shortcutKeys, Text } from '@juno/ui'
 import { SharedFileLines, type FileBlock } from './AttachmentCard'
 import { Files } from './FileCard'
 import { viewingOf } from './MediaGrid'
@@ -408,7 +408,7 @@ function MoreButton({ ts, open, place, onPress }: { readonly ts: string; readonl
       <IconButton
         icon={DotsThree}
         label="More actions"
-        shortcut="⇧F10"
+        shortcut={shortcutKeys('Shift+F10')}
         size={24}
         iconSize={16}
         iconWeight="bold"

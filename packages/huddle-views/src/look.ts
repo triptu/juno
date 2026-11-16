@@ -5,6 +5,7 @@ import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { ReactNode } from 'react'
 import type { ContextTint, PhosphorIcon } from '@juno/ui'
 import type { HuddleConnection, HuddlePlace, HuddlePlaceKind, MicrophoneProblem } from './model'
+import { systemWords } from '@juno/ui'
 
 /** The glyph that says what kind of place it is, as the sidebar's place line draws it. */
 export const placeIcons: Record<HuddlePlaceKind, PhosphorIcon> = {
@@ -43,7 +44,7 @@ export function sharingLine(others: ReadonlyArray<string>, you: boolean): string
 
 /** The status line and Mute's tooltip for each microphone problem (SPEC 20, "When things go wrong"). */
 export const microphoneCopy: Record<MicrophoneProblem, { readonly status: string; readonly tooltip: string }> = {
-  blocked: { status: 'Microphone blocked', tooltip: 'Allow the microphone in System Settings' },
+  blocked: { status: 'Microphone blocked', tooltip: `Allow the microphone in ${systemWords.systemSettings}` },
   missing: { status: 'No microphone', tooltip: 'No microphone connected' },
   failed: { status: 'Microphone unavailable', tooltip: "Couldn't start the microphone" },
 }

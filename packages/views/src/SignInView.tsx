@@ -1,9 +1,10 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Text } from '@juno/ui'
+import { Button, isWindows, Text } from '@juno/ui'
 import { SignInArt } from './SignInArt'
 import { SignInPage } from './SignInPage'
+import { menuKeys } from './keys'
 
 export interface SignInViewProps {
   /** `first-run` has never signed in; `expired` had a session Slack no longer accepts. */
@@ -27,12 +28,13 @@ export const signInCopy = {
     { label: 'Home', line: 'I show you at most three things that want you.' },
     { label: 'Resolve topics', line: 'One click clears a topic from the list, with undo.' },
     { label: 'Smart notifications', line: 'Tell me what matters. I hold the rest inside your hours.' },
-    { label: 'Fast', line: 'Every action answers at once and has a key. ⌘K finds anything.' },
+    { label: 'Fast', line: `Every action answers at once and has a key. ${menuKeys('palette.toggle')} finds anything.` },
   ],
   expiredTitle: 'Slack signed you out',
   expiredBody: 'The Slack app’s session ended. Open Slack, sign in there, then try again. Your topics and settings are kept.',
   button: "Use the Slack app's session",
-  note: 'macOS will ask for your password once, so I can read the Slack app’s session.',
+  // Windows asks for nothing: the Slack app's session is read without a prompt (decision D5).
+  note: isWindows ? undefined : 'macOS will ask for your password once, so I can read the Slack app’s session.',
   busy: 'Reading the Slack app’s session',
   copyDetails: 'Copy details',
 } as const
@@ -91,9 +93,11 @@ export function SignInView({ mode, busy, error, onCopyDetails, onImport, footer 
           <Button variant="primary" size="2xl" onClick={onImport} disabled={waiting}>
             {signInCopy.button}
           </Button>
-          <Text variant="meta" tone="muted" as="p">
-            {signInCopy.note}
-          </Text>
+          {signInCopy.note === undefined ? null : (
+            <Text variant="meta" tone="muted" as="p">
+              {signInCopy.note}
+            </Text>
+          )}
         </div>
       </SignInPage>
       {footer === undefined ? null : <div {...stylex.props(styles.footer)}>{footer}</div>}

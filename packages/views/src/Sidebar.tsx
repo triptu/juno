@@ -8,7 +8,7 @@ import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { BUILTIN_PILL_NAMES, builtinPillLooks, isBuiltinPill, pillOrder as defaultPillOrder, type BuiltinPill, type ConversationKind, type KindFilter, type PillLook } from '@juno/contract'
-import { menuKeys } from '@juno/contract/channels'
+import { menuKeys } from './keys'
 import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,

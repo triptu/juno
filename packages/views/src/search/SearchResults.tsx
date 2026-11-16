@@ -19,7 +19,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import type { SearchSnapshot } from '@juno/contract'
 import { colors, layout, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Button, type ActivateEvent } from '@juno/ui'
+import { type ActivateEvent, Button, commandKey, systemWords } from '@juno/ui'
 import type { LinkInfo } from '../MessageLink'
 import { useCardMarks } from './marks'
 import { isStop, type SearchRowItem } from './rows'
@@ -83,9 +83,9 @@ export interface SearchResultsProps extends SearchRecentProps {
 }
 
 const copy = {
-  unavailable: "Showing matches on this Mac. Slack search didn't answer.",
-  offline: "You're offline. Showing matches on this Mac.",
-  offlineEmpty: "You're offline. Nothing on this Mac matches.",
+  unavailable: `Showing matches on ${systemWords.thisComputer}. Slack search didn't answer.`,
+  offline: `You're offline. Showing matches on ${systemWords.thisComputer}.`,
+  offlineEmpty: `You're offline. Nothing on ${systemWords.thisComputer} matches.`,
   searching: 'Searching Slack…',
 }
 
@@ -211,7 +211,7 @@ function useListKeys({ onSelect, onOpen, onToggleTopic, onShowTopic, onHideTopic
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      return onOpen(id, { newTab: event.metaKey })
+      return onOpen(id, { newTab: commandKey(event) })
     }
     if (event.key === ' ' && plain && !event.shiftKey) {
       event.preventDefault()

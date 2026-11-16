@@ -13,7 +13,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo, type ComponentType, type PointerEvent } from 'react'
 import type { SearchCard, SearchGroup } from '@juno/contract'
 import { accent, colors, layout, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { Avatar, AvatarStack, ContextPill, hueForId, Text, type ActivateEvent, type ContextTint } from '@juno/ui'
+import { type ActivateEvent, Avatar, AvatarStack, commandKey, contextClick, ContextPill, type ContextTint, hueForId, systemWords, Text } from '@juno/ui'
 import { hueFor, initials, kindIcon, stackPerson } from '../look'
 import type { LinkInfo } from '../MessageLink'
 import { Reactions } from '../Reactions'
@@ -61,9 +61,9 @@ export const SearchRow = memo(function SearchRow(props: SearchRowProps) {
 
 function Stop({ row, now, time, selected, focused, tabbable, words, onSelect, onPress, onOpen, onLink, linkInfo, onChannel }: SearchRowProps & { readonly row: Exclude<SearchRowItem, { readonly kind: 'older' }> }) {
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || event.ctrlKey) return
+    if (event.button !== 0 || contextClick(event)) return
     if (event.target instanceof Element && event.target.closest(OWN_PRESS) !== null) return
-    if (event.metaKey) {
+    if (commandKey(event)) {
       // The tab opens behind this one; focus and the selection stay where they are.
       event.preventDefault()
       return onOpen(row.id, { newTab: true })
@@ -208,7 +208,7 @@ function TitleContent({ group, now = 0, time: TimeLeaf }: { readonly group: Sear
 function OlderLine() {
   return (
     <div role="option" aria-disabled="true" aria-selected={false} data-search-older="" {...stylex.props(styles.older)}>
-      <span>Older matches on this Mac</span>
+      <span>Older matches on {systemWords.thisComputer}</span>
       <span {...stylex.props(styles.olderRule)} />
     </div>
   )

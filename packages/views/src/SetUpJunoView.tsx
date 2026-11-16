@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type ModelChoice } from '@juno/agent-contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Chip, ListRow, Segmented, Select, Surface, Text, TextField } from '@juno/ui'
+import { Button, Chip, ListRow, Segmented, Select, Surface, systemWords, Text, TextField } from '@juno/ui'
 import { cell } from './juno-pages/cell'
 import { CODEX_ENABLED, modelOptions } from './juno-pages/JunoSettingsPage'
 import { SignInPage } from './SignInPage'
@@ -41,9 +41,9 @@ export interface SetUpJunoViewProps {
 
 const copy = {
   title: 'Set up Juno',
-  body: 'I run on a model you choose. Keys stay in your keychain, and you can change this later in Settings.',
+  body: `I run on a model you choose. Keys stay ${systemWords.keyStore}, and you can change this later in Settings.`,
   codex: 'Codex',
-  codexSignedIn: 'Codex is signed in on this Mac. It uses your ChatGPT plan.',
+  codexSignedIn: `Codex is signed in on ${systemWords.thisComputer}. It uses your ChatGPT plan.`,
   codexSignedOut: 'Sign in to Codex in your browser. It uses your ChatGPT plan.',
   codexSignIn: 'Sign in to Codex',
   model: 'Model',

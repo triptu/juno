@@ -60,6 +60,8 @@ export interface StartOptions {
   readonly clock?: PageClock
   /** The engine's frames reach the page one at a time, for counted budgets (`work.ts`). */
   readonly counted?: boolean
+  /** The page runs as on Windows (`?platform=win32`), with Ctrl in ⌘'s place. */
+  readonly windows?: boolean
 }
 
 /** The engine options every DOM test gets unless it asks for others, as the browser lane's defaults. */
@@ -78,6 +80,7 @@ export class DomApp {
     readonly userData: string,
     readonly clock: PageClock | undefined,
     readonly counted: boolean,
+    readonly windows: boolean,
   ) {
     this.window = this.#open()
     this.dom = new Dom(this.window)
@@ -88,7 +91,7 @@ export class DomApp {
     const engine = { ...DEFAULT_ENGINE, ...options.engine, ...(options.clock === undefined ? {} : { clock: true }) }
     const host = await hostPool().start(fake, { userData, aliases: options.aliases ?? [], engine })
     try {
-      return new DomApp(host, fake, userData, options.clock, options.counted === true)
+      return new DomApp(host, fake, userData, options.clock, options.counted === true, options.windows === true)
     } catch (error) {
       await host.stop()
       throw error
@@ -102,6 +105,7 @@ export class DomApp {
     const url = new URL(this.host.url)
     url.searchParams.set('e2e', '1')
     if (this.#tour) url.searchParams.set('tour', 'auto')
+    if (this.windows) url.searchParams.set('platform', 'win32')
     if (ready !== undefined) url.searchParams.set('session', JSON.stringify(ready))
     return openWindow(url.href, this.clock, this.clock === undefined ? undefined : { jump: (millis) => this.host.jumpClock(millis) }, storage, this.counted)
   }

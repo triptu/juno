@@ -13,7 +13,7 @@ import { X } from '@phosphor-icons/react/dist/icons/X'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { colors, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { focusRing, Icon, IconButton } from '@juno/ui'
+import { focusRing, Icon, IconButton, shortcutKeys } from '@juno/ui'
 
 export interface TopicHeaderReader {
   /** The one-column page: Back to results leads the left island (Esc does the same). */
@@ -49,8 +49,8 @@ export function ReaderStep({ step }: { readonly step: NonNullable<TopicHeaderRea
   return (
     <>
       <span aria-live="polite" data-match-count="" {...stylex.props(styles.count, styles.wideOnly)}>{`${step.index} of ${step.count}`}</span>
-      <IconButton icon={CaretUp} label={`Previous match${where}`} shortcut="⌘↑" size={28} iconSize={16} radius="full" variant="island" onClick={step.onPrevious} />
-      <IconButton icon={CaretDown} label={`Next match${where}`} shortcut="⌘↓" size={28} iconSize={16} radius="full" variant="island" onClick={step.onNext} />
+      <IconButton icon={CaretUp} label={`Previous match${where}`} shortcut={shortcutKeys('CommandOrControl+Up')} size={28} iconSize={16} radius="full" variant="island" onClick={step.onPrevious} />
+      <IconButton icon={CaretDown} label={`Next match${where}`} shortcut={shortcutKeys('CommandOrControl+Down')} size={28} iconSize={16} radius="full" variant="island" onClick={step.onNext} />
     </>
   )
 }
@@ -58,7 +58,7 @@ export function ReaderStep({ step }: { readonly step: NonNullable<TopicHeaderRea
 export function ReaderOpen({ onOpen }: { readonly onOpen: () => void }) {
   return (
     <WideOnly>
-      <IconButton icon={ArrowSquareOut} label="Open in new tab" shortcut="⌘↵" size={28} iconSize={16} radius="full" variant="island" onClick={onOpen} />
+      <IconButton icon={ArrowSquareOut} label="Open in new tab" shortcut={shortcutKeys('CommandOrControl+Enter')} size={28} iconSize={16} radius="full" variant="island" onClick={onOpen} />
     </WideOnly>
   )
 }

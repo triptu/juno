@@ -49,9 +49,9 @@ export type MenuCommand =
   | 'huddle.leave'
 
 /**
- * The app menu's shortcuts, in Electron's accelerator form. Main registers
- * them; the renderer shows them in tooltips and hints through
- * `shortcutKeys`, so a key changes in one place.
+ * The app menu's shortcuts on the Mac, in Electron's accelerator form. Main
+ * registers them and the renderer labels them (`@juno/views`' `menuKeys`),
+ * both through `menuAccelerator`, so a key changes in one place.
  */
 export const menuShortcuts = {
   'chat.new': 'CommandOrControl+N',
@@ -75,41 +75,17 @@ export const menuShortcuts = {
 } as const satisfies Partial<Record<MenuCommand, string>>
 
 /**
- * The shortcuts that differ on Windows. Electron drops `Command` off the
- * Mac, so ⌃⌘S would be Ctrl+S, which Windows apps use for Save, and ⌃⌘H
- * Ctrl+H, which they use for Find and replace.
+ * Where Windows takes other keys than the Mac (decision D2). Ctrl+S is Save
+ * in most Windows apps and Ctrl+H is Replace or History, so Hide Sidebar and
+ * Hide Message Text add Shift there. Every other command's
+ * `CommandOrControl` is Ctrl on Windows.
  */
-const windowsMenuShortcuts: Readonly<Partial<Record<keyof typeof menuShortcuts, string>>> = {
+const windowsShortcuts = {
   'sidebar.toggle': 'Control+Shift+S',
   'privacy.toggle': 'Control+Shift+H',
-}
+} as const satisfies Partial<Record<keyof typeof menuShortcuts, string>>
 
-/** A menu command's accelerator on Windows or on the Mac. */
-export function menuShortcut(command: keyof typeof menuShortcuts, windows: boolean): string {
-  return (windows ? windowsMenuShortcuts[command] : undefined) ?? menuShortcuts[command]
-}
-
-const keyGlyphs: Record<string, string> = {
-  CommandOrControl: '⌘',
-  Command: '⌘',
-  Control: '⌃',
-  Alt: '⌥',
-  Option: '⌥',
-  Shift: '⇧',
-  Plus: '+',
-}
-// macOS writes the modifiers in this order, whatever order the accelerator uses.
-const modifierOrder = ['⌃', '⌥', '⇧', '⌘']
-
-/** An accelerator as the Mac writes it: "Control+Command+S" is "⌃⌘S". */
-export function shortcutKeys(accelerator: string): string {
-  const parts = accelerator.split('+').map((part) => keyGlyphs[part] ?? part)
-  const key = parts.at(-1) ?? ''
-  const modifiers = parts.slice(0, -1).toSorted((a, b) => modifierOrder.indexOf(a) - modifierOrder.indexOf(b))
-  return [...modifiers, key].join('')
-}
-
-/** The keys of an app-menu command, as the Mac writes them ("⌘["). */
-export function menuKeys(command: keyof typeof menuShortcuts): string {
-  return shortcutKeys(menuShortcuts[command])
+/** A menu command's accelerator on `platform`: main registers it and the page labels it, so the two cannot drift. */
+export function menuAccelerator(command: keyof typeof menuShortcuts, platform: 'mac' | 'windows'): string {
+  return (platform === 'windows' ? (windowsShortcuts as Partial<Record<keyof typeof menuShortcuts, string>>)[command] : undefined) ?? menuShortcuts[command]
 }

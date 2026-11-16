@@ -71,7 +71,7 @@ export function menuKey(event: KeyboardEvent<HTMLDivElement>, onClose: () => voi
     case ' ':
       event.preventDefault()
       // ⌘Enter reads as ⌘-click.
-      return void at?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: event.metaKey }))
+      return void at?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: event.metaKey, ctrlKey: event.ctrlKey }))
   }
   if (event.metaKey || event.ctrlKey || event.altKey) return
   const now = performance.now()

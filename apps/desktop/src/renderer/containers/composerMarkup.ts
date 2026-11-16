@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import type { MarkupLayout } from '@juno/contract'
 import { chunk, usePreloaded } from './chunks'
-import { isWindows } from '@juno/views'
+import { commandKey, otherCommandKey } from '@juno/views'
 
 type Rules = typeof import('./markupRules')
 type Press = import('./markupRules').Press
@@ -19,7 +19,7 @@ export function useComposerMarkup(on: boolean) {
     format: (text: string, opaque: ReadonlyArray<{ readonly start: number; readonly end: number }> = []): { readonly format?: MarkupLayout } =>
       !on ? {} : { format: ready && rules !== undefined ? rules.markupLayout(text, opaque) : PLAIN },
     onKey: (event: KeyboardEvent<HTMLTextAreaElement>, atomic: ReadonlyArray<{ readonly start: number; readonly end: number }> = []): boolean => {
-      if (!on || (isWindows ? !event.ctrlKey || event.metaKey : !event.metaKey || event.ctrlKey) || event.altKey || event.nativeEvent.isComposing) return false
+      if (!on || (!commandKey(event) || otherCommandKey(event)) || event.altKey || event.nativeEvent.isComposing) return false
       const { key, code, metaKey, shiftKey, ctrlKey, altKey, currentTarget: field } = event
       if (!(shiftKey ? /^[xc]$/i.test(key) || code === 'Digit9' : /^[bi]$/i.test(key))) return false
       const press = { key, code, metaKey, shiftKey, ctrlKey, altKey, field, value: field.value, start: field.selectionStart, end: field.selectionEnd, atomic }

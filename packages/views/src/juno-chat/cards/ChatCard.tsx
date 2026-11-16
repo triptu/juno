@@ -7,7 +7,7 @@ import { X } from '@phosphor-icons/react/dist/icons/X'
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import { chatCopy, type CardId, type CardKind, type CardStatus, type OpenTarget, type Place, type PlaceTint } from '@juno/agent-contract'
 import { chat, colors, motion, opacity, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Button, IconButton, Surface, Text, type PhosphorIcon } from '@juno/ui'
+import { Button, commandKey, IconButton, type PhosphorIcon, Surface, Text } from '@juno/ui'
 import type { ChatActions } from '../commands'
 import { TextButton } from '../TextButton'
 import { ShowResult, type ResultToggle } from './ShowResult'
@@ -225,7 +225,7 @@ function After({ children, truncate = false, trailing }: { readonly children: Re
 /** "Open", or the target's own label, as a text button. */
 export function OpenButton({ target, actions, label }: { readonly target: OpenTarget; readonly actions: ChatActions; readonly label?: string }) {
   const text = label ?? (target._tag === 'url' ? target.label : chatCopy.card.sendMessage.open)
-  return <TextButton onClick={(event) => actions.onOpen(target, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>{text}</TextButton>
+  return <TextButton onClick={(event) => actions.onOpen(target, { metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>{text}</TextButton>
 }
 
 /** The icon for a place or topic, by its tint and kind. */

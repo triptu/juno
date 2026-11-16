@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Fragment, type PointerEvent } from 'react'
 import { colors, layout, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Emoji, Text, type HueName } from '@juno/ui'
+import { contextClick, Emoji, type HueName, Text } from '@juno/ui'
 import { TextButton } from './juno-chat/TextButton'
 
 export interface Reactor {
@@ -87,7 +87,7 @@ export function ReactorsCard({ name, emoji, url, reactors, count, id, onSeeAll, 
   const cut = line.others > 0
   // Opens on mouse down, as a popover's trigger does; the dialog takes over from the card.
   const seeAll = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0 || event.ctrlKey || onSeeAll === undefined) return
+    if (event.button !== 0 || contextClick(event) || onSeeAll === undefined) return
     event.preventDefault()
     onSeeAll()
   }

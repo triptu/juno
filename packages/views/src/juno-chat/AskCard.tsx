@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo, type ReactNode } from 'react'
 import { chatCopy, type AskItem, type ProactiveAsk } from '@juno/agent-contract'
 import { chat, motion, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Surface, Text } from '@juno/ui'
+import { Button, commandKey, Surface, Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { rowStyles } from './rows'
 import { TextButton } from './TextButton'
@@ -53,7 +53,7 @@ export const AskCard = memo(function AskCard({ ask, actions, enter = true }: Ask
 function Footer({ ask, actions }: { readonly ask: ProactiveAsk; readonly actions: ChatActions }): ReactNode {
   const status = ask.status
   const answer = (choice: 'start' | 'dismiss' | 'stop') => actions.onAsk(ask.id, choice)
-  const open = <TextButton onClick={(event) => actions.onOpen({ _tag: 'page', page: 'remembers' }, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>{copy.open}</TextButton>
+  const open = <TextButton onClick={(event) => actions.onOpen({ _tag: 'page', page: 'remembers' }, { metaKey: commandKey(event), shiftKey: event.shiftKey, altKey: event.altKey, source: 'pointer' })}>{copy.open}</TextButton>
   switch (status._tag) {
     case 'open':
       return (

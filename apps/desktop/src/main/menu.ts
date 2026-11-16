@@ -10,7 +10,7 @@
  * them; the Mac keeps them in the app menu.
  */
 import { app, BrowserWindow, Menu, type BaseWindow, type MenuItemConstructorOptions } from 'electron'
-import { menuShortcut, type HuddleMenu, type MenuCommand, type menuShortcuts } from '@juno/contract'
+import { menuAccelerator, type HuddleMenu, type MenuCommand, type menuShortcuts } from '@juno/contract'
 import { fitMinimumSizeToZoom, reloadWindow, tabCommand } from './window'
 import { refitWebPanel } from './webPanel'
 
@@ -68,7 +68,7 @@ export function setMenuCheckForUpdates(check: () => void): void {
 }
 
 /** A command's accelerator on this platform. */
-const keys = (name: keyof typeof menuShortcuts) => menuShortcut(name, windows)
+const keys = (name: keyof typeof menuShortcuts) => menuAccelerator(name, windows ? 'windows' : 'mac')
 
 /** A menu item that hands `command` to the focused app window. */
 const command = (id: string, label: string, accelerator: string | undefined, menuCommand: MenuCommand, hidden = false): MenuItemConstructorOptions => ({

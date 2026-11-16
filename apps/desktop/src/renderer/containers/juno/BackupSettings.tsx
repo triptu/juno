@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { chatCopy } from '@juno/agent-contract'
 import { copyText, registry } from '@juno/state'
 import { chooseFolder, junoPageActions, takeRecoveryPhrase, typeRecoveryPhrase, type CommandAnswer } from '@juno/state/agent'
-import { MoveSheet, RecoveryPhraseSheet, RestoreSheet, SheetLayer, type JunoBackupPageProps } from '@juno/views'
+import { type JunoBackupPageProps, MoveSheet, RecoveryPhraseSheet, RestoreSheet, SheetLayer, systemWords } from '@juno/views'
 import { openJunoPage } from '../navigation'
 
 const actions = junoPageActions(registry)
@@ -60,7 +60,7 @@ export function useBackupSettings(): { readonly props: BackupProps; readonly she
     if (current.phrase.trim() !== '') {
       const typed = await typeRecoveryPhrase(current.phrase)
       if (typed !== 'saved') {
-        update({ busy: false, error: typed === 'invalid' ? chatCopy.pages.settings.restoreSheet.phraseInvalid : 'Juno could not reach the keychain. Try again.' })
+        update({ busy: false, error: typed === 'invalid' ? chatCopy.pages.settings.restoreSheet.phraseInvalid : `Juno could not reach ${systemWords.keyStoreName}. Try again.` })
         return
       }
     }

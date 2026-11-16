@@ -31,7 +31,7 @@ import {
   type OpenOptions,
 } from '@juno/state'
 import { junoPageTitles } from '@juno/agent-contract'
-import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
+import { accentLabels, menuKeys, type PaletteIconName, type PaletteItem, settingsSections } from '@juno/views'
 import { muteShortcut } from '@juno/huddle-views'
 import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, shareFull, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
 import { openNewChannel } from './channelActions'
@@ -137,7 +137,7 @@ function pageRows(): ReadonlyArray<CommandRow> {
     junoPage('remembers', 'memory remember facts'),
     ...(junoChatOpen() ? [junoPage('memory', 'chat')] : []),
     junoPage('activity', 'log history work'),
-    row('page-settings', 'settings', 'Settings', 'preferences options', () => openSettings(), { group: 'pages', family: 'pages go settings', hint: '⌘,' }),
+    row('page-settings', 'settings', 'Settings', 'preferences options', () => openSettings(), { group: 'pages', family: 'pages go settings', hint: menuKeys('settings.open') }),
   ]
 }
 
@@ -175,9 +175,9 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     ),
     ...themes.map((option) => row(`theme-${option.theme}`, option.icon, `Theme: ${option.label}`, 'appearance mode', () => setTheme(option.theme), { ...stays, family: 'theme', ...(option.theme === theme ? { sub: 'Current' } : {}) })),
     ...AccentSchema.literals.map((name) => row(`accent-${name}`, 'theme-system', `Accent: ${accentLabels[name]}`, 'appearance', () => setAccent(name), { ...stays, family: 'accent colour color', accent: name, ...(name === accent ? { sub: 'Current' } : {}) })),
-    row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: '⌘T' }),
+    row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: menuKeys('tab.new') }),
     // ⌘N: Home's composer with the destination list open (SPEC 12).
-    row('new-message', 'new-message', 'New message', 'write compose dm send chat', () => newMessage(), { hint: '⌘N' }),
+    row('new-message', 'new-message', 'New message', 'write compose dm send chat', () => newMessage(), { hint: menuKeys('chat.new') }),
     // The channel sheet (SPEC 5, "Channel sheet"); ⌘K is the only place that makes a channel.
     row('new-channel', 'public', 'New channel…', 'create make add start', () => openNewChannel()),
     // Hidden: the developer log shows only for "developer" or "dev log".
@@ -185,8 +185,8 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     // The welcome card (SPEC 4) again, as Help › Show the Tour brings it.
     row('tour', 'tour', 'Show the tour', 'help guide onboarding welcome tips how', () => showTheTour()),
     privacy
-      ? row('privacy', 'show-text', 'Show message text', 'privacy mode screen share', () => setPrivacy(false), { ...stays, hint: '⌃⌘H' })
-      : row('privacy', 'hide-text', 'Hide message text', 'privacy mode screen share blur', () => setPrivacy(true), { ...stays, hint: '⌃⌘H' }),
+      ? row('privacy', 'show-text', 'Show message text', 'privacy mode screen share', () => setPrivacy(false), { ...stays, hint: menuKeys('privacy.toggle') })
+      : row('privacy', 'hide-text', 'Hide message text', 'privacy mode screen share blur', () => setPrivacy(true), { ...stays, hint: menuKeys('privacy.toggle') }),
     ...huddleRows(),
     ...(presence === null
       ? []
@@ -228,7 +228,7 @@ function topicCommands(id: string | undefined): { readonly heading: string; read
     topic.resolved ? row('reopen', 'reopen', 'Reopen', 'unresolve', run('reopen'), stays) : row('resolve', 'resolve', 'Resolve', 'done close', run('resolve'), stays),
     topic.pinned ? row('unpin', 'unpin', 'Unpin', 'pin', run('unpin'), stays) : row('pin', 'pin', 'Pin', 'keep top', run('pin'), stays),
     topic.unreadCount > 0 ? row('read', 'unread', 'Mark as read', 'unread', run('mark-read'), stays) : row('unread', 'unread', 'Mark as unread', 'read', run('mark-unread'), stays),
-    juno && (panelOpen ? row('juno', 'juno', 'Close Juno panel', 'ai assistant', closeJunoPanel, { hint: '⌘J' }) : row('juno', 'juno', 'Open Juno panel', 'ai assistant ask', openPanel, { hint: '⌘J' })),
+    juno && (panelOpen ? row('juno', 'juno', 'Close Juno panel', 'ai assistant', closeJunoPanel, { hint: menuKeys('juno.toggle') }) : row('juno', 'juno', 'Open Juno panel', 'ai assistant ask', openPanel, { hint: menuKeys('juno.toggle') })),
     isLinkable(topic) && row('copy-link', 'link', 'Copy Slack link', 'url share', run('copy-link'), stays),
     row('open-in-slack', 'open-in-slack', 'Open in Slack', 'app', run('open-in-slack'), stays),
     topic.kind === 'thread' && row('rename', 'rename', 'Rename thread', 'title', run('rename')),

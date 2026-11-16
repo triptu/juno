@@ -1,5 +1,6 @@
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { Toast, ToastRegion } from '@juno/ui'
+import { menuKeys } from './keys'
 
 export interface ActionToastProps {
   /** "Resolved · Postgres 16 migration plan" (SPEC 17, inventory 16). */
@@ -19,7 +20,7 @@ export function ActionToast({ text, check = false, onUndo, action }: ActionToast
       <Toast
         text={text}
         {...(check ? { icon: CheckCircle } : {})}
-        {...(onUndo !== undefined ? { action: { label: 'Undo', kbd: '⌘Z', onAction: onUndo } } : action !== undefined ? { action } : {})}
+        {...(onUndo !== undefined ? { action: { label: 'Undo', kbd: menuKeys('edit.undo'), onAction: onUndo } } : action !== undefined ? { action } : {})}
       />
     </ToastRegion>
   )
