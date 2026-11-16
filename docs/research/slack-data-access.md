@@ -77,6 +77,22 @@ Unknown
 - Whether the App Store build's "Slack Safe Storage" item is readable with `security find-generic-password` from another app (it should be, since Chromium uses the legacy login keychain API, but no App Store install was available to check).
 - Whether `fp` (fingerprint) is validated server-side. It is a 2-character hash from FingerprintJS components; the client always sends it.
 
+### Slack for Windows (2026-11-16)
+
+Checked on a Namespace Windows Server 2022 machine with Slack 4.53.287 from `slack.com/ssb/download-win64`, installed with `--silent`, not signed in; the packaged paths are from Slack's deployment guide and its 2022 status note.
+
+Verified
+
+- The installer puts the app in `%LOCALAPPDATA%\slack\app-4.53.287` (with `Update.exe`) and its data in `%APPDATA%\Slack`: `Local State`, `Local Storage\leveldb`, `Network\Cookies`, as on the Mac.
+- `Local State` has `os_crypt.encrypted_key`: base64 of `DPAPI` + a 278-byte DPAPI blob. `CryptUnprotectData` (through koffi, no UI flag) gives back 32 bytes with no prompt.
+- A `v10` cookie (12-byte nonce, AES-256-GCM, 16-byte tag, the SHA-256 of `host_key` before the value) made under a key protected with `CryptProtectData` imported through Juno's own reader.
+- While Slack runs it holds `Network\Cookies` open with no read sharing: copying fails with `EBUSY`, and opening it for read with full sharing fails too.
+
+Not checked
+
+- A signed-in session (no Slack account on the machine), so Slack's own `d` cookie version is not seen. Chromium on Windows writes `v10`; `v20` (app-bound) is Chrome's and needs its elevation service. Juno says so if every `d` cookie is `v20`.
+- The MSIX (`%LOCALAPPDATA%\Packages\com.tinyspeck.slackdesktop_8yrtsj140pw4g\LocalCache\Roaming\Slack`) and older Microsoft Store (`...\91750D7E.Slack_8she8kybcnzg4\...`) folders on a real install.
+
 ## 2. Boot sequence
 
 Observed (`shared`, module `sQEb`; `boot-async`, module `1lIp` `processClientBootData`; `client-boot`, `fetchMessagesData`)
