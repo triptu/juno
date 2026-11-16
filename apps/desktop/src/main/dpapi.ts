@@ -48,7 +48,9 @@ async function bind(): Promise<Unprotect> {
     if (!unprotect({ cbData: data.length, pbData: data }, null, null, null, null, CRYPTPROTECT_UI_FORBIDDEN, output)) return undefined
     if (output.pbData === undefined || output.pbData === null) return undefined
     try {
-      return Buffer.from(koffi.view(output.pbData, output.cbData ?? 0).slice(0))
+      const length = output.cbData ?? 0
+      // A copy into memory V8 owns. `koffi.view` makes an external ArrayBuffer, which Electron's main refuses with a fatal error.
+      return length === 0 ? Buffer.alloc(0) : Buffer.from(koffi.decode(output.pbData, koffi.array('uint8_t', length, 'Typed')) as Uint8Array)
     } finally {
       localFree(output.pbData)
     }
