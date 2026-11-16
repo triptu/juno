@@ -1,0 +1,1 @@
+- 11-16 16:09 · Windows logs and updates · Logs on Windows go to Juno\logs in LOCALAPPDATA, which utility processes can compute without app.getPath; updates are unavailable on Windows and update.json is never read there.
