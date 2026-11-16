@@ -5,8 +5,8 @@
  * through `agent.setProvider` and `agent.setOpenRouterKey`, and the agent
  * gets only the active one, over `parentPort`.
  *
- * - Keys are generic passwords in the login keychain (`keychain.ts`), never
- *   in a file or a log. `OPENROUTER_API_KEY` overrides the initial
+ * - Keys are in the app's keychain (`keychain.ts`: the login keychain on
+ *   the Mac, safeStorage files on Windows), never in a plain file or a log. `OPENROUTER_API_KEY` overrides the initial
  *   OpenRouter key in development until a key is saved or removed.
  * - The endpoint's base URL and which provider is active are not secret:
  *   they live in `juno-provider.json` in userData.

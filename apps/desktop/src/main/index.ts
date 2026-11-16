@@ -14,7 +14,7 @@ import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
 import { clearTemporaryFiles, copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, huddleSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
-import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
+import { appKeychains, CUSTOM_ITEM, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, withSession, type Launch } from './launch'
 import { registerMediaPermissions } from './media'
@@ -182,15 +182,24 @@ const refreshDockBadge = () => void dockBadge.refresh()
 /** System Settings at Juno's notifications; the Notifications pane if macOS refuses the entry's link. */
 const openNotificationSettings = async () => (e2e ? void (notificationSettingsOpenedForTests += 1) : openSettings(app.isPackaged))
 
-// The backup's secrets in the keychain (memory under tests), WP21.
-const backupSecrets = appBackupSecrets(e2e)
+// Provider keys, MCP sign-ins and the backup's secrets: the login keychain on the Mac,
+// safeStorage files on Windows, memory under tests (keychain.ts).
+const keychain = appKeychains({
+  e2e,
+  platform: process.platform,
+  userData: app.getPath('userData'),
+  cipher: { encrypt: (value) => safeStorage.encryptString(value), decrypt: (bytes) => safeStorage.decryptString(bytes) },
+})
+
+// The backup's secrets, WP21.
+const backupSecrets = appBackupSecrets(keychain)
 
 // The agent runs whenever a model provider is set up (ADR 0012, SPEC 13.10).
 const agent = createAgentSupervisor(
   (port) => supervisor.send({ _tag: 'agentPort' }, [port]),
   () => supervisor.currentState === 'ready',
-  // MCP sign-in: OAuth state in the keychain (memory under tests), sign-in pages in the system browser.
-  appMcpCredentials(e2e, (url) => shell.openExternal(url)),
+  // MCP sign-in: OAuth state in the keychain, sign-in pages in the system browser.
+  appMcpCredentials(e2e, keychain, (url) => shell.openExternal(url)),
   backupSecrets.answer,
 )
 // Each process's CPU and memory for Settings › About, and the idle CPU self-check (processWatch.ts).
@@ -200,10 +209,10 @@ supervisor.onReady(() => {
   if (appWindow()?.isVisible()) supervisor.send({ _tag: 'painted' })
 })
 
-// The providers: keys in the keychain (in memory under tests), OPENROUTER_API_KEY as a development override.
+// The providers: keys in the keychain, OPENROUTER_API_KEY as a development override.
 const providers = new ProviderStore(
   app.getPath('userData'),
-  e2e ? { openRouter: memoryKeychain(), custom: memoryKeychain() } : { openRouter: macKeychain(OPENROUTER_ITEM), custom: macKeychain(CUSTOM_ITEM) },
+  { openRouter: keychain(OPENROUTER_ITEM), custom: keychain(CUSTOM_ITEM) },
   // Under JUNO_E2E only the test seam: a test launches with a key, never the developer's.
   e2e ? process.env.JUNO_E2E_OPENROUTER_KEY : app.isPackaged ? undefined : process.env.OPENROUTER_API_KEY,
   (state, provider, engineKey) => {
