@@ -27,6 +27,7 @@ import { loadUnprotect } from './dpapi'
 import { securityRunner } from './keychain'
 import { SLACK_PARTITION } from './slackSession'
 import { fixedKeychain, readSlackApp, securityKeychain, UNREADABLE, type SlackKeychain } from './slackAppData'
+import { readWindowsSlackApp } from './slackAppDataWindows'
 
 export type ImportResult =
   | { readonly ok: true; readonly secrets: SessionSecrets }
@@ -130,8 +131,7 @@ export async function importFromSlackApp(options: ImportOptions = {}): Promise<I
  */
 async function readWindows(home: string, slackDir: string | undefined) {
   if (slackDir !== undefined) {
-    return readSlackApp({
-      os: 'windows',
+    return readWindowsSlackApp({
       candidates: [{ variant: 'direct', dir: slackDir }],
       unprotect: (blob) => blob,
       installDir: slackDir,
@@ -141,8 +141,7 @@ async function readWindows(home: string, slackDir: string | undefined) {
     })
   }
   const unprotect = await loadUnprotect()
-  return readSlackApp({
-    os: 'windows',
+  return readWindowsSlackApp({
     candidates: defaultSlackCandidates(),
     // Without koffi the key stays locked, and the report says so.
     unprotect: unprotect ?? (() => undefined),

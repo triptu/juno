@@ -21,13 +21,10 @@
  * another item is left, the import stops and says so: the next press asks
  * for that item. A refusal is not kept; pressing the button again asks again.
  *
- * On Windows there is no keychain and no prompt: the cookie key is in the
- * install's `Local State`, protected with DPAPI for the Windows user
- * (`dpapi.ts`). Slack may hold its cookie database open while it runs; a copy
- * that fails that way asks the owner to quit Slack.
+ * Windows reads the same way without a keychain (`slackAppDataWindows.ts`).
  */
 import { existsSync } from 'node:fs'
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SignInFailureKind } from '@juno/contract'
@@ -35,25 +32,13 @@ import {
   copySlackAppData,
   KEYCHAIN_SERVICE,
   locateSlackAppData,
-  readProtectedCookieKey,
   readSlackAppSession,
   SlackAppImportError,
-  windowsCookieKey,
   type LocalConfigTeam,
   type SlackAppCandidate,
   type SlackCookie,
 } from '@juno/slack/import'
-import type { Unprotect } from './dpapi'
-import {
-  formatImportReport,
-  type CookieKeyAttempt,
-  type ImportOutcome,
-  type ImportReport,
-  type ImportStep,
-  type KeychainAttempt,
-  type SlackBundle,
-  type SlackWindowsInstall,
-} from './importReport'
+import { formatImportReport, type ImportReport, type ImportStep, type KeychainAttempt, type SlackBundle } from './importReport'
 import type { SecurityRunner } from './keychain'
 
 export type SlackAppRead =
@@ -66,9 +51,6 @@ export const NO_KEYCHAIN = 'Juno could not read the Slack keychain item. Try aga
 export const WRONG_KEYCHAIN = 'The Slack keychain item did not unlock the session cookie. Open Slack, sign in there, then try again.'
 export const NEXT_KEYCHAIN = 'That Slack keychain item did not unlock the session cookie. Use the Slack app’s session again to try the next one.'
 export const UNREADABLE = 'The Slack app’s data could not be read.'
-export const NOT_INSTALLED_WINDOWS = 'Slack isn’t installed on this PC. Install Slack, sign in to it, then try again.'
-export const SLACK_OPEN = 'Juno can’t read the Slack app’s data while Slack is open. Quit Slack, then try again.'
-export const NO_COOKIE_KEY = 'Juno could not unlock the Slack app’s session on this PC. Open Slack, sign in there, then try again.'
 export const APP_BOUND = 'This version of Slack locks its session so that Juno can’t read it.'
 
 /** Account names Slack's keychain item may have: the app name, and the App Store bundle id. */
@@ -113,39 +95,21 @@ export function fixedKeychain(password: string): SlackKeychain {
   }
 }
 
-interface CommonOptions {
+export interface ReadSlackAppOptions {
   readonly candidates: ReadonlyArray<SlackAppCandidate>
-  readonly junoVersion: string
-  /** The home folder, written as `~` in the report. */
-  readonly home: string
-  readonly log?: (line: string) => void
-}
-
-export interface MacReadOptions extends CommonOptions {
-  readonly os?: 'mac'
   readonly keychain: SlackKeychain
   /** Where Slack.app may be installed, in order. */
   readonly bundles: ReadonlyArray<string>
+  readonly junoVersion: string
   readonly macosVersion: string
+  /** The home folder, written as `~` in the report. */
+  readonly home: string
   /** Passwords macOS gave earlier in this run, by service. Read first, and added to. */
   readonly known?: Map<string, string>
+  readonly log?: (line: string) => void
 }
-
-export interface WindowsReadOptions extends CommonOptions {
-  readonly os: 'windows'
-  readonly windowsVersion: string
-  /** `%LOCALAPPDATA%\slack`, where the installer puts `app-<version>` folders. */
-  readonly installDir: string
-  readonly unprotect: Unprotect
-}
-
-export type ReadSlackAppOptions = MacReadOptions | WindowsReadOptions
 
 export async function readSlackApp(options: ReadSlackAppOptions): Promise<SlackAppRead> {
-  return options.os === 'windows' ? readWindows(options) : readMac(options)
-}
-
-async function readMac(options: MacReadOptions): Promise<SlackAppRead> {
   const log = options.log ?? ((line: string) => console.info(line))
   const bundle = await readSlackBundle(options.bundles)
   const keychain: Array<KeychainAttempt> = []
@@ -226,110 +190,7 @@ async function readMac(options: MacReadOptions): Promise<SlackAppRead> {
   }
 }
 
-async function readWindows(options: WindowsReadOptions): Promise<SlackAppRead> {
-  const log = options.log ?? ((line: string) => console.info(line))
-  const install = await readWindowsInstall(options.installDir)
-  let key: CookieKeyAttempt | undefined
-  const report = (outcome: ImportOutcome): string => {
-    const platform = { os: 'windows' as const, windowsVersion: options.windowsVersion, install, ...(key === undefined ? {} : { key }) }
-    const text = formatImportReport({ ...platform, ...outcome, junoVersion: options.junoVersion }, options.home)
-    log(`main: slack import report\n${text}`)
-    return text
-  }
-
-  const location = await locateSlackAppData(options.candidates)
-  if (!location.found) {
-    const step = location.reason === 'not-installed' ? 'not-installed' : 'no-data-files'
-    return windowsFailure(step, report({ checked: location.checked, step }))
-  }
-  const { data, checked } = location
-  const chosen = { variant: data.variant, cookiesFile: data.cookiesFile }
-  // Read only once the team and a stored `d` cookie are found, so a signed-out app reports that.
-  const cookieKey = async () => {
-    const blob = await readProtectedCookieKey(data.dir)
-    if (blob === undefined) {
-      key = 'missing'
-      return undefined
-    }
-    const raw = options.unprotect(blob)
-    if (raw === undefined) {
-      key = 'refused'
-      return undefined
-    }
-    key = 'did-not-unlock'
-    return windowsCookieKey(raw)
-  }
-
-  const copy = await mkdtemp(join(tmpdir(), 'juno-import-'))
-  try {
-    try {
-      await copySlackAppData(data, copy)
-    } catch (cause) {
-      if (!isBusy(cause)) throw cause
-      return windowsFailure('slack-running', report({ checked, chosen, step: 'slack-running' }))
-    }
-    const { team, cookie } = await readSlackAppSession({ dir: copy, cookieKey })
-    key = 'unlocked'
-    report({ checked, chosen, step: 'ok' })
-    return { ok: true, team, cookie }
-  } catch (cause) {
-    const step = windowsStepOf(cause, key)
-    return windowsFailure(step, report({ checked, chosen, step, ...(step === 'unreadable' ? { errorName: errorName(cause) } : {}) }))
-  } finally {
-    await rm(copy, { recursive: true, force: true })
-  }
-}
-
-/** Windows reports a file another process holds open as busy, or as a refused permission. */
-function isBusy(cause: unknown): boolean {
-  const code = (cause as NodeJS.ErrnoException | undefined)?.code
-  return code === 'EBUSY' || code === 'EPERM' || code === 'EACCES'
-}
-
-function windowsStepOf(cause: unknown, key: CookieKeyAttempt | undefined): Exclude<ImportStep, 'ok'> {
-  if (cause instanceof SlackAppImportError && cause.reason === 'no-keychain') return key === 'refused' ? 'key-refused' : 'key-missing'
-  return stepOf(cause, [])
-}
-
-function windowsFailure(step: Exclude<ImportStep, 'ok'>, details: string): SlackAppRead {
-  switch (step) {
-    case 'not-installed':
-      return { ok: false, kind: 'no-slack-app', message: NOT_INSTALLED_WINDOWS, details }
-    case 'slack-running':
-      return { ok: false, kind: 'other', message: SLACK_OPEN, details }
-    case 'key-missing':
-    case 'key-refused':
-    case 'decrypt-failed':
-      return { ok: false, kind: 'keychain', message: NO_COOKIE_KEY, details }
-    default:
-      return failure(step, details)
-  }
-}
-
-/** The installer's newest `app-<version>` folder. A Store or MSIX install leaves none. */
-async function readWindowsInstall(dir: string): Promise<SlackWindowsInstall> {
-  let names: Array<string>
-  try {
-    names = await readdir(dir)
-  } catch {
-    return { dir }
-  }
-  const versions = names.flatMap((name) => /^app-(\d+(?:\.\d+)*)$/.exec(name)?.[1] ?? [])
-  const newest = versions.sort((a, b) => compareVersions(b, a))[0]
-  return newest === undefined ? { dir } : { dir, version: newest }
-}
-
-function compareVersions(a: string, b: string): number {
-  const left = a.split('.').map(Number)
-  const right = b.split('.').map(Number)
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0)
-    if (difference !== 0) return difference
-  }
-  return 0
-}
-
-function failure(step: Exclude<ImportStep, 'ok'>, details: string): SlackAppRead {
+export function failure(step: Exclude<ImportStep, 'ok'>, details: string): SlackAppRead {
   switch (step) {
     case 'not-installed':
       return { ok: false, kind: 'no-slack-app', message: NOT_INSTALLED, details }
@@ -354,7 +215,7 @@ function failure(step: Exclude<ImportStep, 'ok'>, details: string): SlackAppRead
   }
 }
 
-function stepOf(cause: unknown, keychain: ReadonlyArray<KeychainAttempt>): Exclude<ImportStep, 'ok'> {
+export function stepOf(cause: unknown, keychain: ReadonlyArray<KeychainAttempt>): Exclude<ImportStep, 'ok'> {
   if (!(cause instanceof SlackAppImportError)) return 'unreadable'
   switch (cause.reason) {
     case 'no-local-config':
@@ -402,6 +263,6 @@ async function readSlackBundle(paths: ReadonlyArray<string>): Promise<SlackBundl
   return undefined
 }
 
-function errorName(cause: unknown): string {
+export function errorName(cause: unknown): string {
   return cause instanceof Error ? cause.name : typeof cause
 }

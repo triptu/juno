@@ -16,8 +16,8 @@ import { scanLevelDb } from './leveldb.ts'
 import { localConfigFromRecords, pickTeam, teamCount, type LocalConfigTeam } from './localConfig.ts'
 import { COOKIES_FILES, LOCAL_STORAGE_DIR } from './locate.ts'
 
-export { macCookieKey, windowsCookieKey, type CookieKey, type SlackCookie } from './cookies.ts'
-export { LOCAL_STATE_FILE, readProtectedCookieKey } from './localState.ts'
+export { windowsCookieKey, type CookieKey, type SlackCookie } from './cookies.ts'
+export { readProtectedCookieKey } from './localState.ts'
 
 export { LocalConfigTeam } from './localConfig.ts'
 export { snappyUncompress } from './snappy.ts'

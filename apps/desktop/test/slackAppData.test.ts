@@ -7,8 +7,9 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { writeSlackAppFixture } from '@juno/fake-slack'
 import { slackAppCandidates, windowsSlackAppCandidates } from '@juno/slack/import'
-import { NEXT_KEYCHAIN, NO_COOKIE_KEY, NO_KEYCHAIN, NOT_INSTALLED, NOT_INSTALLED_WINDOWS, readSlackApp, securityKeychain, SIGNED_OUT, UNREADABLE, WRONG_KEYCHAIN, type SlackKeychain } from '../src/main/slackAppData'
+import { NEXT_KEYCHAIN, NO_KEYCHAIN, NOT_INSTALLED, readSlackApp, securityKeychain, SIGNED_OUT, UNREADABLE, WRONG_KEYCHAIN, type SlackKeychain } from '../src/main/slackAppData'
 import type { SecurityRunner } from '../src/main/keychain'
+import { NO_COOKIE_KEY, NOT_INSTALLED_WINDOWS, readWindowsSlackApp } from '../src/main/slackAppDataWindows'
 
 const homes: Array<string> = []
 afterEach(async () => {
@@ -315,8 +316,7 @@ describe('readSlackApp on Windows', () => {
 
   async function readOnWindows(root: string, localAppData: string, candidates: ReturnType<typeof windowsSlackAppCandidates>, unprotect = (blob: Buffer) => flip(blob) as Buffer | undefined) {
     const logs: Array<string> = []
-    const result = await readSlackApp({
-      os: 'windows',
+    const result = await readWindowsSlackApp({
       candidates,
       unprotect,
       installDir: join(localAppData, 'slack'),
