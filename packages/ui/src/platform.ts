@@ -71,12 +71,19 @@ export function shortcutLabel(accelerator: string, platform: KeyPlatform): strin
   const order = mac ? macOrder : windowsOrder
   const parts = accelerator.split('+').map((part) => names[part] ?? part)
   const key = parts.at(-1) ?? ''
-  const modifiers = parts.slice(0, -1).toSorted((a, b) => order.indexOf(a) - order.indexOf(b))
+  const modifiers = [...new Set(parts.slice(0, -1))].toSorted((a, b) => order.indexOf(a) - order.indexOf(b))
   return mac ? [...modifiers, key].join('') : [...modifiers, key].join('+')
 }
 
 /** An accelerator as this platform writes it ("⌘K" or "Ctrl+K"). */
 export const shortcutKeys = (accelerator: string): string => shortcutLabel(accelerator, keyPlatform)
+
+/**
+ * A label the Mac has always written by hand, in another order than the
+ * menu's ("⌘⇧T" where the menu shows "⇧⌘T"): the Mac keeps it, and Windows
+ * writes the accelerator its own way.
+ */
+export const handWrittenKeys = (mac: string, accelerator: string): string => (keyPlatform === 'mac' ? mac : shortcutLabel(accelerator, keyPlatform))
 
 /** A shortcut label as keycaps: "⌃⌘S" is ⌃, ⌘, S; "Ctrl+Shift+S" is Ctrl, Shift, S. */
 export function keycaps(keys: string): ReadonlyArray<string> {

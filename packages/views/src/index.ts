@@ -96,7 +96,7 @@ export { TopicArt } from '@juno/ui'
 export { TooltipLayer } from '@juno/ui'
 // Keys typed while focus is on its way: after ⌘N and ⌘T, until Home's field or search has it.
 export { holdKeys, releaseKeys } from '@juno/ui'
-export { commandKey, isWindows, keyPlatform, otherCommandKey, shortcutKeys, systemWords } from '@juno/ui'
+export { commandKey, handWrittenKeys, isWindows, keyPlatform, otherCommandKey, shortcutKeys, systemWords } from '@juno/ui'
 export { menuKeys } from './keys'
 export { NotificationsPage, type NotificationsAnchor } from './NotificationsPage'
 export type { ProposedInstruction } from './NotificationDetails'

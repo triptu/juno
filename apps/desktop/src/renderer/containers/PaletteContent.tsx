@@ -25,11 +25,11 @@
  * after the first paint.
  */
 import { useDeferredValue, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ConversationKind, PaletteCommand, PickConversation, SearchPerson, SearchResult } from '@juno/contract'
+import { menuShortcuts, type ConversationKind, type PaletteCommand, type PickConversation, type SearchPerson, type SearchResult } from '@juno/contract'
 import { COMMAND_DELAY_MS, nowAtom, PALETTE_RECENT, PALETTE_RESULTS, paletteConversationsAtom, paletteTabAtom, readCommand, registry, searchAtom, sendMessage, showToast, type OpenOptions, type Registry } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
-import { CommandPalette, menuKeys, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab, shortcutKeys } from '@juno/views'
+import { CommandPalette, handWrittenKeys, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab, shortcutKeys } from '@juno/views'
 import { newChannelName, openNewChannel } from './channelActions'
 import { junoCommands, openJunoTab } from './juno/actions'
 import { newMessage, openTopic, openTopicAt, warmTopic } from './navigation'
@@ -370,7 +370,7 @@ export function OpenPalette() {
 const SEARCH_ROW = 'search-all'
 
 /** "All results for …", with ⌘⇧F, which does the same. */
-const searchRow = (text: string): PaletteItem => ({ id: SEARCH_ROW, icon: 'search', label: `All results for “${text}”`, shortcut: menuKeys('search.open') })
+const searchRow = (text: string): PaletteItem => ({ id: SEARCH_ROW, icon: 'search', label: `All results for “${text}”`, shortcut: handWrittenKeys('⌘⇧F', menuShortcuts['search.open']) })
 
 /**
  * A one-shot answer for the text, asked once typing pauses for `delay`.
