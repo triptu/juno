@@ -9,6 +9,7 @@
  *
  * SPEC §17 applies: sentence case, verb-first buttons, no emoji.
  */
+import { computer } from './computer'
 import { filesLeftCopy } from './files'
 import { junoAskCopy, junoPageTitles, junoPanelCopy, personFileMissing, listedSources } from './shellCopy'
 
@@ -80,10 +81,10 @@ export const chatCopy = {
       missingKey: 'Add an OpenRouter key in Settings to send this message.',
       rateLimited: 'The provider is busy. Your message is kept. Try again shortly.',
       keyRejected: 'OpenRouter rejected the key. Check it in Settings.',
-      codexMissing: 'Codex is not installed on this Mac. Install Codex and try again.',
+      codexMissing: `Codex is not installed on this ${computer}. Install Codex and try again.`,
       codexQuota: 'Codex has used the available ChatGPT quota. Try again when it resets.',
       codexCrash: 'Codex stopped before finishing. Check any action cards before trying again.',
-      codexSignedOut: 'Codex is signed out on this Mac. Sign in to Codex and try again.',
+      codexSignedOut: `Codex is signed out on this ${computer}. Sign in to Codex and try again.`,
       offline: 'Juno lost the connection. Try again when you are back online.',
     },
     tryAgain: 'Try again',
@@ -108,7 +109,7 @@ export const chatCopy = {
     offline: { chip: "You're offline", line: "You're offline. Juno shows what it has and catches up when you're back." },
     recovery: { chip: 'Juno restored from backup', line: "Juno restored from backup. It won't act until you check pending actions.", review: 'Review' },
     updateNeeded: { chip: 'Juno needs an update', line: 'Juno needs to update its records before it can run. Nothing is lost.' },
-    otherDevice: { chip: 'Juno is on your other Mac', line: 'Juno is working on your other Mac.' },
+    otherDevice: { chip: `Juno is on your other ${computer}`, line: `Juno is working on your other ${computer}.` },
   },
   card: {
     /** The header's kind label, by card `_tag`. A `question` card's header is its asker instead. */
@@ -301,7 +302,7 @@ export const chatCopy = {
    */
   providers: {
     noneTitle: 'Juno needs a model',
-    noneBody: 'Juno runs on a model provider you choose: OpenRouter, or a model on this Mac or another OpenAI-compatible service.',
+    noneBody: `Juno runs on a model provider you choose: OpenRouter, or a model on this ${computer} or another OpenAI-compatible service.`,
     add: 'Add a provider',
     heading: 'Provider',
     sub: 'Juno uses one at a time. Keys stay in your keychain.',
@@ -438,7 +439,7 @@ export const chatCopy = {
       ended: { done: 'Done', failed: 'Failed', unknown: "Can't tell", pending: 'Pending', cancelled: 'Cancelled', refused: 'Refused', unfinished: 'Did not finish' },
     },
     memory: {
-      subtitle: 'What Juno keeps of the conversation, as a summary that grows denser with age. The full text stays on this Mac.',
+      subtitle: `What Juno keeps of the conversation, as a summary that grows denser with age. The full text stays on this ${computer}.`,
       empty: { title: 'Nothing summarised yet', body: 'Juno summarises the chat as it grows. Recent messages are kept in full.' },
       label: 'Memory',
       beingUpdated: 'being updated',
@@ -463,7 +464,7 @@ export const chatCopy = {
       /** Shown when no trusted deletion record checked the backup (SPEC 13.8). */
       unchecked: "Juno can't check that this backup is the newest. If the folder is out of date, messages you removed may come back. You can remove them again.",
       /** "Move code 7KQ2-M9XA. Check that your other Mac shows the same code." */
-      moveCode: (code: string) => `Move code ${code}. Check that your other Mac shows the same code.`,
+      moveCode: (code: string) => `Move code ${code}. Check that your other ${computer} shows the same code.`,
     },
     settings: {
       /** "Removal pending · 1 copy in a running job". */
@@ -475,47 +476,47 @@ export const chatCopy = {
       /** Under the rules when the agent refused the list. */
       rulesInvalid: 'Each rule is one line, a sentence or two, and there are at most 20.',
       exportPhrase: 'Export recovery phrase',
-      move: 'Move to another Mac',
+      move: `Move to another ${computer}`,
       restore: 'Restore from backup',
-      attest: 'Confirm the old Mac is off, erased, or has Juno removed. Juno cannot check this.',
+      attest: `Confirm the old ${computer} is off, erased, or has Juno removed. Juno cannot check this.`,
       /** Who owns Juno's state, by `Ownership`: the chip, then the line beside it. */
       owner: {
-        active: { chip: 'Active here', line: 'This Mac owns Juno’s state.' },
-        moving: { chip: 'Moving', line: 'Writing the final backup. This Mac is read-only.' },
-        moved: { chip: 'Moved', line: (code: string) => `Move code ${code}. Restore from this backup on your other Mac and check that it shows the same code.` },
-        otherMac: { chip: 'Another Mac', line: (name: string) => `Juno is working on ${name === '' ? 'your other Mac' : name}. This Mac is read-only.` },
+        active: { chip: 'Active here', line: `This ${computer} owns Juno’s state.` },
+        moving: { chip: 'Moving', line: `Writing the final backup. This ${computer} is read-only.` },
+        moved: { chip: 'Moved', line: (code: string) => `Move code ${code}. Restore from this backup on your other ${computer} and check that it shows the same code.` },
+        otherMac: { chip: `Another ${computer}`, line: (name: string) => `Juno is working on ${name === '' ? `your other ${computer}` : name}. This ${computer} is read-only.` },
         recovery: { chip: 'Recovery', line: (pending: number) => `Restored from a backup. ${pending === 1 ? '1 action was' : `${pending} actions were`} pending.` },
       },
       /** Shown once after Export recovery phrase. */
       phraseSheet: {
         title: 'Your recovery phrase',
-        body: 'It opens your backup on another Mac. Juno shows it only this once, so keep it in your password manager.',
+        body: `It opens your backup on another ${computer}. Juno shows it only this once, so keep it in your password manager.`,
         copy: 'Copy',
         copied: 'Copied',
         done: 'Done',
       },
       restoreSheet: {
         title: 'Restore from backup',
-        body: 'Juno replaces its state on this Mac with the backup, then waits until you review what was pending.',
+        body: `Juno replaces its state on this ${computer} with the backup, then waits until you review what was pending.`,
         folder: 'Backup folder',
         noFolder: 'No folder chosen',
         choose: 'Choose folder',
         phrase: 'Recovery phrase',
-        phraseNote: 'Needed on a new Mac. Leave it empty on the Mac that made the backup.',
+        phraseNote: `Needed on a new ${computer}. Leave it empty on the ${computer} that made the backup.`,
         phraseInvalid: 'That is not a recovery phrase. Check it and try again.',
-        attest: 'The old Mac is off, erased, or has Juno removed',
-        attestNote: 'Juno cannot check this. If Juno is still running on the old Mac, both Macs can act until it sees this Mac’s backup, which happens only if they share a backup folder.',
+        attest: `The old ${computer} is off, erased, or has Juno removed`,
+        attestNote: `Juno cannot check this. If Juno is still running on the old ${computer}, both ${computer}s can act until it sees this ${computer}’s backup, which happens only if they share a backup folder.`,
         restore: 'Restore',
         cancel: 'Cancel',
       },
       moveSheet: {
-        title: 'Move to another Mac',
-        body: 'Juno finishes what is running, makes this Mac read-only and writes a final backup. Then restore from that backup on your other Mac.',
+        title: `Move to another ${computer}`,
+        body: `Juno finishes what is running, makes this ${computer} read-only and writes a final backup. Then restore from that backup on your other ${computer}.`,
         move: 'Move',
         cancel: 'Cancel',
       },
       allowNetwork: 'Allow T3 Code over the local network',
-      allowNetworkNote: 'Tries this Mac first. Network sign-in may require https.',
+      allowNetworkNote: `Tries this ${computer} first. Network sign-in may require https.`,
     },
     connections: {
       intro: "Where Juno can read and act. Reads run on their own. Before anything else, Juno checks how clearly you asked and whether it can be undone, and asks you when it can't tell.",
@@ -545,7 +546,7 @@ export const chatCopy = {
       address: 'Address',
       addButton: 'Add',
       t3Address: 'T3 Code address',
-      invalidAddress: 'Use an https address, or http on this Mac.',
+      invalidAddress: `Use an https address, or http on this ${computer}.`,
       failed: 'That did not work. Check the connection and try again.',
     },
   },
