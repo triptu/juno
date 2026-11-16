@@ -11,7 +11,19 @@
  * `Cookies` on older; Slack's own main process prefers `Network/Cookies` when
  * it exists. Both builds name the keychain item "Slack Safe Storage" (from
  * the app name; Slack's own App Store to direct migration copies the cookie
- * file across unchanged). Only file names and times are read here.
+ * file across unchanged).
+ *
+ * On Windows (checked against Slack 4.53 and Slack's deployment guide):
+ *
+ * - `direct`: the installer from slack.com (per user, or the MSI per machine),
+ *   app in `%LOCALAPPDATA%\slack\app-<version>`, data in `%APPDATA%\Slack`.
+ * - `msix`: the MSIX package, data in
+ *   `%LOCALAPPDATA%\Packages\com.tinyspeck.slackdesktop_8yrtsj140pw4g\LocalCache\Roaming\Slack`.
+ * - `microsoft-store`: the older Microsoft Store package, data in
+ *   `%LOCALAPPDATA%\Packages\91750D7E.Slack_8she8kybcnzg4\LocalCache\Roaming\Slack`.
+ *
+ * The layout inside is the same, plus `Local State`, which holds the cookie
+ * key (`localState.ts`). Only file names and times are read here.
  */
 import { cp, mkdir, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -21,13 +33,13 @@ export const LOCAL_STORAGE_DIR = join('Local Storage', 'leveldb')
 export const COOKIES_FILES = [join('Network', 'Cookies'), 'Cookies'] as const
 export type CookiesFile = (typeof COOKIES_FILES)[number]
 
-export type SlackAppVariant = 'direct' | 'app-store'
+export type SlackAppVariant = 'direct' | 'app-store' | 'msix' | 'microsoft-store'
 
 export interface SlackAppCandidate {
   readonly variant: SlackAppVariant
   readonly dir: string
-  /** The keychain service holding the cookie encryption password. */
-  readonly keychainService: string
+  /** The Mac keychain service holding the cookie encryption password. Undefined on Windows. */
+  readonly keychainService?: string
 }
 
 export const KEYCHAIN_SERVICE = 'Slack Safe Storage'
@@ -41,6 +53,16 @@ export function slackAppCandidates(home: string): ReadonlyArray<SlackAppCandidat
       dir: join(home, 'Library', 'Containers', 'com.tinyspeck.slackmacgap', 'Data', 'Library', 'Application Support', 'Slack'),
       keychainService: KEYCHAIN_SERVICE,
     },
+  ]
+}
+
+/** The places Slack for Windows keeps its data, the installer's first. */
+export function windowsSlackAppCandidates({ appData, localAppData }: { readonly appData: string; readonly localAppData: string }): ReadonlyArray<SlackAppCandidate> {
+  const packaged = (family: string) => join(localAppData, 'Packages', family, 'LocalCache', 'Roaming', 'Slack')
+  return [
+    { variant: 'direct', dir: join(appData, 'Slack') },
+    { variant: 'msix', dir: packaged('com.tinyspeck.slackdesktop_8yrtsj140pw4g') },
+    { variant: 'microsoft-store', dir: packaged('91750D7E.Slack_8she8kybcnzg4') },
   ]
 }
 

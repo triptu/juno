@@ -11,7 +11,8 @@ function failureLine(error: SignInFailed): string {
     case 'no-token':
       return 'Juno could not read the Slack app’s session. Open Slack, sign in there, then try again.'
     case 'no-slack-app':
-      return 'Slack isn’t installed on this Mac. Install Slack, sign in to it, then try again.'
+      // Main's line names this Mac or this PC.
+      return error.message
     case 'slack-signed-out':
       return 'Slack is installed but not signed in. Open Slack, sign in there, then try again.'
     case 'keychain':

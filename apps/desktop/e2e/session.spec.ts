@@ -147,7 +147,8 @@ test('sign-in: the preload and a second launch, importing the Slack app’s sess
       await juno.expectSignedIn('Juno Fake')
       // The engine verified the session with the captured token and cookie...
       expect(fake.callCount('auth.test')).toBe(1)
-      expect(await juno.slackKeychainReads()).toBe(1)
+      // Windows has no keychain to ask.
+      expect(await juno.slackKeychainReads()).toBe(process.platform === 'win32' ? 0 : 1)
       expect(fake.calls.find((call) => call.method === 'auth.test')?.ok).toBe(true)
       // ...and holds a socket open through main's cookie handshake.
       await expect.poll(() => fake.socketCount(), { timeout: 10_000 }).toBe(1)
