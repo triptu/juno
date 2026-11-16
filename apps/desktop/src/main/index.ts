@@ -1,6 +1,6 @@
 // Must run before any module captures a test switch.
 import './environment'
-import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, safeStorage, session as electronSession, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, Notification, powerMonitor, safeStorage, session as electronSession, shell, type Tray } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
 import { createDockBadge, createDockBounce } from './dockBadge'
@@ -37,6 +37,8 @@ import { appWindow, createMainWindow, refreshTitleBar } from './window'
 app.enableSandbox()
 
 const windows = process.platform === 'win32'
+/** The Windows tray icon, once made; closing the window hides to it. */
+let tray: Tray | undefined
 // Before any notification: Windows shows toasts only for an app it knows by this id (taskbar.ts).
 if (windows) app.setAppUserModelId(APP_USER_MODEL_ID)
 
@@ -322,7 +324,13 @@ app.whenReady().then(() => {
   setMenuCheckForUpdates(() => void updates.check())
   updates.start()
   // On Windows Juno keeps running in the notification area after its window closes, as the Dock keeps it on the Mac.
-  if (windows) void createTray(() => void focusWindow())
+  // Held here: Electron removes a tray it can garbage-collect. Without a tray, closing the window quits.
+  if (windows) {
+    createTray(() => void focusWindow()).then(
+      (created) => (tray = created),
+      (cause: unknown) => console.warn('main: no tray icon, closing the window will quit', cause),
+    )
+  }
 
   // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open,
   // and shows again after a close hid it for a huddle.
@@ -360,7 +368,7 @@ function openWindow(): BrowserWindow {
     // Closing the window while in a huddle hides it; the huddle goes on, and the Dock icon brings it back
     // (SPEC 20, "Quitting"). On Windows it always hides, and the tray icon brings it back. A quit closes it
     // for good, after its own question.
-    if (huddleQuit.hidesOnClose() || (windows && !quitting)) {
+    if (huddleQuit.hidesOnClose() || (tray !== undefined && !quitting)) {
       event.preventDefault()
       window.hide()
     }
@@ -369,9 +377,9 @@ function openWindow(): BrowserWindow {
   return window
 }
 
-// The Mac keeps running in the Dock and Windows in the tray; elsewhere (Linux, tests only) the last window quits.
+// The Mac keeps running in the Dock and Windows in the tray; elsewhere (Linux, tests only), or on Windows without a tray, the last window quits.
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin' && !windows) app.quit()
+  if (process.platform !== 'darwin' && tray === undefined) app.quit()
 })
 
 /** The engine finishing its last requests as the app quits; undefined once it has exited. */
