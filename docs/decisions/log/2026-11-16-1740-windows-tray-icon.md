@@ -1,0 +1,1 @@
+- 11-16 17:40 · Windows tray icon · The tray icon is Juno's icon at 16, 24 and 32 px, shipped as `tray*.png` resources, not the executable's icon · On a Windows Server 2022 install `app.getFileIcon` on Juno.exe gave Windows' generic program icon, so the tray showed no Juno mark.

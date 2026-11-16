@@ -53,10 +53,14 @@ export function showUnreadOverlay(window: BrowserWindow | undefined, text: strin
   else window.setOverlayIcon((dot ??= drawDot()), 'Unread messages')
 }
 
-/** The packaged app's own icon, from its executable; Electron's would show in development, so the build's icon there. */
+/**
+ * Juno's icon at 16, 24 and 32 px (`build/tray*.png`, shipped as resources); Electron picks the size for the
+ * screen's scale. `app.getFileIcon` on the executable gave Windows' generic program icon.
+ */
 async function trayIcon(): Promise<NativeImage> {
-  if (app.isPackaged) return app.getFileIcon(process.execPath, { size: 'normal' })
-  return nativeImage.createFromPath(join(__dirname, '../../build/icon.png')).resize({ width: 32, height: 32, quality: 'best' })
+  const image = nativeImage.createFromPath(join(app.isPackaged ? process.resourcesPath : join(__dirname, '../../build'), 'tray.png'))
+  if (image.isEmpty()) throw new Error('tray.png did not load')
+  return image
 }
 
 /** The tray icon: a click opens the window, and its menu has Open and Quit. */

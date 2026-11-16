@@ -43,6 +43,12 @@ win:
       arch: x64
   # electron-builder makes the .ico from this 1024 px PNG.
   icon: build/icon.png
+  # The tray icon at 16, 24 and 32 px (main/taskbar.ts).
+  extraResources:
+    - from: build
+      to: .
+      filter:
+        - "tray*.png"
   # Windows names its locale packs en-US.pak and en-GB.pak; the macOS list above would delete both.
   electronLanguages:
     - en-US
