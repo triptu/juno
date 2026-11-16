@@ -284,14 +284,14 @@ The M4 benchmark opens a cached topic with 300 messages (20 % with image attachm
 Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows, thread links) runs on `pointerdown`, not `click`. The press and the open are the same frame. Rules:
 
 - Only `button === 0`, `pointerType !== 'touch'` is irrelevant on macOS but the handler checks `isPrimary`.
-- `ctrlKey` on macOS is a context-menu click: ignore it. Button 2 and the context-menu key open the menu, never navigate.
-- `metaKey` opens in a new tab on `pointerdown` too; `shiftKey` and `altKey` do nothing in v1 (reserved).
+- `ctrlKey` on the Mac is a context-menu click: ignore it there (`contextClick`). On Windows Ctrl is the command key. Button 2 and the context-menu key open the menu, never navigate.
+- The command key (⌘ on the Mac, Ctrl on Windows, `commandKey`) opens in a new tab on `pointerdown` too; `shiftKey` and `altKey` do nothing in v1 (reserved).
 - The target must not be inside a nested control (`closest('button, a, input, [data-no-activate]')`), so the tab close button, links and rename inputs are not swallowed.
 - Rows are not draggable, so there is nothing to cancel. Tabs are: as in Safari, a tab activates on mousedown and still drags once the pointer has moved 4px. The drag reads the tabs' places once, then writes only `transform` on the moved tabs once per animation frame, so no tab re-renders and nothing lays out while the pointer moves; the order commits once, on drop (inventory 4, "Reorder").
 - `onClick` still exists for assistive technology, which synthesises `click` with `detail === 0`. A real click (`detail !== 0`) is ignored because `pointerdown` already activated; a touch press waits for its click. This is `activateHandlers` in `packages/ui/src/internal/activate.ts`.
 - Keyboard activation is on `keydown` of Enter or Space (Space on `keyup` for `role="button"`, to match native buttons, but navigation rows use `keydown` for Enter). A held key's auto-repeat (`event.repeat`) does not activate again.
 
-Menu and popover buttons use `menuTriggerHandlers` in `@juno/ui`: primary mouse `pointerdown` opens or toggles them, ignoring ctrl-click and the following mouse click. Enter, Space, ↓, assistive clicks and touch clicks still work. Preventing the mouse-down default keeps focus inside the newly opened panel. Custom popovers do not select an item on the opening press's release; native menus keep the system's drag selection.
+Menu and popover buttons use `menuTriggerHandlers` in `@juno/ui`: primary mouse `pointerdown` opens or toggles them, ignoring ctrl-click on the Mac and the following mouse click. Enter, Space, ↓, assistive clicks and touch clicks still work. Preventing the mouse-down default keeps focus inside the newly opened panel. Custom popovers do not select an item on the opening press's release; native menus keep the system's drag selection.
 
 ### 4.2 Prefetch
 
