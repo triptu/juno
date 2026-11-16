@@ -10,17 +10,23 @@ import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 
 test('packaged app signs in and starts both utility processes @mac', async () => {
   test.setTimeout(180_000)
-  const executable = process.env.JUNO_PACKAGED_EXECUTABLE ?? resolve('release/mac-arm64/Juno.app/Contents/MacOS/Juno')
-  const appPath = resolve(executable, '../../..')
-  let signature = ''
-  // codesign writes its description to stderr, even on success.
-  const inspection = spawn('codesign', ['-dvv', appPath], { stdio: ['ignore', 'ignore', 'pipe'] })
-  inspection.stderr.setEncoding('utf8').on('data', (chunk: string) => { signature += chunk })
-  await once(inspection, 'exit')
-  if (!signature.includes('Authority=Developer ID Application:')) {
-    execFileSync('codesign', ['-s', '-', '--force', '--deep', '--preserve-metadata=entitlements,requirements,flags,runtime', appPath], { stdio: 'pipe' })
+  const windows = process.platform === 'win32'
+  // On Windows this is the per-user NSIS install (docs/development.md, "Windows build").
+  const executable = process.env.JUNO_PACKAGED_EXECUTABLE ?? (windows
+    ? join(process.env.LOCALAPPDATA ?? '', 'Programs', 'juno', 'Juno.exe')
+    : resolve('release/mac-arm64/Juno.app/Contents/MacOS/Juno'))
+  const appPath = windows ? executable : resolve(executable, '../../..')
+  if (!windows) {
+    let signature = ''
+    // codesign writes its description to stderr, even on success.
+    const inspection = spawn('codesign', ['-dvv', appPath], { stdio: ['ignore', 'ignore', 'pipe'] })
+    inspection.stderr.setEncoding('utf8').on('data', (chunk: string) => { signature += chunk })
+    await once(inspection, 'exit')
+    if (!signature.includes('Authority=Developer ID Application:')) {
+      execFileSync('codesign', ['-s', '-', '--force', '--deep', '--preserve-metadata=entitlements,requirements,flags,runtime', appPath], { stdio: 'pipe' })
+    }
+    execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'pipe' })
   }
-  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'pipe' })
   const fuses = await getCurrentFuseWire(appPath)
   for (const fuse of [FuseV1Options.RunAsNode, FuseV1Options.EnableNodeOptionsEnvironmentVariable, FuseV1Options.EnableNodeCliInspectArguments]) {
     expect(fuses[fuse]).toBe('0'.charCodeAt(0))
@@ -74,6 +80,7 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
           if (!page) throw new Error('Packaged app did not open its main window')
           if (pass === 0) {
             await expect(page.getByRole('button', { name: "Use the Slack app's session", exact: true })).toBeVisible()
+            await page.screenshot({ path: test.info().outputPath('packaged-sign-in.png') })
             await page.getByRole('button', { name: "Use the Slack app's session", exact: true }).click()
           }
           await expect(page.getByRole('complementary', { name: 'Sidebar' }).getByRole('listitem').first()).toBeVisible({ timeout: 20_000 })
@@ -119,7 +126,7 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
     }
     expect(JSON.parse(await readFile(join(userData, 'agent', 'codemode-probe.json'), 'utf8'))).toEqual({ ok: true, value: 12 })
     // koffi's .node is unpacked from the asar and loads in the signed app; SkyLight's name resolves.
-    expect(JSON.parse(await readFile(join(userData, 'screen-watch-probe.json'), 'utf8'))).toEqual({ symbol: 'SLSIsScreenWatcherPresent', value: 'boolean' })
+    if (!windows) expect(JSON.parse(await readFile(join(userData, 'screen-watch-probe.json'), 'utf8'))).toEqual({ symbol: 'SLSIsScreenWatcherPresent', value: 'boolean' })
     expect(timings).toHaveLength(5)
     const sorted = timings.toSorted((a, b) => a - b)
     const report = { samplesMs: timings, medianMs: sorted[2], minMs: sorted[0], maxMs: sorted[4] }
