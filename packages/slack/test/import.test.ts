@@ -5,12 +5,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { writeSlackAppFixture } from '@juno/fake-slack'
+import { decryptCookieValue } from '../src/import/cookies.ts'
 import {
   locateSlackAppData,
   readSlackAppSession,
   slackAppCandidates,
   SlackAppImportError,
   snappyUncompress,
+  windowsCookieKey,
 } from '../src/import/index.ts'
 
 const dirs: Array<string> = []
@@ -175,5 +177,32 @@ describe('snappyUncompress', () => {
     // length 5; literal "a"; copy of 4 bytes from offset 1 (a run).
     const run = Uint8Array.from([0x05, 0x00, 0x61, 0x01, 0x01])
     expect(Buffer.from(snappyUncompress(run)).toString()).toBe('aaaaa')
+  })
+})
+
+describe('Windows cookies', () => {
+  const key = Buffer.from('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f', 'hex')
+
+  it('decrypts a v10 AES-256-GCM value: 12-byte nonce, ciphertext, tag, and the host hash stripped', () => {
+    // Made once with Node's AES-256-GCM: nonce a0..ab, plaintext sha256(".slack.com") + "xoxd-known-vector".
+    const value = Buffer.from(
+      '763130a0a1a2a3a4a5a6a7a8a9aaab77040f69e89728f10a9682ec1fb4f3606f05f9e465ddd188a04a7a00166cd779aa193f9b82493d5228f229be6c19f7963519f076b2c2967d19a3827c5747f43064',
+      'hex',
+    )
+    expect(decryptCookieValue(value, '.slack.com', windowsCookieKey(key))).toBe('xoxd-known-vector')
+    // A flipped tag byte is a wrong key, never garbage.
+    value[value.length - 1]! ^= 1
+    expect(() => decryptCookieValue(value, '.slack.com', windowsCookieKey(key))).toThrow()
+  })
+
+  it('says app-bound when every d cookie is v20, before asking for a key', async () => {
+    const dir = await fixture({ team, cookie: 'c', keychainPassword: '', windows: { key, protectedKey: key, version: 'v20' } })
+    let asked = false
+    const cookieKey = async () => {
+      asked = true
+      return windowsCookieKey(key)
+    }
+    await expect(readSlackAppSession({ dir, cookieKey })).rejects.toMatchObject(new SlackAppImportError('app-bound'))
+    expect(asked).toBe(false)
   })
 })

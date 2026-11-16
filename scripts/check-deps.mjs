@@ -216,8 +216,9 @@ const thirdParty = [
   { label: 'the Chime SDK', spec: /^amazon-chime-sdk-js(?:\/|$)/, allow: ['packages/huddle-media/src/chime/', 'packages/huddle-media/test/'], doc: 'packages/huddle-media/README.md' },
   { label: 'pi-mcp', spec: /^@earendil-works\/pi-mcp(?:\/|$)/, allow: ['packages/agent/src/mcp/', 'packages/agent-testing/'] },
   // koffi (ADR 0015): a native FFI module in main, for the private window-server call that tells
-  // Juno the screen is shared, and for macOS's notification permission. Keep it to those files.
-  { label: 'koffi', spec: /^koffi(?:\/|$)/, allow: ['apps/desktop/src/main/screenWatch.ts', 'apps/desktop/src/main/notificationPermission.ts'], doc: 'docs/decisions/0015-koffi-for-screen-share-detection.md' },
+  // Juno the screen is shared, for macOS's notification permission, and for Windows' DPAPI (the Slack
+  // import's cookie key). Keep it to those files.
+  { label: 'koffi', spec: /^koffi(?:\/|$)/, allow: ['apps/desktop/src/main/screenWatch.ts', 'apps/desktop/src/main/notificationPermission.ts', 'apps/desktop/src/main/dpapi.ts'], doc: 'docs/decisions/0015-koffi-for-screen-share-detection.md' },
   {
     label: 'pi-ai and the Codex SDK',
     spec: /^(?:@earendil-works\/pi-ai|@openai\/codex-sdk)(?:\/|$)/,

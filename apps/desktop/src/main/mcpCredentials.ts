@@ -1,8 +1,8 @@
 /**
  * The keychain and browser bridge for Juno Agent's MCP connections (WP17).
  * The agent's MCP manager asks for a connection's OAuth state by id
- * (`CredentialRequest`); main keeps it in the login keychain and nowhere
- * else: never a file, a log or the renderer.
+ * (`CredentialRequest`); main keeps it in the app's keychain (`keychain.ts`)
+ * and nowhere else: never a plain file, a log or the renderer.
  *
  * A state is JSON (tokens, the dynamic client registration, PKCE verifier).
  * `security -i` reads one line of at most about 4 KB, so the state goes in
@@ -22,7 +22,7 @@
  * loopback callback.
  */
 import type { CredentialRequest } from '@juno/agent-contract'
-import { macKeychain, memoryKeychain, type Keychain, type KeychainItem } from './keychain'
+import type { Keychain, KeychainItem } from './keychain'
 
 export const MCP_SERVICE = 'juno-mcp'
 const CHUNK = 3000
@@ -108,18 +108,14 @@ export function isAuthorizationUrl(url: string): boolean {
   }
 }
 
-/** The app's bridge: the login keychain and the system browser, or memory and a fetch under tests. */
-export function appMcpCredentials(e2e: boolean, openExternal: (url: string) => Promise<void>) {
-  if (!e2e) return mcpCredentials({ keychain: (item) => macKeychain(item), open: openExternal })
-  const items = new Map<string, Keychain>()
+/** The app's bridge: the app's keychain (`appKeychains`) and the system browser, or a fetch under tests. */
+export function appMcpCredentials(e2e: boolean, keychain: (item: KeychainItem) => Keychain, openExternal: (url: string) => Promise<void>) {
   return mcpCredentials({
-    keychain: ({ account }) => {
-      let found = items.get(account)
-      if (!found) items.set(account, (found = memoryKeychain()))
-      return found
-    },
-    open: async (url) => {
-      await fetch(url)
-    },
+    keychain,
+    open: e2e
+      ? async (url) => {
+          await fetch(url)
+        }
+      : openExternal,
   })
 }

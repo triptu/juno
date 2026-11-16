@@ -20,6 +20,8 @@
  * again. When the one password asked for does not unlock the cookie and
  * another item is left, the import stops and says so: the next press asks
  * for that item. A refusal is not kept; pressing the button again asks again.
+ *
+ * Windows reads the same way without a keychain (`slackAppDataWindows.ts`).
  */
 import { existsSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
@@ -49,6 +51,7 @@ export const NO_KEYCHAIN = 'Juno could not read the Slack keychain item. Try aga
 export const WRONG_KEYCHAIN = 'The Slack keychain item did not unlock the session cookie. Open Slack, sign in there, then try again.'
 export const NEXT_KEYCHAIN = 'That Slack keychain item did not unlock the session cookie. Use the Slack app’s session again to try the next one.'
 export const UNREADABLE = 'The Slack app’s data could not be read.'
+export const APP_BOUND = 'This version of Slack locks its session so that Juno can’t read it.'
 
 /** Account names Slack's keychain item may have: the app name, and the App Store bundle id. */
 const SLACK_ACCOUNTS = ['Slack', 'com.tinyspeck.slackmacgap']
@@ -110,7 +113,7 @@ export async function readSlackApp(options: ReadSlackAppOptions): Promise<SlackA
   const log = options.log ?? ((line: string) => console.info(line))
   const bundle = await readSlackBundle(options.bundles)
   const keychain: Array<KeychainAttempt> = []
-  const base = { junoVersion: options.junoVersion, macosVersion: options.macosVersion, ...(bundle === undefined ? {} : { bundle }), keychain }
+  const base = { os: 'mac' as const, junoVersion: options.junoVersion, macosVersion: options.macosVersion, ...(bundle === undefined ? {} : { bundle }), keychain }
   const finish = (report: ImportReport): string => {
     const text = formatImportReport(report, options.home)
     log(`main: slack import report\n${text}`)
@@ -126,7 +129,8 @@ export async function readSlackApp(options: ReadSlackAppOptions): Promise<SlackA
   const { data, checked } = location
   const chosen = { variant: data.variant, cookiesFile: data.cookiesFile }
 
-  const services = data.variant === 'app-store' ? await appStoreServices(options.keychain, data.keychainService) : [data.keychainService]
+  const primary = data.keychainService ?? KEYCHAIN_SERVICE
+  const services = data.variant === 'app-store' ? await appStoreServices(options.keychain, primary) : [primary]
   const known = options.known ?? new Map<string, string>()
   let next = 0
   let asked = false
@@ -186,7 +190,7 @@ export async function readSlackApp(options: ReadSlackAppOptions): Promise<SlackA
   }
 }
 
-function failure(step: Exclude<ImportStep, 'ok'>, details: string): SlackAppRead {
+export function failure(step: Exclude<ImportStep, 'ok'>, details: string): SlackAppRead {
   switch (step) {
     case 'not-installed':
       return { ok: false, kind: 'no-slack-app', message: NOT_INSTALLED, details }
@@ -201,12 +205,17 @@ function failure(step: Exclude<ImportStep, 'ok'>, details: string): SlackAppRead
       return { ok: false, kind: 'keychain', message: NO_KEYCHAIN, details }
     case 'decrypt-failed':
       return { ok: false, kind: 'keychain', message: WRONG_KEYCHAIN, details }
+    case 'app-bound':
+      return { ok: false, kind: 'other', message: APP_BOUND, details }
     case 'unreadable':
+    case 'key-missing':
+    case 'key-refused':
+    case 'slack-running':
       return { ok: false, kind: 'other', message: UNREADABLE, details }
   }
 }
 
-function stepOf(cause: unknown, keychain: ReadonlyArray<KeychainAttempt>): Exclude<ImportStep, 'ok'> {
+export function stepOf(cause: unknown, keychain: ReadonlyArray<KeychainAttempt>): Exclude<ImportStep, 'ok'> {
   if (!(cause instanceof SlackAppImportError)) return 'unreadable'
   switch (cause.reason) {
     case 'no-local-config':
@@ -221,6 +230,8 @@ function stepOf(cause: unknown, keychain: ReadonlyArray<KeychainAttempt>): Exclu
       return keychain.some((attempt) => attempt.found) ? 'keychain-refused' : 'keychain-missing'
     case 'no-cookie':
       return 'decrypt-failed'
+    case 'app-bound':
+      return 'app-bound'
   }
 }
 
@@ -252,6 +263,6 @@ async function readSlackBundle(paths: ReadonlyArray<string>): Promise<SlackBundl
   return undefined
 }
 
-function errorName(cause: unknown): string {
+export function errorName(cause: unknown): string {
   return cause instanceof Error ? cause.name : typeof cause
 }

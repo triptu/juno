@@ -52,7 +52,7 @@ async function fakeCodex({ holdStatus = false, loginExits = false }: FakeCodexOp
 
 it('two sign-in clicks run one codex login, and quitting ends it', async () => {
   const codex = await fakeCodex()
-  const home = codexHome(codex.agentDir, codex.executable)
+  const home = codexHome(codex.agentDir, () => codex.executable)
   const first = home.signIn()
   const second = home.signIn()
   await eventually(() => expect(codex.ran()).toContain('login'), { timeout: 5_000 })
@@ -65,7 +65,7 @@ it('two sign-in clicks run one codex login, and quitting ends it', async () => {
 
 it('quitting while the sign-in is still checking the status starts no codex login', async () => {
   const codex = await fakeCodex({ holdStatus: true, loginExits: true })
-  const home = codexHome(codex.agentDir, codex.executable)
+  const home = codexHome(codex.agentDir, () => codex.executable)
   const signingIn = home.signIn()
   await eventually(() => expect(codex.ran()).toContain('login status'), { timeout: 5_000 })
   // The app quits while `codex login status` has not answered yet.

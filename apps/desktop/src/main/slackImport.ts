@@ -1,28 +1,33 @@
 /**
  * Import from the installed Slack app (architecture 14).
  *
- * `slackAppData.ts` finds the install (direct download or Mac App Store),
+ * `slackAppData.ts` finds the install (on the Mac the direct download or the
+ * App Store build; on Windows the installer, MSIX or Microsoft Store build),
  * copies its Local Storage and cookie store to a temp directory and reads the
  * team and `d` cookie from the copy. This module adds the Electron parts: the
- * keychain (`security find-generic-password`, which makes macOS ask the
- * user), the versions for the failure report, and writing the `d` cookie
- * into the `persist:slack` session.
+ * keychain on the Mac (`security find-generic-password`, which makes macOS
+ * ask the user), DPAPI on Windows (`dpapi.ts`, no prompt), the versions for
+ * the failure report, and writing the `d` cookie into the `persist:slack`
+ * session.
  *
  * The passwords macOS gives are kept in memory until Juno quits or signs
  * out, so pressing "Use the Slack app's session" again (after a failure, or
  * a session Slack later expires) does not make macOS ask again.
  *
  * Test seam: `JUNO_SLACK_APP_DIR` points at a fixture directory and
- * `JUNO_SLACK_SAFE_STORAGE_PASSWORD` stands in for the keychain, both read
- * only under `JUNO_E2E`. No value from either path is ever logged.
+ * `JUNO_SLACK_SAFE_STORAGE_PASSWORD` stands in for the Mac's keychain, both
+ * read only under `JUNO_E2E`. On Windows the fixture's `Local State` holds the
+ * key unprotected. No value from either path is ever logged.
  */
 import { app, session as electronSession } from 'electron'
 import { join } from 'node:path'
 import type { SessionSecrets, SignInFailureKind } from '@juno/contract'
-import { KEYCHAIN_SERVICE, slackAppCandidates, type SlackAppCandidate, type SlackCookie } from '@juno/slack/import'
+import { KEYCHAIN_SERVICE, slackAppCandidates, windowsSlackAppCandidates, type SlackAppCandidate, type SlackCookie } from '@juno/slack/import'
+import { loadUnprotect } from './dpapi'
 import { securityRunner } from './keychain'
 import { SLACK_PARTITION } from './slackSession'
 import { fixedKeychain, readSlackApp, securityKeychain, UNREADABLE, type SlackKeychain } from './slackAppData'
+import { readWindowsSlackApp } from './slackAppDataWindows'
 
 export type ImportResult =
   | { readonly ok: true; readonly secrets: SessionSecrets }
@@ -35,9 +40,15 @@ export interface ImportOptions {
   readonly keychainPassword?: string
 }
 
-/** Where the installed Slack app may keep its data: the direct download first, then the App Store sandbox. */
+/** Where the installed Slack app may keep its data, the direct download first. */
 export function defaultSlackCandidates(): ReadonlyArray<SlackAppCandidate> {
+  if (process.platform === 'win32') return windowsSlackAppCandidates({ appData: app.getPath('appData'), localAppData: localAppData() })
   return slackAppCandidates(app.getPath('home'))
+}
+
+/** `%LOCALAPPDATA%`, which Electron has no name for. */
+function localAppData(): string {
+  return process.env.LOCALAPPDATA ?? join(app.getPath('home'), 'AppData', 'Local')
 }
 
 /**
@@ -75,7 +86,7 @@ function counted(keychain: SlackKeychain): SlackKeychain {
 export async function importFromSlackApp(options: ImportOptions = {}): Promise<ImportResult> {
   const home = app.getPath('home')
   const seam = options.slackDir !== undefined
-  const read = await readSlackApp({
+  const read = process.platform === 'win32' ? await readWindows(home, options.slackDir) : await readSlackApp({
     candidates: seam ? [{ variant: 'direct', dir: options.slackDir, keychainService: KEYCHAIN_SERVICE }] : defaultSlackCandidates(),
     keychain: counted(options.keychainPassword === undefined ? securityKeychain(securityRunner(SECURITY_TIMEOUT_MS)) : fixedKeychain(options.keychainPassword)),
     known,
@@ -112,6 +123,33 @@ export async function importFromSlackApp(options: ImportOptions = {}): Promise<I
           }),
     },
   }
+}
+
+/**
+ * Windows: no keychain. Under the test seam the fixture's `Local State` holds
+ * the key itself, so unprotecting it gives it back unchanged.
+ */
+async function readWindows(home: string, slackDir: string | undefined) {
+  if (slackDir !== undefined) {
+    return readWindowsSlackApp({
+      candidates: [{ variant: 'direct', dir: slackDir }],
+      unprotect: (blob) => blob,
+      installDir: slackDir,
+      junoVersion: app.getVersion(),
+      windowsVersion: process.getSystemVersion(),
+      home,
+    })
+  }
+  const unprotect = await loadUnprotect()
+  return readWindowsSlackApp({
+    candidates: defaultSlackCandidates(),
+    // Without koffi the key stays locked, and the report says so.
+    unprotect: unprotect ?? (() => undefined),
+    installDir: join(localAppData(), 'slack'),
+    junoVersion: app.getVersion(),
+    windowsVersion: process.getSystemVersion(),
+    home,
+  })
 }
 
 /** Writes the cookie into the session the engine uses. */
