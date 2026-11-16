@@ -10,7 +10,8 @@ import { createInterface } from 'node:readline'
 const bin = join(process.cwd(), 'node_modules/.bin/electron-vite')
 const groups = [['main', 'preload'], ['renderer']]
 const codes = await Promise.all(groups.map((targets) => new Promise((done) => {
-  const child = spawn(bin, ['build', '--ignoreConfigWarning'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, JUNO_ELECTRON_TARGETS: targets.join(',') } })
+  // On Windows the .bin entry is a .exe or .cmd shim, which only a shell finds.
+  const child = spawn(bin, ['build', '--ignoreConfigWarning'], { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32', env: { ...process.env, JUNO_ELECTRON_TARGETS: targets.join(',') } })
   // Each line keeps its group's name, since the two outputs interleave.
   for (const [stream, out] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) {
     createInterface({ input: stream }).on('line', (line) => out.write(`[${targets[0]}] ${line}\n`))

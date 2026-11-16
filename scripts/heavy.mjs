@@ -11,7 +11,7 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { cpus, loadavg, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
 const queueAt = process.argv[2] === '--queue' ? process.argv[3] : undefined
@@ -118,7 +118,7 @@ const queue = () => readdirSync(queueDir).map((file) => ({ file, job: readJson(j
   .toSorted((a, b) => a.file.localeCompare(b.file))
 const held = []
 const tryAcquire = () => {
-  if (queue()[0]?.file !== ticket.split('/').at(-1)) return undefined
+  if (queue()[0]?.file !== basename(ticket)) return undefined
   if (exclusive) {
     // Existing jobs drain naturally. The queue head prevents new jobs from
     // entering while this exclusive request waits for every slot.
