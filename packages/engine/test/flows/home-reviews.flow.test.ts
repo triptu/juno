@@ -167,3 +167,14 @@ it('old drafts: one untouched for two weeks is proposed with its age and first l
     expect(draftOf('m:C0ENG')).toBeUndefined()
   })
 })
+
+it('old drafts: a draft written in Slack two weeks ago is proposed, and Home keeps answering', async () => {
+  // Slack stamps a draft to the microsecond, so Juno keeps its time with a fraction of a millisecond.
+  const engine = await restart(engines, await syncedEngine(engines), (fake) => {
+    fake.putDraft({ channel: 'C0ENG', text: 'Written on the phone and left', at: fake.now() - 15 * DAY })
+  })
+  const view = await home(engine, (value) => card(value, 'oldDrafts') !== undefined, 'the old drafts card')
+  const main = topicOf(card(view, 'oldDrafts'), 'm:C0ENG')
+  expect(main.draft).toMatchObject({ text: 'Written on the phone and left' })
+  expect(main.draft!.since).toBeGreaterThan(0)
+})

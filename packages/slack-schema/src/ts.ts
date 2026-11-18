@@ -65,10 +65,13 @@ export function tsToMillis(ts: string): number {
   return seconds * 1000 + Math.floor(fraction / 1000)
 }
 
-/** Builds a ts from a time. `sequence` (0..999) fills the last digits so several ts can share one millisecond. */
+/**
+ * Builds a ts from a time. `sequence` (0..999) fills the last digits so several ts can share one millisecond.
+ * A time with a fraction of a millisecond, such as a Slack ts times 1000, is floored to a whole microsecond.
+ */
 export function millisToTs(millis: number, sequence = 0): Ts {
   const seconds = Math.floor(millis / 1000)
-  const micros = (millis - seconds * 1000) * 1000 + sequence
+  const micros = Math.floor((millis - seconds * 1000) * 1000) + sequence
   return Ts.make(`${seconds}.${String(micros).padStart(6, '0')}`)
 }
 
