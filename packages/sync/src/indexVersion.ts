@@ -42,5 +42,8 @@
  * imports; the rows do not differ, as for 10.
  * 19: the socket's `emoji_changed` frame added to the Slack schema, which
  * the index imports; the rows do not differ, as for 10.
+ * 20: `millisToTs` floors a time with a fraction of a millisecond instead
+ * of throwing, in the Slack schema the index imports; the rows do not
+ * differ, as for 10.
  */
-export const INDEX_VERSION = 19
+export const INDEX_VERSION = 20
