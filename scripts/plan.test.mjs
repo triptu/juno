@@ -20,6 +20,10 @@ test('SSH job execution overlaps jobs, reports original indices, and fails missi
   const { join } = await import('node:path')
   const { runnerPlanJobs, runRunnerPlan } = await import('./remote/plan.mjs')
   const { root: dir } = toolFixture(t)
+  // A full run's own JUNO_VERIFY_POLICY would make these jobs serial.
+  const policy = process.env.JUNO_VERIFY_POLICY
+  delete process.env.JUNO_VERIFY_POLICY
+  t.after(() => { if (policy !== undefined) process.env.JUNO_VERIFY_POLICY = policy })
   {
     const self = join(dir, 'remote.mjs')
     writeFileSync(self, `import {appendFileSync, readFileSync} from 'node:fs';
