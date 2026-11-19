@@ -178,7 +178,7 @@ Each row is a tile followed by three lines, except a Main (a channel's, a DM's o
 
 ### Read-dependent membership
 
-In Unread only, including within a view or channel scope, a topic already in the list stays in place while any tab shows it, even after it becomes read. It shows its actual read state: no unread count or bold title, and it stays selected when its tab is active. The same rule applies wherever sidebar membership depends on read state, including a thread shown only for an unread mention. Becoming unread again leaves it in place.
+In Unread only, including within a view or channel scope, a topic already in the list stays in place while any tab shows it, even after it becomes read. It shows its actual read state and its newest message, yours included: no unread count or bold title, and it stays selected when its tab is active. The same rule applies wherever sidebar membership depends on read state, including a thread shown only for an unread mention. Becoming unread again leaves it in place.
 
 The row leaves when the last tab showing it closes or navigates elsewhere. History entries do not count. Removing it does not reorder the rows above it. Changing filters starts a fresh list; an open topic that was never in that list is not added. Resolve, Ignore and Leave channel still remove topics.
 

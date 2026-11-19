@@ -14,8 +14,10 @@ import {
   defaultChannelStyle,
   defaultPersonColor,
   mentionedUserIds,
+  previewSender,
   type ChannelId,
   type ChannelInfo,
+  type PreviewPerson,
   type Topic,
   type Ts,
   type UserId,
@@ -69,7 +71,7 @@ export interface UserRow {
   readonly avatar_small_url?: string | null
   readonly avatar_large_url?: string | null
   readonly avatar_url: string | null
-  /** Read by the topic list, for the preview's name; other readers may leave it out. */
+  /** For the preview's name (`rowPreviewSender`): a bot keeps its whole name. */
   readonly is_bot?: 0 | 1
 }
 
@@ -120,6 +122,35 @@ function parsePreview(json: string | null): StoredPreview {
   } catch {
     return { sender: '', text: '' }
   }
+}
+
+/**
+ * The preview's sender as the row shows it (SPEC section 5): "You", nothing
+ * for the other side of a DM, else a first name, with a last initial when a
+ * namesake wrote in the topic or is in the group DM. A bot keeps its whole
+ * name. `nameOf` gives a person's name and lets the caller note who it used.
+ */
+export function rowPreviewSender(
+  row: Pick<JoinedRow, 'c_kind'>,
+  columns: ParsedColumns,
+  selfId: string | undefined,
+  users: ReadonlyMap<string, UserRow | null>,
+  nameOf: (id: string) => string,
+): string {
+  const { preview } = columns
+  const person = (id: string): PreviewPerson => {
+    const realName = users.get(id)?.real_name
+    return { id, name: nameOf(id), ...(realName == null ? {} : { realName }) }
+  }
+  const mine = preview.sender === 'You' || (selfId !== undefined && preview.senderId === selfId)
+  const others = mine || row.c_kind === 'im' ? [] : [...(preview.namesakes ?? []), ...columns.members].filter((id) => id !== selfId && id !== preview.senderId)
+  const app = preview.senderId === undefined ? undefined : users.get(preview.senderId)?.is_bot === 1 ? nameOf(preview.senderId) : undefined
+  return previewSender({
+    kind: row.c_kind,
+    mine,
+    ...(preview.senderId === undefined || app !== undefined ? { botName: app ?? preview.sender } : { person: person(preview.senderId) }),
+    others: others.map(person),
+  })
 }
 
 /** Every user id the row names: participants, the DM partner, group DM members, the preview's sender and its namesakes, the people the root mentions (for the title). */

@@ -149,12 +149,10 @@ export function retainOpenTopics(
     // Resolved, unfollowed or no longer a channel you are in: the row goes even while its tab shows it.
     if (detail === null || (detail !== undefined && (detail.notMember !== undefined || detail.resolved && !detail.pinned || old.subscribed && !detail.subscribed))) continue
     retained.add(id)
-    // The filtered query no longer carries this row. Its open topic's live
-    // header supplies read state, including marks from another Slack client.
+    // The filtered query no longer carries this row. Its open topic's live header supplies read
+    // state, including marks from another Slack client, and the newest message, yours included.
     retainedRows ??= new Map(next.rows)
-    retainedRows.set(id, detail === undefined || (old.unreadCount === detail.unreadCount && old.unreadExact === detail.unreadExact && old.mentionsMe === detail.mentionsMe)
-      ? old
-      : { ...old, unreadCount: detail.unreadCount, unreadExact: detail.unreadExact, mentionsMe: detail.mentionsMe })
+    retainedRows.set(id, detail === undefined ? old : withDetail(old, detail))
   }
   if (retained.size === 0 && !shown.retained?.size) return next
   const rows = retainedRows ?? next.rows
@@ -170,6 +168,14 @@ export function retainOpenTopics(
     ...next, rows, order: orderUnchanged ? shown.order : order,
     filter: shown.filter, retained,
   }
+}
+
+/** A kept row with the live header's read state, preview and time; the same object when none of them changed. */
+function withDetail(row: TopicRow, detail: TopicDetail): TopicRow {
+  const preview = detail.preview === undefined || (detail.preview.sender === row.preview.sender && detail.preview.text === row.preview.text) ? row.preview : detail.preview
+  const activity = detail.lastActivityTs === undefined || detail.lastActivityAt === undefined || detail.lastActivityTs === row.lastActivityTs ? undefined : { lastActivityTs: detail.lastActivityTs, lastActivityAt: detail.lastActivityAt }
+  if (preview === row.preview && activity === undefined && row.unreadCount === detail.unreadCount && row.unreadExact === detail.unreadExact && row.mentionsMe === detail.mentionsMe) return row
+  return { ...row, ...activity, preview, unreadCount: detail.unreadCount, unreadExact: detail.unreadExact, mentionsMe: detail.mentionsMe }
 }
 
 /**

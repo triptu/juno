@@ -33,7 +33,7 @@ import { Person } from '../refs'
 import { NotFound, NotSignedIn } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
 import { FileView } from './files'
-import { RowChannel, TitleSource, TopicStatus } from './topics'
+import { RowChannel, TitleSource, TopicPreview, TopicStatus } from './topics'
 
 // Windows
 
@@ -233,6 +233,10 @@ export const TopicDetail = Schema.Struct({
   /** Set by Mark as unread until the topic is next marked read. The open topic stays unread while it is set (SPEC 7). Absent means no. */
   markedUnread: Schema.optionalKey(Schema.Boolean),
   lastActivityTs: Schema.optionalKey(Schema.String),
+  /** Epoch milliseconds of `lastActivityTs`, as on `TopicRow`. */
+  lastActivityAt: Schema.optionalKey(Schema.Number),
+  /** The sidebar row's preview, by its rule: a row Unread only keeps for a tab takes it and the time from here (SPEC 5). */
+  preview: Schema.optionalKey(TopicPreview),
   /** Threads: the root's ts. */
   rootTs: Schema.optionalKey(Schema.String),
   /** Main: the channel's threads with activity inside the quiet window, for the "Threads" button. */

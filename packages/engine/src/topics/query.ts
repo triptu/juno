@@ -45,7 +45,6 @@ import {
   isDm,
   isFollowed,
   isResolved,
-  previewSender,
   quietDaysOf,
   resolveTitle,
   rowTags,
@@ -53,7 +52,6 @@ import {
   topicStatus,
   tsToMillis,
   byLatestActivity,
-  type PreviewPerson,
   type ResolvedTitle,
   type Topic,
   type TopicStatus,
@@ -71,6 +69,7 @@ import {
   channelRefOf,
   parseColumns,
   personFrom,
+  rowPreviewSender,
   SHOWN_PARTICIPANTS,
   tileMemberIds,
   topicFrom,
@@ -491,7 +490,7 @@ function entryOf(
   users: ReadonlyMap<string, UserRow | null>,
   usergroups: ReadonlyMap<string, UsergroupName> | undefined,
 ): Pick<CacheEntry, 'topic' | 'people' | 'channel' | 'named' | 'participantIds' | 'moreParticipants' | 'sender' | 'title'> {
-  const { participants, preview } = columns
+  const { participants } = columns
   const used: Array<Person> = []
   const use = (id: string): Person => {
     const person = personOf(id)
@@ -508,21 +507,7 @@ function entryOf(
   const named = shown.map(use)
   if (partner !== undefined) named.push(partner)
   named.push(...members)
-  // The preview's name (SPEC section 5): "You", nothing for the other side of a DM, else a first name, with a last
-  // initial when a namesake wrote in the topic or is in the group DM. A bot keeps its whole name.
-  const previewPerson = (id: string): PreviewPerson => {
-    const realName = users.get(id)?.real_name
-    return { id, name: use(id).name, ...(realName == null ? {} : { realName }) }
-  }
-  const mine = preview.sender === 'You' || (selfId !== undefined && preview.senderId === selfId)
-  const others = mine || row.c_kind === 'im' ? [] : [...(preview.namesakes ?? []), ...columns.members].filter((id) => id !== selfId && id !== preview.senderId)
-  const app = preview.senderId === undefined ? undefined : users.get(preview.senderId)?.is_bot === 1 ? use(preview.senderId).name : undefined
-  const sender = previewSender({
-    kind: row.c_kind,
-    mine,
-    ...(preview.senderId === undefined || app !== undefined ? { botName: app ?? preview.sender } : { person: previewPerson(preview.senderId) }),
-    others: others.map(previewPerson),
-  })
+  const sender = rowPreviewSender(row, columns, selfId, users, (id) => use(id).name)
   const topic = topicFrom(row, columns, info)
   return {
     topic,
