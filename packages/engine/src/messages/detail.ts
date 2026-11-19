@@ -27,6 +27,7 @@ import {
   parseColumns,
   parseIds,
   personFrom,
+  rowPreviewSender,
   tileMemberIds,
   topicFrom,
   TOPIC_COLUMNS,
@@ -60,7 +61,7 @@ const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
   Effect.gen(function* () {
     const users = new Map<string, UserRow & { deleted: 0 | 1 }>()
     if (ids.size === 0) return users
-    for (const user of yield* sql<UserRow & { deleted: 0 | 1 }>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, deleted FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
+    for (const user of yield* sql<UserRow & { deleted: 0 | 1 }>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, is_bot, deleted FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
     return users
   })
 
@@ -142,7 +143,13 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
       mentionsMe: notMember === undefined && topic.activity.mentionsMe,
       ...(lastReadTs === undefined ? {} : { lastReadTs }),
       ...(markedUnread ? { markedUnread } : {}),
-      ...(row.last_activity_ts === null ? {} : { lastActivityTs: row.last_activity_ts }),
+      ...(row.last_activity_ts === null
+        ? {}
+        : {
+            lastActivityTs: row.last_activity_ts,
+            lastActivityAt: tsToMillis(row.last_activity_ts),
+            preview: { sender: rowPreviewSender(row, columns, selfId, users, nameOf), text: columns.preview.text },
+          }),
       ...(target.kind === 'thread' ? { rootTs: target.threadTs } : {}),
       ...(threadCount === undefined ? {} : { threadCount }),
       ...(art === undefined || art.recipe === '' ? {} : { art: art.recipe }),
