@@ -131,7 +131,7 @@ test('--local runs root commands sequentially without requiring tstack or SSH', 
 
 test('workers use allocated threads and preserve explicit worker overrides', () => {
   const run = (threads, extra = {}) => {
-    const result = spawnSync('bash', ['-uc', 'source "$1" test; printf "%s %s %s %s" "$JUNO_TEST_WORKERS" "$GALLERY_WORKERS" "$SPECS_JOBS" "$GALLERY_FAST_WORKERS"', '_', resolve('scripts/remote/workers.sh')], { encoding: 'utf8', env: { ...process.env, JUNO_RUNNER_JOB_CORES: threads, JUNO_TEST_WORKERS: '', GALLERY_WORKERS: '', GALLERY_FAST_WORKERS: '', SPECS_JOBS: '', ...extra } })
+    const result = spawnSync('bash', ['-uc', 'source "$1" test; printf "%s %s %s %s" "$JUNO_TEST_WORKERS" "$GALLERY_WORKERS" "$SPECS_JOBS" "$GALLERY_FAST_WORKERS"', '_', resolve('scripts/remote/workers.sh')], { encoding: 'utf8', env: { ...process.env, JUNO_RUNNER_JOB_CORES: threads, JUNO_MEMORY_BUDGET: '', JUNO_TEST_WORKERS: '', GALLERY_WORKERS: '', GALLERY_FAST_WORKERS: '', SPECS_JOBS: '', ...extra } })
     assert.equal(result.status, 0, result.stderr)
     return result.stdout
   }
